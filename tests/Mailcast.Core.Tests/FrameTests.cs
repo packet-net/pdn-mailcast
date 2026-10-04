@@ -79,7 +79,7 @@ public class FrameTests
     {
         Assert.Equal(ObjectId.ForBid("12345_GB7RDG"), ObjectId.ForBid("12345_gb7rdg"));
         Assert.NotEqual(ObjectId.ForBid("12345_GB7RDG"), ObjectId.ForBid("12346_GB7RDG"));
-        // SHA-256("12345_GB7RDG") starts 0x... ; pin it so the on-air value cannot drift.
+        // The first four octets of SHA-256 of the BID: pinned, since it goes on the air.
         var sha = System.Security.Cryptography.SHA256.HashData("12345_GB7RDG"u8);
         Assert.Equal(System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(sha), ObjectId.ForBid("12345_GB7RDG"));
         Assert.NotEqual(ObjectId.ForDirectory(new DateOnly(2026, 10, 4)), ObjectId.ForDirectory(new DateOnly(2026, 10, 5)));
