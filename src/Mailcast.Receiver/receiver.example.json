@@ -1,0 +1,26 @@
+{
+  // Where the audio comes from. One of:
+  //   "ubersdr:wessex.zapto.org"       a web receiver; the receiver tunes it itself
+  //   "plughw:CARD=Device,DEV=0"       a sound card on your radio, USB dial 7.0497 MHz
+  //   "wav:/path/to/recording.wav"     a recording, for testing
+  "audio": "ubersdr:wessex.zapto.org",
+
+  // Your BBS. "type" is "linBpq" or "fbb". For LinBPQ the port is the FBBPORT in its
+  // Telnet port, and the login is the USER= name you made for the receiver.
+  "bbs": {
+    "type": "linBpq",
+    "host": "127.0.0.1",
+    "port": 8011,
+    "login": "Q0CAST",
+    "password": "change-me",
+    "command": "BBS"
+  },
+
+  // The status page. It has no login, so it is on this machine only unless "lan" is true.
+  "web": {
+    "port": 8073,
+    "lan": false
+  },
+
+  "stateDirectory": "/var/lib/pdn-mailcast"
+}
