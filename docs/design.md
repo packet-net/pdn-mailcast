@@ -69,7 +69,7 @@ The tone gives each receiver three things:
 - its frequency offset from GB7RDG;
 - the day's signal-to-noise ratio, logged.
 
-GB7RDG's Flex runs from its internal TCXO, not a GPS reference. In August the Wessex web SDR, which is GPS disciplined, measured GB7RDG's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so a couple of hertz does not matter, and the tone is a check rather than a necessity. If the Flex gains a GPS reference later, nothing changes.
+GB7RDG's Flex is normally GPS locked, so the tone is a true frequency reference. The head end checks the Flex's reference before the slot and says so in the log if it is running on its internal TCXO instead (it was, briefly, on 2026-09-28). Even unlocked it is close: in August the Wessex web SDR, which is GPS disciplined, measured GB7RDG's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so the tone is a check rather than a necessity.
 
 ### Power and duty
 
@@ -139,6 +139,12 @@ A small local web page for setup and status:
 - **Status.** The last slot (tone offset and signal-to-noise ratio, frames heard), bulletins complete and partial, and what the BBS accepted or rejected.
 
 pdn-soundmodem's station page already has the waterfall and level meter in its library, so the page reuses those and adds the mailcast panels. It listens on localhost and the LAN only.
+
+## Where the code lives
+
+- **pdn-mailcast** (this repo) holds the head end, the receiver, and a core library with the on-air format, compression and directory.
+- **RaptorQ** is its own project in this repo, with no dependency on anything else here, so it can be published as a separate NuGet package if anything else wants it.
+- **MS110D stays inside pdn-soundmodem.** The receiver needs pdn-soundmodem's audio sources (sound card and UberSDR) and its waterfall anyway, so splitting the modem out would not shrink what the receiver depends on. It would only add a package release to every modem change.
 
 ## Changes needed in pdn-soundmodem
 
