@@ -13,7 +13,7 @@ public class BulletinTests
             "R:261001/1234Z 156@GB7RDG.#42.GBR.EURO BPQ6.0.25\r\nR:261001/1200Z 99@M0XYZ BPQ\r\n\r\nHello.\r\n");
         Assert.Equal(2, b.RoutingLines.Count);
         Assert.Equal("\r\nHello.\r\n", b.Body);
-        var expected = "B\nG4ABC\nALL\nWW\n12345_GB7RDG\n2026-10-01T12:34:56Z\nA title\n"
+        var expected = "Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 12345_GB7RDG\nDate: 2026-10-01T12:34:56Z\nTitle: A title\n\n"
             + "R:261001/1234Z 156@GB7RDG.#42.GBR.EURO BPQ6.0.25\r\nR:261001/1200Z 99@M0XYZ BPQ\r\n\r\nHello.\r\n";
         Assert.Equal(Encoding.Latin1.GetBytes(expected), b.Serialize());
     }
@@ -75,15 +75,32 @@ public class BulletinTests
         Assert.Throws<ArgumentException>(() => new Bulletin('B', "G4ABC", "ALL", "WW", "1_X", "€", When, [], ""));
     }
 
+    private const string Good = "Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n\n";
+
     [Theory]
     [InlineData("")]
-    [InlineData("B\nG4ABC\nALL\nWW\n1_X\n2026-10-01T12:34:56Z")]
-    [InlineData("BB\nG4ABC\nALL\nWW\n1_X\n2026-10-01T12:34:56Z\nt\n")]
-    [InlineData("B\nG4ABC\nALL\nWW\n1_X\n2026-10-01 12:34\nt\n")]
-    [InlineData("B\nG4 ABC\nALL\nWW\n1_X\n2026-10-01T12:34:56Z\nt\n")]
+    [InlineData("Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n")] // no blank line
+    [InlineData("Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\n\n")] // no title
+    [InlineData("Type: BB\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n\n")]
+    [InlineData("Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01 12:34\nTitle: t\n\n")]
+    [InlineData("Type: B\nFrom: G4 ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n\n")]
+    [InlineData("Type: B\nFrom: G4ABC\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n\n")]
+    [InlineData("Type: B\nFrom G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n\n")]
     public void Parse_RejectsMalformed(string text)
     {
         Assert.Throws<FormatException>(() => Bulletin.Parse(Encoding.Latin1.GetBytes(text)));
+    }
+
+    [Fact]
+    public void Parse_IgnoresUnknownKeysInAnyOrder()
+    {
+        var text = "Title: t: with a colon\nX-Later: something new\nType: B\nFrom: G4ABC\nTo: ALL\nAt: \nBid: 1_X\nDate: 2026-10-01T12:34:56Z\n\nbody\r\n";
+        var b = Bulletin.Parse(Encoding.Latin1.GetBytes(text));
+        Assert.Equal("t: with a colon", b.Title);
+        Assert.Equal("", b.At);
+        Assert.Equal("body\r\n", b.Body);
+        Assert.Equal(b, Bulletin.Parse(b.Serialize()));
+        Assert.True(Bulletin.Parse(Encoding.Latin1.GetBytes(Good)).Body.Length == 0);
     }
 
     [Fact]

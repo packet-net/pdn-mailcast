@@ -42,8 +42,8 @@ public sealed class ZstdDictionary
 
 /// <summary>
 /// zstd compression, with or without a dictionary. Each compressed object is one zstd frame
-/// with its content size and a content checksum, and without zstd's own dictionary ID since the
-/// broadcast frame carries ours.
+/// with its content size, a content checksum and zstd's own dictionary ID. Decompression
+/// refuses a frame without the checksum.
 /// </summary>
 public sealed class Compression
 {
@@ -55,6 +55,8 @@ public sealed class Compression
 
     /// <summary>The most a decompressed object may be, to bound memory on bad input.</summary>
     public const int MaxDecompressedSize = 1 << 20;
+
+    private static readonly byte[] ZstdMagic = [0x28, 0xB5, 0x2F, 0xFD];
 
     private readonly Dictionary<ushort, ZstdDictionary> _dictionaries = [];
 
@@ -79,7 +81,7 @@ public sealed class Compression
         using var compressor = new Compressor(Level);
         compressor.SetParameter(ZSTD_cParameter.ZSTD_c_checksumFlag, 1);
         compressor.SetParameter(ZSTD_cParameter.ZSTD_c_contentSizeFlag, 1);
-        compressor.SetParameter(ZSTD_cParameter.ZSTD_c_dictIDFlag, 0);
+        compressor.SetParameter(ZSTD_cParameter.ZSTD_c_dictIDFlag, 1);
         if (dictionaryId != NoDictionary)
         {
             compressor.LoadDictionary(Find(dictionaryId).Content);
@@ -88,11 +90,23 @@ public sealed class Compression
     }
 
     /// <summary>
-    /// Decompresses. Throws <see cref="InvalidDataException"/> if the data is not a zstd frame
-    /// made with this dictionary, fails its checksum, or is larger than <see cref="MaxDecompressedSize"/>.
+    /// Decompresses. Throws <see cref="InvalidDataException"/> if the data is not one zstd frame
+    /// with a content checksum, made with this dictionary, that passes its checksum and is no
+    /// larger than <see cref="MaxDecompressedSize"/>.
     /// </summary>
     public byte[] Decompress(ReadOnlySpan<byte> compressed, ushort dictionaryId)
     {
+        // A zstd frame: magic 28 B5 2F FD, then the frame header descriptor, whose bit 2 is the
+        // content checksum flag (RFC 8878 section 3.1.1.1.1).
+        if (compressed.Length < 5 || !compressed[..4].SequenceEqual(ZstdMagic))
+        {
+            throw new InvalidDataException("Not a zstd frame.");
+        }
+        if ((compressed[4] & 0x04) == 0)
+        {
+            throw new InvalidDataException("The zstd frame has no content checksum.");
+        }
+
         using var decompressor = new Decompressor();
         if (dictionaryId != NoDictionary)
         {

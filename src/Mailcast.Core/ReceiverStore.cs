@@ -6,7 +6,7 @@ namespace Mailcast.Core;
 /// <summary>What became of a frame offered to a <see cref="ReceiverStore"/>.</summary>
 public enum FrameOutcome
 {
-    /// <summary>Not a mailcast frame of a version this code reads.</summary>
+    /// <summary>Not a mailcast frame of a version this code reads, or its CRC failed.</summary>
     NotAFrame,
 
     /// <summary>The object was already rebuilt; the frame is not needed.</summary>
@@ -28,8 +28,9 @@ public enum FrameOutcome
     CompletedDirectory,
 
     /// <summary>
-    /// The frame, or the object it completed, failed a check. A rebuilt object that fails is
-    /// thrown away with all its symbols, so it can be collected again.
+    /// The frame, or the object it completed, failed a check; <see cref="AcceptResult.Detail"/>
+    /// says which. Symbols are not thrown away for this: an object that rebuilds wrong keeps its
+    /// pieces (less any found to be bad) and waits for more.
     /// </summary>
     Rejected,
 }
@@ -40,7 +41,7 @@ public enum FrameOutcome
 /// <param name="Bulletin">The bulletin the frame completed, for <see cref="FrameOutcome.CompletedBulletin"/>.</param>
 /// <param name="Directory">The directory the frame completed, for <see cref="FrameOutcome.CompletedDirectory"/>.</param>
 /// <param name="Detail">Why, for <see cref="FrameOutcome.Rejected"/>.</param>
-public sealed record AcceptResult(FrameOutcome Outcome, uint? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null);
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null);
 
 /// <summary>How far one directory entry has got at this receiver.</summary>
 /// <param name="Entry">The directory's entry.</param>
@@ -49,53 +50,90 @@ public sealed record AcceptResult(FrameOutcome Outcome, uint? ObjectId = null, B
 /// <param name="Needed">Symbols needed at least (K), if any have been received.</param>
 public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Received, int Needed);
 
+/// <summary>Settings for a <see cref="ReceiverStore"/>.</summary>
+public sealed record ReceiverStoreOptions
+{
+    /// <summary>
+    /// How long an object is remembered as rebuilt, so later frames of it are ignored. Past
+    /// that, a frame of it starts collecting again; the BBS's BID check is the real filter.
+    /// </summary>
+    public TimeSpan DoneRetention { get; init; } = TimeSpan.FromDays(14);
+
+    /// <summary>How long a partial object is kept after its last new piece.</summary>
+    public TimeSpan PartialRetention { get; init; } = TimeSpan.FromDays(14);
+
+    /// <summary>The most partial objects kept; past this the one with the oldest last piece goes.</summary>
+    public int MaxPartials { get; init; } = 500;
+
+    /// <summary>
+    /// The most pieces for which a wrong rebuild is retried leaving out each piece in turn, to
+    /// find a bad one. Each retry is a full decode.
+    /// </summary>
+    public int MaxLeaveOneOut { get; init; } = 300;
+
+    /// <summary>Where the store says what it threw away and why. Plain ASCII.</summary>
+    public Action<string>? Log { get; init; }
+
+    /// <summary>The clock, for expiry.</summary>
+    public TimeProvider Time { get; init; } = TimeProvider.System;
+
+    /// <summary>Whether writes are flushed to disk. Only tests turn this off, for speed.</summary>
+    internal bool FlushToDisk { get; init; } = true;
+}
+
 /// <summary>
 /// A receiver's store of broadcast symbols. It keeps every symbol on disk until its object is
 /// rebuilt, so an object's pieces add up across days and restarts; it rebuilds each object as
-/// soon as it can, checks it, and hands each bulletin over exactly once.
+/// soon as it can, checks it against its own ID, and hands each bulletin over once.
 /// </summary>
 /// <remarks>
-/// <para>Files under the root directory, each written to a temporary name and then renamed:</para>
+/// <para>Files under the root directory, each written to a temporary name, flushed and renamed:</para>
 /// <code>
-/// objects/OOOOOOOO-DDDD-OTI/EEEEEE.sym   one symbol: object ID, dictionary ID, OTI in hex; ESI in hex
-/// done/OOOOOOOO                          the object has been rebuilt; later frames are ignored
-/// outbox/OOOOOOOO.bulletin               a rebuilt bulletin not yet acknowledged
-/// directory.txt                          the newest directory heard
+/// objects/OOOOOOOOOOOOOOOO-DDDD-OTI/EEEEEE.sym   one symbol: object ID, dictionary ID, OTI in hex; ESI in hex
+/// done/OOOOOOOOOOOOOOOO                          the object has been rebuilt, and when; later frames are ignored
+/// outbox/OOOOOOOOOOOOOOOO.bulletin               a rebuilt bulletin not yet acknowledged
+/// quarantine/                                    outbox files that could not be read
+/// directory.txt                                  the newest directory heard
 /// </code>
 /// <para>
 /// A rebuilt bulletin is returned once, from the <see cref="Accept"/> call whose frame completed
 /// it. It also stays in the outbox until <see cref="Acknowledge"/>, so one rebuilt just before a
-/// crash is not lost: after a restart it is in <see cref="Pending"/>. A receiver delivers what
-/// Accept returns, or what Pending lists at start-up, and acknowledges each once the BBS has
-/// taken it. Objects whose symbols suffice when the store opens are rebuilt then, straight into
-/// the outbox.
+/// crash is not lost: after a restart it is in <see cref="Pending"/>. The outbox file is on disk,
+/// folder included, before the done marker is written.
 /// </para>
 /// <para>
-/// Symbols are kept per object ID, dictionary ID and OTI together, since a bulletin compressed
-/// again with another dictionary is a different octet string and its symbols must not mix.
+/// Done markers and partial objects expire (<see cref="ReceiverStoreOptions"/>), so the store
+/// does not grow without bound.
 /// </para>
 /// <para>Not thread-safe: use one store from one thread.</para>
 /// </remarks>
 public sealed class ReceiverStore
 {
+    private static readonly TimeSpan ExpiryInterval = TimeSpan.FromHours(1);
+
     private readonly string _root;
     private readonly string _objects;
     private readonly string _doneDir;
     private readonly string _outbox;
+    private readonly string _quarantine;
     private readonly Compression _compression;
+    private readonly ReceiverStoreOptions _options;
     private readonly Dictionary<string, Instance> _instances = [];
-    private readonly HashSet<uint> _done = [];
+    private readonly Dictionary<ulong, DateTimeOffset> _done = [];
+    private DateTimeOffset _lastExpiry;
 
     /// <summary>Opens or creates a store, recovering from any interrupted write.</summary>
-    public ReceiverStore(string root, Compression compression)
+    public ReceiverStore(string root, Compression compression, ReceiverStoreOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(root);
         ArgumentNullException.ThrowIfNull(compression);
         _root = root;
         _compression = compression;
+        _options = options ?? new ReceiverStoreOptions();
         _objects = Path.Combine(root, "objects");
         _doneDir = Path.Combine(root, "done");
         _outbox = Path.Combine(root, "outbox");
+        _quarantine = Path.Combine(root, "quarantine");
         System.IO.Directory.CreateDirectory(_objects);
         System.IO.Directory.CreateDirectory(_doneDir);
         System.IO.Directory.CreateDirectory(_outbox);
@@ -106,16 +144,16 @@ public sealed class ReceiverStore
         }
         foreach (var marker in System.IO.Directory.EnumerateFiles(_doneDir))
         {
-            if (TryParseObjectId(Path.GetFileName(marker), out uint id))
+            if (ObjectId.TryParse(Path.GetFileName(marker), out ulong id))
             {
-                _done.Add(id);
+                _done[id] = ReadDoneTime(marker);
             }
         }
         foreach (var file in System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin"))
         {
-            if (TryParseObjectId(Path.GetFileNameWithoutExtension(file), out uint id) && _done.Add(id))
+            if (ObjectId.TryParse(Path.GetFileNameWithoutExtension(file), out ulong id) && !_done.ContainsKey(id))
             {
-                WriteAtomically(Path.Combine(_doneDir, ObjectId.Format(id)), []);
+                WriteDone(id);
             }
         }
         var directoryFile = Path.Combine(root, "directory.txt");
@@ -125,16 +163,25 @@ public sealed class ReceiverStore
             {
                 Directory = BroadcastDirectory.Parse(File.ReadAllBytes(directoryFile));
             }
-            catch (FormatException)
+            catch (FormatException e)
             {
+                Log($"directory.txt unreadable, removed: {e.Message}");
                 File.Delete(directoryFile);
             }
         }
 
         foreach (var dir in System.IO.Directory.EnumerateDirectories(_objects).Order(StringComparer.Ordinal).ToList())
         {
-            LoadInstance(dir);
+            try
+            {
+                LoadInstance(dir);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                Log($"skipped unreadable partial object {Path.GetFileName(dir)}: {e.Message}");
+            }
         }
+        Expire();
         foreach (var instance in _instances.Values.ToList())
         {
             if (_instances.ContainsKey(instance.Key))
@@ -150,17 +197,22 @@ public sealed class ReceiverStore
     /// <summary>How many objects have symbols held but are not yet rebuilt.</summary>
     public int PartialObjects => _instances.Values.Select(i => i.ObjectId).Distinct().Count();
 
-    /// <summary>Whether an object has been rebuilt.</summary>
-    public bool IsComplete(uint objectId) => _done.Contains(objectId);
+    /// <summary>Whether an object has been rebuilt (within <see cref="ReceiverStoreOptions.DoneRetention"/>).</summary>
+    public bool IsComplete(ulong objectId) => _done.ContainsKey(objectId);
 
     /// <summary>Offers one received frame payload (an AX.25 UI frame's information field).</summary>
     public AcceptResult Accept(ReadOnlySpan<byte> payload)
     {
+        var now = _options.Time.GetUtcNow();
+        if (now - _lastExpiry >= ExpiryInterval)
+        {
+            Expire();
+        }
         if (!MailcastFrame.TryParse(payload, out var frame) || frame is null)
         {
             return new AcceptResult(FrameOutcome.NotAFrame);
         }
-        if (_done.Contains(frame.ObjectId))
+        if (_done.ContainsKey(frame.ObjectId))
         {
             return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId);
         }
@@ -170,44 +222,80 @@ public sealed class ReceiverStore
         }
 
         string key = KeyOf(frame.ObjectId, frame.DictionaryId, frame.Oti);
-        if (!_instances.TryGetValue(key, out var instance))
-        {
-            instance = new Instance(key, frame.ObjectId, frame.DictionaryId, frame.Oti, Path.Combine(_objects, key));
-            System.IO.Directory.CreateDirectory(instance.Path);
-            _instances.Add(key, instance);
-        }
-        if (instance.Esis.Contains(frame.EncodingSymbolId))
+        bool isNew = !_instances.TryGetValue(key, out var instance);
+        instance ??= new Instance(key, frame.ObjectId, frame.DictionaryId, frame.Oti, Path.Combine(_objects, key));
+        if (instance.Symbols.ContainsKey(frame.EncodingSymbolId))
         {
             return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
         }
-        try
+        var symbol = frame.Symbol.ToArray();
+        if (!instance.TryAdd(frame.EncodingSymbolId, symbol, out string? problem))
         {
-            instance.Decoder.Add(new PayloadId(0, frame.EncodingSymbolId), frame.Symbol.Span);
+            return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "bad symbol: " + problem);
         }
-        catch (ArgumentException e)
+
+        // Only now, with the symbol accepted, does the object get a folder.
+        if (isNew)
         {
-            return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "bad symbol: " + e.Message);
+            System.IO.Directory.CreateDirectory(instance.Path);
+            _instances.Add(key, instance);
         }
-        instance.Esis.Add(frame.EncodingSymbolId);
-        WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), frame.Symbol.Span);
+        DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), symbol, now, _options.FlushToDisk);
+        instance.LastPiece = now;
+        if (isNew)
+        {
+            EnforcePartialLimit(instance);
+        }
 
         return TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId);
     }
 
-    /// <summary>Rebuilt bulletins not yet acknowledged, oldest file first.</summary>
-    public IReadOnlyList<Bulletin> Pending() =>
-        System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin")
+    /// <summary>
+    /// Rebuilt bulletins not yet acknowledged, oldest file first. An outbox file that cannot be
+    /// read is moved to the quarantine folder and logged.
+    /// </summary>
+    public IReadOnlyList<Bulletin> Pending()
+    {
+        var result = new List<Bulletin>();
+        var files = System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin")
             .Select(f => (File: f, Time: File.GetLastWriteTimeUtc(f)))
             .OrderBy(f => f.Time)
             .ThenBy(f => f.File, StringComparer.Ordinal)
-            .Select(f => Bulletin.Parse(File.ReadAllBytes(f.File)))
             .ToList();
+        foreach (var (file, _) in files)
+        {
+            try
+            {
+                result.Add(Bulletin.Parse(File.ReadAllBytes(file)));
+            }
+            catch (FormatException e)
+            {
+                System.IO.Directory.CreateDirectory(_quarantine);
+                File.Move(file, Path.Combine(_quarantine, Path.GetFileName(file)), overwrite: true);
+                Log($"outbox file {Path.GetFileName(file)} unreadable, quarantined: {e.Message}");
+            }
+        }
+        return result;
+    }
 
-    /// <summary>Removes a bulletin from the outbox, once the BBS has it. It stays marked as rebuilt.</summary>
+    /// <summary>Removes a bulletin from the outbox, once the BBS has it. Its object stays marked as rebuilt.</summary>
     public void Acknowledge(string bid)
     {
-        var file = Path.Combine(_outbox, ObjectId.Format(ObjectId.ForBid(bid)) + ".bulletin");
-        File.Delete(file);
+        ArgumentException.ThrowIfNullOrEmpty(bid);
+        foreach (var file in System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin").ToList())
+        {
+            try
+            {
+                if (string.Equals(Bulletin.Parse(File.ReadAllBytes(file)).Bid, bid, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(file);
+                }
+            }
+            catch (FormatException)
+            {
+                // Pending() quarantines these.
+            }
+        }
     }
 
     /// <summary>How far each entry of the newest directory has got.</summary>
@@ -220,36 +308,151 @@ public sealed class ReceiverStore
         var result = new List<ObjectProgress>();
         foreach (var entry in Directory.Entries)
         {
-            if (_done.Contains(entry.ObjectId))
+            if (_done.ContainsKey(entry.ObjectId))
             {
                 result.Add(new ObjectProgress(entry, true, 0, 0));
                 continue;
             }
-            var held = _instances.Values.Where(i => i.ObjectId == entry.ObjectId).OrderByDescending(i => i.Esis.Count).FirstOrDefault();
+            var held = _instances.Values.Where(i => i.ObjectId == entry.ObjectId).OrderByDescending(i => i.Symbols.Count).FirstOrDefault();
             result.Add(held is null
                 ? new ObjectProgress(entry, false, 0, 0)
-                : new ObjectProgress(entry, false, held.Esis.Count, held.Oti.SourceBlockSymbols(0)));
+                : new ObjectProgress(entry, false, held.Symbols.Count, held.Oti.SourceBlockSymbols(0)));
         }
         return result;
     }
 
+    /// <summary>
+    /// Forgets done markers older than <see cref="ReceiverStoreOptions.DoneRetention"/> and
+    /// partial objects whose last piece is older than <see cref="ReceiverStoreOptions.PartialRetention"/>.
+    /// Runs by itself at most hourly as frames arrive.
+    /// </summary>
+    public void Expire()
+    {
+        var now = _options.Time.GetUtcNow();
+        _lastExpiry = now;
+        foreach (var (id, when) in _done.ToList())
+        {
+            if (now - when > _options.DoneRetention && !File.Exists(OutboxPath(id)))
+            {
+                File.Delete(DonePath(id));
+                _done.Remove(id);
+            }
+        }
+        foreach (var instance in _instances.Values.ToList())
+        {
+            if (now - instance.LastPiece > _options.PartialRetention)
+            {
+                Log($"partial object {ObjectId.Format(instance.ObjectId)} expired with {instance.Symbols.Count} of {instance.Oti.SourceBlockSymbols(0)} pieces");
+                Remove(instance);
+            }
+        }
+    }
+
+    private void EnforcePartialLimit(Instance keep)
+    {
+        while (_instances.Count > _options.MaxPartials)
+        {
+            var oldest = _instances.Values.Where(i => i != keep).MinBy(i => i.LastPiece);
+            if (oldest is null)
+            {
+                return;
+            }
+            Log($"too many partial objects; dropped {ObjectId.Format(oldest.ObjectId)}, last piece {oldest.LastPiece:u}");
+            Remove(oldest);
+        }
+    }
+
     private AcceptResult? TryComplete(Instance instance)
     {
-        var data = instance.Decoder.TryDecode();
+        var data = instance.TryDecode();
         if (data is null)
         {
             return null;
         }
+        if (ObjectId.Of(data) == instance.ObjectId)
+        {
+            return Finish(instance, data);
+        }
 
+        // Some piece is wrong. Pieces that disagree with the rebuild are the first suspects.
+        Log($"object {ObjectId.Format(instance.ObjectId)} rebuilt from {instance.Symbols.Count} pieces does not match its ID; looking for a bad piece");
+        var encoder = new ObjectEncoder(data, instance.Oti);
+        var disagree = instance.Symbols
+            .Where(s => !encoder.Encode(new PayloadId(0, s.Key)).AsSpan(0, s.Value.Length).SequenceEqual(s.Value))
+            .Select(s => s.Key)
+            .ToList();
+        if (disagree.Count > 0 && TryWithout(instance, disagree) is { } fixedData)
+        {
+            return Finish(instance, fixedData);
+        }
+
+        // A bad piece the rebuild used agrees with the wrong rebuild, so try leaving out each in turn.
+        int k = instance.Oti.SourceBlockSymbols(0);
+        if (instance.Symbols.Count > k && instance.Symbols.Count <= _options.MaxLeaveOneOut)
+        {
+            foreach (uint esi in instance.Symbols.Keys.Order().ToList())
+            {
+                if (TryWithout(instance, [esi]) is { } repaired)
+                {
+                    return Finish(instance, repaired);
+                }
+            }
+        }
+
+        instance.ResetDecoder();
+        return new AcceptResult(FrameOutcome.Rejected, instance.ObjectId,
+            Detail: $"rebuilt object does not match its ID; keeping its {instance.Symbols.Count} pieces and waiting for more");
+    }
+
+    /// <summary>Decodes leaving out some pieces; if that matches the ID, deletes those pieces for good.</summary>
+    private byte[]? TryWithout(Instance instance, List<uint> leaveOut)
+    {
+        int k = instance.Oti.SourceBlockSymbols(0);
+        if (instance.Symbols.Count - leaveOut.Count < k)
+        {
+            return null;
+        }
+        var decoder = new ObjectDecoder(instance.Oti);
+        foreach (var (esi, symbol) in instance.Symbols)
+        {
+            if (!leaveOut.Contains(esi))
+            {
+                decoder.Add(new PayloadId(0, esi), symbol);
+            }
+        }
+        var data = decoder.TryDecode();
+        if (data is null || ObjectId.Of(data) != instance.ObjectId)
+        {
+            return null;
+        }
+        foreach (uint esi in leaveOut)
+        {
+            Log($"object {ObjectId.Format(instance.ObjectId)}: piece {esi} was bad, dropped");
+            instance.Symbols.Remove(esi);
+            File.Delete(SymbolPath(instance, esi));
+        }
+        return data;
+    }
+
+    /// <summary>Unpacks an object that matches its ID.</summary>
+    private AcceptResult? Finish(Instance instance, byte[] data)
+    {
         ObjectKind kind;
         byte[] content;
         try
         {
             (kind, content) = TransferObject.Unpack(data, instance.DictionaryId, _compression);
         }
+        catch (KeyNotFoundException)
+        {
+            // Possible only for pieces stored before a dictionary was withdrawn. Keep them.
+            Log($"object {ObjectId.Format(instance.ObjectId)} needs dictionary {instance.DictionaryId}, which this receiver does not have; skipped");
+            instance.ResetDecoder();
+            return new AcceptResult(FrameOutcome.UnknownDictionary, instance.ObjectId);
+        }
         catch (InvalidDataException e)
         {
-            return Reject(instance, "rebuilt object does not decompress: " + e.Message);
+            return Unusable(instance, "matches its ID but does not decompress: " + e.Message);
         }
 
         if (kind == ObjectKind.Directory)
@@ -261,18 +464,14 @@ public sealed class ReceiverStore
             }
             catch (FormatException e)
             {
-                return Reject(instance, "rebuilt directory does not parse: " + e.Message);
-            }
-            if (directory.ObjectId != instance.ObjectId)
-            {
-                return Reject(instance, "rebuilt directory's date does not match its object ID");
+                return Unusable(instance, "is a directory that does not parse: " + e.Message);
             }
             if (Directory is null || directory.Date >= Directory.Date)
             {
-                WriteAtomically(Path.Combine(_root, "directory.txt"), content);
+                DurableFile.WriteAtomically(Path.Combine(_root, "directory.txt"), content, flush: _options.FlushToDisk);
                 Directory = directory;
             }
-            MarkDone(instance.ObjectId);
+            MarkDone(instance);
             return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory);
         }
 
@@ -283,38 +482,56 @@ public sealed class ReceiverStore
         }
         catch (FormatException e)
         {
-            return Reject(instance, "rebuilt bulletin does not parse: " + e.Message);
-        }
-        if (ObjectId.ForBid(bulletin.Bid) != instance.ObjectId)
-        {
-            return Reject(instance, $"rebuilt bulletin's BID {bulletin.Bid} does not match its object ID");
-        }
-        var listed = Directory?.Find(instance.ObjectId);
-        if (listed is not null && (listed.Size != content.Length || listed.ContentHash != DirectoryEntry.HashOf(content)))
-        {
-            return Reject(instance, $"rebuilt bulletin {bulletin.Bid} does not match the directory's hash");
+            return Unusable(instance, "is a bulletin that does not parse: " + e.Message);
         }
 
-        WriteAtomically(Path.Combine(_outbox, ObjectId.Format(instance.ObjectId) + ".bulletin"), content);
-        MarkDone(instance.ObjectId);
+        DurableFile.WriteAtomically(OutboxPath(instance.ObjectId), content, flush: _options.FlushToDisk); // flushes the outbox folder too
+        MarkDone(instance);
         return new AcceptResult(FrameOutcome.CompletedBulletin, instance.ObjectId, Bulletin: bulletin);
     }
 
-    private AcceptResult Reject(Instance instance, string detail)
+    /// <summary>
+    /// An object that matches its ID but cannot be used was sent that way; more pieces would
+    /// rebuild the same thing. Mark it done so it is not collected again.
+    /// </summary>
+    private AcceptResult Unusable(Instance instance, string why)
     {
-        _instances.Remove(instance.Key);
-        System.IO.Directory.Delete(instance.Path, recursive: true);
+        string detail = $"object {ObjectId.Format(instance.ObjectId)} {why}";
+        Log(detail);
+        MarkDone(instance);
         return new AcceptResult(FrameOutcome.Rejected, instance.ObjectId, Detail: detail);
     }
 
-    private void MarkDone(uint objectId)
+    private void MarkDone(Instance instance)
     {
-        WriteAtomically(Path.Combine(_doneDir, ObjectId.Format(objectId)), []);
-        _done.Add(objectId);
-        foreach (var other in _instances.Values.Where(i => i.ObjectId == objectId).ToList())
+        WriteDone(instance.ObjectId);
+        foreach (var other in _instances.Values.Where(i => i.ObjectId == instance.ObjectId).ToList())
         {
-            _instances.Remove(other.Key);
-            System.IO.Directory.Delete(other.Path, recursive: true);
+            Remove(other);
+        }
+    }
+
+    private void WriteDone(ulong objectId)
+    {
+        var now = _options.Time.GetUtcNow();
+        DurableFile.WriteAtomically(DonePath(objectId), Bulletin.TextEncoding.GetBytes(now.ToString("o", CultureInfo.InvariantCulture)), flush: _options.FlushToDisk);
+        _done[objectId] = now;
+    }
+
+    private static DateTimeOffset ReadDoneTime(string marker)
+    {
+        var text = File.ReadAllText(marker).Trim();
+        return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var when)
+            ? when
+            : new DateTimeOffset(File.GetLastWriteTimeUtc(marker), TimeSpan.Zero);
+    }
+
+    private void Remove(Instance instance)
+    {
+        _instances.Remove(instance.Key);
+        if (System.IO.Directory.Exists(instance.Path))
+        {
+            System.IO.Directory.Delete(instance.Path, recursive: true);
         }
     }
 
@@ -323,7 +540,7 @@ public sealed class ReceiverStore
         var name = Path.GetFileName(dir);
         var parts = name.Split('-');
         if (parts.Length != 3
-            || !TryParseObjectId(parts[0], out uint objectId)
+            || !ObjectId.TryParse(parts[0], out ulong objectId)
             || !ushort.TryParse(parts[1], NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ushort dictionaryId)
             || parts[2].Length != ObjectTransmissionInformation.EncodedLength * 2)
         {
@@ -334,62 +551,69 @@ public sealed class ReceiverStore
         {
             oti = ObjectTransmissionInformation.Read(Convert.FromHexString(parts[2]));
         }
-        catch (Exception e) when (e is FormatException or ArgumentException)
+        catch (FormatException)
         {
             return;
         }
-        if (_done.Contains(objectId))
+        if (oti.SourceBlocks != 1)
+        {
+            return;
+        }
+        if (_done.ContainsKey(objectId))
         {
             System.IO.Directory.Delete(dir, recursive: true);
             return;
         }
+        if (!_compression.Knows(dictionaryId))
+        {
+            Log($"partial object {ObjectId.Format(objectId)} needs dictionary {dictionaryId}, which this receiver does not have; left as it is");
+            return;
+        }
         var instance = new Instance(name, objectId, dictionaryId, oti, dir);
+        var last = DateTimeOffset.MinValue;
         foreach (var file in System.IO.Directory.EnumerateFiles(dir, "*.sym").Order(StringComparer.Ordinal))
         {
             if (!uint.TryParse(Path.GetFileNameWithoutExtension(file), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint esi)
-                || esi > PayloadId.MaxEncodingSymbolId)
-            {
-                continue;
-            }
-            try
-            {
-                instance.Decoder.Add(new PayloadId(0, esi), File.ReadAllBytes(file));
-                instance.Esis.Add(esi);
-            }
-            catch (ArgumentException)
+                || esi > PayloadId.MaxEncodingSymbolId
+                || !instance.TryAdd(esi, File.ReadAllBytes(file), out _))
             {
                 File.Delete(file);
+                continue;
+            }
+            var written = new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero);
+            if (written > last)
+            {
+                last = written;
             }
         }
+        if (instance.Symbols.Count == 0)
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
+            return;
+        }
+        instance.LastPiece = last;
         _instances[name] = instance;
     }
 
-    private static string KeyOf(uint objectId, ushort dictionaryId, ObjectTransmissionInformation oti) =>
+    private void Log(string message) => _options.Log?.Invoke(message);
+
+    private string DonePath(ulong objectId) => Path.Combine(_doneDir, ObjectId.Format(objectId));
+
+    private string OutboxPath(ulong objectId) => Path.Combine(_outbox, ObjectId.Format(objectId) + ".bulletin");
+
+    private static string KeyOf(ulong objectId, ushort dictionaryId, ObjectTransmissionInformation oti) =>
         $"{ObjectId.Format(objectId)}-{dictionaryId:x4}-{Convert.ToHexStringLower(oti.ToBytes())}";
 
     private static string SymbolPath(Instance instance, uint esi) =>
         Path.Combine(instance.Path, esi.ToString("x6", CultureInfo.InvariantCulture) + ".sym");
 
-    private static bool TryParseObjectId(string text, out uint id) =>
-        uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out id) && text.Length == 8;
-
-    /// <summary>Writes a file so that it is either absent or complete: a temporary file, flushed, then renamed over.</summary>
-    private static void WriteAtomically(string path, ReadOnlySpan<byte> content)
+    private sealed class Instance(string key, ulong objectId, ushort dictionaryId, ObjectTransmissionInformation oti, string path)
     {
-        string tmp = path + ".tmp";
-        using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            stream.Write(content);
-            stream.Flush(flushToDisk: true);
-        }
-        File.Move(tmp, path, overwrite: true);
-    }
+        private ObjectDecoder _decoder = new(oti);
 
-    private sealed class Instance(string key, uint objectId, ushort dictionaryId, ObjectTransmissionInformation oti, string path)
-    {
         public string Key { get; } = key;
 
-        public uint ObjectId { get; } = objectId;
+        public ulong ObjectId { get; } = objectId;
 
         public ushort DictionaryId { get; } = dictionaryId;
 
@@ -397,8 +621,36 @@ public sealed class ReceiverStore
 
         public string Path { get; } = path;
 
-        public ObjectDecoder Decoder { get; } = new(oti);
+        public Dictionary<uint, byte[]> Symbols { get; } = [];
 
-        public HashSet<uint> Esis { get; } = [];
+        public DateTimeOffset LastPiece { get; set; }
+
+        public bool TryAdd(uint esi, byte[] symbol, out string? problem)
+        {
+            try
+            {
+                _decoder.Add(new PayloadId(0, esi), symbol);
+            }
+            catch (ArgumentException e)
+            {
+                problem = e.Message;
+                return false;
+            }
+            Symbols[esi] = symbol;
+            problem = null;
+            return true;
+        }
+
+        public byte[]? TryDecode() => _decoder.TryDecode();
+
+        /// <summary>Starts the decoder again from the pieces held, after a rebuild that was no use.</summary>
+        public void ResetDecoder()
+        {
+            _decoder = new ObjectDecoder(Oti);
+            foreach (var (esi, symbol) in Symbols)
+            {
+                _decoder.Add(new PayloadId(0, esi), symbol);
+            }
+        }
     }
 }

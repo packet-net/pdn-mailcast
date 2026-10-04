@@ -22,7 +22,7 @@ public class EndToEndTests(ITestOutputHelper output)
         for (int day = 0; day < 3; day++)
         {
             var plan = BroadcastScheduler.Plan(offered, Day1.AddDays(day), 100 + day, Compression.Default);
-            var store = new ReceiverStore(dir.Path, Compression.Default); // a restart every day
+            var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast); // a restart every day
             int heard = 0;
             foreach (var frame in plan.Frames)
             {
@@ -57,7 +57,7 @@ public class EndToEndTests(ITestOutputHelper output)
         var bulletin = TestBulletins.Make(30, 30_000);
         var others = TestBulletins.Day(31, 5);
         var offered = others.Append(bulletin).Select(b => new BroadcastBulletin(b, Day1)).ToList();
-        uint id = ObjectId.ForBid(bulletin.Bid);
+        ulong id = Ids.Of(bulletin);
 
         var day1 = BroadcastScheduler.Plan(offered, Day1, 1, Compression.Default);
         var day2 = BroadcastScheduler.Plan(offered, Day1.AddDays(1), 2, Compression.Default);
@@ -69,7 +69,7 @@ public class EndToEndTests(ITestOutputHelper output)
         Assert.True(day2Frames.Count < k, "day two alone must not be enough");
 
         // Day one: a long fade, so only K - 1 of this bulletin's frames are heard.
-        var store = new ReceiverStore(dir.Path, Compression.Default);
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
         foreach (var frame in day1Frames.Take(k - 1))
         {
             Assert.Equal(FrameOutcome.Stored, store.Accept(frame.ToBytes()).Outcome);
@@ -79,7 +79,7 @@ public class EndToEndTests(ITestOutputHelper output)
         // Day two on its own, at a receiver that missed day one, is not enough either.
         using (var other = new TempDirectory())
         {
-            var fresh = new ReceiverStore(other.Path, Compression.Default);
+            var fresh = new ReceiverStore(other.Path, Compression.Default, TestStores.Fast);
             foreach (var frame in day2Frames)
             {
                 Assert.Equal(FrameOutcome.Stored, fresh.Accept(frame.ToBytes()).Outcome);
@@ -88,7 +88,7 @@ public class EndToEndTests(ITestOutputHelper output)
         }
 
         // Day two after a restart, adding to day one's pieces: enough.
-        store = new ReceiverStore(dir.Path, Compression.Default);
+        store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
         Bulletin? completed = null;
         foreach (var frame in day2Frames)
         {

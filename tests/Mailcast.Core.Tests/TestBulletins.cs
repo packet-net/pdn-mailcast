@@ -109,3 +109,28 @@ internal sealed class TempDirectory : IDisposable
         }
     }
 }
+
+/// <summary>Helpers for content-addressed IDs.</summary>
+internal static class Ids
+{
+    /// <summary>The object ID a bulletin gets with the standard settings.</summary>
+    public static ulong Of(Bulletin bulletin) =>
+        TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default).ObjectId;
+
+    /// <summary>The directory's object ID in a plan.</summary>
+    public static ulong DirectoryOf(DailyBroadcast plan) => plan.Objects[0].Transfer.ObjectId;
+}
+
+/// <summary>A clock the test moves by hand.</summary>
+internal sealed class ManualTime(DateTimeOffset start) : TimeProvider
+{
+    public DateTimeOffset Now { get; set; } = start;
+
+    public override DateTimeOffset GetUtcNow() => Now;
+}
+
+internal static class TestStores
+{
+    /// <summary>Store options without fsync, for tests that write thousands of symbols.</summary>
+    public static ReceiverStoreOptions Fast => new() { FlushToDisk = false };
+}

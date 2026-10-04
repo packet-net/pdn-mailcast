@@ -3,6 +3,18 @@ namespace Mailcast.Core;
 /// <summary>A bulletin offered for broadcast, with the day the head end first saw it.</summary>
 public sealed record BroadcastBulletin(Bulletin Bulletin, DateOnly FirstSeen);
 
+/// <summary>
+/// A bulletin in rotation at the head end: its object exactly as prepared on the day it was first
+/// seen, and the next ESI to send. <see cref="HeadEndStore"/> keeps these from day to day.
+/// </summary>
+/// <param name="Bid">The bulletin ID.</param>
+/// <param name="Title">The subject line, for the directory.</param>
+/// <param name="Size">The serialised bulletin's length, for the directory.</param>
+/// <param name="FirstSeen">The day the head end first saw it.</param>
+/// <param name="Transfer">The compressed, coded object.</param>
+/// <param name="NextEsi">The first ESI not yet sent.</param>
+public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnly FirstSeen, TransferObject Transfer, uint NextEsi);
+
 /// <summary>How much of each bulletin goes out on which day.</summary>
 public sealed record ScheduleOptions
 {
@@ -33,6 +45,12 @@ public sealed record ScheduleOptions
     /// <summary>Bulletins whose serialised form is longer than this are not broadcast.</summary>
     public int MaxBulletinSize { get; init; } = 32 * 1024;
 
+    /// <summary>
+    /// How many days, counting the first, the head end remembers a bulletin, so that one offered
+    /// again after its carrying days is not sent as new.
+    /// </summary>
+    public int RememberDays { get; init; } = 14;
+
     /// <summary>The RaptorQ symbol size.</summary>
     public int SymbolSize { get; init; } = MailcastFrame.StandardSymbolSize;
 
@@ -45,7 +63,12 @@ public sealed record ScheduleOptions
 /// <param name="DayIndex">0 on the day it was first seen, then 1, 2 and so on; the directory is always 0.</param>
 /// <param name="FirstEsi">The first ESI sent today.</param>
 /// <param name="Count">How many symbols are sent today, with consecutive ESIs.</param>
-public sealed record ScheduledObject(TransferObject Transfer, int DayIndex, uint FirstEsi, int Count);
+/// <param name="Bid">The bulletin's BID, or null for the directory.</param>
+public sealed record ScheduledObject(TransferObject Transfer, int DayIndex, uint FirstEsi, int Count, string? Bid = null)
+{
+    /// <summary>The first ESI for the object's next broadcast.</summary>
+    public uint NextEsi => FirstEsi + (uint)Count;
+}
 
 /// <summary>One day's broadcast: the directory, every object's share, and the frames in sending order.</summary>
 public sealed class DailyBroadcast
@@ -71,7 +94,7 @@ public sealed class DailyBroadcast
     /// <summary>The frames in sending order.</summary>
     public IReadOnlyList<MailcastFrame> Frames { get; }
 
-    /// <summary>Bulletins in their carrying days that were left out: too large, or an object ID already taken.</summary>
+    /// <summary>Bulletins in their carrying days that were left out: too large, or a BID already taken.</summary>
     public IReadOnlyList<Bulletin> Skipped { get; }
 }
 
@@ -83,8 +106,9 @@ public sealed class DailyBroadcast
 /// <para>
 /// Each bulletin is carried on <see cref="ScheduleOptions.DaysCarried"/> days running. Its first
 /// day gets most of its symbols and later days continue with fresh ESIs, never repeats, so a
-/// receiver's pieces from different days add up. Where each day's ESIs start depends only on K
-/// and the day, so nothing has to be remembered from one day to the next.
+/// receiver's pieces from different days add up. The object is compressed once, on the day the
+/// bulletin is first seen, and the same octets are sent every day: <see cref="HeadEndStore"/>
+/// keeps them and the next ESI.
 /// </para>
 /// <para>
 /// The frames are interleaved so that every object is spread over the whole broadcast: object j
@@ -131,39 +155,82 @@ public static class BroadcastScheduler
         return (first, counts[dayIndex]);
     }
 
-    /// <summary>Plans today's broadcast.</summary>
+    /// <summary>
+    /// Plans today's broadcast from bulletins alone, compressing each afresh and taking each
+    /// day's first ESI from <see cref="Allocation"/>. That gives the same frames as a head end
+    /// that keeps state, as long as the compression and options are unchanged; a real head end
+    /// should use <see cref="HeadEndStore"/> and the other overload.
+    /// </summary>
     public static DailyBroadcast Plan(IEnumerable<BroadcastBulletin> bulletins, DateOnly today, int seed, Compression compression, ScheduleOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(bulletins);
         ArgumentNullException.ThrowIfNull(compression);
         options ??= new ScheduleOptions();
         Validate(options);
-
-        // Today's bulletins in a fixed order, so the plan does not depend on the caller's order.
-        var carried = bulletins
-            .Select(b => (b.Bulletin, DayIndex: today.DayNumber - b.FirstSeen.DayNumber))
+        var carried = new List<CarriedBulletin>();
+        var skipped = new List<Bulletin>();
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ordered = bulletins
+            .Select(b => (b.Bulletin, b.FirstSeen, DayIndex: today.DayNumber - b.FirstSeen.DayNumber))
             .Where(b => b.DayIndex >= 0 && b.DayIndex < options.DaysCarried)
             .OrderBy(b => b.Bulletin.Bid.ToUpperInvariant(), StringComparer.Ordinal)
-            .ThenBy(b => b.DayIndex)
-            .ToList();
-
-        var scheduled = new List<ScheduledObject>();
-        var entries = new List<DirectoryEntry>();
-        var skipped = new List<Bulletin>();
-        var taken = new HashSet<uint>();
-        foreach (var (bulletin, dayIndex) in carried)
+            .ThenBy(b => b.DayIndex);
+        foreach (var (bulletin, firstSeen, dayIndex) in ordered)
         {
             var serialized = bulletin.Serialize();
-            uint objectId = ObjectId.ForBid(bulletin.Bid);
-            if (serialized.Length > options.MaxBulletinSize || !taken.Add(objectId))
+            if (serialized.Length > options.MaxBulletinSize || !taken.Add(bulletin.Bid))
             {
                 skipped.Add(bulletin);
                 continue;
             }
-            var obj = TransferObject.ForBulletin(bulletin, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
-            var (first, count) = Allocation(obj.SourceSymbols, dayIndex, options);
-            scheduled.Add(new ScheduledObject(obj, dayIndex, first, count));
-            entries.Add(new DirectoryEntry(objectId, options.DictionaryId, serialized.Length, DirectoryEntry.HashOf(serialized), bulletin.Bid, bulletin.Title));
+            var transfer = TransferObject.ForBulletin(bulletin, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
+            var (first, _) = Allocation(transfer.SourceSymbols, dayIndex, options);
+            carried.Add(new CarriedBulletin(bulletin.Bid, bulletin.Title, serialized.Length, firstSeen, transfer, first));
+        }
+        var plan = Plan(carried, today, seed, compression, options);
+        return new DailyBroadcast(plan.Date, plan.Directory, plan.Objects, plan.Frames, skipped);
+    }
+
+    /// <summary>
+    /// Plans today's broadcast from the bulletins in rotation. Each sends today's share of
+    /// symbols starting at its <see cref="CarriedBulletin.NextEsi"/>; the result's
+    /// <see cref="ScheduledObject.NextEsi"/> is where to start next time. Of two entries with
+    /// the same BID, only the first in BID order is sent.
+    /// </summary>
+    /// <param name="carried">The bulletins in rotation, with their objects and next ESIs.</param>
+    /// <param name="today">The broadcast day.</param>
+    /// <param name="seed">Seeds the interleaving.</param>
+    /// <param name="compression">Compresses the directory.</param>
+    /// <param name="options">The schedule settings.</param>
+    public static DailyBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateOnly today, int seed, Compression compression, ScheduleOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(carried);
+        ArgumentNullException.ThrowIfNull(compression);
+        options ??= new ScheduleOptions();
+        Validate(options);
+
+        // Today's bulletins in a fixed order, so the plan does not depend on the caller's order.
+        var inRotation = carried
+            .Select(c => (Carried: c, DayIndex: today.DayNumber - c.FirstSeen.DayNumber))
+            .Where(c => c.DayIndex >= 0 && c.DayIndex < options.DaysCarried)
+            .OrderBy(c => c.Carried.Bid.ToUpperInvariant(), StringComparer.Ordinal)
+            .ThenBy(c => c.DayIndex)
+            .ThenBy(c => c.Carried.Transfer.ObjectId)
+            .ToList();
+
+        var scheduled = new List<ScheduledObject>();
+        var entries = new List<DirectoryEntry>();
+        var takenBids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var takenIds = new HashSet<ulong>();
+        foreach (var (c, dayIndex) in inRotation)
+        {
+            if (!takenBids.Add(c.Bid) || !takenIds.Add(c.Transfer.ObjectId))
+            {
+                continue;
+            }
+            int count = SymbolsPerDay(c.Transfer.SourceSymbols, options)[dayIndex];
+            scheduled.Add(new ScheduledObject(c.Transfer, dayIndex, c.NextEsi, count, c.Bid));
+            entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title));
         }
 
         var directory = new BroadcastDirectory(today, entries);
@@ -209,7 +276,7 @@ public static class BroadcastScheduler
                 frames.Add(scheduled[o.Object].Transfer.Frame(scheduled[o.Object].FirstEsi + (uint)o.Index));
             }
         }
-        return new DailyBroadcast(today, directory, scheduled, frames, skipped);
+        return new DailyBroadcast(today, directory, scheduled, frames, []);
     }
 
     private static void Validate(ScheduleOptions options)

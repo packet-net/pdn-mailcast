@@ -46,7 +46,7 @@ public class SchedulerTests
     {
         var bulletin = TestBulletins.Make(7, 8000);
         var offered = Offer([bulletin], Day1);
-        uint id = ObjectId.ForBid(bulletin.Bid);
+        ulong id = Ids.Of(bulletin);
         var seen = new HashSet<uint>();
         for (int day = 0; day < 4; day++)
         {
@@ -112,7 +112,7 @@ public class SchedulerTests
         var offered = Offer(TestBulletins.Day(4, 25), Day1);
         var options = new ScheduleOptions();
         var plan = BroadcastScheduler.Plan(offered, Day1, 3, Compression.Default, options);
-        uint directoryId = plan.Directory.ObjectId;
+        ulong directoryId = Ids.DirectoryOf(plan);
         var positions = plan.Frames.Select((f, i) => (f, i)).Where(x => x.f.ObjectId == directoryId).Select(x => x.i).ToList();
         Assert.Equal(0, positions[0]);
         Assert.True(positions.Count >= plan.Objects[0].Transfer.SourceSymbols + options.DirectoryExtra);
@@ -132,18 +132,17 @@ public class SchedulerTests
     }
 
     [Fact]
-    public void Plan_ListsEachBulletinInTheDirectoryWithItsHash()
+    public void Plan_ListsEachBulletinInTheDirectory()
     {
         var bulletins = TestBulletins.Day(5, 5);
         var plan = BroadcastScheduler.Plan(Offer(bulletins, Day1), Day1, 1, Compression.Default);
         foreach (var b in bulletins)
         {
-            var entry = plan.Directory.Find(ObjectId.ForBid(b.Bid));
+            var entry = plan.Directory.Find(Ids.Of(b));
             Assert.NotNull(entry);
             Assert.Equal(b.Bid, entry.Bid);
             Assert.Equal(b.Title, entry.Title);
             Assert.Equal(b.Serialize().Length, entry.Size);
-            Assert.Equal(DirectoryEntry.HashOf(b.Serialize()), entry.ContentHash);
         }
     }
 }

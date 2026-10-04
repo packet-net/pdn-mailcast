@@ -14,42 +14,45 @@ public enum ObjectKind : byte
 
 /// <summary>
 /// An object ready to broadcast: one octet of <see cref="ObjectKind"/> then the zstd-compressed
-/// content, RaptorQ coded as one source block. This octet string is what the OTI's transfer
-/// length counts and what a receiver rebuilds.
+/// content, RaptorQ coded as one source block. These octets are what the OTI's transfer length
+/// counts, what the object ID hashes, and what a receiver rebuilds.
 /// </summary>
 public sealed class TransferObject
 {
+    private readonly byte[] _bytes;
     private readonly ObjectEncoder _encoder;
 
-    private TransferObject(uint objectId, ushort dictionaryId, ObjectKind kind, byte[] content, Compression compression, int symbolSize, int alignment)
+    private TransferObject(byte[] bytes, ushort dictionaryId, ObjectTransmissionInformation oti)
     {
-        var compressed = compression.Compress(content, dictionaryId);
-        var data = new byte[1 + compressed.Length];
-        data[0] = (byte)kind;
-        compressed.CopyTo(data, 1);
-
-        ObjectId = objectId;
+        if (bytes.Length < 2 || !Enum.IsDefined((ObjectKind)bytes[0]))
+        {
+            throw new ArgumentException("Not a mailcast object.", nameof(bytes));
+        }
+        if (oti.TransferLength != bytes.Length || oti.SourceBlocks != 1)
+        {
+            throw new ArgumentException("The OTI does not describe these octets as one source block.", nameof(oti));
+        }
+        _bytes = bytes;
         DictionaryId = dictionaryId;
-        Kind = kind;
-        Content = content;
-        Oti = new ObjectTransmissionInformation(data.Length, symbolSize, 1, 1, alignment);
-        _encoder = new ObjectEncoder(data, Oti);
+        Oti = oti;
+        ObjectId = Core.ObjectId.Of(bytes);
+        _encoder = new ObjectEncoder(bytes, oti);
     }
 
-    /// <summary>The object ID frames carry.</summary>
-    public uint ObjectId { get; }
+    /// <summary>The object ID frames carry: the hash of <see cref="Bytes"/>.</summary>
+    public ulong ObjectId { get; }
 
     /// <summary>The zstd dictionary the content was compressed with.</summary>
     public ushort DictionaryId { get; }
 
     /// <summary>What the object holds.</summary>
-    public ObjectKind Kind { get; }
-
-    /// <summary>The content before compression.</summary>
-    public byte[] Content { get; }
+    public ObjectKind Kind => (ObjectKind)_bytes[0];
 
     /// <summary>How the object is RaptorQ coded.</summary>
     public ObjectTransmissionInformation Oti { get; }
+
+    /// <summary>The object's octets: the kind octet and the zstd frame. Keep these to send the object again unchanged.</summary>
+    public ReadOnlySpan<byte> Bytes => _bytes;
 
     /// <summary>K, the number of source symbols: the fewest frames that can rebuild the object.</summary>
     public int SourceSymbols => Oti.SourceBlockSymbols(0);
@@ -57,18 +60,32 @@ public sealed class TransferObject
     /// <summary>The object's length on the air, kind octet and compressed content.</summary>
     public long Length => Oti.TransferLength;
 
-    /// <summary>Prepares a bulletin.</summary>
+    /// <summary>Compresses and prepares a bulletin.</summary>
     public static TransferObject ForBulletin(Bulletin bulletin, ushort dictionaryId, Compression compression, int symbolSize = MailcastFrame.StandardSymbolSize, int alignment = MailcastFrame.StandardAlignment)
     {
         ArgumentNullException.ThrowIfNull(bulletin);
-        return new TransferObject(Core.ObjectId.ForBid(bulletin.Bid), dictionaryId, ObjectKind.Bulletin, bulletin.Serialize(), compression, symbolSize, alignment);
+        return Pack(ObjectKind.Bulletin, bulletin.Serialize(), dictionaryId, compression, symbolSize, alignment);
     }
 
-    /// <summary>Prepares a directory.</summary>
+    /// <summary>Compresses and prepares a directory.</summary>
     public static TransferObject ForDirectory(BroadcastDirectory directory, ushort dictionaryId, Compression compression, int symbolSize = MailcastFrame.StandardSymbolSize, int alignment = MailcastFrame.StandardAlignment)
     {
         ArgumentNullException.ThrowIfNull(directory);
-        return new TransferObject(directory.ObjectId, dictionaryId, ObjectKind.Directory, directory.Serialize(), compression, symbolSize, alignment);
+        return Pack(ObjectKind.Directory, directory.Serialize(), dictionaryId, compression, symbolSize, alignment);
+    }
+
+    /// <summary>An object kept from an earlier day, exactly as it was first prepared.</summary>
+    public static TransferObject FromStored(ReadOnlySpan<byte> bytes, ushort dictionaryId, ObjectTransmissionInformation oti) =>
+        new(bytes.ToArray(), dictionaryId, oti);
+
+    private static TransferObject Pack(ObjectKind kind, byte[] content, ushort dictionaryId, Compression compression, int symbolSize, int alignment)
+    {
+        ArgumentNullException.ThrowIfNull(compression);
+        var compressed = compression.Compress(content, dictionaryId);
+        var bytes = new byte[1 + compressed.Length];
+        bytes[0] = (byte)kind;
+        compressed.CopyTo(bytes, 1);
+        return new TransferObject(bytes, dictionaryId, new ObjectTransmissionInformation(bytes.Length, symbolSize, 1, 1, alignment));
     }
 
     /// <summary>The frame carrying the encoding symbol with this ESI.</summary>
@@ -77,7 +94,8 @@ public sealed class TransferObject
 
     /// <summary>
     /// Reads a rebuilt object back into its kind and decompressed content. Throws
-    /// <see cref="InvalidDataException"/> if it is not one.
+    /// <see cref="InvalidDataException"/> if it is not one, and <see cref="KeyNotFoundException"/>
+    /// if the dictionary is not available.
     /// </summary>
     public static (ObjectKind Kind, byte[] Content) Unpack(ReadOnlySpan<byte> data, ushort dictionaryId, Compression compression)
     {

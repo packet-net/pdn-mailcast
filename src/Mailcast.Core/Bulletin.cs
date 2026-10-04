@@ -14,24 +14,31 @@ namespace Mailcast.Core;
 /// to a character and back, so whatever was received is sent on unchanged.
 /// </para>
 /// <para>
-/// The serialised form, which is what gets compressed and broadcast, is seven header lines each
-/// ended by a line feed, then the message text exactly as received:
+/// The serialised form, which is what gets compressed and broadcast, is a header block of
+/// "Key: value" lines, each ended by a line feed, an empty line, then the message text exactly
+/// as received:
 /// </para>
 /// <code>
-/// B                       type
-/// G4ABC                   from
-/// ALL                     to
-/// WW                      at (may be empty)
-/// 12345_GB7RDG            BID
-/// 2026-10-01T12:34:56Z    date, UTC, whole seconds
-/// Title text              title
+/// Type: B
+/// From: G4ABC
+/// To: ALL
+/// At: WW                  (the value may be empty)
+/// Bid: 12345_GB7RDG
+/// Date: 2026-10-01T12:34:56Z
+/// Title: Title text
+///
 /// R:261001/1234Z ...      message text: routing lines, each ended by CR LF, then the body
 /// </code>
+/// <para>
+/// The seven keys above are required, each once. A reader ignores keys it does not know, so
+/// later versions can add header lines without breaking older receivers. The value is
+/// everything after the first ": " on the line.
+/// </para>
 /// </remarks>
 public sealed class Bulletin : IEquatable<Bulletin>
 {
     private const string DateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
-    private const int HeaderLines = 7;
+    private static readonly string[] RequiredKeys = ["Type", "From", "To", "At", "Bid", "Date", "Title"];
 
     /// <summary>Latin-1, which maps each octet to the character with the same code.</summary>
     public static readonly Encoding TextEncoding = Encoding.Latin1;
@@ -149,45 +156,67 @@ public sealed class Bulletin : IEquatable<Bulletin>
     /// <summary>The serialised form described in the class remarks.</summary>
     public byte[] Serialize()
     {
-        var header = new StringBuilder();
-        header.Append(Type).Append('\n');
-        header.Append(From).Append('\n');
-        header.Append(To).Append('\n');
-        header.Append(At).Append('\n');
-        header.Append(Bid).Append('\n');
-        header.Append(Date.UtcDateTime.ToString(DateFormat, CultureInfo.InvariantCulture)).Append('\n');
-        header.Append(Title).Append('\n');
-        header.Append(MessageText);
-        return TextEncoding.GetBytes(header.ToString());
+        var text = new StringBuilder();
+        text.Append("Type: ").Append(Type).Append('\n');
+        text.Append("From: ").Append(From).Append('\n');
+        text.Append("To: ").Append(To).Append('\n');
+        text.Append("At: ").Append(At).Append('\n');
+        text.Append("Bid: ").Append(Bid).Append('\n');
+        text.Append("Date: ").Append(Date.UtcDateTime.ToString(DateFormat, CultureInfo.InvariantCulture)).Append('\n');
+        text.Append("Title: ").Append(Title).Append('\n');
+        text.Append('\n');
+        text.Append(MessageText);
+        return TextEncoding.GetBytes(text.ToString());
     }
 
     /// <summary>Reads the serialised form. Throws <see cref="FormatException"/> if it is not one.</summary>
     public static Bulletin Parse(ReadOnlySpan<byte> serialized)
     {
         string text = TextEncoding.GetString(serialized);
-        var fields = new string[HeaderLines];
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
         int position = 0;
-        for (int i = 0; i < HeaderLines; i++)
+        while (true)
         {
             int end = text.IndexOf('\n', position);
             if (end < 0)
             {
-                throw new FormatException("The bulletin header is incomplete.");
+                throw new FormatException("The bulletin header does not end with an empty line.");
             }
-            fields[i] = text[position..end];
+            string line = text[position..end];
             position = end + 1;
+            if (line.Length == 0)
+            {
+                break;
+            }
+            int colon = line.IndexOf(": ", StringComparison.Ordinal);
+            if (colon <= 0)
+            {
+                throw new FormatException($"Not a header line: {line}");
+            }
+            string key = line[..colon];
+            if (!fields.TryAdd(key, line[(colon + 2)..]))
+            {
+                throw new FormatException($"The header has {key} twice.");
+            }
         }
-        if (fields[0].Length != 1)
+        foreach (var key in RequiredKeys)
+        {
+            if (!fields.ContainsKey(key))
+            {
+                throw new FormatException($"The header has no {key}.");
+            }
+        }
+        if (fields["Type"].Length != 1)
         {
             throw new FormatException("The type is one letter.");
         }
-        if (!DateTimeOffset.TryParseExact(fields[5], DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date))
+        if (!DateTimeOffset.TryParseExact(fields["Date"], DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date))
         {
             throw new FormatException("The date is not yyyy-MM-ddTHH:mm:ssZ.");
         }
         try
         {
-            return FromMessageText(fields[0][0], fields[1], fields[2], fields[3], fields[4], fields[6], date, text[position..]);
+            return FromMessageText(fields["Type"][0], fields["From"], fields["To"], fields["At"], fields["Bid"], fields["Title"], date, text[position..]);
         }
         catch (ArgumentException e)
         {

@@ -5,26 +5,21 @@ using System.Security.Cryptography;
 namespace Mailcast.Core;
 
 /// <summary>
-/// The 4-octet object field of a frame: the first four octets, big-endian, of a SHA-256 hash.
+/// The 8-octet object field of a frame. Objects are content-addressed: the ID is the first eight
+/// octets, big-endian, of the SHA-256 of the object as RaptorQ encodes it (the kind octet and the
+/// zstd frame). A receiver checks every rebuilt object against its own ID, so an object checks
+/// itself with or without the directory, and two different objects never share an ID.
 /// </summary>
 public static class ObjectId
 {
-    /// <summary>
-    /// The object ID of a bulletin: SHA-256 of its BID in capitals, as Latin-1 octets. BIDs
-    /// are compared without regard to case by BBSs, so the hash is too.
-    /// </summary>
-    public static uint ForBid(string bid)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(bid);
-        return FirstFour(Bulletin.TextEncoding.GetBytes(bid.ToUpperInvariant()));
-    }
+    /// <summary>The ID of an object's octets.</summary>
+    public static ulong Of(ReadOnlySpan<byte> objectBytes) =>
+        BinaryPrimitives.ReadUInt64BigEndian(SHA256.HashData(objectBytes));
 
-    /// <summary>The object ID of the directory for a day: SHA-256 of "MAILCAST DIRECTORY yyyy-MM-dd".</summary>
-    public static uint ForDirectory(DateOnly date) =>
-        FirstFour(Bulletin.TextEncoding.GetBytes("MAILCAST DIRECTORY " + date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+    /// <summary>Sixteen hex digits, as used in the directory, file names and logs.</summary>
+    public static string Format(ulong objectId) => objectId.ToString("x16", CultureInfo.InvariantCulture);
 
-    /// <summary>Eight hex digits, as used in file names and logs.</summary>
-    public static string Format(uint objectId) => objectId.ToString("x8", CultureInfo.InvariantCulture);
-
-    private static uint FirstFour(byte[] data) => BinaryPrimitives.ReadUInt32BigEndian(SHA256.HashData(data));
+    /// <summary>Reads sixteen hex digits.</summary>
+    public static bool TryParse(string text, out ulong objectId) =>
+        ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out objectId) && text.Length == 16;
 }

@@ -69,6 +69,35 @@ public class CompressionTests
     }
 
     [Fact]
+    public void Decompress_RefusesAFrameWithoutAChecksum()
+    {
+        var data = TestBulletins.Make(5, 3000).Serialize();
+        using var compressor = new ZstdSharp.Compressor(3);
+        compressor.SetParameter(ZstdSharp.Unsafe.ZSTD_cParameter.ZSTD_c_checksumFlag, 0);
+        var noChecksum = compressor.Wrap(data).ToArray();
+        Assert.Equal(data, new ZstdSharp.Decompressor().Unwrap(noChecksum).ToArray());
+        Assert.Throws<InvalidDataException>(() => Compression.Default.Decompress(noChecksum, Compression.NoDictionary));
+    }
+
+    [Fact]
+    public void Compress_KeepsZstdsDictionaryId()
+    {
+        // The frame header descriptor's low two bits give the size of the dictionary ID field.
+        var compressed = Compression.Default.Compress(TestBulletins.Make(6, 3000).Serialize(), ZstdDictionary.Gb7rdg1Id);
+        Assert.NotEqual(0, compressed[4] & 0x03);
+        var dictionary = ZstdDictionary.BuiltIn[0].Content;
+        uint dictId = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(dictionary.AsSpan(4));
+        int fieldSize = (compressed[4] & 0x03) switch { 1 => 1, 2 => 2, _ => 4 };
+        int at = 5 + ((compressed[4] & 0x20) == 0 ? 1 : 0); // a window descriptor unless single segment
+        uint inFrame = 0;
+        for (int i = 0; i < fieldSize; i++)
+        {
+            inFrame |= (uint)compressed[at + i] << (8 * i);
+        }
+        Assert.Equal(dictId, inFrame);
+    }
+
+    [Fact]
     public void Decompress_WithTheWrongDictionaryFails()
     {
         var data = TestBulletins.Make(3, 3000).Serialize();
