@@ -29,15 +29,15 @@ public sealed record ToneReport(double FrequencyHz, double OffsetHz, double SnrD
 public sealed class ToneDetector
 {
     /// <summary>The shortest run reported.</summary>
-    public static readonly TimeSpan MinDuration = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan MinDuration = TimeSpan.FromSeconds(20);
 
     /// <summary>The longest run reported.</summary>
-    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(45);
 
     private const int Rate = 8000;
     private const int Size = 8192;
     private const double BinHz = (double)Rate / Size;
-    private const double SearchHz = 300;
+    private const double SearchHz = 100;
     private const double NoiseLowHz = 300;
     private const double NoiseHighHz = 3300;
     private const double NoiseBandwidthHz = 3000;

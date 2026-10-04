@@ -5,6 +5,7 @@
     <RootNamespace>Mailcast.Receiver</RootNamespace>
     <AssemblyName>pdn-mailcast-receiver</AssemblyName>
     <IsPackable>false</IsPackable>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -42,7 +42,7 @@ public class ToneDetectorTests
 
     [Theory]
     [InlineData(1803.2, 10.0)]
-    [InlineData(1791.7, 0.0)]
+    [InlineData(1741.7, 0.0)]
     [InlineData(1800.0, -10.0)]
     public void ThirtySecondTone_MeasuresOffsetAndSnr(double toneHz, double snrDb)
     {
@@ -61,6 +61,12 @@ public class ToneDetectorTests
     }
 
     [Fact]
+    public void ToneTooFarOff_IsNotReported()
+    {
+        Assert.Empty(Run(Signal(40, 1650, 10, toneFrom: 4, toneTo: 34, seed: 11)));
+    }
+
+    [Fact]
     public void NoiseOnly_IsNotReported()
     {
         Assert.Empty(Run(Signal(40, 1800, 0, toneFrom: 0, toneTo: 0, seed: 9)));
@@ -69,6 +75,6 @@ public class ToneDetectorTests
     [Fact]
     public void ShortBlip_IsNotReported()
     {
-        Assert.Empty(Run(Signal(30, 1800, 10, toneFrom: 5, toneTo: 9, seed: 10)));
+        Assert.Empty(Run(Signal(30, 1800, 10, toneFrom: 5, toneTo: 17, seed: 10)));
     }
 }
