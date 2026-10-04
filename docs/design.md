@@ -41,10 +41,12 @@ Each bulletin is carried on three days running, about twice its compressed size 
 
 | Mode | Rate | Airtime a day |
 |---|---|---|
-| `ms110d-wn4` (BPSK, rate 2/3) | 1200 bps | about 15 minutes |
+| `ms110d-wn4` (BPSK, rate 2/3) | 1200 bps | about 15 minutes (20 to 24 measured, see below) |
 | `ms110d-wn3` (BPSK, rate 1/3) | 600 bps | about 30 minutes |
 
 WN4 is our strongest on-air-proven MS110D point and is the starting choice. WN3 is the fallback if receivers struggle.
+
+Measured once the core was built: the trained 64 KB dictionary brings a held-out week to 30% of raw (23% without 7plus), against 45% for plain zstd. Pieces are whole, though, and the average bulletin is only about 2.3 pieces, so "twice over" rounds up. On that week it comes to about 19 minutes a day of WN4 without 7plus and 24 with them. We start there and tune the overhead after the first on-air runs.
 
 ## The daily slot
 
@@ -109,9 +111,11 @@ Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identificati
 | Dictionary | 2 bytes | Which zstd dictionary it was compressed with |
 | Code parameters | 12 bytes | RaptorQ's transfer length and symbol size |
 | Piece | 3 bytes | Which piece this is, counting on across days |
-| Data | the rest | One RaptorQ symbol |
+| Data | the rest | One RaptorQ symbol, 940 bytes |
 
-A small directory object also goes out repeatedly: the objects in rotation, with their BIDs, titles and sizes. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
+A whole frame is then 978 bytes, 45 under IL2P's 1023-byte limit. Frames carry no source block number, so every object is a single RaptorQ block (up to 53 MB, far beyond any bulletin). The first byte of each rebuilt object says whether it is a bulletin or the directory.
+
+A small directory object also goes out repeatedly: the objects in rotation, with their BIDs, titles, sizes and a hash of each, so a receiver can check what it rebuilds. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
 
 The format is published here in full, because amateur transmissions must not obscure their meaning. Compression and coding are allowed; encryption is not.
 
@@ -143,7 +147,7 @@ pdn-soundmodem's station page already has the waterfall and level meter in its l
 ## Where the code lives
 
 - **pdn-mailcast** (this repo) holds the head end, the receiver, and a core library with the on-air format, compression and directory.
-- **RaptorQ** is its own project in this repo, with no dependency on anything else here, so it can be published as a separate NuGet package if anything else wants it.
+- **RaptorQ** is its own project in this repo, with no dependency on anything else here, so it can be published as a separate NuGet package (`M0LTE.RaptorQ`, matching `M0LTE.Il2p` and `M0LTE.Dsp`) if anything else wants it.
 - **MS110D stays inside pdn-soundmodem.** The receiver needs pdn-soundmodem's audio sources (sound card and UberSDR) and its waterfall anyway, so splitting the modem out would not shrink what the receiver depends on. It would only add a package release to every modem change.
 
 ## Changes needed in pdn-soundmodem
