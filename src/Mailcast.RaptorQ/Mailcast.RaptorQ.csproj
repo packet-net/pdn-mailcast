@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Mailcast.RaptorQ</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>PacketNet.RaptorQ</PackageId>
+    <Version>0.1.0</Version>
+    <Description>RaptorQ fountain code (RFC 6330) in managed C#: systematic encoding, repair symbols for any ESI, and decoding from any sufficient set of symbols.</Description>
+    <PackageTags>raptorq;fountain-code;fec;rfc6330;erasure-code</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mailcast.RaptorQ.Tests" />
+  </ItemGroup>
+
+</Project>
