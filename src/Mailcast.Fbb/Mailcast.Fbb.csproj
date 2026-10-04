@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    FBB compressed (B1F) forwarding, copied from packet-net/pdn-bbs (AGPL-3.0, like this repo):
+    all of src/Bbs.Fbb (the sans-IO session state machine for both the calling and the answering
+    side, proposals, FS lines, block framing, LZHUF, the SID, R: lines and B2 objects) plus
+    PacketText from src/Bbs.Core, at commit 92a54cafc1eb7f05779c0d740c67a088eacc3e1a, with
+    tests/Bbs.Fbb.Tests as tests/Mailcast.Fbb.Tests. pdn-bbs does not publish these as a package,
+    and referencing its Bbs.Fbb project would pull in Bbs.Core's SQLite and Argon2 for nothing.
+
+    The files are as they were, namespaces included, so a later copy can be diffed against
+    pdn-bbs directly. The one change: dashes in comments became hyphens, to keep this repo's
+    house style. Some exception messages carry a section sign or a less-than-or-equal sign;
+    anything that logs them should make them ASCII first.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Bbs.Fbb</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>
