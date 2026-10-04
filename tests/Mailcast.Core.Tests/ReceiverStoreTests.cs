@@ -109,7 +109,7 @@ public class ReceiverStoreTests
         Bulletin? completed = null;
         for (uint esi = 0; completed is null; esi++)
         {
-            Assert.True(esi < k + 3, "needed more than two spare pieces");
+            Assert.True(esi < k + 6, $"needed more than five spare pieces, K = {k}: {string.Join(", ", outcomes)} | {string.Join(" / ", log)}");
             var frame = obj.Frame(esi);
             if (esi == badEsi)
             {
@@ -123,8 +123,68 @@ public class ReceiverStoreTests
         }
         Assert.Equal(bulletin, completed);
         Assert.Contains(FrameOutcome.Rejected, outcomes); // the wrong rebuild at K was noticed
-        Assert.Contains(log, l => l.Contains($"piece {badEsi} was bad", StringComparison.Ordinal));
+        Assert.Contains(log, l => l.Contains($"piece {badEsi} was bad", StringComparison.Ordinal) || l.Contains("of its", StringComparison.Ordinal));
         Assert.All(log, l => Assert.True(l.All(char.IsAscii)));
+    }
+
+    [Theory]
+    [InlineData(0u, 1u)] // an early burst
+    [InlineData(2u, 9u)] // apart
+    [InlineData(1u, 4u)]
+    public void TwoBadPieces_AreRecovered(uint bad1, uint bad2)
+    {
+        using var dir = new TempDirectory();
+        var bulletin = TestBulletins.Make(16, 20000);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        int k = obj.SourceSymbols;
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
+        Bulletin? completed = null;
+        uint esi = 0;
+        for (; completed is null; esi++)
+        {
+            Assert.True(esi < 3 * k, $"not recovered after {esi} pieces, K = {k}");
+            var frame = obj.Frame(esi);
+            if (esi == bad1 || esi == bad2)
+            {
+                var symbol = frame.Symbol.ToArray();
+                symbol[7] ^= 0x10;
+                frame = new MailcastFrame(frame.ObjectId, frame.DictionaryId, frame.Oti, esi, symbol);
+            }
+            completed = store.Accept(frame.ToBytes()).Bulletin;
+        }
+        Assert.Equal(bulletin, completed);
+        Assert.Contains(log, l => l.Contains("rebuilt from", StringComparison.Ordinal) && l.Contains("of its", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void HashMatchesButUnusable_IsNotMarkedDone()
+    {
+        // The head end sent an object that is what it says but does not decompress. Its pieces
+        // go, it is not marked done, and later frames of it are ignored until the next start.
+        using var dir = new TempDirectory();
+        var junk = new byte[3000];
+        new Random(5).NextBytes(junk);
+        junk[0] = (byte)ObjectKind.Bulletin;
+        var oti = new ObjectTransmissionInformation(junk.Length, MailcastFrame.StandardSymbolSize, 1, 1, MailcastFrame.StandardAlignment);
+        var obj = TransferObject.FromStored(junk, ZstdDictionary.Gb7rdg1Id, oti);
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
+        AcceptResult result = new(FrameOutcome.Stored);
+        uint esi = 0;
+        while (result.Outcome == FrameOutcome.Stored)
+        {
+            result = store.Accept(obj.Frame(esi++).ToBytes());
+        }
+        Assert.Equal(FrameOutcome.Rejected, result.Outcome);
+        Assert.Contains("does not decompress", result.Detail, StringComparison.Ordinal);
+        Assert.False(store.IsComplete(obj.ObjectId));
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(dir.Path, "done")));
+        Assert.Equal(FrameOutcome.Rejected, store.Accept(obj.Frame(esi++).ToBytes()).Outcome);
+        Assert.Equal(0, store.PartialObjects);
+
+        var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
+        Assert.Equal(FrameOutcome.Stored, reopened.Accept(obj.Frame(esi).ToBytes()).Outcome);
     }
 
     [Fact]
@@ -148,7 +208,7 @@ public class ReceiverStoreTests
         var reopened = new ReceiverStore(dir.Path, Compression.Default);
         Assert.False(reopened.IsComplete(obj.ObjectId));
         Bulletin? completed = null;
-        for (uint esi = (uint)k; completed is null && esi < k + 3; esi++)
+        for (uint esi = (uint)k; completed is null && esi < k + 6; esi++)
         {
             completed = reopened.Accept(obj.Frame(esi).ToBytes()).Bulletin;
         }

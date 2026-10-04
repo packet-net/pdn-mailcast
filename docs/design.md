@@ -108,7 +108,7 @@ Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identificati
 |---|---|---|
 | Version | 1 byte | Format version, now 2 |
 | Flags | 1 byte | None defined yet; senders write 0 and receivers ignore bits they don't know |
-| Object | 8 bytes | Which object: the first 8 bytes of the SHA-256 of the object itself |
+| Object | 8 bytes | Which object: the first 8 bytes of the SHA-256 of the dictionary ID (2 bytes) and the object |
 | Dictionary | 2 bytes | Which zstd dictionary it was compressed with, 0 for none |
 | Code parameters | 12 bytes | RaptorQ's transfer length and symbol size (RFC 6330's OTI) |
 | Piece | 3 bytes | Which piece this is, counting on across days |
@@ -117,7 +117,7 @@ Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identificati
 
 A whole frame is then 987 bytes, 36 under IL2P's 1023-byte limit. Frames carry no source block number, so every object is a single RaptorQ block (up to 53 MB, far beyond any bulletin).
 
-An object is one byte saying what it is (1 a bulletin, 2 the directory) followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, the day it first sees it, and sends those same bytes, with fresh pieces, on every later day.
+An object is one byte saying what it is (1 a bulletin, 2 the directory) followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, the day it first sees it, and sends those same bytes, with fresh pieces, on every later day.
 
 A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`, `To`, `At`, `Bid`, `Date`, `Title`), an empty line, then the message text exactly as a forwarding partner would receive it, R: lines included. Readers ignore keys they don't know, so later versions can add some.
 
@@ -136,7 +136,7 @@ No RaptorQ implementation exists for .NET, so we write one from RFC 6330 and che
 One program and a small config.
 
 - **Audio.** A sound card on the receiver's radio, or an UberSDR web receiver such as `wessex.zapto.org`. pdn-soundmodem's library supports both. The receiver detects the MS110D speed automatically, so there are no mode settings.
-- **Decoding.** The library hands over each good frame. The receiver keeps every piece on disk, so partial bulletins survive restarts and add up across days. If a rebuild does not match its object ID, the receiver keeps its pieces, looks for the bad one once it has a spare, and drops only that.
+- **Decoding.** The library hands over each good frame. The receiver keeps every piece on disk, so partial bulletins survive restarts and add up across days. If a rebuild does not match its object ID, the receiver keeps its pieces and, a few decodes per arriving piece, tries sets of them without the suspect ones; any set that rebuilds to the ID is accepted.
 - **Delivery.** Each rebuilt bulletin is checked against its object ID, decompressed, and offered to the local BBS over its telnet port as FBB B1F forwarding, again reusing pdn-bbs's code. The BBS accepts or rejects by BID as with any partner.
 - **Config.** The audio source, and the BBS host, port, login and password. Everything else is fixed.
 - **Packaging.** A .deb in the packet-net apt repo with a systemd service.

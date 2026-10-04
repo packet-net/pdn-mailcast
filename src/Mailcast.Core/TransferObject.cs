@@ -15,7 +15,7 @@ public enum ObjectKind : byte
 /// <summary>
 /// An object ready to broadcast: one octet of <see cref="ObjectKind"/> then the zstd-compressed
 /// content, RaptorQ coded as one source block. These octets are what the OTI's transfer length
-/// counts, what the object ID hashes, and what a receiver rebuilds.
+/// counts, what the object ID hashes (after the dictionary ID), and what a receiver rebuilds.
 /// </summary>
 public sealed class TransferObject
 {
@@ -35,11 +35,11 @@ public sealed class TransferObject
         _bytes = bytes;
         DictionaryId = dictionaryId;
         Oti = oti;
-        ObjectId = Core.ObjectId.Of(bytes);
+        ObjectId = Core.ObjectId.Of(dictionaryId, bytes);
         _encoder = new ObjectEncoder(bytes, oti);
     }
 
-    /// <summary>The object ID frames carry: the hash of <see cref="Bytes"/>.</summary>
+    /// <summary>The object ID frames carry: the hash of the dictionary ID and <see cref="Bytes"/>.</summary>
     public ulong ObjectId { get; }
 
     /// <summary>The zstd dictionary the content was compressed with.</summary>

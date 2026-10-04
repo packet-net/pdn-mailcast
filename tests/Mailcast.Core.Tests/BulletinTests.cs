@@ -104,6 +104,17 @@ public class BulletinTests
     }
 
     [Fact]
+    public void Parse_AcceptsAKeyWithNoSpaceAfterTheColon()
+    {
+        var text = "Type:B\nFrom:G4ABC\nTo: ALL\nAt:\nBid:1_X\nDate:2026-10-01T12:34:56Z\nTitle:  two spaces\n\nbody";
+        var b = Bulletin.Parse(Encoding.Latin1.GetBytes(text));
+        Assert.Equal("G4ABC", b.From);
+        Assert.Equal("", b.At);
+        Assert.Equal(" two spaces", b.Title); // one space after the colon is the separator; the rest is the value
+        Assert.Equal(b, Bulletin.Parse(b.Serialize()));
+    }
+
+    [Fact]
     public void Date_IsUtc()
     {
         var local = new DateTimeOffset(2026, 10, 1, 13, 34, 56, TimeSpan.FromHours(1));

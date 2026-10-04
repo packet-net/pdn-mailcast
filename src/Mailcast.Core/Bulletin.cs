@@ -31,8 +31,8 @@ namespace Mailcast.Core;
 /// </code>
 /// <para>
 /// The seven keys above are required, each once. A reader ignores keys it does not know, so
-/// later versions can add header lines without breaking older receivers. The value is
-/// everything after the first ": " on the line.
+/// later versions can add header lines without breaking older receivers. The key is everything
+/// before the first colon and the value everything after it, less one space if there is one.
 /// </para>
 /// </remarks>
 public sealed class Bulletin : IEquatable<Bulletin>
@@ -188,13 +188,14 @@ public sealed class Bulletin : IEquatable<Bulletin>
             {
                 break;
             }
-            int colon = line.IndexOf(": ", StringComparison.Ordinal);
+            int colon = line.IndexOf(':', StringComparison.Ordinal);
             if (colon <= 0)
             {
                 throw new FormatException($"Not a header line: {line}");
             }
             string key = line[..colon];
-            if (!fields.TryAdd(key, line[(colon + 2)..]))
+            int valueStart = colon + 1 < line.Length && line[colon + 1] == ' ' ? colon + 2 : colon + 1;
+            if (!fields.TryAdd(key, line[valueStart..]))
             {
                 throw new FormatException($"The header has {key} twice.");
             }

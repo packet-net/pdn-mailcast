@@ -66,10 +66,17 @@ public sealed record ReceiverStoreOptions
     public int MaxPartials { get; init; } = 500;
 
     /// <summary>
-    /// The most pieces for which a wrong rebuild is retried leaving out each piece in turn, to
-    /// find a bad one. Each retry is a full decode.
+    /// After a rebuild that does not match its ID, the most extra decodes tried per arriving
+    /// piece while looking for a set of pieces without the bad ones. The search carries on from
+    /// where it stopped as more pieces arrive, so the work per frame stays small.
     /// </summary>
-    public int MaxLeaveOneOut { get; init; } = 300;
+    public int RepairDecodesPerFrame { get; init; } = 3;
+
+    /// <summary>
+    /// How many seeded random sets of K + 1 pieces the search tries, after leaving out each piece
+    /// in turn and after the newest K + 2. These are what find two or more bad pieces.
+    /// </summary>
+    public int RandomRepairSubsets { get; init; } = 24;
 
     /// <summary>Where the store says what it threw away and why. Plain ASCII.</summary>
     public Action<string>? Log { get; init; }
@@ -120,6 +127,7 @@ public sealed class ReceiverStore
     private readonly ReceiverStoreOptions _options;
     private readonly Dictionary<string, Instance> _instances = [];
     private readonly Dictionary<ulong, DateTimeOffset> _done = [];
+    private readonly HashSet<string> _unusable = [];
     private DateTimeOffset _lastExpiry;
 
     /// <summary>Opens or creates a store, recovering from any interrupted write.</summary>
@@ -222,6 +230,10 @@ public sealed class ReceiverStore
         }
 
         string key = KeyOf(frame.ObjectId, frame.DictionaryId, frame.Oti);
+        if (_unusable.Contains(key))
+        {
+            return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "object already rebuilt and found unusable");
+        }
         bool isNew = !_instances.TryGetValue(key, out var instance);
         instance ??= new Instance(key, frame.ObjectId, frame.DictionaryId, frame.Oti, Path.Combine(_objects, key));
         if (instance.Symbols.ContainsKey(frame.EncodingSymbolId))
@@ -369,69 +381,61 @@ public sealed class ReceiverStore
         {
             return null;
         }
-        if (ObjectId.Of(data) == instance.ObjectId)
+        if (ObjectId.Of(instance.DictionaryId, data) == instance.ObjectId)
         {
             return Finish(instance, data);
         }
 
-        // Some piece is wrong. Pieces that disagree with the rebuild are the first suspects.
-        Log($"object {ObjectId.Format(instance.ObjectId)} rebuilt from {instance.Symbols.Count} pieces does not match its ID; looking for a bad piece");
-        var encoder = new ObjectEncoder(data, instance.Oti);
-        var disagree = instance.Symbols
-            .Where(s => !encoder.Encode(new PayloadId(0, s.Key)).AsSpan(0, s.Value.Length).SequenceEqual(s.Value))
-            .Select(s => s.Key)
-            .ToList();
-        if (disagree.Count > 0 && TryWithout(instance, disagree) is { } fixedData)
-        {
-            return Finish(instance, fixedData);
-        }
-
-        // A bad piece the rebuild used agrees with the wrong rebuild, so try leaving out each in turn.
-        int k = instance.Oti.SourceBlockSymbols(0);
-        if (instance.Symbols.Count > k && instance.Symbols.Count <= _options.MaxLeaveOneOut)
-        {
-            foreach (uint esi in instance.Symbols.Keys.Order().ToList())
-            {
-                if (TryWithout(instance, [esi]) is { } repaired)
-                {
-                    return Finish(instance, repaired);
-                }
-            }
-        }
-
+        // Some piece is wrong. A wrong rebuild agrees with every piece it used, so the pieces
+        // cannot be told apart by checking them against it; instead try sets of pieces, a few
+        // per arriving piece, until one rebuilds to the ID. Any set that does is safe to accept.
         instance.ResetDecoder();
+        int k = instance.Oti.SourceBlockSymbols(0);
+        if (instance.RepairCursor >= instance.RepairCandidates(_options.RandomRepairSubsets) && instance.Arrival.Count > instance.RepairPassPieces)
+        {
+            instance.RepairCursor = 0; // a piece arrived since the last search ran out: search again
+            instance.RepairPassPieces = instance.Arrival.Count;
+        }
+        int total = instance.RepairCandidates(_options.RandomRepairSubsets);
+        if (instance.RepairCursor == 0)
+        {
+            Log($"object {ObjectId.Format(instance.ObjectId)} rebuilt from {instance.Symbols.Count} pieces does not match its ID; looking for bad pieces");
+        }
+        int budget = _options.RepairDecodesPerFrame;
+        while (budget > 0 && instance.RepairCursor < total)
+        {
+            var (subset, leftOut) = instance.RepairCandidate(instance.RepairCursor++, k, _options.RandomRepairSubsets);
+            if (subset is null)
+            {
+                continue;
+            }
+            budget--;
+            var decoder = new ObjectDecoder(instance.Oti);
+            foreach (uint esi in subset)
+            {
+                decoder.Add(new PayloadId(0, esi), instance.Symbols[esi]);
+            }
+            var candidate = decoder.TryDecode();
+            if (candidate is null || ObjectId.Of(instance.DictionaryId, candidate) != instance.ObjectId)
+            {
+                continue;
+            }
+            if (leftOut is { } bad)
+            {
+                Log($"object {ObjectId.Format(instance.ObjectId)}: piece {bad} was bad, dropped");
+                instance.Symbols.Remove(bad);
+                instance.Arrival.Remove(bad);
+                File.Delete(SymbolPath(instance, bad));
+            }
+            else
+            {
+                Log($"object {ObjectId.Format(instance.ObjectId)}: rebuilt from {subset.Count} of its {instance.Symbols.Count} pieces");
+            }
+            return Finish(instance, candidate);
+        }
+
         return new AcceptResult(FrameOutcome.Rejected, instance.ObjectId,
             Detail: $"rebuilt object does not match its ID; keeping its {instance.Symbols.Count} pieces and waiting for more");
-    }
-
-    /// <summary>Decodes leaving out some pieces; if that matches the ID, deletes those pieces for good.</summary>
-    private byte[]? TryWithout(Instance instance, List<uint> leaveOut)
-    {
-        int k = instance.Oti.SourceBlockSymbols(0);
-        if (instance.Symbols.Count - leaveOut.Count < k)
-        {
-            return null;
-        }
-        var decoder = new ObjectDecoder(instance.Oti);
-        foreach (var (esi, symbol) in instance.Symbols)
-        {
-            if (!leaveOut.Contains(esi))
-            {
-                decoder.Add(new PayloadId(0, esi), symbol);
-            }
-        }
-        var data = decoder.TryDecode();
-        if (data is null || ObjectId.Of(data) != instance.ObjectId)
-        {
-            return null;
-        }
-        foreach (uint esi in leaveOut)
-        {
-            Log($"object {ObjectId.Format(instance.ObjectId)}: piece {esi} was bad, dropped");
-            instance.Symbols.Remove(esi);
-            File.Delete(SymbolPath(instance, esi));
-        }
-        return data;
     }
 
     /// <summary>Unpacks an object that matches its ID.</summary>
@@ -491,14 +495,16 @@ public sealed class ReceiverStore
     }
 
     /// <summary>
-    /// An object that matches its ID but cannot be used was sent that way; more pieces would
-    /// rebuild the same thing. Mark it done so it is not collected again.
+    /// An object that matches its ID but cannot be used was sent that way, so more pieces would
+    /// only rebuild it again. It is not marked done: its pieces are dropped and further frames
+    /// of it are ignored until the store is next opened.
     /// </summary>
     private AcceptResult Unusable(Instance instance, string why)
     {
         string detail = $"object {ObjectId.Format(instance.ObjectId)} {why}";
         Log(detail);
-        MarkDone(instance);
+        _unusable.Add(instance.Key);
+        Remove(instance);
         return new AcceptResult(FrameOutcome.Rejected, instance.ObjectId, Detail: detail);
     }
 
@@ -571,7 +577,11 @@ public sealed class ReceiverStore
         }
         var instance = new Instance(name, objectId, dictionaryId, oti, dir);
         var last = DateTimeOffset.MinValue;
-        foreach (var file in System.IO.Directory.EnumerateFiles(dir, "*.sym").Order(StringComparer.Ordinal))
+        var files = System.IO.Directory.EnumerateFiles(dir, "*.sym")
+            .Select(f => (File: f, Written: new DateTimeOffset(File.GetLastWriteTimeUtc(f), TimeSpan.Zero)))
+            .OrderBy(f => f.Written)
+            .ThenBy(f => f.File, StringComparer.Ordinal); // arrival order, as near as the files show it
+        foreach (var (file, written) in files)
         {
             if (!uint.TryParse(Path.GetFileNameWithoutExtension(file), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out uint esi)
                 || esi > PayloadId.MaxEncodingSymbolId
@@ -580,7 +590,6 @@ public sealed class ReceiverStore
                 File.Delete(file);
                 continue;
             }
-            var written = new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero);
             if (written > last)
             {
                 last = written;
@@ -623,7 +632,52 @@ public sealed class ReceiverStore
 
         public Dictionary<uint, byte[]> Symbols { get; } = [];
 
+        /// <summary>ESIs held, in the order they arrived.</summary>
+        public List<uint> Arrival { get; } = [];
+
         public DateTimeOffset LastPiece { get; set; }
+
+        /// <summary>Where the search for a good set of pieces has got to; see <see cref="RepairCandidate"/>.</summary>
+        public int RepairCursor { get; set; } = int.MaxValue; // no search yet: the first mismatch starts one
+
+        /// <summary>How many pieces were held when the current search began.</summary>
+        public int RepairPassPieces { get; set; } = -1;
+
+        /// <summary>How many candidate sets the current search has.</summary>
+        public int RepairCandidates(int randomSubsets) => Math.Max(RepairPassPieces, 0) + 1 + randomSubsets;
+
+        /// <summary>
+        /// Candidate set number i of the current search, or null where it does not apply: first all
+        /// pieces but one, for each piece held when the search began, in arrival order (a single
+        /// bad piece); then the newest K + 2 (bad pieces in an early burst); then seeded random
+        /// sets of K + 1 (two or more bad pieces anywhere). Pieces that arrive during a search
+        /// join the sets; a new search starts when one runs out and more pieces have come.
+        /// </summary>
+        public (List<uint>? Subset, uint? LeftOut) RepairCandidate(int i, int k, int randomSubsets)
+        {
+            int pass = Math.Max(RepairPassPieces, 0);
+            int n = Arrival.Count;
+            if (i < pass)
+            {
+                return i < n && n - 1 >= k ? (Arrival.Where((_, j) => j != i).ToList(), Arrival[i]) : (null, null);
+            }
+            if (i == pass)
+            {
+                return n > k + 2 ? (Arrival.Skip(n - (k + 2)).ToList(), null) : (null, null);
+            }
+            if (i <= pass + randomSubsets && n > k + 1)
+            {
+                var rng = new Random(unchecked((int)ObjectId ^ (int)(ObjectId >> 32) ^ (i * 7919)));
+                var pool = Arrival.ToArray();
+                for (int j = 0; j < k + 1; j++)
+                {
+                    int pick = j + rng.Next(pool.Length - j);
+                    (pool[j], pool[pick]) = (pool[pick], pool[j]);
+                }
+                return (pool.Take(k + 1).ToList(), null);
+            }
+            return (null, null);
+        }
 
         public bool TryAdd(uint esi, byte[] symbol, out string? problem)
         {
@@ -637,6 +691,7 @@ public sealed class ReceiverStore
                 return false;
             }
             Symbols[esi] = symbol;
+            Arrival.Add(esi);
             problem = null;
             return true;
         }

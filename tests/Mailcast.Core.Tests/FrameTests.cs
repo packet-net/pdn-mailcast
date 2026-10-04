@@ -102,13 +102,14 @@ public class FrameTests
     }
 
     [Fact]
-    public void ObjectId_IsTheFirstEightOctetsOfTheObjectsSha256()
+    public void ObjectId_IsTheFirstEightOctetsOfSha256OfDictionaryAndObject()
     {
         var bulletin = TestBulletins.Make(1, 2000);
         var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var sha = System.Security.Cryptography.SHA256.HashData(obj.Bytes);
+        var sha = System.Security.Cryptography.SHA256.HashData([0x00, 0x01, .. obj.Bytes]); // dictionary ID 1, then the object
         Assert.Equal(BinaryPrimitives.ReadUInt64BigEndian(sha), obj.ObjectId);
-        Assert.Equal(obj.ObjectId, ObjectId.Of(obj.Bytes));
+        Assert.Equal(obj.ObjectId, ObjectId.Of(ZstdDictionary.Gb7rdg1Id, obj.Bytes));
+        Assert.NotEqual(obj.ObjectId, ObjectId.Of(2, obj.Bytes));
         Assert.Equal((byte)ObjectKind.Bulletin, obj.Bytes[0]);
 
         // Same bulletin, same settings: same object. Any change: another object.
