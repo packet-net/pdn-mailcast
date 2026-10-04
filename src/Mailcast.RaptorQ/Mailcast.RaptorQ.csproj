@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Mailcast.RaptorQ</RootNamespace>
     <IsPackable>true</IsPackable>
-    <PackageId>PacketNet.RaptorQ</PackageId>
+    <PackageId>M0LTE.RaptorQ</PackageId>
     <Version>0.1.0</Version>
     <Description>RaptorQ fountain code (RFC 6330) in managed C#: systematic encoding, repair symbols for any ESI, and decoding from any sufficient set of symbols.</Description>
     <PackageTags>raptorq;fountain-code;fec;rfc6330;erasure-code</PackageTags>
