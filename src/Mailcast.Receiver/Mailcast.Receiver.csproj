@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Web\index.html" LogicalName="Mailcast.Receiver.Web.index.html" />
+    <EmbeddedResource Include="Web\signin.html" LogicalName="Mailcast.Receiver.Web.signin.html" />
   </ItemGroup>
 
   <ItemGroup>
