@@ -1,5 +1,6 @@
 using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
+using Mailcast.Receiver.Retune;
 
 namespace Mailcast.Receiver;
 
@@ -37,7 +38,17 @@ public sealed class ReceiverHost : IAsyncDisposable
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
         Intake.ScheduleHeard += OnScheduleHeard;
+        if (config.Rig is not null)
+        {
+            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log);
+        }
     }
+
+    /// <summary>
+    /// What moves a shared radio to the bulletin frequency for each slot and holds LinBPQ off the
+    /// air meanwhile, when the config has <c>rig</c>; null otherwise.
+    /// </summary>
+    public Retuner? Retuner { get; }
 
     /// <summary>
     /// GB7RDG's slots: as its newest directory gives them once one has been heard, and until then
@@ -137,21 +148,34 @@ public sealed class ReceiverHost : IAsyncDisposable
             _log($"store: {pending} rebuilt bulletin{(pending == 1 ? "" : "s")} waiting for the BBS from before");
         }
 
+        if (Retuner is null)
+        {
+            Retuner.SayIfLeftOver(Config.StateDirectory, _log);
+        }
+
         using var stopOthers = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         Task delivery = Delivery.RunAsync(stopOthers.Token);
         Task audio = SuperviseAudioAsync(stopOthers.Token);
-        Task first = await Task.WhenAny(delivery, audio).ConfigureAwait(false);
+        // The retuner catches and logs its own problems and ends only when the others do,
+        // putting the rig back and LinBPQ on the air on its way out; if it ends any other way,
+        // that is a failure like the others', and systemd's restart picks up where it left off.
+        Task retune = Retuner?.RunAsync(stopOthers.Token) ?? DelayAsync(Timeout.InfiniteTimeSpan, stopOthers.Token);
+        Task first = await Task.WhenAny(delivery, audio, retune).ConfigureAwait(false);
         await stopOthers.CancelAsync().ConfigureAwait(false);
         try
         {
-            await Task.WhenAll(delivery, audio).ConfigureAwait(false);
+            await Task.WhenAll(delivery, audio, retune).ConfigureAwait(false);
         }
-        catch (Exception) when (first.IsFaulted)
+        catch (Exception) when (first.IsFaulted || first == retune)
         {
+        }
+        if (first == retune && !cancellation.IsCancellationRequested && !first.IsFaulted)
+        {
+            throw new InvalidOperationException("the retune loop stopped on its own");
         }
         if (first.IsFaulted)
         {
-            string which = first == delivery ? "delivery" : "audio";
+            string which = first == delivery ? "delivery" : first == audio ? "audio" : "retune";
             throw new InvalidOperationException($"the {which} loop failed: {Ascii.Clean(first.Exception!.GetBaseException().Message)}", first.Exception);
         }
     }
@@ -416,6 +440,10 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (Retuner is not null)
+        {
+            await Retuner.DisposeAsync().ConfigureAwait(false);
+        }
         await Intake.DisposeAsync().ConfigureAwait(false);
     }
 

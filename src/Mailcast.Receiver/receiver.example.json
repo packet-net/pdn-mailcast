@@ -46,5 +46,8 @@
   // the oldest going first. 0 for either keeps none.
   "archive": { "days": 30, "maxMegabytes": 50 },
 
+  // To share your radio with LinBPQ packet, the receiver can retune it for each slot: add
+  // "rig" and "bpq" as docs/receiver.md says under "Sharing a radio with LinBPQ".
+
   "stateDirectory": "/var/lib/pdn-mailcast"
 }
