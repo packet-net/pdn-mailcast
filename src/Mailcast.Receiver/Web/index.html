@@ -163,7 +163,7 @@ async function refresh() {
          <div class="muted">Tone at ${t.frequencyHz} Hz (it should be at ${s.markers.centreHz} Hz), signal to noise in 3 kHz, ${t.seconds} s long.
          ${Math.abs(t.offsetHz) <= 50 ? "That is close enough." : "That is well off: check the dial."}</div>`
       : `<div class="muted">No tone heard at the start of this slot, but frames were.</div>`)
-      + `<dl style="margin-top:10px"><dt>Started</dt><dd>${when(s.slot.started)}</dd>
+      + `<dl style="margin-top:10px">${s.slot.scheduled ? `<dt>Slot</dt><dd>${utc(s.slot.scheduled)}</dd>` : ""}<dt>Started</dt><dd>${when(s.slot.started)}</dd>
          <dt>Frames heard</dt><dd>${s.slot.framesHeard}${s.slot.lastFrame ? ", last at " + new Date(s.slot.lastFrame).toLocaleTimeString() : ""}</dd></dl>`;
   }
 
@@ -214,10 +214,6 @@ function schedule(s) {
       : `the next slot it listens to is ${at(web.slot)}`}.
       ${all ? "It listens to every slot." : `It listens to ${web.slotsPerDay} of the ${c.slotsPerDay} slots a day (${web.times.join(", ")} UTC)
       to stay inside its allowance of about 3 hours a day.`}</dd>`;
-  }
-  if (c.oldConfig) {
-    rows += `<dt>Note</dt><dd class="warn">Your config file is from before hourly slots, so this receiver expects one slot a day.
-      Set <code>"slotUtc": "00:00"</code> and <code>"everyMinutes": 60</code> in receiver.json.</dd>`;
   }
   $("when").innerHTML = rows;
   $("slotShape").textContent = `Each slot starts with a ${c.toneSeconds} second tone, ${s.markers.centreHz} Hz in your audio, then a few minutes of short data bursts.`;

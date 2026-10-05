@@ -1,5 +1,5 @@
 [Unit]
-Description=pdn-mailcast receiver: GB7RDG's daily bulletins into your BBS
+Description=pdn-mailcast receiver: GB7RDG's bulletins into your BBS
 Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/src/Mailcast.Receiver/README.md
 After=network-online.target sound.target time-sync.target
 Wants=network-online.target time-sync.target

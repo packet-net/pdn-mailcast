@@ -26,7 +26,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         _log = log;
         Intake = new Intake(config.StateDirectory, log);
         Ledger = new DeliveryLedger(config.StateDirectory);
-        Slots = new SlotTracker(time, log);
+        Slots = new SlotTracker(time, log, ScheduleFor(AudioSource.Parse(config.Audio), config));
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
@@ -99,10 +99,9 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} (USB dial {OnAir.Mhz(Config.DialHz)} MHz), delivering to {DescribeBbs(Config.Bbs)}");
         _log($"slots: GB7RDG's slots are {Config.Schedule.Describe()}");
-        if (Config.DailyFromOldConfig)
+        if (Config.SlotUtcWithoutEveryMinutes)
         {
-            _log($"config: the config file gives \"slotUtc\" but not \"everyMinutes\", as before GB7RDG sent every hour, so this is read as one slot a day at {Config.SlotUtc} UTC. "
-                + "For every hour, set \"slotUtc\": \"00:00\" and \"everyMinutes\": 60");
+            _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
         }
         int pending = Intake.Pending().Count;
         if (pending > 0)
@@ -136,12 +135,13 @@ public sealed class ReceiverHost : IAsyncDisposable
     public async Task<string?> DecodeOnceAsync(string wavPath, CancellationToken cancellation)
     {
         var pipeline = CreatePipeline(new AudioSource(AudioSourceKind.Wav, wavPath), Config);
+        Slots.Schedule = null;
         Attach(pipeline);
         await pipeline.StartAsync(cancellation).ConfigureAwait(false);
         await pipeline.Finished.WaitAsync(cancellation).ConfigureAwait(false);
         await pipeline.DisposeAsync().ConfigureAwait(false);
         await Intake.DrainAsync(cancellation).ConfigureAwait(false);
-        _log($"decode: {Intake.FramesHeard} broadcast frames heard, {Intake.Pending().Count} bulletins to deliver");
+        _log($"decode: {Intake.FramesHeard} frames heard, {Intake.Pending().Count} bulletins to deliver");
         return await Delivery.DeliverPendingAsync(cancellation).ConfigureAwait(false);
     }
 
@@ -220,13 +220,14 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 closedSaid = null;
                 closeAt = new CancellationTokenSource();
-                _ = CloseAtAsync(closes, closeAt, restart.Token);
+                _ = CloseAtAsync(opens, closes, closeAt, restart.Token);
             }
 
             using var window = closeAt;
             using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
             CancellationToken token = running?.Token ?? restart.Token;
             var pipeline = PipelineFactory?.Invoke(source) ?? CreatePipeline(source, config);
+            Slots.Schedule = ScheduleFor(source, config);
             lock (_gate)
             {
                 _pipeline = pipeline;
@@ -255,7 +256,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 if (window is { IsCancellationRequested: true } && !restart.IsCancellationRequested)
                 {
-                    _log("audio: the slot's listening window has ended; closing the web SDR until its next slot");
+                    _log("audio: the clock is outside the slot's listening window now; closing the web SDR until its next slot");
                 }
             }
             catch (Exception e) when (!cancellation.IsCancellationRequested)
@@ -301,12 +302,15 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     private static TimeSpan Shorter(TimeSpan a, TimeSpan b) => a < b ? (a < TimeSpan.Zero ? TimeSpan.Zero : a) : b;
 
-    /// <summary>Cancels <paramref name="close"/> once the clock reads <paramref name="closes"/>, looking at it every minute.</summary>
-    private async Task CloseAtAsync(DateTimeOffset closes, CancellationTokenSource close, CancellationToken cancellation)
+    /// <summary>
+    /// Cancels <paramref name="close"/> once the clock reads <paramref name="closes"/>, or is put
+    /// back before <paramref name="opens"/>, looking at it every minute.
+    /// </summary>
+    private async Task CloseAtAsync(DateTimeOffset opens, DateTimeOffset closes, CancellationTokenSource close, CancellationToken cancellation)
     {
         try
         {
-            while (_time.GetUtcNow() < closes)
+            while (_time.GetUtcNow() >= opens && _time.GetUtcNow() < closes)
             {
                 var tick = Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation);
                 ClockWaiting?.Invoke();
@@ -318,6 +322,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
         }
     }
+
+    /// <summary>The slots to group what is heard into: none for a recording, whose time of day is not known.</summary>
+    private static SlotSchedule? ScheduleFor(AudioSource source, ReceiverConfig config) =>
+        source.Kind == AudioSourceKind.Wav ? null : config.Schedule;
 
     /// <summary>The pipeline for <paramref name="source"/>, heard on <paramref name="config"/>'s dial.</summary>
     internal AudioPipeline CreatePipeline(AudioSource source, ReceiverConfig config) =>
