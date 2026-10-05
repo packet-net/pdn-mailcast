@@ -37,6 +37,7 @@ public sealed class AudioPipeline : IAsyncDisposable
     private Thread? _thread;
     private Task? _watch;
     private long _lastAudio;
+    private bool _watchOff;
     private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _threadDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -84,8 +85,8 @@ public sealed class AudioPipeline : IAsyncDisposable
     public string? EndReason { get; private set; }
 
     /// <summary>For tests: a pipeline over an input that is already open, watched as a sound card would be.</summary>
-    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time) =>
-        new(new AudioSource(AudioSourceKind.Alsa, "test"), log, time) { _input = input };
+    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true) =>
+        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), log, time) { _input = input, _watchOff = !watch };
 
     /// <summary>Builds a pipeline for <paramref name="source"/>. Call <see cref="Start"/> once anything that listens is attached.</summary>
     public static AudioPipeline Create(AudioSource source, Action<string> log, TimeProvider? time = null) => new(source, log, time ?? TimeProvider.System);
@@ -146,7 +147,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
         _thread = new Thread(Pump) { IsBackground = true, Name = "mailcast audio" };
         _thread.Start();
-        if (_source.Kind != AudioSourceKind.Wav)
+        if (_source.Kind != AudioSourceKind.Wav && !_watchOff)
         {
             _watch = WatchAsync();
         }

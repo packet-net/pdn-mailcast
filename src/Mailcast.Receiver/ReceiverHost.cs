@@ -190,7 +190,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                     // At most a minute at a time, then the clock again: a Pi that booted on
                     // fake-hwclock's stale time is put right by NTP partway through the wait,
                     // and one long timer would sleep straight through the real slot.
-                    await DelayAsync(Shorter(opens - _time.GetUtcNow(), ClockCheck), restart.Token).ConfigureAwait(false);
+                    await ClockDelayAsync(Shorter(opens - _time.GetUtcNow(), ClockCheck), restart.Token).ConfigureAwait(false);
                     continue;
                 }
                 closeAt = new CancellationTokenSource();
@@ -200,7 +200,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             using var window = closeAt;
             using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
             CancellationToken token = running?.Token ?? restart.Token;
-            var pipeline = AudioPipeline.Create(source, _log, _time);
+            var pipeline = PipelineFactory?.Invoke(source) ?? AudioPipeline.Create(source, _log, _time);
             lock (_gate)
             {
                 _pipeline = pipeline;
@@ -282,11 +282,32 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             while (_time.GetUtcNow() < closes)
             {
-                await Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation).ConfigureAwait(false);
+                var tick = Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation);
+                ClockWaiting?.Invoke();
+                await tick.ConfigureAwait(false);
             }
             await close.CancelAsync().ConfigureAwait(false);
         }
         catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException)
+        {
+        }
+    }
+
+    /// <summary>For tests: builds the pipeline for a source in place of the real one.</summary>
+    internal Func<AudioSource, AudioPipeline>? PipelineFactory { get; set; }
+
+    /// <summary>For tests: raised once a wait on the wall clock (the window's opening or closing) has set its timer.</summary>
+    internal event Action? ClockWaiting;
+
+    private async Task ClockDelayAsync(TimeSpan delay, CancellationToken cancellation)
+    {
+        try
+        {
+            var tick = Task.Delay(delay, _time, cancellation);
+            ClockWaiting?.Invoke();
+            await tick.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
         {
         }
     }
