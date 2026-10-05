@@ -161,6 +161,7 @@ public sealed class DeliveryService
 
         var byBid = bulletins.ToDictionary(b => b.Bid, StringComparer.OrdinalIgnoreCase);
         bool waitingOnBbs = false;
+        var answered = new List<(string Bid, BbsVerdict Verdict, string? Detail)>();
         foreach (var outcome in report.Outcomes)
         {
             var bulletin = byBid[outcome.Bid];
@@ -168,18 +169,7 @@ public sealed class DeliveryService
             {
                 case DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Refused:
                     var record = Record(bulletin, outcome);
-                    try
-                    {
-                        _intake.Acknowledge(bulletin.Bid, Final(record.Verdict), record.Detail);
-                    }
-                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                    {
-                        // It stays in the outbox and is offered again, after the usual wait
-                        // rather than straight away, since a full disk does not clear itself
-                        // in a second; the BBS answers FS -.
-                        _log($"store: cannot move {Ascii.Clean(bulletin.Bid)} from the outbox to the archive: {Ascii.Clean(e.Message)}");
-                        waitingOnBbs = true;
-                    }
+                    answered.Add((bulletin.Bid, Final(record.Verdict), record.Detail));
                     _log($"bbs: {Ascii.Clean(bulletin.Bid)} {Describe(record.Verdict)}{(record.Detail is null ? "" : ": " + Ascii.Clean(record.Detail))}");
                     break;
                 case DeliveryVerdict.Deferred or DeliveryVerdict.Unconfirmed:
@@ -191,6 +181,16 @@ public sealed class DeliveryService
                     waitingOnBbs = true;
                     break;
             }
+        }
+
+        // All of the session's final answers at once, so the mail list is rebuilt once, not per bulletin.
+        foreach (var (bid, e) in _intake.Acknowledge(answered))
+        {
+            // It stays in the outbox and is offered again, after the usual wait rather than
+            // straight away, since a disk that will not take a rename does not clear itself in
+            // a second; the BBS answers FS -.
+            _log($"store: cannot move {Ascii.Clean(bid)} out of the outbox: {Ascii.Clean(e.Message)}");
+            waitingOnBbs = true;
         }
 
         if (report.ReverseOffered > 0)

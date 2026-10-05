@@ -128,7 +128,10 @@ internal sealed class MailArchive
     private readonly Action<string> _log;
     private readonly Action _countRead;
     private readonly Dictionary<ulong, (MailEntry Entry, long FileBytes)> _index = [];
-    private readonly SortedSet<(DateTimeOffset Time, ulong Id)> _order = [];
+    private static readonly IComparer<MailEntry> ByAnswer = Comparer<MailEntry>.Create((a, b) =>
+        a.Time != b.Time ? a.Time.CompareTo(b.Time) : a.ObjectId.CompareTo(b.ObjectId));
+
+    private System.Collections.Immutable.ImmutableSortedSet<MailEntry> _order = System.Collections.Immutable.ImmutableSortedSet.Create(ByAnswer);
     private long _totalBytes;
 
     /// <summary>
@@ -190,7 +193,10 @@ internal sealed class MailArchive
     public bool Enabled => _retention > TimeSpan.Zero && _maxBytes > 0;
 
     /// <summary>What is held, newest answer first.</summary>
-    public IEnumerable<MailEntry> NewestFirst() => _order.Reverse().Select(k => _index[k.Id].Entry);
+    public IEnumerable<MailEntry> NewestFirst() => _order.Reverse();
+
+    /// <summary>What is held, oldest answer first, as an immutable set any thread may read.</summary>
+    public System.Collections.Immutable.ImmutableSortedSet<MailEntry> Order => _order;
 
     /// <summary>How many bulletins are held.</summary>
     public int Count => _index.Count;
@@ -264,25 +270,32 @@ internal sealed class MailArchive
     public void Prune()
     {
         var now = _time.GetUtcNow();
-        int dropped = 0;
+        int dropped = 0, stuck = 0;
+        string? why = null;
         while (_order.Count > 0)
         {
-            var (time, id) = _order.Min;
-            if (now - time <= _retention && _totalBytes <= _maxBytes)
+            var oldest = _order.Min!;
+            if (now - oldest.Time <= _retention && _totalBytes <= _maxBytes)
             {
                 break;
             }
             try
             {
-                File.Delete(PathOf(id));
+                File.Delete(PathOf(oldest.ObjectId));
+                dropped++;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                _log($"archive file {ObjectId.Format(id)}{Extension} cannot be removed: {e.Message}");
-                break;
+                // Forgotten all the same, so one file that will not go cannot stop the rest; it
+                // is found again, and tried again, at the next start.
+                stuck++;
+                why ??= $"{ObjectId.Format(oldest.ObjectId)}{Extension}: {e.Message}";
             }
-            Forget(id);
-            dropped++;
+            Forget(oldest.ObjectId);
+        }
+        if (stuck > 0)
+        {
+            _log($"archive: {stuck} old file{(stuck == 1 ? "" : "s")} could not be removed and {(stuck == 1 ? "is" : "are")} no longer listed (first: {why})");
         }
         if (dropped > 0)
         {
@@ -293,7 +306,7 @@ internal sealed class MailArchive
     private void Index(MailEntry entry, long fileBytes)
     {
         _index[entry.ObjectId] = (entry, fileBytes);
-        _order.Add((entry.Time, entry.ObjectId));
+        _order = _order.Add(entry);
         _totalBytes += fileBytes;
     }
 
@@ -301,7 +314,7 @@ internal sealed class MailArchive
     {
         if (_index.Remove(objectId, out var held))
         {
-            _order.Remove((held.Entry.Time, objectId));
+            _order = _order.Remove(held.Entry);
             _totalBytes -= held.FileBytes;
         }
     }

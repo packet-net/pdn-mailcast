@@ -435,4 +435,46 @@ public class MailTests
         Assert.Contains("Cannot put it back", (await resend.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString(), StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("api/mail")).StatusCode);
     }
+
+    [Fact]
+    public async Task OneDeliverySession_RebuildsTheMailListOnce()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        await using var intake = new Intake(dir.Path, _ => { }, new ReceiverStoreOptions { Time = time });
+        await RebuildAsync(intake, Samples.Bulletin(31), Samples.Bulletin(32), Samples.Bulletin(33), Samples.Bulletin(34));
+        var service = new DeliveryService(intake, new AnsweringBbs(b => new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)), new DeliveryLedger(dir.Path), time, _ => { });
+        long before = intake.MailBuilds;
+
+        Assert.Null(await service.DeliverPendingAsync(CancellationToken.None));
+
+        Assert.Equal(before + 1, intake.MailBuilds);
+        Assert.Equal(4, intake.Mail().Archived);
+        Assert.Equal(0, intake.Mail().Waiting);
+    }
+
+    [Fact]
+    public async Task SendToBbsAgain_PastFiftyWaiting_IsTooMany()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        var bulletins = Enumerable.Range(40, ReceiverStore.MaxResentWaiting + 1).Select(i => Samples.Bulletin(i, bodyLines: 2)).ToArray();
+        await RebuildAsync(host.Intake, bulletins);
+        host.Intake.Acknowledge([.. bulletins.Select(b => (b.Bid, BbsVerdict.Accepted, (string?)null))]);
+        var ids = host.Intake.Mail().NewestFirst.Select(m => ObjectId.Format(m.ObjectId)).ToList();
+
+        foreach (string id in ids.Take(ReceiverStore.MaxResentWaiting))
+        {
+            Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Resend(id))).StatusCode);
+        }
+        var tooMany = await http.SendAsync(Resend(ids[^1]));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, tooMany.StatusCode);
+        Assert.Contains("50 bulletins sent again are already waiting", await tooMany.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(ReceiverStore.MaxResentWaiting, host.Intake.Mail().Waiting);
+    }
 }

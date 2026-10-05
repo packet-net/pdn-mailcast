@@ -52,7 +52,7 @@ public sealed class Intake : IAsyncDisposable
             new BoundedChannelOptions(queueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite },
             _ => Dropped());
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
-            (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)) });
+            (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)), PublishMailOnChange = false });
         _heardSchedule = _store.HeardSchedule;
         _progress = (_store.Directory, _store.Progress());
         _worker = Task.Run(RunAsync);
@@ -176,9 +176,55 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>Moves a bulletin from the outbox to the archive once the BBS has answered for it for good.</summary>
     public void Acknowledge(string bid, BbsVerdict verdict, string? detail = null)
     {
+        MailParts? parts;
         lock (_gate)
         {
-            _store.Acknowledge(bid, verdict, detail);
+            try
+            {
+                _store.Acknowledge(bid, verdict, detail);
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
+        }
+        Publish(parts);
+    }
+
+    /// <summary>
+    /// Moves every bulletin of one delivery session that the BBS has answered for good from the
+    /// outbox to the archive, and rebuilds the mail list once for the lot, outside the lock.
+    /// Returns those that could not be moved, with why; the rest are done.
+    /// </summary>
+    public IReadOnlyList<(string Bid, Exception Error)> Acknowledge(IReadOnlyList<(string Bid, BbsVerdict Verdict, string? Detail)> answers)
+    {
+        var failed = new List<(string, Exception)>();
+        MailParts? parts;
+        lock (_gate)
+        {
+            foreach (var (bid, verdict, detail) in answers)
+            {
+                try
+                {
+                    _store.Acknowledge(bid, verdict, detail);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    failed.Add((bid, e));
+                }
+            }
+            parts = _store.CaptureMail();
+        }
+        Publish(parts);
+        return failed;
+    }
+
+    /// <summary>Builds the mail list from what was captured under the lock, now that it is released.</summary>
+    private void Publish(MailParts? parts)
+    {
+        if (parts is not null)
+        {
+            _store.Publish(parts);
         }
     }
 
@@ -197,10 +243,13 @@ public sealed class Intake : IAsyncDisposable
         var held = _store.ReadMail(objectId, out bool unreadable);
         if (unreadable)
         {
+            MailParts? parts;
             lock (_gate)
             {
-                _store.ForgetUnreadable(objectId);
+                _store.ForgetUnreadable(objectId); // which reads it again first
+                parts = _store.CaptureMail();
             }
+            Publish(parts);
         }
         return held;
     }
@@ -210,11 +259,20 @@ public sealed class Intake : IAsyncDisposable
     {
         ResendOutcome outcome;
         Bulletin? bulletin;
+        MailParts? parts;
         lock (_gate)
         {
-            (outcome, bulletin) = _store.Resend(objectId);
-            _progress = (_store.Directory, _store.Progress());
+            try
+            {
+                (outcome, bulletin) = _store.Resend(objectId);
+                _progress = (_store.Directory, _store.Progress());
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
         }
+        Publish(parts);
         return (outcome, bulletin);
     }
 
@@ -223,6 +281,9 @@ public sealed class Intake : IAsyncDisposable
     /// frame that changed it. Takes no lock: the store's thread keeps it up to date.
     /// </summary>
     public (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) Progress() => _progress;
+
+    /// <summary>For tests: how many times the mail list has been rebuilt.</summary>
+    internal long MailBuilds => _store.MailBuilds;
 
     /// <summary>For tests: how many times the store has read the outbox or the archive from disk.</summary>
     internal long StoreDiskReads => _store.DiskReads;
@@ -264,16 +325,25 @@ public sealed class Intake : IAsyncDisposable
     private void Accept(ReadOnlyMemory<byte> payload)
     {
         AcceptResult result;
+        MailParts? parts = null;
         try
         {
             lock (_gate)
             {
-                result = _store.Accept(payload.Span);
-                if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
+                try
                 {
-                    _progress = (_store.Directory, _store.Progress());
+                    result = _store.Accept(payload.Span);
+                    if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
+                    {
+                        _progress = (_store.Directory, _store.Progress());
+                    }
+                }
+                finally
+                {
+                    parts = _store.CaptureMail(); // null unless a bulletin completed or the archive was pruned
                 }
             }
+            Publish(parts);
         }
         catch (Exception e)
         {

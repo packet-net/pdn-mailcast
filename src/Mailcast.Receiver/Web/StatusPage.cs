@@ -678,6 +678,9 @@ public sealed class StatusPage : IAsyncDisposable
                 _host.Delivery.Nudge();
                 await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { resent = true, bid = b.Bid }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
                 break;
+            case Packet.Mailcast.ResendOutcome.TooMany:
+                await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = $"{Packet.Mailcast.ReceiverStore.MaxResentWaiting} bulletins sent again are already waiting for the BBS. Try again once it has answered for them." })).ConfigureAwait(false);
+                break;
             case Packet.Mailcast.ResendOutcome.AlreadyWaiting:
                 await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = "It is already waiting for the BBS." })).ConfigureAwait(false);
                 break;

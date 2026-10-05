@@ -113,9 +113,9 @@ A rebuilt bulletin waits in the outbox until your BBS has answered for it: accep
 
 The status page's **Mail** section lists both, newest first, 25 to a page: BID, from, to, @, title, date, size, and status. A waiting bulletin shows the BBS's last answer, if any, and the next try. Click one to read the whole bulletin as it will reach the BBS: its header lines, its R: lines and its text. **Open as text** shows it on its own.
 
-**Send to BBS again** puts an archived bulletin back in the outbox, and the next session offers it. If your BBS still has it, it says so by its BID, nothing is sent twice, and the bulletin stays down as accepted. Each one sent again is logged, and the same one can only be sent again once every 2 minutes.
+**Send to BBS again** puts an archived bulletin back in the outbox, and the next session offers it. If your BBS still has it, it says so by its BID, nothing is sent twice, and the bulletin stays down as accepted. Each one sent again is logged, the same one can only be sent again once every 2 minutes, and at most 50 sent again can wait for the BBS at once.
 
-The copies are a convenience: if one cannot be written (a full disk, say), that is logged, and a bulletin your BBS has taken leaves the outbox all the same. A refused one stays in the outbox until a copy can be kept.
+The copies are a convenience: if one cannot be written (a full disk, say), that is logged, and a bulletin your BBS has taken leaves the outbox all the same. A refused one is moved to `store/quarantine/` instead, so it is kept without holding up newer mail.
 
 The same is there for scripts, behind the page's password if it has one:
 

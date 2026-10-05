@@ -266,18 +266,98 @@ public class MailArchiveTests
     }
 
     [Fact]
-    public void ArchiveThatCannotBeWritten_ForRefusedMail_LeavesItInTheOutbox()
+    public void ArchiveThatCannotBeWritten_ForRefusedMail_MovesItToQuarantine_SoNewerMailIsNotHeldUp()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
+        var refused = TestBulletins.Make(71, 1500);
+        var newer = TestBulletins.Make(72, 1500);
+        ulong id = Rebuild(store, refused);
+        Rebuild(store, newer);
+        File.WriteAllText(ArchiveFolder(dir), "a file where the archive folder should be");
+
+        store.Acknowledge(refused.Bid, BbsVerdict.Refused);
+
+        Assert.Equal([newer], store.Pending());
+        string kept = Path.Combine(dir.Path, "quarantine", ObjectId.Format(id) + ".bulletin");
+        Assert.Equal(refused, Bulletin.Parse(File.ReadAllBytes(kept))); // the BBS does not have it, so it is kept
+        Assert.Single(log, l => l.Contains("refused " + refused.Bid, StringComparison.Ordinal) && l.Contains("quarantine/", StringComparison.Ordinal));
+        Assert.Equal([newer], new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast).Pending());
+    }
+
+    [Fact]
+    public void Prune_PastAFileThatWillNotGo_CarriesOn()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        var time = new ManualTime(Start);
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, Log = log.Add });
+        var ids = new List<ulong>();
+        for (int i = 0; i < 4; i++)
+        {
+            var b = TestBulletins.Make(100 + i, 800);
+            ids.Add(Rebuild(store, b));
+            store.Acknowledge(b.Bid, BbsVerdict.Accepted);
+            time.Now += TimeSpan.FromDays(1);
+        }
+        // The oldest two cannot be removed: a folder stands where each file was.
+        foreach (ulong id in ids.Take(2))
+        {
+            string file = Path.Combine(ArchiveFolder(dir), ObjectId.Format(id) + ".mail");
+            File.Delete(file);
+            Directory.CreateDirectory(Path.Combine(file, "in the way"));
+        }
+
+        time.Now = Start + TimeSpan.FromDays(32.5); // past 30 days for the first three
+        store.Expire();
+
+        Assert.Equal([ids[3]], store.Mail.NewestFirst.Select(m => m.ObjectId));
+        Assert.False(File.Exists(Path.Combine(ArchiveFolder(dir), ObjectId.Format(ids[2]) + ".mail")));
+        Assert.Single(log, l => l.Contains("2 old files could not be removed", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resend_IsCappedAtFiftyWaiting()
     {
         using var dir = new TempDirectory();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
-        var bulletin = TestBulletins.Make(71, 1500);
-        Rebuild(store, bulletin);
-        File.WriteAllText(ArchiveFolder(dir), "a file where the archive folder should be");
+        var ids = new List<ulong>();
+        for (int i = 0; i <= ReceiverStore.MaxResentWaiting; i++)
+        {
+            var b = TestBulletins.Make(200 + i, 300);
+            ids.Add(Rebuild(store, b));
+            store.Acknowledge(b.Bid, BbsVerdict.Accepted);
+        }
 
-        Assert.ThrowsAny<IOException>(() => store.Acknowledge(bulletin.Bid, BbsVerdict.Refused));
+        Assert.All(ids.Take(ReceiverStore.MaxResentWaiting), id => Assert.Equal(ResendOutcome.Resent, store.Resend(id).Outcome));
+        Assert.Equal(ResendOutcome.TooMany, store.Resend(ids[^1]).Outcome);
+        Assert.Equal(ReceiverStore.MaxResentWaiting, store.Pending().Count);
 
-        Assert.Equal([bulletin], store.Pending()); // the BBS does not have it, so this is its only copy
-        Assert.True(Assert.Single(store.Mail.NewestFirst).Waiting);
+        store.Acknowledge(store.Pending()[0].Bid, BbsVerdict.AlreadyHad); // the BBS answers for one
+        Assert.Equal(ResendOutcome.Resent, store.Resend(ids[^1]).Outcome);
+    }
+
+    [Fact]
+    public void ForgetUnreadable_ReadsTheFileAgain_AndLeavesACopyThatNowReads()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
+        var bulletin = TestBulletins.Make(73, 1500);
+        ulong id = Rebuild(store, bulletin);
+        store.Acknowledge(bulletin.Bid, BbsVerdict.Accepted);
+        string file = Path.Combine(ArchiveFolder(dir), ObjectId.Format(id) + ".mail");
+        byte[] good = File.ReadAllBytes(file);
+        File.WriteAllBytes(file, good[..10]); // caught half rewritten by a read on another thread
+
+        Assert.Null(store.ReadMail(id, out bool unreadable));
+        Assert.True(unreadable);
+        File.WriteAllBytes(file, good); // the rewrite finishes
+        store.ForgetUnreadable(id);
+
+        Assert.True(File.Exists(file));
+        Assert.Equal(bulletin.Serialize(), store.ReadMail(id)!.Value.Serialized);
+        Assert.Single(store.Mail.NewestFirst);
     }
 
     [Fact]
