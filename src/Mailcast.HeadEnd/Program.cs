@@ -22,13 +22,18 @@ public static partial class Program
         pdn-mailcast-headend: the GB7RDG mailcast head end.
 
           pdn-mailcast-headend [--config FILE]
-              Runs the service: takes bulletins in, and broadcasts once a day.
-          pdn-mailcast-headend --plan [--date YYYY-MM-DD] [--config FILE]
-              Prints what the day's slot would send, and changes nothing.
-          pdn-mailcast-headend --wav OUT.wav [--date YYYY-MM-DD] [--bulletins DIR] [--rate HZ] [--config FILE]
-              Renders the day's slot to a WAV file, offline. --bulletins takes a directory of
-              bulletin files (the file drop format), all treated as first seen on the date;
-              without it the head end's own store is used. Opens no connection to anything.
+              Runs the service: takes bulletins in, and sends them in each slot.
+          pdn-mailcast-headend --plan [--date YYYY-MM-DD] [--time HH:MM] [--config FILE]
+              Prints what a slot would send, and changes nothing. The slot is the one running
+              at --time (slot.timeUtc if left out) on --date (today if left out).
+          pdn-mailcast-headend --wav OUT.wav [--date YYYY-MM-DD] [--time HH:MM] [--bulletins DIR] [--rate HZ] [--config FILE]
+              Renders that slot to a WAV file, offline. --bulletins takes a directory of
+              bulletin files (the file drop format), all new in that slot; without it the head
+              end's own store is used. Opens no connection to anything.
+          pdn-mailcast-headend --run-now [--config FILE]
+              Asks the running service for a one-off slot now, through its status listener
+              (POST /run). It is a whole slot with the usual checks, counted like any other, and
+              the schedule carries on afterwards.
           pdn-mailcast-headend --check-config [--config FILE]
           pdn-mailcast-headend --version
 
@@ -80,6 +85,11 @@ public static partial class Program
             return 0;
         }
 
+        if (options.ContainsKey("--run-now"))
+        {
+            return await RunNowAsync(config);
+        }
+
         DateOnly? date = null;
         if (options.TryGetValue("--date", out string? dateText))
         {
@@ -91,16 +101,29 @@ public static partial class Program
             date = parsed;
         }
 
+        TimeOnly at = config.SlotTime;
+        if (options.TryGetValue("--time", out string? timeText))
+        {
+            if (!TimeOnly.TryParseExact(timeText, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out at))
+            {
+                await Console.Error.WriteLineAsync($"pdn-mailcast-headend: --time '{timeText}' is not HH:MM");
+                return 2;
+            }
+        }
+
         var journal = new ConsoleJournal();
         if (offline)
         {
-            return Offline(config, options, date ?? DateOnly.FromDateTime(DateTime.UtcNow), journal);
+            var day = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            DateTimeOffset slot = config.ToSlotSchedule().SlotAtOrBefore(new DateTimeOffset(day.ToDateTime(at, DateTimeKind.Utc)));
+            return Offline(config, options, slot, journal);
         }
         return await ServiceAsync(config, journal);
     }
 
-    private static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateOnly day, ConsoleJournal journal)
+    private static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateTimeOffset slot, ConsoleJournal journal)
     {
+        var day = DateOnly.FromDateTime(slot.UtcDateTime);
         // Offline work never touches the head end's own state: it runs on a copy, or on a store
         // made from the files given, in a scratch directory that is removed afterwards.
         string scratch = Directory.CreateTempSubdirectory("mailcast-offline-").FullName;
@@ -126,7 +149,7 @@ public static partial class Program
             var store = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
             var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions);
 
-            SlotPlan plan = planner.Plan(day);
+            SlotPlan plan = planner.Plan(slot);
             SlotSettings settings = config.ToSlotSettings();
             var airtime = LinearAirtime.Measure(config.Station.Mode);
             var runner = new SlotRunner(settings, new NullStation(), new NullKiss(), null, airtime, journal, TimeProvider.System);
@@ -134,13 +157,13 @@ public static partial class Program
             journal.Write(string.Create(CultureInfo.InvariantCulture,
                 $"airtime on {config.Station.Mode}: {airtime.PerBurst.TotalSeconds:0.00} s a burst, {airtime.Burst([1003]).TotalSeconds - airtime.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)"));
             journal.Write(string.Create(CultureInfo.InvariantCulture,
-                $"plan {day:yyyy-MM-dd}: {plan.BulletinsInRotation} bulletins in rotation, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {config.Station.Mode}"));
+                $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {config.Station.Mode}, about {runner.Airtime(plan.Frames, bursts).TotalMinutes:0.0} min on the air"));
 
             if (options.GetValueOrDefault("--wav") is string wavPath)
             {
                 int rate = int.Parse(options.GetValueOrDefault("--rate") ?? "48000", CultureInfo.InvariantCulture);
                 var summary = new WavRenderer(settings, config.Station.Mode, rate)
-                    .Render(plan.Frames, wavPath, new DateTimeOffset(day.ToDateTime(config.SlotTime, DateTimeKind.Utc)));
+                    .Render(plan.Frames, wavPath, slot);
                 journal.Write(string.Create(CultureInfo.InvariantCulture,
                     $"wav: {wavPath}, {summary.Length.TotalMinutes:0.0} min at {rate} Hz: tone {(summary.Tone ? "yes" : "no")}, {summary.Frames} frames, one per burst (the published pdn-soundmodem cannot pack them yet), {summary.Idents} CW idents"));
             }
@@ -229,7 +252,13 @@ public static partial class Program
             : "flex: not configured, so no PA temperature watch and no reference check");
 
         var status = new StatusStore(config.StateDirectory, time);
-        await using StatusServer? server = string.IsNullOrWhiteSpace(config.Status.Bind) ? null : new StatusServer(config.Status.Bind, config.Status.Port, status);
+        journal.Write(config.Slot.EveryMinutes == 1440
+            ? $"schedule: a slot every day at {config.Slot.TimeUtc}Z"
+            : $"schedule: a slot every {config.Slot.EveryMinutes} min, counted from {config.Slot.TimeUtc}Z");
+        using var service = new HeadEndService(
+            config.ToSlotSchedule(), TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
+            planner, store, intakes, runner, status, journal, time);
+        await using StatusServer? server = string.IsNullOrWhiteSpace(config.Status.Bind) ? null : new StatusServer(config.Status.Bind, config.Status.Port, status, service.RequestRunNow);
         if (server is not null)
         {
             try
@@ -243,19 +272,42 @@ public static partial class Program
             }
         }
 
-        var service = new HeadEndService(
-            config.SlotTime, TimeSpan.FromMinutes(config.Slot.CatchUpMinutes), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
-            planner, store, intakes, runner, status, journal, time);
         await service.RunAsync(stop.Token);
         fbbIntake?.Dispose();
         journal.Write("pdn-mailcast-headend stopped");
         return 0;
     }
 
+    private static async Task<int> RunNowAsync(HeadEndConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.Status.Bind))
+        {
+            await Console.Error.WriteLineAsync("pdn-mailcast-headend: the status listener is off (\"status\".\"bind\" is empty), so there is nothing to ask");
+            return 2;
+        }
+        string host = config.Status.Bind is "*" or "+" or "0.0.0.0" ? "127.0.0.1" : config.Status.Bind is "::" ? "[::1]" : config.Status.Bind;
+        var url = new Uri(string.Create(CultureInfo.InvariantCulture, $"http://{host}:{config.Status.Port}/run"));
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+        request.Headers.Add(StatusServer.RequestedByHeader, $"{Environment.UserName} with --run-now");
+        try
+        {
+            using HttpResponseMessage response = await http.SendAsync(request);
+            string body = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"{(int)response.StatusCode} {Ascii.Plain(body)}");
+            return response.StatusCode == System.Net.HttpStatusCode.Accepted ? 0 : 1;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: cannot reach the head end at {url}: {Ascii.Plain(e.Message)}");
+            return 1;
+        }
+    }
+
     internal static Dictionary<string, string?> ParseArguments(string[] args, out string? error)
     {
-        string[] withValue = ["--config", "--wav", "--date", "--bulletins", "--rate"];
-        string[] flags = ["--plan", "--check-config", "--version", "--help"];
+        string[] withValue = ["--config", "--wav", "--date", "--time", "--bulletins", "--rate"];
+        string[] flags = ["--plan", "--check-config", "--run-now", "--version", "--help"];
         var options = new Dictionary<string, string?>(StringComparer.Ordinal);
         error = null;
         for (int i = 0; i < args.Length; i++)

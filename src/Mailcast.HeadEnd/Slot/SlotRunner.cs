@@ -6,7 +6,7 @@ using Mailcast.HeadEnd.Station;
 namespace Mailcast.HeadEnd.Slot;
 
 /// <summary>
-/// Runs one daily slot against the station: channel check and calibration tone, the transmit
+/// Runs one slot against the station: channel check and calibration tone, the transmit
 /// lease, the frames in bursts, and the hard stops.
 /// </summary>
 /// <remarks>
@@ -110,8 +110,26 @@ public sealed class SlotRunner
         return sizes;
     }
 
+    /// <summary>
+    /// The frames' airtime in bursts of <paramref name="sizes"/> (from <see cref="BurstSizes"/>
+    /// when null): the bursts alone, without the tone, the idents or the gaps between bursts.
+    /// </summary>
+    public TimeSpan Airtime(IReadOnlyList<SlotFrame> frames, IReadOnlyList<int>? sizes = null)
+    {
+        ArgumentNullException.ThrowIfNull(frames);
+        sizes ??= BurstSizes(frames);
+        TimeSpan total = TimeSpan.Zero;
+        int next = 0;
+        foreach (int n in sizes)
+        {
+            total += _airtime.Burst([.. frames.Skip(next).Take(n).Select(f => Ax25(f).Length)]);
+            next += n;
+        }
+        return total;
+    }
+
     /// <summary>Runs the slot. Never throws for anything the station or the radio does.</summary>
-    /// <param name="day">The broadcast day.</param>
+    /// <param name="slot">The slot's start, which names it in the journal and the report.</param>
     /// <param name="frames">The frames, in sending order.</param>
     /// <param name="bulletinsInRotation">For the log and the report.</param>
     /// <param name="cancellation">Stops the slot: nothing more is queued, and the lease is released.</param>
@@ -119,12 +137,16 @@ public sealed class SlotRunner
     /// Told how many frames have been handed to the modem so far, each time more are: the planner
     /// records them as it goes, so a crash mid-slot never repeats one.
     /// </param>
-    public async Task<SlotReport> RunAsync(DateOnly day, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null)
+    /// <param name="requestedBy">Who asked for a one-off slot, or null for a scheduled one.</param>
+    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        using var run = new Run(this, day, frames, bulletinsInRotation, queued);
+        using var run = new Run(this, slot, frames, bulletinsInRotation, queued, requestedBy);
         return await run.ExecuteAsync(cancellation);
     }
+
+    /// <summary>How a slot is named in the journal: its start, UTC, to the minute.</summary>
+    public static string Name(DateTimeOffset slot) => slot.UtcDateTime.ToString("yyyy-MM-dd HH:mm'Z'", CultureInfo.InvariantCulture);
 
     private static string Clock(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
@@ -133,7 +155,7 @@ public sealed class SlotRunner
     private static string Degrees(double c) => c.ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>One slot's state.</summary>
-    private sealed class Run(SlotRunner owner, DateOnly day, IReadOnlyList<SlotFrame> frames, int bulletins, Action<int>? onQueued) : IDisposable
+    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, Action<int>? onQueued, string? requestedBy) : IDisposable
     {
         /// <summary>How long the modem may gather the first frame of a burst before contending.</summary>
         private static readonly TimeSpan Gather = TimeSpan.FromSeconds(1);
@@ -168,19 +190,22 @@ public sealed class SlotRunner
             set => Interlocked.Exchange(ref _leaseUntilTicks, value.UtcTicks);
         }
 
-        private void Say(string line) => owner._journal.Write($"slot {day:yyyy-MM-dd}: {line}");
+        private void Say(string line) => owner._journal.Write($"slot {Name(slot)}: {line}");
 
         public async Task<SlotReport> ExecuteAsync(CancellationToken cancellation)
         {
             _start = Now;
-            var sizes = owner.BurstSizes(frames);
-            TimeSpan estimate = Estimate(sizes);
-            Say($"starting at {Clock(_start)}Z, {frames.Count} frames for {bulletins} bulletins in {sizes.Count} bursts, about {Minutes(estimate)} min on the air");
-
+            if (requestedBy is not null)
+            {
+                Say($"a one-off slot, asked for by {requestedBy}");
+            }
             if (frames.Count == 0)
             {
                 return Finish(SlotOutcome.Skipped, "nothing to send");
             }
+            var sizes = owner.BurstSizes(frames);
+            TimeSpan estimate = owner.Airtime(frames, sizes);
+            Say($"starting at {Clock(_start)}Z, {frames.Count} frames for {bulletins} bulletins in {sizes.Count} bursts, about {Minutes(estimate)} min on the air");
 
             if (S.RequireClockSync)
             {
@@ -242,7 +267,9 @@ public sealed class SlotRunner
                 }
                 finally
                 {
-                    await slot.CancelAsync();
+                    // In line rather than CancelAsync, which finishes on another thread: the slot's own
+                    // loops stop before anything else runs, on virtual time too.
+                    slot.Cancel();
                     await Quietly(renewing);
                     await Quietly(watching);
                     if (_dropping is not null)
@@ -261,18 +288,6 @@ public sealed class SlotRunner
             return _sent == frames.Count && _abort is null
                 ? Finish(SlotOutcome.Completed, null)
                 : Finish(SlotOutcome.Aborted, _abort ?? "stopped early");
-        }
-
-        private TimeSpan Estimate(IReadOnlyList<int> sizes)
-        {
-            TimeSpan total = TimeSpan.Zero;
-            int next = 0;
-            foreach (int n in sizes)
-            {
-                total += owner._airtime.Burst([.. frames.Skip(next).Take(n).Select(f => owner.Ax25(f).Length)]);
-                next += n;
-            }
-            return total;
         }
 
         private async Task<string?> ReadFlexAsync(CancellationToken cancellation)
@@ -295,7 +310,7 @@ public sealed class SlotRunner
             Say($"Flex reference {reference.Summary}");
             if (reference.GpsLocked == false)
             {
-                Say("WARNING - the Flex is not GPS locked, so today's tone is not a true frequency reference");
+                Say("WARNING - the Flex is not GPS locked, so this slot's tone is not a true frequency reference");
             }
             if (flex.PaTemperatureC is double pa)
             {
@@ -684,7 +699,8 @@ public sealed class SlotRunner
             DateTimeOffset end = Now;
             var report = new SlotReport
             {
-                Day = day,
+                Slot = slot,
+                Day = DateOnly.FromDateTime(slot.UtcDateTime),
                 Start = _start,
                 End = end,
                 Outcome = outcome,
@@ -699,6 +715,7 @@ public sealed class SlotRunner
                 PaTemperatureMaxC = _paMax,
                 LeaseTaken = _leaseTaken,
                 LeaseRenewals = _renewals,
+                RequestedBy = requestedBy,
                 Retryable = retryable,
             };
             string pa = _paMax is double max ? $"{Degrees(max)} C" : "not read";
@@ -711,7 +728,7 @@ public sealed class SlotRunner
                     Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");
                     break;
                 default:
-                    Say($"skipped: {reason}. {(_toneSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry today" : "")}");
+                    Say($"skipped: {reason}. {(_toneSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry of this one" : "")}");
                     break;
             }
             return report;

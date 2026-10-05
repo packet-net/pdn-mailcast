@@ -1,25 +1,33 @@
 {
   // pdn-mailcast-headend. Every key has a default except "station"."apiKey"; the service will not
-  // start until that is set. docs/headend.md says what each one does.
+  // start until that is set. docs/headend.md says what each one does. The slot settings here are
+  // GB7RDG's, a slot every hour on the hour; the rest are the defaults.
   "callsign": "GB7RDG",
   "destination": "MCAST",
   "stateDirectory": "/var/lib/pdn-mailcast-headend",
 
   // Frame size: the bytes of bulletin per frame, 64 to 940 in steps of 4. Smaller frames survive
-  // fades and other stations better; docs/headend.md says more.
+  // fades and other stations better; docs/headend.md says more. How each bulletin is carried
+  // ("slotShares", "slotOffsets", "extraSymbols", "carryOverSlots") is left to the defaults for
+  // the slot interval: for hourly, the first slot after it arrives and again 5, 10, 17 and 25
+  // hours later.
   "schedule": {
     "symbolSize": 240
   },
 
+  // A slot at "timeUtc" and then every "everyMinutes" (dividing a day, at least 15). Left out,
+  // "everyMinutes" is 1440, one slot a day, and then "toneSeconds" is 30, "maxMinutes" 40 and
+  // "catchUpMinutes" 30. Receivers expect GB7RDG every hour on the hour with a 10 s tone.
   "slot": {
-    "timeUtc": "12:00",
-    "catchUpMinutes": 30,
+    "timeUtc": "00:00",
+    "everyMinutes": 60,
+    "catchUpMinutes": 5,
     "requireClockSync": true,
     "retryMinutes": 5,
-    "maxMinutes": 40,
+    "maxMinutes": 10,
     "channelWaitSeconds": 120,
     "whenStillBusy": "go",
-    "toneSeconds": 30,
+    "toneSeconds": 10,
     "toneHz": 1800,
     "pauseAfterToneSeconds": 8,
     "burstGapSeconds": 1
@@ -76,6 +84,8 @@
     }
   },
 
+  // GET /status for the state; POST /run (pdn-mailcast-headend --run-now) for a one-off slot,
+  // accepted only from this machine.
   "status": {
     "bind": "127.0.0.1",
     "port": 8216

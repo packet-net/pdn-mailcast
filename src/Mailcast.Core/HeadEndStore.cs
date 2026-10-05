@@ -7,18 +7,23 @@ namespace Mailcast.Core;
 
 /// <summary>
 /// The head end's memory of the bulletins in rotation. A bulletin is compressed and coded once,
-/// on the day it is first offered, and the same object is sent on every later day, continuing
-/// from the next unsent ESI. Nothing is ever compressed twice, so a change of compression
+/// when it is first offered, and the same object is sent in every later slot, continuing from
+/// the next unsent ESI. Nothing is ever compressed twice, so a change of compression
 /// settings or dictionary cannot make the pieces of one bulletin disagree.
 /// </summary>
 /// <remarks>
 /// <para>One folder per bulletin under <c>bulletins/</c>, named from a hash of its BID in capitals:</para>
 /// <code>
 /// object.bin   the object's octets, exactly as coded
-/// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi
+/// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi,
+///              and FirstSlot once it has been carried
 /// </code>
+/// <para>
+/// A state without FirstSlot but with pieces sent comes from a daily head end before slots had
+/// times, and counts as first carried at midnight UTC on its FirstSeen day.
+/// </para>
 /// <para>And one file per directory object sent, <c>directories/OBJECTID.txt</c>, with its Day and
-/// NextEsi, so a second plan the same day does not repeat the directory's pieces.</para>
+/// NextEsi, so a later plan with the same directory object does not repeat its pieces.</para>
 /// <para>
 /// Both are written to a temporary name and renamed, object first, so a folder whose state is
 /// missing or does not match its object is an interrupted first offer and is discarded.
@@ -86,7 +91,7 @@ public sealed class HeadEndStore
     /// <summary>
     /// The first unsent ESI of a directory object: 0 for one never sent. Pass this method to
     /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateOnly, int, Compression, ScheduleOptions?, Func{ulong, uint}?)"/>
-    /// so that a second plan the same day does not repeat the directory's pieces either.
+    /// so that a later plan with the same directory object does not repeat its pieces either.
     /// </summary>
     public uint DirectoryNextEsi(ulong objectId) =>
         _directoryEsis.TryGetValue(objectId, out var d) ? d.NextEsi : 0;
@@ -96,7 +101,7 @@ public sealed class HeadEndStore
 
     /// <summary>
     /// Offers a bulletin. The first time a BID is offered it is compressed, coded and kept, with
-    /// <paramref name="seen"/> as its first-seen day; later offers of the same BID return what
+    /// <paramref name="seen"/> as its first-seen day and no first slot yet; later offers of the same BID return what
     /// was kept, unchanged, whatever their content. Returns null if the bulletin is over
     /// <see cref="ScheduleOptions.MaxBulletinSize"/>.
     /// </summary>
@@ -124,15 +129,22 @@ public sealed class HeadEndStore
         return carried;
     }
 
-    /// <summary>The bulletins in their carrying days on <paramref name="today"/>, to pass to <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateOnly, int, Compression, ScheduleOptions?, Func{ulong, uint}?)"/>.</summary>
-    public IReadOnlyList<CarriedBulletin> InRotation(DateOnly today) =>
+    /// <summary>The bulletins in rotation in the slot at midnight UTC on <paramref name="today"/>.</summary>
+    public IReadOnlyList<CarriedBulletin> InRotation(DateOnly today) => InRotation(BroadcastScheduler.Midnight(today));
+
+    /// <summary>
+    /// The bulletins in rotation in the slot starting at <paramref name="slot"/>: those not yet
+    /// carried, and those still in their carrying slots. Pass them to
+    /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?)"/>.
+    /// </summary>
+    public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot) =>
         _entries.Values
             .Select(e => e.Carried)
-            .Where(c => today.DayNumber - c.FirstSeen.DayNumber is var d && d >= 0 && d < _options.DaysCarried)
+            .Where(c => BroadcastScheduler.InRotation(c, slot, _options))
             .ToList();
 
     /// <summary>Records that a plan's frames have been sent, so the next plan continues with fresh ESIs.</summary>
-    public void Commit(DailyBroadcast broadcast)
+    public void Commit(SlotBroadcast broadcast)
     {
         ArgumentNullException.ThrowIfNull(broadcast);
         Commit(broadcast, broadcast.Frames.Count);
@@ -142,9 +154,10 @@ public sealed class HeadEndStore
     /// Records that the first <paramref name="framesSent"/> of a plan's frames have been sent (or
     /// may have been: a frame handed to the modem counts). Each object moves on past the highest ESI
     /// of its own among them, so nothing sent is ever sent again, and what was not sent is still
-    /// owed: the next plan sends it on top of that day's share.
+    /// owed: the next plan sends it on top of that slot's share. A bulletin with a frame among
+    /// them that had no first slot gets this one.
     /// </summary>
-    public void Commit(DailyBroadcast broadcast, int framesSent)
+    public void Commit(SlotBroadcast broadcast, int framesSent)
     {
         ArgumentNullException.ThrowIfNull(broadcast);
         ArgumentOutOfRangeException.ThrowIfNegative(framesSent);
@@ -175,9 +188,13 @@ public sealed class HeadEndStore
             {
                 continue;
             }
-            if (nextEsi > entry.Carried.NextEsi)
+            if (nextEsi > entry.Carried.NextEsi || entry.Carried.FirstSlot is null)
             {
-                entry.Carried = entry.Carried with { NextEsi = nextEsi };
+                entry.Carried = entry.Carried with
+                {
+                    NextEsi = Math.Max(nextEsi, entry.Carried.NextEsi),
+                    FirstSlot = entry.Carried.FirstSlot ?? broadcast.Slot,
+                };
                 SaveState(entry);
             }
         }
@@ -257,6 +274,10 @@ public sealed class HeadEndStore
         text.Append(CultureInfo.InvariantCulture, $"Dictionary: {c.Transfer.DictionaryId}\n");
         text.Append("Oti: ").Append(Convert.ToHexStringLower(c.Transfer.Oti.ToBytes())).Append('\n');
         text.Append(CultureInfo.InvariantCulture, $"NextEsi: {c.NextEsi}\n");
+        if (c.FirstSlot is DateTimeOffset firstSlot)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"FirstSlot: {firstSlot.UtcDateTime:yyyy-MM-ddTHH:mmZ}\n");
+        }
         DurableFile.WriteAtomically(Path.Combine(entry.Dir, "state.txt"), Bulletin.TextEncoding.GetBytes(text.ToString()));
     }
 
@@ -285,13 +306,19 @@ public sealed class HeadEndStore
             {
                 return null;
             }
+            var firstSeen = DateOnly.ParseExact(fields["FirstSeen"], "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            uint nextEsi = uint.Parse(fields["NextEsi"], CultureInfo.InvariantCulture);
+            DateTimeOffset? firstSlot = fields.TryGetValue("FirstSlot", out var slotText)
+                ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
+                : nextEsi > 0 ? BroadcastScheduler.Midnight(firstSeen) : null;
             var carried = new CarriedBulletin(
                 fields["Bid"],
                 fields["Title"],
                 int.Parse(fields["Size"], CultureInfo.InvariantCulture),
-                DateOnly.ParseExact(fields["FirstSeen"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                firstSeen,
                 transfer,
-                uint.Parse(fields["NextEsi"], CultureInfo.InvariantCulture));
+                nextEsi,
+                firstSlot);
             return new Entry(dir, carried);
         }
         catch (Exception e) when (e is FormatException or ArgumentException or KeyNotFoundException or OverflowException)

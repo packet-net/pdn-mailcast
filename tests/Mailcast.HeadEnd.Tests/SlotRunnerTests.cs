@@ -7,7 +7,7 @@ namespace Mailcast.HeadEnd.Tests;
 public class SlotRunnerTests(ITestOutputHelper output)
 {
     private static readonly DateTimeOffset Noon = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
-    private static readonly DateOnly Day = new(2026, 10, 5);
+    private static readonly DateTimeOffset Day = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
     private static readonly ReferenceReading Gps = new("GPSDO locked", true);
 
     private sealed class Rig
@@ -37,8 +37,13 @@ public class SlotRunnerTests(ITestOutputHelper output)
 
         public List<int> Progress { get; } = [];
 
-        public SlotReport Run(int frames) =>
-            Time.Run(() => Runner.RunAsync(Day, [.. Enumerable.Range(0, frames).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None, Progress.Add));
+        public SlotReport Run(int frames, Action? first = null) =>
+            Time.Run(() =>
+            {
+                // Anything started here runs on the virtual clock's own pump, as the slot does.
+                first?.Invoke();
+                return Runner.RunAsync(Day, [.. Enumerable.Range(0, frames).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None, Progress.Add);
+            });
     }
 
     private static void AssertNothingKeyedOutsideTheLease(FakeStation station)
@@ -231,8 +236,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         // says busy, the head end waits for it to clear, and the tone goes after the keyup.
         var rig = new Rig();
         rig.Station.FirstBusyReadMisses = true;
-        rig.Station.KeyOtherTraffic(TimeSpan.FromSeconds(90));
-        var report = rig.Run(5);
+        var report = rig.Run(5, () => rig.Station.KeyOtherTraffic(TimeSpan.FromSeconds(90)));
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         Assert.True(report.ToneSent);
         var other = rig.Station.Keyups.Single(k => k.What.StartsWith("other traffic", StringComparison.Ordinal));

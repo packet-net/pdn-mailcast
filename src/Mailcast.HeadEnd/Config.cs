@@ -86,28 +86,54 @@ public sealed record HeadEndConfig
         ChannelWait = TimeSpan.FromSeconds(Slot.ChannelWaitSeconds),
         RequireClockSync = Slot.RequireClockSync,
         WhenStillBusy = Slot.WhenStillBusy,
-        ToneLength = TimeSpan.FromSeconds(Slot.ToneSeconds),
+        ToneLength = TimeSpan.FromSeconds(Slot.Tone),
         ToneHz = Slot.ToneHz,
         PauseAfterTone = TimeSpan.FromSeconds(Slot.PauseAfterToneSeconds),
         MaxBurst = TimeSpan.FromSeconds(Station.MaxBurstSeconds),
         FramesPerBurst = Station.FramesPerBurst,
         BurstGap = TimeSpan.FromSeconds(Slot.BurstGapSeconds),
         AckGrace = TimeSpan.FromSeconds(Station.AckGraceSeconds),
-        MaxSlotLength = TimeSpan.FromMinutes(Slot.MaxMinutes),
+        MaxSlotLength = TimeSpan.FromMinutes(Slot.Max),
         PaTemperatureLimitC = Flex.PaTemperatureLimitC,
         WhenFlexUnreachable = Flex.WhenUnreachable,
     };
 
-    /// <summary>The scheduler's options.</summary>
+    /// <summary>
+    /// The scheduler's options. A daily station's defaults are the core's; any shorter interval
+    /// starts from <see cref="ScheduleOptions.Hourly"/>, its offsets kept in hours. The daily
+    /// station's old keys (<c>daysCarried</c>, <c>totalOverhead</c>, <c>dayShares</c>) still work:
+    /// each day's share of the total becomes a slot share, the carryings a day apart.
+    /// </summary>
     public ScheduleOptions ToScheduleOptions()
     {
-        var defaults = new ScheduleOptions();
+        int every = Slot.EveryMinutes;
+        ScheduleOptions defaults = every == MinutesPerDay ? new ScheduleOptions() : HourlyScaledTo(every);
+        IReadOnlyList<double> shares = Schedule.SlotShares ?? defaults.SlotShares;
+        IReadOnlyList<int> offsets = Schedule.SlotOffsets ?? defaults.SlotOffsets;
+        if (Schedule.SlotShares is not null && Schedule.SlotOffsets is null && shares.Count != offsets.Count)
+        {
+            // New shares without offsets: carried in that many slots, spread as evenly as the
+            // default's span allows.
+            int span = Math.Max(defaults.SlotOffsets[^1], shares.Count - 1);
+            offsets = [.. Enumerable.Range(0, shares.Count).Select(c => shares.Count == 1 ? 0 : (int)Math.Round(c * span / (double)(shares.Count - 1)))];
+        }
+        int carryOver = Schedule.CarryOverSlots ?? defaults.CarryOverSlots;
+        if (Schedule.UsesDailyKeys)
+        {
+            int days = Schedule.DaysCarried ?? 3;
+            double overhead = Schedule.TotalOverhead ?? 2.0;
+            IReadOnlyList<double> dayShares = Schedule.DayShares ?? (days == 3 ? [0.7, 0.15, 0.15] : [.. Enumerable.Repeat(1.0 / days, days)]);
+            shares = [.. dayShares.Select(d => d * overhead)];
+            offsets = [.. Enumerable.Range(0, days).Select(d => d * (MinutesPerDay / every))];
+            carryOver = 0;
+        }
         return defaults with
         {
-            DaysCarried = Schedule.DaysCarried ?? defaults.DaysCarried,
-            TotalOverhead = Schedule.TotalOverhead ?? defaults.TotalOverhead,
+            SlotMinutes = every,
+            SlotShares = shares,
+            SlotOffsets = offsets,
+            CarryOverSlots = carryOver,
             ExtraSymbols = Schedule.ExtraSymbols ?? defaults.ExtraSymbols,
-            DayShares = Schedule.DayShares ?? defaults.DayShares,
             DirectoryEvery = Schedule.DirectoryEvery ?? defaults.DirectoryEvery,
             RememberDays = Schedule.RememberDays ?? defaults.RememberDays,
             SymbolSize = Schedule.SymbolSize ?? defaults.SymbolSize,
@@ -115,8 +141,31 @@ public sealed record HeadEndConfig
         };
     }
 
-    /// <summary>The slot's start time of day, UTC.</summary>
+    /// <summary>The hourly defaults for another interval: the same hours, in that interval's slots.</summary>
+    private static ScheduleOptions HourlyScaledTo(int every)
+    {
+        var hourly = ScheduleOptions.Hourly;
+        var offsets = new List<int>();
+        foreach (int hours in hourly.SlotOffsets)
+        {
+            int slot = (int)Math.Round(hours * 60.0 / every);
+            offsets.Add(offsets.Count == 0 ? 0 : Math.Max(slot, offsets[^1] + 1));
+        }
+        return hourly with
+        {
+            SlotMinutes = every,
+            SlotOffsets = offsets,
+            CarryOverSlots = (int)Math.Round(hourly.CarryOverSlots * 60.0 / every),
+        };
+    }
+
+    /// <summary>The first slot's time of day, UTC, which the others are counted from.</summary>
     public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture);
+
+    /// <summary>When the slots are.</summary>
+    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes));
+
+    private const int MinutesPerDay = 1440;
 
     private void Validate(string source)
     {
@@ -133,11 +182,28 @@ public sealed record HeadEndConfig
         {
             problems.Add($"\"slot\".\"timeUtc\": '{Slot.TimeUtc}' is not HH:mm");
         }
-        if (Slot.MaxMinutes is <= 0 or > 180)
+        if (Slot.Max is <= 0 or > 180)
         {
             problems.Add("\"slot\".\"maxMinutes\" must be above 0 and at most 180");
         }
-        if (Slot.ToneSeconds is < 0 or > 60)
+        bool everyFine = Slot.EveryMinutes >= 15 && Slot.EveryMinutes <= MinutesPerDay && MinutesPerDay % Slot.EveryMinutes == 0;
+        if (!everyFine)
+        {
+            problems.Add("\"slot\".\"everyMinutes\" must be at least 15 and divide 1440 (a day): 15, 20, 30, 60, 120, 180, 240, 360, 480, 720 or 1440");
+        }
+        else
+        {
+            if (Slot.Max > Slot.EveryMinutes)
+            {
+                problems.Add(string.Create(CultureInfo.InvariantCulture, $"\"slot\".\"maxMinutes\" {Slot.Max} is longer than the {Slot.EveryMinutes} minutes between slots"));
+            }
+            if (Slot.CatchUp < 0 || Slot.CatchUp >= Slot.EveryMinutes)
+            {
+                problems.Add(string.Create(CultureInfo.InvariantCulture, $"\"slot\".\"catchUpMinutes\" must be 0 or more and less than the {Slot.EveryMinutes} minutes between slots, so a late slot never meets the next"));
+            }
+        }
+        ValidateSchedule(problems, everyFine);
+        if (Slot.Tone is < 0 or > 60)
         {
             problems.Add("\"slot\".\"toneSeconds\" must be 0 to 60 (the station caps a test at 60 s, 30 s unless its txTest.maxSeconds says more)");
         }
@@ -226,21 +292,104 @@ public sealed record HeadEndConfig
             throw new ConfigException($"{source}: {string.Join("; ", problems)}");
         }
     }
+
+    private void ValidateSchedule(List<string> problems, bool everyFine)
+    {
+        if (Schedule.UsesDailyKeys)
+        {
+            if (Schedule.SlotShares is not null || Schedule.SlotOffsets is not null || Schedule.CarryOverSlots is not null)
+            {
+                problems.Add("\"schedule\": use either \"slotShares\" and \"slotOffsets\" or the daily station's \"daysCarried\", \"totalOverhead\" and \"dayShares\", not both");
+                return;
+            }
+            int days = Schedule.DaysCarried ?? 3;
+            if (days < 1)
+            {
+                problems.Add("\"schedule\".\"daysCarried\" must be at least 1");
+                return;
+            }
+            if (Schedule.DayShares is { } d && (d.Count != days || d.Any(x => x < 0) || Math.Abs(d.Sum() - 1) > 1e-9))
+            {
+                problems.Add("\"schedule\".\"dayShares\" must have one share for each day carried, none negative, summing to 1");
+                return;
+            }
+            if (Schedule.TotalOverhead is < 1)
+            {
+                problems.Add("\"schedule\".\"totalOverhead\" must be at least 1");
+                return;
+            }
+        }
+        if (Schedule.SlotShares is { } shares && (shares.Count == 0 || shares.Any(x => x < 0 || double.IsNaN(x)) || shares[0] <= 0))
+        {
+            problems.Add("\"schedule\".\"slotShares\" must have at least one entry, none negative and the first above 0");
+            return;
+        }
+        if (Schedule.SlotOffsets is { } offsets)
+        {
+            int count = Schedule.SlotShares?.Count ?? ToScheduleOptions().SlotShares.Count;
+            if (offsets.Count != count || offsets.Count == 0 || offsets[0] != 0 || offsets.Zip(offsets.Skip(1)).Any(p => p.Second <= p.First))
+            {
+                problems.Add("\"schedule\".\"slotOffsets\" must have one entry for each of \"slotShares\", the first 0 and each later one above the one before");
+                return;
+            }
+        }
+        if (Schedule.CarryOverSlots is < 0)
+        {
+            problems.Add("\"schedule\".\"carryOverSlots\" must be 0 or more");
+            return;
+        }
+        if (Schedule.ExtraSymbols is < 0)
+        {
+            problems.Add("\"schedule\".\"extraSymbols\" must be 0 or more");
+            return;
+        }
+        if (Schedule.DirectoryEvery is < 2)
+        {
+            problems.Add("\"schedule\".\"directoryEvery\" must be at least 2");
+            return;
+        }
+        if (everyFine)
+        {
+            try
+            {
+                BroadcastScheduler.Validate(ToScheduleOptions());
+            }
+            catch (ArgumentException e)
+            {
+                problems.Add($"\"schedule\": {e.Message}");
+            }
+        }
+    }
 }
 
 public sealed record SlotConfig
 {
-    /// <summary>The slot's start, UTC, HH:mm.</summary>
+    /// <summary>A slot's start, UTC, HH:mm: the first of the day's slots, or the only one for a daily station.</summary>
     public string TimeUtc { get; init; } = "12:00";
 
-    /// <summary>A head end started this many minutes late still runs today's slot.</summary>
-    public int CatchUpMinutes { get; init; } = 30;
+    /// <summary>Minutes from one slot to the next, at least 15 and dividing a day: 1440 is daily, 60 hourly.</summary>
+    public int EveryMinutes { get; init; } = 1440;
+
+    /// <summary>A head end started this many minutes late still runs the slot it missed. Left out, 30 for a daily station and 5 otherwise.</summary>
+    public int? CatchUpMinutes { get; init; }
+
+    /// <summary><see cref="CatchUpMinutes"/>, or its default for the interval.</summary>
+    [JsonIgnore]
+    public int CatchUp => CatchUpMinutes ?? (EveryMinutes == 1440 ? 30 : 5);
 
     /// <summary>A slot skipped for a reason at the station is tried again after this long, within the catch-up window.</summary>
     public double RetryMinutes { get; init; } = 5;
 
-    /// <summary>The hard stop.</summary>
-    public double MaxMinutes { get; init; } = 40;
+    /// <summary>
+    /// The hard stop, from the slot's start. Left out, 40 for a daily station and 10 otherwise,
+    /// so an hourly slot ends while a web SDR receiver, which listens to 12 minutes past, is
+    /// still there.
+    /// </summary>
+    public double? MaxMinutes { get; init; }
+
+    /// <summary><see cref="MaxMinutes"/>, or its default for the interval.</summary>
+    [JsonIgnore]
+    public double Max => MaxMinutes ?? (EveryMinutes == 1440 ? 40 : 10);
 
     /// <summary>Key nothing until the kernel says the clock is synchronised.</summary>
     public bool RequireClockSync { get; init; } = true;
@@ -249,7 +398,12 @@ public sealed record SlotConfig
 
     public BusyPolicy WhenStillBusy { get; init; } = BusyPolicy.Go;
 
-    public double ToneSeconds { get; init; } = 30;
+    /// <summary>The calibration tone. Left out, 30 s for a daily station and 10 s otherwise, which receivers expect from an hourly one.</summary>
+    public double? ToneSeconds { get; init; }
+
+    /// <summary><see cref="ToneSeconds"/>, or its default for the interval.</summary>
+    [JsonIgnore]
+    public double Tone => ToneSeconds ?? (EveryMinutes == 1440 ? 30 : 10);
 
     public double ToneHz { get; init; } = 1800;
 
@@ -312,16 +466,36 @@ public sealed record FlexConfig
     public FlexUnreachablePolicy WhenUnreachable { get; init; } = FlexUnreachablePolicy.CarryOn;
 }
 
-/// <summary>Overrides of the scheduler's options; each left out keeps the core's default.</summary>
+/// <summary>Overrides of the scheduler's options; each left out keeps the default for the slot interval.</summary>
 public sealed record ScheduleConfig
 {
-    public int? DaysCarried { get; init; }
+    /// <summary>
+    /// Symbols for each carrying of a bulletin, as multiples of its K, the first for the slot after
+    /// it is taken in. As many entries as carryings.
+    /// </summary>
+    public IReadOnlyList<double>? SlotShares { get; init; }
 
-    public double? TotalOverhead { get; init; }
+    /// <summary>Which slot each carrying is in, counted from the first: 0, then rising. One for each of <see cref="SlotShares"/>.</summary>
+    public IReadOnlyList<int>? SlotOffsets { get; init; }
 
+    /// <summary>Slots after the last carrying in which a bulletin may still make up pieces a skipped or cut-short slot did not send.</summary>
+    public int? CarryOverSlots { get; init; }
+
+    /// <summary>Spare symbols on top of the first carrying's share.</summary>
     public int? ExtraSymbols { get; init; }
 
+    /// <summary>A daily station's old setting: how many days running a bulletin is carried. Use <see cref="SlotShares"/> instead.</summary>
+    public int? DaysCarried { get; init; }
+
+    /// <summary>A daily station's old setting: symbols over all days, as a multiple of K. Use <see cref="SlotShares"/> instead.</summary>
+    public double? TotalOverhead { get; init; }
+
+    /// <summary>A daily station's old setting: each day's fraction of the total, summing to 1. Use <see cref="SlotShares"/> instead.</summary>
     public IReadOnlyList<double>? DayShares { get; init; }
+
+    /// <summary>Whether any of the daily station's old keys is set.</summary>
+    [JsonIgnore]
+    public bool UsesDailyKeys => DaysCarried is not null || TotalOverhead is not null || DayShares is not null;
 
     public int? DirectoryEvery { get; init; }
 

@@ -118,7 +118,7 @@ internal static class Ids
         TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default).ObjectId;
 
     /// <summary>The directory's object ID in a plan.</summary>
-    public static ulong DirectoryOf(DailyBroadcast plan) => plan.Objects[0].Transfer.ObjectId;
+    public static ulong DirectoryOf(SlotBroadcast plan) => plan.Objects[0].Transfer.ObjectId;
 }
 
 /// <summary>A clock the test moves by hand.</summary>

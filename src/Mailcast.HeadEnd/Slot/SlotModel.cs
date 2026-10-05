@@ -8,7 +8,7 @@ public enum BusyPolicy
     /// <summary>Carry on without the calibration tone.</summary>
     Go,
 
-    /// <summary>Give up for today; everything rolls to tomorrow.</summary>
+    /// <summary>Give up on this slot; everything rolls on to the next.</summary>
     Skip,
 }
 
@@ -123,6 +123,10 @@ public enum SlotOutcome
 /// <summary>What happened in one slot. This is also what the status endpoint shows.</summary>
 public sealed record SlotReport
 {
+    /// <summary>The slot's start. A report from before slots had times leaves it unset: see <see cref="Day"/>.</summary>
+    public DateTimeOffset Slot { get; init; }
+
+    /// <summary>The slot's day, UTC.</summary>
     public DateOnly Day { get; init; }
 
     public DateTimeOffset Start { get; init; }
@@ -157,8 +161,11 @@ public sealed record SlotReport
 
     public bool LeaseTaken { get; init; }
 
-    /// <summary>True when it was skipped for a reason at the station that may clear, so it is worth trying again today.</summary>
+    /// <summary>True when it was skipped for a reason at the station that may clear, so it is worth trying the same slot again.</summary>
     public bool Retryable { get; init; }
 
     public int LeaseRenewals { get; init; }
+
+    /// <summary>Who asked for a one-off slot (<c>POST /run</c>), or null for a scheduled one.</summary>
+    public string? RequestedBy { get; init; }
 }
