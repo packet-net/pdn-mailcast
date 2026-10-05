@@ -66,10 +66,10 @@ public sealed class DeliveryService
 
     /// <summary>
     /// Raised once the service is waiting, with the wait if it is on a timer (null: waiting for a
-    /// bulletin). Its timer is already running on the clock when this is raised, so a test can
-    /// move a fake clock on from here.
+    /// bulletin) and the timer's task. The timer is already running on the clock when this is
+    /// raised, so a test can move a fake clock on from here and see exactly when it fires.
     /// </summary>
-    internal event Action<TimeSpan?>? Waiting;
+    internal event Action<TimeSpan?, Task?>? Waiting;
 
     /// <summary>Asks for a session now, if the service is idle rather than backing off.</summary>
     public void Nudge()
@@ -95,15 +95,26 @@ public sealed class DeliveryService
                 woken = _wake.Task;
             }
 
-            var pending = _intake.Pending();
-            if (pending.Count == 0)
+            TimeSpan? wait;
+            try
             {
-                NextAttempt = null;
-                await WaitAsync(woken, null, cancellation).ConfigureAwait(false);
-                continue;
+                var pending = Unique(_intake.Pending());
+                if (pending.Count == 0)
+                {
+                    NextAttempt = null;
+                    await WaitAsync(woken, null, cancellation).ConfigureAwait(false);
+                    continue;
+                }
+                wait = await AttemptAsync([.. pending.Take(MaxPerSession)], cancellation).ConfigureAwait(false);
             }
-
-            TimeSpan? wait = await AttemptAsync([.. pending.Take(MaxPerSession)], cancellation).ConfigureAwait(false);
+            catch (Exception e) when (!cancellation.IsCancellationRequested)
+            {
+                // Whatever it was, the loop carries on: an outbox it cannot read now may be
+                // readable later, and a dead delivery loop delivers nothing.
+                LastFailure = "unexpected failure: " + Ascii.Clean(e.Message);
+                _log($"bbs: {LastFailure}. Trying again in {Describe(Backoff[0])}.");
+                wait = Backoff[0];
+            }
             if (wait is TimeSpan delay)
             {
                 NextAttempt = _time.GetUtcNow() + delay;
@@ -119,7 +130,7 @@ public sealed class DeliveryService
     /// </summary>
     public async Task<string?> DeliverPendingAsync(CancellationToken cancellation)
     {
-        while (_intake.Pending() is { Count: > 0 } pending)
+        while (Unique(_intake.Pending()) is { Count: > 0 } pending)
         {
             TimeSpan? wait = await AttemptAsync([.. pending.Take(MaxPerSession)], cancellation).ConfigureAwait(false);
             if (wait is not null)
@@ -142,6 +153,11 @@ public sealed class DeliveryService
         {
             return null;
         }
+        catch (Exception e) when (!cancellation.IsCancellationRequested)
+        {
+            report = new SessionReport(false, "the session failed: " + Ascii.Clean(e.Message),
+                [.. bulletins.Select(b => new DeliveryOutcome(b.Bid, DeliveryVerdict.NotOffered))], 0);
+        }
 
         var byBid = bulletins.ToDictionary(b => b.Bid, StringComparer.OrdinalIgnoreCase);
         bool waitingOnBbs = false;
@@ -151,12 +167,20 @@ public sealed class DeliveryService
             switch (outcome.Verdict)
             {
                 case DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Refused:
-                    var record = _ledger.Record(bulletin, outcome, _time.GetUtcNow());
-                    _intake.Acknowledge(bulletin.Bid);
+                    var record = Record(bulletin, outcome);
+                    try
+                    {
+                        _intake.Acknowledge(bulletin.Bid);
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                    {
+                        // It stays in the outbox and is offered again; the BBS answers FS -.
+                        _log($"store: cannot take {Ascii.Clean(bulletin.Bid)} out of the outbox: {Ascii.Clean(e.Message)}");
+                    }
                     _log($"bbs: {Ascii.Clean(bulletin.Bid)} {Describe(record.Verdict)}{(record.Detail is null ? "" : ": " + Ascii.Clean(record.Detail))}");
                     break;
                 case DeliveryVerdict.Deferred or DeliveryVerdict.Unconfirmed:
-                    _ledger.Record(bulletin, outcome, _time.GetUtcNow());
+                    Record(bulletin, outcome);
                     _log($"bbs: {Ascii.Clean(bulletin.Bid)} {Describe(outcome.Verdict)}{(outcome.Detail is null ? "" : ": " + Ascii.Clean(outcome.Detail))}");
                     waitingOnBbs = true;
                     break;
@@ -186,19 +210,39 @@ public sealed class DeliveryService
         return waitingOnBbs ? LaterRetry : null;
     }
 
+    /// <summary>One bulletin per BID: the store could in principle hold two objects that say the same BID.</summary>
+    private static List<Bulletin> Unique(IReadOnlyList<Bulletin> pending) =>
+        [.. pending.GroupBy(b => b.Bid, StringComparer.OrdinalIgnoreCase).Select(g => g.First())];
+
+    /// <summary>Records an answer. A record that cannot be written is logged; the delivery stands.</summary>
+    private DeliveryRecord Record(Bulletin bulletin, DeliveryOutcome outcome)
+    {
+        try
+        {
+            return _ledger.Record(bulletin, outcome, _time.GetUtcNow());
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _log($"store: cannot write the delivery record for {Ascii.Clean(bulletin.Bid)}: {Ascii.Clean(e.Message)}");
+            return new DeliveryRecord(_time.GetUtcNow(), bulletin.Bid, bulletin.Title, outcome.Verdict, outcome.Detail);
+        }
+    }
+
     private async Task WaitAsync(Task? woken, TimeSpan? delay, CancellationToken cancellation)
     {
         using var done = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         var waits = new List<Task> { Task.Delay(Timeout.InfiniteTimeSpan, done.Token) };
+        Task? timer = null;
         if (delay is TimeSpan d)
         {
-            waits.Add(Task.Delay(d, _time, done.Token));
+            timer = Task.Delay(d, _time, done.Token);
+            waits.Add(timer);
         }
         if (woken is not null)
         {
             waits.Add(woken);
         }
-        Waiting?.Invoke(delay);
+        Waiting?.Invoke(delay, timer);
         await Task.WhenAny(waits).ConfigureAwait(false);
         await done.CancelAsync().ConfigureAwait(false);
     }

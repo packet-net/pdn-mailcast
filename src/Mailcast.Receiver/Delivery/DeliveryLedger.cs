@@ -33,21 +33,43 @@ public sealed class DeliveryLedger
         {
             return;
         }
+        var read = new List<DeliveryRecord>();
         foreach (string line in File.ReadLines(_path))
         {
-            DeliveryRecord? record;
             try
             {
-                record = JsonSerializer.Deserialize<DeliveryRecord>(line, ReceiverConfig.Json);
+                if (JsonSerializer.Deserialize<DeliveryRecord>(line, ReceiverConfig.JsonLine) is { } record)
+                {
+                    read.Add(record);
+                }
             }
             catch (JsonException)
             {
-                continue; // a line cut short by a crash
+                // a line cut short by a crash
             }
-            if (record is not null)
+        }
+
+        // Compacted on open: only the newest answer for each BID is ever consulted, so the file
+        // keeps one line per bulletin rather than growing for ever.
+        var newest = read.GroupBy(r => r.Bid, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).OrderBy(r => r.Time).ToList();
+        foreach (var record in newest)
+        {
+            Remember(record);
+        }
+        if (newest.Count < read.Count)
+        {
+            string tmp = _path + ".tmp";
+            using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var writer = new StreamWriter(stream))
             {
-                Remember(record);
+                foreach (var record in newest)
+                {
+                    writer.WriteLine(JsonSerializer.Serialize(record, ReceiverConfig.JsonLine));
+                }
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
             }
+            File.Move(tmp, _path, overwrite: true);
         }
     }
 

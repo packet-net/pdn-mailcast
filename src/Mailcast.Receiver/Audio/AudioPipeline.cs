@@ -22,17 +22,29 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>Samples read from the source at a time: 100 ms.</summary>
     private const int BlockSamples = OnAir.SampleRate / 10;
 
+    /// <summary>A source that should be delivering and has said nothing for this long is reopened.</summary>
+    public static readonly TimeSpan StarvedAfter = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long <see cref="DisposeAsync"/> waits for the audio thread to stop.</summary>
+    public static readonly TimeSpan StopWait = TimeSpan.FromSeconds(5);
+
     private readonly AudioSource _source;
     private readonly Action<string> _log;
+    private readonly TimeProvider _time;
     private readonly CancellationTokenSource _stop = new();
     private IAudioInput? _input;
+    private UberSdrAudioInput? _webSdr;
     private Thread? _thread;
+    private Task? _watch;
+    private long _lastAudio;
     private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _threadDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private AudioPipeline(AudioSource source, Action<string> log)
+    private AudioPipeline(AudioSource source, Action<string> log, TimeProvider time)
     {
         _source = source;
         _log = log;
+        _time = time;
         Channel = new SoundModemChannel(OnAir.SampleRate);
         Channel.ReceiveOnlyReason = "pdn-mailcast's receiver never transmits";
         Channel.AddModem(0, sink => new Ms110dModem(OnAir.SampleRate, sink));
@@ -58,14 +70,18 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>Why the audio ended, if it ended on its own.</summary>
     public string? EndReason { get; private set; }
 
+    /// <summary>For tests: a pipeline over an input that is already open, watched as a sound card would be.</summary>
+    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time) =>
+        new(new AudioSource(AudioSourceKind.Alsa, "test"), log, time) { _input = input };
+
     /// <summary>Builds a pipeline for <paramref name="source"/>. Call <see cref="Start"/> once anything that listens is attached.</summary>
-    public static AudioPipeline Create(AudioSource source, Action<string> log) => new(source, log);
+    public static AudioPipeline Create(AudioSource source, Action<string> log, TimeProvider? time = null) => new(source, log, time ?? TimeProvider.System);
 
     /// <summary>Opens the source and starts the audio thread.</summary>
     /// <exception cref="AudioSourceException">The source could not be opened; the message says why.</exception>
     public async Task StartAsync(CancellationToken cancellation)
     {
-        switch (_source.Kind)
+        switch (_input is null ? _source.Kind : (AudioSourceKind?)null)
         {
             case AudioSourceKind.Alsa:
                 try
@@ -87,6 +103,12 @@ public sealed class AudioPipeline : IAsyncDisposable
                 {
                     web = await UberSdrAudioInput.OpenAsync(endpoint, tuning, line => _log(Ascii.Clean(line)), cancellation).ConfigureAwait(false);
                 }
+                catch (Exception e) when (e.GetType().Name == "UberSdrRefusedException")
+                {
+                    // pdn-soundmodem's type for an HTTP 429 (rate limited, or the address's daily
+                    // allowance spent) is internal, so it is known here by name.
+                    throw new AudioSourceException($"the web receiver {endpoint} refused us for now ({Ascii.Clean(e.Message)})", refused: true);
+                }
                 catch (Exception e) when (e is InvalidOperationException or HttpRequestException or IOException or System.Net.WebSockets.WebSocketException)
                 {
                     throw new AudioSourceException($"cannot open the web receiver {endpoint}: {Ascii.Clean(e.Message)}");
@@ -97,6 +119,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                     _stop.Cancel();
                 };
                 _input = web;
+                _webSdr = web;
                 _log($"audio: web receiver {endpoint}, USB dial {OnAir.DialHz / 1e6:F4} MHz"
                     + (web.ReceiverDescription is { } about ? $" ({Ascii.Clean(about)})" : ""));
                 break;
@@ -107,8 +130,45 @@ public sealed class AudioPipeline : IAsyncDisposable
                 break;
         }
 
+        Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
         _thread = new Thread(Pump) { IsBackground = true, Name = "mailcast audio" };
         _thread.Start();
+        if (_source.Kind != AudioSourceKind.Wav)
+        {
+            _watch = WatchAsync();
+        }
+    }
+
+    /// <summary>
+    /// Ends the pipeline if a source that should be delivering has said nothing for
+    /// <see cref="StarvedAfter"/>, so the supervisor reopens it. A web receiver between sessions
+    /// (reconnecting, or refused until its allowance resets) is quiet on purpose and not counted.
+    /// A blocked read cannot be interrupted, so this works beside the audio thread, not in it.
+    /// </summary>
+    private async Task WatchAsync()
+    {
+        try
+        {
+            while (!_stop.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), _time, _stop.Token).ConfigureAwait(false);
+                if (_webSdr is { SessionLive: false })
+                {
+                    Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
+                    continue;
+                }
+                if (_time.GetElapsedTime(Interlocked.Read(ref _lastAudio)) >= StarvedAfter)
+                {
+                    EndReason = $"no audio from {_source} for {StarvedAfter.TotalSeconds:F0} s";
+                    await _stop.CancelAsync().ConfigureAwait(false);
+                    _finished.TrySetResult();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private void Pump()
@@ -128,6 +188,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                     }
                     continue;
                 }
+                Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
                 var samples = block.AsSpan(0, read);
                 SourceBlock?.Invoke(samples);
                 if (_input is AlsaAudioInput)
@@ -137,12 +198,14 @@ public sealed class AudioPipeline : IAsyncDisposable
                 Channel.ProcessReceive(samples);
             }
         }
-        catch (Exception e) when (e is IOException or InvalidOperationException)
+        catch (Exception e)
         {
-            EndReason = "the audio source failed: " + Ascii.Clean(e.Message);
+            // Anything at all: the thread must not die silently, and the supervisor reopens.
+            EndReason = "the audio failed: " + Ascii.Clean(e.Message);
         }
         finally
         {
+            _threadDone.TrySetResult();
             _finished.TrySetResult();
         }
     }
@@ -151,13 +214,31 @@ public sealed class AudioPipeline : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _stop.CancelAsync().ConfigureAwait(false);
+        if (_watch is not null)
+        {
+            await _watch.ConfigureAwait(false);
+        }
+        bool stopped = true;
         if (_thread is not null)
         {
-            // The read blocks for at most a block's worth of audio on every source.
-            await _finished.Task.ConfigureAwait(false);
+            // A read normally returns within a block's worth of audio. One that is stuck in the
+            // driver is left behind, and so is its device: closing a device under a read that is
+            // still in it is worse than leaking it until the service restarts.
+            try
+            {
+                await _threadDone.Task.WaitAsync(StopWait, _time).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                stopped = false;
+                _log($"audio: the read from {_source} did not return within {StopWait.TotalSeconds:F0} s; leaving it");
+            }
         }
-        (_input as IDisposable)?.Dispose();
-        _stop.Dispose();
+        if (stopped)
+        {
+            (_input as IDisposable)?.Dispose();
+            _stop.Dispose();
+        }
     }
 
     /// <summary>A recording as an audio input, converted to 48 kHz, read as fast as it will go.</summary>
@@ -219,4 +300,8 @@ public sealed class AudioPipeline : IAsyncDisposable
 }
 
 /// <summary>An audio source that could not be opened, with a sentence saying why.</summary>
-public sealed class AudioSourceException(string message) : Exception(message);
+public sealed class AudioSourceException(string message, bool refused = false) : Exception(message)
+{
+    /// <summary>A web receiver refused us for now (HTTP 429): wait longer before asking again.</summary>
+    public bool Refused { get; } = refused;
+}

@@ -85,6 +85,9 @@ public sealed partial class BbsClient : IBbsSession
     /// <summary>How long the BBS may say nothing before the session is given up.</summary>
     public TimeSpan IdleTimeout { get; init; } = TimeSpan.FromMinutes(2);
 
+    /// <summary>The longest a whole session may take, however busy the BBS keeps it.</summary>
+    public TimeSpan SessionTimeout { get; init; } = TimeSpan.FromMinutes(15);
+
     /// <summary>The software version in the receiver's SID.</summary>
     public string Version { get; init; } = "0.1.0";
 
@@ -112,11 +115,23 @@ public sealed partial class BbsClient : IBbsSession
         {
             try
             {
-                await run.ExecuteAsync(cancellation).ConfigureAwait(false);
+                using var whole = new Deadline(SessionTimeout, _time, cancellation);
+                try
+                {
+                    await run.ExecuteAsync(whole.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (whole.Token.IsCancellationRequested && !cancellation.IsCancellationRequested)
+                {
+                    throw new SessionFailedException($"the session was still going after {SessionTimeout.TotalMinutes:F0} min");
+                }
             }
             catch (Exception e) when (e is SocketException or IOException or TimeoutException or SessionFailedException)
             {
                 failure = e is SessionFailedException ? e.Message : $"{Ascii.Clean(e.Message)}";
+            }
+            catch (FbbProtocolException e)
+            {
+                failure = "protocol error: " + Ascii.Clean(e.Message);
             }
             catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
             {
@@ -194,6 +209,7 @@ public sealed partial class BbsClient : IBbsSession
         private FbbSession? _session;
         private Dictionary<FbbOutboundMessage, string> _bids = new(ReferenceEqualityComparer.Instance);
         private NetworkStream? _stream;
+        private int _reverseRounds;
 
         public Dictionary<string, FsAnswer> Answers { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -365,7 +381,7 @@ public sealed partial class BbsClient : IBbsSession
                         await SendAsync(line.Line + "\r\n", cancellation).ConfigureAwait(false);
                         break;
                     case FbbSendBytes bytes:
-                        await _stream!.WriteAsync(bytes.Data, cancellation).ConfigureAwait(false);
+                        await WriteAsync(bytes.Data, cancellation).ConfigureAwait(false);
                         break;
                     case FbbOutboundResult result:
                         Answers[_bids[result.Message]] = result.Answer;
@@ -374,6 +390,18 @@ public sealed partial class BbsClient : IBbsSession
                         // Never FS -: that would tell the BBS the receiver has these, and it would
                         // mark them delivered. See the class remarks.
                         ReverseOffered += proposals.Proposals.Count;
+                        // The FBB session answers FS - itself to a proposal whose TO is over six
+                        // characters, whatever it is told. Rather than let it, hang up unanswered:
+                        // the BBS keeps the message. And one round of the BBS's mail is plenty
+                        // for a receiver that takes none of it.
+                        if (proposals.Proposals.Any(p => p is FaProposal { RequiresPoliteReject: true }) || ++_reverseRounds > 1)
+                        {
+                            Failure = _reverseRounds > 1
+                                ? "the BBS kept offering mail to the receiver; hung up"
+                                : "the BBS offered the receiver a message it cannot decline without saying it has it; hung up";
+                            Over = true;
+                            return;
+                        }
                         foreach (var next in _session!.Advance(new FbbProposalDecisions([.. proposals.Proposals.Select(_ => FsAnswer.Defer)])))
                         {
                             queue.Enqueue(next);
@@ -405,9 +433,14 @@ public sealed partial class BbsClient : IBbsSession
             return "protocol error: " + Ascii.Clean(errorLine);
         }
 
-        private async Task SendAsync(string text, CancellationToken cancellation)
+        private Task SendAsync(string text, CancellationToken cancellation) =>
+            WriteAsync(Encoding.Latin1.GetBytes(text), cancellation);
+
+        /// <summary>A write the BBS has <see cref="IdleTimeout"/> to take, as a read has to answer.</summary>
+        private async Task WriteAsync(ReadOnlyMemory<byte> data, CancellationToken cancellation)
         {
-            await _stream!.WriteAsync(Encoding.Latin1.GetBytes(text), cancellation).ConfigureAwait(false);
+            using var idle = Linked(owner.IdleTimeout, cancellation);
+            await _stream!.WriteAsync(data, idle.Token).ConfigureAwait(false);
         }
     }
 }

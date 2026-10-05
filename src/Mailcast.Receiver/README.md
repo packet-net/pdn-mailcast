@@ -30,14 +30,16 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
     "password": "pick-one",
     "command": "BBS"
   },
-  "web": { "port": 8073, "lan": false },
+  "web": { "port": 8130, "lan": false, "password": "" },
+  "slotUtc": "12:00",
   "stateDirectory": "/var/lib/pdn-mailcast"
 }
 ```
 
 - `audio`: `ubersdr:wessex.zapto.org` for the web SDR, an ALSA device such as `plughw:CARD=Device,DEV=0` for your radio's sound card, or `wav:/path/to/file.wav` to decode a recording.
 - `bbs`: where your BBS is and how the receiver logs in. See below.
-- `web`: the status page. It has no password, so it only answers on this machine unless you set `lan` to true.
+- `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which your browser asks for (any user name).
+- `slotUtc`: when the daily slot starts. A web SDR is only listened to from 15 minutes before it to 90 minutes after: public UberSDR receivers allow each address about three hours a day. A sound card listens all the time.
 - `stateDirectory`: where the pieces, the rebuilt bulletins and the record of deliveries are kept.
 
 To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.

@@ -16,11 +16,17 @@
     "command": "BBS"
   },
 
-  // The status page. It has no login, so it is on this machine only unless "lan" is true.
+  // The status page. It is on this machine only unless "lan" is true, and on the network
+  // it needs a password, which the browser asks for.
   "web": {
-    "port": 8073,
-    "lan": false
+    "port": 8130,
+    "lan": false,
+    "password": ""
   },
+
+  // When GB7RDG's daily slot starts, UTC. A web SDR is only listened to from 15 minutes
+  // before to 90 minutes after, to save its daily listening allowance.
+  "slotUtc": "12:00",
 
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

@@ -17,10 +17,16 @@ public sealed class Intake : IAsyncDisposable
 {
     private readonly ReceiverStore _store;
     private readonly object _gate = new();
-    private readonly Channel<Item> _queue = Channel.CreateUnbounded<Item>(new UnboundedChannelOptions { SingleReader = true });
+    // Bounded: frames come a few a minute, so a full queue means the store has stopped, and
+    // memory should not be what finds that out. Frames are dropped, and counted, rather than waited for.
+    private readonly Channel<Item> _queue = Channel.CreateBounded<Item>(new BoundedChannelOptions(QueueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
     private readonly Action<string> _log;
     private readonly Task _worker;
+    /// <summary>Frames that may wait for the store at once.</summary>
+    public const int QueueLength = 4096;
+
     private long _framesHeard;
+    private long _framesDropped;
     private long _framesStored;
 
     /// <summary>Opens the store under <paramref name="stateDirectory"/>/store.</summary>
@@ -54,7 +60,10 @@ public sealed class Intake : IAsyncDisposable
             return false;
         }
         Interlocked.Increment(ref _framesHeard);
-        _queue.Writer.TryWrite(new Item(payload, null));
+        if (!_queue.Writer.TryWrite(new Item(payload, null)) && Interlocked.Increment(ref _framesDropped) % 100 == 1)
+        {
+            _log($"store: the store is not keeping up; {Interlocked.Read(ref _framesDropped)} frame(s) dropped");
+        }
         return true;
     }
 
@@ -62,7 +71,7 @@ public sealed class Intake : IAsyncDisposable
     public async Task DrainAsync(CancellationToken cancellation)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _queue.Writer.TryWrite(new Item(default, done));
+        await _queue.Writer.WriteAsync(new Item(default, done), cancellation).ConfigureAwait(false);
         await done.Task.WaitAsync(cancellation).ConfigureAwait(false);
     }
 
@@ -130,37 +139,51 @@ public sealed class Intake : IAsyncDisposable
                     result = _store.Accept(payload.Span);
                 }
             }
-            catch (IOException e)
+            catch (Exception e)
             {
+                // The worker must outlive anything one frame does to the store, or every frame
+                // after it is lost without a word.
                 _log($"store: cannot keep a piece: {Ascii.Clean(e.Message)}");
                 continue;
             }
 
-            FrameHeard?.Invoke();
-            switch (result.Outcome)
+            try
             {
-                case FrameOutcome.Stored:
-                    Interlocked.Increment(ref _framesStored);
-                    break;
-                case FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin:
-                    Interlocked.Increment(ref _framesStored);
-                    _log($"bulletin complete: {Ascii.Clean(bulletin.Bid)} from {Ascii.Clean(bulletin.From)} to {Ascii.Clean(bulletin.To)}"
-                        + $"{(bulletin.At.Length > 0 ? "@" + Ascii.Clean(bulletin.At) : "")}, \"{Ascii.Clean(bulletin.Title)}\"");
-                    BulletinCompleted?.Invoke(bulletin);
-                    break;
-                case FrameOutcome.CompletedDirectory when result.Directory is { } directory:
-                    Interlocked.Increment(ref _framesStored);
-                    _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation");
-                    break;
-                case FrameOutcome.UnknownDictionary:
-                    _log("store: a frame uses a compression dictionary this receiver does not have; a newer receiver may be needed");
-                    break;
-                case FrameOutcome.Rejected:
-                    _log($"store: a frame or a rebuilt object failed its check: {Ascii.Clean(result.Detail)}");
-                    break;
-                default:
-                    break;
+                FrameHeard?.Invoke();
+                Report(result);
             }
+            catch (Exception e)
+            {
+                _log($"store: a listener failed: {Ascii.Clean(e.Message)}");
+            }
+        }
+    }
+
+    private void Report(AcceptResult result)
+    {
+        switch (result.Outcome)
+        {
+            case FrameOutcome.Stored:
+                Interlocked.Increment(ref _framesStored);
+                break;
+            case FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin:
+                Interlocked.Increment(ref _framesStored);
+                _log($"bulletin complete: {Ascii.Clean(bulletin.Bid)} from {Ascii.Clean(bulletin.From)} to {Ascii.Clean(bulletin.To)}"
+                    + $"{(bulletin.At.Length > 0 ? "@" + Ascii.Clean(bulletin.At) : "")}, \"{Ascii.Clean(bulletin.Title)}\"");
+                BulletinCompleted?.Invoke(bulletin);
+                break;
+            case FrameOutcome.CompletedDirectory when result.Directory is { } directory:
+                Interlocked.Increment(ref _framesStored);
+                _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation");
+                break;
+            case FrameOutcome.UnknownDictionary:
+                _log("store: a frame uses a compression dictionary this receiver does not have; a newer receiver may be needed");
+                break;
+            case FrameOutcome.Rejected:
+                _log($"store: a frame or a rebuilt object failed its check: {Ascii.Clean(result.Detail)}");
+                break;
+            default:
+                break;
         }
     }
 

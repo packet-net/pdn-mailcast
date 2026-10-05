@@ -36,7 +36,7 @@ public class DeliveryServiceTests
             Intake.DrainAsync(CancellationToken.None).GetAwaiter().GetResult();
             Ledger = new DeliveryLedger(Dir.Path);
             Service = new DeliveryService(Intake, Bbs, Ledger, Time, _ => { });
-            Service.Waiting += delay => Waits.Writer.TryWrite(delay);
+            Service.Waiting += (delay, timer) => Waits.Writer.TryWrite((delay, timer));
             _run = Service.RunAsync(_stop.Token);
         }
 
@@ -52,12 +52,14 @@ public class DeliveryServiceTests
 
         public DeliveryService Service { get; }
 
-        public Channel<TimeSpan?> Waits { get; } = Channel.CreateUnbounded<TimeSpan?>();
+        public Channel<(TimeSpan? Delay, Task? Timer)> Waits { get; } = Channel.CreateUnbounded<(TimeSpan?, Task?)>();
 
         public async Task<(IReadOnlyList<Bulletin> Offered, TaskCompletionSource<SessionReport> Answer)> NextCallAsync() =>
             await Bbs.Calls.Reader.ReadAsync();
 
-        public async Task<TimeSpan?> NextWaitAsync() => await Waits.Reader.ReadAsync();
+        public async Task<TimeSpan?> NextWaitAsync() => (await Waits.Reader.ReadAsync()).Delay;
+
+        public async Task<(TimeSpan? Delay, Task? Timer)> NextTimedWaitAsync() => await Waits.Reader.ReadAsync();
 
         public async ValueTask DisposeAsync()
         {
@@ -116,14 +118,15 @@ public class DeliveryServiceTests
         {
             var (offered, answer) = await rig.NextCallAsync();
             answer.SetResult(Unreachable(offered));
-            var wait = await rig.NextWaitAsync();
+            var (wait, timer) = await rig.NextTimedWaitAsync();
             Assert.Equal(DeliveryService.Backoff[attempt], wait);
             Assert.Equal("connection refused", rig.Service.LastFailure);
 
-            // Not a moment before the wait is up.
+            // Not a moment before the wait is up: the fake clock fires its timers inside Advance.
             rig.Time.Advance(wait!.Value - TimeSpan.FromSeconds(1));
-            Assert.False(rig.Bbs.Calls.Reader.TryPeek(out _));
+            Assert.False(timer!.IsCompleted);
             rig.Time.Advance(TimeSpan.FromSeconds(1));
+            Assert.True(timer.IsCompleted);
         }
 
         var (last, lastAnswer) = await rig.NextCallAsync();
@@ -169,5 +172,26 @@ public class DeliveryServiceTests
         Assert.Equal(["9_GB7RDG"], offered.Select(b => b.Bid));
         answer.SetResult(Answer(offered, DeliveryVerdict.Accepted));
         Assert.Null(await rig.NextWaitAsync());
+    }
+}
+
+public class DeliveryLedgerTests
+{
+    [Fact]
+    public void Open_CompactsToTheNewestAnswerPerBid()
+    {
+        using var dir = new TempDirectory();
+        var ledger = new DeliveryLedger(dir.Path);
+        var t = new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
+        ledger.Record(Samples.Bulletin(1), new DeliveryOutcome("1_GB7RDG", DeliveryVerdict.Deferred), t);
+        ledger.Record(Samples.Bulletin(1), new DeliveryOutcome("1_GB7RDG", DeliveryVerdict.Accepted), t.AddMinutes(10));
+        ledger.Record(Samples.Bulletin(2), new DeliveryOutcome("2_GB7RDG", DeliveryVerdict.AlreadyHad), t.AddMinutes(11));
+        File.AppendAllText(Path.Combine(dir.Path, "deliveries.jsonl"), "{\"time\":\"2026-10-05T12:2");
+
+        var reopened = new DeliveryLedger(dir.Path);
+
+        Assert.Equal(2, File.ReadAllLines(Path.Combine(dir.Path, "deliveries.jsonl")).Length);
+        Assert.Equal(DeliveryVerdict.Accepted, reopened.Latest("1_GB7RDG")!.Verdict);
+        Assert.Equal(DeliveryVerdict.AlreadyHad, reopened.Latest("2_GB7RDG")!.Verdict);
     }
 }

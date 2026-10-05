@@ -68,6 +68,28 @@ public class BbsClientTests
     }
 
     [Fact]
+    public async Task Deliver_BbsOffersMoreThanOneRound_ReceiverHangsUpAndKeepsNothing()
+    {
+        await using var bbs = new FakeBbs();
+        for (int i = 0; i < 6; i++)
+        {
+            bbs.Queued.Add(new FbbOutboundMessage
+            {
+                MessageType = 'P', From = "G4TST", AtBbs = "Q0CAST", To = "Q0CAST", Bid = $"{i}_GB7TST", Title = "hello",
+                Body = "R:261004/1200Z 1@GB7TST\r\n\r\nhello\r\n"u8.ToArray(),
+            });
+        }
+
+        var report = await Client(bbs.Port).DeliverAsync([Samples.Bulletin(302)], CancellationToken.None);
+
+        Assert.False(report.Graceful);
+        Assert.Contains("kept offering", report.Failure, StringComparison.Ordinal);
+        // Its transfer went before the BBS's turn, so it is offered again and FS - confirms it.
+        Assert.Equal(DeliveryVerdict.Unconfirmed, Assert.Single(report.Outcomes).Verdict);
+        Assert.All(bbs.ReverseAnswers, a => Assert.Equal(nameof(FsAnswerKind.Defer), a));
+    }
+
+    [Fact]
     public async Task Deliver_WrongPassword_FailsWithAHint()
     {
         await using var bbs = new FakeBbs();

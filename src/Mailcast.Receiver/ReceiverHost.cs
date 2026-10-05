@@ -75,10 +75,23 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
     }
 
-    /// <summary>Raised on the audio supervisor whenever a new pipeline has started, so the page can attach to it.</summary>
+    /// <summary>A sentence on what the audio is doing, for the page and the log.</summary>
+    public string AudioState { get; private set; } = "starting";
+
+    /// <summary>
+    /// Raised on the audio supervisor for each new pipeline before its audio starts, so the page
+    /// can attach its waterfall: anything listening to the channel has to be added before then.
+    /// </summary>
+    public event Action<AudioPipeline>? PipelineCreated;
+
+    /// <summary>Raised on the audio supervisor whenever a pipeline has started.</summary>
     public event Action<AudioPipeline>? PipelineStarted;
 
-    /// <summary>Runs the service until <paramref name="cancellation"/> is cancelled.</summary>
+    /// <summary>
+    /// Runs the service until <paramref name="cancellation"/> is cancelled. Each loop catches and
+    /// logs what goes wrong inside it; if one dies anyway, this throws, so the process exits
+    /// non-zero and systemd restarts it rather than leaving half a receiver running.
+    /// </summary>
     public async Task RunAsync(CancellationToken cancellation)
     {
         _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio}, delivering to {DescribeBbs(Config.Bbs)}");
@@ -88,9 +101,23 @@ public sealed class ReceiverHost : IAsyncDisposable
             _log($"store: {pending} rebuilt bulletin{(pending == 1 ? "" : "s")} waiting for the BBS from before");
         }
 
-        Task delivery = Delivery.RunAsync(cancellation);
-        Task audio = SuperviseAudioAsync(cancellation);
-        await Task.WhenAll(delivery, audio).ConfigureAwait(false);
+        using var stopOthers = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        Task delivery = Delivery.RunAsync(stopOthers.Token);
+        Task audio = SuperviseAudioAsync(stopOthers.Token);
+        Task first = await Task.WhenAny(delivery, audio).ConfigureAwait(false);
+        await stopOthers.CancelAsync().ConfigureAwait(false);
+        try
+        {
+            await Task.WhenAll(delivery, audio).ConfigureAwait(false);
+        }
+        catch (Exception) when (first.IsFaulted)
+        {
+        }
+        if (first.IsFaulted)
+        {
+            string which = first == delivery ? "delivery" : "audio";
+            throw new InvalidOperationException($"the {which} loop failed: {Ascii.Clean(first.Exception!.GetBaseException().Message)}", first.Exception);
+        }
     }
 
     /// <summary>
@@ -99,7 +126,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public async Task<string?> DecodeOnceAsync(string wavPath, CancellationToken cancellation)
     {
-        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Wav, wavPath), _log);
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Wav, wavPath), _log, _time);
         Attach(pipeline);
         await pipeline.StartAsync(cancellation).ConfigureAwait(false);
         await pipeline.Finished.WaitAsync(cancellation).ConfigureAwait(false);
@@ -118,7 +145,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         CancellationTokenSource? restart = null;
         lock (_gate)
         {
-            bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal);
+            bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal)
+                || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal);
             _config = config;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
             if (audioChanged)
@@ -131,35 +159,78 @@ public sealed class ReceiverHost : IAsyncDisposable
         Delivery.Nudge();
     }
 
+    /// <summary>The waits after a web receiver refuses us for now; the last repeats.</summary>
+    public static readonly IReadOnlyList<TimeSpan> RefusedBackoff =
+        [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(30)];
+
     private async Task SuperviseAudioAsync(CancellationToken cancellation)
     {
+        int refusals = 0;
         while (!cancellation.IsCancellationRequested)
         {
             using var restart = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            AudioPipeline pipeline;
+            ReceiverConfig config;
             lock (_gate)
             {
                 _audioRestart = restart;
-                pipeline = AudioPipeline.Create(AudioSource.Parse(_config.Audio), _log);
+                config = _config;
+            }
+
+            var source = AudioSource.Parse(config.Audio);
+            CancellationTokenSource? closeAt = null;
+            if (source.Kind == AudioSourceKind.UberSdr)
+            {
+                // A public web SDR allows each address about three hours a day, so it is only
+                // listened to around the slot.
+                var (opens, closes) = ListeningWindow.Next(_time.GetUtcNow(), config.SlotStart);
+                if (opens > _time.GetUtcNow())
+                {
+                    AudioState = $"the web SDR is closed until {opens:HH:mm} UTC, {ListeningWindow.Describe(config.SlotStart)}";
+                    _log($"audio: {AudioState}");
+                    await DelayAsync(opens - _time.GetUtcNow(), restart.Token).ConfigureAwait(false);
+                    continue;
+                }
+                closeAt = new CancellationTokenSource(closes - _time.GetUtcNow(), _time);
+            }
+
+            using var window = closeAt;
+            using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
+            CancellationToken token = running?.Token ?? restart.Token;
+            var pipeline = AudioPipeline.Create(source, _log, _time);
+            lock (_gate)
+            {
                 _pipeline = pipeline;
             }
 
-            string? why;
+            string? why = null;
+            bool refused = false;
             try
             {
                 Attach(pipeline);
-                await pipeline.StartAsync(restart.Token).ConfigureAwait(false);
+                PipelineCreated?.Invoke(pipeline);
+                AudioState = $"opening {pipeline.Source}";
+                await pipeline.StartAsync(token).ConfigureAwait(false);
+                AudioState = $"listening to {pipeline.Source}";
+                refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
-                await pipeline.Finished.WaitAsync(restart.Token).ConfigureAwait(false);
+                await pipeline.Finished.WaitAsync(token).ConfigureAwait(false);
                 why = pipeline.EndReason ?? "the audio stopped";
             }
             catch (AudioSourceException e)
             {
                 why = e.Message;
+                refused = e.Refused;
             }
             catch (OperationCanceledException)
             {
-                why = null; // a new source, or shutting down
+                if (window is { IsCancellationRequested: true } && !restart.IsCancellationRequested)
+                {
+                    _log("audio: the slot's listening window has ended; closing the web SDR until tomorrow");
+                }
+            }
+            catch (Exception e) when (!cancellation.IsCancellationRequested)
+            {
+                why = "unexpected failure: " + Ascii.Clean(e.Message);
             }
             finally
             {
@@ -175,20 +246,29 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 continue;
             }
+            why = why.TrimEnd('.', ' ');
             if (pipeline.Source.Kind == AudioSourceKind.Wav)
             {
                 _log($"audio: {why}; the receiver keeps running to deliver what it rebuilt");
+                AudioState = why;
                 await WaitForRestartAsync(cancellation).ConfigureAwait(false);
                 continue;
             }
-            _log($"audio: {why}. Trying again in {AudioRetry.TotalSeconds:F0} s.");
-            try
-            {
-                await Task.Delay(AudioRetry, _time, cancellation).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)] : AudioRetry;
+            _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
+            AudioState = $"{why}; trying again shortly";
+            await DelayAsync(wait, cancellation).ConfigureAwait(false);
+        }
+    }
+
+    private async Task DelayAsync(TimeSpan delay, CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(delay, _time, cancellation).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
@@ -200,13 +280,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             _audioRestart = restart;
         }
-        try
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, restart.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await DelayAsync(Timeout.InfiniteTimeSpan, restart.Token).ConfigureAwait(false);
         lock (_gate)
         {
             _audioRestart = null;

@@ -48,14 +48,20 @@ public sealed record BbsSettings
 /// <summary>The local web page.</summary>
 public sealed record WebSettings
 {
-    /// <summary>TCP port of the page.</summary>
-    public int Port { get; init; } = 8073;
+    /// <summary>TCP port of the page. 8130 keeps clear of KiwiSDR's 8073 and of pdn-soundmodem's ports.</summary>
+    public int Port { get; init; } = 8130;
 
     /// <summary>
     /// Whether the page is reachable from the local network as well as from this machine. It has
     /// no login, so it is off unless asked for.
     /// </summary>
     public bool Lan { get; init; }
+
+    /// <summary>
+    /// The page's password, which the browser asks for. Required when <see cref="Lan"/> is set,
+    /// since anything on the network could otherwise change the settings; optional otherwise.
+    /// </summary>
+    public string Password { get; init; } = "";
 }
 
 /// <summary>
@@ -76,6 +82,24 @@ public sealed record ReceiverConfig
 
     /// <summary>The local web page.</summary>
     public WebSettings Web { get; init; } = new();
+
+    /// <summary>
+    /// When the daily slot starts, UTC, as HH:mm. A web SDR is only listened to from 15 minutes
+    /// before it to 90 minutes after, because public UberSDR instances allow each address about
+    /// three hours a day. A sound card listens all the time.
+    /// </summary>
+    public string SlotUtc { get; init; } = "12:00";
+
+    /// <summary>How long before the slot a web SDR is opened.</summary>
+    public static readonly TimeSpan WebSdrBefore = TimeSpan.FromMinutes(15);
+
+    /// <summary>How long after the slot starts a web SDR is kept open.</summary>
+    public static readonly TimeSpan WebSdrAfter = TimeSpan.FromMinutes(90);
+
+    /// <summary>The slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
+    public TimeOnly SlotStart => TimeOnly.TryParseExact(SlotUtc, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)
+        ? t
+        : throw new ConfigException($"\"slotUtc\" \"{SlotUtc}\" is not a time like 12:00");
 
     /// <summary>Where the pieces heard, the rebuilt bulletins and the delivery record are kept.</summary>
     public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast";
@@ -120,18 +144,54 @@ public sealed record ReceiverConfig
     }
 
     /// <summary>Writes the config file, to a temporary name first so a crash leaves the old one whole.</summary>
+    /// <remarks>
+    /// The file holds the BBS password, so the new one is made readable by its owner and group
+    /// only (0640) before anything is written to it, flushed to disk, and then renamed over the old.
+    /// </remarks>
     public void Save(string path)
     {
         Validate();
         string tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json) + "\n");
+        var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead;
+        }
+        using (var stream = new FileStream(tmp, options))
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                // The create mode is masked by the umask; this is the mode it should have.
+                File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
+            }
+            stream.Write(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n"));
+            stream.Flush(flushToDisk: true);
+        }
         File.Move(tmp, path, overwrite: true);
     }
 
     /// <summary>Throws <see cref="ConfigException"/> if a setting cannot work.</summary>
     public void Validate()
     {
+        // JSON can say null for anything; say which setting rather than fail on it later.
+        if (Audio is null)
+        {
+            throw new ConfigException("\"audio\" is null: give an ALSA device, a ubersdr: web receiver or a wav: recording");
+        }
+        if (Bbs is null || Bbs.Host is null || Bbs.Login is null || Bbs.Password is null || Bbs.Command is null)
+        {
+            throw new ConfigException("\"bbs\" or one of its settings is null: give host, port, login, password and command");
+        }
+        if (Web is null || Web.Password is null)
+        {
+            throw new ConfigException("\"web\" or its password is null");
+        }
+        if (StateDirectory is null || SlotUtc is null)
+        {
+            throw new ConfigException("\"stateDirectory\" or \"slotUtc\" is null");
+        }
         _ = AudioSource.Parse(Audio);
+        _ = SlotStart;
         if (string.IsNullOrWhiteSpace(Bbs.Host))
         {
             throw new ConfigException("\"bbs\".\"host\" is empty: give the BBS's address, normally 127.0.0.1");
@@ -151,6 +211,10 @@ public sealed record ReceiverConfig
         if (Web.Port is < 1 or > 65535)
         {
             throw new ConfigException($"\"web\".\"port\" {Web.Port} is not a TCP port");
+        }
+        if (Web.Lan && Web.Password.Length == 0)
+        {
+            throw new ConfigException("\"web\".\"lan\" is on but \"web\".\"password\" is empty: the page can change the BBS settings, so on the network it needs a password");
         }
         if (string.IsNullOrWhiteSpace(StateDirectory))
         {
