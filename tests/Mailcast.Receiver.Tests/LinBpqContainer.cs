@@ -55,6 +55,54 @@ internal sealed partial class LinBpqContainer : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// A LinBPQ node with no mail, from <paramref name="config"/> in LinBpq/, reached on its
+    /// telnet port (8010 inside), once that answers with its user prompt.
+    /// </summary>
+    public static async Task<LinBpqContainer> StartNodeAsync(string config, CancellationToken cancellation)
+    {
+        string id = (await DockerAsync(cancellation, "create", "-p", "127.0.0.1::8010", Image)).Trim();
+        try
+        {
+            await DockerAsync(cancellation, "cp", Path.Combine(AppContext.BaseDirectory, "LinBpq", config), $"{id}:/data/bpq32.cfg");
+            await DockerAsync(cancellation, "start", id);
+            var container = new LinBpqContainer(id, 0, await PortAsync(id, 8010, cancellation));
+            string lastSeen = "";
+            while (true)
+            {
+                if (cancellation.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException($"LinBPQ's telnet port never gave its user prompt; last seen: {lastSeen}; container log: {await DockerAsync(CancellationToken.None, "logs", id)}");
+                }
+                using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+                attempt.CancelAfter(TimeSpan.FromSeconds(10));
+                try
+                {
+                    using var client = new TcpClient();
+                    await client.ConnectAsync("127.0.0.1", container.TelnetPort, attempt.Token);
+                    await ReadUntilAsync(client.GetStream(), "user:", attempt.Token);
+                    return container;
+                }
+                catch (Exception e) when (e is SocketException or IOException || (e is OperationCanceledException && !cancellation.IsCancellationRequested))
+                {
+                    lastSeen = e.Message;
+                }
+                try
+                {
+                    await Task.Delay(1000, cancellation);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }
+        }
+        catch
+        {
+            await DockerAsync(CancellationToken.None, "rm", "-f", id);
+            throw;
+        }
+    }
+
     /// <summary>Waits until BPQMail answers on the FBBPORT with its SID.</summary>
     /// <remarks>
     /// Each try gets ten seconds: while LinBPQ is starting, a connection can be accepted (by
