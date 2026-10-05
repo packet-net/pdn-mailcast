@@ -123,6 +123,12 @@ public sealed class HeadEndService(
     public static DateTimeOffset NextSlot(DateTimeOffset now, TimeOnly slotTime, TimeSpan catchUp, SlotReport? last, TimeSpan? retryAfter = null)
     {
         var today = DateOnly.FromDateTime(now.UtcDateTime);
+        if (last is not null && today < last.Day)
+        {
+            // The clock has gone back behind a day already broadcast: never run an earlier day.
+            today = last.Day;
+            return new DateTimeOffset(today.AddDays(1).ToDateTime(slotTime, DateTimeKind.Utc));
+        }
         var at = new DateTimeOffset(today.ToDateTime(slotTime, DateTimeKind.Utc));
         DateTimeOffset tomorrow = at.AddDays(1);
         if (last is not null && last.Day == today)

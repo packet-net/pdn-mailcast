@@ -222,7 +222,7 @@ public static partial class Program
         using var api = new StationApiClient(new Uri(config.Station.ApiUrl), config.Station.ApiKey, settings.RenewEvery);
         var kiss = new KissTcpConnector(config.Station.KissHost, config.Station.KissPort, config.Station.KissPortNibble);
         await using var flex = config.Flex.Enabled ? new FlexMonitor(config.Flex.Host, config.Flex.Port, time: time, staleAfter: TimeSpan.FromSeconds(config.Flex.PaStaleSeconds)) : null;
-        var runner = new SlotRunner(settings, api, kiss, flex, airtime, journal, time);
+        var runner = new SlotRunner(settings, api, kiss, flex, airtime, journal, time, new KernelClockSync());
         journal.Write($"station: KISS {config.Station.KissHost}:{config.Station.KissPort}, API {config.Station.ApiUrl}, sub-channel {config.Station.SubChannel}, {config.Station.Mode}, bursts up to {config.Station.MaxBurstSeconds:0} s");
         journal.Write(config.Flex.Enabled
             ? $"flex: reading PA temperature and reference from {config.Flex.Host}, stopping at {config.Flex.PaTemperatureLimitC:0.#} C"

@@ -64,6 +64,9 @@ public class FlexMonitorTests
         Assert.True(await monitor.ConnectAsync(CancellationToken.None), monitor.Problem);
         radio.PushMeters((9, (short)(45 * 64)));
         await Until(() => monitor.PaTemperatureC is not null);
+        // A wall-clock step does not age it; time passing does.
+        clock.StepWallClock(TimeSpan.FromHours(-2));
+        Assert.Equal(45.0, monitor.PaTemperatureC);
         clock.Advance(TimeSpan.FromSeconds(60));
         Assert.Null(monitor.PaTemperatureC);
     }

@@ -25,6 +25,8 @@ public sealed class FakeStation : IStationApi, IKissConnector
     private DateTimeOffset _expires;
     private TimeSpan _maxCarrierWait = TimeSpan.MaxValue;
     private int _dropGeneration;
+    private int _keying;
+    private int _busyReads;
 
     public FakeStation(VirtualTime time, int subChannel)
     {
@@ -74,7 +76,14 @@ public sealed class FakeStation : IStationApi, IKissConnector
 
     public bool LeaseHeld => _holder == _subChannel && _time.GetUtcNow() < _expires;
 
-    public bool ChannelBusy => _time.GetUtcNow() < ChannelBusyUntil;
+    /// <summary>As #545's flag: busy for somebody else's signal, and while this station itself transmits.</summary>
+    public bool ChannelBusy => _keying > 0 || _time.GetUtcNow() < ChannelBusyUntil;
+
+    /// <summary>The first channel-busy read answers clear whatever the truth, as a flag read just before a keyup begins would.</summary>
+    public bool FirstBusyReadMisses { get; set; }
+
+    /// <summary>Keys the radio for something else that was already on the air when the slot began, as a keyup a lease does not cut short.</summary>
+    public void KeyOtherTraffic(TimeSpan length) => _ = KeyAsync(length, "other traffic, already on the air", CancellationToken.None);
 
     public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation)
     {
@@ -96,7 +105,9 @@ public sealed class FakeStation : IStationApi, IKissConnector
     public async Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation)
     {
         await Task.Yield();
-        return new LeaseAnswer(LeaseHeld, 0, null, ChannelBusy);
+        bool busy = ChannelBusy && !(FirstBusyReadMisses && _busyReads == 0);
+        _busyReads++;
+        return new LeaseAnswer(LeaseHeld, 0, null, busy);
     }
 
     public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
@@ -151,7 +162,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
     {
         DateTimeOffset start = _time.GetUtcNow();
         bool inside = LeaseHeld;
-        await Task.Delay(length, _time, cancellation);
+        _keying++;
+        try
+        {
+            await Task.Delay(length, _time, cancellation);
+        }
+        finally
+        {
+            _keying--;
+        }
         inside &= LeaseHeld;
         Keyups.Add(new Keyup(start, _time.GetUtcNow(), what, inside));
     }
@@ -252,6 +271,14 @@ public sealed class FakeFlex(TimeProvider time, Func<TimeSpan, double?> temperat
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+/// <summary>A system clock that is, or is not, synchronised.</summary>
+public sealed class FakeClockSync(bool synchronised = true) : IClockSync
+{
+    public bool Synchronised { get; set; } = synchronised;
+
+    public ClockState Check() => new(Synchronised, Synchronised ? "synchronised" : "the kernel says the clock is not synchronised");
 }
 
 /// <summary>The airtime the fake station uses, so plans and keyups agree.</summary>

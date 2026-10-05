@@ -8,6 +8,7 @@
   "slot": {
     "timeUtc": "12:00",
     "catchUpMinutes": 30,
+    "requireClockSync": true,
     "retryMinutes": 5,
     "maxMinutes": 40,
     "channelWaitSeconds": 120,

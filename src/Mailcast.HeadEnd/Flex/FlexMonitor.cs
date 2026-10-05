@@ -66,6 +66,9 @@ public sealed class FlexMonitor : IFlexMonitor
     private readonly TimeSpan _staleAfter;
     private FlexClient? _client;
     private FlexMeters? _meters;
+    private readonly Lock _paGate = new();
+    private double? _pa;
+    private long _paArrived;
 
     /// <summary>A monitor for the radio at <paramref name="host"/>.</summary>
     public FlexMonitor(string host, int port = 4992, TimeSpan? connectTimeout = null, TimeProvider? time = null, TimeSpan? referenceWait = null, TimeSpan? staleAfter = null)
@@ -89,13 +92,33 @@ public sealed class FlexMonitor : IFlexMonitor
     public ReferenceReading Reference => _client is null ? ReferenceReading.Unknown : Read(_client.Reference);
 
     /// <inheritdoc />
-    /// <remarks>Null when the latest reading is older than the stale limit (15 s by default), so a
-    /// radio that has stopped sending meters is not mistaken for a cool one.</remarks>
-    public double? PaTemperatureC =>
-        _meters is not null && _meters.TryGet("PATEMP", out FlexMeterReading reading)
-            && _time.GetUtcNow().UtcDateTime - reading.UtcTime <= _staleAfter
-            ? reading.Value
-            : null;
+    /// <remarks>Null when the latest reading arrived longer ago than the stale limit (15 s by
+    /// default), so a radio that has stopped sending meters is not mistaken for a cool one. Each
+    /// reading's arrival is stamped here on the monotonic clock, so a wall-clock step cannot make a
+    /// stale reading look fresh or a fresh one stale.</remarks>
+    public double? PaTemperatureC
+    {
+        get
+        {
+            lock (_paGate)
+            {
+                return _pa is double value && _time.GetElapsedTime(_paArrived) <= _staleAfter ? value : null;
+            }
+        }
+    }
+
+    private void OnMeter(FlexMeterReading reading)
+    {
+        if (!string.Equals(reading.Descriptor.Name, "PATEMP", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        lock (_paGate)
+        {
+            _pa = reading.Value;
+            _paArrived = _time.GetTimestamp();
+        }
+    }
 
     /// <inheritdoc />
     public async Task<bool> ConnectAsync(CancellationToken cancellation)
@@ -115,6 +138,7 @@ public sealed class FlexMonitor : IFlexMonitor
             _client.ReferenceChanged += _ => heard.TrySetResult();
             _client.SendCommandNoWait("sub radio all");
             _meters = await FlexMeters.SubscribeAsync(_client, linked.Token).ConfigureAwait(false);
+            _meters.Updated += OnMeter;
 
             // The reference arrives as status in answer to the subscription; give it a moment, but
             // an answer that never comes is "unknown", not a failure.
@@ -147,6 +171,14 @@ public sealed class FlexMonitor : IFlexMonitor
 
     private async Task CloseAsync()
     {
+        if (_meters is not null)
+        {
+            _meters.Updated -= OnMeter;
+        }
+        lock (_paGate)
+        {
+            _pa = null;
+        }
         _meters?.Dispose();
         _meters = null;
         if (_client is not null)

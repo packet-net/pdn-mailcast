@@ -13,6 +13,9 @@ Restart=on-failure
 RestartSec=10
 # Exit 2 means the configuration is wrong, and says how; retrying would only bury that.
 RestartPreventExitStatus=2
+# A stop mid-slot drops our queued frames and releases the lease, which then stays "closing" for up
+# to 60 s while the station sends the closing ident.
+TimeoutStopSec=150
 User=pdn-mailcast-headend
 Group=pdn-mailcast-headend
 # Bulletins in rotation, each one's next ESI, and the last slot's report.

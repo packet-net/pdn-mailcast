@@ -18,7 +18,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
             Station = new FakeStation(Time, 4);
             Settings = settings ?? new SlotSettings { SubChannel = 4 };
             Flex = withFlex ? new FakeFlex(Time, pa ?? (_ => 40.0), Gps, flexReachable) : null;
-            Runner = new SlotRunner(Settings, Station, Station, Flex, FakeAirtime.For(Station), Journal, Time);
+            Runner = new SlotRunner(Settings, Station, Station, Flex, FakeAirtime.For(Station), Journal, Time, Clock);
         }
 
         public VirtualTime Time { get; }
@@ -31,6 +31,8 @@ public class SlotRunnerTests(ITestOutputHelper output)
 
         public MemoryJournal Journal { get; } = new();
 
+        public FakeClockSync Clock { get; } = new();
+
         public SlotRunner Runner { get; }
 
         public List<int> Progress { get; } = [];
@@ -41,7 +43,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
 
     private static void AssertNothingKeyedOutsideTheLease(FakeStation station)
     {
-        Assert.All(station.Keyups, k => Assert.True(k.InsideLease, $"{k.What} from {k.Start:HH:mm:ss} to {k.End:HH:mm:ss} was not inside the lease"));
+        Assert.All(station.Keyups.Where(k => !k.What.StartsWith("other traffic", StringComparison.Ordinal)), k => Assert.True(k.InsideLease, $"{k.What} from {k.Start:HH:mm:ss} to {k.End:HH:mm:ss} was not inside the lease"));
         Assert.All(station.Frames, f => Assert.True(f.LeaseHeld, $"a frame was queued at {f.At:HH:mm:ss} without the lease"));
     }
 
@@ -219,6 +221,42 @@ public class SlotRunnerTests(ITestOutputHelper output)
         rig.Run(20);
         rig.Time.Run(async () => { await Task.Delay(TimeSpan.FromMinutes(20), rig.Time); return 0; });
         Assert.Contains(rig.Station.Keyups, k => !k.InsideLease);
+    }
+
+    [Fact]
+    public void Run_WaitsOutTheStationsOwnTransmission_AndRetriesARefusedTone()
+    {
+        // Something of the station's own is on the air for 90 s as the slot starts. The first flag
+        // read misses it, so the tone is asked for, waits its minute and is refused; the flag then
+        // says busy, the head end waits for it to clear, and the tone goes after the keyup.
+        var rig = new Rig();
+        rig.Station.FirstBusyReadMisses = true;
+        rig.Station.KeyOtherTraffic(TimeSpan.FromSeconds(90));
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.True(report.ToneSent);
+        var other = rig.Station.Keyups.Single(k => k.What.StartsWith("other traffic", StringComparison.Ordinal));
+        var tone = rig.Station.Keyups.Single(k => k.What.StartsWith("tone", StringComparison.Ordinal));
+        Assert.True(tone.Start >= other.End);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("channel busy; waiting", StringComparison.Ordinal));
+        AssertNothingKeyedOutsideTheLease(rig.Station);
+    }
+
+    [Fact]
+    public void Run_KeysNothingUntilTheClockIsSynchronised()
+    {
+        var rig = new Rig();
+        rig.Clock.Synchronised = false;
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.True(report.Retryable);
+        Assert.Contains("not known to be synchronised", report.Reason, StringComparison.Ordinal);
+        Assert.Empty(rig.Station.LeaseRequests);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("waiting for the system clock", StringComparison.Ordinal));
+
+        var relaxed = new Rig(new SlotSettings { SubChannel = 4, RequireClockSync = false });
+        relaxed.Clock.Synchronised = false;
+        Assert.Equal(SlotOutcome.Completed, relaxed.Run(5).Outcome);
     }
 
     [Fact]

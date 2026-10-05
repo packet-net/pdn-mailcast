@@ -84,6 +84,7 @@ public sealed record HeadEndConfig
         MaxCarrierWait = TimeSpan.FromSeconds(Station.MaxCarrierWaitSeconds),
         RenewEvery = TimeSpan.FromSeconds(Station.RenewSeconds),
         ChannelWait = TimeSpan.FromSeconds(Slot.ChannelWaitSeconds),
+        RequireClockSync = Slot.RequireClockSync,
         WhenStillBusy = Slot.WhenStillBusy,
         ToneLength = TimeSpan.FromSeconds(Slot.ToneSeconds),
         ToneHz = Slot.ToneHz,
@@ -235,6 +236,9 @@ public sealed record SlotConfig
 
     /// <summary>The hard stop.</summary>
     public double MaxMinutes { get; init; } = 40;
+
+    /// <summary>Key nothing until the kernel says the clock is synchronised.</summary>
+    public bool RequireClockSync { get; init; } = true;
 
     public double ChannelWaitSeconds { get; init; } = 120;
 

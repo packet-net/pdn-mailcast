@@ -15,6 +15,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Public types here are an application's, documented where it helps rather than everywhere. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- For adjtimex(2), the clock-sync check, through LibraryImport. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

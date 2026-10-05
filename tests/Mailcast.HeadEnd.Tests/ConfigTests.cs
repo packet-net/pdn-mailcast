@@ -41,3 +41,18 @@ public class ConfigTests
         Assert.Contains(mentions, e.Message, StringComparison.Ordinal);
     }
 }
+
+public class ClockSyncTests
+{
+    [Fact]
+    public void KernelClockSync_AnswersWithoutThrowing()
+    {
+        // Whether this machine is synchronised is not the test's business; that the kernel can be asked is.
+        var state = new Mailcast.HeadEnd.Slot.KernelClockSync().Check();
+        Assert.False(string.IsNullOrWhiteSpace(state.Detail));
+        if (OperatingSystem.IsLinux())
+        {
+            Assert.NotNull(state.Synchronised);
+        }
+    }
+}

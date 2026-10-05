@@ -46,9 +46,11 @@ public sealed class SlotRunner
     private readonly IAirtime _airtime;
     private readonly IJournal _journal;
     private readonly TimeProvider _time;
+    private readonly IClockSync? _clock;
 
-    public SlotRunner(SlotSettings settings, IStationApi station, IKissConnector kiss, IFlexMonitor? flex, IAirtime airtime, IJournal journal, TimeProvider time)
+    public SlotRunner(SlotSettings settings, IStationApi station, IKissConnector kiss, IFlexMonitor? flex, IAirtime airtime, IJournal journal, TimeProvider time, IClockSync? clock = null)
     {
+        _clock = clock;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         if (settings.MaxCarrierWait > settings.LeaseMargin)
         {
@@ -178,6 +180,16 @@ public sealed class SlotRunner
             if (frames.Count == 0)
             {
                 return Finish(SlotOutcome.Skipped, "nothing to send");
+            }
+
+            if (S.RequireClockSync)
+            {
+                ClockState clock = owner._clock?.Check() ?? new ClockState(null, "no way to ask was given");
+                if (clock.Synchronised != true)
+                {
+                    Say($"waiting for the system clock: {clock.Detail}");
+                    return Finish(SlotOutcome.Skipped, $"the system clock is not known to be synchronised ({clock.Detail}), and nothing keys until it is", retryable: true);
+                }
             }
 
             if (owner._flex is not null)
@@ -501,7 +513,10 @@ public sealed class SlotRunner
                     }
                 }
 
-                // Write-ahead: the whole burst is on record as queued before any of it is written.
+                // Write-ahead: the whole burst is on record as queued before any of it is written. If
+                // the writing is then cut short (a KISS failure, an abort), the frames not written are
+                // under-sent: their ESIs are spent and the next plan makes the shortfall up with fresh
+                // ones. Under-sending costs a little airtime; it can never send a piece twice.
                 try
                 {
                     onQueued?.Invoke(_queued + batch.Count);
@@ -518,6 +533,11 @@ public sealed class SlotRunner
                 {
                     foreach (byte[] frame in batch)
                     {
+                        if (_abort is not null)
+                        {
+                            // A drop has been asked for: nothing more is written after it.
+                            break;
+                        }
                         id++;
                         waiting.Add(id);
                         await link.SendAsync(id, frame, cancellation);
@@ -620,8 +640,9 @@ public sealed class SlotRunner
             }
             try
             {
-                // The station holds the lease until the closing ident has gone, up to 60 s, and answers then.
-                using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(90), owner._time);
+                // Answered at once; the station keeps the lease "closing" for up to 60 s while the
+                // closing ident goes, which is why the unit gives a stopping head end 150 s.
+                using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30), owner._time);
                 bool released = await owner._station.ReleaseLeaseAsync(S.SubChannel, bounded.Token);
                 Say(released
                     ? "transmit lease released; anything of ours not yet keyed is dropped, and the station sends the closing ident"

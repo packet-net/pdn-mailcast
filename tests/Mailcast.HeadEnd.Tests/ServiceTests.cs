@@ -31,6 +31,10 @@ public class ServiceTests
         var stopped = ran with { Outcome = SlotOutcome.Aborted, Reason = "the head end is stopping" };
         Assert.Equal(late, HeadEndService.NextSlot(late, Noon, catchUp, stopped));
 
+        // A clock that has gone back behind a day already run never runs an earlier day.
+        var ahead = ran with { Day = Day1.AddDays(3) };
+        Assert.Equal(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late, Noon, catchUp, ahead));
+
         var yesterday = ran with { Day = Day1.AddDays(-1) };
         Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(morning, Noon, catchUp, yesterday));
     }
@@ -44,7 +48,7 @@ public class ServiceTests
             var options = new ScheduleOptions();
             Store = new RotationStore(dir.Path, Compression.Default, options, Journal);
             Planner = new StoreSlotPlanner(Store, Compression.Default, options);
-            var runner = new SlotRunner(settings, Station, Station, null, FakeAirtime.For(Station), Journal, Time);
+            var runner = new SlotRunner(settings, Station, Station, null, FakeAirtime.For(Station), Journal, Time, new FakeClockSync());
             Service = new HeadEndService(Noon, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), Planner, Store, intakes ?? [], runner, new StatusStore(null, Time), Journal, Time);
         }
 

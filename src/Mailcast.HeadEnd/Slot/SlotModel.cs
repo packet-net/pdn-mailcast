@@ -54,6 +54,12 @@ public sealed record SlotSettings
     /// </summary>
     public TimeSpan MaxCarrierWait { get; init; } = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Refuse to key until the system clock is synchronised: a slot timed by a wrong clock goes out
+    /// when nobody is listening, and possibly over somebody else.
+    /// </summary>
+    public bool RequireClockSync { get; init; } = true;
+
     /// <summary>How long to keep trying for a clear channel.</summary>
     public TimeSpan ChannelWait { get; init; } = TimeSpan.FromMinutes(2);
 

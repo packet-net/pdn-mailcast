@@ -41,6 +41,11 @@ public sealed class VirtualTime : TimeProvider
         }
     }
 
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+    /// <summary>The monotonic clock, which a wall-clock step does not move.</summary>
+    public override long GetTimestamp() => Monotonic.UtcTicks;
+
     /// <summary>Steps the wall clock, as a time sync after a boot with a stale clock does; timers keep their due times.</summary>
     public void StepWallClock(TimeSpan by)
     {

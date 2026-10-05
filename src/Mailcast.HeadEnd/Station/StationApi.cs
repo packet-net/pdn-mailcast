@@ -48,8 +48,8 @@ public interface IStationApi
 
     /// <summary>
     /// Gives the lease back, dropping any of the holder's frames not yet keyed
-    /// (<c>{"release": true, "dropQueued": true}</c>). The station sends the holder's closing ident
-    /// first, holding the lease up to 60 s for it, and answers once it has gone.
+    /// (<c>{"release": true, "dropQueued": true}</c>). The station answers at once, then keeps the
+    /// lease "closing" for up to 60 s while the holder's closing ident goes out.
     /// </summary>
     Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation);
 
@@ -128,8 +128,8 @@ public sealed class StationApiClient : IStationApi, IDisposable
     public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
     {
         var body = new JsonObject { ["release"] = true, ["subChannel"] = subChannel, ["dropQueued"] = true };
-        // Answered once the closing ident has gone, which the station allows up to 60 s.
-        var (status, json, _) = await LeaseCallAsync(HttpMethod.Post, body, cancellation, ReleaseLimit).ConfigureAwait(false);
+        // Answered at once; the lease then stays "closing" for up to 60 s while the closing ident goes.
+        var (status, json, _) = await LeaseCallAsync(HttpMethod.Post, body, cancellation).ConfigureAwait(false);
         return status == HttpStatusCode.OK && json?["released"]?.GetValue<bool>() == true;
     }
 
@@ -173,12 +173,9 @@ public sealed class StationApiClient : IStationApi, IDisposable
             : new ToneAnswer(ToneOutcome.Failed, $"HTTP {(int)status}: {why}");
     }
 
-    /// <summary>How long a release may take: the station's 60 s for the closing ident, and some.</summary>
-    public static readonly TimeSpan ReleaseLimit = TimeSpan.FromSeconds(90);
-
-    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation, TimeSpan? callLimit = null)
+    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation)
     {
-        TimeSpan allowed = callLimit ?? _leaseCallLimit;
+        TimeSpan allowed = _leaseCallLimit;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         limit.CancelAfter(allowed);
         try
