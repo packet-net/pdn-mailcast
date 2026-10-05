@@ -100,6 +100,8 @@ The published pdn-soundmodem package cannot pack frames yet, so offline every fr
 
 `/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key with its default. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file.
 
+`schedule.symbolSize` sets the frame size: the bytes of bulletin each frame carries, 64 to 940 in steps of 4 (940 if left out). Smaller frames survive fades and other stations' transmissions better, and since a bulletin rounds up to whole pieces they waste less on short bulletins too. On 2026-10-05 a busy 40 m band left almost nothing of 940-byte frames, and 240 is the size to try first. Receivers read the size from each frame, so nothing changes at their end. A bulletin keeps the size it was first encoded with.
+
 `scripts/build-headend-deb.sh linux-x64 VERSION` builds the package (also `linux-arm64` and `linux-arm`), laid out like the receiver's: the binary in `/usr/lib/pdn-mailcast-headend`, state in `/var/lib/pdn-mailcast-headend`.
 
 ## What the head end expects of pdn-soundmodem's lease

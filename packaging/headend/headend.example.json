@@ -5,6 +5,12 @@
   "destination": "MCAST",
   "stateDirectory": "/var/lib/pdn-mailcast-headend",
 
+  // Frame size: the bytes of bulletin per frame, 64 to 940 in steps of 4. Smaller frames survive
+  // fades and other stations better; docs/headend.md says more.
+  "schedule": {
+    "symbolSize": 940
+  },
+
   "slot": {
     "timeUtc": "12:00",
     "catchUpMinutes": 30,
