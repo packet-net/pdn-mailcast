@@ -27,6 +27,8 @@ public class SignInTests
 
         public required List<string> Log { get; init; }
 
+        public required int Port { get; init; }
+
         /// <summary>Every body and header the page has answered with, to look for the password in.</summary>
         public List<string> Answers { get; } = [];
 
@@ -63,7 +65,7 @@ public class SignInTests
     };
 
     /// <summary>See StatusPageTests for why it may ask for a port twice. No cookies are kept by the client: each test gives them itself.</summary>
-    private static async Task<Receiver> StartAsync(string dir, FakeTimeProvider time, string password = Password, bool delay = false)
+    private static async Task<Receiver> StartAsync(string dir, FakeTimeProvider time, string password = Password, Func<TimeSpan, Task>? pause = null)
     {
         string path = System.IO.Path.Combine(dir, "receiver.json");
         var log = new List<string>();
@@ -83,7 +85,7 @@ public class SignInTests
             var config = Config(dir, port, password);
             config.Save(path);
             var host = new ReceiverHost(config, time, Log);
-            var page = new StatusPage(host, path, Log) { FailureDelay = delay ? SignInThrottle.FailureDelay : TimeSpan.Zero };
+            var page = new StatusPage(host, path, Log) { FailureDelay = pause is null ? TimeSpan.Zero : SignInThrottle.FailureDelay, Pause = pause };
             try
             {
                 page.Start();
@@ -91,7 +93,7 @@ public class SignInTests
                 {
                     BaseAddress = new Uri($"http://127.0.0.1:{port}/"),
                 };
-                return new Receiver { Host = host, Page = page, Http = http, ConfigPath = path, Log = log };
+                return new Receiver { Host = host, Page = page, Http = http, ConfigPath = path, Log = log, Port = port };
             }
             catch (HttpListenerException) when (attempt < 20)
             {
@@ -101,9 +103,14 @@ public class SignInTests
         }
     }
 
-    private static HttpRequestMessage Request(HttpMethod method, string url, string? cookie = null, object? json = null, string? origin = null)
+    /// <summary>A request; <paramref name="browser"/> is the Sec-Fetch-Mode a browser would send with it, which a script does not.</summary>
+    private static HttpRequestMessage Request(HttpMethod method, string url, string? cookie = null, object? json = null, string? origin = null, string? browser = null)
     {
         var request = new HttpRequestMessage(method, url);
+        if (browser is not null)
+        {
+            request.Headers.Add("Sec-Fetch-Mode", browser);
+        }
         if (json is not null)
         {
             request.Content = JsonContent.Create(json);
@@ -122,8 +129,8 @@ public class SignInTests
     private static Task<HttpResponseMessage> SignInAsync(Receiver r, string password, bool remember = false, string? origin = null) =>
         r.SendAsync(Request(HttpMethod.Post, "login", json: new { password, remember }, origin: origin));
 
-    private static Task<HttpResponseMessage> GetAsync(Receiver r, string url, string? cookie = null) =>
-        r.SendAsync(Request(HttpMethod.Get, url, cookie));
+    private static Task<HttpResponseMessage> GetAsync(Receiver r, string url, string? cookie = null, bool browser = false) =>
+        r.SendAsync(Request(HttpMethod.Get, url, cookie, browser: browser ? "navigate" : null));
 
     private static string? SetCookie(HttpResponseMessage answer) =>
         answer.Headers.TryGetValues("Set-Cookie", out var values) ? values.Single() : null;
@@ -149,7 +156,7 @@ public class SignInTests
         using var dir = new TempDirectory();
         await using var r = await StartAsync(dir.Path, new FakeTimeProvider(Start));
 
-        var page = await GetAsync(r, "/");
+        var page = await GetAsync(r, "/", browser: true);
         string html = await page.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         Assert.Contains("name=\"password\"", html, StringComparison.Ordinal);
@@ -160,7 +167,7 @@ public class SignInTests
         Assert.DoesNotMatch("[^\\x00-\\x7F]", html);
         Assert.False(page.Headers.Contains("WWW-Authenticate"));
         // A page further down posts to the same /login.
-        Assert.Contains("action=\"../login\"", await (await GetAsync(r, "/waterfall/")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Contains("action=\"../login\"", await (await GetAsync(r, "/waterfall/", browser: true)).Content.ReadAsStringAsync(), StringComparison.Ordinal);
 
         var answer = await SignInAsync(r, Password);
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
@@ -178,14 +185,14 @@ public class SignInTests
 
         string cookie = Cookie(answer);
         Assert.Equal(HttpStatusCode.OK, (await GetAsync(r, "api/status", cookie)).StatusCode);
-        string signedIn = await (await GetAsync(r, "/", cookie)).Content.ReadAsStringAsync();
+        string signedIn = await (await GetAsync(r, "/", cookie, browser: true)).Content.ReadAsStringAsync();
         Assert.Contains("api/status", signedIn, StringComparison.Ordinal);
         Assert.Contains("Sign out", signedIn, StringComparison.Ordinal);
         var settings = await (await GetAsync(r, "api/settings", cookie)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(settings.GetProperty("web").GetProperty("passwordSet").GetBoolean());
         Assert.Contains(r.Log, l => l.StartsWith("web: signed in from 127.0.0.1", StringComparison.Ordinal));
         // Once in, /login goes back to the page.
-        var again = await GetAsync(r, "login", cookie);
+        var again = await GetAsync(r, "login", cookie, browser: true);
         Assert.Equal(HttpStatusCode.Redirect, again.StatusCode);
     }
 
@@ -391,21 +398,22 @@ public class SignInTests
     public async Task WrongPassword_IsAnsweredOnlyAfterADelay_TheRightOneAtOnce()
     {
         using var dir = new TempDirectory();
-        var time = new FakeTimeProvider(Start);
-        await using var r = await StartAsync(dir.Path, time, delay: true);
-
-        // The fake clock only moves when told to: the right password needs none of it.
-        Assert.Equal(HttpStatusCode.OK, (await SignInAsync(r, Password)).StatusCode);
-
-        var started = time.GetUtcNow();
-        var wrong = SignInAsync(r, Wrong);
-        while (!wrong.IsCompleted)
+        var asked = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var r = await StartAsync(dir.Path, new FakeTimeProvider(Start), pause: wait =>
         {
-            time.Advance(TimeSpan.FromMilliseconds(100));
-            await Task.Delay(5);
-        }
+            asked.TrySetResult(wait);
+            return release.Task;
+        });
+
+        Assert.Equal(HttpStatusCode.OK, (await SignInAsync(r, Password)).StatusCode);
+        Assert.False(asked.Task.IsCompleted); // the right password does not wait
+
+        var wrong = SignInAsync(r, Wrong);
+        Assert.Equal(SignInThrottle.FailureDelay, await asked.Task);
+        Assert.False(wrong.IsCompleted); // held until the wait is over
+        release.SetResult();
         Assert.Equal(HttpStatusCode.Unauthorized, (await wrong).StatusCode);
-        Assert.True(time.GetUtcNow() - started >= SignInThrottle.FailureDelay);
     }
 
     [Fact]
@@ -434,6 +442,188 @@ public class SignInTests
         var fromBrowser = await r.SendAsync(browser);
         Assert.Equal(HttpStatusCode.Unauthorized, fromBrowser.StatusCode);
         Assert.Empty(fromBrowser.Headers.WwwAuthenticate);
+
+        // A script asking for a page is asked too, not given the sign-in page.
+        foreach (string url in new[] { "/", "/waterfall/" })
+        {
+            var page = await GetAsync(r, url);
+            Assert.Equal(HttpStatusCode.Unauthorized, page.StatusCode);
+            Assert.Contains("Basic", page.Headers.WwwAuthenticate.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain("name=\"password\"", await page.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+        var pageWithBasic = Request(HttpMethod.Get, "/");
+        pageWithBasic.Headers.TryAddWithoutValidation("Authorization", Basic(Password));
+        var shown = await r.SendAsync(pageWithBasic);
+        Assert.Equal(HttpStatusCode.OK, shown.StatusCode);
+        Assert.Contains("api/status", await shown.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Browser_RememberingABasicLogin_StillSeesTheSignInPage_CanSignOut_AndIsNeverLockedOut()
+    {
+        using var dir = new TempDirectory();
+        await using var r = await StartAsync(dir.Path, new FakeTimeProvider(Start));
+        HttpRequestMessage FromBrowser(string url, string basic, string? cookie = null, string mode = "navigate")
+        {
+            var request = Request(HttpMethod.Get, url, cookie, browser: mode);
+            request.Headers.TryAddWithoutValidation("Authorization", Basic(basic));
+            return request;
+        }
+
+        // The right password by Basic does not let a browser in: it gets the sign-in page, with no complaint.
+        var page = await r.SendAsync(FromBrowser("/", Password));
+        string html = await page.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Contains("name=\"password\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("not right", html, StringComparison.Ordinal);
+        var api = await r.SendAsync(FromBrowser("api/status", Password, mode: "cors"));
+        Assert.Equal(HttpStatusCode.Unauthorized, api.StatusCode);
+        Assert.Empty(api.Headers.WwwAuthenticate);
+
+        // Signed in, then out: the remembered Basic login does not keep it in.
+        string cookie = await CookieAsync(r);
+        Assert.Contains("api/status", await (await r.SendAsync(FromBrowser("/", Password, cookie))).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, (await r.SendAsync(Request(HttpMethod.Post, "logout", cookie, new { }, browser: "cors"))).StatusCode);
+        Assert.Contains("name=\"password\"", await (await r.SendAsync(FromBrowser("/", Password, cookie))).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        // An old password remembered after a change is not counted against the address, however often the page polls.
+        for (int i = 0; i < 4 * SignInThrottle.MaxFailures; i++)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await r.SendAsync(FromBrowser("api/status", Wrong, mode: "cors"))).StatusCode);
+        }
+        Assert.DoesNotContain("not right", await (await r.SendAsync(FromBrowser("/", Wrong))).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.DoesNotContain(r.Log, l => l.Contains("wrong passwords", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.OK, (await SignInAsync(r, Password)).StatusCode);
+    }
+
+    [Fact]
+    public void Ipv6_IsCountedByItsSlash64_AndIpv4MappedAsIpv4()
+    {
+        var time = new FakeTimeProvider(Start);
+        var log = new List<string>();
+        var throttle = new SignInThrottle(time, log.Add);
+
+        for (int i = 1; i <= SignInThrottle.MaxFailures; i++)
+        {
+            Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(IPAddress.Parse($"2001:db8:0:1::{i:x}"), Wrong, Password, out _));
+        }
+
+        Assert.Equal(SignInThrottle.Verdict.LockedOut, throttle.Check(IPAddress.Parse("2001:db8:0:1:ffff:ffff:ffff:ffff"), Password, Password, out var wait));
+        Assert.Equal(SignInThrottle.LockoutTime, wait);
+        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(IPAddress.Parse("2001:db8:0:2::1"), Password, Password, out _));
+        Assert.Equal(["web: 5 wrong passwords from 2001:db8:0:1::/64 within 5 minutes; sign-in from there is refused for 10 minutes"], log);
+
+        for (int i = 0; i < SignInThrottle.MaxFailures; i++)
+        {
+            var from = IPAddress.Parse(i % 2 == 0 ? "192.168.1.9" : "::ffff:192.168.1.9");
+            Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(from, Wrong, Password, out _));
+        }
+        Assert.Equal(SignInThrottle.Verdict.LockedOut, throttle.Check(IPAddress.Parse("192.168.1.9"), Password, Password, out _));
+    }
+
+    [Fact]
+    public void ManyAddresses_SpendTheBudgetForEverywhere_AndThenEverySignInIsSlowed()
+    {
+        var time = new FakeTimeProvider(Start);
+        var log = new List<string>();
+        var throttle = new SignInThrottle(time, log.Add);
+        int next = 0;
+        IPAddress Fresh() { next++; return new IPAddress([10, (byte)(next >> 16), (byte)(next >> 8), (byte)next]); }
+
+        for (int i = 0; i < SignInThrottle.GlobalBudget; i++)
+        {
+            Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(Fresh(), Wrong, Password, out _));
+        }
+        Assert.Empty(log);
+
+        // From now on, one attempt each 3 seconds from anywhere, right or wrong.
+        Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(Fresh(), Wrong, Password, out _));
+        Assert.Equal(SignInThrottle.Verdict.Busy, throttle.Check(Fresh(), Password, Password, out var wait));
+        Assert.Equal(SignInThrottle.GlobalSpacing, wait);
+        time.Advance(SignInThrottle.GlobalSpacing);
+        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(Fresh(), Password, Password, out _));
+        Assert.Single(log, l => l.Contains("from all addresses together", StringComparison.Ordinal));
+
+        // Thousands of addresses, far past what the table of addresses holds, guessing as fast as
+        // they can for 20 minutes: only one guess each 3 seconds is looked at.
+        int looked = 0;
+        var started = time.GetUtcNow();
+        for (int step = 0; step < 20 * 60 * 10; step++)
+        {
+            time.Advance(TimeSpan.FromMilliseconds(100));
+            if (throttle.Check(Fresh(), Wrong, Password, out _) != SignInThrottle.Verdict.Busy)
+            {
+                looked++;
+            }
+        }
+        Assert.True(next > SignInThrottle.MaxAddresses);
+        Assert.InRange(looked, 1, (int)((time.GetUtcNow() - started) / SignInThrottle.GlobalSpacing) + 1);
+
+        // Once five minutes pass without a wrong password, sign-in is as before.
+        time.Advance(SignInThrottle.FailureWindow);
+        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(Fresh(), Password, Password, out _));
+        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(Fresh(), Password, Password, out _));
+        Assert.Single(log, l => l.Contains("from all addresses together", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SigningOut_ClosesThatSessionsWaterfall_AndAPasswordChange_ClosesThemAll()
+    {
+        using var dir = new TempDirectory();
+        await using var r = await StartAsync(dir.Path, new FakeTimeProvider(Start));
+        await using var pipeline = r.Host.CreatePipeline(AudioSource.Parse(r.Host.Config.Audio), r.Host.Config);
+        r.Page.Attach(pipeline);
+        string first = await CookieAsync(r);
+        string second = await CookieAsync(r);
+        using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // only against a hang
+        async Task<System.Net.WebSockets.ClientWebSocket> OpenAsync(string? cookie, string? basic = null)
+        {
+            var socket = new System.Net.WebSockets.ClientWebSocket();
+            if (cookie is not null)
+            {
+                socket.Options.SetRequestHeader("Cookie", cookie);
+            }
+            if (basic is not null)
+            {
+                socket.Options.SetRequestHeader("Authorization", Basic(basic));
+            }
+            await socket.ConnectAsync(new Uri($"ws://127.0.0.1:{r.Port}/waterfall/ws"), guard.Token);
+            return socket;
+        }
+        async Task ClosedAsync(System.Net.WebSockets.ClientWebSocket socket)
+        {
+            var buffer = new byte[64 * 1024];
+            try
+            {
+                while ((await socket.ReceiveAsync(buffer, guard.Token)).MessageType != System.Net.WebSockets.WebSocketMessageType.Close)
+                {
+                }
+            }
+            catch (System.Net.WebSockets.WebSocketException)
+            {
+                // The connection dropped, which is what closing it does.
+            }
+            Assert.False(guard.IsCancellationRequested);
+        }
+
+        using var a = await OpenAsync(first);
+        using var b = await OpenAsync(second);
+        using var script = await OpenAsync(null, Password);
+        Assert.Equal(3, r.Page.OpenSockets);
+
+        Assert.Equal(HttpStatusCode.OK, (await r.SendAsync(Request(HttpMethod.Post, "logout", first, new { }))).StatusCode);
+        Assert.Equal(2, r.Page.OpenSockets); // the other session's and the script's are still open
+        await ClosedAsync(a);
+
+        var form = new
+        {
+            audio = "wav:/nonexistent.wav", type = "linBpq", host = "127.0.0.1", port = 8011, login = "Q0CAST", password = "", command = "BBS",
+            pagePassword = "brand-new-9K", currentPagePassword = Password,
+        };
+        Assert.Equal(HttpStatusCode.OK, (await r.SendAsync(Request(HttpMethod.Post, "api/settings", second, form))).StatusCode);
+        Assert.Equal(0, r.Page.OpenSockets);
+        await ClosedAsync(b);
+        await ClosedAsync(script);
     }
 
     [Fact]

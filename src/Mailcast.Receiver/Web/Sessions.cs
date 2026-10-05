@@ -41,8 +41,11 @@ internal sealed class SessionStore
     private readonly Func<string> _currentPassword;
     private string _password;
 
-    /// <summary>One signed-in browser: when its sign-in ends, and whether it asked to be kept signed in.</summary>
-    public sealed record Session(DateTimeOffset Expires, bool Remembered);
+    /// <summary>
+    /// One signed-in browser: <paramref name="Id"/> names it (it is the stored hash, never the
+    /// token), when its sign-in ends, and whether it asked to be kept signed in.
+    /// </summary>
+    public sealed record Session(string Id, DateTimeOffset Expires, bool Remembered);
 
     private sealed record Saved(string Hash, DateTimeOffset Expires, bool Remembered);
 
@@ -77,19 +80,20 @@ internal sealed class SessionStore
     {
         byte[] token = RandomNumberGenerator.GetBytes(TokenBytes);
         var now = _time.GetUtcNow();
-        var session = new Session(now + (remembered ? RememberedLifetime : BrowserSessionLifetime), remembered);
         lock (_gate)
         {
             string password = NoticePassword();
+            string hash = Hash(token, password);
+            var session = new Session(hash, now + (remembered ? RememberedLifetime : BrowserSessionLifetime), remembered);
             Prune(now);
             while (_sessions.Count >= MaxSessions)
             {
                 _sessions.Remove(_sessions.MinBy(s => s.Value.Expires).Key);
             }
-            _sessions[Hash(token, password)] = session;
+            _sessions[hash] = session;
             Save();
+            return (Base64Url(token), session);
         }
-        return (Base64Url(token), session);
     }
 
     /// <summary>The session <paramref name="token"/> is for, if it is one, still running, under the password in force.</summary>
@@ -116,21 +120,32 @@ internal sealed class SessionStore
         }
     }
 
-    /// <summary>Ends the session <paramref name="token"/> is for, if any; false if there was none.</summary>
-    public bool Remove(string? token)
+    /// <summary>Ends the session <paramref name="token"/> is for, if any, and gives its <see cref="Session.Id"/>; null if there was none.</summary>
+    public string? Remove(string? token)
     {
         if (Decode(token) is not { } bytes)
         {
-            return false;
+            return null;
         }
         lock (_gate)
         {
-            if (!_sessions.Remove(Hash(bytes, NoticePassword())))
+            string hash = Hash(bytes, NoticePassword());
+            if (!_sessions.Remove(hash))
             {
-                return false;
+                return null;
             }
             Save();
-            return true;
+            return hash;
+        }
+    }
+
+    /// <summary>Whether the session <paramref name="id"/> names is still held (and the password has not changed since).</summary>
+    public bool Holds(string id)
+    {
+        lock (_gate)
+        {
+            NoticePassword();
+            return _sessions.TryGetValue(id, out var session) && session.Expires > _time.GetUtcNow();
         }
     }
 
@@ -206,7 +221,7 @@ internal sealed class SessionStore
             var now = _time.GetUtcNow();
             foreach (var s in saved.Where(s => s.Hash is { Length: 64 } && s.Expires > now).Take(MaxSessions))
             {
-                _sessions[s.Hash] = new Session(s.Expires, s.Remembered);
+                _sessions[s.Hash] = new Session(s.Hash, s.Expires, s.Remembered);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -251,10 +266,18 @@ internal sealed class SessionStore
 }
 
 /// <summary>
-/// Slows down password guessing: each wrong password is answered after <see cref="FailureDelay"/>,
-/// and <see cref="MaxFailures"/> wrong ones from one address within <see cref="FailureWindow"/>
-/// refuse every sign-in from it, right or wrong, for <see cref="LockoutTime"/>.
+/// Slows down password guessing: each wrong password is answered after <see cref="FailureDelay"/>;
+/// <see cref="MaxFailures"/> wrong ones from one address within <see cref="FailureWindow"/>
+/// refuse every sign-in from it, right or wrong, for <see cref="LockoutTime"/>; and
+/// <see cref="GlobalBudget"/> wrong ones from everywhere together within the window slow every
+/// sign-in, from anywhere, to one each <see cref="GlobalSpacing"/>.
 /// </summary>
+/// <remarks>
+/// An IPv6 address counts by its /64, since one machine is usually given a whole /64 to pick
+/// addresses from. The budget for everywhere together is what stops someone with many addresses
+/// guessing without limit: the table of addresses is capped, so on its own it could be made to
+/// forget a lockout.
+/// </remarks>
 internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
 {
     /// <summary>How long each wrong password waits before it is answered.</summary>
@@ -263,17 +286,26 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
     /// <summary>Wrong passwords from one address, within <see cref="FailureWindow"/>, that lock it out.</summary>
     public const int MaxFailures = 5;
 
-    /// <summary>The window <see cref="MaxFailures"/> are counted in.</summary>
+    /// <summary>The window failures are counted in.</summary>
     public static readonly TimeSpan FailureWindow = TimeSpan.FromMinutes(5);
 
     /// <summary>How long an address is locked out for.</summary>
     public static readonly TimeSpan LockoutTime = TimeSpan.FromMinutes(10);
+
+    /// <summary>Wrong passwords from everywhere together, within <see cref="FailureWindow"/>, that slow every sign-in.</summary>
+    public const int GlobalBudget = 50;
+
+    /// <summary>While the budget is spent, the least time between one sign-in attempt and the next, from anywhere.</summary>
+    public static readonly TimeSpan GlobalSpacing = TimeSpan.FromSeconds(3);
 
     /// <summary>The most addresses remembered; past it the quietest are forgotten.</summary>
     public const int MaxAddresses = 1024;
 
     private readonly object _gate = new();
     private readonly Dictionary<System.Net.IPAddress, Tally> _tallies = [];
+    private readonly Queue<DateTimeOffset> _recentFailures = new();
+    private DateTimeOffset _nextAttempt;
+    private bool _slowed;
 
     private sealed class Tally
     {
@@ -293,16 +325,39 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
 
         /// <summary>Not looked at: the address is locked out.</summary>
         LockedOut,
+
+        /// <summary>Not looked at: there have been too many wrong passwords from everywhere, and this one came too soon after the last.</summary>
+        Busy,
     }
+
+    /// <summary>What an address is counted as: itself for IPv4, its /64 for IPv6.</summary>
+    internal static System.Net.IPAddress Counted(System.Net.IPAddress from)
+    {
+        if (from.IsIPv4MappedToIPv6)
+        {
+            return from.MapToIPv4();
+        }
+        if (from.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            return from;
+        }
+        byte[] bytes = from.GetAddressBytes();
+        Array.Clear(bytes, 8, 8);
+        return new System.Net.IPAddress(bytes);
+    }
+
+    private static string Describe(System.Net.IPAddress counted) =>
+        counted.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? $"{counted}/64" : counted.ToString();
 
     /// <summary>
     /// Checks <paramref name="given"/> against <paramref name="password"/> for a request from
-    /// <paramref name="from"/>, in constant time, and counts it. While locked out the answer is
-    /// <see cref="Verdict.LockedOut"/> whatever was given; <paramref name="retryAfter"/> then says for how long.
+    /// <paramref name="from"/>, in constant time, and counts it. While locked out, or while every
+    /// sign-in is slowed and this one is too soon, it is not looked at;
+    /// <paramref name="retryAfter"/> then says how long to wait.
     /// </summary>
     public Verdict Check(System.Net.IPAddress from, string given, string password, out TimeSpan retryAfter)
     {
-        from = from.IsIPv4MappedToIPv6 ? from.MapToIPv4() : from;
+        from = Counted(from);
         var now = time.GetUtcNow();
         retryAfter = TimeSpan.Zero;
         lock (_gate)
@@ -317,6 +372,28 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
                 _tallies.Remove(from);
                 tally = null;
             }
+            while (_recentFailures.TryPeek(out var oldest) && now - oldest >= FailureWindow)
+            {
+                _recentFailures.Dequeue();
+            }
+            if (_recentFailures.Count >= GlobalBudget)
+            {
+                if (now < _nextAttempt)
+                {
+                    retryAfter = _nextAttempt - now;
+                    return Verdict.Busy;
+                }
+                _nextAttempt = now + GlobalSpacing;
+                if (!_slowed)
+                {
+                    _slowed = true;
+                    log($"web: {GlobalBudget} wrong passwords within {FailureWindow.TotalMinutes:0} minutes from all addresses together; every sign-in is limited to one each {GlobalSpacing.TotalSeconds:0} seconds until that calms down");
+                }
+            }
+            else
+            {
+                _slowed = false;
+            }
             // Hashed first, so the comparison takes as long whatever the lengths.
             bool right = CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(given)), SHA256.HashData(Encoding.UTF8.GetBytes(password)));
             if (right)
@@ -324,6 +401,7 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
                 _tallies.Remove(from);
                 return Verdict.Right;
             }
+            _recentFailures.Enqueue(now);
             if (tally is null)
             {
                 Forget(now);
@@ -336,7 +414,7 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
             {
                 tally.LockedUntil = now + LockoutTime;
                 tally.Failures.Clear();
-                log($"web: {MaxFailures} wrong passwords from {from} within {FailureWindow.TotalMinutes:0} minutes; sign-in from there is refused for {LockoutTime.TotalMinutes:0} minutes");
+                log($"web: {MaxFailures} wrong passwords from {Describe(from)} within {FailureWindow.TotalMinutes:0} minutes; sign-in from there is refused for {LockoutTime.TotalMinutes:0} minutes");
             }
             return Verdict.Wrong;
         }

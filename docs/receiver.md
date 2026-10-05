@@ -151,14 +151,14 @@ On this machine only, the page answers to `localhost` and nothing else.
 To reach the page from other computers, set `"lan": true` and a `"password"` in `web`, and restart the receiver. Then the page asks you to sign in first:
 
 - Enter the password. Tick **Keep me signed in on this device** to stay signed in for 30 days; otherwise you are signed out when you close the browser, or after a day at most.
-- **Sign out**, at the top right of the page, signs that browser out.
-- Sign-ins last a restart of the receiver. Changing the page password signs every browser out, except the one you changed it from. To change it on the page, enter the new one and the current one in the settings and save. You can also change it in the config file and restart the receiver.
-- A wrong password is answered after a second. Five wrong in five minutes from one address and that address can't sign in for 10 minutes, even with the right password. The log says so once, with the address, never the password.
-- Scripts can skip the sign-in page and give the password with HTTP Basic (any user name), as before: `curl -u any:pick-one http://receiver:8130/api/mail`.
+- **Sign out**, at the top right of the page, signs that browser out and closes its live spectrogram.
+- Sign-ins last a restart of the receiver. To change the page password on the page, enter the new one and the current one in the settings and save: every other browser is signed out, and the one you saved from stays signed in. Changing it in the config file and restarting the receiver signs every browser out.
+- A wrong password is answered after a second. Five wrong in five minutes from one address (for IPv6, one /64) and that address can't sign in for 10 minutes, even with the right password. If there are 50 wrong in five minutes from all addresses together, every sign-in, from anywhere, is slowed to one every 3 seconds until it calms down. The log says so once each time, never with the password.
+- Scripts can skip the sign-in page and give the password with HTTP Basic (any user name), as before: `curl -u any:pick-one http://receiver:8130/api/mail`. A script that gives no password is asked for one (a 401 with a Basic challenge). Browsers always get the sign-in page instead, and a Basic login a browser remembers from before is ignored, so it can sign out.
 
 A password set without `lan` works the same way on this machine.
 
-Use it on a network you trust: it is plain HTTP, so the password and the sign-in cookie cross the network unencrypted, and the cookie isn't marked Secure, since that would stop it working over HTTP. The cookie can't be read by scripts on the page, and browsers don't send it with requests from other sites, and changes from another site's page are refused as before. The signed-in browsers are kept in `web-sessions.json` in the state directory, readable only by the receiver, which holds a hash of each one, not the cookie itself and not the password. To sign everyone out, stop the receiver and delete it.
+Use it on a network you trust: it is plain HTTP, so the password and the sign-in cookie cross the network unencrypted, and the cookie isn't marked Secure, since that would stop it working over HTTP. The cookie can't be read by scripts on the page. Browsers don't send it with requests started by pages on other machines, though they do for other pages on the same machine name, whatever their port. So, as before, any change (saving the settings, sending mail again, signing in or out) is refused unless it comes from this page itself, at this address and port. The signed-in browsers are kept in `web-sessions.json` in the state directory, readable only by the receiver, which holds a hash of each one, not the cookie itself and not the password. To sign everyone out, stop the receiver and delete it.
 
 ## Mail
 

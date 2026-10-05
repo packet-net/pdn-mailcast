@@ -40,6 +40,7 @@ public sealed class StatusPage : IAsyncDisposable
     private readonly Dictionary<ulong, DateTimeOffset> _resentAt = [];
 
     private readonly SessionStore _sessions;
+    private readonly Dictionary<HttpListenerContext, string?> _sockets = [];
     private readonly SignInThrottle _throttle;
 
     private readonly ReceiverHost _host;
@@ -83,6 +84,9 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>How long a wrong password waits before it is answered; tests that are not about the wait set it to zero.</summary>
     internal TimeSpan FailureDelay { get; init; } = SignInThrottle.FailureDelay;
 
+    /// <summary>How the wait for a wrong password is done, for a test to hold it; null waits on the host's clock.</summary>
+    internal Func<TimeSpan, Task>? Pause { get; init; }
+
     /// <summary>The signed-in browsers, for tests.</summary>
     internal SessionStore Sessions => _sessions;
 
@@ -98,7 +102,7 @@ public sealed class StatusPage : IAsyncDisposable
     }
 
     /// <summary>Gives a new pipeline its waterfall, before its audio starts.</summary>
-    private void Attach(AudioPipeline pipeline)
+    internal void Attach(AudioPipeline pipeline)
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
         {
@@ -171,7 +175,8 @@ public sealed class StatusPage : IAsyncDisposable
                     await SignOutAsync(context).ConfigureAwait(false);
                     return;
             }
-            if (!await AdmitAsync(context, path).ConfigureAwait(false))
+            string? session = null;
+            if (!await AdmitAsync(context, path, id => session = id).ConfigureAwait(false))
             {
                 return; // answered: the sign-in page, or why not
             }
@@ -187,7 +192,15 @@ public sealed class StatusPage : IAsyncDisposable
                 {
                     Redirect(context, WaterfallBase);
                 }
-                else if (waterfall is null || !await waterfall.TryServeAsync(context, WaterfallBase).ConfigureAwait(false))
+                else if (waterfall is null)
+                {
+                    await RespondAsync(context, 503, "text/plain", "No audio yet.\n").ConfigureAwait(false);
+                }
+                else if (context.Request.IsWebSocketRequest)
+                {
+                    await ServeSocketAsync(waterfall, context, session).ConfigureAwait(false);
+                }
+                else if (!await waterfall.TryServeAsync(context, WaterfallBase).ConfigureAwait(false))
                 {
                     await RespondAsync(context, 503, "text/plain", "No audio yet.\n").ConfigureAwait(false);
                 }
@@ -266,6 +279,72 @@ public sealed class StatusPage : IAsyncDisposable
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
         && string.Equals(uri.Authority, host, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Serves a waterfall WebSocket, which stays open as long as the page does, noting which
+    /// session it is for so that signing that session out, or changing the password, closes it.
+    /// </summary>
+    private async Task ServeSocketAsync(WaterfallWebServer waterfall, HttpListenerContext context, string? session)
+    {
+        lock (_gate)
+        {
+            _sockets[context] = session;
+        }
+        try
+        {
+            if (session is not null && !_sessions.Holds(session))
+            {
+                // Signed out between being let in and getting here.
+                context.Response.Abort();
+                return;
+            }
+            await waterfall.TryServeAsync(context, WaterfallBase).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _sockets.Remove(context);
+            }
+        }
+    }
+
+    /// <summary>Closes the open waterfall WebSockets whose session <paramref name="which"/> picks (null for one let in by HTTP Basic).</summary>
+    private void CloseSockets(Func<string?, bool> which)
+    {
+        List<HttpListenerContext> closing;
+        lock (_gate)
+        {
+            closing = [.. _sockets.Where(s => which(s.Value)).Select(s => s.Key)];
+            foreach (var context in closing)
+            {
+                _sockets.Remove(context);
+            }
+        }
+        foreach (var context in closing)
+        {
+            try
+            {
+                context.Response.Abort(); // drops the connection under the WebSocket
+            }
+            catch (Exception e) when (e is ObjectDisposedException or InvalidOperationException or HttpListenerException)
+            {
+                // Already gone.
+            }
+        }
+    }
+
+    /// <summary>The open waterfall WebSockets, for tests.</summary>
+    internal int OpenSockets
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _sockets.Count;
+            }
+        }
+    }
+
     /// <summary>The password in an HTTP Basic <c>Authorization</c> header (any user name), or null if there is none.</summary>
     internal static string? BasicPassword(string? authorization)
     {
@@ -288,52 +367,89 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>
     /// Lets a request in if the page has no password, it has a session cookie that is still good,
-    /// or it gives the password with HTTP Basic, as a script would. Otherwise answers it and gives
-    /// false: a page asked for by a browser gets the sign-in page, anything else 401 (or 429 while
-    /// its address is locked out) as JSON.
+    /// or it is a script giving the password with HTTP Basic. Otherwise answers it and gives false:
+    /// a browser asking for a page gets the sign-in page, anything else 401 (or 429 while sign-in
+    /// is refused for a while) as JSON. <paramref name="session"/> is the session let in on, if any.
     /// </summary>
-    private async Task<bool> AdmitAsync(HttpListenerContext context, string path)
+    /// <remarks>
+    /// Every current browser sends <c>Sec-Fetch-Mode</c> and no script does unless told to. A
+    /// browser's HTTP Basic is ignored, never counted as a wrong password: one that remembers a
+    /// Basic login from before the sign-in page would otherwise never see that page, could not sign
+    /// out, and after a change of password would lock its own address out with its old password
+    /// within seconds, the page asking for its status every few.
+    /// </remarks>
+    private async Task<bool> AdmitAsync(HttpListenerContext context, string path, Action<string?> session)
     {
         var request = context.Request;
         string password = _host.Config.Web.Password;
-        if (password.Length == 0 || _sessions.Find(SessionToken(request)) is not null)
+        if (password.Length == 0)
         {
             return true;
         }
+        if (_sessions.Find(SessionToken(request)) is { } found)
+        {
+            session(found.Id);
+            return true;
+        }
+        if (IsBrowser(request))
+        {
+            if (request.HttpMethod == "GET" && !request.IsWebSocketRequest && !path.StartsWith("/api/", StringComparison.Ordinal))
+            {
+                await SignInPageAsync(context, 200, path, null).ConfigureAwait(false);
+            }
+            else
+            {
+                await RespondAsync(context, 401, "application/json", JsonSerializer.Serialize(new { error = SignInFirst })).ConfigureAwait(false);
+            }
+            return false;
+        }
+
         string? message = null;
         int status = 401;
         if (BasicPassword(request.Headers["Authorization"]) is { } given)
         {
-            switch (_throttle.Check(RemoteAddress(request), given, password, out var wait))
+            var verdict = _throttle.Check(RemoteAddress(request), given, password, out var wait);
+            switch (verdict)
             {
                 case SignInThrottle.Verdict.Right:
                     return true;
                 case SignInThrottle.Verdict.Wrong:
-                    await Task.Delay(FailureDelay, _host.Time).ConfigureAwait(false);
+                    await PauseAsync().ConfigureAwait(false);
                     message = WrongPassword;
                     break;
                 default:
                     status = 429;
-                    message = LockedOut(wait);
+                    message = TooMany(verdict, wait);
                     context.Response.Headers["Retry-After"] = RetryAfter(wait);
                     break;
             }
         }
-        bool page = request.HttpMethod == "GET" && !request.IsWebSocketRequest && !path.StartsWith("/api/", StringComparison.Ordinal);
-        if (page)
+        if (status == 401)
         {
-            await SignInPageAsync(context, status == 429 ? 429 : 200, path, message).ConfigureAwait(false);
-            return false;
-        }
-        if (status == 401 && request.Headers["Sec-Fetch-Mode"] is null)
-        {
-            // A script, not a browser (every current browser sends Sec-Fetch-Mode): one that only
-            // gives its password when asked still can. A browser is not asked, or it would put up
-            // its own password box over the page's.
+            // A script: one that only gives its password when asked still can.
             context.Response.Headers["WWW-Authenticate"] = "Basic realm=\"pdn-mailcast receiver\", charset=\"UTF-8\"";
         }
-        await RespondAsync(context, status, "application/json", JsonSerializer.Serialize(new { error = message ?? "Sign in first: this page needs its password." })).ConfigureAwait(false);
+        await RespondAsync(context, status, "application/json", JsonSerializer.Serialize(new { error = message ?? SignInFirst })).ConfigureAwait(false);
         return false;
+    }
+
+    private const string SignInFirst = "Sign in first: this page needs its password.";
+
+    private static bool IsBrowser(HttpListenerRequest request) => request.Headers["Sec-Fetch-Mode"] is not null;
+
+    /// <summary>Waits <see cref="FailureDelay"/> before a wrong password is answered.</summary>
+    private Task PauseAsync() =>
+        FailureDelay <= TimeSpan.Zero ? Task.CompletedTask
+        : Pause is { } pause ? pause(FailureDelay)
+        : Task.Delay(FailureDelay, _host.Time);
+
+    private static string TooMany(SignInThrottle.Verdict verdict, TimeSpan wait) =>
+        verdict == SignInThrottle.Verdict.Busy ? Busy(wait) : LockedOut(wait);
+
+    private static string Busy(TimeSpan wait)
+    {
+        int seconds = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds));
+        return $"There have been too many wrong passwords lately, so sign-in is slowed down. Try again in {seconds} second{(seconds == 1 ? "" : "s")}.";
     }
 
     private const string WrongPassword = "That password is not right.";
@@ -432,7 +548,8 @@ public sealed class StatusPage : IAsyncDisposable
             return;
         }
         var from = RemoteAddress(request);
-        switch (_throttle.Check(from, attempt, password, out var wait))
+        var verdict = _throttle.Check(from, attempt, password, out var wait);
+        switch (verdict)
         {
             case SignInThrottle.Verdict.Right:
                 StartSession(context, given.Remember);
@@ -440,12 +557,12 @@ public sealed class StatusPage : IAsyncDisposable
                 await SignedInAsync(context, form).ConfigureAwait(false);
                 break;
             case SignInThrottle.Verdict.Wrong:
-                await Task.Delay(FailureDelay, _host.Time).ConfigureAwait(false);
+                await PauseAsync().ConfigureAwait(false);
                 await SignInRefusedAsync(context, form, 401, WrongPassword).ConfigureAwait(false);
                 break;
             default:
                 context.Response.Headers["Retry-After"] = RetryAfter(wait);
-                await SignInRefusedAsync(context, form, 429, LockedOut(wait)).ConfigureAwait(false);
+                await SignInRefusedAsync(context, form, 429, TooMany(verdict, wait)).ConfigureAwait(false);
                 break;
         }
     }
@@ -478,8 +595,9 @@ public sealed class StatusPage : IAsyncDisposable
         {
             return;
         }
-        if (_sessions.Remove(SessionToken(context.Request)))
+        if (_sessions.Remove(SessionToken(context.Request)) is { } ended)
         {
+            CloseSockets(id => id == ended);
             _log($"web: signed out from {RemoteAddress(context.Request)}");
         }
         SetSessionCookie(context, "", TimeSpan.Zero);
@@ -781,15 +899,18 @@ public sealed class StatusPage : IAsyncDisposable
         bool newPagePassword = !string.IsNullOrEmpty(form.PagePassword);
         if (newPagePassword && pagePassword.Length > 0)
         {
-            switch (_throttle.Check(RemoteAddress(context.Request), form.CurrentPagePassword ?? "", pagePassword, out var wait))
+            var verdict = _throttle.Check(RemoteAddress(context.Request), form.CurrentPagePassword ?? "", pagePassword, out var wait);
+            switch (verdict)
             {
+                case SignInThrottle.Verdict.Right:
+                    break;
                 case SignInThrottle.Verdict.Wrong:
-                    await Task.Delay(FailureDelay, _host.Time).ConfigureAwait(false);
+                    await PauseAsync().ConfigureAwait(false);
                     await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "To change the page password, enter the current one too." })).ConfigureAwait(false);
                     return;
-                case SignInThrottle.Verdict.LockedOut:
+                default:
                     context.Response.Headers["Retry-After"] = RetryAfter(wait);
-                    await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = LockedOut(wait) })).ConfigureAwait(false);
+                    await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = TooMany(verdict, wait) })).ConfigureAwait(false);
                     return;
             }
         }
@@ -821,6 +942,7 @@ public sealed class StatusPage : IAsyncDisposable
         if (!string.Equals(next.Web.Password, pagePassword, StringComparison.Ordinal))
         {
             _sessions.NoticePasswordChange(); // signs every browser out
+            CloseSockets(_ => true);
             _log("web: the page password was changed from the page");
             if (mine is not null || pagePassword.Length == 0)
             {
