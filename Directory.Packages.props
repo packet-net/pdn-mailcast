@@ -3,9 +3,11 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="M0LTE.Flex" Version="0.14.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="ZstdSharp.Port" Version="0.8.8" />
+    <PackageVersion Include="pdn-soundmodem" Version="0.83.0" />
   </ItemGroup>
 </Project>

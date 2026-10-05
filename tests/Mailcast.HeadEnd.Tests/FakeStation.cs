@@ -1,0 +1,202 @@
+using System.Threading.Channels;
+using Mailcast.HeadEnd.Flex;
+using Mailcast.HeadEnd.Slot;
+using Mailcast.HeadEnd.Station;
+
+namespace Mailcast.HeadEnd.Tests;
+
+/// <summary>One stretch of time the fake radio was keyed, and what for.</summary>
+public sealed record Keyup(DateTimeOffset Start, DateTimeOffset End, string What, bool InsideLease);
+
+/// <summary>
+/// pdn-soundmodem as the head end sees it - the lease and tone API and the broadcast modem's KISS
+/// port - on a virtual clock. It keeps a record of every keyup and whether a lease held by the
+/// broadcast sub-channel covered all of it.
+/// </summary>
+public sealed class FakeStation : IStationApi, IKissConnector
+{
+    private readonly VirtualTime _time;
+    private readonly int _subChannel;
+    private int? _holder;
+    private DateTimeOffset _expires;
+
+    public FakeStation(VirtualTime time, int subChannel)
+    {
+        _time = time;
+        _subChannel = subChannel;
+    }
+
+    /// <summary>Each lease request's time and whether it was granted.</summary>
+    public List<(DateTimeOffset At, bool Granted)> LeaseRequests { get; } = [];
+
+    public List<DateTimeOffset> Releases { get; } = [];
+
+    public List<Keyup> Keyups { get; } = [];
+
+    /// <summary>When each frame reached the station, with whether the lease was ours then.</summary>
+    public List<(DateTimeOffset At, bool LeaseHeld, byte[] Frame)> Frames { get; } = [];
+
+    /// <summary>Lease requests after this many are refused, as if another sub-channel had taken it.</summary>
+    public int? RefuseAfterRequests { get; set; }
+
+    /// <summary>The first lease request is refused.</summary>
+    public bool RefuseFirstLease { get; set; }
+
+    /// <summary>Tone requests answered "the channel did not clear" before one is sent; -1 for always.</summary>
+    public int BusyTones { get; set; }
+
+    /// <summary>Whether the station answers tones at all: false answers 404 as with txTest off.</summary>
+    public bool ToneAvailable { get; set; } = true;
+
+    /// <summary>The modem stops acknowledging after this many frames, as if the channel stayed busy.</summary>
+    public int? AckOnlyFirst { get; set; }
+
+    public double SecondsPerFrame { get; set; } = 7.25;
+
+    public double SecondsPerBurst { get; set; } = 1.2;
+
+    public bool LeaseHeld => _holder == _subChannel && _time.GetUtcNow() < _expires;
+
+    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, CancellationToken cancellation)
+    {
+        await Task.Yield();
+        bool refuse = (RefuseFirstLease && LeaseRequests.Count == 0)
+            || (RefuseAfterRequests is int n && LeaseRequests.Count >= n);
+        LeaseRequests.Add((_time.GetUtcNow(), !refuse));
+        if (refuse)
+        {
+            return LeaseAnswer.No("sub-channel 2 holds the transmit lease until later");
+        }
+        _holder = subChannel;
+        int granted = Math.Min(seconds, 300);
+        _expires = _time.GetUtcNow() + TimeSpan.FromSeconds(granted);
+        return new LeaseAnswer(true, granted, null);
+    }
+
+    public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
+    {
+        await Task.Yield();
+        Releases.Add(_time.GetUtcNow());
+        bool held = LeaseHeld;
+        _holder = null;
+        return held;
+    }
+
+    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, CancellationToken cancellation)
+    {
+        if (!ToneAvailable)
+        {
+            await Task.Yield();
+            return new ToneAnswer(ToneOutcome.Refused, "HTTP 404: no transmitter test here");
+        }
+        if (BusyTones != 0)
+        {
+            if (BusyTones > 0)
+            {
+                BusyTones--;
+            }
+            await Task.Delay(TimeSpan.FromSeconds(60), _time, cancellation);
+            return new ToneAnswer(ToneOutcome.ChannelBusy, "the channel did not clear within 60 s, so the test was withdrawn and nothing was transmitted");
+        }
+        await KeyAsync(TimeSpan.FromSeconds(seconds), $"tone {toneHz} Hz", cancellation);
+        return new ToneAnswer(ToneOutcome.Sent, "tone");
+    }
+
+    public Task<IKissLink> ConnectAsync(CancellationToken cancellation)
+    {
+        return Task.FromResult<IKissLink>(new FakeLink(this));
+    }
+
+    private async Task KeyAsync(TimeSpan length, string what, CancellationToken cancellation)
+    {
+        DateTimeOffset start = _time.GetUtcNow();
+        bool inside = LeaseHeld;
+        await Task.Delay(length, _time, cancellation);
+        inside &= LeaseHeld;
+        Keyups.Add(new Keyup(start, _time.GetUtcNow(), what, inside));
+    }
+
+    private sealed class FakeLink(FakeStation station) : IKissLink
+    {
+        private readonly Channel<ushort> _acks = Channel.CreateUnbounded<ushort>();
+        private readonly List<ushort> _queued = [];
+        private bool _transmitting;
+        private int _acked;
+
+        public ChannelReader<ushort> Acks => _acks.Reader;
+
+        public Task SendAsync(ushort id, ReadOnlyMemory<byte> ax25, CancellationToken cancellation)
+        {
+            station.Frames.Add((station._time.GetUtcNow(), station.LeaseHeld, ax25.ToArray()));
+            _queued.Add(id);
+            if (!_transmitting)
+            {
+                _transmitting = true;
+                _ = TransmitAsync();
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>Gathers for half a second, then sends everything queued as one burst.</summary>
+        private async Task TransmitAsync()
+        {
+            await Task.Delay(TimeSpan.FromSeconds(0.5), station._time);
+            while (_queued.Count > 0)
+            {
+                var burst = _queued.ToList();
+                _queued.Clear();
+                await station.KeyAsync(TimeSpan.FromSeconds(station.SecondsPerBurst + (station.SecondsPerFrame * burst.Count)), $"burst of {burst.Count}", CancellationToken.None);
+                foreach (ushort id in burst)
+                {
+                    if (station.AckOnlyFirst is int limit && _acked >= limit)
+                    {
+                        continue;
+                    }
+                    _acked++;
+                    _acks.Writer.TryWrite(id);
+                }
+            }
+            _transmitting = false;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _acks.Writer.TryComplete();
+            return ValueTask.CompletedTask;
+        }
+    }
+}
+
+/// <summary>A Flex whose PA temperature follows a script and whose reference is fixed.</summary>
+public sealed class FakeFlex(TimeProvider time, Func<TimeSpan, double?> temperature, ReferenceReading reference, bool reachable = true) : IFlexMonitor
+{
+    private DateTimeOffset _connectedAt;
+
+    public string? Problem { get; private set; }
+
+    public bool Connected { get; private set; }
+
+    public ReferenceReading Reference => reference;
+
+    public double? PaTemperatureC => Connected ? temperature(time.GetUtcNow() - _connectedAt) : null;
+
+    public Task<bool> ConnectAsync(CancellationToken cancellation)
+    {
+        Connected = reachable;
+        Problem = reachable ? null : "no route to host";
+        _connectedAt = time.GetUtcNow();
+        return Task.FromResult(reachable);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+/// <summary>The airtime the fake station uses, so plans and keyups agree.</summary>
+public static class FakeAirtime
+{
+    public static LinearAirtime For(FakeStation station) =>
+        new(TimeSpan.FromSeconds(station.SecondsPerBurst), TimeSpan.Zero, station.SecondsPerFrame / 1003.0);
+
+    public static SlotFrame Frame(int i, int length = 987) =>
+        new(Enumerable.Range(0, length).Select(b => (byte)(b + i)).ToArray(), (ulong)(i % 5), (uint)i);
+}

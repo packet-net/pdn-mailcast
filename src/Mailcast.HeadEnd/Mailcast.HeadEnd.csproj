@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The head end: takes GB7RDG's bulletins from its BBS, and once a day broadcasts them through the
+    station's own pdn-soundmodem (KISS for the frames, its HTTP API for the transmit lease and the
+    calibration tone). It does not embed the modem; pdn-soundmodem's package is here only for the
+    offline WAV render, which modulates frames exactly as the station would.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>pdn-mailcast-headend</AssemblyName>
+    <RootNamespace>Mailcast.HeadEnd</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Public types here are an application's, documented where it helps rather than everywhere. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="M0LTE.Flex" />
+    <PackageReference Include="pdn-soundmodem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mailcast.Core\Mailcast.Core.csproj" />
+    <ProjectReference Include="..\Mailcast.Fbb\Mailcast.Fbb.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mailcast.HeadEnd.Tests" />
+  </ItemGroup>
+
+</Project>

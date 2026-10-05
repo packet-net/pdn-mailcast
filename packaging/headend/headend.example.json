@@ -1,0 +1,72 @@
+{
+  // pdn-mailcast-headend. Every key has a default except "station"."apiKey"; the service will not
+  // start until that is set. docs/headend.md says what each one does.
+  "callsign": "GB7RDG",
+  "destination": "MCAST",
+  "stateDirectory": "/var/lib/pdn-mailcast-headend",
+
+  "slot": {
+    "timeUtc": "12:00",
+    "catchUpMinutes": 30,
+    "maxMinutes": 40,
+    "channelWaitSeconds": 120,
+    "whenStillBusy": "go",
+    "toneSeconds": 30,
+    "toneHz": 1800,
+    "pauseAfterToneSeconds": 8,
+    "burstGapSeconds": 1
+  },
+
+  // The station's pdn-soundmodem: its API (the page port and api.key) and the broadcast modem's
+  // own KISS port and sub-channel, as in its modems[] entry.
+  "station": {
+    "apiUrl": "http://127.0.0.1:8107/",
+    "apiKey": "",
+    "kissHost": "127.0.0.1",
+    "kissPort": 8112,
+    "kissPortNibble": 0,
+    "subChannel": 4,
+    "mode": "ms110d-wn4",
+    "maxBurstSeconds": 60,
+    "leaseSeconds": 120,
+    "renewSeconds": 30,
+    "ackGraceSeconds": 120
+  },
+
+  // Read-only: PA temperature and the frequency reference. Never takes a slice or keys anything.
+  "flex": {
+    "enabled": false,
+    "host": "",
+    "port": 4992,
+    "paTemperatureLimitC": 70,
+    "whenUnreachable": "carryOn"
+  },
+
+  "intake": {
+    "dropDirectory": "/var/lib/pdn-mailcast-headend/drop",
+    "maxBulletinBytes": 32768,
+    // The head end calls the BBS's forwarding port as a partner and takes the bulletins queued
+    // for it. This login is LinBPQ's FBBPORT (no prompts: user, password, then BBS); for pdn-bbs's
+    // fbbTcp port it is [{ "expect": "Callsign :", "send": "{call}" }]. Remove this section to use
+    // the drop directory alone.
+    "fbb": {
+      "host": "127.0.0.1",
+      "port": 8011,
+      "partnerCallsign": "Q0HEAD",
+      "user": "Q0HEAD",
+      "password": "",
+      "login": [
+        { "send": "{user}" },
+        { "send": "{password}" },
+        { "send": "BBS" }
+      ],
+      "pollMinutes": 30,
+      "sessionTimeoutSeconds": 300
+    }
+  },
+
+  "status": {
+    "bind": "127.0.0.1",
+    "port": 8216
+  }
+}
