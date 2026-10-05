@@ -38,6 +38,46 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 
 To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.
 
+## Sharing a radio with LinBPQ
+
+If the radio on the receiver's sound card is also your LinBPQ packet radio (through QtSoundModem, say, with flrig controlling the rig), the receiver can borrow it for each slot. About a minute before each daylight slot it tells LinBPQ to stop transmitting on that radio's port, tunes the radio to USB on `dialKHz`, listens until 12 minutes after the slot starts, puts the radio back where it was, and only then lets LinBPQ transmit again.
+
+Add this to the config:
+
+```json
+"rig": { "rigctld": "127.0.0.1:4532" },
+"bpq": { "host": "127.0.0.1", "port": 8010, "user": "sysop", "password": "your-sysop-password", "hfPort": 2 }
+```
+
+- `rig`: Hamlib's rigctld for the radio. With flrig, run `rigctld -m 4` beside it: that is Hamlib's flrig backend, so flrig stays in charge of the rig.
+- `bpq`: LinBPQ's node telnet port (the Telnet port's `TCPPORT`, not the `FBBPORT`) and a user whose `USER=` line ends in `SYSOP`, such as `USER=sysop,your-sysop-password,G4ABC,,SYSOP`. `hfPort` is the number of LinBPQ's port on the shared radio, as its `PORTS` command lists it. The log says which port that is at start-up; add `"expectedPortId": "..."` with the name `PORTS` gives it, and the receiver won't retune if the number ever points at another port.
+- `drainSeconds` in `bpq` (15 unless set): how long to wait after LinBPQ stops before tuning, so that anything LinBPQ had already handed to the TNC goes out first.
+- If nothing else ever transmits on the radio, leave out `bpq` and say so instead: `"rig": { "rigctld": "127.0.0.1:4532", "dedicatedRadio": true }`. With `rig` and neither of these, the receiver won't start.
+
+It only retunes when `audio` is the radio's sound card, never for a web SDR, and only when rigctld is answering.
+
+To keep LinBPQ off the air it logs in as that user and sends `XMITOFF 2 1`, which makes LinBPQ drop anything it would send on port 2, and `XMITOFF 2 0` afterwards. It only tunes the radio once LinBPQ has confirmed, the drain time has passed and rigctld says the radio is not transmitting. During the slot it checks LinBPQ every 5 seconds. Everything that can go wrong goes the safe way:
+
+- if LinBPQ doesn't confirm, or the radio is still transmitting, the radio isn't retuned for that slot;
+- if LinBPQ's answer is lost or garbled, it counts as taken, and `XMITOFF 2 0` is sent afterwards;
+- if LinBPQ can't be reached during the slot, the radio goes straight back;
+- if LinBPQ restarts during the slot (which turns `XMITOFF` off), the receiver sees the connection drop at once and turns it off again, or puts the radio straight back if LinBPQ isn't answering yet;
+- if the radio can't be put back where it was, LinBPQ stays off, the log says so loudly, and the receiver keeps trying;
+- if the receiver stops in the middle of a slot, LinBPQ stays off rather than transmitting on the bulletin frequency. The next start puts the radio back first and then turns LinBPQ on again, and the log says what happened. If the receiver never comes back, LinBPQ stays off until you send `XMITOFF 2 0` as sysop or restart LinBPQ;
+- if you had already turned the port off yourself, it is left off afterwards.
+
+For this to be safe:
+
+- the shared radio must be on a KISS or AGW-style port (QtSoundModem, Direwolf and the like). Pactor-type drivers such as VARA and ARDOP don't go through the queue `XMITOFF` stops, so they can't be held off this way;
+- one LinBPQ port per radio: the receiver holds off only `hfPort`;
+- the TNC must not transmit on its own during a slot. In QtSoundModem, send the CW ID only after transmissions, not on a timer;
+- no other program may be connected straight to the TNC's AGW or KISS ports, because those don't go through LinBPQ;
+- tune the radio through CAT (flrig or rigctld), not by hand. The receiver puts it back where it was before the slot, and won't let LinBPQ transmit until the radio reads that frequency again.
+
+One gap remains: a LinBPQ that restarts during a slot comes back with transmit on, and anything it sends in the seconds before the receiver has logged in again (an ID at start-up, say) goes out on the bulletin frequency. Avoid restarting LinBPQ during a slot.
+
+The status page shows what it is doing (idle, holding LinBPQ's transmit off, tuned to 7.052 MHz, putting the rig back) and the last problem, and the log lines start `retune:` and `rig:`. The sysop password is never logged or shown. While it works it keeps `interlock.json` and `rig-restore-HOST-PORT.json` in the state directory; leave them alone.
+
 ## The receiver's login on your BBS
 
 The receiver logs in as **Q0CAST**. It needs a login of its own:

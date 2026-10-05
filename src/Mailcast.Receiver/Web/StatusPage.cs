@@ -255,6 +255,16 @@ public sealed class StatusPage : IAsyncDisposable
                 nextAttempt = _host.Delivery.NextAttempt,
                 waiting = _host.Intake.Pending().Count,
             },
+            retune = _host.Retuner is not { } retuner ? null : new
+            {
+                stage = retuner.Stage,
+                state = retuner.State,
+                rigctld = retuner.Endpoint.ToString(),
+                linBpq = config.Bpq?.ToString(),
+                nextSlot = retuner.NextSlot,
+                problem = retuner.LastProblem?.Text,
+                problemAt = retuner.LastProblem?.At,
+            },
             markers = new
             {
                 centreHz = OnAir.CentreAudioHz,

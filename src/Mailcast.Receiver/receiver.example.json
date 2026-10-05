@@ -41,5 +41,8 @@
   // 12 is the most.
   "webSdrSlotsPerDay": 8,
 
+  // To share your radio with LinBPQ packet, the receiver can retune it for each slot: add
+  // "rig" and "bpq" as docs/receiver.md says under "Sharing a radio with LinBPQ".
+
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

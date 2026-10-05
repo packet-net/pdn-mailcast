@@ -221,3 +221,90 @@ public class ConfigTests
         Assert.Equal(kind, AudioSource.Parse(setting).Kind);
     }
 }
+
+public class RetuneConfigTests
+{
+    private static ReceiverConfig Load(string json)
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, json);
+        return ReceiverConfig.Load(path);
+    }
+
+    private const string Bpq = """
+        "bpq": { "host": "127.0.0.1", "port": 8010, "user": "sysop", "password": "pw", "hfPort": 2 }
+        """;
+
+    [Fact]
+    public void Default_HasNoRigAndNoBpq()
+    {
+        var config = Load("""{ "audio": "plughw:CARD=Device,DEV=0" }""");
+
+        Assert.Null(config.Rig);
+        Assert.Null(config.Bpq);
+    }
+
+    [Fact]
+    public void RigWithBpq_Loads()
+    {
+        var config = Load($$"""{ "audio": "plughw:CARD=Device,DEV=0", "rig": { "rigctld": "127.0.0.1:4532" }, {{Bpq}} }""");
+
+        Assert.Equal(new Packet.SoundModem.Rig.RigctldEndpoint("127.0.0.1", 4532), config.Rig!.Endpoint);
+        Assert.False(config.Rig.DedicatedRadio);
+        Assert.Equal(2, config.Bpq!.HfPort);
+        Assert.Equal(15, config.Bpq.DrainSeconds);
+        Assert.Null(config.Bpq.ExpectedPortId);
+        Assert.Equal("sysop", config.Bpq.User);
+        Assert.DoesNotContain("pw", config.Bpq.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RigWithoutBpq_IsRefusedUnlessTheRadioIsDedicated()
+    {
+        var e = Assert.Throws<ConfigException>(() => Load("""{ "rig": { "rigctld": "127.0.0.1:4532" } }"""));
+        Assert.Contains("\"bpq\"", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"dedicatedRadio\": true", e.Message, StringComparison.Ordinal);
+
+        var dedicated = Load("""{ "rig": { "rigctld": "127.0.0.1:4532", "dedicatedRadio": true } }""");
+        Assert.True(dedicated.Rig!.DedicatedRadio);
+        Assert.Null(dedicated.Bpq);
+    }
+
+    [Fact]
+    public void BpqWithoutRig_IsRefused()
+    {
+        var e = Assert.Throws<ConfigException>(() => Load($$"""{ {{Bpq}} }"""));
+        Assert.Contains("\"rig\" is not", e.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{ "rig": { "rigctld": "127.0.0.1:99999", "dedicatedRadio": true } }""", "\"rig\".\"rigctld\"")]
+    [InlineData("""{ "rig": { "rigctld": "", "dedicatedRadio": true } }""", "\"rig\".\"rigctld\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw" } }""", "\"bpq\".\"hfPort\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "", "password": "pw", "hfPort": 2 } }""", "\"bpq\".\"user\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "", "hfPort": 2 } }""", "\"bpq\".\"password\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "port": 0 } }""", "\"bpq\".\"port\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "drainSeconds": 500 } }""", "\"bpq\".\"drainSeconds\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "expectedPortId": " " } }""", "\"bpq\".\"expectedPortId\"")]
+    public void BadSettings_AreRefusedSayingWhich(string json, string which)
+    {
+        var e = Assert.Throws<ConfigException>(() => Load(json));
+        Assert.Contains(which, e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Saved_KeepsRigAndBpq()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, $$"""{ "rig": { "rigctld": "127.0.0.1:4532" }, {{Bpq}} }""");
+        var config = ReceiverConfig.Load(path);
+
+        config.Save(path);
+
+        var again = ReceiverConfig.Load(path);
+        Assert.Equal(config.Rig, again.Rig);
+        Assert.Equal(config.Bpq, again.Bpq);
+    }
+}

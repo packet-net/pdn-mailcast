@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Mailcast.Receiver.Retune;
 using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
@@ -180,6 +181,20 @@ public sealed record ReceiverConfig
     /// <summary>Where the pieces heard, the rebuilt bulletins and the delivery record are kept.</summary>
     public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast";
 
+    /// <summary>
+    /// The radio's rigctld, for a radio shared with packet: the receiver tunes it to
+    /// <see cref="DialKHz"/> for each slot and puts it back afterwards. Null (the default) leaves
+    /// the radio alone.
+    /// </summary>
+    public RigSettings? Rig { get; init; }
+
+    /// <summary>
+    /// LinBPQ's node telnet port, so the receiver can stop LinBPQ transmitting on the radio while
+    /// it is on the bulletin frequency. Needed with <see cref="Rig"/> unless the radio is
+    /// <see cref="RigSettings.DedicatedRadio"/>.
+    /// </summary>
+    public BpqNodeSettings? Bpq { get; init; }
+
     internal static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -327,6 +342,19 @@ public sealed record ReceiverConfig
         if (string.IsNullOrWhiteSpace(StateDirectory))
         {
             throw new ConfigException("\"stateDirectory\" is empty");
+        }
+        Rig?.Validate();
+        Bpq?.Validate();
+        if (Rig is { DedicatedRadio: false } && Bpq is null)
+        {
+            throw new ConfigException(
+                "\"rig\" is set, so the receiver retunes your radio for each slot, but there is no \"bpq\" to stop LinBPQ transmitting while it is on "
+                + "the bulletin frequency. Add \"bpq\" (LinBPQ's node telnet port and a SYSOP user), or, if nothing else ever transmits on this radio, "
+                + "set \"rig\": { ..., \"dedicatedRadio\": true }");
+        }
+        if (Rig is null && Bpq is not null)
+        {
+            throw new ConfigException("\"bpq\" is set but \"rig\" is not: LinBPQ is only held off the air while the receiver has retuned the radio, so add \"rig\" too, or remove \"bpq\"");
         }
     }
 }

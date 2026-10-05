@@ -67,6 +67,11 @@
     <dl id="bbs"></dl>
   </section>
 
+  <section id="retuneBox" hidden>
+    <h2>Sharing the radio</h2>
+    <dl id="retune"></dl>
+  </section>
+
   <section class="wide">
     <h2>Spectrogram</h2>
     <canvas id="spectro"></canvas>
@@ -171,6 +176,15 @@ async function refresh() {
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
     ${s.bbs.lastFailure ? `<dt>Problem</dt><dd class="bad">${esc(s.bbs.lastFailure)}</dd>` : `<dt>Last session</dt><dd class="good">fine</dd>`}
     ${s.bbs.nextAttempt ? `<dt>Next try</dt><dd>${when(s.bbs.nextAttempt)}</dd>` : ""}`;
+
+  $("retuneBox").hidden = !s.retune;
+  if (s.retune) {
+    const r = s.retune;
+    $("retune").innerHTML = `<dt>Now</dt><dd>${esc(r.state)}</dd>
+      <dt>Rig</dt><dd>rigctld at ${esc(r.rigctld)}</dd>
+      <dt>LinBPQ</dt><dd>${r.linBpq ? esc(r.linBpq) : "not held off: nothing else transmits on this radio"}</dd>
+      ${r.problem ? `<dt>Last problem</dt><dd class="bad">${esc(r.problem)} (${when(r.problemAt)})</dd>` : ""}`;
+  }
 
   if (s.directory && s.bulletins.length) {
     const done = s.bulletins.filter(b => b.complete).length;
