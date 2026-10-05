@@ -46,11 +46,26 @@ public class FlexMonitorTests
         Assert.NotEmpty(log);
         Assert.All(log, c => Assert.True(
             c.StartsWith("client udpport ", StringComparison.Ordinal)
-            || c is "sub radio all" or "meter list" or "sub meter all" or "unsub meter all"
+            || c is "sub radio all" or "meter list" or "sub meter all" or "unsub meter all" or "keepalive enable" or "ping"
             || (c.StartsWith("sub meter ", StringComparison.Ordinal) && int.TryParse(c["sub meter ".Length..], out _)),
             $"the monitor sent '{c}'"));
         Assert.Contains("sub radio all", log);
         Assert.Contains("meter list", log);
+        Assert.Contains("keepalive enable", log);
+    }
+
+    [Fact]
+    public async Task Monitor_TreatsAnOldPaReadingAsNone()
+    {
+        await using var radio = new MockFlexRadio(DaxStreamFormat.FullBandwidth);
+        radio.Start();
+        var clock = new VirtualTime(DateTimeOffset.UtcNow);
+        await using var monitor = new FlexMonitor("127.0.0.1", radio.TcpPort, time: clock, referenceWait: TimeSpan.Zero, staleAfter: TimeSpan.FromSeconds(15));
+        Assert.True(await monitor.ConnectAsync(CancellationToken.None), monitor.Problem);
+        radio.PushMeters((9, (short)(45 * 64)));
+        await Until(() => monitor.PaTemperatureC is not null);
+        clock.Advance(TimeSpan.FromSeconds(60));
+        Assert.Null(monitor.PaTemperatureC);
     }
 
     [Fact]

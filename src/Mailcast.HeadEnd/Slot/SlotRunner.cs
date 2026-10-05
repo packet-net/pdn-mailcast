@@ -23,12 +23,19 @@ namespace Mailcast.HeadEnd.Slot;
 /// burst's at once). The station's queue never holds more than one burst of ours.</para>
 /// <para><b>Inside the lease.</b> Before queueing a burst the runner checks that the lease it
 /// holds has at least the burst's airtime and <see cref="SlotSettings.LeaseMargin"/> left, and
-/// renews first if not. So a burst always finishes inside the lease, even when the renewal after
-/// it fails.</para>
-/// <para><b>Stopping.</b> A refused renewal, a hot PA or the hard stop at
-/// <see cref="SlotSettings.MaxSlotLength"/> stop the runner queueing more; a burst already queued
-/// finishes, because the station cannot take frames back. Frames not sent are the planner's to
-/// carry to tomorrow.</para>
+/// renews first if not. The lease asks the station to drop any of the holder's frames that would
+/// wait longer than <see cref="SlotSettings.MaxCarrierWait"/> (no more than the margin) for a clear
+/// channel, and the station drops the holder's unkeyed frames itself if the lease runs out. So a
+/// burst either keys inside the lease or not at all, even when the renewal after it fails.</para>
+/// <para><b>Stopping.</b> A refused renewal, a hot PA or a lost PA watch, a KISS failure,
+/// missing acknowledgements or the hard stop at <see cref="SlotSettings.MaxSlotLength"/> stop the
+/// runner queueing more, and it asks the station at once to drop whatever of ours is not yet
+/// keyed. A burst already on the air finishes inside the lease; the release drops anything left
+/// and the station sends its closing ident. Frames not sent are the planner's to carry
+/// forward.</para>
+/// <para><b>Write-ahead.</b> Every frame of a burst is reported as queued before the first is
+/// written, and nothing is written if that report fails, so a crash mid-burst can never lead to a
+/// piece being sent twice.</para>
 /// </remarks>
 public sealed class SlotRunner
 {
@@ -43,6 +50,10 @@ public sealed class SlotRunner
     public SlotRunner(SlotSettings settings, IStationApi station, IKissConnector kiss, IFlexMonitor? flex, IAirtime airtime, IJournal journal, TimeProvider time)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        if (settings.MaxCarrierWait > settings.LeaseMargin)
+        {
+            throw new ArgumentException("MaxCarrierWait must be no more than LeaseMargin, or a burst that waits its longest could run past the lease.", nameof(settings));
+        }
         _station = station ?? throw new ArgumentNullException(nameof(station));
         _kiss = kiss ?? throw new ArgumentNullException(nameof(kiss));
         _flex = flex;
@@ -122,29 +133,38 @@ public sealed class SlotRunner
     /// <summary>One slot's state.</summary>
     private sealed class Run(SlotRunner owner, DateOnly day, IReadOnlyList<SlotFrame> frames, int bulletins, Action<int>? onQueued) : IDisposable
     {
-        public void Dispose() => _leaseGate.Dispose();
+        /// <summary>How long the modem may gather the first frame of a burst before contending.</summary>
+        private static readonly TimeSpan Gather = TimeSpan.FromSeconds(1);
 
         private readonly SemaphoreSlim _leaseGate = new(1, 1);
+        private readonly CancellationTokenSource _aborted = new();
         private SlotSettings S => owner._settings;
         private DateTimeOffset Now => owner._time.GetUtcNow();
         private DateTimeOffset _start;
         private long _leaseUntilTicks;
         private string? _abort;
-
-        private DateTimeOffset LeaseUntil
-        {
-            get => new(Interlocked.Read(ref _leaseUntilTicks), TimeSpan.Zero);
-            set => Interlocked.Exchange(ref _leaseUntilTicks, value.UtcTicks);
-        }
+        private Task? _dropping;
         private string _reference = "not read (no Flex configured)";
         private double? _paMax;
-        private bool _flexLost;
+        private bool _paWatchLost;
         private int _queued;
         private int _sent;
         private int _bursts;
         private int _renewals;
         private bool _leaseTaken;
         private bool _toneSent;
+
+        public void Dispose()
+        {
+            _leaseGate.Dispose();
+            _aborted.Dispose();
+        }
+
+        private DateTimeOffset LeaseUntil
+        {
+            get => new(Interlocked.Read(ref _leaseUntilTicks), TimeSpan.Zero);
+            set => Interlocked.Exchange(ref _leaseUntilTicks, value.UtcTicks);
+        }
 
         private void Say(string line) => owner._journal.Write($"slot {day:yyyy-MM-dd}: {line}");
 
@@ -165,7 +185,7 @@ public sealed class SlotRunner
                 string? flexSkip = await ReadFlexAsync(cancellation);
                 if (flexSkip is not null)
                 {
-                    return Finish(SlotOutcome.Skipped, flexSkip);
+                    return Finish(SlotOutcome.Skipped, flexSkip, retryable: true);
                 }
             }
 
@@ -176,7 +196,7 @@ public sealed class SlotRunner
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                return Finish(SlotOutcome.Skipped, $"cannot reach the station's KISS port: {e.Message}");
+                return Finish(SlotOutcome.Skipped, $"cannot reach the station's KISS port: {e.Message}", retryable: true);
             }
 
             await using (link)
@@ -185,11 +205,11 @@ public sealed class SlotRunner
                 LeaseAnswer first = await AskForLeaseAsync(cancellation);
                 if (!first.Held)
                 {
-                    return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}");
+                    return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", retryable: true);
                 }
                 _leaseTaken = true;
                 LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
-                Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s");
+                Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames waiting over {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel are dropped");
 
                 using var slot = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
                 Task renewing = RenewLoopAsync(slot.Token);
@@ -199,7 +219,7 @@ public sealed class SlotRunner
                 try
                 {
                     (skipped, skipReason) = await ToneAsync(cancellation);
-                    if (skipped is null)
+                    if (skipped is null && _abort is null)
                     {
                         await BurstsAsync(link, sizes, cancellation);
                     }
@@ -213,6 +233,10 @@ public sealed class SlotRunner
                     await slot.CancelAsync();
                     await Quietly(renewing);
                     await Quietly(watching);
+                    if (_dropping is not null)
+                    {
+                        await _dropping;
+                    }
                     await ReleaseAsync();
                 }
 
@@ -281,7 +305,8 @@ public sealed class SlotRunner
         {
             try
             {
-                return await owner._station.TakeLeaseAsync(S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), cancellation);
+                return await owner._station.TakeLeaseAsync(
+                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
@@ -343,22 +368,45 @@ public sealed class SlotRunner
             {
                 return;
             }
-            if (!flex.Connected)
+            double? pa = flex.Connected ? flex.PaTemperatureC : null;
+            if (pa is not double temperature)
             {
-                if (!_flexLost)
+                if (!_paWatchLost)
                 {
-                    _flexLost = true;
-                    Say($"Flex API session lost ({flex.Problem ?? "no reason given"}); carrying on without the PA temperature watch");
+                    _paWatchLost = true;
+                    string why = flex.Connected ? "the Flex has sent no recent PA temperature" : $"the Flex API session ended ({flex.Problem ?? "no reason given"})";
+                    if (S.WhenFlexUnreachable == FlexUnreachablePolicy.Skip)
+                    {
+                        Abort($"lost the PA temperature watch: {why}");
+                    }
+                    else
+                    {
+                        Say($"lost the PA temperature watch: {why}; carrying on without it");
+                    }
                 }
                 return;
             }
-            if (flex.PaTemperatureC is double pa)
+            if (_paWatchLost)
             {
-                _paMax = Math.Max(_paMax ?? pa, pa);
-                if (pa > S.PaTemperatureLimitC)
-                {
-                    Abort($"PA temperature {Degrees(pa)} C passed the {Degrees(S.PaTemperatureLimitC)} C limit");
-                }
+                _paWatchLost = false;
+                Say($"PA temperature watch back, {Degrees(temperature)} C");
+            }
+            _paMax = Math.Max(_paMax ?? temperature, temperature);
+            if (temperature > S.PaTemperatureLimitC)
+            {
+                Abort($"PA temperature {Degrees(temperature)} C passed the {Degrees(S.PaTemperatureLimitC)} C limit");
+            }
+        }
+
+        private async Task<bool?> ChannelBusyAsync(CancellationToken cancellation)
+        {
+            try
+            {
+                return (await owner._station.ReadLeaseAsync(cancellation)).ChannelBusy;
+            }
+            catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
+            {
+                return null;
             }
         }
 
@@ -369,21 +417,23 @@ public sealed class SlotRunner
                 return (null, null);
             }
             DateTimeOffset giveUp = Now + S.ChannelWait;
-            while (true)
+            bool saidBusy = false;
+            while (_abort is null)
             {
-                ToneAnswer answer;
-                try
+                bool? busy = await ChannelBusyAsync(cancellation);
+                if (busy != true)
                 {
-                    answer = await owner._station.SendToneAsync(S.SubChannel, S.ToneHz, S.ToneLength.TotalSeconds, cancellation);
-                }
-                catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
-                {
-                    answer = new ToneAnswer(ToneOutcome.Failed, e.Message);
-                }
-
-                switch (answer.Outcome)
-                {
-                    case ToneOutcome.Sent:
+                    ToneAnswer answer;
+                    try
+                    {
+                        answer = await owner._station.SendToneAsync(S.SubChannel, S.ToneHz, S.ToneLength.TotalSeconds, cancellation);
+                    }
+                    catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
+                    {
+                        answer = new ToneAnswer(ToneOutcome.Failed, e.Message);
+                    }
+                    if (answer.Outcome == ToneOutcome.Sent)
+                    {
                         _toneSent = true;
                         Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {S.ToneHz:0} Hz");
                         if (_abort is null && S.PauseAfterTone > TimeSpan.Zero)
@@ -391,24 +441,33 @@ public sealed class SlotRunner
                             await Task.Delay(S.PauseAfterTone, owner._time, cancellation);
                         }
                         return (null, null);
-
-                    case ToneOutcome.ChannelBusy when Now < giveUp:
-                        Say($"channel busy, no tone yet ({answer.Message}); trying again");
-                        await Task.Delay(TimeSpan.FromSeconds(5), owner._time, cancellation);
-                        continue;
-
-                    case ToneOutcome.ChannelBusy when S.WhenStillBusy == BusyPolicy.Skip:
-                        return (SlotOutcome.Skipped, $"the channel stayed busy for {S.ChannelWait.TotalMinutes:0.#} min");
-
-                    case ToneOutcome.ChannelBusy:
-                        Say($"channel still busy after {S.ChannelWait.TotalMinutes:0.#} min; going ahead without the tone (the modem still waits for a clear channel before each burst)");
-                        return (null, null);
-
-                    default:
+                    }
+                    // Refused: only the station's channel-busy flag says whether that was the channel.
+                    busy = await ChannelBusyAsync(cancellation);
+                    if (busy != true)
+                    {
                         Say($"the station did not send the tone ({answer.Message}); carrying on without it");
                         return (null, null);
+                    }
                 }
+
+                if (Now >= giveUp)
+                {
+                    if (S.WhenStillBusy == BusyPolicy.Skip)
+                    {
+                        return (SlotOutcome.Skipped, $"the channel stayed busy for {S.ChannelWait.TotalMinutes:0.#} min");
+                    }
+                    Say($"channel still busy after {S.ChannelWait.TotalMinutes:0.#} min; going ahead without the tone (frames that wait over {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel are dropped by the station)");
+                    return (null, null);
+                }
+                if (!saidBusy)
+                {
+                    saidBusy = true;
+                    Say($"channel busy; waiting up to {S.ChannelWait.TotalMinutes:0.#} min for it to clear");
+                }
+                await Task.Delay(TimeSpan.FromSeconds(5), owner._time, cancellation);
             }
+            return (null, null);
         }
 
         private async Task BurstsAsync(IKissLink link, IReadOnlyList<int> sizes, CancellationToken cancellation)
@@ -442,20 +501,45 @@ public sealed class SlotRunner
                     }
                 }
 
-                var waiting = new HashSet<ushort>();
-                foreach (byte[] frame in batch)
+                // Write-ahead: the whole burst is on record as queued before any of it is written.
+                try
                 {
-                    id++;
-                    waiting.Add(id);
-                    await link.SendAsync(id, frame, cancellation);
-                    _queued++;
+                    onQueued?.Invoke(_queued + batch.Count);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+                {
+                    Abort($"could not record the next burst before queueing it ({e.Message}), so it was not sent");
+                    return;
+                }
+
+                DateTimeOffset queuedAt = Now;
+                var waiting = new HashSet<ushort>();
+                try
+                {
+                    foreach (byte[] frame in batch)
+                    {
+                        id++;
+                        waiting.Add(id);
+                        await link.SendAsync(id, frame, cancellation);
+                        _queued++;
+                    }
+                }
+                catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException)
+                {
+                    Abort($"the KISS connection failed while queueing burst {_bursts + 1}: {e.Message}");
+                    // Anything of it that did reach the modem may still go; wait for it as below.
                 }
                 _bursts++;
-                onQueued?.Invoke(_queued);
 
-                int acknowledged = await AcksAsync(link, waiting, airtime + S.AckGrace, cancellation);
+                // The latest a burst can end: gathered, then a carrier wait the station cuts off, then its airtime.
+                DateTimeOffset latestEnd = queuedAt + Gather + S.MaxCarrierWait + airtime + TimeSpan.FromSeconds(5);
+                int acknowledged = await AcksAsync(link, waiting, Now + airtime + S.AckGrace, latestEnd, cancellation);
                 _sent += acknowledged;
                 next += count;
+                if (_abort is not null)
+                {
+                    return;
+                }
                 if (acknowledged < batch.Count)
                 {
                     Abort($"the modem acknowledged {acknowledged} of the {batch.Count} frames of burst {_bursts} within {(airtime + S.AckGrace).TotalSeconds:0} s");
@@ -472,27 +556,60 @@ public sealed class SlotRunner
             }
         }
 
-        private async Task<int> AcksAsync(IKissLink link, HashSet<ushort> waiting, TimeSpan within, CancellationToken cancellation)
+        /// <summary>
+        /// Waits for a burst's acknowledgements until <paramref name="deadline"/>; once the slot is
+        /// being aborted, only until <paramref name="latestEnd"/>, the latest the burst could still
+        /// be on the air, since anything not keyed by then has been dropped.
+        /// </summary>
+        private async Task<int> AcksAsync(IKissLink link, HashSet<ushort> waiting, DateTimeOffset deadline, DateTimeOffset latestEnd, CancellationToken cancellation)
         {
             int total = waiting.Count;
-            using var timeout = new CancellationTokenSource(within, owner._time);
-            using var either = CancellationTokenSource.CreateLinkedTokenSource(cancellation, timeout.Token);
-            try
+            while (waiting.Count > 0)
             {
-                while (waiting.Count > 0)
+                bool aborting = _abort is not null;
+                DateTimeOffset until = aborting && latestEnd < deadline ? latestEnd : deadline;
+                TimeSpan left = until - Now;
+                if (left <= TimeSpan.Zero)
+                {
+                    break;
+                }
+                using var timeout = new CancellationTokenSource(left, owner._time);
+                using var either = aborting
+                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellation, timeout.Token)
+                    : CancellationTokenSource.CreateLinkedTokenSource(cancellation, timeout.Token, _aborted.Token);
+                try
                 {
                     waiting.Remove(await link.Acks.ReadAsync(either.Token));
                 }
-            }
-            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
-            {
-                // Out of time; the caller says so.
-            }
-            catch (ChannelClosedException)
-            {
-                Say("the KISS connection closed");
+                catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+                {
+                    if (timeout.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    // Aborted meanwhile: go round with the shorter deadline.
+                }
+                catch (ChannelClosedException)
+                {
+                    Abort("the KISS connection closed");
+                    break;
+                }
             }
             return total - waiting.Count;
+        }
+
+        private async Task DropQueuedAsync()
+        {
+            try
+            {
+                using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30), owner._time);
+                bool dropped = await owner._station.DropQueuedAsync(S.SubChannel, bounded.Token);
+                Say(dropped ? "asked the station to drop our frames not yet on the air" : "the station would not drop our queued frames; the release drops them");
+            }
+            catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException or InvalidOperationException)
+            {
+                Say($"could not ask the station to drop our queued frames ({e.Message}); the release or the lease running out drops them");
+            }
         }
 
         private async Task ReleaseAsync()
@@ -505,7 +622,9 @@ public sealed class SlotRunner
             {
                 using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30), owner._time);
                 bool released = await owner._station.ReleaseLeaseAsync(S.SubChannel, bounded.Token);
-                Say(released ? "transmit lease released" : "the station had no lease of ours to release (it may have run out)");
+                Say(released
+                    ? "transmit lease released; anything of ours not yet keyed is dropped, and the station sends the closing ident"
+                    : "the station had no lease of ours to release (it may have run out, dropping anything of ours not yet keyed)");
             }
             catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException or InvalidOperationException)
             {
@@ -513,7 +632,19 @@ public sealed class SlotRunner
             }
         }
 
-        private void Abort(string reason) => Interlocked.CompareExchange(ref _abort, reason, null);
+        /// <summary>Stops the slot for a reason, once, and asks the station to drop what of ours is not yet keyed.</summary>
+        private void Abort(string reason)
+        {
+            if (Interlocked.CompareExchange(ref _abort, reason, null) is not null)
+            {
+                return;
+            }
+            _aborted.Cancel();
+            if (_leaseTaken && _queued > 0)
+            {
+                _dropping = DropQueuedAsync();
+            }
+        }
 
         private static async Task Quietly(Task task)
         {
@@ -526,7 +657,7 @@ public sealed class SlotRunner
             }
         }
 
-        private SlotReport Finish(SlotOutcome outcome, string? reason)
+        private SlotReport Finish(SlotOutcome outcome, string? reason, bool retryable = false)
         {
             DateTimeOffset end = Now;
             var report = new SlotReport
@@ -546,6 +677,7 @@ public sealed class SlotRunner
                 PaTemperatureMaxC = _paMax,
                 LeaseTaken = _leaseTaken,
                 LeaseRenewals = _renewals,
+                Retryable = retryable,
             };
             string pa = _paMax is double max ? $"{Degrees(max)} C" : "not read";
             switch (outcome)
@@ -554,15 +686,11 @@ public sealed class SlotRunner
                     Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts, {bulletins} bulletins in rotation, tone {(_toneSent ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
                     break;
                 case SlotOutcome.Aborted:
-                    Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts ({_queued} queued); the rest roll to tomorrow. PA max {pa}, reference {_reference}");
+                    Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");
                     break;
                 default:
-                    Say($"skipped: {reason}. {(_toneSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls to tomorrow");
+                    Say($"skipped: {reason}. {(_toneSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry today" : "")}");
                     break;
-            }
-            if (_toneSent || _queued > 0)
-            {
-                Say("the modem sends its closing CW ident when its 10 minute ident clock next falls due, not at once");
             }
             return report;
         }

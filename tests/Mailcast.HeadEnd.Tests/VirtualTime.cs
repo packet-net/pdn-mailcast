@@ -10,6 +10,10 @@ public sealed class VirtualTime : TimeProvider
 {
     private readonly Lock _gate = new();
     private readonly List<VirtualTimer> _timers = [];
+
+    // One pump for the clock's whole life: work begun in one Run (a fake transmitter waiting for a
+    // clear channel, say) carries on in the next.
+    private readonly PumpContext _context = new();
     private DateTimeOffset _now;
     private long _sequence;
 
@@ -28,6 +32,15 @@ public sealed class VirtualTime : TimeProvider
         var timer = new VirtualTimer(this, callback, state);
         timer.Change(dueTime, period);
         return timer;
+    }
+
+    /// <summary>Moves the clock on without firing anything, for code that only reads it.</summary>
+    public void Advance(TimeSpan by)
+    {
+        lock (_gate)
+        {
+            _now += by;
+        }
     }
 
     /// <summary>Moves to the earliest pending timer and fires it. False if there is none.</summary>
@@ -60,7 +73,7 @@ public sealed class VirtualTime : TimeProvider
     public T Run<T>(Func<Task<T>> body, TimeSpan? limit = null)
     {
         var previous = SynchronizationContext.Current;
-        using var context = new PumpContext();
+        var context = _context;
         SynchronizationContext.SetSynchronizationContext(context);
         DateTimeOffset start = GetUtcNow();
         try
@@ -146,21 +159,18 @@ public sealed class VirtualTime : TimeProvider
         }
     }
 
-    private sealed class PumpContext : SynchronizationContext, IDisposable
+    private sealed class PumpContext : SynchronizationContext
     {
-        public void Dispose() => _signal.Dispose();
-
         private readonly Queue<(SendOrPostCallback Callback, object? State)> _queue = new();
-        private readonly Lock _gate = new();
-        private readonly SemaphoreSlim _signal = new(0);
+        private readonly object _gate = new();
 
         public override void Post(SendOrPostCallback d, object? state)
         {
             lock (_gate)
             {
                 _queue.Enqueue((d, state));
+                Monitor.PulseAll(_gate);
             }
-            _signal.Release();
         }
 
         public override void Send(SendOrPostCallback d, object? state) => throw new NotSupportedException();
@@ -188,12 +198,8 @@ public sealed class VirtualTime : TimeProvider
         {
             lock (_gate)
             {
-                if (_queue.Count > 0)
-                {
-                    return true;
-                }
+                return _queue.Count > 0 || (Monitor.Wait(_gate, limit) && _queue.Count > 0);
             }
-            return _signal.Wait(limit);
         }
     }
 }

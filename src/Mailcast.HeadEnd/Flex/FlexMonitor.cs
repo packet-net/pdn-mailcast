@@ -51,7 +51,8 @@ public interface IFlexMonitor : IAsyncDisposable
 /// <c>client udpport</c> (where this client's own meter packets go; a local ephemeral port, so
 /// nothing clashes with pdn-soundmodem's sockets on the same machine), <c>sub radio all</c> (for the
 /// <c>radio oscillator</c> status that carries the reference state), <c>meter list</c>,
-/// <c>sub meter all</c> and <c>sub meter N</c>, and <c>unsub meter all</c> on the way out. It never
+/// <c>sub meter all</c> and <c>sub meter N</c>, <c>keepalive enable</c> and its pings (this
+/// session's own), and <c>unsub meter all</c> on the way out. It never
 /// sends <c>client gui</c>, <c>client bind</c>, any <c>slice</c>, <c>stream</c>, <c>transmit</c>
 /// or <c>xmit</c> command.</para>
 /// </remarks>
@@ -62,11 +63,12 @@ public sealed class FlexMonitor : IFlexMonitor
     private readonly TimeProvider _time;
     private readonly TimeSpan _connectTimeout;
     private readonly TimeSpan _referenceWait;
+    private readonly TimeSpan _staleAfter;
     private FlexClient? _client;
     private FlexMeters? _meters;
 
     /// <summary>A monitor for the radio at <paramref name="host"/>.</summary>
-    public FlexMonitor(string host, int port = 4992, TimeSpan? connectTimeout = null, TimeProvider? time = null, TimeSpan? referenceWait = null)
+    public FlexMonitor(string host, int port = 4992, TimeSpan? connectTimeout = null, TimeProvider? time = null, TimeSpan? referenceWait = null, TimeSpan? staleAfter = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         _host = host;
@@ -74,6 +76,7 @@ public sealed class FlexMonitor : IFlexMonitor
         _time = time ?? TimeProvider.System;
         _connectTimeout = connectTimeout ?? TimeSpan.FromSeconds(10);
         _referenceWait = referenceWait ?? TimeSpan.FromSeconds(5);
+        _staleAfter = staleAfter ?? TimeSpan.FromSeconds(15);
     }
 
     /// <inheritdoc />
@@ -86,8 +89,13 @@ public sealed class FlexMonitor : IFlexMonitor
     public ReferenceReading Reference => _client is null ? ReferenceReading.Unknown : Read(_client.Reference);
 
     /// <inheritdoc />
+    /// <remarks>Null when the latest reading is older than the stale limit (15 s by default), so a
+    /// radio that has stopped sending meters is not mistaken for a cool one.</remarks>
     public double? PaTemperatureC =>
-        _meters is not null && _meters.TryGet("PATEMP", out FlexMeterReading reading) ? reading.Value : null;
+        _meters is not null && _meters.TryGet("PATEMP", out FlexMeterReading reading)
+            && _time.GetUtcNow().UtcDateTime - reading.UtcTime <= _staleAfter
+            ? reading.Value
+            : null;
 
     /// <inheritdoc />
     public async Task<bool> ConnectAsync(CancellationToken cancellation)
@@ -100,6 +108,8 @@ public sealed class FlexMonitor : IFlexMonitor
             _client = await FlexClient.ConnectAsync(_host, _port, cancellation: linked.Token).ConfigureAwait(false);
             _client.Disconnected += () => Problem = "the radio closed the API session";
             await _client.InitUdpAsync(linked.Token).ConfigureAwait(false);
+            // The radio's keepalive, so a session that has died is noticed (15 s of silence ends it).
+            await _client.EnableKeepaliveAsync(TimeSpan.FromSeconds(5), linked.Token).ConfigureAwait(false);
 
             var heard = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _client.ReferenceChanged += _ => heard.TrySetResult();

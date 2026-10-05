@@ -15,6 +15,8 @@ public sealed record ScheduledIntake(IBulletinIntake Intake, TimeSpan Every);
 public sealed class HeadEndService(
     TimeOnly slotTime,
     TimeSpan catchUp,
+    TimeSpan retryAfter,
+    TimeSpan preSlotIntakeLimit,
     ISlotPlanner planner,
     RotationStore store,
     IReadOnlyList<ScheduledIntake> intakes,
@@ -31,7 +33,7 @@ public sealed class HeadEndService(
         {
             while (!cancellation.IsCancellationRequested)
             {
-                DateTimeOffset next = NextSlot(time.GetUtcNow(), slotTime, catchUp, status.LastSlot);
+                DateTimeOffset next = NextSlot(time.GetUtcNow(), slotTime, catchUp, status.LastSlot, retryAfter);
                 status.SetState("waiting", next);
                 status.SetBulletinsHeld(store.Count);
                 journal.Write($"next slot {next.UtcDateTime:yyyy-MM-dd HH:mm}Z; {store.Count} bulletins held");
@@ -62,9 +64,23 @@ public sealed class HeadEndService(
     public async Task<SlotReport> RunSlotAsync(DateOnly day, CancellationToken cancellation)
     {
         status.SetState("in slot", null);
-        foreach (var scheduled in intakes)
+        // Tightly bounded: a BBS that does not answer must not hold the slot up. Whatever it has
+        // not handed over by then goes tomorrow.
+        using (var limit = new CancellationTokenSource(preSlotIntakeLimit, time))
+        using (var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellation, limit.Token))
         {
-            await CollectAsync(scheduled.Intake, day, cancellation);
+            foreach (var scheduled in intakes)
+            {
+                try
+                {
+                    await CollectAsync(scheduled.Intake, day, bounded.Token);
+                }
+                catch (OperationCanceledException) when (limit.IsCancellationRequested && !cancellation.IsCancellationRequested)
+                {
+                    journal.Write($"intake ({scheduled.Intake.Name}): not finished within {preSlotIntakeLimit.TotalSeconds:0} s before the slot; going ahead with what is held");
+                    break;
+                }
+            }
         }
         int forgotten = store.Expire(day);
         if (forgotten > 0)
@@ -83,19 +99,30 @@ public sealed class HeadEndService(
     /// <summary>
     /// When the next slot is: today's if it has not run and it is no more than
     /// <paramref name="catchUp"/> late, otherwise tomorrow's. A slot cut short because the head end
-    /// was stopping counts as not run, so a restart carries on with it.
+    /// was stopping counts as not run, so a restart carries on with it; one skipped for a reason at
+    /// the station that may clear (no KISS port, no lease, no Flex) is tried again
+    /// <paramref name="retryAfter"/> later, while that is still inside the catch-up window.
     /// </summary>
-    public static DateTimeOffset NextSlot(DateTimeOffset now, TimeOnly slotTime, TimeSpan catchUp, SlotReport? last)
+    public static DateTimeOffset NextSlot(DateTimeOffset now, TimeOnly slotTime, TimeSpan catchUp, SlotReport? last, TimeSpan? retryAfter = null)
     {
         var today = DateOnly.FromDateTime(now.UtcDateTime);
         var at = new DateTimeOffset(today.ToDateTime(slotTime, DateTimeKind.Utc));
-        bool ranToday = last is not null && last.Day == today
-            && !(last.Outcome == SlotOutcome.Aborted && last.Reason == "the head end is stopping");
-        if (!ranToday && now <= at + catchUp)
+        DateTimeOffset tomorrow = at.AddDays(1);
+        if (last is not null && last.Day == today)
         {
-            return now > at ? now : at;
+            if (last.Outcome == SlotOutcome.Aborted && last.Reason == "the head end is stopping")
+            {
+                return now <= at + catchUp ? (now > at ? now : at) : tomorrow;
+            }
+            if (last.Retryable && retryAfter is TimeSpan wait)
+            {
+                DateTimeOffset retry = last.End + wait;
+                retry = retry > now ? retry : now;
+                return retry <= at + catchUp ? retry : tomorrow;
+            }
+            return tomorrow;
         }
-        return at.AddDays(1);
+        return now <= at + catchUp ? (now > at ? now : at) : tomorrow;
     }
 
     private async Task IntakeLoopAsync(ScheduledIntake scheduled, CancellationToken cancellation)

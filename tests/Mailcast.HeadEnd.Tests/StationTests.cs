@@ -78,63 +78,97 @@ public class StationTests
 
     private sealed class Handler(Func<HttpRequestMessage, string, (HttpStatusCode, string)> answer) : HttpMessageHandler
     {
-        public List<(string Path, string? Key, JsonNode Body)> Requests { get; } = [];
+        public List<(string Path, string? Key, JsonNode? Body)> Requests { get; } = [];
+
+        public bool Hang { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            string body = await request.Content!.ReadAsStringAsync(cancellationToken);
-            Requests.Add((request.RequestUri!.AbsolutePath, request.Headers.TryGetValues("X-API-Key", out var keys) ? keys.Single() : null, JsonNode.Parse(body)!));
+            string body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
+            Requests.Add((request.RequestUri!.AbsolutePath, request.Headers.TryGetValues("X-API-Key", out var keys) ? keys.Single() : null, body.Length > 0 ? JsonNode.Parse(body) : null));
+            if (Hang)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
             var (status, text) = answer(request, body);
             return new HttpResponseMessage(status) { Content = new StringContent(text, Encoding.UTF8, "application/json") };
         }
     }
 
-    [Fact]
-    public async Task StationApiClient_TakesRenewsAndReleasesTheLease()
-    {
-        using var handler = new Handler((_, body) => JsonNode.Parse(body)!["release"] is null
-            ? (HttpStatusCode.OK, """{"held": true, "subChannel": 4, "expires": "2026-10-05T12:02:00Z", "renewed": false, "seconds": 120, "capped": false}""")
-            : (HttpStatusCode.OK, """{"released": true}"""));
-        using var api = new StationApiClient(new Uri("http://127.0.0.1:8107/"), "secret", handler);
+    private static StationApiClient Client(Handler handler, TimeSpan? limit = null) =>
+        new(new Uri("http://127.0.0.1:8107/"), "secret", limit ?? TimeSpan.FromSeconds(30), handler);
 
-        var lease = await api.TakeLeaseAsync(4, 120, CancellationToken.None);
+    [Fact]
+    public async Task StationApiClient_TakesRenewsReadsDropsAndReleasesTheLease()
+    {
+        using var handler = new Handler((request, body) => request.Method == HttpMethod.Get
+            ? (HttpStatusCode.OK, """{"held": true, "subChannel": 4, "expires": "2026-10-05T12:02:00Z", "channelBusy": true}""")
+            : JsonNode.Parse(body)!["release"] is not null
+                ? (HttpStatusCode.OK, """{"released": true}""")
+                : JsonNode.Parse(body)!["seconds"] is null
+                    ? (HttpStatusCode.OK, """{"dropped": 3}""")
+                    : (HttpStatusCode.OK, """{"held": true, "subChannel": 4, "expires": "2026-10-05T12:02:00Z", "renewed": false, "seconds": 120, "capped": false, "channelBusy": false}"""));
+        using var api = Client(handler);
+
+        var lease = await api.TakeLeaseAsync(4, 120, 10, CancellationToken.None);
         Assert.True(lease.Held);
         Assert.Equal(120, lease.Seconds);
+        Assert.False(lease.ChannelBusy);
+        Assert.True((await api.ReadLeaseAsync(CancellationToken.None)).ChannelBusy);
+        Assert.True(await api.DropQueuedAsync(4, CancellationToken.None));
         Assert.True(await api.ReleaseLeaseAsync(4, CancellationToken.None));
 
-        Assert.Equal("/api/txlease", handler.Requests[0].Path);
-        Assert.Equal("secret", handler.Requests[0].Key);
-        Assert.Equal(4, handler.Requests[0].Body["subChannel"]!.GetValue<int>());
-        Assert.Equal(120, handler.Requests[0].Body["seconds"]!.GetValue<int>());
-        Assert.True(handler.Requests[1].Body["release"]!.GetValue<bool>());
-        Assert.Equal(4, handler.Requests[1].Body["subChannel"]!.GetValue<int>());
+        Assert.All(handler.Requests, r => Assert.Equal("/api/txlease", r.Path));
+        Assert.All(handler.Requests, r => Assert.Equal("secret", r.Key));
+        var take = handler.Requests[0].Body!;
+        Assert.Equal(4, take["subChannel"]!.GetValue<int>());
+        Assert.Equal(120, take["seconds"]!.GetValue<int>());
+        Assert.Equal(10, take["maxCarrierWaitSeconds"]!.GetValue<int>());
+        Assert.Null(handler.Requests[1].Body);
+        var drop = handler.Requests[2].Body!;
+        Assert.True(drop["dropQueued"]!.GetValue<bool>());
+        Assert.Equal(4, drop["subChannel"]!.GetValue<int>());
+        Assert.Null(drop["release"]);
+        var release = handler.Requests[3].Body!;
+        Assert.True(release["release"]!.GetValue<bool>());
+        Assert.True(release["dropQueued"]!.GetValue<bool>());
+        Assert.Equal(4, release["subChannel"]!.GetValue<int>());
     }
 
     [Fact]
     public async Task StationApiClient_ReportsAnotherHoldersLease()
     {
         using var handler = new Handler((_, _) => (HttpStatusCode.Conflict, """{"held": true, "subChannel": 2, "expires": "2026-10-05T12:01:00Z", "refused": "sub-channel 2 holds the transmit lease"}"""));
-        using var api = new StationApiClient(new Uri("http://127.0.0.1:8107/"), "secret", handler);
-        var lease = await api.TakeLeaseAsync(4, 120, CancellationToken.None);
+        using var api = Client(handler);
+        var lease = await api.TakeLeaseAsync(4, 120, 10, CancellationToken.None);
         Assert.False(lease.Held);
         Assert.Equal("sub-channel 2 holds the transmit lease until 2026-10-05T12:01:00Z", lease.Problem);
+        Assert.Null(lease.ChannelBusy);
+    }
+
+    [Fact]
+    public async Task StationApiClient_GivesUpOnALeaseCallThatIsNotAnswered()
+    {
+        using var handler = new Handler((_, _) => (HttpStatusCode.OK, "{}")) { Hang = true };
+        using var api = Client(handler, TimeSpan.FromMilliseconds(50));
+        var e = await Assert.ThrowsAsync<HttpRequestException>(() => api.TakeLeaseAsync(4, 120, 10, CancellationToken.None));
+        Assert.Contains("did not answer", e.Message, StringComparison.Ordinal);
     }
 
     [Theory]
     [InlineData(200, """{"transmitted": true, "sent": "1800 Hz for 30 s", "refused": null, "failed": null}""", ToneOutcome.Sent)]
-    [InlineData(409, """{"transmitted": false, "sent": null, "refused": "the channel did not clear within 60 s, so the test was withdrawn and nothing was transmitted", "failed": null}""", ToneOutcome.ChannelBusy)]
-    [InlineData(409, """{"transmitted": false, "sent": null, "refused": "a test transmission is already running", "failed": null}""", ToneOutcome.Refused)]
+    [InlineData(409, """{"transmitted": false, "sent": null, "refused": "the channel did not clear within 60 s", "failed": null}""", ToneOutcome.Refused)]
     [InlineData(404, "txTest is off", ToneOutcome.Refused)]
     [InlineData(500, """{"transmitted": false, "failed": "the card went away"}""", ToneOutcome.Failed)]
     public async Task StationApiClient_ReadsEveryToneAnswer(int status, string body, ToneOutcome expected)
     {
         using var handler = new Handler((_, _) => ((HttpStatusCode)status, body));
-        using var api = new StationApiClient(new Uri("http://127.0.0.1:8107/"), "secret", handler);
+        using var api = Client(handler);
         var answer = await api.SendToneAsync(4, 1800, 30, CancellationToken.None);
         Assert.Equal(expected, answer.Outcome);
         var request = handler.Requests.Single();
         Assert.Equal("/api/txtest", request.Path);
-        Assert.False(request.Body["twoTone"]!.GetValue<bool>());
+        Assert.False(request.Body!["twoTone"]!.GetValue<bool>());
         Assert.Equal(1800, request.Body["toneHz"]!.GetValue<double>());
         Assert.Equal(30, request.Body["seconds"]!.GetValue<double>());
         Assert.Equal(4, request.Body["subChannel"]!.GetValue<int>());

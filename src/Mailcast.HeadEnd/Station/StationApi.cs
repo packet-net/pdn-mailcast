@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -11,7 +10,8 @@ namespace Mailcast.HeadEnd.Station;
 /// <param name="Held">True when the lease is ours.</param>
 /// <param name="Seconds">How long it was granted for, which the station may have capped.</param>
 /// <param name="Problem">Why not, in the station's words or ours, when <paramref name="Held"/> is false.</param>
-public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem)
+/// <param name="ChannelBusy">The station's carrier sense for the holder's sub-channel; null if it did not say.</param>
+public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem, bool? ChannelBusy = null)
 {
     /// <summary>A refusal or failure.</summary>
     public static LeaseAnswer No(string problem) => new(false, 0, problem);
@@ -23,10 +23,7 @@ public enum ToneOutcome
     /// <summary>The tone went out.</summary>
     Sent,
 
-    /// <summary>The channel did not clear within the station's own wait, so nothing was sent.</summary>
-    ChannelBusy,
-
-    /// <summary>The station would not send it, for some other reason.</summary>
+    /// <summary>The station would not send it; whether that was a busy channel is the lease's channel-busy flag.</summary>
     Refused,
 
     /// <summary>The request or the station failed.</summary>
@@ -39,11 +36,24 @@ public sealed record ToneAnswer(ToneOutcome Outcome, string Message);
 /// <summary>The parts of pdn-soundmodem's HTTP API the head end uses.</summary>
 public interface IStationApi
 {
-    /// <summary>Takes or renews the transmit lease for a sub-channel (<c>POST /api/txlease</c>).</summary>
-    Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, CancellationToken cancellation);
+    /// <summary>
+    /// Takes or renews the transmit lease for a sub-channel (<c>POST /api/txlease</c>), asking the
+    /// station to drop any of the holder's frames that would wait longer than
+    /// <paramref name="maxCarrierWaitSeconds"/> for a clear channel.
+    /// </summary>
+    Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation);
 
-    /// <summary>Gives the lease back (<c>POST /api/txlease</c> with <c>release</c>).</summary>
+    /// <summary>Reads the lease and the channel-busy flag (<c>GET /api/txlease</c>).</summary>
+    Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation);
+
+    /// <summary>
+    /// Gives the lease back, dropping any of the holder's frames not yet keyed
+    /// (<c>{"release": true, "dropQueued": true}</c>). The station sends the holder's closing ident.
+    /// </summary>
     Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation);
+
+    /// <summary>Drops the holder's frames not yet keyed (<c>{"dropQueued": true}</c>), keeping the lease.</summary>
+    Task<bool> DropQueuedAsync(int subChannel, CancellationToken cancellation);
 
     /// <summary>
     /// Sends a single tone as the lease holder (<c>POST /api/txtest</c> naming the sub-channel).
@@ -57,15 +67,22 @@ public interface IStationApi
 public sealed class StationApiClient : IStationApi, IDisposable
 {
     private readonly HttpClient _http;
-    private readonly bool _ownsClient;
+    private readonly TimeSpan _leaseCallLimit;
 
     /// <summary>Talks to the station at <paramref name="baseUrl"/>, such as http://127.0.0.1:8107/.</summary>
-    public StationApiClient(Uri baseUrl, string apiKey, HttpMessageHandler? handler = null)
+    /// <param name="baseUrl">The station page's address.</param>
+    /// <param name="apiKey">The station's api.key.</param>
+    /// <param name="leaseCallLimit">
+    /// How long one lease call may take: about the renewal interval, so a station that stops
+    /// answering is noticed before the lease it granted runs out.
+    /// </param>
+    /// <param name="handler">For tests.</param>
+    public StationApiClient(Uri baseUrl, string apiKey, TimeSpan leaseCallLimit, HttpMessageHandler? handler = null)
     {
         ArgumentNullException.ThrowIfNull(baseUrl);
         ArgumentException.ThrowIfNullOrEmpty(apiKey);
+        _leaseCallLimit = leaseCallLimit;
         _http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
-        _ownsClient = true;
         _http.BaseAddress = baseUrl;
         // A tone request is answered when the tone is over, after up to a minute's wait for a
         // clear channel; the slot's own deadlines bound everything else.
@@ -75,28 +92,51 @@ public sealed class StationApiClient : IStationApi, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, CancellationToken cancellation)
+    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation)
     {
-        var body = new JsonObject { ["subChannel"] = subChannel, ["seconds"] = seconds };
-        var (status, json, text) = await PostAsync("api/txlease", body, cancellation).ConfigureAwait(false);
+        var body = new JsonObject
+        {
+            ["subChannel"] = subChannel,
+            ["seconds"] = seconds,
+            ["maxCarrierWaitSeconds"] = maxCarrierWaitSeconds,
+        };
+        var (status, json, text) = await LeaseCallAsync(HttpMethod.Post, body, cancellation).ConfigureAwait(false);
+        bool? busy = Busy(json);
         if (status == HttpStatusCode.OK && json?["held"]?.GetValue<bool>() == true)
         {
             double granted = json["seconds"] is JsonNode s ? s.GetValue<double>() : seconds;
-            return new LeaseAnswer(true, granted, null);
+            return new LeaseAnswer(true, granted, null, busy);
         }
         if (status == HttpStatusCode.Conflict && json?["subChannel"] is JsonNode holder)
         {
-            return LeaseAnswer.No($"sub-channel {holder.ToJsonString()} holds the transmit lease until {json["expires"]?.ToString() ?? "unknown"}");
+            return new LeaseAnswer(false, 0, $"sub-channel {holder.ToJsonString()} holds the transmit lease until {json["expires"]?.ToString() ?? "unknown"}", busy);
         }
-        return LeaseAnswer.No($"HTTP {(int)status}: {Describe(json, text)}");
+        return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy);
+    }
+
+    /// <inheritdoc />
+    public async Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation)
+    {
+        var (status, json, text) = await LeaseCallAsync(HttpMethod.Get, null, cancellation).ConfigureAwait(false);
+        return status == HttpStatusCode.OK
+            ? new LeaseAnswer(json?["held"]?.GetValue<bool>() == true, 0, null, Busy(json))
+            : LeaseAnswer.No($"HTTP {(int)status}: {Describe(json, text)}");
     }
 
     /// <inheritdoc />
     public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
     {
-        var body = new JsonObject { ["release"] = true, ["subChannel"] = subChannel };
-        var (status, json, _) = await PostAsync("api/txlease", body, cancellation).ConfigureAwait(false);
+        var body = new JsonObject { ["release"] = true, ["subChannel"] = subChannel, ["dropQueued"] = true };
+        var (status, json, _) = await LeaseCallAsync(HttpMethod.Post, body, cancellation).ConfigureAwait(false);
         return status == HttpStatusCode.OK && json?["released"]?.GetValue<bool>() == true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> DropQueuedAsync(int subChannel, CancellationToken cancellation)
+    {
+        var body = new JsonObject { ["dropQueued"] = true, ["subChannel"] = subChannel };
+        var (status, _, _) = await LeaseCallAsync(HttpMethod.Post, body, cancellation).ConfigureAwait(false);
+        return status == HttpStatusCode.OK;
     }
 
     /// <inheritdoc />
@@ -114,7 +154,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
         string text;
         try
         {
-            (status, json, text) = await PostAsync("api/txtest", body, cancellation).ConfigureAwait(false);
+            (status, json, text) = await SendAsync(HttpMethod.Post, "api/txtest", body, cancellation).ConfigureAwait(false);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancellation.IsCancellationRequested)
         {
@@ -126,19 +166,33 @@ public sealed class StationApiClient : IStationApi, IDisposable
             return new ToneAnswer(ToneOutcome.Sent, json["sent"]?.ToString() ?? "sent");
         }
         string why = Describe(json, text);
-        if (status == HttpStatusCode.Conflict && why.Contains("did not clear", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ToneAnswer(ToneOutcome.ChannelBusy, why);
-        }
         return status == HttpStatusCode.Conflict || status == HttpStatusCode.NotFound
             ? new ToneAnswer(ToneOutcome.Refused, $"HTTP {(int)status}: {why}")
             : new ToneAnswer(ToneOutcome.Failed, $"HTTP {(int)status}: {why}");
     }
 
-    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> PostAsync(string path, JsonObject body, CancellationToken cancellation)
+    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation)
     {
-        using var content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await _http.PostAsync(new Uri(path, UriKind.Relative), content, cancellation).ConfigureAwait(false);
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        limit.CancelAfter(_leaseCallLimit);
+        try
+        {
+            return await SendAsync(method, "api/txlease", body, limit.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            throw new HttpRequestException($"the station did not answer within {_leaseCallLimit.TotalSeconds:0} s");
+        }
+    }
+
+    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> SendAsync(HttpMethod method, string path, JsonObject? body, CancellationToken cancellation)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
+        if (body is not null)
+        {
+            request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        }
+        using var response = await _http.SendAsync(request, cancellation).ConfigureAwait(false);
         string text = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
         JsonNode? json = null;
         try
@@ -150,6 +204,9 @@ public sealed class StationApiClient : IStationApi, IDisposable
         }
         return (response.StatusCode, json, text);
     }
+
+    private static bool? Busy(JsonNode? json) =>
+        json?["channelBusy"] is JsonNode b && b.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? b.GetValue<bool>() : null;
 
     private static string Describe(JsonNode? json, string text)
     {
@@ -165,13 +222,5 @@ public sealed class StationApiClient : IStationApi, IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        if (_ownsClient)
-        {
-            _http.Dispose();
-        }
-    }
-
-    internal static string Seconds(double s) => s.ToString("0.#", CultureInfo.InvariantCulture);
+    public void Dispose() => _http.Dispose();
 }

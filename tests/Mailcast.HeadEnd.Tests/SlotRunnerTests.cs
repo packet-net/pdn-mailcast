@@ -121,7 +121,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.All(rig.Station.Frames, f => Assert.True(f.At < refused));
         AssertNothingKeyedOutsideTheLease(rig.Station);
         Assert.Single(rig.Station.Releases);
-        Assert.Contains(rig.Journal.Lines, l => l.Contains("ABORTED", StringComparison.Ordinal) && l.Contains("roll to tomorrow", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("ABORTED", StringComparison.Ordinal) && l.Contains("roll on to the next slot", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -166,21 +166,22 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Run_RetriesTheToneWhileTheChannelIsBusy()
+    public void Run_WaitsForTheChannelToClearBeforeTheTone()
     {
         var rig = new Rig();
-        rig.Station.BusyTones = 1;
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromSeconds(70);
         var report = rig.Run(5);
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         Assert.True(report.ToneSent);
-        Assert.Contains(rig.Journal.Lines, l => l.Contains("channel busy, no tone yet", StringComparison.Ordinal));
+        Assert.True(rig.Station.Keyups[0].Start >= Noon + TimeSpan.FromSeconds(70));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("channel busy; waiting", StringComparison.Ordinal));
     }
 
     [Fact]
     public void Run_GoesAheadWithoutTheToneWhenTheChannelStaysBusy()
     {
         var rig = new Rig();
-        rig.Station.BusyTones = -1;
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromSeconds(125);
         var report = rig.Run(5);
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         Assert.False(report.ToneSent);
@@ -190,12 +191,45 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Run_OnAChannelBusyForGood_TheStationDropsTheBurstAndNothingKeysLater()
+    {
+        // The channel never clears: the first burst waits past the lease's carrier limit and is
+        // dropped, the slot aborts, and when the channel clears later nothing of ours goes out.
+        var rig = new Rig();
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromMinutes(10);
+        var report = rig.Run(20);
+        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
+        Assert.Contains("acknowledged 0 of the 7 frames of burst 1", report.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, report.FramesSent);
+        Assert.Equal(7, report.FramesQueued);
+        Assert.Equal(7, rig.Station.Dropped);
+        rig.Time.Run(async () => { await Task.Delay(TimeSpan.FromMinutes(20), rig.Time); return 0; });
+        Assert.Empty(rig.Station.Keyups);
+        Assert.Single(rig.Station.Releases);
+    }
+
+    [Fact]
+    public void KeyupCheck_CatchesAStationThatKeysQueuedFramesAfterTheRelease()
+    {
+        // The same busy channel at a station that ignores dropQueued and expiry: its frames key
+        // once the channel clears, after the lease, and the check sees it. This is the failure the
+        // head end's dropQueued requests prevent.
+        var rig = new Rig();
+        rig.Station.IgnoreDrops = true;
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromMinutes(10);
+        rig.Run(20);
+        rig.Time.Run(async () => { await Task.Delay(TimeSpan.FromMinutes(20), rig.Time); return 0; });
+        Assert.Contains(rig.Station.Keyups, k => !k.InsideLease);
+    }
+
+    [Fact]
     public void Run_SkipsWhenTheChannelStaysBusyAndTheConfigurationSaysSo()
     {
         var rig = new Rig(new SlotSettings { SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
-        rig.Station.BusyTones = -1;
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
         var report = rig.Run(5);
         Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.False(report.Retryable);
         Assert.Empty(rig.Station.Keyups);
         Assert.Empty(rig.Station.Frames);
         Assert.Single(rig.Station.Releases);
@@ -220,6 +254,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         var report = rig.Run(5);
         Assert.Equal(SlotOutcome.Skipped, report.Outcome);
         Assert.Contains("refused the transmit lease", report.Reason, StringComparison.Ordinal);
+        Assert.True(report.Retryable);
         Assert.Empty(rig.Station.Keyups);
         Assert.Empty(rig.Station.Frames);
         Assert.Empty(rig.Station.Releases);
@@ -242,13 +277,99 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_AbortsWhenTheModemStopsAcknowledging()
     {
+        // The channel goes busy for good during the second burst's gather: it is dropped unkeyed.
         var rig = new Rig();
-        rig.Station.AckOnlyFirst = 10;
+        rig.Station.ChannelBusyUntil = DateTimeOffset.MaxValue;
+        rig.Station.ChannelBusyUntil = Noon;
+        var report = rig.Time.Run(async () =>
+        {
+            var run = rig.Runner.RunAsync(Day, [.. Enumerable.Range(0, 30).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None, rig.Progress.Add);
+            while (rig.Station.Frames.Count < 8)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(0.1), rig.Time);
+            }
+            rig.Station.ChannelBusyUntil = DateTimeOffset.MaxValue;
+            return await run;
+        });
+        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
+        Assert.Contains("acknowledged 0 of the 7 frames of burst 2", report.Reason, StringComparison.Ordinal);
+        Assert.Equal(7, report.FramesSent);
+        Assert.Equal(14, report.FramesQueued);
+        AssertNothingKeyedOutsideTheLease(rig.Station);
+    }
+
+    [Fact]
+    public void Run_RecordsEachBurstAsQueuedBeforeWritingAnyOfIt()
+    {
+        var rig = new Rig();
+        var seen = new List<(int Recorded, int AlreadyAtStation)>();
+        var report = rig.Time.Run(() => rig.Runner.RunAsync(Day, [.. Enumerable.Range(0, 20).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None,
+            queued => seen.Add((queued, rig.Station.Frames.Count))));
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal([(7, 0), (14, 7), (20, 14)], seen);
+    }
+
+    [Fact]
+    public void Run_SendsNothingWhenTheWriteAheadRecordFails()
+    {
+        var rig = new Rig();
+        var report = rig.Time.Run(() => rig.Runner.RunAsync(Day, [.. Enumerable.Range(0, 20).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None,
+            _ => throw new IOException("disk full")));
+        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
+        Assert.Contains("disk full", report.Reason, StringComparison.Ordinal);
+        Assert.Empty(rig.Station.Frames);
+        Assert.Single(rig.Station.Releases);
+    }
+
+    [Fact]
+    public void Run_AKissWriteFailureAbortsTheSlotInsteadOfThrowing()
+    {
+        var rig = new Rig();
+        rig.Station.FailWriteNumber = 10;
         var report = rig.Run(30);
         Assert.Equal(SlotOutcome.Aborted, report.Outcome);
-        Assert.Contains("acknowledged 3 of the 7 frames of burst 2", report.Reason, StringComparison.Ordinal);
-        Assert.Equal(10, report.FramesSent);
-        Assert.Equal(14, report.FramesQueued);
+        Assert.Contains("the KISS connection failed while queueing burst 2: Broken pipe", report.Reason, StringComparison.Ordinal);
+        Assert.Equal(9, report.FramesQueued);
+        Assert.Equal(7, report.FramesSent);
+        Assert.Single(rig.Station.Releases);
+        AssertNothingKeyedOutsideTheLease(rig.Station);
+    }
+
+    [Fact]
+    public void Run_AbortAsksTheStationToDropWhatIsQueued()
+    {
+        var rig = new Rig(pa: t => t < TimeSpan.FromMinutes(2) ? 40 : 75);
+        var report = rig.Run(60);
+        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
+        var drop = Assert.Single(rig.Station.DropRequests);
+        Assert.True(drop >= Noon + TimeSpan.FromMinutes(2) && drop < Noon + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(10));
+        AssertNothingKeyedOutsideTheLease(rig.Station);
+    }
+
+    [Fact]
+    public void Run_LosingThePaWatch_CarriesOnOrStops_AsConfigured()
+    {
+        // Readings stop three minutes in, as if the radio had stopped sending meters.
+        var carryOn = new Rig(pa: t => t < TimeSpan.FromMinutes(3) ? 40 : null);
+        var completed = carryOn.Run(40);
+        Assert.Equal(SlotOutcome.Completed, completed.Outcome);
+        Assert.Contains(carryOn.Journal.Lines, l => l.Contains("lost the PA temperature watch: the Flex has sent no recent PA temperature; carrying on", StringComparison.Ordinal));
+
+        var stop = new Rig(new SlotSettings { SubChannel = 4, WhenFlexUnreachable = FlexUnreachablePolicy.Skip }, pa: t => t < TimeSpan.FromMinutes(3) ? 40 : null);
+        var aborted = stop.Run(40);
+        Assert.Equal(SlotOutcome.Aborted, aborted.Outcome);
+        Assert.StartsWith("lost the PA temperature watch", aborted.Reason, StringComparison.Ordinal);
+        AssertNothingKeyedOutsideTheLease(stop.Station);
+    }
+
+    [Fact]
+    public void Runner_RefusesACarrierWaitLongerThanTheLeaseMargin()
+    {
+        var time = new VirtualTime(Noon);
+        var station = new FakeStation(time, 4);
+        Assert.Throws<ArgumentException>(() => new SlotRunner(
+            new SlotSettings { MaxCarrierWait = TimeSpan.FromSeconds(20), LeaseMargin = TimeSpan.FromSeconds(15) },
+            station, station, null, FakeAirtime.For(station), new MemoryJournal(), time));
     }
 
     [Fact]
@@ -273,7 +394,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     public void Run_JournalIsPlainAscii()
     {
         var rig = new Rig();
-        rig.Station.BusyTones = 1;
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromSeconds(20);
         rig.Run(10);
         foreach (string line in rig.Journal.Lines)
         {

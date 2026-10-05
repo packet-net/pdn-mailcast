@@ -81,6 +81,7 @@ public sealed record HeadEndConfig
         Destination = Destination,
         SubChannel = Station.SubChannel,
         LeaseLength = TimeSpan.FromSeconds(Station.LeaseSeconds),
+        MaxCarrierWait = TimeSpan.FromSeconds(Station.MaxCarrierWaitSeconds),
         RenewEvery = TimeSpan.FromSeconds(Station.RenewSeconds),
         ChannelWait = TimeSpan.FromSeconds(Slot.ChannelWaitSeconds),
         WhenStillBusy = Slot.WhenStillBusy,
@@ -166,6 +167,23 @@ public sealed record HeadEndConfig
             problems.Add(string.Create(CultureInfo.InvariantCulture,
                 $"\"station\".\"leaseSeconds\" {Station.LeaseSeconds} is too short: a {Station.MaxBurstSeconds} s burst queued after a renewal must finish inside the lease even if the next renewal {Station.RenewSeconds} s later fails, which needs at least {needed} s"));
         }
+        if (Station.MaxCarrierWaitSeconds is < 1 or > SlotSettingsDefaults.LeaseMarginSeconds)
+        {
+            problems.Add(string.Create(CultureInfo.InvariantCulture,
+                $"\"station\".\"maxCarrierWaitSeconds\" must be 1 to {SlotSettingsDefaults.LeaseMarginSeconds}: a burst that waits its longest for a clear channel must still end inside the lease"));
+        }
+        if (Slot.RetryMinutes <= 0)
+        {
+            problems.Add("\"slot\".\"retryMinutes\" must be above 0");
+        }
+        if (Flex.PaStaleSeconds <= 0)
+        {
+            problems.Add("\"flex\".\"paStaleSeconds\" must be above 0");
+        }
+        if (Intake.PreSlotSeconds <= 0)
+        {
+            problems.Add("\"intake\".\"preSlotSeconds\" must be above 0");
+        }
         if (string.IsNullOrWhiteSpace(Station.ApiKey))
         {
             problems.Add("\"station\".\"apiKey\" is required: the station's api.key, which the lease and the tone need");
@@ -211,6 +229,9 @@ public sealed record SlotConfig
 
     /// <summary>A head end started this many minutes late still runs today's slot.</summary>
     public int CatchUpMinutes { get; init; } = 30;
+
+    /// <summary>A slot skipped for a reason at the station is tried again after this long, within the catch-up window.</summary>
+    public double RetryMinutes { get; init; } = 5;
 
     /// <summary>The hard stop.</summary>
     public double MaxMinutes { get; init; } = 40;
@@ -258,6 +279,9 @@ public sealed record StationConfig
 
     public double LeaseSeconds { get; init; } = 120;
 
+    /// <summary>The lease's maxCarrierWaitSeconds: frames that would wait longer for a clear channel are dropped.</summary>
+    public double MaxCarrierWaitSeconds { get; init; } = 10;
+
     public double RenewSeconds { get; init; } = 30;
 
     public double AckGraceSeconds { get; init; } = 120;
@@ -272,6 +296,9 @@ public sealed record FlexConfig
     public int Port { get; init; } = 4992;
 
     public double PaTemperatureLimitC { get; init; } = 70;
+
+    /// <summary>A PA temperature older than this counts as no reading.</summary>
+    public double PaStaleSeconds { get; init; } = 15;
 
     public FlexUnreachablePolicy WhenUnreachable { get; init; } = FlexUnreachablePolicy.CarryOn;
 }
@@ -298,6 +325,9 @@ public sealed record IntakeConfig
     public string DropDirectory { get; init; } = "/var/lib/pdn-mailcast-headend/drop";
 
     public int MaxBulletinBytes { get; init; } = 32 * 1024;
+
+    /// <summary>The longest the collection just before a slot may take, so a BBS that does not answer cannot hold the slot up.</summary>
+    public double PreSlotSeconds { get; init; } = 30;
 
     /// <summary>Forwarding from the BBS. Left out, the file drop is the only source.</summary>
     public FbbIntakeConfig? Fbb { get; init; }
@@ -351,6 +381,13 @@ public sealed record StatusConfig
     public string Bind { get; init; } = "127.0.0.1";
 
     public int Port { get; init; } = 8216;
+}
+
+/// <summary>Fixed parts of the slot that the configuration is checked against.</summary>
+public static class SlotSettingsDefaults
+{
+    /// <summary>The slot's <see cref="SlotSettings.LeaseMargin"/>, in seconds.</summary>
+    public const int LeaseMarginSeconds = 15;
 }
 
 /// <summary>A configuration the head end will not run with.</summary>

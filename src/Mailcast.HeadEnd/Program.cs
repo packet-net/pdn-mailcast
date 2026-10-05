@@ -219,9 +219,9 @@ public static partial class Program
 
         SlotSettings settings = config.ToSlotSettings();
         IAirtime airtime = LinearAirtime.Measure(config.Station.Mode);
-        using var api = new StationApiClient(new Uri(config.Station.ApiUrl), config.Station.ApiKey);
+        using var api = new StationApiClient(new Uri(config.Station.ApiUrl), config.Station.ApiKey, settings.RenewEvery);
         var kiss = new KissTcpConnector(config.Station.KissHost, config.Station.KissPort, config.Station.KissPortNibble);
-        await using var flex = config.Flex.Enabled ? new FlexMonitor(config.Flex.Host, config.Flex.Port, time: time) : null;
+        await using var flex = config.Flex.Enabled ? new FlexMonitor(config.Flex.Host, config.Flex.Port, time: time, staleAfter: TimeSpan.FromSeconds(config.Flex.PaStaleSeconds)) : null;
         var runner = new SlotRunner(settings, api, kiss, flex, airtime, journal, time);
         journal.Write($"station: KISS {config.Station.KissHost}:{config.Station.KissPort}, API {config.Station.ApiUrl}, sub-channel {config.Station.SubChannel}, {config.Station.Mode}, bursts up to {config.Station.MaxBurstSeconds:0} s");
         journal.Write(config.Flex.Enabled
@@ -244,7 +244,7 @@ public static partial class Program
         }
 
         var service = new HeadEndService(
-            config.SlotTime, TimeSpan.FromMinutes(config.Slot.CatchUpMinutes),
+            config.SlotTime, TimeSpan.FromMinutes(config.Slot.CatchUpMinutes), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
             planner, store, intakes, runner, status, journal, time);
         await service.RunAsync(stop.Token);
         fbbIntake?.Dispose();
@@ -293,9 +293,13 @@ public static partial class Program
 
     private sealed class NullStation : IStationApi
     {
-        public Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, CancellationToken cancellation) => throw new NotSupportedException();
+        public Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation) => throw new NotSupportedException();
+
+        public Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation) => throw new NotSupportedException();
 
         public Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation) => throw new NotSupportedException();
+
+        public Task<bool> DropQueuedAsync(int subChannel, CancellationToken cancellation) => throw new NotSupportedException();
 
         public Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, CancellationToken cancellation) => throw new NotSupportedException();
     }

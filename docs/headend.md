@@ -6,25 +6,27 @@ The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins
 
 At 12:00 UTC (`slot.timeUtc`) the head end:
 
-1. Collects any bulletins waiting at the BBS, and plans the day's frames.
+1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the day's frames.
 2. Reads the Flex's frequency reference and PA temperature, if configured, and logs whether it is GPS locked. It does not start with the PA already over the limit.
-3. Opens the broadcast modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s.
-4. Sends the 30 s calibration tone at 1800 Hz as the lease holder's transmitter test. The station waits for a clear channel first, up to a minute; if it never got to send it, the head end tries again, for up to 2 minutes in all (`slot.channelWaitSeconds`). Then it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up for the day (`"skip"`).
+3. Opens the broadcast modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and asks the station to drop any of our frames that would wait more than 10 s for a clear channel (`station.maxCarrierWaitSeconds`).
+4. Waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the 30 s calibration tone at 1800 Hz as the lease holder's transmitter test. If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up for the day (`"skip"`).
 5. Pauses 8 s so the modem's CW ident, which falls due with the first transmission, goes out before the first burst.
 6. Sends the frames a burst at a time (see below), checking the PA temperature every 5 s.
-7. Releases the lease. Normal packet service resumes.
+7. Releases the lease, dropping anything of ours not yet on the air. The station sends its closing CW ident, and normal packet service resumes.
 
-It stops early, cleanly, if a lease renewal fails, the PA passes `flex.paTemperatureLimitC`, the modem stops acknowledging frames, or the next burst would run past `slot.maxMinutes` (40). A burst already on the air finishes, because the station cannot take frames back. Whatever was not sent is owed: the next plan sends it on top of that day's share, with fresh ESIs. Each bulletin's next ESI is saved as every burst is queued, so a crash or restart mid-slot never repeats a piece. A slot cut short by the head end stopping is carried on when it starts again within `slot.catchUpMinutes` (30).
+It stops early, cleanly, if a lease renewal fails, the PA passes `flex.paTemperatureLimitC`, the PA watch is lost and `flex.whenUnreachable` is `"skip"`, the KISS connection fails, the modem stops acknowledging frames, or the next burst would run past `slot.maxMinutes` (40). It then asks the station at once to drop whatever of ours is not yet keyed; a burst already on the air finishes inside the lease.
+
+Whatever was not sent is owed: the next plan sends it on top of that day's share, with fresh ESIs. Each burst is recorded as queued before any of it is written to the modem, and nothing is written if that fails, so a crash or restart never repeats a piece, the directory's included. A slot cut short by the head end stopping carries on when it starts again within `slot.catchUpMinutes` (30). One skipped for a reason at the station (no KISS port, no lease, no Flex when it is required, a hot PA) is tried again 5 minutes later (`slot.retryMinutes`), within the same window.
 
 ## How the bursts are paced
 
 pdn-soundmodem packs frames queued together into one burst, up to the modem entry's `maxBurstSeconds`, after waiting `burstGatherSeconds` for the rest of a run to arrive. The head end works out how many frames fit (about 7 full frames in 60 s on WN4, from the modem's own modulator) and writes them over KISS together, as ACKMODE frames. pdn-soundmodem acknowledges every frame of a packed burst at once, when the burst has been handed to the sound card. Only when all of them are acknowledged does the head end queue the next burst, after a 1 s pause. So pdn-soundmodem never holds more than one burst of ours.
 
-Before queueing a burst the head end checks that the lease it holds will outlast the burst by 15 s, and renews first if not. That is why the lease is 120 s rather than 60: a burst queued just after a renewal must finish inside the lease even if the next renewal, 30 s later, fails. With a 60 s lease a 60 s burst could not.
+Before queueing a burst the head end checks that the lease it holds will outlast the burst by 15 s, and renews first if not. The 10 s carrier limit fits inside those 15 s, and the station drops our unkeyed frames itself if the lease runs out, so a burst either keys inside the lease or not at all. That is why the lease is 120 s rather than 60: a burst queued just after a renewal must finish inside the lease even if the next renewal, 30 s later, fails. With a 60 s lease a 60 s burst could not. Each lease call gives up after 30 s, so a station that stops answering is noticed in time.
 
 ## GB7RDG's pdn-soundmodem
 
-It needs pdn-soundmodem with burst packing (#544) and the transmit lease (#545), an API key, and one more modem entry for the broadcast, on its own sub-channel and KISS port:
+It needs pdn-soundmodem with burst packing (#544) and the transmit lease (#545) with its dropQueued, channel-busy flag, maxCarrierWaitSeconds and closing ident, an API key, and one more modem entry for the broadcast, on its own sub-channel and KISS port:
 
 ```json
 {
@@ -61,7 +63,7 @@ GB7RDG's existing bulletin filters apply as for any partner, because LinBPQ choo
 
 Q0HEAD is a Q callsign, which is never issued, so it cannot clash with a station, and it is never sent on the air (frames come from GB7RDG). FBB-style BBSs only accept logins shaped like a callsign. It must not be the receiver's login (Q0CAST) or GB7RDG itself.
 
-If LinBPQ ever offers the head end a personal message or NTS traffic, the head end answers `-` and logs a WARNING naming the BID. LinBPQ takes `-` as "already have it", so that message would not be delivered by this route: the warning means the partner's routes need fixing.
+If LinBPQ ever offers the head end a personal message or NTS traffic, the head end answers `=` (later), so LinBPQ keeps it queued rather than counting it delivered, and logs a WARNING naming the BID every time it is offered: the partner's routes need fixing, and the message sending on by hand. Bulletins over the size cap, or with a BID already held, are answered `-`.
 
 ### Later, packet.net's BBS
 
@@ -73,7 +75,7 @@ pdn-bbs speaks the same FBB B1F forwarding, and its `fbbTcp` listener (BPQ's FBB
 
 ## The Flex
 
-With `flex.enabled`, the head end opens its own API session to the Flex for the length of each slot. It is a second, non-GUI client that only reads: it subscribes to the radio's status (for the frequency reference) and its meters (for PA temperature), and never asks for a slice, a DAX stream or the transmitter, so it cannot disturb pdn-soundmodem's slice. If the radio cannot be reached the head end logs it and carries on without the PA watch, or skips the day with `"whenUnreachable": "skip"`.
+With `flex.enabled`, the head end opens its own API session to the Flex for the length of each slot. It is a second, non-GUI client that only reads: it subscribes to the radio's status (for the frequency reference) and its meters (for PA temperature), with the radio's keepalive on so a dead session is noticed, and never asks for a slice, a DAX stream or the transmitter, so it cannot disturb pdn-soundmodem's slice. A PA reading older than 15 s (`flex.paStaleSeconds`) counts as none. If the radio cannot be reached, or the readings stop during the slot, the head end logs it and carries on without the PA watch, or with `"whenUnreachable": "skip"` skips the day or stops the slot.
 
 ## Status
 
@@ -99,8 +101,6 @@ The published pdn-soundmodem package cannot pack frames yet, so offline every fr
 
 `scripts/build-headend-deb.sh linux-x64 VERSION` builds the package (also `linux-arm64` and `linux-arm`), laid out like the receiver's: the binary in `/usr/lib/pdn-mailcast-headend`, state in `/var/lib/pdn-mailcast-headend`.
 
-## Still missing in pdn-soundmodem
+## What the head end expects of pdn-soundmodem's lease
 
-- **An ident at the end.** The modem's CW ident falls due with the first transmission and then every 10 minutes while the modem transmits, so the slot opens with one and has one at least every 10 minutes. But the closing ident goes out only when the next 10 minutes are up, after the lease has gone, not straight after the last burst. Releasing the lease (or a request to identify now) could send the holder's owed ident at once.
-- **A channel check the head end can make.** The station's transmitter test is the only way to ask, and only by trying to transmit. And "go anyway" can only skip the tone: each burst still waits for the modem's own carrier sense, with no limit, so on a channel that reads busy for good the head end stops when the acknowledgements do not come.
-- **Taking frames back.** A burst queued when the slot stops early still goes out, possibly after the lease is released if the channel stays busy. Dropping a KISS host's queued frames when it disconnects, or on lease release, would stop that.
+The head end is written against #545 as it is being extended: `maxCarrierWaitSeconds` on a lease request; `{"release": true, "subChannel": N, "dropQueued": true}` to release and drop our unkeyed frames; `{"dropQueued": true, "subChannel": N}` to drop them and keep the lease; a `channelBusy` boolean in `GET /api/txlease` and the lease answers; the holder's unkeyed frames dropped when its lease runs out; and the closing ident sent on release or expiry. If those names change there, `src/Mailcast.HeadEnd/Station/StationApi.cs` is the one place to follow them.

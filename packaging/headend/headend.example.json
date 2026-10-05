@@ -8,6 +8,7 @@
   "slot": {
     "timeUtc": "12:00",
     "catchUpMinutes": 30,
+    "retryMinutes": 5,
     "maxMinutes": 40,
     "channelWaitSeconds": 120,
     "whenStillBusy": "go",
@@ -29,6 +30,7 @@
     "mode": "ms110d-wn4",
     "maxBurstSeconds": 60,
     "leaseSeconds": 120,
+    "maxCarrierWaitSeconds": 10,
     "renewSeconds": 30,
     "ackGraceSeconds": 120
   },
@@ -39,12 +41,14 @@
     "host": "",
     "port": 4992,
     "paTemperatureLimitC": 70,
+    "paStaleSeconds": 15,
     "whenUnreachable": "carryOn"
   },
 
   "intake": {
     "dropDirectory": "/var/lib/pdn-mailcast-headend/drop",
     "maxBulletinBytes": 32768,
+    "preSlotSeconds": 30,
     // The head end calls the BBS's forwarding port as a partner and takes the bulletins queued
     // for it. This login is LinBPQ's FBBPORT (no prompts: user, password, then BBS); for pdn-bbs's
     // fbbTcp port it is [{ "expect": "Callsign :", "send": "{call}" }]. Remove this section to use

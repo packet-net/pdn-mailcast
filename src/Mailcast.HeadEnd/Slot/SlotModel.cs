@@ -47,6 +47,13 @@ public sealed record SlotSettings
     /// </summary>
     public TimeSpan LeaseMargin { get; init; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// The lease's <c>maxCarrierWaitSeconds</c>: the station drops any of the holder's frames that
+    /// would wait longer than this for a clear channel. At most <see cref="LeaseMargin"/>, so a
+    /// burst that waits its longest still ends inside the lease.
+    /// </summary>
+    public TimeSpan MaxCarrierWait { get; init; } = TimeSpan.FromSeconds(10);
+
     /// <summary>How long to keep trying for a clear channel.</summary>
     public TimeSpan ChannelWait { get; init; } = TimeSpan.FromMinutes(2);
 
@@ -143,6 +150,9 @@ public sealed record SlotReport
     public double? PaTemperatureMaxC { get; init; }
 
     public bool LeaseTaken { get; init; }
+
+    /// <summary>True when it was skipped for a reason at the station that may clear, so it is worth trying again today.</summary>
+    public bool Retryable { get; init; }
 
     public int LeaseRenewals { get; init; }
 }

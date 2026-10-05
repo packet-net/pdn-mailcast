@@ -10,7 +10,11 @@ public sealed record Keyup(DateTimeOffset Start, DateTimeOffset End, string What
 
 /// <summary>
 /// pdn-soundmodem as the head end sees it - the lease and tone API and the broadcast modem's KISS
-/// port - on a virtual clock. It keeps a record of every keyup and whether a lease held by the
+/// port - on a virtual clock, with #545's lease as the head end codes against it: a channel-busy
+/// flag, maxCarrierWaitSeconds, dropQueued on release and on its own, and the holder's unkeyed
+/// frames dropped when the lease runs out. Its transmitter keys whatever is still queued once the
+/// channel clears, lease or no lease, so a frame the head end failed to get dropped shows up as a
+/// keyup outside the lease. It keeps a record of every keyup and whether a lease held by the
 /// broadcast sub-channel covered all of it.
 /// </summary>
 public sealed class FakeStation : IStationApi, IKissConnector
@@ -19,6 +23,8 @@ public sealed class FakeStation : IStationApi, IKissConnector
     private readonly int _subChannel;
     private int? _holder;
     private DateTimeOffset _expires;
+    private TimeSpan _maxCarrierWait = TimeSpan.MaxValue;
+    private int _dropGeneration;
 
     public FakeStation(VirtualTime time, int subChannel)
     {
@@ -31,10 +37,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
 
     public List<DateTimeOffset> Releases { get; } = [];
 
+    public List<DateTimeOffset> DropRequests { get; } = [];
+
     public List<Keyup> Keyups { get; } = [];
 
     /// <summary>When each frame reached the station, with whether the lease was ours then.</summary>
     public List<(DateTimeOffset At, bool LeaseHeld, byte[] Frame)> Frames { get; } = [];
+
+    /// <summary>Frames the station dropped without keying them.</summary>
+    public int Dropped { get; private set; }
 
     /// <summary>Lease requests after this many are refused, as if another sub-channel had taken it.</summary>
     public int? RefuseAfterRequests { get; set; }
@@ -42,14 +53,17 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>The first lease request is refused.</summary>
     public bool RefuseFirstLease { get; set; }
 
-    /// <summary>Tone requests answered "the channel did not clear" before one is sent; -1 for always.</summary>
-    public int BusyTones { get; set; }
+    /// <summary>The station's carrier sense says busy until then.</summary>
+    public DateTimeOffset ChannelBusyUntil { get; set; }
 
     /// <summary>Whether the station answers tones at all: false answers 404 as with txTest off.</summary>
     public bool ToneAvailable { get; set; } = true;
 
-    /// <summary>The modem stops acknowledging after this many frames, as if the channel stayed busy.</summary>
-    public int? AckOnlyFirst { get; set; }
+    /// <summary>A station that ignores dropQueued and lease expiry, to show the keyup check catches it.</summary>
+    public bool IgnoreDrops { get; set; }
+
+    /// <summary>The KISS link fails on this write (1-based), as a closed socket would.</summary>
+    public int? FailWriteNumber { get; set; }
 
     public double SecondsPerFrame { get; set; } = 7.25;
 
@@ -57,7 +71,9 @@ public sealed class FakeStation : IStationApi, IKissConnector
 
     public bool LeaseHeld => _holder == _subChannel && _time.GetUtcNow() < _expires;
 
-    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, CancellationToken cancellation)
+    public bool ChannelBusy => _time.GetUtcNow() < ChannelBusyUntil;
+
+    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation)
     {
         await Task.Yield();
         bool refuse = (RefuseFirstLease && LeaseRequests.Count == 0)
@@ -65,12 +81,19 @@ public sealed class FakeStation : IStationApi, IKissConnector
         LeaseRequests.Add((_time.GetUtcNow(), !refuse));
         if (refuse)
         {
-            return LeaseAnswer.No("sub-channel 2 holds the transmit lease until later");
+            return new LeaseAnswer(false, 0, "sub-channel 2 holds the transmit lease until later", ChannelBusy);
         }
         _holder = subChannel;
+        _maxCarrierWait = TimeSpan.FromSeconds(maxCarrierWaitSeconds);
         int granted = Math.Min(seconds, 300);
         _expires = _time.GetUtcNow() + TimeSpan.FromSeconds(granted);
-        return new LeaseAnswer(true, granted, null);
+        return new LeaseAnswer(true, granted, null, ChannelBusy);
+    }
+
+    public async Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation)
+    {
+        await Task.Yield();
+        return new LeaseAnswer(LeaseHeld, 0, null, ChannelBusy);
     }
 
     public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
@@ -79,7 +102,16 @@ public sealed class FakeStation : IStationApi, IKissConnector
         Releases.Add(_time.GetUtcNow());
         bool held = LeaseHeld;
         _holder = null;
+        DropUnkeyed();
         return held;
+    }
+
+    public async Task<bool> DropQueuedAsync(int subChannel, CancellationToken cancellation)
+    {
+        await Task.Yield();
+        DropRequests.Add(_time.GetUtcNow());
+        DropUnkeyed();
+        return true;
     }
 
     public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, CancellationToken cancellation)
@@ -89,22 +121,27 @@ public sealed class FakeStation : IStationApi, IKissConnector
             await Task.Yield();
             return new ToneAnswer(ToneOutcome.Refused, "HTTP 404: no transmitter test here");
         }
-        if (BusyTones != 0)
+        DateTimeOffset giveUp = _time.GetUtcNow() + TimeSpan.FromSeconds(60);
+        while (ChannelBusy)
         {
-            if (BusyTones > 0)
+            if (_time.GetUtcNow() >= giveUp)
             {
-                BusyTones--;
+                return new ToneAnswer(ToneOutcome.Refused, "HTTP 409: the test was withdrawn and nothing was transmitted");
             }
-            await Task.Delay(TimeSpan.FromSeconds(60), _time, cancellation);
-            return new ToneAnswer(ToneOutcome.ChannelBusy, "the channel did not clear within 60 s, so the test was withdrawn and nothing was transmitted");
+            await Task.Delay(TimeSpan.FromSeconds(1), _time, cancellation);
         }
         await KeyAsync(TimeSpan.FromSeconds(seconds), $"tone {toneHz} Hz", cancellation);
         return new ToneAnswer(ToneOutcome.Sent, "tone");
     }
 
-    public Task<IKissLink> ConnectAsync(CancellationToken cancellation)
+    public Task<IKissLink> ConnectAsync(CancellationToken cancellation) => Task.FromResult<IKissLink>(new FakeLink(this));
+
+    private void DropUnkeyed()
     {
-        return Task.FromResult<IKissLink>(new FakeLink(this));
+        if (!IgnoreDrops)
+        {
+            _dropGeneration++;
+        }
     }
 
     private async Task KeyAsync(TimeSpan length, string what, CancellationToken cancellation)
@@ -119,16 +156,20 @@ public sealed class FakeStation : IStationApi, IKissConnector
     private sealed class FakeLink(FakeStation station) : IKissLink
     {
         private readonly Channel<ushort> _acks = Channel.CreateUnbounded<ushort>();
-        private readonly List<ushort> _queued = [];
+        private readonly List<(ushort Id, int Generation)> _queued = [];
         private bool _transmitting;
-        private int _acked;
+        private int _writes;
 
         public ChannelReader<ushort> Acks => _acks.Reader;
 
         public Task SendAsync(ushort id, ReadOnlyMemory<byte> ax25, CancellationToken cancellation)
         {
+            if (++_writes == station.FailWriteNumber)
+            {
+                throw new IOException("Broken pipe");
+            }
             station.Frames.Add((station._time.GetUtcNow(), station.LeaseHeld, ax25.ToArray()));
-            _queued.Add(id);
+            _queued.Add((id, station._dropGeneration));
             if (!_transmitting)
             {
                 _transmitting = true;
@@ -137,7 +178,11 @@ public sealed class FakeStation : IStationApi, IKissConnector
             return Task.CompletedTask;
         }
 
-        /// <summary>Gathers for half a second, then sends everything queued as one burst.</summary>
+        /// <summary>
+        /// Gathers for half a second, then sends everything queued as one burst once the channel is
+        /// clear, dropping it if it waited past the lease's carrier limit, was dropped by request, or
+        /// the lease ran out first.
+        /// </summary>
         private async Task TransmitAsync()
         {
             await Task.Delay(TimeSpan.FromSeconds(0.5), station._time);
@@ -145,14 +190,27 @@ public sealed class FakeStation : IStationApi, IKissConnector
             {
                 var burst = _queued.ToList();
                 _queued.Clear();
-                await station.KeyAsync(TimeSpan.FromSeconds(station.SecondsPerBurst + (station.SecondsPerFrame * burst.Count)), $"burst of {burst.Count}", CancellationToken.None);
-                foreach (ushort id in burst)
+                DateTimeOffset waitFrom = station._time.GetUtcNow();
+                bool drop = false;
+                while (station.ChannelBusy)
                 {
-                    if (station.AckOnlyFirst is int limit && _acked >= limit)
+                    if (!station.IgnoreDrops && station._time.GetUtcNow() - waitFrom >= station._maxCarrierWait)
                     {
-                        continue;
+                        drop = true;
+                        break;
                     }
-                    _acked++;
+                    await Task.Delay(TimeSpan.FromSeconds(1), station._time);
+                }
+                drop |= burst.Any(b => b.Generation < station._dropGeneration);
+                drop |= !station.IgnoreDrops && !station.LeaseHeld;
+                if (drop)
+                {
+                    station.Dropped += burst.Count;
+                    continue;
+                }
+                await station.KeyAsync(TimeSpan.FromSeconds(station.SecondsPerBurst + (station.SecondsPerFrame * burst.Count)), $"burst of {burst.Count}", CancellationToken.None);
+                foreach (var (id, _) in burst)
+                {
                     _acks.Writer.TryWrite(id);
                 }
             }

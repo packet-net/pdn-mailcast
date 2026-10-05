@@ -42,6 +42,15 @@ public sealed class RotationStore
         }
     }
 
+    /// <summary>Whether a bulletin with this BID is remembered.</summary>
+    public bool Holds(string bid)
+    {
+        lock (_gate)
+        {
+            return _store.Holds(bid);
+        }
+    }
+
     /// <summary>Offers a bulletin received on <paramref name="today"/>.</summary>
     public OfferOutcome Offer(Bulletin bulletin, DateOnly today)
     {
@@ -60,7 +69,7 @@ public sealed class RotationStore
     {
         lock (_gate)
         {
-            return BroadcastScheduler.Plan(_store.InRotation(day), day, seed, compression, options);
+            return BroadcastScheduler.Plan(_store.InRotation(day), day, seed, compression, options, _store.DirectoryNextEsi);
         }
     }
 

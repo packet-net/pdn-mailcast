@@ -37,7 +37,7 @@ public class ServiceTests
 
     private sealed class Head
     {
-        public Head(TempDirectory dir, DateOnly day, SlotSettings settings)
+        public Head(TempDirectory dir, DateOnly day, SlotSettings settings, IReadOnlyList<ScheduledIntake>? intakes = null)
         {
             Time = new VirtualTime(new DateTimeOffset(day.ToDateTime(Noon, DateTimeKind.Utc)));
             Station = new FakeStation(Time, 4);
@@ -45,7 +45,7 @@ public class ServiceTests
             Store = new RotationStore(dir.Path, Compression.Default, options, Journal);
             Planner = new StoreSlotPlanner(Store, Compression.Default, options);
             var runner = new SlotRunner(settings, Station, Station, null, FakeAirtime.For(Station), Journal, Time);
-            Service = new HeadEndService(Noon, TimeSpan.FromMinutes(30), Planner, Store, [], runner, new StatusStore(null, Time), Journal, Time);
+            Service = new HeadEndService(Noon, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), Planner, Store, intakes ?? [], runner, new StatusStore(null, Time), Journal, Time);
         }
 
         public VirtualTime Time { get; }
@@ -114,7 +114,7 @@ public class ServiceTests
     }
 
     [Fact]
-    public void ARestartMidSlot_CarriesOnTheSameDayWithoutRepeating()
+    public void ARestartMidSlot_CarriesOnTheSameDayWithoutRepeatingAnyPiece()
     {
         using var dir = new TempDirectory();
         var settings = new SlotSettings { SubChannel = 4 };
@@ -133,13 +133,54 @@ public class ServiceTests
         int sentBulletinFrames = first.Sent().Count(f => bulletinIds.Contains(f.Item1));
         Assert.InRange(sentBulletinFrames, 1, plannedBulletinFrames - 1);
 
-        // After the restart the same day's plan holds only the bulletin frames not yet queued.
+        // After the restart the same day's plan holds only the bulletin frames not yet queued, and
+        // the directory carries on from where it stopped too.
         var again = new Head(dir, Day1, settings);
         var rest = again.Planner.Plan(Day1);
         Assert.Equal(plannedBulletinFrames - sentBulletinFrames, rest.Frames.Count(f => bulletinIds.Contains(f.ObjectId)));
+        Assert.True(rest.Broadcast!.Objects[0].FirstEsi > 0);
         Assert.Equal(SlotOutcome.Completed, again.Run(Day1).Outcome);
-        var bulletinFrames = first.Sent().Concat(again.Sent()).Where(f => bulletinIds.Contains(f.Item1)).ToList();
-        Assert.Equal(plannedBulletinFrames, bulletinFrames.Count);
-        Assert.Equal(bulletinFrames.Count, bulletinFrames.Distinct().Count());
+        var all = first.Sent().Concat(again.Sent()).ToList();
+        Assert.Equal(plannedBulletinFrames, all.Count(f => bulletinIds.Contains(f.Item1)));
+        Assert.Equal(all.Count, all.Distinct().Count());
+    }
+
+    [Fact]
+    public void NextSlot_RetriesASlotSkippedAtTheStation_WithinTheCatchUpWindow()
+    {
+        var catchUp = TimeSpan.FromMinutes(30);
+        var retry = TimeSpan.FromMinutes(5);
+        var skipped = new SlotReport { Day = Day1, Outcome = SlotOutcome.Skipped, Retryable = true, End = new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero) };
+        var at = new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero);
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 6, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Noon, catchUp, skipped, retry));
+
+        var late = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 27, 0, TimeSpan.Zero) };
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late.End, Noon, catchUp, late, retry));
+
+        var notRetryable = skipped with { Retryable = false };
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Noon, catchUp, notRetryable, retry));
+    }
+
+    private sealed class HangingIntake : IBulletinIntake
+    {
+        public string Name => "hanging";
+
+        public async Task<IntakeResult> CollectAsync(DateOnly today, CancellationToken cancellation)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellation);
+            return IntakeResult.Nothing;
+        }
+    }
+
+    [Fact]
+    public void ABbsThatDoesNotAnswer_DelaysTheSlotOnlyByThePreSlotLimit()
+    {
+        using var dir = new TempDirectory();
+        var head = new Head(dir, Day1, new SlotSettings { SubChannel = 4 }, [new ScheduledIntake(new HangingIntake(), TimeSpan.FromMinutes(30))]);
+        head.Store.Offer(Bulletins.Make(40, 3000), Day1);
+        var report = head.Run(Day1);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 30, TimeSpan.Zero), head.Station.LeaseRequests[0].At);
+        Assert.Contains(head.Journal.Lines, l => l.Contains("not finished within 30 s before the slot", StringComparison.Ordinal));
     }
 }

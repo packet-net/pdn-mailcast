@@ -8,8 +8,9 @@ namespace Mailcast.HeadEnd.Intake;
 /// <summary>
 /// Collects bulletins from the BBS as a forwarding partner, over FBB B1F with Mailcast.Fbb's
 /// session state machine: the head end calls the BBS, logs in, says it has nothing to send, and
-/// takes what the BBS proposes. Bulletins up to the size cap are accepted; personal mail, NTS
-/// traffic and anything over the cap are answered <c>-</c>.
+/// takes what the BBS proposes. Bulletins up to the size cap are accepted; bulletins over the cap
+/// or already held are answered <c>-</c>; personal mail and NTS traffic, which should never be
+/// routed here, are answered <c>=</c> (later) so the BBS keeps them, with a warning.
 /// </summary>
 /// <remarks>
 /// <para>The head end always calls, on its own timer and just before each slot, so the BBS needs
@@ -158,22 +159,22 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             _journal.Write("intake: refused a B2F (FC) proposal; this partner speaks B1F only");
             return FsAnswer.AlreadyHave;
         }
-        string? why = _policy.Refusal(fa.MessageType, fa.Bid, fa.Size);
+        if (char.ToUpperInvariant(fa.MessageType) != 'B')
+        {
+            // A personal or NTS message routed here is a routing mistake on the BBS. "=" (later)
+            // leaves it queued there rather than letting the BBS count it delivered, as "-" would.
+            counts.Refused++;
+            _journal.Write($"intake: WARNING - the BBS offered {fa.Bid} (type {fa.MessageType}, to {fa.To}@{fa.AtBbs}) to the mailcast partner; answered \"later\" so the BBS keeps it. Only bulletins should be routed here: check the partner's TO, AT and personal HR routes, then send the message on by hand");
+            return FsAnswer.Defer;
+        }
+        string? why = _policy.Refusal(fa.MessageType, fa.Bid, fa.Size)
+            ?? (_store.Holds(fa.Bid) ? "its BID is already held" : null);
         if (why is null)
         {
             return FsAnswer.Accept;
         }
         counts.Refused++;
-        if (char.ToUpperInvariant(fa.MessageType) != 'B')
-        {
-            // Answered "-", which a BBS takes as "already have it", so it will not offer it to this
-            // partner again. A personal or NTS message routed here is a routing mistake on the BBS.
-            _journal.Write($"intake: WARNING - the BBS offered {fa.Bid} (type {fa.MessageType}, to {fa.To}@{fa.AtBbs}) to the mailcast partner and it was refused. Only bulletins should be routed here: check the partner's TO, AT and HRoutesP settings");
-        }
-        else
-        {
-            _journal.Write($"intake: refused {fa.Bid} to {fa.To}@{fa.AtBbs}: {why}");
-        }
+        _journal.Write($"intake: refused {fa.Bid} to {fa.To}@{fa.AtBbs}: {why}");
         return FsAnswer.AlreadyHave;
     }
 

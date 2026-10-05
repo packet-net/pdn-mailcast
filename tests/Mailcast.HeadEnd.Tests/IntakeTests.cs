@@ -155,11 +155,13 @@ public class IntakeTests
         var bulletin = Bulletins.Make(11, 3000);
         var personal = Bulletins.Make(12, 1000, type: 'P');
         var huge = Bulletins.Make(13, 9000);
-        await using var bbs = new FakeBbs([Queued(bulletin), Queued(personal), Queued(huge)]);
+        var held = Bulletins.Make(14, 2000);
+        await using var bbs = new FakeBbs([Queued(bulletin), Queued(personal), Queued(huge), Queued(held)]);
 
         using var state = new TempDirectory();
         var journal = new MemoryJournal();
         var store = Store(state, journal, cap: 6000);
+        store.Offer(held, Today.AddDays(-1));
         var config = new FbbIntakeConfig
         {
             Host = "127.0.0.1",
@@ -176,18 +178,18 @@ public class IntakeTests
 
         Assert.Null(result.Problem);
         Assert.Equal(1, result.Accepted);
-        Assert.Equal(2, result.Refused);
+        Assert.Equal(3, result.Refused);
         Assert.Equal(["Q0HEAD", "pw"], bbs.Logins);
+        Assert.Equal(FsAnswerKind.AlreadyHave, bbs.Answers[held.Bid]);
         Assert.Equal(FsAnswerKind.Accept, bbs.Answers[bulletin.Bid]);
-        Assert.Equal(FsAnswerKind.AlreadyHave, bbs.Answers[personal.Bid]);
+        Assert.Equal(FsAnswerKind.Defer, bbs.Answers[personal.Bid]);
         Assert.Equal(FsAnswerKind.AlreadyHave, bbs.Answers[huge.Bid]);
-        Assert.Equal(1, store.Count);
+        Assert.Equal(2, store.Count);
         Assert.Contains(journal.Lines, l => l.Contains("WARNING", StringComparison.Ordinal) && l.Contains(personal.Bid, StringComparison.Ordinal));
 
         // What was kept is the bulletin as the BBS sent it: same routing lines and text.
         var plan = store.Plan(Today, 1, Compression.Default, new ScheduleOptions());
-        var entry = Assert.Single(plan.Directory.Entries);
-        Assert.Equal(bulletin.Bid, entry.Bid);
+        var entry = Assert.Single(plan.Directory.Entries, e => e.Bid == bulletin.Bid);
         Assert.Equal(bulletin.Title, entry.Title);
     }
 
