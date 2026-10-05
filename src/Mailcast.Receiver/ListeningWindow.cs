@@ -1,5 +1,5 @@
 using System.Globalization;
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
 
@@ -15,7 +15,7 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
 {
     private const int MinutesPerDay = 1440;
 
-    /// <summary>The same, as Mailcast.Core and the directory have it.</summary>
+    /// <summary>The same, as Packet.Mailcast and the directory have it.</summary>
     public SlotTimetable Timetable => new(Anchor, EveryMinutes, Daylight);
 
     /// <summary>A head end's timetable, as its directory gives it.</summary>

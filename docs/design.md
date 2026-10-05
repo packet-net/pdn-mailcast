@@ -191,8 +191,9 @@ pdn-soundmodem's station page already has the waterfall and level meter in its l
 
 ## Where the code lives
 
-- **pdn-mailcast** (this repo) holds the head end, the receiver, and a core library with the on-air format, compression and directory.
+- **pdn-mailcast** (this repo) holds the head end, the receiver, and a core library with the on-air format, compression and directory, published on nuget.org as `Packet.Mailcast` (namespace `Packet.Mailcast`), after packet.net's `Packet.Core` and `Packet.Ax25`.
 - **RaptorQ** is its own project in this repo, with no dependency on anything else here, so it can be published as a separate NuGet package (`M0LTE.RaptorQ`, matching `M0LTE.Il2p` and `M0LTE.Dsp`) if anything else wants it.
+- **FBB forwarding comes from pdn-fbb** as the `Packet.Fbb` package (namespace `Packet.Fbb`), so there is one copy of it, shared with pdn-bbs.
 - **MS110D stays inside pdn-soundmodem.** The receiver needs pdn-soundmodem's audio sources (sound card and UberSDR) and its waterfall anyway, so splitting the modem out would not shrink what the receiver depends on. It would only add a package release to every modem change.
 
 ## Changes needed in pdn-soundmodem

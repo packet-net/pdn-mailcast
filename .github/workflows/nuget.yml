@@ -1,6 +1,6 @@
 name: nuget
 
-# Pushes M0LTE.RaptorQ, M0LTE.Mailcast.Core and M0LTE.Mailcast.Fbb to nuget.org from a GitHub Release's .nupkg, with NuGet trusted
+# Pushes every .nupkg on a GitHub Release (M0LTE.RaptorQ and Packet.Mailcast) to nuget.org, with NuGet trusted
 # publishing (OIDC), so there is no long-lived API key anywhere. The nuget.org trusted
 # publishing policy names this file, so keep its name.
 #
@@ -32,9 +32,9 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'M0LTE.*.nupkg' --dir pkg
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.nupkg' --dir pkg
           ls -l pkg
-          [ "$(find pkg -name '*.nupkg' | wc -l)" -ge 1 ] || { echo "::error::no M0LTE .nupkg on $TAG"; exit 1; }
+          [ "$(find pkg -name '*.nupkg' | wc -l)" -ge 1 ] || { echo "::error::no .nupkg on $TAG"; exit 1; }
 
       - uses: actions/setup-dotnet@v4
         with:

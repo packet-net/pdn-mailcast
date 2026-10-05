@@ -193,7 +193,7 @@ public class StatusPageTests
     public void Schedule_FromTheDirectory_IsUsedAndSaidSo()
     {
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
-        var heard = SlotSchedule.From(new Mailcast.Core.SlotTimetable(new TimeOnly(0, 30), 60, new Mailcast.Core.DaylightRule("IO91lk", 60, 60)));
+        var heard = SlotSchedule.From(new Packet.Mailcast.SlotTimetable(new TimeOnly(0, 30), 60, new Packet.Mailcast.DaylightRule("IO91lk", 60, 60)));
 
         var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, heard, true, T("2026-10-05T12:05:00Z")), ReceiverConfig.JsonLine);
 

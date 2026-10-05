@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Slot;
 using Mailcast.HeadEnd.Station;
 
@@ -293,7 +293,7 @@ public sealed record HeadEndConfig
         {
             problems.Add("\"flex\".\"host\" is required when \"flex\".\"enabled\" is true");
         }
-        if (Schedule.SymbolSize is int symbolSize && (symbolSize < 64 || symbolSize > Mailcast.Core.MailcastFrame.StandardSymbolSize || symbolSize % Mailcast.Core.MailcastFrame.StandardAlignment != 0))
+        if (Schedule.SymbolSize is int symbolSize && (symbolSize < 64 || symbolSize > Packet.Mailcast.MailcastFrame.StandardSymbolSize || symbolSize % Packet.Mailcast.MailcastFrame.StandardAlignment != 0))
         {
             problems.Add("\"schedule\".\"symbolSize\" must be 64 to 940 and a multiple of 4");
         }

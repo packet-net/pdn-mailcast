@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Intake;
 
 namespace Mailcast.HeadEnd.Tests;

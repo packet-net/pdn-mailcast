@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Mailcast.Core\Mailcast.Core.csproj" />
+    <ProjectReference Include="..\..\src\Packet.Mailcast\Packet.Mailcast.csproj" />
   </ItemGroup>
 
 </Project>

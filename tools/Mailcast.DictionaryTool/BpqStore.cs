@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.DictionaryTool;
 

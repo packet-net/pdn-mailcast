@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
 using Microsoft.Extensions.Time.Testing;
 

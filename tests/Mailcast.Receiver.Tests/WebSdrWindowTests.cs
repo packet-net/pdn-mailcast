@@ -219,7 +219,7 @@ public class WebSdrWindowTests
     public async Task Daylight_ListensToEightOfTheDaysDaylightSlots_AndWaitsForTheMorningsFirst()
     {
         // 06:00 on 5 October: the first daylight slot is 09:00, so the window opens at 08:58.
-        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Mailcast.Core.DaylightSettings() });
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Packet.Mailcast.DaylightSettings() });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 08:58 UTC, ready for the 09:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
@@ -230,7 +230,7 @@ public class WebSdrWindowTests
     [Fact]
     public async Task Daylight_AfterTheDaysLastSlot_WaitsForTomorrowsFirst_AndSaysTomorrowsSlots()
     {
-        await using var rig = new Rig(new DateTimeOffset(2026, 12, 21, 16, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Mailcast.Core.DaylightSettings() });
+        await using var rig = new Rig(new DateTimeOffset(2026, 12, 21, 16, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Packet.Mailcast.DaylightSettings() });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 10:58 UTC, ready for the 11:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);

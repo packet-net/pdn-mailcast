@@ -42,7 +42,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Whether <see cref="Schedule"/> comes from GB7RDG's directory rather than the config file.</summary>
     public bool ScheduleFromDirectory => Intake.HeardSchedule is not null;
 
-    private void OnScheduleHeard(Mailcast.Core.SlotTimetable heard)
+    private void OnScheduleHeard(Packet.Mailcast.SlotTimetable heard)
     {
         var schedule = SlotSchedule.From(heard);
         _log($"slots: GB7RDG's directory gives its slots as {schedule.Describe()}; using that instead of the config file's");
@@ -416,7 +416,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Always delivers through the client for the configuration in force.</summary>
     private sealed class SwitchableSession(ReceiverHost host) : IBbsSession
     {
-        public Task<SessionReport> DeliverAsync(IReadOnlyList<Mailcast.Core.Bulletin> bulletins, CancellationToken cancellation) =>
+        public Task<SessionReport> DeliverAsync(IReadOnlyList<Packet.Mailcast.Bulletin> bulletins, CancellationToken cancellation) =>
             host.Bbs.DeliverAsync(bulletins, cancellation);
     }
 }

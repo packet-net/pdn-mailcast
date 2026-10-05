@@ -80,7 +80,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 
 | Component | Where | Licence |
 |---|---|---|
-| Head end, receiver, core library | github.com/packet-net/pdn-mailcast | AGPL-3.0-or-later |
+| Head end, receiver, core library | github.com/packet-net/pdn-mailcast; the core library is Packet.Mailcast on nuget.org | AGPL-3.0-or-later |
 | RaptorQ | M0LTE.RaptorQ on nuget.org, checked byte for byte against the Rust `raptorq` crate | AGPL-3.0-or-later |
-| FBB forwarding | From pdn-bbs | AGPL-3.0-or-later |
+| FBB forwarding | Packet.Fbb on nuget.org, from github.com/packet-net/pdn-fbb, shared with pdn-bbs | AGPL-3.0-or-later |
 | Modem, transmit lease, rig control | github.com/packet-net/pdn-soundmodem | AGPL-3.0-or-later, with some files GPL-3.0 (see its LICENSING.md) |

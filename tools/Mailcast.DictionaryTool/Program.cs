@@ -15,7 +15,7 @@
 
 using System.Globalization;
 using System.IO.Compression;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.DictionaryTool;
 using ZstdSharp;
 

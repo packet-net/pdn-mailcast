@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Slot;
 using Xunit.Abstractions;
 
