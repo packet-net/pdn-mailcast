@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Mailcast.Core;
 
 namespace Mailcast.Receiver;
 
@@ -160,11 +161,19 @@ public sealed record ReceiverConfig
         ? t
         : throw new ConfigException($"\"slotUtc\" \"{SlotUtc}\" is not a time like 00:00");
 
-    /// <summary>GB7RDG's slots.</summary>
-    [JsonIgnore]
-    public SlotSchedule Schedule => new(SlotStart, EveryMinutes);
+    /// <summary>
+    /// GB7RDG's daylight hours: its slots run only from <see cref="DaylightSettings.AfterSunriseMinutes"/>
+    /// after sunrise to <see cref="DaylightSettings.BeforeSunsetMinutes"/> before sunset at
+    /// <see cref="DaylightSettings.Locator"/>. Left out, GB7RDG's own (IO91lk, 120, 30); null for
+    /// every slot. A directory heard from the head end that gives its slots is used instead.
+    /// </summary>
+    public DaylightSettings? Daylight { get; init; } = new();
 
-    /// <summary>The slots a web SDR is listened to, by time of day, earliest first.</summary>
+    /// <summary>GB7RDG's slots, as this file gives them.</summary>
+    [JsonIgnore]
+    public SlotSchedule Schedule => new(SlotStart, EveryMinutes, Daylight?.ToRule());
+
+    /// <summary>The slots a web SDR would listen to without a daylight rule, by time of day, earliest first.</summary>
     [JsonIgnore]
     public IReadOnlyList<TimeOnly> WebSdrSlots => ListeningWindow.WebSdrSlots(Schedule, WebSdrSlotsPerDay);
 
@@ -275,6 +284,10 @@ public sealed record ReceiverConfig
         if (EveryMinutes < ShortestEveryMinutes || 1440 % EveryMinutes != 0)
         {
             throw new ConfigException($"\"everyMinutes\" {EveryMinutes} must divide a day (1440) and be at least {ShortestEveryMinutes}; GB7RDG's is 60");
+        }
+        if (Daylight?.Problem(EveryMinutes, SlotStart) is { } daylightProblem)
+        {
+            throw new ConfigException($"\"daylight\": {daylightProblem}; GB7RDG's is {{ \"locator\": \"IO91lk\", \"afterSunriseMinutes\": 120, \"beforeSunsetMinutes\": 30 }}");
         }
         if (WebSdrSlotsPerDay < 1 || WebSdrSlotsPerDay > MostWebSdrSlotsPerDay)
         {

@@ -158,6 +158,58 @@ public class SlotIntervalTests
     }
 }
 
+public class DaylightConfigTests
+{
+    private static HeadEndConfig Parse(string slot, string schedule = "{}") =>
+        HeadEndConfig.Parse($$"""{"station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
+
+    [Fact]
+    public void Daylight_ReachesTheScheduleTheSchedulerAndTheDirectory_WithLighterCarrying()
+    {
+        var config = Parse("""{"timeUtc": "00:00", "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""");
+        var expected = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        Assert.Equal(expected, config.ToSlotTimetable());
+        Assert.Equal(expected, config.ToSlotSchedule().Timetable);
+        var options = config.ToScheduleOptions();
+        Assert.Equal(expected, options.Timetable);
+        Assert.Equal(ScheduleOptions.HourlyDaylight.SlotShares, options.SlotShares);
+        Assert.Equal(ScheduleOptions.HourlyDaylight.SlotOffsets, options.SlotOffsets);
+
+        // Shares given in the file still win.
+        var set = Parse("""{"everyMinutes": 60, "daylight": {}}""", """{"slotShares": [1.5, 0.5, 0.5], "slotOffsets": [0, 5, 10]}""");
+        Assert.Equal([1.5, 0.5, 0.5], set.ToScheduleOptions().SlotShares);
+        Assert.Equal(DaylightRule.Gb7rdg, set.ToSlotSchedule().Daylight);
+    }
+
+    [Fact]
+    public void WithoutDaylight_EverySlotRuns_AndTheDirectoryStillGivesTheSlots()
+    {
+        var config = Parse("""{"timeUtc": "00:00", "everyMinutes": 60}""");
+        Assert.Null(config.ToSlotSchedule().Daylight);
+        Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60), config.ToScheduleOptions().Timetable);
+        Assert.Equal(ScheduleOptions.Hourly.SlotShares, config.ToScheduleOptions().SlotShares);
+    }
+
+    [Theory]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "XX99"}}""", "locator")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 800}}""", "afterSunriseMinutes")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"afterSunriseMinutes": 600, "beforeSunsetMinutes": 600}}""", "no slot in a whole year")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"sunrise": 1}}""", "sunrise")]
+    public void Parse_RefusesDaylightSettingsThatCannotWork(string slot, string mentions)
+    {
+        var e = Assert.Throws<ConfigException>(() => Parse(slot));
+        Assert.Contains(mentions, e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheExampleFile_IsGb7rdgsDaylightHours()
+    {
+        string example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "headend.example.json"));
+        var config = HeadEndConfig.Parse(example.Replace("\"apiKey\": \"\"", "\"apiKey\": \"k\"", StringComparison.Ordinal));
+        Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), config.ToSlotTimetable());
+    }
+}
+
 public class SymbolSizeTests
 {
     [Fact]

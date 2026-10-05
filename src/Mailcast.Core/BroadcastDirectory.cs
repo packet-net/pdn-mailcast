@@ -9,7 +9,8 @@ namespace Mailcast.Core;
 /// <param name="Size">The serialised bulletin's length in octets, before compression.</param>
 /// <param name="Bid">The bulletin ID.</param>
 /// <param name="Title">The subject line.</param>
-public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Size, string Bid, string Title);
+/// <param name="Type">The object's content type (<see cref="ContentType"/>): 1, a packet mail bulletin, unless the directory says otherwise.</param>
+public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Size, string Bid, string Title, byte Type = (byte)ObjectKind.Bulletin);
 
 /// <summary>
 /// The list of objects in rotation on one day's broadcast, so that a receiver can tell how many
@@ -28,6 +29,14 @@ public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Siz
 /// in a title becomes a space.
 /// </para>
 /// <para>
+/// From v0.3.0 each entry also gives its object's content type, <c>type=1</c> for a packet mail
+/// bulletin (an entry without one is a bulletin), and the first entry's line also carries the head end's <see cref="SlotTimetable"/> in
+/// fields after its title, <c>slots=00:00/60</c> and, with a daylight rule,
+/// <c>daylight=IO91lk/120/30</c> (see <see cref="SlotTimetable.ToFields"/>). Readers from before
+/// ignore them, as they ignore any field after the title; a directory with no entries has nowhere
+/// to carry it.
+/// </para>
+/// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
 /// different contents never share an ID, even on the same day.
 /// </para>
@@ -38,10 +47,11 @@ public sealed class BroadcastDirectory
     public const string VersionLine = "MAILCAST DIRECTORY 1";
 
     /// <summary>Creates a directory.</summary>
-    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries)
+    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         Date = date;
+        Schedule = schedule;
         Entries = entries.Select(e => e with { Title = e.Title.Replace('\t', ' ') }).ToArray();
         foreach (var e in Entries)
         {
@@ -55,6 +65,12 @@ public sealed class BroadcastDirectory
     /// <summary>The broadcast day.</summary>
     public DateOnly Date { get; }
 
+    /// <summary>
+    /// The head end's timetable, when it sent one and there is an entry to carry it: what a
+    /// receiver should take as the slots, in place of its own settings.
+    /// </summary>
+    public SlotTimetable? Schedule { get; }
+
     /// <summary>The objects in rotation.</summary>
     public IReadOnlyList<DirectoryEntry> Entries { get; }
 
@@ -67,9 +83,18 @@ public sealed class BroadcastDirectory
         var text = new StringBuilder();
         text.Append(VersionLine).Append('\n');
         text.Append(Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append('\n');
-        foreach (var e in Entries)
+        for (int i = 0; i < Entries.Count; i++)
         {
-            text.Append(CultureInfo.InvariantCulture, $"{ObjectId.Format(e.ObjectId)}\t{e.DictionaryId}\t{e.Size}\t{e.Bid}\t{e.Title}\n");
+            var e = Entries[i];
+            text.Append(CultureInfo.InvariantCulture, $"{ObjectId.Format(e.ObjectId)}\t{e.DictionaryId}\t{e.Size}\t{e.Bid}\t{e.Title}\ttype={e.Type}");
+            if (i == 0 && Schedule is { } schedule)
+            {
+                foreach (var field in schedule.ToFields())
+                {
+                    text.Append('\t').Append(field);
+                }
+            }
+            text.Append('\n');
         }
         return Bulletin.TextEncoding.GetBytes(text.ToString());
     }
@@ -91,6 +116,7 @@ public sealed class BroadcastDirectory
             throw new FormatException("The directory's date is not yyyy-MM-dd.");
         }
         var entries = new List<DirectoryEntry>();
+        SlotTimetable? schedule = null;
         foreach (var line in lines[2..^1])
         {
             var parts = line.Split('\t');
@@ -101,11 +127,25 @@ public sealed class BroadcastDirectory
             {
                 throw new FormatException($"Bad directory line: {line}");
             }
-            entries.Add(new DirectoryEntry(objectId, dictionaryId, size, parts[3], parts[4]));
+            byte type = (byte)ObjectKind.Bulletin;
+            foreach (var field in parts.AsSpan(5))
+            {
+                if (field.StartsWith("type=", StringComparison.Ordinal)
+                    && byte.TryParse(field.AsSpan(5), NumberStyles.None, CultureInfo.InvariantCulture, out byte t) && t is > 0 and < ContentType.MetadataFollows)
+                {
+                    type = t;
+                    break;
+                }
+            }
+            entries.Add(new DirectoryEntry(objectId, dictionaryId, size, parts[3], parts[4], type));
+            if (entries.Count == 1 && parts.Length > 5)
+            {
+                schedule = SlotTimetable.FromFields(parts[5..]);
+            }
         }
         try
         {
-            return new BroadcastDirectory(date, entries);
+            return new BroadcastDirectory(date, entries, schedule);
         }
         catch (ArgumentException e)
         {

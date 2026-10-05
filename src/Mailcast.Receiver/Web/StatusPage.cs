@@ -263,7 +263,7 @@ public sealed class StatusPage : IAsyncDisposable
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },
-            schedule = Schedule(config, _host.Time.GetUtcNow()),
+            schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs },
             slot = slot is null ? null : new
             {
@@ -306,32 +306,47 @@ public sealed class StatusPage : IAsyncDisposable
         };
     }
 
+    /// <summary>When the slots are, for the page, as the config file gives them.</summary>
+    internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
+
     /// <summary>
-    /// When the slots are, for the page: in words, the next slot and the one before it if that
-    /// may still be on, and for a web SDR which slots it listens to and the next of those.
+    /// When the slots are, for the page: in words, today's slots, the next slot and the one before
+    /// it if that may still be on, and for a web SDR which slots it listens to and the next of
+    /// those. <paramref name="fromDirectory"/> says the schedule is GB7RDG's own, from its directory.
     /// </summary>
-    internal static object Schedule(ReceiverConfig config, DateTimeOffset now)
+    internal static object Schedule(ReceiverConfig config, SlotSchedule schedule, bool fromDirectory, DateTimeOffset now)
     {
-        var schedule = config.Schedule;
-        var next = schedule.NextStart(now);
-        var before = next.AddMinutes(-schedule.EveryMinutes);
+        var next = schedule.NextActiveStart(now);
+        var before = schedule.LatestActiveStart(now);
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var todays = schedule.ActiveOn(today);
         bool webSdr = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.UberSdr;
-        var listened = config.WebSdrSlots;
-        var (opens, closes, listenSlot) = ListeningWindow.Next(now, listened);
+        var (opens, closes, listenSlot) = ListeningWindow.Next(now, schedule, config.WebSdrSlotsPerDay);
+        var listened = ListeningWindow.WebSdrSlotsOn(schedule, config.WebSdrSlotsPerDay, today);
+        static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         return new
         {
             words = schedule.Describe(),
+            from = fromDirectory ? "directory" : "config",
             everyMinutes = schedule.EveryMinutes,
-            slotUtc = config.SlotUtc,
-            slotsPerDay = schedule.SlotsPerDay,
+            slotUtc = schedule.Anchor.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+            slotsPerDay = todays.Count,
+            today = todays.Select(Hhmm),
+            daylight = schedule.Daylight is not { } d ? null : new
+            {
+                locator = d.Locator,
+                afterSunriseMinutes = d.AfterSunriseMinutes,
+                beforeSunsetMinutes = d.BeforeSunsetMinutes,
+                words = d.Describe(),
+            },
             next,
             // The slot before, while it may still be on: within the time a web SDR would stay open for it.
-            recent = before < now && now - before < ReceiverConfig.WebSdrAfter ? before : (DateTimeOffset?)null,
+            recent = before is { } b && b < now && now - b < ReceiverConfig.WebSdrAfter ? b : (DateTimeOffset?)null,
             toneSeconds = OnAir.ToneSeconds,
             webSdr = !webSdr ? null : new
             {
                 slotsPerDay = listened.Count,
-                times = listened.Select(t => t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
+                times = listened.Select(Hhmm),
                 slot = listenSlot,
                 opens,
                 closes,

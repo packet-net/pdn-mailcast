@@ -107,7 +107,8 @@ public sealed record HeadEndConfig
     public ScheduleOptions ToScheduleOptions()
     {
         int every = Slot.EveryMinutes;
-        ScheduleOptions defaults = every == MinutesPerDay ? new ScheduleOptions() : HourlyScaledTo(every);
+        ScheduleOptions defaults = every == MinutesPerDay ? new ScheduleOptions()
+            : HourlyScaledTo(Slot.Daylight is null ? ScheduleOptions.Hourly : ScheduleOptions.HourlyDaylight, every);
         IReadOnlyList<double> shares = Schedule.SlotShares ?? defaults.SlotShares;
         IReadOnlyList<int> offsets = Schedule.SlotOffsets ?? defaults.SlotOffsets;
         if (Schedule.SlotShares is not null && Schedule.SlotOffsets is null && shares.Count != offsets.Count)
@@ -138,13 +139,13 @@ public sealed record HeadEndConfig
             RememberDays = Schedule.RememberDays ?? defaults.RememberDays,
             SymbolSize = Schedule.SymbolSize ?? defaults.SymbolSize,
             MaxBulletinSize = Intake.MaxBulletinBytes,
+            Timetable = TimetableIfValid(),
         };
     }
 
     /// <summary>The hourly defaults for another interval: the same hours, in that interval's slots.</summary>
-    private static ScheduleOptions HourlyScaledTo(int every)
+    private static ScheduleOptions HourlyScaledTo(ScheduleOptions hourly, int every)
     {
-        var hourly = ScheduleOptions.Hourly;
         var offsets = new List<int>();
         foreach (int hours in hourly.SlotOffsets)
         {
@@ -163,7 +164,28 @@ public sealed record HeadEndConfig
     public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>When the slots are.</summary>
-    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes));
+    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToRule());
+
+    /// <summary>The timetable, or null while validation still has something to say about it.</summary>
+    private SlotTimetable? TimetableIfValid()
+    {
+        if (!TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+            || Slot.EveryMinutes < 1 || MinutesPerDay % Slot.EveryMinutes != 0)
+        {
+            return null;
+        }
+        try
+        {
+            return ToSlotTimetable();
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>When the slots are, as the directory carries them.</summary>
+    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToRule());
 
     private const int MinutesPerDay = 1440;
 
@@ -202,7 +224,14 @@ public sealed record HeadEndConfig
                 problems.Add(string.Create(CultureInfo.InvariantCulture, $"\"slot\".\"catchUpMinutes\" must be 0 or more and less than the {Slot.EveryMinutes} minutes between slots, so a late slot never meets the next"));
             }
         }
-        ValidateSchedule(problems, everyFine);
+        bool daylightFine = true;
+        if (Slot.Daylight is { } daylight && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
+            && daylight.Problem(everyFine ? Slot.EveryMinutes : 0, anchor) is { } daylightProblem)
+        {
+            problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
+            daylightFine = false;
+        }
+        ValidateSchedule(problems, everyFine && daylightFine && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
         if (Slot.Tone is < 0 or > 60)
         {
             problems.Add("\"slot\".\"toneSeconds\" must be 0 to 60 (the station caps a test at 60 s, 30 s unless its txTest.maxSeconds says more)");
@@ -390,6 +419,14 @@ public sealed record SlotConfig
     /// <summary><see cref="MaxMinutes"/>, or its default for the interval.</summary>
     [JsonIgnore]
     public double Max => MaxMinutes ?? (EveryMinutes == 1440 ? 40 : 10);
+
+    /// <summary>
+    /// Send only in daylight: a slot runs only if it starts between
+    /// <see cref="DaylightSettings.AfterSunriseMinutes"/> after sunrise and
+    /// <see cref="DaylightSettings.BeforeSunsetMinutes"/> before sunset at the locator. Left out,
+    /// every slot runs. A slot on demand (<c>--run-now</c>) runs whatever the time.
+    /// </summary>
+    public DaylightSettings? Daylight { get; init; }
 
     /// <summary>Key nothing until the kernel says the clock is synchronised.</summary>
     public bool RequireClockSync { get; init; } = true;

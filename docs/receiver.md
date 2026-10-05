@@ -21,6 +21,7 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
   "web": { "port": 8130, "lan": false, "password": "" },
   "slotUtc": "00:00",
   "everyMinutes": 60,
+  "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
   "webSdrSlotsPerDay": 8,
   "stateDirectory": "/var/lib/pdn-mailcast"
 }
@@ -30,8 +31,9 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 - `dialKHz`: the USB dial in kHz, normally `7052.0` (7.052 MHz), which is also what you get if you leave it out. The web SDR is tuned there, and a radio on a sound card should be set there. The signal is centred 1800 Hz above the dial, on 7.0538 MHz. Only change it if the signal moves; anything from 1800 to 30000 kHz is accepted.
 - `bbs`: where your BBS is and how the receiver logs in. See below.
 - `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which your browser asks for (any user name).
-- `slotUtc` and `everyMinutes`: when GB7RDG's slots are, in UTC. One starts at `slotUtc` and then one every `everyMinutes`, round the clock. GB7RDG sends every hour on the hour, so `"00:00"` and `60`, which is also what you get if you leave them out. `everyMinutes` must divide a day (1440) and be at least 15. A config file from before hourly slots has only `slotUtc` (`"12:00"`); it is read as every 60 minutes from that time, which is the same hourly slots, so nothing needs changing. A sound card listens all the time, whatever these say. The receiver also uses the slots to make sense of what it hears: each frame counts for the slot whose start most recently passed, and a tone only counts as a slot's opening tone if it starts within 5 minutes of a slot's start, so someone tuning up near 7.0538 MHz isn't taken for GB7RDG.
-- `webSdrSlotsPerDay`: how many slots a day a web SDR listens to, normally 8. Public UberSDR receivers allow each address about three hours a day, so a web SDR can't listen every hour. It listens to this many slots, spread evenly through the day starting at `slotUtc` (8 of the 24 hourly slots is 00:00, 03:00 and so on to 21:00 UTC), from 2 minutes before each slot to 12 minutes after. That is 14 minutes a slot, so 12 is the most. The log and the status page say which slots it listens to.
+- `slotUtc` and `everyMinutes`: when GB7RDG's slots are, in UTC. One starts at `slotUtc` and then one every `everyMinutes`, round the clock, but only those in daylight run (see `daylight`). GB7RDG sends every hour on the hour, so `"00:00"` and `60`, which is also what you get if you leave them out. `everyMinutes` must divide a day (1440) and be at least 15. A config file from before hourly slots has only `slotUtc` (`"12:00"`); it is read as every 60 minutes from that time, which is the same hourly slots, so nothing needs changing. A sound card listens all the time, whatever these say. The receiver also uses the slots to make sense of what it hears: each frame counts for the slot whose start most recently passed, and a tone only counts as a slot's opening tone if it starts within 5 minutes of a slot's start, so someone tuning up near 7.0538 MHz isn't taken for GB7RDG.
+- `daylight`: GB7RDG only sends in daylight, because 40 m does not reach UK stations at night. A slot runs only if it starts between `afterSunriseMinutes` after sunrise and `beforeSunsetMinutes` before sunset at `locator` (a 4 or 6 character Maidenhead locator). The receiver works out sunrise and sunset itself, from the date, in UTC, so it needs no internet and summer time makes no difference. Left out, it is GB7RDG's own: IO91lk, 120 and 30, which today (5 October) is 09:00 to 17:00 UTC, in midwinter 11:00 to 15:00 and in midsummer 06:00 to 19:00. `"daylight": null` means every slot. You should not need to change it: once the receiver has heard GB7RDG's directory, which gives GB7RDG's own slots and daylight hours, it uses those instead of these settings, and says so in the log and on the status page. A sound card listens all the time anyway; the daylight hours only matter for a web SDR and for the "next slot" on the page.
+- `webSdrSlotsPerDay`: how many slots a day a web SDR listens to, normally 8. Public UberSDR receivers allow each address about three hours a day, so a web SDR can't listen every hour. It listens to this many of the day's daylight slots, spread evenly starting with the first (8 of the 9 on 5 October is 09:00 to 16:00 UTC; in midwinter there are only 5, so it hears them all), from 2 minutes before each slot to 12 minutes after. That is 14 minutes a slot, so 12 is the most. The log says which slots it listens to each day, and the status page shows them.
 - `stateDirectory`: where the pieces, the rebuilt bulletins and the record of deliveries are kept.
 
 To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.
@@ -65,7 +67,7 @@ Tested against LinBPQ 6.0.25.41.
 
 4. Put the same password in the receiver's config, and `"port": 8011`.
 
-LinBPQ holds bulletins older than its BID lifetime and maximum age. If you have set either very low, bulletins sent this way (carried for three days) may arrive held.
+LinBPQ holds bulletins older than its BID lifetime and maximum age. If you have set either very low, bulletins sent this way (carried for a day or so) may arrive held.
 
 ### Linux FBB
 
@@ -89,7 +91,7 @@ Not tested yet: this is from FBB 7.0.11's documentation and source.
 
 http://127.0.0.1:8130/ shows:
 
-- when to listen: the frequency, the slots, the next slot, and for a web SDR the next slot it will listen to;
+- when to listen: the frequency, the slots and today's slot times, whether they come from GB7RDG's directory or your config, the next slot, and for a web SDR which of today's slots it listens to and the next of them;
 - the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
 - your BBS: where bulletins go, how many are waiting, and any problem reaching it;
 - a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away;
@@ -102,7 +104,7 @@ On this machine only, the page answers to `localhost` and nothing else. To reach
 
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, which slots a web SDR listens to, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 

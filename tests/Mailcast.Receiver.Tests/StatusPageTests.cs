@@ -118,7 +118,7 @@ public class StatusPageTests
         {
             Assert.DoesNotContain(stale, html, StringComparison.Ordinal);
         }
-        Assert.Equal("every hour on the hour", status.GetProperty("schedule").GetProperty("words").GetString());
+        Assert.Equal("every hour on the hour, in daylight: from 120 minutes after sunrise to 30 minutes before sunset at IO91lk", status.GetProperty("schedule").GetProperty("words").GetString());
         Assert.Equal(10, status.GetProperty("schedule").GetProperty("toneSeconds").GetInt32());
     }
 
@@ -133,7 +133,7 @@ public class StatusPageTests
     [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
     public void Schedule_GivesTheNextSlot_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
     {
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Daylight = null };
 
         var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
 
@@ -156,12 +156,51 @@ public class StatusPageTests
     [Fact]
     public void Schedule_SoundCard_HasNoWebSdrPart()
     {
-        var config = new ReceiverConfig { Audio = "plughw:CARD=Device,DEV=0" };
+        var config = new ReceiverConfig { Audio = "plughw:CARD=Device,DEV=0", Daylight = null };
 
         var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T("2026-10-05T13:20:00Z")), ReceiverConfig.JsonLine);
 
         Assert.Equal(JsonValueKind.Null, schedule.GetProperty("webSdr").ValueKind);
         Assert.Equal(24, schedule.GetProperty("slotsPerDay").GetInt32());
+    }
+
+    [Theory]
+    // In daylight on 5 October (09:00 to 17:00), before it, and after the last slot.
+    [InlineData("2026-10-05T12:05:00Z", "2026-10-05T13:00:00Z", "2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", true)]
+    [InlineData("2026-10-05T06:00:00Z", "2026-10-05T09:00:00Z", null, "2026-10-05T09:00:00Z", false)]
+    [InlineData("2026-10-05T17:20:00Z", "2026-10-06T09:00:00Z", null, "2026-10-06T09:00:00Z", false)]
+    public void Schedule_InDaylight_GivesTodaysSlots_AndTheWebSdrSpreadOverThem(string now, string next, string? recent, string webSlot, bool webOpen)
+    {
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
+
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
+
+        Assert.Equal(T(next), schedule.GetProperty("next").GetDateTimeOffset());
+        Assert.Equal(recent is null ? JsonValueKind.Null : JsonValueKind.String, schedule.GetProperty("recent").ValueKind);
+        Assert.Equal("config", schedule.GetProperty("from").GetString());
+        Assert.Equal(9, schedule.GetProperty("slotsPerDay").GetInt32());
+        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"], schedule.GetProperty("today").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal("IO91lk", schedule.GetProperty("daylight").GetProperty("locator").GetString());
+        Assert.Contains("in daylight", schedule.GetProperty("words").GetString(), StringComparison.Ordinal);
+        var web = schedule.GetProperty("webSdr");
+        Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
+        Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
+        // 8 of the 9, spread from the first: all but 17:00.
+        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"], web.GetProperty("times").EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
+    public void Schedule_FromTheDirectory_IsUsedAndSaidSo()
+    {
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
+        var heard = SlotSchedule.From(new Mailcast.Core.SlotTimetable(new TimeOnly(0, 30), 60, new Mailcast.Core.DaylightRule("IO91lk", 60, 60)));
+
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, heard, true, T("2026-10-05T12:05:00Z")), ReceiverConfig.JsonLine);
+
+        Assert.Equal("directory", schedule.GetProperty("from").GetString());
+        Assert.Equal(T("2026-10-05T12:30:00Z"), schedule.GetProperty("next").GetDateTimeOffset());
+        Assert.Equal("07:30", schedule.GetProperty("today")[0].GetString());
+        Assert.Equal("16:30", schedule.GetProperty("today").EnumerateArray().Last().GetString());
     }
 
     [Fact]

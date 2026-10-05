@@ -1,3 +1,4 @@
+using Mailcast.Core;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Planning;
 using Mailcast.HeadEnd.Slot;
@@ -16,18 +17,56 @@ public sealed record RunNowAnswer(bool Accepted, DateTimeOffset? Slot, string? P
 
 /// <summary>
 /// When slots are: <see cref="Anchor"/> UTC and then every <see cref="Every"/>, which divides a
-/// day, so every day has the same slots. A daily station has one, at the anchor.
+/// day, so every day has the same slots. A daily station has one, at the anchor. With a
+/// <see cref="Daylight"/> rule only the slots that start in its window run.
 /// </summary>
 public sealed record SlotSchedule
 {
-    public SlotSchedule(TimeOnly anchor, TimeSpan every)
+    public SlotSchedule(TimeOnly anchor, TimeSpan every, DaylightRule? daylight = null)
     {
-        if (every <= TimeSpan.Zero || TimeSpan.FromDays(1).Ticks % every.Ticks != 0)
+        if (every <= TimeSpan.Zero || TimeSpan.FromDays(1).Ticks % every.Ticks != 0 || every.Ticks % TimeSpan.TicksPerMinute != 0)
         {
-            throw new ArgumentException("A slot interval must divide a day.", nameof(every));
+            throw new ArgumentException("A slot interval must be whole minutes and divide a day.", nameof(every));
         }
         Anchor = anchor;
         Every = every;
+        Timetable = new SlotTimetable(anchor, (int)every.TotalMinutes, daylight);
+    }
+
+    /// <summary>The same, as Mailcast.Core and the directory have it.</summary>
+    public SlotTimetable Timetable { get; }
+
+    /// <summary>The daylight rule, or null when every slot runs.</summary>
+    public DaylightRule? Daylight => Timetable.Daylight;
+
+    /// <summary>The latest slot that runs starting at or before <paramref name="t"/>, if any.</summary>
+    public DateTimeOffset? ActiveAtOrBefore(DateTimeOffset t) => Timetable.ActiveAtOrBefore(t);
+
+    /// <summary>
+    /// The first slot that runs starting after <paramref name="t"/>. A rule with no slot in a
+    /// year is refused by the configuration, so there is always one; failing that, a day later.
+    /// </summary>
+    public DateTimeOffset NextActiveAfter(DateTimeOffset t) => Timetable.NextActiveAfter(t) ?? t.AddDays(1);
+
+    /// <summary>
+    /// The day's slots in one line for the journal: "daylight 2026-10-05 at IO91lk: sunrise
+    /// 06:11Z, sunset 17:33Z; 9 slots, 09:00, 10:00 ... and 17:00 UTC". Null without a rule.
+    /// </summary>
+    public string? DescribeDay(DateOnly day)
+    {
+        if (Daylight is not { } rule)
+        {
+            return null;
+        }
+        var window = rule.WindowOn(day);
+        var slots = Timetable.ActiveSlotsOn(day);
+        string sun = window.Sun.Kind switch
+        {
+            SunDay.AlwaysUp => "the sun does not set",
+            SunDay.AlwaysDown => "the sun does not rise",
+            _ => $"sunrise {window.Sun.Sunrise!.Value.UtcDateTime:HH:mm}Z, sunset {window.Sun.Sunset!.Value.UtcDateTime:HH:mm}Z",
+        };
+        return $"daylight {day:yyyy-MM-dd} at {rule.Locator}: {sun}; {slots.Count} slot{(slots.Count == 1 ? "" : "s")}{(slots.Count == 0 ? "" : ", " + SlotTimetable.Times(slots))}";
     }
 
     /// <summary>One slot a day.</summary>
@@ -131,6 +170,7 @@ public sealed class HeadEndService(
                 DateTimeOffset next = NextSlot(time.GetUtcNow(), schedule, catchUp, status.LastSlot, retryAfter);
                 status.SetState("waiting", next);
                 status.SetBulletinsHeld(store.Count);
+                AnnounceDay(next);
                 journal.Write($"next slot {SlotRunner.Name(next)}; {store.Count} bulletins held");
                 // Woken at least every minute to look at the clock again, so a box that booted with a
                 // stale clock and is then corrected does not sleep through the real slot.
@@ -142,6 +182,7 @@ public sealed class HeadEndService(
                     {
                         next = due;
                         status.SetState("waiting", next);
+                        AnnounceDay(next);
                         journal.Write($"next slot {SlotRunner.Name(next)} (the clock moved)");
                     }
                     TimeSpan wait = next - now;
@@ -179,6 +220,19 @@ public sealed class HeadEndService(
             catch (OperationCanceledException)
             {
             }
+        }
+    }
+
+    private DateOnly? _announced;
+
+    /// <summary>Once a day, with a daylight rule: the day's slots, in the journal.</summary>
+    private void AnnounceDay(DateTimeOffset next)
+    {
+        var day = DateOnly.FromDateTime(next.UtcDateTime);
+        if (_announced != day && schedule.DescribeDay(day) is { } line)
+        {
+            _announced = day;
+            journal.Write(line);
         }
     }
 
@@ -294,23 +348,29 @@ public sealed class HeadEndService(
 
     /// <summary>
     /// When the next slot is: the current one (the latest start at or before
-    /// <paramref name="now"/>) if it has not run and it is no more than <paramref name="catchUp"/>
-    /// late, otherwise the one after. A slot cut short because the head end was stopping counts as
-    /// not run, so a restart carries on with it; one skipped for a reason at the station that may
-    /// clear (no KISS port, no lease, no Flex) is tried again <paramref name="retryAfter"/> later,
-    /// while that is still inside the catch-up window. A slot earlier than the last one run is
-    /// never run, whatever the clock says.
+    /// <paramref name="now"/> of a slot that runs) if it has not run and it is no more than
+    /// <paramref name="catchUp"/> late, otherwise the next that runs. A slot cut short because
+    /// the head end was stopping counts as not run, so a restart carries on with it; one skipped
+    /// for a reason at the station that may clear (no KISS port, no lease, no Flex) is tried again
+    /// <paramref name="retryAfter"/> later, while that is still inside the catch-up window. A slot
+    /// earlier than the last one run is never run, whatever the clock says. With a daylight rule,
+    /// slots in the dark are passed over.
     /// </summary>
     public static DateTimeOffset NextSlot(DateTimeOffset now, SlotSchedule schedule, TimeSpan catchUp, SlotReport? last, TimeSpan? retryAfter = null)
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        DateTimeOffset current = schedule.SlotAtOrBefore(now);
-        DateTimeOffset following = current + schedule.Every;
+        DateTimeOffset? latest = schedule.ActiveAtOrBefore(now);
+        DateTimeOffset following = schedule.NextActiveAfter(latest ?? now);
         DateTimeOffset? lastSlot = last is null ? null : schedule.SlotOf(last);
+        if (latest is not DateTimeOffset current)
+        {
+            return lastSlot > now ? schedule.NextActiveAfter(lastSlot.Value) : following;
+        }
         if (lastSlot > current)
         {
-            // The clock has gone back behind a slot already run: never run an earlier one.
-            return schedule.SlotAfter(lastSlot.Value);
+            // The clock has gone back behind a slot already run (or a slot on demand ran since the
+            // last scheduled one): never run an earlier one.
+            return schedule.NextActiveAfter(lastSlot.Value);
         }
         if (lastSlot == current)
         {
