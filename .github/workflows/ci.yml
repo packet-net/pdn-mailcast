@@ -75,6 +75,11 @@ jobs:
         run: |
           dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
           echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
+      # cargo for the Rust raptorq crate: GitHub's machines have it; on a self-hosted runner without
+      # it, install a minimal stable toolchain into the runner account's home (no root needed).
+      - name: Rust toolchain
+        if: runner.environment != 'github-hosted'
+        uses: dtolnay/rust-toolchain@stable
       - name: Regenerate the crate's vectors and compare with the committed ones
         run: |
           cargo run --release --locked --manifest-path tools/raptorq-vectors/Cargo.toml -- generate "$RUNNER_TEMP/crate.json"
