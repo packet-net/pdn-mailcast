@@ -66,7 +66,8 @@ public sealed record WebSettings
 
 /// <summary>
 /// The receiver's configuration file. Only what a station has to choose is here; the broadcast's
-/// own details (callsigns, frequencies, the modem) are fixed in <see cref="OnAir"/>.
+/// own details (callsigns, the modem, where the signal sits above the dial) are fixed in
+/// <see cref="OnAir"/>.
 /// </summary>
 public sealed record ReceiverConfig
 {
@@ -76,6 +77,29 @@ public sealed record ReceiverConfig
     /// <c>wav:/path/to/file.wav</c>.
     /// </summary>
     public string Audio { get; init; } = "ubersdr:wessex.zapto.org";
+
+    /// <summary>The usual USB dial, in kHz: 7.052 MHz, which puts the signal's centre on 7.0538 MHz.</summary>
+    public const double DefaultDialKHz = 7052.0;
+
+    /// <summary>The lowest dial accepted, in kHz: the bottom of 160 m.</summary>
+    public const double LowestDialKHz = 1800;
+
+    /// <summary>The highest dial accepted, in kHz: the top of HF.</summary>
+    public const double HighestDialKHz = 30000;
+
+    /// <summary>
+    /// The USB dial, in kHz. A web SDR is tuned here; a radio on a sound card should be set here.
+    /// The signal's centre is always <see cref="OnAir.CentreAudioHz"/> above it.
+    /// </summary>
+    public double DialKHz { get; init; } = DefaultDialKHz;
+
+    /// <summary>The USB dial in Hz.</summary>
+    [JsonIgnore]
+    public double DialHz => DialKHz * 1000;
+
+    /// <summary>The signal's centre in Hz: the dial plus <see cref="OnAir.CentreAudioHz"/>.</summary>
+    [JsonIgnore]
+    public double CentreHz => DialHz + OnAir.CentreAudioHz;
 
     /// <summary>The BBS the bulletins go to.</summary>
     public BbsSettings Bbs { get; init; } = new();
@@ -192,6 +216,11 @@ public sealed record ReceiverConfig
         }
         _ = AudioSource.Parse(Audio);
         _ = SlotStart;
+        if (!(DialKHz >= LowestDialKHz && DialKHz <= HighestDialKHz))
+        {
+            throw new ConfigException(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"\"dialKHz\" {DialKHz} is not a USB dial in kHz between {LowestDialKHz:F0} and {HighestDialKHz:F0}; the usual one is {DefaultDialKHz:F1}"));
+        }
         if (string.IsNullOrWhiteSpace(Bbs.Host))
         {
             throw new ConfigException("\"bbs\".\"host\" is empty: give the BBS's address, normally 127.0.0.1");

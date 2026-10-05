@@ -1,9 +1,13 @@
 {
   // Where the audio comes from. One of:
   //   "ubersdr:wessex.zapto.org"       a web receiver; the receiver tunes it itself
-  //   "plughw:CARD=Device,DEV=0"       a sound card on your radio, USB dial 7.0497 MHz
+  //   "plughw:CARD=Device,DEV=0"       a sound card on your radio, set to USB on "dialKHz"
   //   "wav:/path/to/recording.wav"     a recording, for testing
   "audio": "ubersdr:wessex.zapto.org",
+
+  // The USB dial in kHz. The web SDR is tuned here, and your radio should be too if you use
+  // a sound card. The signal is centred 1800 Hz above it, on 7.0538 MHz.
+  "dialKHz": 7052.0,
 
   // Your BBS. "type" is "linBpq" or "fbb". For LinBPQ the port is the FBBPORT in its
   // Telnet port, and the login is the USER= name you made for the receiver.

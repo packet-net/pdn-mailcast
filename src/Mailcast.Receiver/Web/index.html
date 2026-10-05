@@ -92,7 +92,7 @@
       <label>Audio
         <select id="audioKind">
           <option value="ubersdr">Web SDR</option>
-          <option value="alsa">Sound card on my radio (USB, dial 7.0497 MHz)</option>
+          <option value="alsa" id="alsaOption">Sound card on my radio (USB)</option>
           <option value="wav">Recording</option>
         </select>
       </label>
@@ -100,6 +100,10 @@
         <input id="audioWhere" list="cards" autocomplete="off">
         <datalist id="cards"></datalist>
       </label>
+      <label>USB dial
+        <input id="dial" readonly>
+      </label>
+      <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal is centred 1800 Hz above it.</div>
       <div class="row">
         <label>BBS host <input id="host"></label>
         <label>Port <input id="port" type="number" min="1" max="65535"></label>
@@ -122,6 +126,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null;
 
@@ -131,7 +136,7 @@ async function refresh() {
     status = await (await fetch("api/status")).json();
   } catch { $("summary").textContent = "The receiver is not answering."; return; }
   const s = status;
-  $("summary").innerHTML = `Version ${esc(s.version)}. Audio: ${esc(s.audio.state)}. ${s.framesHeard} broadcast frames heard since it started.`;
+  $("summary").innerHTML = `Version ${esc(s.version)}. Audio: ${esc(s.audio.state)}, USB dial ${mhz(s.audio.dialKHz)} MHz. ${s.framesHeard} broadcast frames heard since it started.`;
 
   if (s.slot) {
     const t = s.slot.tone;
@@ -278,6 +283,8 @@ async function loadSettings() {
   const kind = a.startsWith("ubersdr:") ? "ubersdr" : a.startsWith("wav:") ? "wav" : "alsa";
   $("audioKind").value = kind;
   $("audioWhere").value = a;
+  $("dial").value = `${mhz(settings.dialKHz)} MHz (signal centre ${mhz(settings.dialKHz + 1.8)} MHz)`;
+  $("alsaOption").textContent = `Sound card on my radio (USB, dial ${mhz(settings.dialKHz)} MHz)`;
   $("cards").innerHTML = settings.soundCards.map(c => `<option value="${esc(c)}">`).join("");
   $("type").value = settings.bbs.type;
   $("host").value = settings.bbs.host;

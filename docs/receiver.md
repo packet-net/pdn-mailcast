@@ -9,6 +9,7 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 ```json
 {
   "audio": "ubersdr:wessex.zapto.org",
+  "dialKHz": 7052.0,
   "bbs": {
     "type": "linBpq",
     "host": "127.0.0.1",
@@ -24,6 +25,7 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 ```
 
 - `audio`: `ubersdr:wessex.zapto.org` for the web SDR, an ALSA device such as `plughw:CARD=Device,DEV=0` for your radio's sound card, or `wav:/path/to/file.wav` to decode a recording.
+- `dialKHz`: the USB dial in kHz, normally `7052.0` (7.052 MHz), which is also what you get if you leave it out. The web SDR is tuned there, and a radio on a sound card should be set there. The signal is centred 1800 Hz above the dial, on 7.0538 MHz. Only change it if the signal moves; anything from 1800 to 30000 kHz is accepted.
 - `bbs`: where your BBS is and how the receiver logs in. See below.
 - `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which your browser asks for (any user name).
 - `slotUtc`: when the daily slot starts. A web SDR is only listened to from 15 minutes before it to 90 minutes after: public UberSDR receivers allow each address about three hours a day. A sound card listens all the time.
@@ -89,7 +91,7 @@ http://127.0.0.1:8130/ shows:
 - a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away;
 - the input level, with the same target as pdn-soundmodem: peaks between -18 and -9 dBFS;
 - today's bulletins, how many pieces of each have arrived, and what the BBS said about each;
-- the settings: audio, and the BBS's address and login. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
+- the settings: audio, and the BBS's address and login. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
 
 On this machine only, the page answers to `localhost` and nothing else. To reach it from your network, set `"lan": true` and a `"password"` in `web`; the browser asks for it (any user name). Use it on a network you trust: it is plain HTTP.
 

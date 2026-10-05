@@ -94,7 +94,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public async Task RunAsync(CancellationToken cancellation)
     {
-        _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio}, delivering to {DescribeBbs(Config.Bbs)}");
+        _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} (USB dial {OnAir.Mhz(Config.DialHz)} MHz), delivering to {DescribeBbs(Config.Bbs)}");
         int pending = Intake.Pending().Count;
         if (pending > 0)
         {
@@ -126,7 +126,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public async Task<string?> DecodeOnceAsync(string wavPath, CancellationToken cancellation)
     {
-        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Wav, wavPath), _log, _time);
+        var pipeline = CreatePipeline(new AudioSource(AudioSourceKind.Wav, wavPath), Config);
         Attach(pipeline);
         await pipeline.StartAsync(cancellation).ConfigureAwait(false);
         await pipeline.Finished.WaitAsync(cancellation).ConfigureAwait(false);
@@ -146,7 +146,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         lock (_gate)
         {
             bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal)
-                || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal);
+                || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal)
+                || _config.DialKHz != config.DialKHz;
             _config = config;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
             if (audioChanged)
@@ -200,7 +201,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             using var window = closeAt;
             using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
             CancellationToken token = running?.Token ?? restart.Token;
-            var pipeline = PipelineFactory?.Invoke(source) ?? AudioPipeline.Create(source, _log, _time);
+            var pipeline = PipelineFactory?.Invoke(source) ?? CreatePipeline(source, config);
             lock (_gate)
             {
                 _pipeline = pipeline;
@@ -292,6 +293,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
         }
     }
+
+    /// <summary>The pipeline for <paramref name="source"/>, heard on <paramref name="config"/>'s dial.</summary>
+    internal AudioPipeline CreatePipeline(AudioSource source, ReceiverConfig config) =>
+        AudioPipeline.Create(source, config.DialHz, _log, _time);
 
     /// <summary>For tests: builds the pipeline for a source in place of the real one.</summary>
     internal Func<AudioSource, AudioPipeline>? PipelineFactory { get; set; }

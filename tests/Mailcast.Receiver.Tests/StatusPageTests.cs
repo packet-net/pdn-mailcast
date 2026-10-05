@@ -107,12 +107,40 @@ public class StatusPageTests
 
         var status = await http.GetFromJsonAsync<JsonElement>("api/status");
         Assert.Equal(1800, status.GetProperty("markers").GetProperty("centreHz").GetDouble());
+        Assert.Equal(7052.0, status.GetProperty("audio").GetProperty("dialKHz").GetDouble());
         Assert.Equal(-18, status.GetProperty("level").GetProperty("lowDbFs").GetDouble());
         Assert.Contains("Q0CAST", status.GetProperty("bbs").GetProperty("target").GetString(), StringComparison.Ordinal);
 
         string html = await http.GetStringAsync("/");
         Assert.Contains("pdn-mailcast receiver", html, StringComparison.Ordinal);
         Assert.DoesNotMatch("[^\\x00-\\x7F]", html);
+    }
+
+    [Fact]
+    public async Task ConfiguredDial_ReachesTheWebSdrTuningTheStatusAndTheSettings()
+    {
+        using var dir = new TempDirectory();
+        var config = Config(dir.Path) with { Audio = "ubersdr:wessex.zapto.org", DialKHz = 7053.5 };
+        await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
+        // Never started, so it holds no port; disposing it would make HttpListener bind one.
+        var page = new StatusPage(host, null, _ => { });
+
+        await using var pipeline = host.CreatePipeline(AudioSource.Parse(config.Audio), host.Config);
+        Assert.Equal(7_053_500, pipeline.DialHz);
+        Assert.Equal(7_053_500, pipeline.WebSdrTuning.FrequencyHz);
+        Assert.Equal("Upper", pipeline.WebSdrTuning.Sideband.ToString());
+
+        var status = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        Assert.Equal(7053.5, status.GetProperty("audio").GetProperty("dialKHz").GetDouble());
+        Assert.Equal(7055.3, status.GetProperty("audio").GetProperty("centreKHz").GetDouble(), 6);
+        Assert.Equal(1800, status.GetProperty("markers").GetProperty("centreHz").GetDouble());
+
+        var settings = JsonSerializer.SerializeToElement(StatusPage.SettingsView(host.Config), ReceiverConfig.JsonLine);
+        Assert.Equal(7053.5, settings.GetProperty("dialKHz").GetDouble());
+
+        // The form has no dial: saving the other settings keeps the one in the file.
+        var saved = StatusPage.Apply(host.Config, new StatusPage.SettingsForm("ubersdr:wessex.zapto.org", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS"));
+        Assert.Equal(7053.5, saved.DialKHz);
     }
 
     [Fact]
