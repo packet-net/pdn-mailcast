@@ -44,3 +44,16 @@ dotnet run --project tools/Mailcast.DictionaryTool -- evaluate <bulletin-dir> --
 ```
 
 A retrained dictionary needs a new dictionary ID, since receivers decompress by ID.
+
+## Releasing
+
+Push a version tag to cut a release:
+
+```
+git tag v0.2.0 <full-commit-sha>
+git push origin v0.2.0
+```
+
+Or run the `release` workflow by hand with a `version` (without the `v`) and `publish` ticked; with `publish` left off it is a dry run that builds everything and keeps it as workflow artifacts. A version with a hyphen (`0.2.0-rc1`) becomes a prerelease, which the apt repo does not pick up.
+
+Either way the tests run first, including the LinBPQ ones in docker, and nothing is built if they fail. A release then has `pdn-mailcast-receiver` and `pdn-mailcast-headend` as `.deb` packages for amd64, arm64 and armhf, the `M0LTE.RaptorQ` NuGet package (attached only, not pushed to nuget.org), a `SHA256SUMS` file and notes made from the merged PRs since the last tag. Finally it asks the packet-net apt repo to rebuild. Pull requests that change the packaging run the same build with publishing off.
