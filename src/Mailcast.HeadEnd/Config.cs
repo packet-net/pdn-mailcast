@@ -110,6 +110,7 @@ public sealed record HeadEndConfig
             DayShares = Schedule.DayShares ?? defaults.DayShares,
             DirectoryEvery = Schedule.DirectoryEvery ?? defaults.DirectoryEvery,
             RememberDays = Schedule.RememberDays ?? defaults.RememberDays,
+            SymbolSize = Schedule.SymbolSize ?? defaults.SymbolSize,
             MaxBulletinSize = Intake.MaxBulletinBytes,
         };
     }
@@ -196,6 +197,10 @@ public sealed record HeadEndConfig
         if (Flex.Enabled && string.IsNullOrWhiteSpace(Flex.Host))
         {
             problems.Add("\"flex\".\"host\" is required when \"flex\".\"enabled\" is true");
+        }
+        if (Schedule.SymbolSize is int symbolSize && (symbolSize < 64 || symbolSize > Mailcast.Core.MailcastFrame.StandardSymbolSize || symbolSize % Mailcast.Core.MailcastFrame.StandardAlignment != 0))
+        {
+            problems.Add("\"schedule\".\"symbolSize\" must be 64 to 940 and a multiple of 4");
         }
         if (Intake.MaxBulletinBytes <= 0)
         {
@@ -321,6 +326,14 @@ public sealed record ScheduleConfig
     public int? DirectoryEvery { get; init; }
 
     public int? RememberDays { get; init; }
+
+    /// <summary>
+    /// RaptorQ symbol size in bytes, so the on-air frame size: 64 to 940, a multiple of 4. Smaller
+    /// frames survive fades and collisions better at the cost of more header per byte. Receivers
+    /// read it from each frame, so it can change at any time; a bulletin already held keeps the
+    /// size it was first encoded with.
+    /// </summary>
+    public int? SymbolSize { get; init; }
 }
 
 public sealed record IntakeConfig

@@ -35,10 +35,25 @@ public class ConfigTests
     [InlineData("""{"station": {"apiKey": "k"}, "colour": "blue"}""", "colour")]
     [InlineData("""{"station": {"apiKey": "k"}, "callsign": "NOT A CALL"}""", "callsign")]
     [InlineData("""{"station": {"apiKey": "k"}, "flex": {"enabled": true}}""", "flex")]
+    [InlineData("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 250}}""", "symbolSize")]
+    [InlineData("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 32}}""", "symbolSize")]
+    [InlineData("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 1000}}""", "symbolSize")]
     public void Parse_RefusesWhatCannotWork(string json, string mentions)
     {
         var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(json));
         Assert.Contains(mentions, e.Message, StringComparison.Ordinal);
+    }
+}
+
+public class SymbolSizeTests
+{
+    [Fact]
+    public void A_Symbol_Size_Reaches_The_Scheduler_And_The_Default_Is_Unchanged()
+    {
+        var small = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 240}}""");
+        Assert.Equal(240, small.ToScheduleOptions().SymbolSize);
+        var standard = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""");
+        Assert.Equal(Mailcast.Core.MailcastFrame.StandardSymbolSize, standard.ToScheduleOptions().SymbolSize);
     }
 }
 
