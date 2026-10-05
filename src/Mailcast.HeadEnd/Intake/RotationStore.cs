@@ -16,8 +16,8 @@ public enum OfferOutcome
 }
 
 /// <summary>
-/// Mailcast.Core's <see cref="HeadEndStore"/>, which keeps each bulletin's object from the day it
-/// is first seen and its next ESI, made safe to share between the intakes and the slot.
+/// Mailcast.Core's <see cref="HeadEndStore"/>, which keeps each bulletin's object from when it is
+/// first seen, its first slot and its next ESI, made safe to share between the intakes and the slot.
 /// </summary>
 public sealed class RotationStore
 {
@@ -64,17 +64,17 @@ public sealed class RotationStore
         }
     }
 
-    /// <summary>Plans a day from the bulletins in rotation.</summary>
-    public DailyBroadcast Plan(DateOnly day, int seed, Compression compression, ScheduleOptions options)
+    /// <summary>Plans a slot from the bulletins in rotation.</summary>
+    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options)
     {
         lock (_gate)
         {
-            return BroadcastScheduler.Plan(_store.InRotation(day), day, seed, compression, options, _store.DirectoryNextEsi);
+            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi);
         }
     }
 
     /// <summary>Records that the first <paramref name="framesQueued"/> frames of a plan were handed to the modem.</summary>
-    public void Commit(DailyBroadcast plan, int framesQueued)
+    public void Commit(SlotBroadcast plan, int framesQueued)
     {
         lock (_gate)
         {

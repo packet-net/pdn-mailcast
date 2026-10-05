@@ -25,7 +25,7 @@ public class OfflineTests
         {
             store.Offer(b, day);
         }
-        var plan = new StoreSlotPlanner(store, Compression.Default, options).Plan(day);
+        var plan = new StoreSlotPlanner(store, Compression.Default, options).Plan(new DateTimeOffset(day.ToDateTime(new TimeOnly(12, 0), DateTimeKind.Utc)));
 
         string wav = Path.Combine(output.Path, "slot.wav");
         var settings = new SlotSettings { ToneLength = TimeSpan.FromSeconds(3), PauseAfterTone = TimeSpan.FromSeconds(4) };

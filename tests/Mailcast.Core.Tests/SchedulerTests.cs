@@ -23,21 +23,20 @@ public class SchedulerTests
     }
 
     [Fact]
-    public void Allocation_ContinuesEsisAcrossDaysWithoutRepeats()
+    public void DailyDefaults_CarryThreeDaysMostOnTheFirst_AboutTwiceKInAll()
     {
         var options = new ScheduleOptions();
+        Assert.Equal(1440, options.SlotMinutes);
+        Assert.Equal(3, options.SlotsInRotation);
         foreach (int k in new[] { 1, 2, 3, 10, 35 })
         {
-            var esis = new List<uint>();
-            for (int day = 0; day < options.DaysCarried; day++)
-            {
-                var (first, count) = BroadcastScheduler.Allocation(k, day, options);
-                Assert.Equal((uint)esis.Count, first);
-                esis.AddRange(Enumerable.Range((int)first, count).Select(i => (uint)i));
-            }
-            var perDay = BroadcastScheduler.SymbolsPerDay(k, options);
+            var perDay = BroadcastScheduler.SymbolsPerCarrying(k, options);
+            Assert.Equal(3, perDay.Length);
             Assert.True(perDay[0] > perDay[1] + perDay[2], $"K={k}: day one should get most");
-            Assert.InRange(esis.Count, (2 * k) + 1, (2 * k) + options.DaysCarried);
+            Assert.InRange(perDay.Sum(), (2 * k) + 1, (2 * k) + 3);
+            Assert.Equal(perDay[0], BroadcastScheduler.DueBySlot(k, 0, options));
+            Assert.Equal(perDay[0] + perDay[1], BroadcastScheduler.DueBySlot(k, 1, options));
+            Assert.Equal(perDay.Sum(), BroadcastScheduler.DueBySlot(k, 2, options));
         }
     }
 

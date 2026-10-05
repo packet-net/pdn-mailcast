@@ -147,7 +147,7 @@ static int Evaluate(string directory, Dictionary<string, string> options)
             dict += compressed.Length;
             int k = (int)((compressed.Length + 1 + MailcastFrame.StandardSymbolSize - 1) / MailcastFrame.StandardSymbolSize);
             symbols += k;
-            frames += BroadcastScheduler.SymbolsPerDay(k, schedule).Sum();
+            frames += BroadcastScheduler.SymbolsPerCarrying(k, schedule).Sum();
         }
     }
 

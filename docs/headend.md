@@ -1,23 +1,63 @@
 # The head end
 
-The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins from the BBS as a forwarding partner, and once a day sends them through the station's own modem. It never touches the radio directly: the frames go over KISS to a dedicated modem in pdn-soundmodem, and the lease and the calibration tone go through pdn-soundmodem's HTTP API.
+The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins from the BBS as a forwarding partner, and sends them in slots through the station's own modem: every hour on the hour at GB7RDG, or once a day for a station configured that way. It never touches the radio directly: the frames go over KISS to a dedicated modem in pdn-soundmodem, and the lease and the calibration tone go through pdn-soundmodem's HTTP API.
 
-## What happens each day
+## When the slots are
 
-At 12:00 UTC (`slot.timeUtc`) the head end:
+A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the clock. `everyMinutes` must divide a day (1440) and be at least 15. Left out it is 1440, one slot a day, which is how a head end configured before hourly slots carries on unchanged. GB7RDG uses `"timeUtc": "00:00"` and `"everyMinutes": 60`, a slot every hour on the hour, which is what receivers expect.
 
-1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the day's frames.
-2. Checks that the system clock is synchronised (the kernel's own flag, as timedatectl shows it), and keys nothing until it is (`slot.requireClockSync`); a slot it skips for this is retried. It never runs a day earlier than the last one it ran.
+A few settings have a different default for a daily station and for anything more often:
+
+| Setting | Daily (1440) | Hourly and other intervals |
+|---|---|---|
+| `slot.toneSeconds` | 30 | 10, which receivers expect from an hourly station |
+| `slot.maxMinutes` | 40 | 10, so a slot ends while a web SDR receiver, which listens to 12 minutes past, is still there |
+| `slot.catchUpMinutes` | 30 | 5 |
+| how bulletins are carried | three days running | five slots over a little more than a day (see below) |
+
+## What happens in each slot
+
+At each slot the head end:
+
+1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the slot's frames. If no bulletin has anything due, it keys nothing and waits for the next slot.
+2. Checks that the system clock is synchronised (the kernel's own flag, as timedatectl shows it), and keys nothing until it is (`slot.requireClockSync`); a slot it skips for this is retried. It never runs a slot earlier than the last one it ran, whatever the clock says.
 3. Reads the Flex's frequency reference and PA temperature, if configured, and logs whether it is GPS locked. It does not start with the PA already over the limit.
 4. Opens the bulletin modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and tells the station to send each burst anyway once it has waited 10 s for a clear channel (`station.maxCarrierWaitSeconds`).
-5. Waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the 30 s calibration tone at 1800 Hz as the lease holder's transmitter test. If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up for the day (`"skip"`).
+5. Waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the calibration tone at 1800 Hz (`slot.toneSeconds`, 10 s at GB7RDG) as the lease holder's transmitter test. If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up on the slot (`"skip"`).
 6. Pauses 8 s so the modem's CW ident, which falls due with the first transmission, goes out before the first burst.
 7. Sends the frames a burst at a time (see below), checking the PA temperature every 5 s.
 8. Releases the lease, dropping anything of ours not yet on the air. The station sends its closing CW ident, keeping the lease `closing` for up to 60 s while it does, and normal packet service resumes.
 
-It stops early, cleanly, if a lease renewal fails, the PA passes `flex.paTemperatureLimitC`, the PA watch is lost and `flex.whenUnreachable` is `"skip"`, the KISS connection fails, the modem stops acknowledging frames, or the next burst would run past `slot.maxMinutes` (40). It then asks the station at once to drop whatever of ours is not yet keyed; a burst already on the air finishes inside the lease.
+It stops early, cleanly, if a lease renewal fails, the PA passes `flex.paTemperatureLimitC`, the PA watch is lost and `flex.whenUnreachable` is `"skip"`, the KISS connection fails, the modem stops acknowledging frames, or the next burst would run past `slot.maxMinutes` from the slot's start (10 at GB7RDG). It then asks the station at once to drop whatever of ours is not yet keyed; a burst already on the air finishes inside the lease.
 
-Whatever was not sent is owed: the next plan sends it on top of that day's share, with fresh ESIs. Each burst is recorded as queued before any of it is written to the modem, and nothing is written if that fails, so a crash or restart never repeats a piece, the directory's included. The price is that a burst cut off part way (a KISS failure, an abort) is under-sent: its unwritten pieces are spent, and the next plan makes the shortfall up with fresh ones. A slot cut short by the head end stopping carries on when it starts again within `slot.catchUpMinutes` (30). One skipped for a reason that may clear (an unsynchronised clock, no KISS port, no lease, no Flex when it is required, a hot PA) is tried again 5 minutes later (`slot.retryMinutes`), within the same window.
+Whatever was not sent is owed: the next slot sends it on top of its own share, with fresh ESIs. Each burst is recorded as queued before any of it is written to the modem, and nothing is written if that fails, so a crash or restart never repeats a piece, the directory's included. The price is that a burst cut off part way (a KISS failure, an abort) is under-sent: its unwritten pieces are spent, and the next slot makes the shortfall up with fresh ones. A slot cut short by the head end stopping carries on when it starts again within `slot.catchUpMinutes` (5 at GB7RDG); later than that, the next slot sends the rest. One skipped for a reason that may clear (an unsynchronised clock, no KISS port, no lease, no Flex when it is required, a hot PA) is tried again 5 minutes later (`slot.retryMinutes`), within the same window.
+
+## How each bulletin is carried
+
+A bulletin's first slot is the first slot planned after it is taken in. That slot carries enough of it for a clean rebuild from that slot alone: 1.5 times its K (the number of pieces it is cut into) plus 2 spare pieces, which still rebuilds it with a fifth of the frames lost. It then goes out again with fresh pieces, never repeats, 5, 10, 17 and 25 hours later, 0.7 K each time, so a listener who missed that hour still gets it, and it is heard in five different hours of the day over a little more than a day. Pieces from different slots add together at the receiver.
+
+A web SDR receiver listens to every third slot (8 a day), to stay inside the web SDR's allowance. Two of the four repeats fall in each of the two sets of every third slot that miss a bulletin's first slot, so whichever set a receiver hears, it gets at least 1.4 K of every bulletin. A receiver on its own radio hears everything.
+
+If a repeat's slot is skipped or cut short, the next slot makes up what it owed. After the last repeat a bulletin stays in rotation for 3 more slots (`schedule.carryOverSlots`) to make up a shortfall, then leaves it. The directory goes out in every slot that keys, listing every bulletin in rotation.
+
+On GB7RDG's volume (about 25 bulletins a day, about 200 KB, about 60 KB once compressed, in 240-byte pieces on WN4 in 18 s bursts), that is about 3 minutes on the air in an average hour, tone and idents included (about 74 minutes a day), under 6 in 19 hours out of 20, and up to about 8 in the busiest. `tests/Mailcast.HeadEnd.Tests/AirtimeBudgetTests.cs` checks it on a sample of that size.
+
+The settings, in `schedule`, are there to tune it; left out, they are the defaults above:
+
+- `slotShares`: the pieces for each carrying, as a multiple of K, the first for the first slot: `[1.5, 0.7, 0.7, 0.7, 0.7]`. Each is rounded up on its own.
+- `slotOffsets`: which slot each carrying is in, counted from the first: `[0, 5, 10, 17, 25]`. One for each share, starting at 0. Give shares without offsets and they are spread over the same span.
+- `extraSymbols`: spare pieces on top of the first carrying's share: 2.
+- `carryOverSlots`: 3.
+
+For another interval the defaults keep the same hours, in that interval's slots. A daily station's defaults are three days running, `[1.4, 0.3, 0.3]` with 1 spare piece. The daily station's old keys `daysCarried`, `totalOverhead` and `dayShares` still work: each day's share of the total becomes a slot share, the carryings a day apart. A config can use those or the new ones, not both.
+
+A bulletin first carried before this release is counted as first carried at midnight UTC on the day it was taken in.
+
+## A slot on demand
+
+`pdn-mailcast-headend --run-now` asks the running head end for a slot now, between the scheduled ones, for a test transmission say. It goes through the status listener: `POST /run` on `status.bind` and `status.port` (127.0.0.1:8216), and only from the same machine, so nothing on the LAN can key the transmitter. The head end answers 202 with the slot it started, named by the minute it starts in, or 409 if a slot is already running, a one-off is already starting, or the clock is behind the last slot run. The journal says who asked (the `X-Requested-By` header, which `--run-now` fills with the user, and the address).
+
+It is a whole slot with the usual checks: the clock, the lease, the tone, the bursts and the idents. It counts like any other slot, so no piece is ever sent twice: it sends whatever is owed and the first share of anything new, and the directory even if nothing else is due. The schedule carries on as before; the next scheduled slot still runs, and sends nothing again that the one-off sent.
 
 ## How the bursts are paced
 
@@ -72,33 +112,35 @@ pdn-bbs speaks the same FBB B1F forwarding, and its `fbbTcp` listener (BPQ's FBB
 
 ## Bulletins by file
 
-`intake.dropDirectory` takes bulletin files too, checked every minute: one bulletin per file in Mailcast.Core's serialised form (a `Type:`, `From:`, `To:`, `At:`, `Bid:`, `Date:` and `Title:` header, a blank line, then the message text with its R: lines). A file taken in is deleted; one refused moves to `rejected/` with the reason in the journal. Name a file `.tmp` or start it with a dot while writing it, then rename it. Either way, only bulletins (type B) up to `intake.maxBulletinBytes` (32 KB) are taken, each BID once, and the day it is first seen is the first of its three carrying days.
+`intake.dropDirectory` takes bulletin files too, checked every minute: one bulletin per file in Mailcast.Core's serialised form (a `Type:`, `From:`, `To:`, `At:`, `Bid:`, `Date:` and `Title:` header, a blank line, then the message text with its R: lines). A file taken in is deleted; one refused moves to `rejected/` with the reason in the journal. Name a file `.tmp` or start it with a dot while writing it, then rename it. Either way, only bulletins (type B) up to `intake.maxBulletinBytes` (32 KB) are taken, each BID once, and the next slot is the first it is carried in.
 
 ## The Flex
 
-With `flex.enabled`, the head end opens its own API session to the Flex for the length of each slot. It is a second, non-GUI client that only reads: it subscribes to the radio's status (for the frequency reference) and its meters (for PA temperature), with the radio's keepalive on so a dead session is noticed, and never asks for a slice, a DAX stream or the transmitter, so it cannot disturb pdn-soundmodem's slice. A PA reading older than 15 s (`flex.paStaleSeconds`) counts as none. If the radio cannot be reached, or the readings stop during the slot, the head end logs it and carries on without the PA watch, or with `"whenUnreachable": "skip"` skips the day or stops the slot.
+With `flex.enabled`, the head end opens its own API session to the Flex for the length of each slot. It is a second, non-GUI client that only reads: it subscribes to the radio's status (for the frequency reference) and its meters (for PA temperature), with the radio's keepalive on so a dead session is noticed, and never asks for a slice, a DAX stream or the transmitter, so it cannot disturb pdn-soundmodem's slice. A PA reading older than 15 s (`flex.paStaleSeconds`) counts as none. If the radio cannot be reached, or the readings stop during the slot, the head end logs it and carries on without the PA watch, or with `"whenUnreachable": "skip"` skips the slot or stops it.
 
 ## Status
 
-`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, bulletins held, the last intake, and the last slot's start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation, whether the tone went, the PA temperature maximum and the reference state. The journal carries the same in plain lines, for example:
+`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation, whether the tone went, the PA temperature maximum, the reference state, and who asked for it if it was a one-off (`requestedBy`). The journal carries the same in plain lines, each slot named by its start, for example:
 
 ```
-slot 2026-10-05: starting at 12:00:00Z, 171 frames for 34 bulletins in 25 bursts, about 21.6 min on the air
-slot 2026-10-05: Flex reference GPS locked (GPSDO locked)
-slot 2026-10-05: transmit lease taken for sub-channel 4, 120 s, renewed every 30 s
-slot 2026-10-05: calibration tone sent, 30 s at 1800 Hz
-slot 2026-10-05: done, 12:00:00 to 12:23:31Z, 171 of 171 frames sent in 25 bursts, 34 bulletins in rotation, tone sent, PA max 41.0 C, reference GPS locked (GPSDO locked)
+next slot 2026-10-05 13:00Z; 38 bulletins held
+slot 2026-10-05 13:00Z: starting at 13:00:03Z, 64 frames for 38 bulletins in 10 bursts, about 2.6 min on the air
+slot 2026-10-05 13:00Z: Flex reference GPS locked (GPSDO locked)
+slot 2026-10-05 13:00Z: transmit lease taken for sub-channel 4, 120 s, renewed every 30 s
+slot 2026-10-05 13:00Z: calibration tone sent, 10 s at 1800 Hz
+slot 2026-10-05 13:00Z: done, 13:00:03 to 13:03:21Z, 64 of 64 frames sent in 10 bursts, 38 bulletins in rotation, tone sent, PA max 41.0 C, reference GPS locked (GPSDO locked)
+slots today (2026-10-05): 14, 13 completed, 0 cut short, 1 skipped
 ```
 
 ## Offline
 
-`pdn-mailcast-headend --plan` prints what the day's slot would send. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, `--date` picks the day, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state.
+`pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.timeUtc` if left out), and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state.
 
 The published pdn-soundmodem package cannot pack frames yet, so offline every frame is its own burst, about 0.8 s longer each than on the air. A receiver decodes it the same way.
 
 ## Configuration
 
-`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key with its default. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file.
+`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with GB7RDG's hourly slot settings and the defaults for the rest. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file.
 
 `schedule.symbolSize` sets the frame size: the bytes of bulletin each frame carries, 64 to 940 in steps of 4 (940 if left out). Smaller frames survive fades and other stations' transmissions better, and since a bulletin rounds up to whole pieces they waste less on short bulletins too. On 2026-10-05 a busy 40 m band left almost nothing of 940-byte frames, and 240 is the size to try first. Receivers read the size from each frame, so nothing changes at their end. A bulletin keeps the size it was first encoded with.
 

@@ -1,14 +1,14 @@
 # pdn-mailcast design
 
-Status: draft, 2026-10-04. Nothing is built yet.
+Status: draft, 2026-10-04; built and on the air since 2026-10-05, every hour since v0.2.0.
 
 ## What it is
 
-Once a day, GB7RDG sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
+Every hour on the hour, GB7RDG sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
 
 Two ideas make a one-way link work:
 
-- **Fountain coding.** Each bulletin is cut into pieces, and the sender can make as many different pieces as it likes. Any set of pieces slightly larger than the bulletin rebuilds it, whichever ones they are. A receiver that misses a third of the transmission in a fade still gets its bulletins, and pieces heard on different days add together.
+- **Fountain coding.** Each bulletin is cut into pieces, and the sender can make as many different pieces as it likes. Any set of pieces slightly larger than the bulletin rebuilds it, whichever ones they are. A receiver that misses a third of the transmission in a fade still gets its bulletins, and pieces heard in different slots add together.
 - **Frames that are either perfect or absent.** The transmission uses pdn-soundmodem's MS110D modes (MIL-STD-188-110D Appendix D), which carry IL2P frames with a CRC. A frame arrives intact or is discarded. That is exactly the kind of loss fountain codes handle best.
 
 ## Decisions so far
@@ -17,7 +17,7 @@ Two ideas make a one-way link work:
 |---|---|
 | What is sent | Bulletins only. No personal mail. |
 | Who sends | GB7RDG, a Flex 6500 on 40 m. |
-| When | Daily, around midday, daytime NVIS. Planned as 12:00 UTC. |
+| When | Every hour on the hour, a short slot of about 3 minutes on average. Until 2026-10-05 it was once a day at 12:00 UTC, which a head end can still be set to. |
 | Where | Centred on 7.0538 MHz (USB dial 7.052 MHz), occupying about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz. |
 | Receivers | Linux, with LinBPQ or FBB mail. |
 | Receiver packaging | One program with pdn-soundmodem's library embedded from NuGet. No separate pdn-soundmodem install and no KISS link. |
@@ -37,7 +37,7 @@ Measured on GB7RDG's mail store on 2026-10-04. Since bulletin forwarding started
 
 Compressing each bulletin with a trained zstd dictionary should land between those two, around 30%, so about 60 KB a day. 26 of the 197 were 7plus pictures, most of which the filters added on 2026-10-04 now keep out.
 
-Each bulletin is carried on three days running, about twice its compressed size in pieces in total. That is about 120 KB a day:
+The first plan carried each bulletin on three days running, about twice its compressed size in pieces in total. That is about 120 KB a day:
 
 | Mode | Rate | Airtime a day |
 |---|---|---|
@@ -46,16 +46,24 @@ Each bulletin is carried on three days running, about twice its compressed size 
 
 WN4 is our strongest on-air-proven MS110D point and is the starting choice. WN3 is the fallback if receivers struggle.
 
-Measured once the core was built: the trained 64 KB dictionary brings a held-out week to 30% of raw (23% without 7plus), against 45% for plain zstd. Pieces are whole, though, and the average bulletin is only about 2.3 pieces, so "twice over" rounds up. On that week it comes to about 19 minutes a day of WN4 without 7plus and 24 with them. We start there and tune the overhead after the first on-air runs.
+Measured once the core was built: the trained 64 KB dictionary brings a held-out week to 30% of raw (23% without 7plus), against 45% for plain zstd. Pieces are whole, though, and the average bulletin is only about 2.3 pieces, so "twice over" rounds up. On that week it comes to about 19 minutes a day of WN4 without 7plus and 24 with them.
 
-## The daily slot
+The first on-air runs, on 2026-10-05, used 240-byte pieces rather than 940, which survive a busy band far better. Six bulletins went out as 41 frames in 7 bursts of up to 18 s, and were rebuilt at 5 of the 6 UK and Irish web SDRs tried.
+
+### Hourly
+
+From v0.2.0 GB7RDG sends every hour on the hour instead. A bulletin goes out first in the slot after it arrives, with enough pieces to rebuild it from that slot alone (1.5 times its pieces, plus 2), then again 5, 10, 17 and 25 hours later with 0.7 times its pieces each time, always fresh ones. So it is heard in five different hours of the day over a little more than a day, and a listener who missed one hour gets it later. A web SDR receiver listens to every third slot, to stay inside its allowance; whichever third it hears, it gets at least 1.4 times each bulletin's pieces. [headend.md](headend.md) has the details and the settings.
+
+That is about twice as many pieces as the daily plan, plus a tone, idents and the directory every hour. On GB7RDG's volume, in 240-byte pieces, it comes to about 3 minutes on the air in an average hour (about 74 minutes a day), under 6 in 19 hours out of 20, and about 8 in the busiest hour.
+
+## Each slot
 
 1. The head end listens first. If the channel is busy, it waits, up to a limit.
 2. It takes a transmit lease on GB7RDG's modem (see below), so nothing else can key the radio during the slot.
-3. 30 seconds of steady tone at the centre frequency, then a CW ident.
-4. Bursts of about a minute, each with its own MS110D preamble, so a receiver that tunes in late or loses sync in a fade picks up at the next burst.
+3. 10 seconds of steady tone at the centre frequency (30 for a daily station), then a CW ident.
+4. Bursts of up to 18 seconds, each with its own MS110D preamble, so a receiver that tunes in late or loses sync in a fade picks up at the next burst.
 5. A CW ident at least every 10 minutes and at the end.
-6. The lease is released and normal packet service resumes.
+6. The lease is released and normal packet service resumes. An hourly slot never runs past 10 minutes from its start; anything left goes in the next one.
 
 ### Frequency
 
@@ -69,21 +77,21 @@ The tone gives each receiver three things:
 
 - a mark on its spectrogram showing whether the signal sits where it should in the passband;
 - its frequency offset from GB7RDG;
-- the day's signal-to-noise ratio, logged.
+- the slot's signal-to-noise ratio, logged.
 
 GB7RDG's Flex is normally GPS locked, so the tone is a true frequency reference. The head end checks the Flex's reference before the slot and says so in the log if it is running on its internal TCXO instead (it was, briefly, on 2026-09-28). Even unlocked it is close: in August the Wessex web SDR, which is GPS disciplined, measured GB7RDG's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so the tone is a check rather than a necessity.
 
 ### Power and duty
 
-Tom suggested about 40 W, into an SWR near 1. FlexRadio rates the 6000 series at "100% ICAS". Their support manager said RTTY or FT8 "all day" at full power is fine, because the PA is derated and has thermal protection. 15 minutes of one-minute bursts at 40% of rated power is well inside that.
+Tom suggested about 40 W, into an SWR near 1. FlexRadio rates the 6000 series at "100% ICAS". Their support manager said RTTY or FT8 "all day" at full power is fine, because the PA is derated and has thermal protection. About 3 minutes an hour of short bursts at 40% of rated power is well inside that.
 
-MS110D's PSK signal peaks at about twice its average power. If 40 W is the Flex's power setting, the average is about 20 W. If 40 W is the average, the peaks reach about 80 W, which is still within rating, but ALC needs watching. The 30-second tone is full carrier, so it is the hardest part of the slot on the PA. The head end can read the Flex's PA temperature and stop the slot if it climbs past a limit, and we watch it on the first few runs.
+MS110D's PSK signal peaks at about twice its average power. If 40 W is the Flex's power setting, the average is about 20 W. If 40 W is the average, the peaks reach about 80 W, which is still within rating, but ALC needs watching. The tone is full carrier, so it is the hardest part of the slot on the PA; at 10 seconds an hour that is far less than the daily plan's 30. The head end can read the Flex's PA temperature and stop the slot if it climbs past a limit, and we watch it on the first few runs.
 
 ## Keeping other traffic off the air during the slot
 
 GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports, on the same slice and the same transmitter. During the slot, none of that traffic may key the radio.
 
-**What exists today:** `POST /api/config` applies a one-run configuration. That configuration could be one without LinBPQ's ports and with only the bulletin modem, and the next restart returns to the file. It works, but it costs two restarts a day. Each restart drops LinBPQ's KISS links (they come back within about 25 seconds) and kills any HF sessions in progress. If the head end died mid-slot, the station would stay in its bulletin-only configuration until something restarted it, so it needs a systemd timer on the node as a backstop.
+**What exists today:** `POST /api/config` applies a one-run configuration. That configuration could be one without LinBPQ's ports and with only the bulletin modem, and the next restart returns to the file. It works, but it costs two restarts a slot. Each restart drops LinBPQ's KISS links (they come back within about 25 seconds) and kills any HF sessions in progress. If the head end died mid-slot, the station would stay in its bulletin-only configuration until something restarted it, so it needs a systemd timer on the node as a backstop.
 
 **Proposed instead:** a small addition to pdn-soundmodem, a transmit lease.
 
@@ -98,7 +106,7 @@ GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports
 - **Selection.** BPQ's own forwarding rules choose what reaches the partner, so GB7RDG's existing filters apply unchanged. Bulletins over a size cap (32 KB to start) are skipped.
 - **Content.** Each bulletin is sent exactly as GB7RDG would forward it to a partner, routing (R:) lines included.
 - **Radio.** The head end does not embed the modem. It uses the pdn-soundmodem already running the Flex: a new `ms110d-wn4` modem entry on its own KISS port, plus the transmit lease. Two programs cannot share the radio cleanly.
-- **Schedule.** A daily timer. Each bulletin stays in rotation for three days. Its first day gets most of its pieces; later days send fresh pieces, never repeats.
+- **Schedule.** A slot every hour on the hour. Each bulletin goes out in five slots over a little more than a day. Its first slot gets enough to rebuild it; later ones send fresh pieces, never repeats.
 
 ## On-air format
 
@@ -111,17 +119,17 @@ Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identificati
 | Object | 8 bytes | Which object: the first 8 bytes of the SHA-256 of the dictionary ID (2 bytes) and the object |
 | Dictionary | 2 bytes | Which zstd dictionary it was compressed with, 0 for none |
 | Code parameters | 12 bytes | RaptorQ's transfer length and symbol size (RFC 6330's OTI) |
-| Piece | 3 bytes | Which piece this is, counting on across days |
+| Piece | 3 bytes | Which piece this is, counting on across slots |
 | Data | the rest | One RaptorQ symbol, 940 bytes |
 | CRC | 4 bytes | CRC-32 of everything before it, checked before a piece is stored |
 
 A whole frame is then 987 bytes, 36 under IL2P's 1023-byte limit. Frames carry no source block number, so every object is a single RaptorQ block (up to 53 MB, far beyond any bulletin).
 
-An object is one byte saying what it is (1 a bulletin, 2 the directory) followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, the day it first sees it, and sends those same bytes, with fresh pieces, on every later day.
+An object is one byte saying what it is (1 a bulletin, 2 the directory) followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, when it first sees it, and sends those same bytes, with fresh pieces, in every later slot.
 
 A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`, `To`, `At`, `Bid`, `Date`, `Title`), an empty line, then the message text exactly as a forwarding partner would receive it, R: lines included. Readers ignore keys they don't know, so later versions can add some.
 
-A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs and titles. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. Its ID comes from its content like any other object, so a second slot on one day can never mix two versions. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
+A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs and titles. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. It goes out in every slot. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
 
 A receiver forgets which objects it has rebuilt after 14 days, and drops a partial object 14 days after its last new piece. The BBS's BID check remains the real duplicate filter.
 
@@ -136,7 +144,7 @@ No RaptorQ implementation exists for .NET, so we write one from RFC 6330 and che
 One program and a small config.
 
 - **Audio.** A sound card on the receiver's radio, or an UberSDR web receiver such as `wessex.zapto.org`. pdn-soundmodem's library supports both. The receiver detects the MS110D speed automatically, so there are no mode settings.
-- **Decoding.** The library hands over each good frame. The receiver keeps every piece on disk, so partial bulletins survive restarts and add up across days. If a rebuild does not match its object ID, the receiver keeps its pieces and, a few decodes per arriving piece, tries sets of them without the suspect ones; any set that rebuilds to the ID is accepted.
+- **Decoding.** The library hands over each good frame. The receiver keeps every piece on disk, so partial bulletins survive restarts and add up across slots. If a rebuild does not match its object ID, the receiver keeps its pieces and, a few decodes per arriving piece, tries sets of them without the suspect ones; any set that rebuilds to the ID is accepted.
 - **Delivery.** Each rebuilt bulletin is checked against its object ID, decompressed, and offered to the local BBS over its telnet port as FBB B1F forwarding, again reusing pdn-bbs's code. The BBS accepts or rejects by BID as with any partner.
 - **Config.** The audio source, and the BBS host, port, login and password. Everything else is fixed.
 - **Packaging.** A .deb in the packet-net apt repo with a systemd service.

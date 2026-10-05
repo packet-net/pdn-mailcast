@@ -6,7 +6,7 @@ public class ReceiverStoreTests
 {
     private static readonly DateOnly Day1 = new(2026, 10, 4);
 
-    private static DailyBroadcast PlanDay(IEnumerable<Bulletin> bulletins, DateOnly day, int seed = 1) =>
+    private static SlotBroadcast PlanDay(IEnumerable<Bulletin> bulletins, DateOnly day, int seed = 1) =>
         BroadcastScheduler.Plan(bulletins.Select(b => new BroadcastBulletin(b, Day1)), day, seed, Compression.Default);
 
     private static List<Bulletin> Feed(ReceiverStore store, IEnumerable<MailcastFrame> frames)

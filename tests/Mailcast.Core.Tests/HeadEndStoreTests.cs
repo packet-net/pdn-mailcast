@@ -93,6 +93,7 @@ public class HeadEndStoreTests
         var store = new HeadEndStore(dir.Path, Compression.Default);
         var bulletin = TestBulletins.Make(5, 3000);
         store.Offer(bulletin, Day1);
+        store.Commit(BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default));
         Assert.Equal(0, store.Expire(Day1.AddDays(13)));
         Assert.Empty(store.InRotation(Day1.AddDays(13)));
         Assert.Equal(1, store.Expire(Day1.AddDays(14)));
@@ -200,7 +201,7 @@ public class HeadEndStoreTests
         {
             var t = today.Objects.Single(x => x.Transfer.ObjectId == o.Transfer.ObjectId);
             int sentToday = sentEsis.Count(e => e.ObjectId == o.Transfer.ObjectId);
-            int[] perDay = BroadcastScheduler.SymbolsPerDay(o.Transfer.SourceSymbols, options);
+            int[] perDay = BroadcastScheduler.SymbolsPerCarrying(o.Transfer.SourceSymbols, options);
             Assert.Equal(perDay[1] + (t.Count - sentToday), o.Count);
             Assert.Equal((uint)sentToday, o.FirstEsi);
         }
@@ -208,7 +209,7 @@ public class HeadEndStoreTests
     }
 
     [Fact]
-    public void Plan_AfterASkippedDay_SendsBothDaysShares()
+    public void Plan_AfterASkippedSlot_ANewBulletinStartsItsCarryingInTheNext()
     {
         using var dir = new TempDirectory();
         var store = new HeadEndStore(dir.Path, Compression.Default);
@@ -216,9 +217,59 @@ public class HeadEndStoreTests
         var day2 = Day1.AddDays(1);
         var plan = BroadcastScheduler.Plan(store.InRotation(day2), day2, 3, Compression.Default);
         var o = plan.Objects[1];
-        int[] perDay = BroadcastScheduler.SymbolsPerDay(o.Transfer.SourceSymbols, new ScheduleOptions());
+        int[] perDay = BroadcastScheduler.SymbolsPerCarrying(o.Transfer.SourceSymbols, new ScheduleOptions());
         Assert.Equal(0u, o.FirstEsi);
-        Assert.Equal(perDay[0] + perDay[1], o.Count);
+        Assert.Equal(0, o.SlotIndex);
+        Assert.Equal(perDay[0], o.Count);
+        store.Commit(plan);
+        Assert.Equal(BroadcastScheduler.Midnight(day2), store.InRotation(day2).Single().FirstSlot);
+
+        // Carried from then on: the next two days, and no more.
+        Assert.Single(store.InRotation(day2.AddDays(2)));
+        Assert.Empty(store.InRotation(day2.AddDays(3)));
+    }
+
+    [Fact]
+    public void Plan_AfterASkippedCarrying_SendsBothShares()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        store.Offer(TestBulletins.Make(14, 9000), Day1);
+        store.Commit(BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 3, Compression.Default));
+        var day3 = Day1.AddDays(2);
+        var plan = BroadcastScheduler.Plan(store.InRotation(day3), day3, 3, Compression.Default);
+        var o = plan.Objects[1];
+        int[] perDay = BroadcastScheduler.SymbolsPerCarrying(o.Transfer.SourceSymbols, new ScheduleOptions());
+        Assert.Equal((uint)perDay[0], o.FirstEsi);
+        Assert.Equal(perDay[1] + perDay[2], o.Count);
+    }
+
+    [Fact]
+    public void Open_AStateFromBeforeSlotsHadTimes_CountsAsFirstCarriedAtMidnightOnItsDay()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        store.Offer(TestBulletins.Make(15, 3000), Day1);
+        store.Offer(TestBulletins.Make(16, 3000), Day1);
+        var plan = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 3, Compression.Default);
+        store.Commit(plan, plan.Frames.Count);
+
+        // Rewrite the states as v0.1 wrote them: no FirstSlot. One had pieces sent, one did not.
+        var folders = Directory.EnumerateDirectories(Path.Combine(dir.Path, "bulletins")).ToList();
+        foreach (var (folder, i) in folders.Select((f, i) => (f, i)))
+        {
+            var state = Path.Combine(folder, "state.txt");
+            var lines = File.ReadAllLines(state).Where(l => !l.StartsWith("FirstSlot:", StringComparison.Ordinal)).ToList();
+            if (i == 1)
+            {
+                lines = [.. lines.Select(l => l.StartsWith("NextEsi:", StringComparison.Ordinal) ? "NextEsi: 0" : l)];
+            }
+            File.WriteAllText(state, string.Join('\n', lines) + "\n");
+        }
+        var reopened = new HeadEndStore(dir.Path, Compression.Default).InRotation(Day1.AddDays(1));
+        Assert.Equal(2, reopened.Count);
+        Assert.Single(reopened, c => c.FirstSlot == BroadcastScheduler.Midnight(Day1) && c.NextEsi > 0);
+        Assert.Single(reopened, c => c.FirstSlot is null && c.NextEsi == 0);
     }
 
     [Fact]

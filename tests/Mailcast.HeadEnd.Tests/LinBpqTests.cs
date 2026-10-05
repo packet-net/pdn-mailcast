@@ -59,7 +59,7 @@ public sealed class LinBpqTests
             Assert.True(result.Problem is null, $"{result.Problem}\n{string.Join('\n', journal.Lines)}");
             Assert.Equal(3, result.Accepted);
             Assert.Equal(0, result.Refused);
-            var directory = store.Plan(today, 1, Compression.Default, new ScheduleOptions()).Directory;
+            var directory = store.Plan(BroadcastScheduler.Midnight(today).AddHours(12), 1, Compression.Default, new ScheduleOptions()).Directory;
             Assert.Equal(new[] { ww, gbr, euro }.Order(), directory.Entries.Select(e => e.Bid).Order());
             Assert.DoesNotContain(local, directory.Entries.Select(e => e.Bid));
             Assert.DoesNotContain(personal, directory.Entries.Select(e => e.Bid));

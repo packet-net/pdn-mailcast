@@ -7,7 +7,7 @@ namespace Mailcast.HeadEnd.Tests;
 public class SlotRunnerTests(ITestOutputHelper output)
 {
     private static readonly DateTimeOffset Noon = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
-    private static readonly DateOnly Day = new(2026, 10, 5);
+    private static readonly DateTimeOffset Day = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
     private static readonly ReferenceReading Gps = new("GPSDO locked", true);
 
     private sealed class Rig

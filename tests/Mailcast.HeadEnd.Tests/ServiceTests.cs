@@ -10,47 +10,62 @@ namespace Mailcast.HeadEnd.Tests;
 public class ServiceTests
 {
     private static readonly TimeOnly Noon = new(12, 0);
+    private static readonly SlotSchedule Daily = SlotSchedule.Daily(Noon);
     private static readonly DateOnly Day1 = new(2026, 10, 5);
+
+    private static DateTimeOffset NoonOn(DateOnly day) => new(day.ToDateTime(Noon, DateTimeKind.Utc));
 
     [Fact]
     public void NextSlot_IsTodayUntilItHasRunOrIsTooLate()
     {
         var catchUp = TimeSpan.FromMinutes(30);
         var morning = new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
-        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(morning, Noon, catchUp, null));
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(morning, Daily, catchUp, null));
 
         var late = new DateTimeOffset(2026, 10, 5, 12, 20, 0, TimeSpan.Zero);
-        Assert.Equal(late, HeadEndService.NextSlot(late, Noon, catchUp, null));
+        Assert.Equal(late, HeadEndService.NextSlot(late, Daily, catchUp, null));
 
         var tooLate = new DateTimeOffset(2026, 10, 5, 12, 31, 0, TimeSpan.Zero);
-        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(tooLate, Noon, catchUp, null));
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(tooLate, Daily, catchUp, null));
 
         var ran = new SlotReport { Day = Day1, Outcome = SlotOutcome.Completed };
-        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late, Noon, catchUp, ran));
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late, Daily, catchUp, ran));
 
         var stopped = ran with { Outcome = SlotOutcome.Aborted, Reason = "the head end is stopping" };
-        Assert.Equal(late, HeadEndService.NextSlot(late, Noon, catchUp, stopped));
+        Assert.Equal(late, HeadEndService.NextSlot(late, Daily, catchUp, stopped));
 
         // A clock that has gone back behind a day already run never runs an earlier day.
         var ahead = ran with { Day = Day1.AddDays(3) };
-        Assert.Equal(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late, Noon, catchUp, ahead));
+        Assert.Equal(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late, Daily, catchUp, ahead));
 
         var yesterday = ran with { Day = Day1.AddDays(-1) };
-        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(morning, Noon, catchUp, yesterday));
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(morning, Daily, catchUp, yesterday));
     }
 
     private sealed class Head
     {
         public Head(TempDirectory dir, DateOnly day, SlotSettings settings, IReadOnlyList<ScheduledIntake>? intakes = null)
+            : this(dir, NoonOn(day), Daily, new ScheduleOptions(), settings, intakes)
         {
-            Time = new VirtualTime(new DateTimeOffset(day.ToDateTime(Noon, DateTimeKind.Utc)));
+        }
+
+        public Head(TempDirectory dir, DateTimeOffset start, SlotSchedule schedule, ScheduleOptions options, SlotSettings settings, IReadOnlyList<ScheduledIntake>? intakes = null, string? statusDirectory = null, TimeSpan? catchUp = null)
+        {
+            Time = new VirtualTime(start);
             Station = new FakeStation(Time, 4);
-            var options = new ScheduleOptions();
+            Options = options;
+            Status = new StatusStore(statusDirectory, Time);
             Store = new RotationStore(dir.Path, Compression.Default, options, Journal);
             Planner = new StoreSlotPlanner(Store, Compression.Default, options);
-            var runner = new SlotRunner(settings, Station, Station, null, FakeAirtime.For(Station), Journal, Time, new FakeClockSync());
-            Service = new HeadEndService(Noon, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), Planner, Store, intakes ?? [], runner, new StatusStore(null, Time), Journal, Time);
+            var runner = new SlotRunner(settings, Station, Station, null, FakeAirtime.For(Station), Journal, Time, Clock);
+            Service = new HeadEndService(schedule, catchUp ?? TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), Planner, Store, intakes ?? [], runner, Status, Journal, Time);
         }
+
+        public ScheduleOptions Options { get; }
+
+        public FakeClockSync Clock { get; } = new();
+
+        public StatusStore Status { get; }
 
         public VirtualTime Time { get; }
 
@@ -79,10 +94,12 @@ public class ServiceTests
             return Station.LeaseRequests.Count > 0 ? Station.LeaseRequests[0].At : (DateTimeOffset?)null;
         });
 
-        public SlotReport Run(DateOnly day, TimeSpan? stopAfter = null) => Time.Run(async () =>
+        public SlotReport Run(DateOnly day, TimeSpan? stopAfter = null) => Run(NoonOn(day), stopAfter);
+
+        public SlotReport Run(DateTimeOffset slot, TimeSpan? stopAfter = null) => Time.Run(async () =>
         {
             using var stop = stopAfter is TimeSpan t ? new CancellationTokenSource(t, Time) : new CancellationTokenSource();
-            return await Service.RunSlotAsync(day, stop.Token);
+            return await Service.RunSlotAsync(slot, stop.Token);
         });
 
         public IEnumerable<(ulong, uint)> Sent() => Station.Frames.Select(f =>
@@ -103,7 +120,7 @@ public class ServiceTests
         {
             monday.Store.Offer(Bulletins.Make(seed, 4000), Day1);
         }
-        int planned = monday.Planner.Plan(Day1).Frames.Count;
+        int planned = monday.Planner.Plan(NoonOn(Day1)).Frames.Count;
         var first = monday.Run(Day1);
         Assert.Equal(SlotOutcome.Aborted, first.Outcome);
         Assert.InRange(first.FramesQueued, 1, planned - 1);
@@ -111,7 +128,7 @@ public class ServiceTests
 
         // Tuesday, after a restart: the rest of Monday's share is owed, on top of Tuesday's own.
         var tuesday = new Head(dir, Day1.AddDays(1), settings with { MaxSlotLength = TimeSpan.FromMinutes(40) });
-        var plan = tuesday.Planner.Plan(Day1.AddDays(1));
+        var plan = tuesday.Planner.Plan(NoonOn(Day1.AddDays(1)));
         var second = tuesday.Run(Day1.AddDays(1));
         Assert.Equal(SlotOutcome.Completed, second.Outcome);
         var sentTuesday = tuesday.Sent().ToList();
@@ -127,7 +144,7 @@ public class ServiceTests
         var options = new ScheduleOptions();
         foreach (var o in plan.Broadcast!.Objects.Skip(1))
         {
-            int[] perDay = BroadcastScheduler.SymbolsPerDay(o.Transfer.SourceSymbols, options);
+            int[] perDay = BroadcastScheduler.SymbolsPerCarrying(o.Transfer.SourceSymbols, options);
             Assert.Equal(perDay[0] + perDay[1], (int)o.NextEsi);
         }
     }
@@ -142,7 +159,7 @@ public class ServiceTests
         {
             first.Store.Offer(Bulletins.Make(seed, 5000), Day1);
         }
-        var whole = first.Planner.Plan(Day1);
+        var whole = first.Planner.Plan(NoonOn(Day1));
         var bulletinIds = whole.Broadcast!.Objects.Skip(1).Select(o => o.Transfer.ObjectId).ToHashSet();
         int plannedBulletinFrames = whole.Frames.Count(f => bulletinIds.Contains(f.ObjectId));
         var stopped = first.Run(Day1, stopAfter: TimeSpan.FromMinutes(2));
@@ -155,7 +172,7 @@ public class ServiceTests
         // After the restart the same day's plan holds only the bulletin frames not yet queued, and
         // the directory carries on from where it stopped too.
         var again = new Head(dir, Day1, settings);
-        var rest = again.Planner.Plan(Day1);
+        var rest = again.Planner.Plan(NoonOn(Day1));
         Assert.Equal(plannedBulletinFrames - sentBulletinFrames, rest.Frames.Count(f => bulletinIds.Contains(f.ObjectId)));
         Assert.True(rest.Broadcast!.Objects[0].FirstEsi > 0);
         Assert.Equal(SlotOutcome.Completed, again.Run(Day1).Outcome);
@@ -171,13 +188,13 @@ public class ServiceTests
         var retry = TimeSpan.FromMinutes(5);
         var skipped = new SlotReport { Day = Day1, Outcome = SlotOutcome.Skipped, Retryable = true, End = new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero) };
         var at = new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero);
-        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 6, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Noon, catchUp, skipped, retry));
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 6, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Daily, catchUp, skipped, retry));
 
         var late = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 27, 0, TimeSpan.Zero) };
-        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late.End, Noon, catchUp, late, retry));
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late.End, Daily, catchUp, late, retry));
 
         var notRetryable = skipped with { Retryable = false };
-        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Noon, catchUp, notRetryable, retry));
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Daily, catchUp, notRetryable, retry));
     }
 
     private sealed class HangingIntake : IBulletinIntake
@@ -214,5 +231,251 @@ public class ServiceTests
         DateTimeOffset? started = head.WaitForTheSlotAcrossAClockStep(TimeSpan.FromHours(11.5));
         Assert.NotNull(started);
         Assert.InRange(started.Value, new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 5, 12, 3, 0, TimeSpan.Zero));
+    }
+
+    // Hourly: slots on the hour, counted from 00:00.
+    private static readonly SlotSchedule Hourly = new(new TimeOnly(0, 0), TimeSpan.FromHours(1));
+
+    private static DateTimeOffset At(int hour, int minute = 0, int second = 0) => new(2026, 10, 5, hour, minute, second, TimeSpan.Zero);
+
+    [Fact]
+    public void SlotSchedule_FindsTheSlotRunningAtAnyTime()
+    {
+        Assert.Equal(At(12), Hourly.SlotAtOrBefore(At(12)));
+        Assert.Equal(At(12), Hourly.SlotAtOrBefore(At(12, 59, 59)));
+        Assert.Equal(At(13), Hourly.SlotAfter(At(12, 0, 1)));
+        var halfPast = new SlotSchedule(new TimeOnly(12, 30), TimeSpan.FromHours(1));
+        Assert.Equal(At(0, 30), halfPast.SlotAtOrBefore(At(1, 10)));
+        Assert.Equal(At(0, 30).AddDays(-1).AddHours(23), halfPast.SlotAtOrBefore(At(0, 10)));
+        Assert.Equal(At(12), Daily.SlotAtOrBefore(At(23, 0)));
+        Assert.Equal(At(12).AddDays(-1), Daily.SlotAtOrBefore(At(11, 59)));
+        Assert.Throws<ArgumentException>(() => new SlotSchedule(new TimeOnly(0, 0), TimeSpan.FromMinutes(50)));
+    }
+
+    [Fact]
+    public void NextSlot_Hourly_CatchesUpRetriesAndNeverRunsAnEarlierSlot()
+    {
+        var catchUp = TimeSpan.FromMinutes(5);
+        var retry = TimeSpan.FromMinutes(5);
+        Assert.Equal(At(12), HeadEndService.NextSlot(At(11, 40), Hourly, catchUp, null));
+        Assert.Equal(At(12, 3), HeadEndService.NextSlot(At(12, 3), Hourly, catchUp, null));
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 6), Hourly, catchUp, null));
+
+        var ran = new SlotReport { Slot = At(12), Day = Day1, Outcome = SlotOutcome.Completed, End = At(12, 4) };
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 4), Hourly, catchUp, ran));
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(13), Hourly, catchUp, ran));
+        Assert.Equal(At(14, 2), HeadEndService.NextSlot(At(14, 2), Hourly, catchUp, ran));
+
+        // Cut short by a restart: carried on within the catch-up window, not after.
+        var stopped = ran with { Outcome = SlotOutcome.Aborted, Reason = "the head end is stopping", End = At(12, 1) };
+        Assert.Equal(At(12, 2), HeadEndService.NextSlot(At(12, 2), Hourly, catchUp, stopped));
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 6), Hourly, catchUp, stopped));
+
+        // Skipped at the station: tried again five minutes on, while inside the window.
+        var skipped = ran with { Outcome = SlotOutcome.Skipped, Retryable = true, End = At(12, 0, 10) };
+        Assert.Equal(At(12, 5, 10), HeadEndService.NextSlot(At(12, 0, 10), Hourly, TimeSpan.FromMinutes(10), skipped, retry));
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 0, 10), Hourly, catchUp, skipped, retry));
+
+        // The clock has gone back behind the last slot run: the slot after that one, never an earlier.
+        var later = ran with { Slot = At(15), End = At(15, 3) };
+        Assert.Equal(At(16), HeadEndService.NextSlot(At(12, 30), Hourly, catchUp, later));
+        Assert.Equal(At(16), HeadEndService.NextSlot(At(15, 2), Hourly, catchUp, later));
+
+        // A report from before slots had times names only its day, and was that day's slot at the anchor.
+        var old = new SlotReport { Day = Day1, Outcome = SlotOutcome.Completed };
+        Assert.Equal(At(0), Hourly.SlotOf(old));
+        Assert.Equal(At(12), Daily.SlotOf(old));
+        Assert.Equal(At(1), HeadEndService.NextSlot(At(0, 30), Hourly, catchUp, old));
+    }
+
+    private static Head HourlyHead(TempDirectory dir, DateTimeOffset start, string? statusDirectory = null) =>
+        new(dir, start, Hourly, ScheduleOptions.Hourly, new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
+            statusDirectory: statusDirectory, catchUp: TimeSpan.FromMinutes(5));
+
+    /// <summary>When each slot took its lease: the first request after a release, not the renewals.</summary>
+    private static List<DateTimeOffset> LeaseTimes(Head head)
+    {
+        var taken = new List<DateTimeOffset>();
+        DateTimeOffset? released = null;
+        foreach (var (at, granted) in head.Station.LeaseRequests.Where(r => r.Granted))
+        {
+            if (taken.Count == 0 || (released is DateTimeOffset r && at >= r && taken[^1] < r))
+            {
+                taken.Add(at);
+            }
+            released = head.Station.Releases.Where(t => t >= at).Cast<DateTimeOffset?>().FirstOrDefault();
+        }
+        return taken;
+    }
+
+    [Fact]
+    public void Hourly_RunsEachSlotWithSomethingDue_AndKeysNothingInTheRest()
+    {
+        using var dir = new TempDirectory();
+        var head = HourlyHead(dir, At(11, 59, 30));
+        head.Store.Offer(Bulletins.Make(60, 3000), Day1);
+        head.Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = head.Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMinutes(90), head.Time);
+            head.Store.Offer(Bulletins.Make(61, 3000), Day1); // taken in at 13:29:30
+            await Task.Delay(TimeSpan.FromMinutes(120), head.Time);
+            await stop.CancelAsync();
+            await service;
+            return 0;
+        }, TimeSpan.FromHours(5));
+
+        // 12:00 for the first, 14:00 for the second; 13:00 and 15:00 had nothing due.
+        var leases = LeaseTimes(head);
+        Assert.Contains(leases, t => t >= At(12) && t < At(12, 2));
+        Assert.Contains(leases, t => t >= At(14) && t < At(14, 2));
+        Assert.DoesNotContain(leases, t => t >= At(13) && t < At(14));
+        Assert.DoesNotContain(leases, t => t >= At(15));
+        Assert.Contains(head.Journal.Lines, l => l.StartsWith("slot 2026-10-05 13:00Z: skipped: nothing to send", StringComparison.Ordinal));
+        Assert.Equal(new SlotsToday(Day1, 4, 2, 0, 2), head.Status.SlotsToday);
+        Assert.Contains(head.Journal.Lines, l => l == "slots today (2026-10-05): 4, 2 completed, 0 cut short, 2 skipped");
+        Assert.Equal(head.Sent().Count(), head.Sent().Distinct().Count());
+    }
+
+    [Fact]
+    public void Hourly_AClockSteppedBackAfterASlot_NeverRunsItOrAnEarlierOneAgain()
+    {
+        using var dir = new TempDirectory();
+        var head = HourlyHead(dir, At(11, 59, 30));
+        head.Store.Offer(Bulletins.Make(62, 3000), Day1);
+        head.Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = head.Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMinutes(20), head.Time);
+            Assert.Single(LeaseTimes(head));
+            head.Time.StepWallClock(TimeSpan.FromHours(-2)); // 12:19:30 becomes 10:19:30
+            head.Store.Offer(Bulletins.Make(63, 3000), Day1);
+            await Task.Delay(TimeSpan.FromMinutes(150), head.Time); // to 12:49:30 by the stepped clock
+            Assert.Single(LeaseTimes(head));
+            await Task.Delay(TimeSpan.FromMinutes(15), head.Time); // past 13:00
+            await stop.CancelAsync();
+            await service;
+            return 0;
+        }, TimeSpan.FromHours(5));
+        var leases = LeaseTimes(head);
+        Assert.Equal(2, leases.Count);
+        Assert.InRange(leases[1], At(13), At(13, 2));
+        Assert.Contains(head.Journal.Lines, l => l.Contains("next slot 2026-10-05 13:00Z (the clock moved)", StringComparison.Ordinal) || l.Contains("next slot 2026-10-05 13:00Z;", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Hourly_ARestartMidSlot_CarriesOnInsideTheCatchUpWindow_AndRepeatsNothing()
+    {
+        using var dir = new TempDirectory();
+        using var status = new TempDirectory();
+        var first = HourlyHead(dir, At(12), status.Path);
+        foreach (int seed in Enumerable.Range(70, 6))
+        {
+            first.Store.Offer(Bulletins.Make(seed, 5000), Day1);
+        }
+        var whole = first.Planner.Plan(At(12));
+        var stopped = first.Run(At(12), stopAfter: TimeSpan.FromMinutes(1));
+        Assert.Equal(SlotOutcome.Aborted, stopped.Outcome);
+        Assert.Equal(At(12), stopped.Slot);
+        Assert.InRange(first.Sent().Count(), 1, whole.Frames.Count - 1);
+
+        // Back two minutes later: the same slot carries on, then nothing more is due for an hour.
+        var again = HourlyHead(dir, At(12, 2), status.Path);
+        again.Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = again.Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMinutes(70), again.Time);
+            await stop.CancelAsync();
+            await service;
+            return 0;
+        });
+        var leases = LeaseTimes(again);
+        Assert.Single(leases);
+        Assert.InRange(leases[0], At(12, 2), At(12, 3));
+        var bulletinIds = whole.Broadcast!.Objects.Skip(1).Select(o => o.Transfer.ObjectId).ToHashSet();
+        var all = first.Sent().Concat(again.Sent()).ToList();
+        Assert.Equal(all.Count, all.Distinct().Count());
+        Assert.Equal(whole.Broadcast.BulletinFrames, all.Count(f => bulletinIds.Contains(f.Item1)));
+        Assert.Equal(At(13), again.Status.LastSlot!.Slot);
+        Assert.Equal(SlotOutcome.Skipped, again.Status.LastSlot.Outcome);
+    }
+
+    [Fact]
+    public void RunNow_StartsAOneOffSlot_RefusesASecondWhileItRuns_AndTheScheduleCarriesOn()
+    {
+        using var dir = new TempDirectory();
+        var head = HourlyHead(dir, At(11, 59, 30));
+        head.Store.Offer(Bulletins.Make(80, 4000), Day1);
+        RunNowAnswer? accepted = null;
+        RunNowAnswer? busy = null;
+        head.Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = head.Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMinutes(25), head.Time); // 12:24:30, the 12:00 slot long done
+            head.Store.Offer(Bulletins.Make(81, 4000), Day1);
+            accepted = head.Service.RequestRunNow("tester");
+            await Task.Delay(TimeSpan.FromSeconds(20), head.Time);
+            busy = head.Service.RequestRunNow("someone else");
+            await Task.Delay(TimeSpan.FromMinutes(30), head.Time); // 12:55
+            head.Store.Offer(Bulletins.Make(82, 4000), Day1);
+            await Task.Delay(TimeSpan.FromMinutes(10), head.Time); // past 13:00
+            await stop.CancelAsync();
+            await service;
+            return 0;
+        });
+
+        Assert.True(accepted!.Accepted);
+        Assert.Equal(At(12, 24), accepted.Slot);
+        Assert.False(busy!.Accepted);
+        Assert.Contains("a slot is running", busy.Problem, StringComparison.Ordinal);
+        var leases = LeaseTimes(head);
+        Assert.Equal(3, leases.Count);
+        Assert.InRange(leases[1], At(12, 24, 30), At(12, 26));
+        Assert.InRange(leases[2], At(13), At(13, 2));
+        Assert.Contains(head.Journal.Lines, l => l == "run now: asked for by tester; slot 2026-10-05 12:24Z starts now");
+        Assert.Contains(head.Journal.Lines, l => l.StartsWith("run now: asked for by someone else, refused: a slot is running", StringComparison.Ordinal));
+        Assert.Contains(head.Journal.Lines, l => l == "slot 2026-10-05 12:24Z: a one-off slot, asked for by tester");
+        Assert.Equal(head.Sent().Count(), head.Sent().Distinct().Count());
+        Assert.Equal(new SlotsToday(Day1, 3, 3, 0, 0), head.Status.SlotsToday);
+        Assert.Null(head.Status.LastSlot!.RequestedBy);
+    }
+
+    [Fact]
+    public void RunNow_WithNothingDue_SendsTheDirectory_AndAClockThatIsNotSynchronisedStillStopsIt()
+    {
+        using var dir = new TempDirectory();
+        var head = HourlyHead(dir, At(12));
+        head.Store.Offer(Bulletins.Make(83, 3000), Day1);
+        Assert.Equal(SlotOutcome.Completed, head.Run(At(12)).Outcome);
+        int before = head.Station.Frames.Count;
+
+        head.Time.Advance(TimeSpan.FromMinutes(20));
+        var oneOff = head.Time.Run(() => head.Service.RunSlotAsync(At(12, 20), CancellationToken.None, "tester"));
+        Assert.Equal(SlotOutcome.Completed, oneOff.Outcome);
+        Assert.Equal("tester", oneOff.RequestedBy);
+        var directoryOnly = head.Station.Frames.Skip(before).ToList();
+        Assert.NotEmpty(directoryOnly);
+        Assert.Single(head.Sent().Skip(before).Select(f => f.Item1).Distinct());
+
+        head.Clock.Synchronised = false;
+        var refused = head.Time.Run(() => head.Service.RunSlotAsync(At(12, 30), CancellationToken.None, "tester"));
+        Assert.Equal(SlotOutcome.Skipped, refused.Outcome);
+        Assert.Contains("clock", refused.Reason, StringComparison.Ordinal);
+        Assert.Equal(before + directoryOnly.Count, head.Station.Frames.Count);
+    }
+
+    [Fact]
+    public void RunNow_RefusesWhenTheClockIsBehindTheLastSlotRun()
+    {
+        using var dir = new TempDirectory();
+        var head = HourlyHead(dir, At(12));
+        head.Status.RecordSlot(new SlotReport { Slot = At(15), Day = Day1, Outcome = SlotOutcome.Completed, End = At(15, 3) });
+        var answer = head.Service.RequestRunNow("tester");
+        Assert.False(answer.Accepted);
+        Assert.Contains("behind the last slot run", answer.Problem, StringComparison.Ordinal);
     }
 }

@@ -188,7 +188,7 @@ public class IntakeTests
         Assert.Contains(journal.Lines, l => l.Contains("WARNING", StringComparison.Ordinal) && l.Contains(personal.Bid, StringComparison.Ordinal));
 
         // What was kept is the bulletin as the BBS sent it: same routing lines and text.
-        var plan = store.Plan(Today, 1, Compression.Default, new ScheduleOptions());
+        var plan = store.Plan(BroadcastScheduler.Midnight(Today).AddHours(12), 1, Compression.Default, new ScheduleOptions());
         var entry = Assert.Single(plan.Directory.Entries, e => e.Bid == bulletin.Bid);
         Assert.Equal(bulletin.Title, entry.Title);
     }

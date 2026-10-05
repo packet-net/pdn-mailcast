@@ -11,7 +11,13 @@ namespace Mailcast.HeadEnd.Status;
 /// <summary>The last intake pass, for the status endpoint.</summary>
 public sealed record IntakeStatus(DateTimeOffset At, string Source, int Accepted, int Refused, string? Problem);
 
-/// <summary>What the head end is doing and what it last did. The last slot survives a restart.</summary>
+/// <summary>
+/// The slots run on one UTC day, each counted once by how its latest run ended: a slot retried
+/// after a skip, or carried on after a restart, is one slot.
+/// </summary>
+public sealed record SlotsToday(DateOnly Date, int Slots, int Completed, int Aborted, int Skipped);
+
+/// <summary>What the head end is doing and what it last did. The last slot, and the slots of the last two days, survive a restart.</summary>
 public sealed class StatusStore
 {
     internal static readonly JsonSerializerOptions Json = new()
@@ -21,7 +27,12 @@ public sealed class StatusStore
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
+    /// <summary>How many slot reports are kept for <see cref="SlotsToday"/>: two days of 15-minute slots, with retries.</summary>
+    private const int RecentKept = 400;
+
     private readonly string? _path;
+    private readonly string? _recentPath;
+    private readonly List<SlotReport> _recent = [];
     private readonly TimeProvider _time;
     private readonly Lock _gate = new();
     private SlotReport? _lastSlot;
@@ -38,6 +49,18 @@ public sealed class StatusStore
         {
             Directory.CreateDirectory(stateDirectory);
             _path = Path.Combine(stateDirectory, "last-slot.json");
+            _recentPath = Path.Combine(stateDirectory, "recent-slots.json");
+            if (File.Exists(_recentPath))
+            {
+                try
+                {
+                    _recent.AddRange(JsonSerializer.Deserialize<List<SlotReport>>(File.ReadAllText(_recentPath), Json) ?? []);
+                }
+                catch (JsonException)
+                {
+                    _recent.Clear();
+                }
+            }
             if (File.Exists(_path))
             {
                 try
@@ -62,6 +85,34 @@ public sealed class StatusStore
                 return _lastSlot;
             }
         }
+    }
+
+    /// <summary>The slots run so far on the current UTC day.</summary>
+    public SlotsToday SlotsToday
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return CountToday();
+            }
+        }
+    }
+
+    private SlotsToday CountToday()
+    {
+        var today = DateOnly.FromDateTime(_time.GetUtcNow().UtcDateTime);
+        var latest = _recent
+            .Where(r => r.Day == today)
+            .GroupBy(r => r.Slot != default ? r.Slot : new DateTimeOffset(r.Day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)))
+            .Select(g => g.MaxBy(r => r.End)!)
+            .ToList();
+        return new SlotsToday(
+            today,
+            latest.Count,
+            latest.Count(r => r.Outcome == SlotOutcome.Completed),
+            latest.Count(r => r.Outcome == SlotOutcome.Aborted),
+            latest.Count(r => r.Outcome == SlotOutcome.Skipped));
     }
 
     public void SetState(string state, DateTimeOffset? nextSlot)
@@ -95,9 +146,20 @@ public sealed class StatusStore
         lock (_gate)
         {
             _lastSlot = report;
+            _recent.Add(report);
+            var keepFrom = report.Day.AddDays(-1);
+            _recent.RemoveAll(r => r.Day < keepFrom);
+            if (_recent.Count > RecentKept)
+            {
+                _recent.RemoveRange(0, _recent.Count - RecentKept);
+            }
             if (_path is not null)
             {
                 WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(report, Json));
+            }
+            if (_recentPath is not null)
+            {
+                WriteAtomically(_recentPath, JsonSerializer.SerializeToUtf8Bytes(_recent, Json));
             }
         }
     }
@@ -125,6 +187,7 @@ public sealed class StatusStore
                 now = _time.GetUtcNow(),
                 state = _state,
                 nextSlot = _nextSlot,
+                slotsToday = CountToday(),
                 bulletinsHeld = _bulletinsHeld,
                 lastIntake = _lastIntake,
                 lastSlot = _lastSlot,
@@ -134,17 +197,26 @@ public sealed class StatusStore
     }
 }
 
-/// <summary>Serves <see cref="StatusStore.Render"/> at <c>/</c> and <c>/status</c>, read-only.</summary>
+/// <summary>
+/// Serves <see cref="StatusStore.Render"/> at <c>/</c> and <c>/status</c>, and, when given a way to
+/// start one, a one-off slot on <c>POST /run</c>, from this machine only: 202 with the slot it
+/// started, 409 when it cannot start one now, 403 from anywhere else.
+/// </summary>
 public sealed class StatusServer : IAsyncDisposable
 {
+    /// <summary>The header naming who asked for a one-off slot; the remote address is logged with it.</summary>
+    public const string RequestedByHeader = "X-Requested-By";
+
     private readonly HttpListener _listener = new();
     private readonly StatusStore _status;
+    private readonly Func<string, Service.RunNowAnswer>? _runNow;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
 
-    public StatusServer(string bind, int port, StatusStore status)
+    public StatusServer(string bind, int port, StatusStore status, Func<string, Service.RunNowAnswer>? runNow = null)
     {
         _status = status;
+        _runNow = runNow;
         string host = bind is "*" or "0.0.0.0" ? "+" : bind;
         _listener.Prefixes.Add(string.Create(CultureInfo.InvariantCulture, $"http://{host}:{port}/"));
         Address = string.Create(CultureInfo.InvariantCulture, $"http://{bind}:{port}/status");
@@ -175,9 +247,13 @@ public sealed class StatusServer : IAsyncDisposable
             try
             {
                 string path = context.Request.Url?.AbsolutePath ?? "/";
-                bool known = context.Request.HttpMethod == "GET" && path is "/" or "/status";
-                byte[] body = Encoding.UTF8.GetBytes(known ? _status.Render() : "{\"error\": \"not found\"}");
-                context.Response.StatusCode = known ? 200 : 404;
+                (int code, string text) = path == "/run" && _runNow is not null
+                    ? Run(context.Request)
+                    : context.Request.HttpMethod == "GET" && path is "/" or "/status"
+                        ? (200, _status.Render())
+                        : (404, "{\"error\": \"not found\"}");
+                byte[] body = Encoding.UTF8.GetBytes(text);
+                context.Response.StatusCode = code;
                 context.Response.ContentType = "application/json; charset=utf-8";
                 context.Response.Headers["Cache-Control"] = "no-cache";
                 await context.Response.OutputStream.WriteAsync(body).ConfigureAwait(false);
@@ -191,6 +267,31 @@ public sealed class StatusServer : IAsyncDisposable
             }
         }
     }
+
+    private (int Code, string Body) Run(HttpListenerRequest request)
+    {
+        if (request.HttpMethod != "POST")
+        {
+            return (405, Error("POST to start a one-off slot"));
+        }
+        IPEndPoint? remote = request.RemoteEndPoint;
+        if (remote is null || !IPAddress.IsLoopback(remote.Address))
+        {
+            return (403, Error("a one-off slot can only be asked for from this machine"));
+        }
+        string who = Ascii.Plain(request.Headers[RequestedByHeader] ?? "").Trim();
+        if (who.Length > 80)
+        {
+            who = who[..80];
+        }
+        who = string.Create(CultureInfo.InvariantCulture, $"{(who.Length > 0 ? who : "someone")} ({remote})");
+        Service.RunNowAnswer answer = _runNow!(who);
+        return answer.Accepted
+            ? (202, JsonSerializer.Serialize(new { slot = answer.Slot, requestedBy = who }, StatusStore.Json))
+            : (409, Error(answer.Problem ?? "not now"));
+    }
+
+    private static string Error(string message) => JsonSerializer.Serialize(new { error = message }, StatusStore.Json);
 
     public async ValueTask DisposeAsync()
     {
