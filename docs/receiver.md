@@ -60,7 +60,7 @@ Tested against LinBPQ 6.0.25.41.
 
 4. Put the same password in the receiver's config, and `"port": 8011`.
 
-LinBPQ holds bulletins older than its BID lifetime and maximum age. If you have set either very low, broadcast bulletins (carried for three days) may arrive held.
+LinBPQ holds bulletins older than its BID lifetime and maximum age. If you have set either very low, bulletins sent this way (carried for three days) may arrive held.
 
 ### Linux FBB
 

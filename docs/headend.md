@@ -1,6 +1,6 @@
 # The head end
 
-The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins from the BBS as a forwarding partner, and once a day broadcasts them through the station's own modem. It never touches the radio directly: the frames go over KISS to a broadcast modem in pdn-soundmodem, and the lease and the calibration tone go through pdn-soundmodem's HTTP API.
+The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins from the BBS as a forwarding partner, and once a day sends them through the station's own modem. It never touches the radio directly: the frames go over KISS to a dedicated modem in pdn-soundmodem, and the lease and the calibration tone go through pdn-soundmodem's HTTP API.
 
 ## What happens each day
 
@@ -9,7 +9,7 @@ At 12:00 UTC (`slot.timeUtc`) the head end:
 1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the day's frames.
 2. Checks that the system clock is synchronised (the kernel's own flag, as timedatectl shows it), and keys nothing until it is (`slot.requireClockSync`); a slot it skips for this is retried. It never runs a day earlier than the last one it ran.
 3. Reads the Flex's frequency reference and PA temperature, if configured, and logs whether it is GPS locked. It does not start with the PA already over the limit.
-4. Opens the broadcast modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and tells the station to send each burst anyway once it has waited 10 s for a clear channel (`station.maxCarrierWaitSeconds`).
+4. Opens the bulletin modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and tells the station to send each burst anyway once it has waited 10 s for a clear channel (`station.maxCarrierWaitSeconds`).
 5. Waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the 30 s calibration tone at 1800 Hz as the lease holder's transmitter test. If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up for the day (`"skip"`).
 6. Pauses 8 s so the modem's CW ident, which falls due with the first transmission, goes out before the first burst.
 7. Sends the frames a burst at a time (see below), checking the PA temperature every 5 s.
@@ -27,7 +27,7 @@ Before queueing a burst the head end checks that the lease it holds will outlast
 
 ## GB7RDG's pdn-soundmodem
 
-It needs pdn-soundmodem with burst packing (#544) and the transmit lease (#545) with its dropQueued, channel-busy flag, maxCarrierWaitSeconds and closing ident, an API key, and one more modem entry for the broadcast, on its own sub-channel and KISS port:
+It needs pdn-soundmodem with burst packing (#544) and the transmit lease (#545) with its dropQueued, channel-busy flag, maxCarrierWaitSeconds and closing ident, an API key, and one more modem entry for the bulletins, on its own sub-channel and KISS port:
 
 ```json
 {

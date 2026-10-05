@@ -21,7 +21,7 @@ jobs:
         # Everything but the docker end-to-end test, which has a job of its own below.
         run: dotnet test -c Release --no-build --filter "Category!=Docker"
 
-  # The receiver end to end: a day's broadcast modulated into a noisy recording, decoded by the
+  # The receiver end to end: a day's slot modulated into a noisy recording, decoded by the
   # receiver and delivered into a real LinBPQ in docker (tests/Mailcast.Receiver.Tests/EndToEndTests.cs).
   receiver-end-to-end:
     runs-on: ubuntu-latest

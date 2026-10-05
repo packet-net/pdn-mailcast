@@ -19,7 +19,7 @@
     "burstGapSeconds": 1
   },
 
-  // The station's pdn-soundmodem: its API (the page port and api.key) and the broadcast modem's
+  // The station's pdn-soundmodem: its API (the page port and api.key) and the bulletin modem's
   // own KISS port and sub-channel, as in its modems[] entry.
   "station": {
     "apiUrl": "http://127.0.0.1:8107/",

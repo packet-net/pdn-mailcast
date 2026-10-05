@@ -8,9 +8,9 @@ Recommends: pdn-soundmodem
 Section: hamradio
 Priority: optional
 Homepage: https://github.com/packet-net/pdn-mailcast
-Description: head end for the daily packet bulletin broadcast
+Description: head end for the daily packet bulletin service
  Takes bulletins from the station's BBS as a forwarding partner and, once a
- day, broadcasts them through the station's own pdn-soundmodem: a transmit
+ day, sends them through the station's own pdn-soundmodem: a transmit
  lease, a calibration tone, then RaptorQ-coded MS110D bursts that receivers
  rebuild and hand to their own BBS. It drives pdn-soundmodem over KISS and its
  HTTP API and never opens the radio itself. Self-contained: it bundles its own

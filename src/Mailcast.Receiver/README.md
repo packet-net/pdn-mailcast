@@ -1,6 +1,6 @@
 # pdn-mailcast receiver
 
-Hears GB7RDG's daily bulletin broadcast on 40 m and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
+Hears GB7RDG's daily bulletin transmission on 40 m and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
 
 You need a Linux machine (a Pi is fine) running LinBPQ with its mail.
 
