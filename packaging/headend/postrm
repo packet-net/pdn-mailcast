@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+UNIT=pdn-mailcast-headend.service
+
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then
+    systemctl --system daemon-reload >/dev/null || true
+fi
+
+if [ "$1" = "remove" ] && command -v deb-systemd-helper >/dev/null; then
+    deb-systemd-helper mask "$UNIT" >/dev/null || true
+fi
+
+if [ "$1" = "purge" ]; then
+    if command -v deb-systemd-helper >/dev/null; then
+        deb-systemd-helper purge "$UNIT" >/dev/null || true
+        deb-systemd-helper unmask "$UNIT" >/dev/null || true
+    fi
+    # The config is made by postinst, not shipped, so dpkg does not remove it on purge. The
+    # bulletins and their ESIs in /var/lib/pdn-mailcast-headend go too: purge means start again.
+    rm -f /etc/pdn-mailcast-headend/headend.json
+    rmdir --ignore-fail-on-non-empty /etc/pdn-mailcast-headend 2>/dev/null || true
+    rm -rf /var/lib/pdn-mailcast-headend
+    if getent passwd pdn-mailcast-headend >/dev/null; then
+        deluser --system --quiet pdn-mailcast-headend >/dev/null 2>&1 || true
+    fi
+fi
+
+exit 0

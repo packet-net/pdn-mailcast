@@ -95,7 +95,9 @@ The published pdn-soundmodem package cannot pack frames yet, so offline every fr
 
 ## Configuration
 
-`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key with its default. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. `pdn-mailcast-headend --check-config` checks a file.
+`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key with its default. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file.
+
+`scripts/build-headend-deb.sh linux-x64 VERSION` builds the package (also `linux-arm64` and `linux-arm`), laid out like the receiver's: the binary in `/usr/lib/pdn-mailcast-headend`, state in `/var/lib/pdn-mailcast-headend`.
 
 ## Still missing in pdn-soundmodem
 

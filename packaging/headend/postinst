@@ -1,0 +1,44 @@
+#!/bin/sh
+set -e
+
+EXAMPLE=/usr/share/pdn-mailcast-headend/headend.example.json
+CONFIG=/etc/pdn-mailcast-headend/headend.json
+UNIT=pdn-mailcast-headend.service
+
+case "$1" in
+  configure)
+    if ! getent passwd pdn-mailcast-headend >/dev/null; then
+        adduser --system --no-create-home --home /var/lib/pdn-mailcast-headend --group pdn-mailcast-headend
+    fi
+    # The config holds the station's API key and the BBS password: no access for anyone else.
+    install -d -o root -g pdn-mailcast-headend -m 0750 /etc/pdn-mailcast-headend
+    if [ ! -e "$CONFIG" ]; then
+        install -o root -g pdn-mailcast-headend -m 0640 "$EXAMPLE" "$CONFIG"
+        echo "pdn-mailcast-headend: put an example config in $CONFIG."
+        echo "  Set up the station and the BBS (see /usr/share/doc/pdn-mailcast-headend/headend.md),"
+        echo "  put the station's API key and the BBS password in $CONFIG, then:"
+        echo "  systemctl start pdn-mailcast-headend"
+    fi
+    ;;
+esac
+
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
+    if command -v deb-systemd-helper >/dev/null; then
+        deb-systemd-helper unmask "$UNIT" >/dev/null || true
+        if deb-systemd-helper --quiet was-enabled "$UNIT"; then
+            deb-systemd-helper enable "$UNIT" >/dev/null || true
+        else
+            deb-systemd-helper update-state "$UNIT" >/dev/null || true
+        fi
+    fi
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then
+        systemctl --system daemon-reload >/dev/null || true
+        # Not started on a first install: the station and the BBS have to be set up first. An
+        # upgrade restarts a head end that was running, so it picks up the new binary.
+        if [ -n "${2:-}" ] && command -v deb-systemd-invoke >/dev/null; then
+            deb-systemd-invoke try-restart "$UNIT" >/dev/null || true
+        fi
+    fi
+fi
+
+exit 0

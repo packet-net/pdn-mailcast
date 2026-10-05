@@ -24,7 +24,7 @@ The code so far:
 - `src/Mailcast.RaptorQ`: RaptorQ (RFC 6330), with no dependency on the rest of the repo.
 - `src/Mailcast.Core`: the on-air frame format, the bulletin model, zstd compression with the trained dictionary, the directory, the head end's store and daily schedule, and the receiver's symbol store.
 - `src/Mailcast.Fbb`: FBB compressed (B1F) forwarding, both the calling and the answering side, copied from pdn-bbs with its tests. The receiver uses it to hand bulletins to your BBS, and the head end to take them from GB7RDG's.
-- `src/Mailcast.HeadEnd`: the head end, `pdn-mailcast-headend`: takes bulletins from GB7RDG's BBS as a forwarding partner and broadcasts them once a day through the station's pdn-soundmodem, or renders a day's slot to a WAV file offline. See [docs/headend.md](docs/headend.md); `packaging/headend/build-deb.sh` builds its .deb.
+- `src/Mailcast.HeadEnd`: the head end, `pdn-mailcast-headend`: takes bulletins from GB7RDG's BBS as a forwarding partner and broadcasts them once a day through the station's pdn-soundmodem, or renders a day's slot to a WAV file offline. See [docs/headend.md](docs/headend.md); `scripts/build-headend-deb.sh linux-x64 VERSION` builds its .deb.
 - `tools/Mailcast.DictionaryTool`: imports bulletins from a copy of a LinBPQ mail store, trains a dictionary, and compares compressed sizes.
 - `tools/raptorq-vectors` and `tools/RaptorQ.InteropExport`: check our RaptorQ against the Rust `raptorq` crate, both ways. CI runs them; to run them by hand you also need cargo:
 
