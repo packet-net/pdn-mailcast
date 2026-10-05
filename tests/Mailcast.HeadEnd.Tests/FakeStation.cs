@@ -11,7 +11,7 @@ public sealed record Keyup(DateTimeOffset Start, DateTimeOffset End, string What
 /// <summary>
 /// pdn-soundmodem as the head end sees it - the lease and tone API and the broadcast modem's KISS
 /// port - on a virtual clock, with #545's lease as the head end codes against it: a channel-busy
-/// flag, maxCarrierWaitSeconds, dropQueued on release and on its own, and the holder's unkeyed
+/// flag, maxCarrierWaitSeconds (frames go anyway after it), dropQueued on release and on its own, and the holder's unkeyed
 /// frames dropped when the lease runs out. Its transmitter keys whatever is still queued once the
 /// channel clears, lease or no lease, so a frame the head end failed to get dropped shows up as a
 /// keyup outside the lease. It keeps a record of every keyup and whether a lease held by the
@@ -59,7 +59,10 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Whether the station answers tones at all: false answers 404 as with txTest off.</summary>
     public bool ToneAvailable { get; set; } = true;
 
-    /// <summary>A station that ignores dropQueued and lease expiry, to show the keyup check catches it.</summary>
+    /// <summary>The modem stops acknowledging after this many frames, though it still transmits.</summary>
+    public int? SilentAfterFrames { get; set; }
+
+    /// <summary>A station that ignores dropQueued, lease expiry and the carrier limit, to show the keyup check catches it.</summary>
     public bool IgnoreDrops { get; set; }
 
     /// <summary>The KISS link fails on this write (1-based), as a closed socket would.</summary>
@@ -159,6 +162,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
         private readonly List<(ushort Id, int Generation)> _queued = [];
         private bool _transmitting;
         private int _writes;
+        private int _acked;
 
         public ChannelReader<ushort> Acks => _acks.Reader;
 
@@ -190,18 +194,14 @@ public sealed class FakeStation : IStationApi, IKissConnector
             {
                 var burst = _queued.ToList();
                 _queued.Clear();
+                // #545: the holder's frames wait for a clear channel no longer than the lease's
+                // maxCarrierWaitSeconds, then go anyway.
                 DateTimeOffset waitFrom = station._time.GetUtcNow();
-                bool drop = false;
-                while (station.ChannelBusy)
+                while (station.ChannelBusy && (station.IgnoreDrops || station._time.GetUtcNow() - waitFrom < station._maxCarrierWait))
                 {
-                    if (!station.IgnoreDrops && station._time.GetUtcNow() - waitFrom >= station._maxCarrierWait)
-                    {
-                        drop = true;
-                        break;
-                    }
                     await Task.Delay(TimeSpan.FromSeconds(1), station._time);
                 }
-                drop |= burst.Any(b => b.Generation < station._dropGeneration);
+                bool drop = burst.Any(b => b.Generation < station._dropGeneration);
                 drop |= !station.IgnoreDrops && !station.LeaseHeld;
                 if (drop)
                 {
@@ -211,6 +211,11 @@ public sealed class FakeStation : IStationApi, IKissConnector
                 await station.KeyAsync(TimeSpan.FromSeconds(station.SecondsPerBurst + (station.SecondsPerFrame * burst.Count)), $"burst of {burst.Count}", CancellationToken.None);
                 foreach (var (id, _) in burst)
                 {
+                    if (station.SilentAfterFrames is int quiet && _acked >= quiet)
+                    {
+                        continue;
+                    }
+                    _acked++;
                     _acks.Writer.TryWrite(id);
                 }
             }

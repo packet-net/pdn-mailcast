@@ -279,7 +279,7 @@ public sealed record StationConfig
 
     public double LeaseSeconds { get; init; } = 120;
 
-    /// <summary>The lease's maxCarrierWaitSeconds: frames that would wait longer for a clear channel are dropped.</summary>
+    /// <summary>The lease's maxCarrierWaitSeconds: frames that have waited this long for a clear channel go anyway.</summary>
     public double MaxCarrierWaitSeconds { get; init; } = 10;
 
     public double RenewSeconds { get; init; } = 30;

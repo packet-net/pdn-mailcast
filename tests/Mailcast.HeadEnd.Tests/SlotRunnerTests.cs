@@ -191,21 +191,20 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Run_OnAChannelBusyForGood_TheStationDropsTheBurstAndNothingKeysLater()
+    public void Run_OnAChannelBusyForGood_EachBurstGoesAfterTheCarrierLimitInsideTheLease()
     {
-        // The channel never clears: the first burst waits past the lease's carrier limit and is
-        // dropped, the slot aborts, and when the channel clears later nothing of ours goes out.
         var rig = new Rig();
-        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromMinutes(10);
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(2);
         var report = rig.Run(20);
-        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
-        Assert.Contains("acknowledged 0 of the 7 frames of burst 1", report.Reason, StringComparison.Ordinal);
-        Assert.Equal(0, report.FramesSent);
-        Assert.Equal(7, report.FramesQueued);
-        Assert.Equal(7, rig.Station.Dropped);
-        rig.Time.Run(async () => { await Task.Delay(TimeSpan.FromMinutes(20), rig.Time); return 0; });
-        Assert.Empty(rig.Station.Keyups);
-        Assert.Single(rig.Station.Releases);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.False(report.ToneSent);
+        var queued = rig.Station.Frames.Select(f => f.At).Distinct().ToList();
+        Assert.Equal(queued.Count, rig.Station.Keyups.Count);
+        for (int i = 0; i < queued.Count; i++)
+        {
+            Assert.True(rig.Station.Keyups[i].Start >= queued[i] + TimeSpan.FromSeconds(10));
+        }
+        AssertNothingKeyedOutsideTheLease(rig.Station);
     }
 
     [Fact]
@@ -277,23 +276,12 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_AbortsWhenTheModemStopsAcknowledging()
     {
-        // The channel goes busy for good during the second burst's gather: it is dropped unkeyed.
         var rig = new Rig();
-        rig.Station.ChannelBusyUntil = DateTimeOffset.MaxValue;
-        rig.Station.ChannelBusyUntil = Noon;
-        var report = rig.Time.Run(async () =>
-        {
-            var run = rig.Runner.RunAsync(Day, [.. Enumerable.Range(0, 30).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None, rig.Progress.Add);
-            while (rig.Station.Frames.Count < 8)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(0.1), rig.Time);
-            }
-            rig.Station.ChannelBusyUntil = DateTimeOffset.MaxValue;
-            return await run;
-        });
+        rig.Station.SilentAfterFrames = 10;
+        var report = rig.Run(30);
         Assert.Equal(SlotOutcome.Aborted, report.Outcome);
-        Assert.Contains("acknowledged 0 of the 7 frames of burst 2", report.Reason, StringComparison.Ordinal);
-        Assert.Equal(7, report.FramesSent);
+        Assert.Contains("acknowledged 3 of the 7 frames of burst 2", report.Reason, StringComparison.Ordinal);
+        Assert.Equal(10, report.FramesSent);
         Assert.Equal(14, report.FramesQueued);
         AssertNothingKeyedOutsideTheLease(rig.Station);
     }

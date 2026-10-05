@@ -25,6 +25,9 @@ public sealed class HeadEndService(
     IJournal journal,
     TimeProvider time)
 {
+    /// <summary>The longest the wait for a slot sleeps before looking at the clock again.</summary>
+    public static readonly TimeSpan WakeEvery = TimeSpan.FromSeconds(60);
+
     /// <summary>Runs until cancelled.</summary>
     public async Task RunAsync(CancellationToken cancellation)
     {
@@ -37,10 +40,24 @@ public sealed class HeadEndService(
                 status.SetState("waiting", next);
                 status.SetBulletinsHeld(store.Count);
                 journal.Write($"next slot {next.UtcDateTime:yyyy-MM-dd HH:mm}Z; {store.Count} bulletins held");
-                TimeSpan wait = next - time.GetUtcNow();
-                if (wait > TimeSpan.Zero)
+                // Woken at least every minute to look at the clock again, so a box that booted with a
+                // stale clock and is then corrected does not sleep through the real slot.
+                while (true)
                 {
-                    await Task.Delay(wait, time, cancellation);
+                    DateTimeOffset now = time.GetUtcNow();
+                    DateTimeOffset due = NextSlot(now, slotTime, catchUp, status.LastSlot, retryAfter);
+                    if (due != next)
+                    {
+                        next = due;
+                        status.SetState("waiting", next);
+                        journal.Write($"next slot {next.UtcDateTime:yyyy-MM-dd HH:mm}Z (the clock moved)");
+                    }
+                    TimeSpan wait = next - now;
+                    if (wait <= TimeSpan.Zero)
+                    {
+                        break;
+                    }
+                    await Task.Delay(wait < WakeEvery ? wait : WakeEvery, time, cancellation);
                 }
                 await RunSlotAsync(DateOnly.FromDateTime(next.UtcDateTime), cancellation);
             }

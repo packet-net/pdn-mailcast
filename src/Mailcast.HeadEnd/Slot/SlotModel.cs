@@ -48,8 +48,8 @@ public sealed record SlotSettings
     public TimeSpan LeaseMargin { get; init; } = TimeSpan.FromSeconds(15);
 
     /// <summary>
-    /// The lease's <c>maxCarrierWaitSeconds</c>: the station drops any of the holder's frames that
-    /// would wait longer than this for a clear channel. At most <see cref="LeaseMargin"/>, so a
+    /// The lease's <c>maxCarrierWaitSeconds</c>: the station sends the holder's frames anyway once
+    /// they have waited this long for a clear channel. At most <see cref="LeaseMargin"/>, so a
     /// burst that waits its longest still ends inside the lease.
     /// </summary>
     public TimeSpan MaxCarrierWait { get; init; } = TimeSpan.FromSeconds(10);

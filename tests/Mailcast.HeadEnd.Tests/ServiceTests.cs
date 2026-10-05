@@ -60,6 +60,21 @@ public class ServiceTests
 
         public MemoryJournal Journal { get; } = new();
 
+        public DateTimeOffset? WaitForTheSlotAcrossAClockStep(TimeSpan step) => Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromSeconds(90), Time);
+            Time.StepWallClock(step);
+            for (int i = 0; i < 30 && Station.LeaseRequests.Count == 0; i++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10), Time);
+            }
+            await stop.CancelAsync();
+            await service;
+            return Station.LeaseRequests.Count > 0 ? Station.LeaseRequests[0].At : (DateTimeOffset?)null;
+        });
+
         public SlotReport Run(DateOnly day, TimeSpan? stopAfter = null) => Time.Run(async () =>
         {
             using var stop = stopAfter is TimeSpan t ? new CancellationTokenSource(t, Time) : new CancellationTokenSource();
@@ -182,5 +197,18 @@ public class ServiceTests
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 0, 30, TimeSpan.Zero), head.Station.LeaseRequests[0].At);
         Assert.Contains(head.Journal.Lines, l => l.Contains("not finished within 30 s before the slot", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheWaitForTheSlot_FollowsAClockCorrection()
+    {
+        // Booted at 00:30 by a clock eleven and a half hours slow, corrected 90 s later to 12:02.
+        using var dir = new TempDirectory();
+        var head = new Head(dir, Day1, new SlotSettings { SubChannel = 4 });
+        head.Store.Offer(Bulletins.Make(41, 3000), Day1);
+        head.Time.StepWallClock(TimeSpan.FromHours(-11.5));
+        DateTimeOffset? started = head.WaitForTheSlotAcrossAClockStep(TimeSpan.FromHours(11.5));
+        Assert.NotNull(started);
+        Assert.InRange(started.Value, new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 5, 12, 3, 0, TimeSpan.Zero));
     }
 }

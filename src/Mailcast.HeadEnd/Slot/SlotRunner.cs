@@ -23,8 +23,8 @@ namespace Mailcast.HeadEnd.Slot;
 /// burst's at once). The station's queue never holds more than one burst of ours.</para>
 /// <para><b>Inside the lease.</b> Before queueing a burst the runner checks that the lease it
 /// holds has at least the burst's airtime and <see cref="SlotSettings.LeaseMargin"/> left, and
-/// renews first if not. The lease asks the station to drop any of the holder's frames that would
-/// wait longer than <see cref="SlotSettings.MaxCarrierWait"/> (no more than the margin) for a clear
+/// renews first if not. The lease tells the station to send the holder's frames anyway once they
+/// have waited <see cref="SlotSettings.MaxCarrierWait"/> (no more than the margin) for a clear
 /// channel, and the station drops the holder's unkeyed frames itself if the lease runs out. So a
 /// burst either keys inside the lease or not at all, even when the renewal after it fails.</para>
 /// <para><b>Stopping.</b> A refused renewal, a hot PA or a lost PA watch, a KISS failure,
@@ -209,7 +209,7 @@ public sealed class SlotRunner
                 }
                 _leaseTaken = true;
                 LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
-                Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames waiting over {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel are dropped");
+                Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames go anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel");
 
                 using var slot = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
                 Task renewing = RenewLoopAsync(slot.Token);
@@ -457,7 +457,7 @@ public sealed class SlotRunner
                     {
                         return (SlotOutcome.Skipped, $"the channel stayed busy for {S.ChannelWait.TotalMinutes:0.#} min");
                     }
-                    Say($"channel still busy after {S.ChannelWait.TotalMinutes:0.#} min; going ahead without the tone (frames that wait over {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel are dropped by the station)");
+                    Say($"channel still busy after {S.ChannelWait.TotalMinutes:0.#} min; going ahead without the tone (each burst goes anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel)");
                     return (null, null);
                 }
                 if (!saidBusy)
@@ -620,7 +620,8 @@ public sealed class SlotRunner
             }
             try
             {
-                using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30), owner._time);
+                // The station holds the lease until the closing ident has gone, up to 60 s, and answers then.
+                using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(90), owner._time);
                 bool released = await owner._station.ReleaseLeaseAsync(S.SubChannel, bounded.Token);
                 Say(released
                     ? "transmit lease released; anything of ours not yet keyed is dropped, and the station sends the closing ident"

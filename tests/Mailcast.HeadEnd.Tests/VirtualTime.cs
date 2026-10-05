@@ -14,7 +14,10 @@ public sealed class VirtualTime : TimeProvider
     // One pump for the clock's whole life: work begun in one Run (a fake transmitter waiting for a
     // clear channel, say) carries on in the next.
     private readonly PumpContext _context = new();
+    // Timers run on _now, the monotonic clock; GetUtcNow adds _wallStep, so the wall clock can be
+    // stepped as NTP steps it without moving any timer.
     private DateTimeOffset _now;
+    private TimeSpan _wallStep;
     private long _sequence;
 
     public VirtualTime(DateTimeOffset start) => _now = start;
@@ -23,7 +26,27 @@ public sealed class VirtualTime : TimeProvider
     {
         lock (_gate)
         {
-            return _now;
+            return _now + _wallStep;
+        }
+    }
+
+    private DateTimeOffset Monotonic
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _now;
+            }
+        }
+    }
+
+    /// <summary>Steps the wall clock, as a time sync after a boot with a stale clock does; timers keep their due times.</summary>
+    public void StepWallClock(TimeSpan by)
+    {
+        lock (_gate)
+        {
+            _wallStep += by;
         }
     }
 
@@ -75,7 +98,7 @@ public sealed class VirtualTime : TimeProvider
         var previous = SynchronizationContext.Current;
         var context = _context;
         SynchronizationContext.SetSynchronizationContext(context);
-        DateTimeOffset start = GetUtcNow();
+        DateTimeOffset start = Monotonic;
         try
         {
             Task<T> task = body();
@@ -85,7 +108,7 @@ public sealed class VirtualTime : TimeProvider
                 {
                     continue;
                 }
-                if (GetUtcNow() - start > (limit ?? TimeSpan.FromHours(3)))
+                if (Monotonic - start > (limit ?? TimeSpan.FromHours(3)))
                 {
                     throw new InvalidOperationException($"virtual time passed {limit} with the work unfinished");
                 }

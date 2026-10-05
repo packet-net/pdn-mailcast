@@ -37,8 +37,8 @@ public sealed record ToneAnswer(ToneOutcome Outcome, string Message);
 public interface IStationApi
 {
     /// <summary>
-    /// Takes or renews the transmit lease for a sub-channel (<c>POST /api/txlease</c>), asking the
-    /// station to drop any of the holder's frames that would wait longer than
+    /// Takes or renews the transmit lease for a sub-channel (<c>POST /api/txlease</c>), telling the
+    /// station to send the holder's frames anyway once they have waited
     /// <paramref name="maxCarrierWaitSeconds"/> for a clear channel.
     /// </summary>
     Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation);
@@ -48,7 +48,8 @@ public interface IStationApi
 
     /// <summary>
     /// Gives the lease back, dropping any of the holder's frames not yet keyed
-    /// (<c>{"release": true, "dropQueued": true}</c>). The station sends the holder's closing ident.
+    /// (<c>{"release": true, "dropQueued": true}</c>). The station sends the holder's closing ident
+    /// first, holding the lease up to 60 s for it, and answers once it has gone.
     /// </summary>
     Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation);
 
@@ -127,7 +128,8 @@ public sealed class StationApiClient : IStationApi, IDisposable
     public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
     {
         var body = new JsonObject { ["release"] = true, ["subChannel"] = subChannel, ["dropQueued"] = true };
-        var (status, json, _) = await LeaseCallAsync(HttpMethod.Post, body, cancellation).ConfigureAwait(false);
+        // Answered once the closing ident has gone, which the station allows up to 60 s.
+        var (status, json, _) = await LeaseCallAsync(HttpMethod.Post, body, cancellation, ReleaseLimit).ConfigureAwait(false);
         return status == HttpStatusCode.OK && json?["released"]?.GetValue<bool>() == true;
     }
 
@@ -171,17 +173,21 @@ public sealed class StationApiClient : IStationApi, IDisposable
             : new ToneAnswer(ToneOutcome.Failed, $"HTTP {(int)status}: {why}");
     }
 
-    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation)
+    /// <summary>How long a release may take: the station's 60 s for the closing ident, and some.</summary>
+    public static readonly TimeSpan ReleaseLimit = TimeSpan.FromSeconds(90);
+
+    private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation, TimeSpan? callLimit = null)
     {
+        TimeSpan allowed = callLimit ?? _leaseCallLimit;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        limit.CancelAfter(_leaseCallLimit);
+        limit.CancelAfter(allowed);
         try
         {
             return await SendAsync(method, "api/txlease", body, limit.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
         {
-            throw new HttpRequestException($"the station did not answer within {_leaseCallLimit.TotalSeconds:0} s");
+            throw new HttpRequestException($"the station did not answer within {allowed.TotalSeconds:0} s");
         }
     }
 

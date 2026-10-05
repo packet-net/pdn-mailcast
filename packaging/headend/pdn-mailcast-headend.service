@@ -1,8 +1,9 @@
 [Unit]
 Description=pdn-mailcast head end: the daily HF bulletin broadcast, through pdn-soundmodem
 Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/docs/headend.md
-After=network-online.target pdn-soundmodem.service
-Wants=network-online.target
+# The slot is at a time of day: wait for the clock to be set, as far as the system can tell.
+After=network-online.target time-sync.target pdn-soundmodem.service
+Wants=network-online.target time-sync.target
 ConditionPathExists=/etc/pdn-mailcast-headend/headend.json
 
 [Service]
