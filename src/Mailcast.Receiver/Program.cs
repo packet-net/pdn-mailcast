@@ -22,7 +22,7 @@ for (int i = 0; i < args.Length; i++)
         case "--help" or "-h":
             Console.WriteLine(
                 $"""
-                pdn-mailcast-receiver {ReceiverHost.Version}: hears GB7RDG's daily bulletin broadcast and hands each bulletin to your BBS.
+                pdn-mailcast-receiver {ReceiverHost.Version}: hears GB7RDG's bulletins on 40 m and hands each one to your BBS.
 
                   --config PATH    the config file (default {DefaultConfig})
                   --decode FILE    decode one WAV recording, deliver what it completes, and exit

@@ -41,29 +41,40 @@ public class ToneDetectorTests
     }
 
     [Theory]
-    [InlineData(1803.2, 10.0)]
-    [InlineData(1741.7, 0.0)]
-    [InlineData(1800.0, -10.0)]
-    public void ThirtySecondTone_MeasuresOffsetAndSnr(double toneHz, double snrDb)
+    [InlineData(1803.2, 10.0, 7)]
+    [InlineData(1741.7, 0.0, 7)]
+    [InlineData(1800.0, -10.0, 7)]
+    [InlineData(1800.0, -10.0, 21)]
+    [InlineData(1858.0, 3.0, 22)]
+    public void TenSecondTone_MeasuresOffsetAndSnr(double toneHz, double snrDb, int seed)
     {
-        var reports = Run(Signal(40, toneHz, snrDb, toneFrom: 4, toneTo: 34, seed: 7));
+        var reports = Run(Signal(20, toneHz, snrDb, toneFrom: 3.3, toneTo: 13.3, seed: seed));
 
         var report = Assert.Single(reports);
-        Assert.InRange(report.OffsetHz, toneHz - 1800 - 0.2, toneHz - 1800 + 0.2);
-        Assert.InRange(report.SnrDb, snrDb - 1.5, snrDb + 1.5);
-        Assert.InRange(report.Duration.TotalSeconds, 27, 33);
+        Assert.InRange(report.OffsetHz, toneHz - 1800 - 0.3, toneHz - 1800 + 0.3);
+        Assert.InRange(report.SnrDb, snrDb - 2, snrDb + 2);
+        Assert.InRange(report.Duration.TotalSeconds, 8, 11);
     }
 
     [Fact]
-    public void CarrierThatNeverStops_IsNotReported()
+    public void TenSecondTone_IsInsideTheLengthsAccepted()
     {
-        Assert.Empty(Run(Signal(75, 1850, 10, toneFrom: 0, toneTo: 75, seed: 8)));
+        Assert.InRange(TimeSpan.FromSeconds(OnAir.ToneSeconds), ToneDetector.MinDuration + TimeSpan.FromSeconds(2.1), ToneDetector.MaxDuration - TimeSpan.FromSeconds(2.1));
+    }
+
+    [Theory]
+    [InlineData(1850, 75)]
+    [InlineData(1790, 75)]
+    [InlineData(1810, 30)]
+    public void CarrierNearTheCentre_ThatGoesOnTooLong_IsNotReported(double hz, double seconds)
+    {
+        Assert.Empty(Run(Signal(seconds + 10, hz, 10, toneFrom: 2, toneTo: 2 + seconds, seed: 8)));
     }
 
     [Fact]
     public void ToneTooFarOff_IsNotReported()
     {
-        Assert.Empty(Run(Signal(40, 1650, 10, toneFrom: 4, toneTo: 34, seed: 11)));
+        Assert.Empty(Run(Signal(20, 1650, 10, toneFrom: 3, toneTo: 13, seed: 11)));
     }
 
     [Fact]
@@ -75,6 +86,6 @@ public class ToneDetectorTests
     [Fact]
     public void ShortBlip_IsNotReported()
     {
-        Assert.Empty(Run(Signal(30, 1800, 10, toneFrom: 5, toneTo: 17, seed: 10)));
+        Assert.Empty(Run(Signal(15, 1800, 10, toneFrom: 5, toneTo: 9, seed: 10)));
     }
 }

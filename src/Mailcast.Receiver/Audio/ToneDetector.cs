@@ -21,18 +21,19 @@ public sealed record ToneReport(double FrequencyHz, double OffsetHz, double SnrD
 /// when the run ends, its frequency (refined between bins, then averaged) and its SNR are
 /// reported.</para>
 /// <para>A run is reported only if it lasted between <see cref="MinDuration"/> and
-/// <see cref="MaxDuration"/>: the slot's tone is 30 seconds, and a carrier that never stops (a
-/// birdie, or a station tuning up) is not it.</para>
+/// <see cref="MaxDuration"/>: the slot's tone is 10 seconds, and a carrier that goes on much
+/// longer (a birdie, or a station tuning up) is not it. The blocks are just over a second, so a
+/// 10-second tone is measured as between about 8 and 11 seconds.</para>
 /// <para>Time here is counted in samples, so the result does not depend on how fast the audio
 /// arrives. Not thread-safe: feed it from one thread.</para>
 /// </remarks>
 public sealed class ToneDetector
 {
     /// <summary>The shortest run reported.</summary>
-    public static readonly TimeSpan MinDuration = TimeSpan.FromSeconds(20);
+    public static readonly TimeSpan MinDuration = TimeSpan.FromSeconds(7);
 
     /// <summary>The longest run reported.</summary>
-    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(45);
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(15);
 
     private const int Rate = 8000;
     private const int Size = 8192;

@@ -263,6 +263,7 @@ public sealed class StatusPage : IAsyncDisposable
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },
+            schedule = Schedule(config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs },
             slot = slot is null ? null : new
             {
@@ -301,6 +302,41 @@ public sealed class StatusPage : IAsyncDisposable
                 said = DeliveryService.Describe(r.Verdict),
                 detail = r.Detail,
             }),
+        };
+    }
+
+    /// <summary>
+    /// When the slots are, for the page: in words, the next slot and the one before it if that
+    /// may still be on, and for a web SDR which slots it listens to and the next of those.
+    /// </summary>
+    internal static object Schedule(ReceiverConfig config, DateTimeOffset now)
+    {
+        var schedule = config.Schedule;
+        var next = schedule.NextStart(now);
+        var before = next.AddMinutes(-schedule.EveryMinutes);
+        bool webSdr = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.UberSdr;
+        var listened = config.WebSdrSlots;
+        var (opens, closes, listenSlot) = ListeningWindow.Next(now, listened);
+        return new
+        {
+            words = schedule.Describe(),
+            everyMinutes = schedule.EveryMinutes,
+            slotUtc = config.SlotUtc,
+            oldConfig = config.DailyFromOldConfig,
+            slotsPerDay = schedule.SlotsPerDay,
+            next,
+            // The slot before, while it may still be on: within the time a web SDR would stay open for it.
+            recent = before < now && now - before < ReceiverConfig.WebSdrAfter ? before : (DateTimeOffset?)null,
+            toneSeconds = OnAir.ToneSeconds,
+            webSdr = !webSdr ? null : new
+            {
+                slotsPerDay = listened.Count,
+                times = listened.Select(t => t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
+                slot = listenSlot,
+                opens,
+                closes,
+                openNow = opens <= now,
+            },
         };
     }
 

@@ -52,8 +52,14 @@
 </header>
 <main>
   <section>
+    <h2>Hearing GB7RDG</h2>
+    <dl id="when"></dl>
+    <p class="muted" id="slotShape">Each slot starts with a 10 second tone, then a few minutes of short data bursts.</p>
+  </section>
+
+  <section>
     <h2>Last slot</h2>
-    <div id="slot" class="muted">Nothing heard yet. GB7RDG broadcasts once a day, around midday UK time.</div>
+    <div id="slot" class="muted">Nothing heard yet.</div>
   </section>
 
   <section>
@@ -74,11 +80,21 @@
     <h2 style="margin-top:14px">Input level</h2>
     <div class="meter"><div class="band" id="band"></div><div class="peak" id="peak"></div></div>
     <div class="muted" id="levelText">Peaks between -18 and -9 dBFS are best.</div>
+    <p class="muted">Check the level while a slot is on. Between slots there is only band noise, so a lower reading then is normal.</p>
+  </section>
+
+  <section class="wide">
+    <h2>If nothing is heard</h2>
+    <ul id="help">
+      <li>Wait for the next slot and watch the spectrogram. The tone shows as a bright line on the dashed centre line, then the data fills the space between the blue edges.</li>
+      <li>40 m changes through the day, so some slots may not reach you. Give it a few slots before changing anything.</li>
+      <li>The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.</li>
+    </ul>
   </section>
 
   <section class="wide">
     <h2>Bulletins</h2>
-    <div id="bulletins" class="muted">No directory heard yet: it says which bulletins are in today's broadcast.</div>
+    <div id="bulletins" class="muted">No list of bulletins heard yet. It comes round in each slot.</div>
   </section>
 
   <section class="wide">
@@ -136,15 +152,17 @@ async function refresh() {
     status = await (await fetch("api/status")).json();
   } catch { $("summary").textContent = "The receiver is not answering."; return; }
   const s = status;
-  $("summary").innerHTML = `Version ${esc(s.version)}. Audio: ${esc(s.audio.state)}, USB dial ${mhz(s.audio.dialKHz)} MHz. ${s.framesHeard} broadcast frames heard since it started.`;
+  $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
+  schedule(s);
 
   if (s.slot) {
     const t = s.slot.tone;
     $("slot").className = "";
     $("slot").innerHTML = (t
       ? `<div class="big">${t.offsetHz > 0 ? "+" : ""}${t.offsetHz} Hz, ${t.snrDb} dB</div>
-         <div class="muted">Tone at ${t.frequencyHz} Hz (it should be at ${s.markers.centreHz} Hz), signal to noise in 3 kHz, ${t.seconds} s long.</div>`
-      : `<div class="muted">No tone heard at the start of this slot.</div>`)
+         <div class="muted">Tone at ${t.frequencyHz} Hz (it should be at ${s.markers.centreHz} Hz), signal to noise in 3 kHz, ${t.seconds} s long.
+         ${Math.abs(t.offsetHz) <= 50 ? "That is close enough." : "That is well off: check the dial."}</div>`
+      : `<div class="muted">No tone heard at the start of this slot, but frames were.</div>`)
       + `<dl style="margin-top:10px"><dt>Started</dt><dd>${when(s.slot.started)}</dd>
          <dt>Frames heard</dt><dd>${s.slot.framesHeard}${s.slot.lastFrame ? ", last at " + new Date(s.slot.lastFrame).toLocaleTimeString() : ""}</dd></dl>`;
   }
@@ -157,7 +175,7 @@ async function refresh() {
   if (s.directory && s.bulletins.length) {
     const done = s.bulletins.filter(b => b.complete).length;
     $("bulletins").className = "";
-    $("bulletins").innerHTML = `<p class="muted">Broadcast of ${esc(s.directory.date)}: ${s.bulletins.length} bulletins, ${done} complete here.</p>
+    $("bulletins").innerHTML = `<p class="muted">List of ${esc(s.directory.date)}: ${s.bulletins.length} bulletins, ${done} complete here.</p>
       <table><tr><th>BID</th><th>Title</th><th>Pieces</th><th>BBS</th></tr>
       ${s.bulletins.map(b => `<tr><td class="num">${esc(b.bid)}</td><td>${esc(b.title)}</td>
         <td>${b.complete ? '<span class="good">complete</span>'
@@ -177,6 +195,46 @@ async function refresh() {
   $("band").style.left = pct(lvl.lowDbFs) + "%";
   $("band").style.width = (pct(lvl.highDbFs) - pct(lvl.lowDbFs)) + "%";
 }
+/* when and where to listen */
+const utc = t => new Date(t).toISOString().slice(11, 16) + " UTC";
+const local = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const day = t => new Date(t).toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10) ? "tomorrow " : "";
+const at = t => `${day(t)}${utc(t)} (${local(t)} your time)`;
+function schedule(s) {
+  const c = s.schedule, a = s.audio, web = c.webSdr;
+  const kind = a.source.startsWith("ubersdr:") ? "web" : a.source.startsWith("wav:") ? "wav" : "radio";
+  const tuning = kind === "web" ? `The web SDR is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
+    : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
+  let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
+    <dt>Slots</dt><dd>${esc(c.words)}</dd>
+    <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
+  if (web) {
+    const all = web.slotsPerDay === c.slotsPerDay;
+    rows += `<dt>Web SDR</dt><dd>${web.openNow ? `listening now, to the ${utc(web.slot)} slot`
+      : `the next slot it listens to is ${at(web.slot)}`}.
+      ${all ? "It listens to every slot." : `It listens to ${web.slotsPerDay} of the ${c.slotsPerDay} slots a day (${web.times.join(", ")} UTC)
+      to stay inside its allowance of about 3 hours a day.`}</dd>`;
+  }
+  if (c.oldConfig) {
+    rows += `<dt>Note</dt><dd class="warn">Your config file is from before hourly slots, so this receiver expects one slot a day.
+      Set <code>"slotUtc": "00:00"</code> and <code>"everyMinutes": 60</code> in receiver.json.</dd>`;
+  }
+  $("when").innerHTML = rows;
+  $("slotShape").textContent = `Each slot starts with a ${c.toneSeconds} second tone, ${s.markers.centreHz} Hz in your audio, then a few minutes of short data bursts.`;
+  if (!s.slot) $("slot").textContent = `Nothing heard yet. ${web && !web.openNow ? `The web SDR listens next at ${utc(web.slot)}.` : `The next slot is at ${utc(c.next)}.`}`;
+
+  const tips = [
+    web ? `Wait for the next slot the web SDR listens to, at ${utc(web.slot)}, and watch the spectrogram.`
+      : `Wait for the next slot, at ${utc(c.next)}, and watch the spectrogram.`,
+    "The tone shows as a bright line on the dashed centre line, then the data fills the space between the blue edges.",
+    "40 m changes through the day, so some slots may not reach you. Give it a few slots before changing anything.",
+  ];
+  if (kind === "radio") tips.push(`Check the radio is on USB at ${mhz(a.dialKHz)} MHz with a receive filter at least 3 kHz wide, and that the level meter moves.`);
+  if (web) tips.push("If this web SDR never hears it, try another UberSDR receiver in the settings below.");
+  tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
+  $("help").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
+}
+
 const pct = db => Math.max(0, Math.min(100, (db + 60) / 60 * 100));
 setInterval(refresh, 3000);
 refresh();

@@ -14,6 +14,67 @@ public class ConfigTests
         Assert.Equal("Q0CAST", config.Bbs.Login);
         Assert.False(config.Web.Lan);
         Assert.Equal(7052.0, config.DialKHz);
+        Assert.Equal("00:00", config.SlotUtc);
+        Assert.Equal(60, config.EveryMinutes);
+        Assert.Equal(8, config.WebSdrSlotsPerDay);
+        Assert.False(config.DailyFromOldConfig);
+    }
+
+    [Fact]
+    public void Slots_DefaultToEveryHourOnTheHour()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "audio": "ubersdr:wessex.zapto.org" }""");
+
+        var config = ReceiverConfig.Load(path);
+
+        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60), config.Schedule);
+        Assert.Equal(8, config.WebSdrSlots.Count);
+        Assert.False(config.DailyFromOldConfig);
+    }
+
+    [Fact]
+    public void OldConfig_WithOnlySlotUtc_IsOneSlotADay_AndStaysSoWhenSaved()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """
+            {
+              // as the example was before hourly slots
+              "audio": "ubersdr:wessex.zapto.org",
+              "slotUtc": "12:00",
+            }
+            """);
+
+        var config = ReceiverConfig.Load(path);
+
+        Assert.True(config.DailyFromOldConfig);
+        Assert.Equal(new SlotSchedule(new TimeOnly(12, 0), 1440), config.Schedule);
+        Assert.Equal([new TimeOnly(12, 0)], config.WebSdrSlots);
+
+        // Saving from the page does not make one slot a day a choice the file states.
+        config.Save(path);
+        Assert.DoesNotContain("everyMinutes", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Equal(config, ReceiverConfig.Load(path));
+    }
+
+    [Fact]
+    public void SlotUtcWithEveryMinutes_IsTakenAsGiven()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "slotUtc": "00:30", "everyMinutes": 120, "webSdrSlotsPerDay": 12 }""");
+
+        var config = ReceiverConfig.Load(path);
+
+        Assert.False(config.DailyFromOldConfig);
+        Assert.Equal(12, config.Schedule.SlotsPerDay);
+        Assert.Equal(12, config.WebSdrSlots.Count);
+        config.Save(path);
+        Assert.Contains("\"everyMinutes\": 120", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.DoesNotContain("slotStart", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Equal(config, ReceiverConfig.Load(path));
     }
 
     [Fact]
@@ -81,6 +142,15 @@ public class ConfigTests
     [InlineData("""{ "bbs": { "host": null } }""", "bbs")]
     [InlineData("""{ "web": { "lan": true } }""", "password")]
     [InlineData("""{ "slotUtc": "noon" }""", "slotUtc")]
+    [InlineData("""{ "slotUtc": "noon", "everyMinutes": 60 }""", "slotUtc")]
+    [InlineData("""{ "everyMinutes": 0 }""", "everyMinutes")]
+    [InlineData("""{ "everyMinutes": -60 }""", "everyMinutes")]
+    [InlineData("""{ "everyMinutes": 10 }""", "everyMinutes")]
+    [InlineData("""{ "everyMinutes": 50 }""", "everyMinutes")]
+    [InlineData("""{ "everyMinutes": 2880 }""", "everyMinutes")]
+    [InlineData("""{ "webSdrSlotsPerDay": 0 }""", "webSdrSlotsPerDay")]
+    [InlineData("""{ "webSdrSlotsPerDay": 13 }""", "3 hours")]
+    [InlineData("""{ "webSdrSlotsPerDay": 24 }""", "webSdrSlotsPerDay")]
     [InlineData("""{ "dialKHz": 7.052 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": 0 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": -7052 }""", "dialKHz")]
@@ -97,6 +167,16 @@ public class ConfigTests
         var e = Assert.Throws<ConfigException>(() => ReceiverConfig.Load(path));
 
         Assert.Contains(mentioned, e.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(15)]
+    [InlineData(60)]
+    [InlineData(180)]
+    [InlineData(1440)]
+    public void EveryMinutes_ThatDividesADay_IsAccepted(int minutes)
+    {
+        new ReceiverConfig { EveryMinutes = minutes }.Validate();
     }
 
     [Theory]

@@ -1,6 +1,6 @@
 namespace Mailcast.Receiver;
 
-/// <summary>The broadcast's fixed details, from docs/design.md.</summary>
+/// <summary>The transmission's fixed details, from docs/design.md.</summary>
 public static class OnAir
 {
     /// <summary>The station that sends the broadcast.</summary>
@@ -21,6 +21,9 @@ public static class OnAir
     /// 2.9 kHz, so its edges sit near 350 and 3250 Hz of audio.
     /// </summary>
     public const double HalfWidthHz = 1450;
+
+    /// <summary>How long the steady tone that opens each slot lasts, in seconds.</summary>
+    public const int ToneSeconds = 10;
 
     /// <summary>The audio rate the modem and everything else run at.</summary>
     public const int SampleRate = 48_000;

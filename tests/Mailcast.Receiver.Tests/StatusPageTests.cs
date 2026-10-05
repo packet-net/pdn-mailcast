@@ -114,6 +114,54 @@ public class StatusPageTests
         string html = await http.GetStringAsync("/");
         Assert.Contains("pdn-mailcast receiver", html, StringComparison.Ordinal);
         Assert.DoesNotMatch("[^\\x00-\\x7F]", html);
+        foreach (string stale in new[] { "broadcast", "Broadcast", "midday", "7.0497", "once a day", "30 s", "30 second" })
+        {
+            Assert.DoesNotContain(stale, html, StringComparison.Ordinal);
+        }
+        Assert.Equal("every hour on the hour", status.GetProperty("schedule").GetProperty("words").GetString());
+        Assert.Equal(10, status.GetProperty("schedule").GetProperty("toneSeconds").GetInt32());
+    }
+
+    private static DateTimeOffset T(string s) => DateTimeOffset.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+
+    [Theory]
+    // During a slot the web SDR listens to, during one it doesn't, between slots, and around midnight.
+    [InlineData("2026-10-05T12:05:00Z", "2026-10-05T13:00:00Z", "2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", true)]
+    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T15:00:00Z", false)]
+    [InlineData("2026-10-05T13:20:00Z", "2026-10-05T14:00:00Z", null, "2026-10-05T15:00:00Z", false)]
+    [InlineData("2026-10-05T23:59:00Z", "2026-10-06T00:00:00Z", null, "2026-10-06T00:00:00Z", true)]
+    [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
+    public void Schedule_GivesTheNextSlot_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
+    {
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
+
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
+
+        Assert.Equal(T(next), schedule.GetProperty("next").GetDateTimeOffset());
+        if (recent is null)
+        {
+            Assert.Equal(JsonValueKind.Null, schedule.GetProperty("recent").ValueKind);
+        }
+        else
+        {
+            Assert.Equal(T(recent), schedule.GetProperty("recent").GetDateTimeOffset());
+        }
+        var web = schedule.GetProperty("webSdr");
+        Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
+        Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
+        Assert.Equal(8, web.GetProperty("times").GetArrayLength());
+        Assert.Equal("03:00", web.GetProperty("times")[1].GetString());
+    }
+
+    [Fact]
+    public void Schedule_SoundCard_HasNoWebSdrPart()
+    {
+        var config = new ReceiverConfig { Audio = "plughw:CARD=Device,DEV=0" };
+
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T("2026-10-05T13:20:00Z")), ReceiverConfig.JsonLine);
+
+        Assert.Equal(JsonValueKind.Null, schedule.GetProperty("webSdr").ValueKind);
+        Assert.Equal(24, schedule.GetProperty("slotsPerDay").GetInt32());
     }
 
     [Fact]
