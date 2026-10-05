@@ -1,140 +1,59 @@
 # pdn-mailcast receiver
 
-Once a day, around midday UK time, GB7RDG broadcasts its recent bulletins on 40 m. This program listens, rebuilds each bulletin from the pieces it hears, and hands it to your own BBS as if a forwarding partner had sent it. Your BBS throws away any bulletin it already has, so it is just one more way for mail to reach you.
+Hears GB7RDG's daily bulletin broadcast on 40 m and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
 
-You need a Linux box, LinBPQ (or Linux FBB) with its mail running, and one of:
+You need a Linux machine (a Pi is fine) running LinBPQ with its mail.
 
-- a web receiver: the receiver can listen through the Wessex web SDR (`wessex.zapto.org`) on its own, no radio needed;
-- a radio on USB with its audio into a sound card, tuned to **7.0497 MHz** dial. The signal is centred on 7.0515 MHz, which puts it at 1800 Hz in your audio.
-
-Nothing is ever transmitted.
-
-## How it works
-
-Each bulletin is cut into pieces and sent with some spare ones, so the receiver does not need to hear all of them: any set slightly larger than the bulletin rebuilds it, and pieces heard on different days add up. Pieces are kept on disk, so a restart loses nothing. A bulletin is offered to your BBS as soon as it is complete, using the same compressed forwarding (FBB B1F) that BBSes use with each other.
-
-The slot opens with 30 seconds of steady tone. The receiver measures it and logs how far off frequency it is and the signal-to-noise ratio, which is a handy check on your dial and your antenna.
-
-## Installing
-
-Install the .deb (amd64, arm64 or armhf):
+## 1. Install
 
 ```
-sudo apt install ./pdn-mailcast-receiver_0.1.0_amd64.deb
+curl -fsSL https://packet-net.github.io/apt/pubkey.asc | sudo gpg --dearmor -o /usr/share/keyrings/packet-net.gpg
+echo "deb [signed-by=/usr/share/keyrings/packet-net.gpg] https://packet-net.github.io/apt ./" | sudo tee /etc/apt/sources.list.d/packet-net.list
+sudo apt update
+sudo apt install pdn-mailcast-receiver
 ```
 
-It brings its own .NET runtime. It creates a `pdn-mailcast` system user, an example config in `/etc/pdn-mailcast/receiver.json` and a systemd service, but does not start the service: set up your BBS first (below), put the password in the config, then
+## 2. Add it to LinBPQ
+
+1. Stop LinBPQ. In `bpq32.cfg`, in your Telnet port's `CONFIG` section, add these two lines (if you already have an `FBBPORT` line, keep yours and use its number in step 3):
+
+   ```
+    FBBPORT=8011
+    USER=Q0CAST,choose-a-password,Q0CAST,,
+   ```
+
+   Start LinBPQ again.
+
+2. In LinBPQ's web page, open **Mail Mgmt**:
+   - under **Users**, add **Q0CAST** and tick **BBS**;
+   - on Q0CAST's **Forwarding** page, tick **Allow Blocked**, **Allow Compressed** and **Use B1 Protocol**, and leave everything else empty.
+
+   Save both.
+
+3. Put the password in the receiver's config:
+
+   ```
+   sudo nano /etc/pdn-mailcast/receiver.json
+   ```
+
+   Set `"password"` to the one you chose. Change `"port"` too if your `FBBPORT` isn't 8011.
+
+## 3. Start it
 
 ```
 sudo systemctl start pdn-mailcast-receiver
 ```
 
-and open the status page at http://127.0.0.1:8130/.
+Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appear in your BBS as they complete, usually during the midday slot.
 
-## Configuration
+## Using your own radio instead
 
-The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few settings:
+Set your radio to USB on **7.0497 MHz**, with its receive audio into a sound card. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
 
-```json
-{
-  "audio": "ubersdr:wessex.zapto.org",
-  "bbs": {
-    "type": "linBpq",
-    "host": "127.0.0.1",
-    "port": 8011,
-    "login": "Q0CAST",
-    "password": "pick-one",
-    "command": "BBS"
-  },
-  "web": { "port": 8130, "lan": false, "password": "" },
-  "slotUtc": "12:00",
-  "stateDirectory": "/var/lib/pdn-mailcast"
-}
-```
+## Linux FBB
 
-- `audio`: `ubersdr:wessex.zapto.org` for the web SDR, an ALSA device such as `plughw:CARD=Device,DEV=0` for your radio's sound card, or `wav:/path/to/file.wav` to decode a recording.
-- `bbs`: where your BBS is and how the receiver logs in. See below.
-- `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which your browser asks for (any user name).
-- `slotUtc`: when the daily slot starts. A web SDR is only listened to from 15 minutes before it to 90 minutes after: public UberSDR receivers allow each address about three hours a day. A sound card listens all the time.
-- `stateDirectory`: where the pieces, the rebuilt bulletins and the record of deliveries are kept.
+Instead of step 2: add a telnet port in `port.sys`, add user **Q0CAST** (`EU Q0CAST`) with the **B** and **M** flags and a password, and don't add it to `forward.sys`. In the receiver's config set `"type": "fbb"` and FBB's telnet port. (Not tested yet.)
 
-To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.
+## More
 
-## The receiver's login on your BBS
-
-The receiver logs in as **Q0CAST**. It needs a login of its own:
-
-- Not GB7RDG. If you already forward with GB7RDG, its real sessions and the receiver's would share one partner, and anything your BBS queued for GB7RDG could be offered to the receiver instead.
-- Not your own callsign, which is your sysop login.
-- A Q callsign is never issued to anyone, so Q0CAST cannot clash with a real station. It is never sent on the air. FBB only accepts logins shaped like a callsign, which rules out names like MCAST.
-
-The receiver only ever sends. If your BBS does try to send it something, the receiver answers "later" so the BBS keeps it, and logs a warning.
-
-### LinBPQ
-
-Tested against LinBPQ 6.0.25.41.
-
-1. In `bpq32.cfg`, in your Telnet port's `CONFIG` section, make sure there is an `FBBPORT` and add a user for the receiver:
-
-   ```
-    FBBPORT=8011
-    USER=Q0CAST,pick-one,Q0CAST,,
-   ```
-
-   The receiver must use the FBBPORT, not the ordinary telnet port, because forwarding is binary. Leave the fourth field (the command run at login) empty: the receiver sends `BBS` itself. Restart LinBPQ.
-
-2. In the mail configuration (the web page's Mail Mgmt, or BPQMail's configuration), add a user **Q0CAST** and tick **BBS**.
-
-3. On Q0CAST's forwarding page, tick **Allow Blocked**, **Allow Compressed** and **Use B1 Protocol**. Leave the TO, AT and HR boxes empty, so nothing is ever queued for it. It does not need to be enabled for forwarding, because LinBPQ never has to call it.
-
-4. Put the same password in the receiver's config, and `"port": 8011`.
-
-LinBPQ holds bulletins older than its BID lifetime and maximum age. If you have set either very low, broadcast bulletins (carried for three days) may arrive held.
-
-### Linux FBB
-
-Not tested yet: this is from FBB 7.0.11's documentation and source.
-
-1. In `port.sys`, add a telnet port (interface 9, address in hex, so `189C` is port 6300) and a TNC line for it with mode `T`, for example:
-
-   ```
-   2    9         189C               0
-   ...
-   2    8    2   0      250   2     1     10     00/60   TUWR  Telnet
-   ```
-
-2. Add the user Q0CAST (`EU Q0CAST`), give it the **B** (BBS) flag and the **M** flag (modem and telnet access), and set its password.
-
-3. Don't add Q0CAST to `forward.sys`: FBB never needs to forward to it.
-
-4. In the receiver's config use `"type": "fbb"`, FBB's host and port, and the password. The receiver logs in as `.Q0CAST`: the dot asks FBB for a binary session, without which FBB would mangle the compressed transfers.
-
-## The status page
-
-http://127.0.0.1:8130/ shows:
-
-- the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
-- your BBS: where bulletins go, how many are waiting, and any problem reaching it;
-- a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away;
-- the input level, with the same target as pdn-soundmodem: peaks between -18 and -9 dBFS;
-- today's bulletins, how many pieces of each have arrived, and what the BBS said about each;
-- the settings: audio, and the BBS's address and login. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
-
-On this machine only, the page answers to `localhost` and nothing else. To reach it from your network, set `"lan": true` and a `"password"` in `web`; the browser asks for it (any user name). Use it on a network you trust: it is plain HTTP.
-
-## What it logs
-
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 30 s`), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
-
-## Building from source
-
-You need the .NET 10 SDK.
-
-```
-dotnet publish src/Mailcast.Receiver -c Release -o out
-out/pdn-mailcast-receiver --config src/Mailcast.Receiver/receiver.example.json
-```
-
-`scripts/build-receiver-deb.sh linux-x64 0.1.0` builds the .deb into `artifacts/`.
-
-The test suite includes one test that decodes a simulated slot into a real LinBPQ in docker. It is tagged `Category=Docker`: `dotnet test --filter Category=Docker` runs it, and `--filter "Category!=Docker"` leaves it out.
+The settings, the status page, the logs and building from source are in [docs/receiver.md](../../docs/receiver.md).
