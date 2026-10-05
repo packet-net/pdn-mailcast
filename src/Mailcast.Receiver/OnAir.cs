@@ -9,14 +9,12 @@ public static class OnAir
     /// <summary>The AX.25 destination every broadcast frame carries.</summary>
     public const string Destination = "MCAST";
 
-    /// <summary>The centre of the signal, 7.0515 MHz.</summary>
-    public const double CentreHz = 7_051_500;
-
-    /// <summary>The USB dial that puts the centre at <see cref="CentreAudioHz"/>.</summary>
-    public const double DialHz = 7_049_700;
-
-    /// <summary>Where the centre and the tone fall in the receiver's audio, the MS110D standard's own centre.</summary>
-    public const double CentreAudioHz = CentreHz - DialHz;
+    /// <summary>
+    /// Where the centre of the signal and the tone fall in the receiver's audio, the MS110D
+    /// standard's own centre. The receiver's USB dial is a setting
+    /// (<see cref="ReceiverConfig.DialKHz"/>); the signal is always this far above it.
+    /// </summary>
+    public const double CentreAudioHz = 1800;
 
     /// <summary>
     /// Half the signal's occupied width: MS110D with the standard's pulse shaping fills about
@@ -26,4 +24,7 @@ public static class OnAir
 
     /// <summary>The audio rate the modem and everything else run at.</summary>
     public const int SampleRate = 48_000;
+
+    /// <summary>A frequency in Hz as MHz for a person: 7.052, 7.0538, 7.05225.</summary>
+    public static string Mhz(double hz) => (hz / 1e6).ToString("0.000###", System.Globalization.CultureInfo.InvariantCulture);
 }

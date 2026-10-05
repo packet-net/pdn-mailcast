@@ -41,9 +41,10 @@ public sealed class AudioPipeline : IAsyncDisposable
     private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _threadDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private AudioPipeline(AudioSource source, Action<string> log, TimeProvider time)
+    private AudioPipeline(AudioSource source, double dialHz, Action<string> log, TimeProvider time)
     {
         _source = source;
+        DialHz = dialHz;
         _log = log;
         _time = time;
         Channel = new SoundModemChannel(OnAir.SampleRate);
@@ -61,6 +62,12 @@ public sealed class AudioPipeline : IAsyncDisposable
 
     /// <summary>What this pipeline listens to.</summary>
     public AudioSource Source => _source;
+
+    /// <summary>The USB dial this pipeline's audio is heard on, in Hz: a web SDR is tuned to it.</summary>
+    public double DialHz { get; }
+
+    /// <summary>How a web SDR is asked to tune: USB on <see cref="DialHz"/>, at the modem's rate.</summary>
+    internal UberSdrTuning WebSdrTuning => new() { FrequencyHz = (int)Math.Round(DialHz), Sideband = Sideband.Upper, OutputRate = OnAir.SampleRate };
 
     /// <summary>Raised on the audio thread with each block as the source delivered it, before the modem.</summary>
     public event ReceiveTap? SourceBlock;
@@ -86,10 +93,13 @@ public sealed class AudioPipeline : IAsyncDisposable
 
     /// <summary>For tests: a pipeline over an input that is already open, watched as a sound card would be.</summary>
     internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true) =>
-        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), log, time) { _input = input, _watchOff = !watch };
+        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), ReceiverConfig.DefaultDialKHz * 1000, log, time) { _input = input, _watchOff = !watch };
 
-    /// <summary>Builds a pipeline for <paramref name="source"/>. Call <see cref="Start"/> once anything that listens is attached.</summary>
-    public static AudioPipeline Create(AudioSource source, Action<string> log, TimeProvider? time = null) => new(source, log, time ?? TimeProvider.System);
+    /// <summary>
+    /// Builds a pipeline for <paramref name="source"/>, heard on the USB dial <paramref name="dialHz"/>.
+    /// Call <see cref="StartAsync"/> once anything that listens is attached.
+    /// </summary>
+    public static AudioPipeline Create(AudioSource source, double dialHz, Action<string> log, TimeProvider? time = null) => new(source, dialHz, log, time ?? TimeProvider.System);
 
     /// <summary>Opens the source and starts the audio thread.</summary>
     /// <exception cref="AudioSourceException">The source could not be opened; the message says why.</exception>
@@ -106,12 +116,12 @@ public sealed class AudioPipeline : IAsyncDisposable
                 {
                     throw new AudioSourceException($"cannot open the sound card {_source.Target}: {Ascii.Clean(e.Message)}");
                 }
-                _log($"audio: sound card {_source.Target} at {OnAir.SampleRate} Hz");
+                _log($"audio: sound card {_source.Target} at {OnAir.SampleRate} Hz, the radio on USB dial {OnAir.Mhz(DialHz)} MHz");
                 break;
 
             case AudioSourceKind.UberSdr:
                 var endpoint = UberSdrDevice.Parse(_source.Target);
-                var tuning = new UberSdrTuning { FrequencyHz = (int)OnAir.DialHz, Sideband = Sideband.Upper, OutputRate = OnAir.SampleRate };
+                var tuning = WebSdrTuning;
                 UberSdrAudioInput web;
                 try
                 {
@@ -134,7 +144,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 };
                 _input = web;
                 _webSdr = web;
-                _log($"audio: web receiver {endpoint}, USB dial {OnAir.DialHz / 1e6:F4} MHz"
+                _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(DialHz + OnAir.CentreAudioHz)} MHz"
                     + (web.ReceiverDescription is { } about ? $" ({Ascii.Clean(about)})" : ""));
                 break;
 

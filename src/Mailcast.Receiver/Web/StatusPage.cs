@@ -72,7 +72,7 @@ public sealed class StatusPage : IAsyncDisposable
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
         {
-            DialFrequencyHz = OnAir.DialHz,
+            DialFrequencyHz = pipeline.DialHz,
             Sideband = "usb",
             LinesPerSecond = 10,
             InputLevelMeter = true,
@@ -241,7 +241,13 @@ public sealed class StatusPage : IAsyncDisposable
         return new
         {
             version = ReceiverHost.Version,
-            audio = new { source = config.Audio, state = _host.AudioState },
+            audio = new
+            {
+                source = config.Audio,
+                state = _host.AudioState,
+                dialKHz = config.DialKHz,
+                centreKHz = config.CentreHz / 1000,
+            },
             bbs = new
             {
                 target = ReceiverHost.DescribeBbs(config.Bbs),
@@ -302,6 +308,7 @@ public sealed class StatusPage : IAsyncDisposable
     internal static object SettingsView(ReceiverConfig config) => new
     {
         audio = config.Audio,
+        dialKHz = config.DialKHz,
         bbs = new
         {
             type = config.Bbs.Type,

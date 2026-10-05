@@ -48,7 +48,7 @@ Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appe
 
 ## Using your own radio instead
 
-Set your radio to USB on **7.0497 MHz**, with its receive audio into a sound card. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
+Set your radio to USB on **7.052 MHz**, with its receive audio into a sound card. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
 
 ## Linux FBB
 

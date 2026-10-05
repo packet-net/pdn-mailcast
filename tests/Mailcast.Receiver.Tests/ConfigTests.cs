@@ -13,6 +13,38 @@ public class ConfigTests
         Assert.Equal(8130, config.Web.Port);
         Assert.Equal("Q0CAST", config.Bbs.Login);
         Assert.False(config.Web.Lan);
+        Assert.Equal(7052.0, config.DialKHz);
+    }
+
+    [Fact]
+    public void Dial_DefaultsTo7052kHz_WithTheSignal1800HzAbove()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "audio": "ubersdr:wessex.zapto.org" }""");
+
+        var config = ReceiverConfig.Load(path);
+
+        Assert.Equal(7052.0, config.DialKHz);
+        Assert.Equal(7_052_000, config.DialHz);
+        Assert.Equal(7_053_800, config.CentreHz);
+    }
+
+    [Fact]
+    public void Dial_IsReadFromTheFileAndSavedBack()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "dialKHz": 7049.7 }""");
+
+        var config = ReceiverConfig.Load(path);
+        Assert.Equal(7049.7, config.DialKHz);
+        Assert.Equal(7_051_500, config.CentreHz, 3);
+
+        config.Save(path);
+        Assert.Contains("\"dialKHz\": 7049.7", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.DoesNotContain("dialHz", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Equal(7049.7, ReceiverConfig.Load(path).DialKHz);
     }
 
     [Fact]
@@ -49,6 +81,13 @@ public class ConfigTests
     [InlineData("""{ "bbs": { "host": null } }""", "bbs")]
     [InlineData("""{ "web": { "lan": true } }""", "password")]
     [InlineData("""{ "slotUtc": "noon" }""", "slotUtc")]
+    [InlineData("""{ "dialKHz": 7.052 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": 0 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": -7052 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": 7052000 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": 1799.9 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": 30000.1 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": "7052" }""", "JSON")]
     public void BadSetting_SaysWhich(string json, string mentioned)
     {
         using var dir = new TempDirectory();
