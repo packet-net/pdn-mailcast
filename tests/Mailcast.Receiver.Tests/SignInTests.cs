@@ -497,22 +497,32 @@ public class SignInTests
     }
 
     [Fact]
-    public void Ipv6_IsCountedByItsSlash64_AndIpv4MappedAsIpv4()
+    public void EachIpv6Address_IsCountedOnItsOwn_EvenInOneSlash64_AndIpv4MappedAsIpv4()
     {
         var time = new FakeTimeProvider(Start);
         var log = new List<string>();
         var throttle = new SignInThrottle(time, log.Add);
 
-        for (int i = 1; i <= SignInThrottle.MaxFailures; i++)
+        // One device on a home network guesses wrong until it is locked out.
+        for (int i = 0; i < SignInThrottle.MaxFailures; i++)
         {
-            Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(IPAddress.Parse($"2001:db8:0:1::{i:x}"), Wrong, Password, out _));
+            Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(IPAddress.Parse("2001:db8:0:1::5"), Wrong, Password, out _));
         }
-
-        Assert.Equal(SignInThrottle.Verdict.LockedOut, throttle.Check(IPAddress.Parse("2001:db8:0:1:ffff:ffff:ffff:ffff"), Password, Password, out var wait));
+        Assert.Equal(SignInThrottle.Verdict.LockedOut, throttle.Check(IPAddress.Parse("2001:db8:0:1::5"), Password, Password, out var wait));
         Assert.Equal(SignInThrottle.LockoutTime, wait);
-        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(IPAddress.Parse("2001:db8:0:2::1"), Password, Password, out _));
-        Assert.Equal(["web: 5 wrong passwords from 2001:db8:0:1::/64 within 5 minutes; sign-in from there is refused for 10 minutes"], log);
+        Assert.Equal(["web: 5 wrong passwords from 2001:db8:0:1::5 within 5 minutes; sign-in from there is refused for 10 minutes"], log);
 
+        // Another device in the same /64, and one on the same link-local network, are not.
+        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(IPAddress.Parse("2001:db8:0:1::6"), Password, Password, out _));
+        for (int i = 0; i < SignInThrottle.MaxFailures - 1; i++)
+        {
+            Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(IPAddress.Parse("fe80::1"), Wrong, Password, out _));
+        }
+        Assert.Equal(SignInThrottle.Verdict.Right, throttle.Check(IPAddress.Parse("fe80::2"), Password, Password, out _));
+        Assert.Equal(SignInThrottle.Verdict.Wrong, throttle.Check(IPAddress.Parse("fe80::2"), Wrong, Password, out _));
+        Assert.Single(log);
+
+        // An IPv4 address in IPv6 form is the same address.
         for (int i = 0; i < SignInThrottle.MaxFailures; i++)
         {
             var from = IPAddress.Parse(i % 2 == 0 ? "192.168.1.9" : "::ffff:192.168.1.9");

@@ -273,10 +273,11 @@ internal sealed class SessionStore
 /// sign-in, from anywhere, to one each <see cref="GlobalSpacing"/>.
 /// </summary>
 /// <remarks>
-/// An IPv6 address counts by its /64, since one machine is usually given a whole /64 to pick
-/// addresses from. The budget for everywhere together is what stops someone with many addresses
-/// guessing without limit: the table of addresses is capped, so on its own it could be made to
-/// forget a lockout.
+/// Each address counts on its own, IPv6 ones too: a home network is one IPv6 /64 (and every
+/// link-local address shares fe80::/64), so counting by /64 would let one device's wrong guesses
+/// lock every device on the network out. The budget for everywhere together is what stops someone
+/// with many addresses guessing without limit: the table of addresses is capped, so on its own it
+/// could be made to forget a lockout.
 /// </remarks>
 internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
 {
@@ -330,24 +331,9 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
         Busy,
     }
 
-    /// <summary>What an address is counted as: itself for IPv4, its /64 for IPv6.</summary>
-    internal static System.Net.IPAddress Counted(System.Net.IPAddress from)
-    {
-        if (from.IsIPv4MappedToIPv6)
-        {
-            return from.MapToIPv4();
-        }
-        if (from.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
-        {
-            return from;
-        }
-        byte[] bytes = from.GetAddressBytes();
-        Array.Clear(bytes, 8, 8);
-        return new System.Net.IPAddress(bytes);
-    }
-
-    private static string Describe(System.Net.IPAddress counted) =>
-        counted.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? $"{counted}/64" : counted.ToString();
+    /// <summary>What an address is counted as: itself, with an IPv4 address in IPv6 form as the IPv4 one.</summary>
+    internal static System.Net.IPAddress Counted(System.Net.IPAddress from) =>
+        from.IsIPv4MappedToIPv6 ? from.MapToIPv4() : from;
 
     /// <summary>
     /// Checks <paramref name="given"/> against <paramref name="password"/> for a request from
@@ -414,7 +400,7 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
             {
                 tally.LockedUntil = now + LockoutTime;
                 tally.Failures.Clear();
-                log($"web: {MaxFailures} wrong passwords from {Describe(from)} within {FailureWindow.TotalMinutes:0} minutes; sign-in from there is refused for {LockoutTime.TotalMinutes:0} minutes");
+                log($"web: {MaxFailures} wrong passwords from {from} within {FailureWindow.TotalMinutes:0} minutes; sign-in from there is refused for {LockoutTime.TotalMinutes:0} minutes");
             }
             return Verdict.Wrong;
         }
