@@ -1,0 +1,27 @@
+[Unit]
+Description=pdn-mailcast head end: the daily HF bulletin broadcast, through pdn-soundmodem
+Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/docs/headend.md
+After=network-online.target pdn-soundmodem.service
+Wants=network-online.target
+ConditionPathExists=/etc/pdn-mailcast-headend/headend.json
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pdn-mailcast-headend --config /etc/pdn-mailcast-headend/headend.json
+Restart=on-failure
+RestartSec=10
+# Exit 2 means the configuration is wrong, and says how; retrying would only bury that.
+RestartPreventExitStatus=2
+User=pdn-mailcast-headend
+Group=pdn-mailcast-headend
+# Bulletins in rotation, each one's next ESI, and the last slot's report.
+StateDirectory=pdn-mailcast-headend
+StateDirectoryMode=0750
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
