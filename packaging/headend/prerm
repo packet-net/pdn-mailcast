@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+if [ -d /run/systemd/system ] && [ "$1" = "remove" ] && command -v deb-systemd-invoke >/dev/null; then
+    deb-systemd-invoke stop pdn-mailcast-headend.service >/dev/null || true
+fi
+
+exit 0

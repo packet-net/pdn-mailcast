@@ -17,6 +17,8 @@ namespace Mailcast.Core;
 /// object.bin   the object's octets, exactly as coded
 /// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi
 /// </code>
+/// <para>And one file per directory object sent, <c>directories/OBJECTID.txt</c>, with its Day and
+/// NextEsi, so a second plan the same day does not repeat the directory's pieces.</para>
 /// <para>
 /// Both are written to a temporary name and renamed, object first, so a folder whose state is
 /// missing or does not match its object is an interrupted first offer and is discarded.
@@ -30,6 +32,8 @@ public sealed class HeadEndStore
     private readonly ScheduleOptions _options;
     private readonly Action<string>? _log;
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    private readonly string _directories;
+    private readonly Dictionary<ulong, (DateOnly Day, uint NextEsi)> _directoryEsis = [];
 
     /// <summary>Opens or creates a store.</summary>
     public HeadEndStore(string root, Compression compression, ScheduleOptions? options = null, Action<string>? log = null)
@@ -56,7 +60,36 @@ public sealed class HeadEndStore
             }
             _entries[Path.GetFileName(dir)] = entry;
         }
+        _directories = Path.Combine(root, "directories");
+        Directory.CreateDirectory(_directories);
+        foreach (var file in Directory.EnumerateFiles(_directories))
+        {
+            if (file.EndsWith(".tmp", StringComparison.Ordinal))
+            {
+                File.Delete(file);
+                continue;
+            }
+            if (LoadDirectory(file) is { } d)
+            {
+                _directoryEsis[d.ObjectId] = (d.Day, d.NextEsi);
+            }
+        }
     }
+
+    /// <summary>Whether a bulletin with this BID is remembered, regardless of case.</summary>
+    public bool Holds(string bid)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bid);
+        return _entries.ContainsKey(KeyOf(bid));
+    }
+
+    /// <summary>
+    /// The first unsent ESI of a directory object: 0 for one never sent. Pass this method to
+    /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateOnly, int, Compression, ScheduleOptions?, Func{ulong, uint}?)"/>
+    /// so that a second plan the same day does not repeat the directory's pieces either.
+    /// </summary>
+    public uint DirectoryNextEsi(ulong objectId) =>
+        _directoryEsis.TryGetValue(objectId, out var d) ? d.NextEsi : 0;
 
     /// <summary>How many bulletins the store remembers.</summary>
     public int Count => _entries.Count;
@@ -91,7 +124,7 @@ public sealed class HeadEndStore
         return carried;
     }
 
-    /// <summary>The bulletins in their carrying days on <paramref name="today"/>, to pass to <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateOnly, int, Compression, ScheduleOptions?)"/>.</summary>
+    /// <summary>The bulletins in their carrying days on <paramref name="today"/>, to pass to <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateOnly, int, Compression, ScheduleOptions?, Func{ulong, uint}?)"/>.</summary>
     public IReadOnlyList<CarriedBulletin> InRotation(DateOnly today) =>
         _entries.Values
             .Select(e => e.Carried)
@@ -102,15 +135,49 @@ public sealed class HeadEndStore
     public void Commit(DailyBroadcast broadcast)
     {
         ArgumentNullException.ThrowIfNull(broadcast);
+        Commit(broadcast, broadcast.Frames.Count);
+    }
+
+    /// <summary>
+    /// Records that the first <paramref name="framesSent"/> of a plan's frames have been sent (or
+    /// may have been: a frame handed to the modem counts). Each object moves on past the highest ESI
+    /// of its own among them, so nothing sent is ever sent again, and what was not sent is still
+    /// owed: the next plan sends it on top of that day's share.
+    /// </summary>
+    public void Commit(DailyBroadcast broadcast, int framesSent)
+    {
+        ArgumentNullException.ThrowIfNull(broadcast);
+        ArgumentOutOfRangeException.ThrowIfNegative(framesSent);
+        var next = new Dictionary<ulong, uint>();
+        foreach (var frame in broadcast.Frames.Take(framesSent))
+        {
+            uint after = frame.EncodingSymbolId + 1;
+            if (!next.TryGetValue(frame.ObjectId, out uint known) || after > known)
+            {
+                next[frame.ObjectId] = after;
+            }
+        }
         foreach (var o in broadcast.Objects)
         {
-            if (o.Bid is null || !_entries.TryGetValue(KeyOf(o.Bid), out var entry) || entry.Carried.Transfer.ObjectId != o.Transfer.ObjectId)
+            if (o.Bid is null)
+            {
+                // The directory: kept by object ID, which is a hash of its content.
+                ulong id = o.Transfer.ObjectId;
+                if (next.TryGetValue(id, out uint directoryNext) && directoryNext > DirectoryNextEsi(id))
+                {
+                    _directoryEsis[id] = (broadcast.Date, directoryNext);
+                    SaveDirectory(id, broadcast.Date, directoryNext);
+                }
+                continue;
+            }
+            if (!next.TryGetValue(o.Transfer.ObjectId, out uint nextEsi)
+                || !_entries.TryGetValue(KeyOf(o.Bid), out var entry) || entry.Carried.Transfer.ObjectId != o.Transfer.ObjectId)
             {
                 continue;
             }
-            if (o.NextEsi > entry.Carried.NextEsi)
+            if (nextEsi > entry.Carried.NextEsi)
             {
-                entry.Carried = entry.Carried with { NextEsi = o.NextEsi };
+                entry.Carried = entry.Carried with { NextEsi = nextEsi };
                 SaveState(entry);
             }
         }
@@ -132,7 +199,47 @@ public sealed class HeadEndStore
                 removed++;
             }
         }
+        foreach (var (id, d) in _directoryEsis.ToList())
+        {
+            if (today.DayNumber - d.Day.DayNumber >= _options.RememberDays)
+            {
+                File.Delete(DirectoryPath(id));
+                _directoryEsis.Remove(id);
+            }
+        }
         return removed;
+    }
+
+    private string DirectoryPath(ulong objectId) => Path.Combine(_directories, ObjectId.Format(objectId) + ".txt");
+
+    private void SaveDirectory(ulong objectId, DateOnly day, uint nextEsi) =>
+        DurableFile.WriteAtomically(DirectoryPath(objectId), Bulletin.TextEncoding.GetBytes(
+            string.Create(CultureInfo.InvariantCulture, $"Day: {day:yyyy-MM-dd}\nNextEsi: {nextEsi}\n")));
+
+    private (ulong ObjectId, DateOnly Day, uint NextEsi)? LoadDirectory(string path)
+    {
+        try
+        {
+            if (!ObjectId.TryParse(Path.GetFileNameWithoutExtension(path), out ulong id))
+            {
+                return null;
+            }
+            var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var line in Bulletin.TextEncoding.GetString(File.ReadAllBytes(path)).Split('\n'))
+            {
+                int colon = line.IndexOf(": ", StringComparison.Ordinal);
+                if (colon > 0)
+                {
+                    fields[line[..colon]] = line[(colon + 2)..];
+                }
+            }
+            return (id, DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture), uint.Parse(fields["NextEsi"], CultureInfo.InvariantCulture));
+        }
+        catch (Exception e) when (e is FormatException or KeyNotFoundException or OverflowException or IOException)
+        {
+            _log?.Invoke($"head end store: unreadable directory state {Path.GetFileName(path)}: {e.Message}");
+            return null;
+        }
     }
 
     private static string KeyOf(string bid) =>

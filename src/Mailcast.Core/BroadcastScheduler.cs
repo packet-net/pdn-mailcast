@@ -192,8 +192,10 @@ public static class BroadcastScheduler
     }
 
     /// <summary>
-    /// Plans today's broadcast from the bulletins in rotation. Each sends today's share of
-    /// symbols starting at its <see cref="CarriedBulletin.NextEsi"/>; the result's
+    /// Plans today's broadcast from the bulletins in rotation. Each sends what is due by the end of
+    /// today (its shares of every day so far) less what it has already sent, starting at its
+    /// <see cref="CarriedBulletin.NextEsi"/>, so frames an earlier slot did not send are made up
+    /// today with fresh ESIs; the result's
     /// <see cref="ScheduledObject.NextEsi"/> is where to start next time. Of two entries with
     /// the same BID, only the first in BID order is sent.
     /// </summary>
@@ -202,7 +204,13 @@ public static class BroadcastScheduler
     /// <param name="seed">Seeds the interleaving.</param>
     /// <param name="compression">Compresses the directory.</param>
     /// <param name="options">The schedule settings.</param>
-    public static DailyBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateOnly today, int seed, Compression compression, ScheduleOptions? options = null)
+    /// <param name="directoryNextEsi">
+    /// The first unsent ESI of a directory object, by object ID: <see cref="HeadEndStore.DirectoryNextEsi"/>.
+    /// A second plan the same day with the same rotation makes the same directory object, and
+    /// carries on with fresh ESIs from here instead of repeating the first plan's. Null starts
+    /// every directory at ESI 0.
+    /// </param>
+    public static DailyBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateOnly today, int seed, Compression compression, ScheduleOptions? options = null, Func<ulong, uint>? directoryNextEsi = null)
     {
         ArgumentNullException.ThrowIfNull(carried);
         ArgumentNullException.ThrowIfNull(compression);
@@ -228,7 +236,12 @@ public static class BroadcastScheduler
             {
                 continue;
             }
-            int count = SymbolsPerDay(c.Transfer.SourceSymbols, options)[dayIndex];
+            // Everything due up to and including today, less what has gone already. For a head end
+            // whose every slot went out whole that is exactly today's share; frames a cut-short or
+            // skipped slot did not send are added to the next day's, and a second plan the same day
+            // sends only what the first did not.
+            uint dueByToday = (uint)SymbolsPerDay(c.Transfer.SourceSymbols, options).Take(dayIndex + 1).Sum();
+            int count = c.NextEsi >= dueByToday ? 0 : (int)(dueByToday - c.NextEsi);
             scheduled.Add(new ScheduledObject(c.Transfer, dayIndex, c.NextEsi, count, c.Bid));
             entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title));
         }
@@ -239,7 +252,8 @@ public static class BroadcastScheduler
         int directoryFrames = Math.Max(
             directoryObject.SourceSymbols + options.DirectoryExtra,
             (int)Math.Ceiling(bulletinFrames / (double)(options.DirectoryEvery - 1)));
-        scheduled.Insert(0, new ScheduledObject(directoryObject, 0, 0, directoryFrames));
+        uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
+        scheduled.Insert(0, new ScheduledObject(directoryObject, 0, directoryFirst, directoryFrames));
 
         // Interleave the bulletins by position (i + u) / n.
         var rng = new Random(seed);
@@ -268,7 +282,7 @@ public static class BroadcastScheduler
         {
             if (nextDirectory < directoryFrames && slot == (int)((long)nextDirectory * totalFrames / directoryFrames))
             {
-                frames.Add(directoryObject.Frame((uint)nextDirectory++));
+                frames.Add(directoryObject.Frame(directoryFirst + (uint)nextDirectory++));
             }
             else
             {

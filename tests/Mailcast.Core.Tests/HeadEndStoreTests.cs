@@ -156,4 +156,102 @@ public class HeadEndStoreTests
         }
         Assert.Equal(bulletins.OrderBy(b => b.Bid), delivered.OrderBy(b => b.Bid));
     }
+
+    [Fact]
+    public void Commit_PartOfAPlan_SendsTheRestTheSameDayAndNothingTwice()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        foreach (var b in TestBulletins.Day(9, 6))
+        {
+            store.Offer(b, Day1);
+        }
+        var whole = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default);
+        int cut = whole.Frames.Count / 3;
+        store.Commit(whole, cut);
+
+        // A rerun the same day sends only what the first run did not, all of it with fresh ESIs.
+        var rest = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default);
+        var bulletinIds = whole.Objects.Skip(1).Select(o => o.Transfer.ObjectId).ToHashSet();
+        var first = whole.Frames.Take(cut).Where(f => bulletinIds.Contains(f.ObjectId)).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToHashSet();
+        var second = rest.Frames.Where(f => bulletinIds.Contains(f.ObjectId)).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToList();
+        Assert.DoesNotContain(second, first.Contains);
+        Assert.Equal(whole.Objects.Skip(1).Sum(o => o.Count), first.Count + second.Count);
+    }
+
+    [Fact]
+    public void Commit_PartOfAPlan_RollsTheRestToTomorrowOnTopOfItsShare()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        foreach (var b in TestBulletins.Day(10, 6))
+        {
+            store.Offer(b, Day1);
+        }
+        var today = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default);
+        int sent = today.Frames.Count / 2;
+        store.Commit(today, sent);
+        var sentEsis = today.Frames.Take(sent).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToHashSet();
+
+        var day2 = Day1.AddDays(1);
+        var tomorrow = BroadcastScheduler.Plan(store.InRotation(day2), day2, 2, Compression.Default);
+        var options = new ScheduleOptions();
+        foreach (var o in tomorrow.Objects.Skip(1))
+        {
+            var t = today.Objects.Single(x => x.Transfer.ObjectId == o.Transfer.ObjectId);
+            int sentToday = sentEsis.Count(e => e.ObjectId == o.Transfer.ObjectId);
+            int[] perDay = BroadcastScheduler.SymbolsPerDay(o.Transfer.SourceSymbols, options);
+            Assert.Equal(perDay[1] + (t.Count - sentToday), o.Count);
+            Assert.Equal((uint)sentToday, o.FirstEsi);
+        }
+        Assert.DoesNotContain(tomorrow.Frames.Select(f => (f.ObjectId, f.EncodingSymbolId)), sentEsis.Contains);
+    }
+
+    [Fact]
+    public void Plan_AfterASkippedDay_SendsBothDaysShares()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        store.Offer(TestBulletins.Make(11, 9000), Day1);
+        var day2 = Day1.AddDays(1);
+        var plan = BroadcastScheduler.Plan(store.InRotation(day2), day2, 3, Compression.Default);
+        var o = plan.Objects[1];
+        int[] perDay = BroadcastScheduler.SymbolsPerDay(o.Transfer.SourceSymbols, new ScheduleOptions());
+        Assert.Equal(0u, o.FirstEsi);
+        Assert.Equal(perDay[0] + perDay[1], o.Count);
+    }
+
+    [Fact]
+    public void DirectoryNextEsi_ASecondPlanTheSameDayRepeatsNoDirectoryPiece()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        foreach (var b in TestBulletins.Day(12, 5))
+        {
+            store.Offer(b, Day1);
+        }
+        var first = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default, directoryNextEsi: store.DirectoryNextEsi);
+        int cut = first.Frames.Count / 2;
+        store.Commit(first, cut);
+
+        // Reopened, as after a restart: the directory's next ESI survives it.
+        store = new HeadEndStore(dir.Path, Compression.Default);
+        var second = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default, directoryNextEsi: store.DirectoryNextEsi);
+        Assert.Equal(first.Objects[0].Transfer.ObjectId, second.Objects[0].Transfer.ObjectId);
+        var sent = first.Frames.Take(cut).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToHashSet();
+        Assert.DoesNotContain(second.Frames.Select(f => (f.ObjectId, f.EncodingSymbolId)), sent.Contains);
+        Assert.Equal(store.DirectoryNextEsi(first.Objects[0].Transfer.ObjectId), second.Objects[0].FirstEsi);
+        Assert.True(second.Objects[0].FirstEsi > 0);
+    }
+
+    [Fact]
+    public void Holds_KnowsABidRegardlessOfCase()
+    {
+        using var dir = new TempDirectory();
+        var store = new HeadEndStore(dir.Path, Compression.Default);
+        var bulletin = TestBulletins.Make(13, 2000);
+        Assert.False(store.Holds(bulletin.Bid));
+        store.Offer(bulletin, Day1);
+        Assert.True(store.Holds(bulletin.Bid.ToLowerInvariant()));
+    }
 }
