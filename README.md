@@ -4,7 +4,7 @@ An hourly one-way HF transmission of packet BBS bulletins, and a receiver that d
 
 GB7RDG sends its bulletins on 40 m every hour on the hour in daylight, when 40 m carries across the UK, each one more than once, in a slot of a few minutes. The receiver listens through a sound card on your radio, or through a public web SDR, and collects pieces of the transmission until each bulletin is complete. It then hands the bulletin to your LinBPQ or FBB mail as an ordinary forwarding partner. Your BBS already rejects bulletins it has seen, so this is just one more route for mail to reach you.
 
-This is an experiment at an early stage: the libraries, the head end and the receiver exist, and GB7RDG has been on the air with them since 2026-10-05. The plan is in [docs/design.md](docs/design.md). To run a receiver, see [src/Mailcast.Receiver/README.md](src/Mailcast.Receiver/README.md).
+This is an experiment at an early stage: the libraries, the head end and the receiver exist, and GB7RDG has been on the air with them since 2026-10-05. The plan is in [docs/design.md](docs/design.md), and the figures in [docs/factsheet.md](docs/factsheet.md). To run a receiver, see [src/Mailcast.Receiver/README.md](src/Mailcast.Receiver/README.md).
 
 ## Licence
 
