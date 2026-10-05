@@ -443,6 +443,41 @@ public sealed class RetunerTests
     }
 
     [Fact]
+    public async Task KeyedDuringTheSlot_TheRigGoesBackAtOnceAndLinBpqIsLetGo()
+    {
+        await using var s = await TunedForNoon(new Station(At(11, 58, 30)));
+        await s.RunTo(At(12, 4));
+
+        // The TNC sends a frame it had held back for a busy channel.
+        s.Rig.Ptt = true;
+        await s.Step();
+        await s.NextWait();
+
+        Assert.Equal(At(12, 4, 5), s.Clock.GetUtcNow());
+        Assert.Equal(PacketDialHz, s.Rig.DialHz);
+        Assert.Single(s.Log, l => l.Contains("transmitting while tuned to the bulletin frequency", StringComparison.Ordinal));
+        Assert.True(s.Index($"rig: F {PacketDialHz}") < s.Index("bpq: XMITOFF 2 0"), string.Join(" | ", s.Events));
+        Assert.Equal(0, s.Node!.XmitOff(2));
+
+        // Not taken again for the rest of the slot.
+        s.Rig.Ptt = false;
+        await s.RunTo(At(12, 20));
+        Assert.Single(s.Events, e => e == $"rig: F {BulletinDialHz}");
+        Assert.Single(s.Log, l => l.Contains("transmitting while tuned to the bulletin frequency", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task LongestDrain_StillTunesBeforeTheSlotStarts()
+    {
+        await using var s = new Station(At(11, 58, 30), adjust: b => b with { DrainSeconds = BpqNodeSettings.MostDrainSeconds });
+        s.Start();
+        await s.StepUntil(() => s.Retuner.Stage == RetuneStage.Tuned, "tuned");
+
+        Assert.True(s.Clock.GetUtcNow() < Noon, $"tuned at {s.Clock.GetUtcNow():HH:mm:ss}");
+        Assert.Equal(At(11, 59, 40), s.Clock.GetUtcNow());
+    }
+
+    [Fact]
     public async Task RigCannotBePutBack_LinBpqStaysOffAndTheRestoreIsRetried()
     {
         await using var s = await TunedForNoon(new Station(At(11, 58, 30)));

@@ -313,7 +313,7 @@ public class RetuneConfigTests
     [InlineData("""{ "rig": {}, "bpq": { "user": "", "password": "pw", "hfPort": 2 } }""", "\"bpq\".\"user\"")]
     [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "", "hfPort": 2 } }""", "\"bpq\".\"password\"")]
     [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "port": 0 } }""", "\"bpq\".\"port\"")]
-    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "drainSeconds": 500 } }""", "\"bpq\".\"drainSeconds\"")]
+    [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "drainSeconds": 41 } }""", "\"bpq\".\"drainSeconds\" 41 must be from 0 to 40")]
     [InlineData("""{ "rig": {}, "bpq": { "user": "sysop", "password": "pw", "hfPort": 2, "expectedPortId": " " } }""", "\"bpq\".\"expectedPortId\"")]
     public void BadSettings_AreRefusedSayingWhich(string json, string which)
     {

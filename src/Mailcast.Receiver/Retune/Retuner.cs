@@ -504,6 +504,10 @@ public sealed class Retuner : IAsyncDisposable
                         Warn($"retune: WARNING - cannot confirm that LinBPQ still holds port {_bpq!.HfPort}'s transmit off, so the rig goes back now, before the slot ends");
                         break;
                     }
+                    if (Node is not null && await KeyedOnTheBulletinFrequencyAsync(cancellation).ConfigureAwait(false))
+                    {
+                        break;
+                    }
                 }
             }
             finally
@@ -557,6 +561,30 @@ public sealed class Retuner : IAsyncDisposable
             }
             await WaitAsync(PttRetry, cancellation).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// In a window: true when rigctld reads PTT on, which with LinBPQ held off means the TNC sent
+    /// something it had held back (for a busy channel, say), on the bulletin frequency. The rig
+    /// then goes back at once. A PTT that cannot be read is noted and the slot carries on.
+    /// </summary>
+    private async Task<bool> KeyedOnTheBulletinFrequencyAsync(CancellationToken cancellation)
+    {
+        try
+        {
+            if (!await RigPtt.TransmittingAsync(Endpoint, cancellation).ConfigureAwait(false))
+            {
+                return false;
+            }
+        }
+        catch (IOException e)
+        {
+            NoteProblem($"cannot read the radio's PTT during the slot ({Ascii.Clean(e.Message)})");
+            return false;
+        }
+        NoteProblem("the radio transmitted while tuned to the bulletin frequency");
+        Warn($"retune: WARNING - the radio is transmitting while tuned to the bulletin frequency (rigctld reads PTT on), though LinBPQ's port {_bpq!.HfPort} is held off: the TNC must have sent something it was holding. The rig goes back now");
+        return true;
     }
 
     /// <summary>Ends the rig's window, which puts it back, and says how that went.</summary>

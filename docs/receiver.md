@@ -53,16 +53,17 @@ Add this to the config:
 
 - `rig`: Hamlib's rigctld for the radio. With flrig, run `rigctld -m 4` beside it: that is Hamlib's flrig backend, so flrig stays in charge of the rig.
 - `bpq`: LinBPQ's node telnet port (the Telnet port's `TCPPORT`, not the `FBBPORT`) and a user whose `USER=` line ends in `SYSOP`, such as `USER=sysop,your-sysop-password,G4ABC,,SYSOP`. `hfPort` is the number of LinBPQ's port on the shared radio, as its `PORTS` command lists it. The log says which port that is at start-up; add `"expectedPortId": "..."` with the name `PORTS` gives it, and the receiver won't retune if the number ever points at another port.
-- `drainSeconds` in `bpq` (15 unless set): how long to wait after LinBPQ stops before tuning, so that anything LinBPQ had already handed to the TNC goes out first.
+- `drainSeconds` in `bpq` (15 unless set, at most 40): how long to wait after LinBPQ stops before tuning, so that anything LinBPQ had already handed to the TNC goes out first.
 - If nothing else ever transmits on the radio, leave out `bpq` and say so instead: `"rig": { "rigctld": "127.0.0.1:4532", "dedicatedRadio": true }`. With `rig` and neither of these, the receiver won't start.
 
 It only retunes when `audio` is the radio's sound card, never for a web SDR, and only when rigctld is answering.
 
-To keep LinBPQ off the air it logs in as that user and sends `XMITOFF 2 1`, which makes LinBPQ drop anything it would send on port 2, and `XMITOFF 2 0` afterwards. It only tunes the radio once LinBPQ has confirmed, the drain time has passed and rigctld says the radio is not transmitting. During the slot it checks LinBPQ every 5 seconds. Everything that can go wrong goes the safe way:
+To keep LinBPQ off the air it logs in as that user and sends `XMITOFF 2 1`, which makes LinBPQ drop anything it would send on port 2, and `XMITOFF 2 0` afterwards. It only tunes the radio once LinBPQ has confirmed, the drain time has passed and rigctld says the radio is not transmitting. During the slot it checks LinBPQ and the radio's PTT every 5 seconds. Everything that can go wrong goes the safe way:
 
 - if LinBPQ doesn't confirm, or the radio is still transmitting, the radio isn't retuned for that slot;
 - if LinBPQ's answer is lost or garbled, it counts as taken, and `XMITOFF 2 0` is sent afterwards;
 - if LinBPQ can't be reached during the slot, the radio goes straight back;
+- if the radio transmits during the slot anyway (a frame the TNC was still holding for a busy channel), the radio goes straight back and LinBPQ is let go;
 - if LinBPQ restarts during the slot (which turns `XMITOFF` off), the receiver sees the connection drop at once and turns it off again, or puts the radio straight back if LinBPQ isn't answering yet;
 - if the radio can't be put back where it was, LinBPQ stays off, the log says so loudly, and the receiver keeps trying;
 - if the receiver stops in the middle of a slot, LinBPQ stays off rather than transmitting on the bulletin frequency. The next start puts the radio back first and then turns LinBPQ on again, and the log says what happened. If the receiver never comes back, LinBPQ stays off until you send `XMITOFF 2 0` as sysop or restart LinBPQ;

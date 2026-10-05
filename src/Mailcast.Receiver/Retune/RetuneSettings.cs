@@ -54,8 +54,11 @@ public sealed record BpqNodeSettings
     /// <summary>The number of the LinBPQ port on the shared radio, as in its <c>PORTNUM=</c>.</summary>
     public int HfPort { get; init; }
 
-    /// <summary>The longest <see cref="DrainSeconds"/> accepted.</summary>
-    public const int MostDrainSeconds = 120;
+    /// <summary>
+    /// The longest <see cref="DrainSeconds"/> accepted: LinBPQ is held off a minute before the
+    /// slot, so the drain and the PTT check have to fit in that and still tune before it starts.
+    /// </summary>
+    public const int MostDrainSeconds = 40;
 
     /// <summary>
     /// How long to wait after XMITOFF before tuning, in seconds, for frames LinBPQ had already
