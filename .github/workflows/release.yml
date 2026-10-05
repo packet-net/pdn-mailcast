@@ -199,11 +199,13 @@ jobs:
             apt-get install -y -qq /a/pdn-mailcast-receiver_*.deb /a/pdn-mailcast-headend_*.deb
             test -f /etc/pdn-mailcast/receiver.json
             test -f /etc/pdn-mailcast-headend/headend.json
+            # The receiver reports Major.Minor.Patch alone (it is also the version in its FBB
+            # SID), so a prerelease 0.2.0-rc1 shows as 0.2.0; the head end reports it in full.
             for p in pdn-mailcast-receiver pdn-mailcast-headend; do
               out="$($p --version)"
               echo "$out"
               case "$out" in
-                "$p $VERSION"|"$p $VERSION+"*) ;;
+                "$p $VERSION"|"$p $VERSION+"*|"$p ${VERSION%%-*}") ;;
                 *) echo "$p reports \"$out\", expected version $VERSION" >&2; exit 1 ;;
               esac
             done'
