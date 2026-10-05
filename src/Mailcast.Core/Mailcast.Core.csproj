@@ -2,7 +2,10 @@
 
   <PropertyGroup>
     <RootNamespace>Mailcast.Core</RootNamespace>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackageId>M0LTE.Mailcast.Core</PackageId>
+    <Description>pdn-mailcast's core: the on-air frame format, bulletins, zstd compression with the trained dictionary, the directory and timetable, the solar daylight window, the head end's store and schedule, and the receiver's symbol store.</Description>
+    <PackageTags>packet-radio;amateur-radio;bbs;raptorq;fountain-code</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 

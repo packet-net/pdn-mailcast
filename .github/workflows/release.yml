@@ -215,10 +215,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Pack M0LTE.RaptorQ
-        run: dotnet pack src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj -c Release -o artifacts -p:Version=${{ needs.version.outputs.version }}
-      - name: Check the package
-        run: test -f "artifacts/M0LTE.RaptorQ.${{ needs.version.outputs.version }}.nupkg"
+      - name: Pack M0LTE.RaptorQ, M0LTE.Mailcast.Core and M0LTE.Mailcast.Fbb
+        run: |
+          set -euo pipefail
+          for p in src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj src/Mailcast.Core/Mailcast.Core.csproj src/Mailcast.Fbb/Mailcast.Fbb.csproj; do
+            dotnet pack "$p" -c Release -o artifacts -p:Version=${{ needs.version.outputs.version }}
+          done
+      - name: Check the packages
+        run: |
+          set -euo pipefail
+          for id in M0LTE.RaptorQ M0LTE.Mailcast.Core M0LTE.Mailcast.Fbb; do
+            test -f "artifacts/$id.${{ needs.version.outputs.version }}.nupkg"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: pdn-mailcast-nupkg

@@ -1,6 +1,6 @@
 name: nuget
 
-# Pushes M0LTE.RaptorQ to nuget.org from a GitHub Release's .nupkg, with NuGet trusted
+# Pushes M0LTE.RaptorQ, M0LTE.Mailcast.Core and M0LTE.Mailcast.Fbb to nuget.org from a GitHub Release's .nupkg, with NuGet trusted
 # publishing (OIDC), so there is no long-lived API key anywhere. The nuget.org trusted
 # publishing policy names this file, so keep its name.
 #
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag whose M0LTE.RaptorQ .nupkg to push (e.g. v0.1.0)'
+        description: 'Release tag whose .nupkg files to push (e.g. v0.4.0)'
         required: true
 
 permissions:
@@ -32,9 +32,9 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'M0LTE.RaptorQ.*.nupkg' --dir pkg
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'M0LTE.*.nupkg' --dir pkg
           ls -l pkg
-          [ "$(find pkg -name '*.nupkg' | wc -l)" = 1 ] || { echo "::error::expected one M0LTE.RaptorQ .nupkg on $TAG"; exit 1; }
+          [ "$(find pkg -name '*.nupkg' | wc -l)" -ge 1 ] || { echo "::error::no M0LTE .nupkg on $TAG"; exit 1; }
 
       - uses: actions/setup-dotnet@v4
         with:
