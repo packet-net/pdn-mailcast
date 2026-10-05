@@ -66,6 +66,19 @@ public sealed record WebSettings
     public string Password { get; init; } = "";
 }
 
+/// <summary>The receiver's own copies of bulletins the BBS has answered for.</summary>
+public sealed record ArchiveSettings
+{
+    /// <summary>The longest <see cref="Days"/> can be: ten years.</summary>
+    public const int MostDays = 3650;
+
+    /// <summary>How many days a bulletin is kept after the BBS answered for it. 0 keeps none.</summary>
+    public int Days { get; init; } = 30;
+
+    /// <summary>The most the copies may add up to, in megabytes (MiB); past it the oldest go first. 0 keeps none.</summary>
+    public int MaxMegabytes { get; init; } = 50;
+}
+
 /// <summary>
 /// The receiver's configuration file. Only what a station has to choose is here; the broadcast's
 /// own details (callsigns, the modem, where the signal sits above the dial) are fixed in
@@ -108,6 +121,9 @@ public sealed record ReceiverConfig
 
     /// <summary>The local web page.</summary>
     public WebSettings Web { get; init; } = new();
+
+    /// <summary>How long the receiver keeps its own copy of each bulletin once the BBS has answered for it.</summary>
+    public ArchiveSettings Archive { get; init; } = new();
 
     /// <summary>
     /// When GB7RDG's slots are, UTC, as HH:mm: one slot starts here and then every
@@ -289,6 +305,14 @@ public sealed record ReceiverConfig
         if (Web is null || Web.Password is null)
         {
             throw new ConfigException("\"web\" or its password is null");
+        }
+        if (Archive is null)
+        {
+            throw new ConfigException("\"archive\" is null: leave it out for the defaults, or give days and maxMegabytes");
+        }
+        if (Archive.Days is < 0 or > ArchiveSettings.MostDays || Archive.MaxMegabytes < 0)
+        {
+            throw new ConfigException($"\"archive\": \"days\" is from 0 to {ArchiveSettings.MostDays} and \"maxMegabytes\" cannot be negative; 0 for either keeps no copies");
         }
         if (StateDirectory is null || SlotUtc is null)
         {

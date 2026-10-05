@@ -18,6 +18,34 @@ public class ConfigTests
         Assert.Equal(60, config.EveryMinutes);
         Assert.Equal(8, config.WebSdrSlotsPerDay);
         Assert.False(config.SlotUtcWithoutEveryMinutes);
+        Assert.Equal(new ArchiveSettings { Days = 30, MaxMegabytes = 50 }, config.Archive);
+    }
+
+    [Theory]
+    [InlineData("""{ "archive": { "days": -1 } }""")]
+    [InlineData("""{ "archive": { "maxMegabytes": -5 } }""")]
+    [InlineData("""{ "archive": { "days": 99999 } }""")]
+    [InlineData("""{ "archive": null }""")]
+    public void Archive_ThatCannotWork_IsRefusedWithAReason(string json)
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, json);
+
+        var e = Assert.Throws<ConfigException>(() => ReceiverConfig.Load(path));
+        Assert.Contains("archive", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Archive_LeftOut_Keeps30DaysAnd50Megabytes_AndZeroKeepsNone()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "audio": "ubersdr:wessex.zapto.org" }""");
+        Assert.Equal(new ArchiveSettings { Days = 30, MaxMegabytes = 50 }, ReceiverConfig.Load(path).Archive);
+
+        File.WriteAllText(path, """{ "archive": { "days": 0 } }""");
+        Assert.Equal(new ArchiveSettings { Days = 0, MaxMegabytes = 50 }, ReceiverConfig.Load(path).Archive);
     }
 
     [Fact]

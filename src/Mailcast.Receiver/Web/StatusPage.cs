@@ -9,7 +9,7 @@ using Packet.SoundModem.Waterfall;
 namespace Mailcast.Receiver.Web;
 
 /// <summary>
-/// The receiver's local web page: status, settings, the input level and a live spectrogram.
+/// The receiver's local web page: status, the mail held, settings, the input level and a live spectrogram.
 /// </summary>
 /// <remarks>
 /// <para>The spectrogram and the level meter come from pdn-soundmodem's
@@ -24,8 +24,18 @@ public sealed class StatusPage : IAsyncDisposable
 {
     private const string WaterfallBase = "/waterfall/";
 
-    /// <summary>The largest settings form accepted.</summary>
+    /// <summary>The largest settings form, or any other request body, accepted.</summary>
     public const int MaxFormBytes = 16 * 1024;
+
+    /// <summary>The most mail entries one page of <c>/api/mail</c> gives.</summary>
+    public const int MaxMailPage = 200;
+
+    private const string MailBase = "/api/mail/";
+
+    /// <summary>How soon one bulletin can be sent to the BBS again after the last time.</summary>
+    public static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
+
+    private readonly Dictionary<ulong, DateTimeOffset> _resentAt = [];
 
     private readonly ReceiverHost _host;
     private readonly string? _configPath;
@@ -158,6 +168,15 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/settings", "POST"):
                     await SaveSettingsAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/mail", "GET"):
+                    await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(MailList(context.Request.QueryString), ReceiverConfig.JsonLine)).ConfigureAwait(false);
+                    break;
+                case ("/api/mail/resend", "POST"):
+                    await ResendAsync(context).ConfigureAwait(false);
+                    break;
+                case (_, "GET") when path.StartsWith(MailBase, StringComparison.Ordinal):
+                    await ServeBulletinAsync(context, path[MailBase.Length..]).ConfigureAwait(false);
+                    break;
                 default:
                     await RespondAsync(context, 404, "text/plain", "Not found.\n").ConfigureAwait(false);
                     break;
@@ -253,7 +272,7 @@ public sealed class StatusPage : IAsyncDisposable
                 target = ReceiverHost.DescribeBbs(config.Bbs),
                 lastFailure = _host.Delivery.LastFailure,
                 nextAttempt = _host.Delivery.NextAttempt,
-                waiting = _host.Intake.Pending().Count,
+                waiting = _host.Intake.Mail().Waiting, // from memory: this page is asked every few seconds
             },
             retune = _host.Retuner is not { } retuner ? null : new
             {
@@ -422,21 +441,26 @@ public sealed class StatusPage : IAsyncDisposable
         return next;
     }
 
-    private async Task SaveSettingsAsync(HttpListenerContext context)
+    /// <summary>
+    /// Reads a state-changing request's JSON body, or answers the request itself and returns null:
+    /// 415 for a body that is not application/json (a form a page elsewhere can post without
+    /// asking, text/plain or a form encoding, is not one) and 413 for one over
+    /// <see cref="MaxFormBytes"/>. A body that is not a <typeparamref name="T"/> gives null with
+    /// nothing answered yet, for the caller to say why.
+    /// </summary>
+    private static async Task<(bool Answered, T? Value)> ReadJsonAsync<T>(HttpListenerContext context)
+        where T : class
     {
         if (!(context.Request.ContentType ?? "").Split(';')[0].Trim().Equals("application/json", StringComparison.OrdinalIgnoreCase))
         {
-            // A form a page elsewhere can post without asking (text/plain, a form encoding) is not one.
-            await RespondAsync(context, 415, "application/json", JsonSerializer.Serialize(new { error = "Settings are sent as application/json." })).ConfigureAwait(false);
-            return;
+            await RespondAsync(context, 415, "application/json", JsonSerializer.Serialize(new { error = "Send this as application/json." })).ConfigureAwait(false);
+            return (true, null);
         }
         if (context.Request.ContentLength64 > MaxFormBytes)
         {
             await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
-            return;
+            return (true, null);
         }
-
-        SettingsForm? form = null;
         var body = new MemoryStream();
         var buffer = new byte[4096];
         int read;
@@ -446,15 +470,25 @@ public sealed class StatusPage : IAsyncDisposable
             if (body.Length > MaxFormBytes)
             {
                 await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
-                return;
+                return (true, null);
             }
         }
         try
         {
-            form = JsonSerializer.Deserialize<SettingsForm>(body.ToArray(), ReceiverConfig.Json);
+            return (false, JsonSerializer.Deserialize<T>(body.ToArray(), ReceiverConfig.Json));
         }
         catch (JsonException)
         {
+            return (false, null);
+        }
+    }
+
+    private async Task SaveSettingsAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<SettingsForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return; // not JSON, or too large
         }
         if (form is null)
         {
@@ -489,6 +523,183 @@ public sealed class StatusPage : IAsyncDisposable
         await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { saved = true })).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// One page of the bulletins held, newest first: <c>offset</c> and <c>limit</c> (at most
+    /// <see cref="MaxMailPage"/>) from the query string.
+    /// </summary>
+    internal object MailList(System.Collections.Specialized.NameValueCollection query)
+    {
+        int offset = Math.Max(0, int.TryParse(query["offset"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int o) ? o : 0);
+        int limit = int.TryParse(query["limit"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int l) ? Math.Clamp(l, 1, MaxMailPage) : 50;
+        var mail = _host.Intake.Mail(); // in memory, newest first, already counted: no files, no lock, no sorting
+        return new
+        {
+            total = mail.Count,
+            waiting = mail.Waiting,
+            archived = mail.Archived,
+            offset,
+            limit,
+            archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
+            items = mail.Page(offset, limit).Select(MailView).ToList(),
+        };
+    }
+
+    /// <summary>One bulletin for the list: what it is, where it is, and what the BBS has said.</summary>
+    private object MailView(Packet.Mailcast.MailEntry m)
+    {
+        string status;
+        DeliveryRecord? last = null;
+        if (m.Waiting)
+        {
+            // Only a non-final answer can be about this stay in the outbox; a final one is from
+            // before the bulletin was sent again.
+            last = _host.Ledger.Latest(m.Bid) is { Verdict: DeliveryVerdict.Deferred or DeliveryVerdict.Unconfirmed } r ? r : null;
+            status = last is not null ? "waiting: " + DeliveryService.Describe(last.Verdict)
+                : _host.Delivery.LastFailure is { } failure ? "waiting: " + failure
+                : "waiting for the BBS";
+        }
+        else
+        {
+            status = m.Verdict switch
+            {
+                Packet.Mailcast.BbsVerdict.Accepted => "accepted by the BBS",
+                Packet.Mailcast.BbsVerdict.AlreadyHad => "the BBS already had it",
+                _ => "refused by the BBS",
+            };
+        }
+        return new
+        {
+            id = Packet.Mailcast.ObjectId.Format(m.ObjectId),
+            waiting = m.Waiting,
+            bid = m.Bid,
+            from = m.From,
+            to = m.To,
+            at = m.At,
+            title = m.Title,
+            date = m.Date,
+            size = m.Size,
+            time = m.Time,
+            status,
+            verdict = m.Verdict,
+            detail = m.Detail ?? last?.Detail,
+            lastAttempt = last?.Time,
+            nextAttempt = m.Waiting ? _host.Delivery.NextAttempt : null,
+        };
+    }
+
+    /// <summary>
+    /// One bulletin as stored (its header block, R: lines and body) as plain text. Its content is
+    /// whatever was on the air, so the browser is told plainly that it is text, not to guess
+    /// otherwise, and to run nothing.
+    /// </summary>
+    private async Task ServeBulletinAsync(HttpListenerContext context, string id)
+    {
+        (Packet.Mailcast.MailEntry Entry, byte[] Serialized)? found = null;
+        if (Packet.Mailcast.ObjectId.TryParse(id, out ulong objectId))
+        {
+            try
+            {
+                found = _host.Intake.ReadMail(objectId);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                await RespondAsync(context, 500, "text/plain; charset=utf-8", $"Cannot read that bulletin: {Ascii.Clean(e.Message)}\n").ConfigureAwait(false);
+                return;
+            }
+        }
+        if (found is not { } held)
+        {
+            await RespondAsync(context, 404, "text/plain; charset=utf-8", "No such bulletin.\n").ConfigureAwait(false);
+            return;
+        }
+        context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
+        await RespondAsync(context, 200, "text/plain; charset=utf-8", BulletinText(held.Serialized)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// BBS mail is octets in no declared character set: read as UTF-8 if it is valid UTF-8, else
+    /// as Latin-1, which every octet is. Either way it is sent on as UTF-8.
+    /// </summary>
+    internal static string BulletinText(byte[] stored)
+    {
+        try
+        {
+            return new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(stored);
+        }
+        catch (DecoderFallbackException)
+        {
+            return Packet.Mailcast.Bulletin.TextEncoding.GetString(stored);
+        }
+    }
+
+    /// <summary>The resend form: which bulletin, by its object ID.</summary>
+    internal sealed record ResendForm(string? Id);
+
+    private async Task ResendAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<ResendForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        if (form?.Id is not { } id || !Packet.Mailcast.ObjectId.TryParse(id, out ulong objectId))
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Say which bulletin, by its id." })).ConfigureAwait(false);
+            return;
+        }
+        var now = _host.Time.GetUtcNow();
+        TimeSpan? wait = null;
+        lock (_gate)
+        {
+            if (!_host.Intake.Mail().IsWaiting(objectId) && _resentAt.TryGetValue(objectId, out var last) && now - last < ResendCooldown)
+            {
+                wait = ResendCooldown - (now - last);
+            }
+        }
+        if (wait is TimeSpan left)
+        {
+            // Each one sent again is a session with the BBS; a script or a stuck key should not make dozens.
+            await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = $"That one was sent again a moment ago. Try again in {Math.Ceiling(left.TotalSeconds)} s." })).ConfigureAwait(false);
+            return;
+        }
+        (Packet.Mailcast.ResendOutcome Outcome, Packet.Mailcast.Bulletin? Bulletin) result;
+        try
+        {
+            result = _host.Intake.Resend(objectId);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
+        {
+            await RespondAsync(context, 500, "application/json", JsonSerializer.Serialize(new { error = "Cannot put it back in the outbox: " + Ascii.Clean(e.Message) })).ConfigureAwait(false);
+            return;
+        }
+        switch (result.Outcome)
+        {
+            case Packet.Mailcast.ResendOutcome.Resent:
+                lock (_gate)
+                {
+                    foreach (var old in _resentAt.Where(r => now - r.Value >= ResendCooldown).Select(r => r.Key).ToList())
+                    {
+                        _resentAt.Remove(old);
+                    }
+                    _resentAt[objectId] = now;
+                }
+                var b = result.Bulletin!;
+                _log($"mail: {Ascii.Clean(b.Bid)} \"{Ascii.Clean(b.Title)}\" put back in the outbox from the web page ({context.Request.RemoteEndPoint?.Address}), to be offered to the BBS again");
+                _host.Delivery.Nudge();
+                await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { resent = true, bid = b.Bid }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
+                break;
+            case Packet.Mailcast.ResendOutcome.TooMany:
+                await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = $"{Packet.Mailcast.ReceiverStore.MaxResentWaiting} bulletins sent again are already waiting for the BBS. Try again once it has answered for them." })).ConfigureAwait(false);
+                break;
+            case Packet.Mailcast.ResendOutcome.AlreadyWaiting:
+                await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = "It is already waiting for the BBS." })).ConfigureAwait(false);
+                break;
+            default:
+                await RespondAsync(context, 404, "application/json", JsonSerializer.Serialize(new { error = "No such bulletin in the archive." })).ConfigureAwait(false);
+                break;
+        }
+    }
+
     /// <summary>The sound cards ALSA knows, as device names the audio setting takes.</summary>
     private static string[] SoundCards()
     {
@@ -519,6 +730,7 @@ public sealed class StatusPage : IAsyncDisposable
         context.Response.StatusCode = status;
         context.Response.ContentType = type;
         context.Response.Headers["Cache-Control"] = "no-store";
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
         context.Response.ContentLength64 = bytes.Length;
         await context.Response.OutputStream.WriteAsync(bytes).ConfigureAwait(false);
         context.Response.Close();

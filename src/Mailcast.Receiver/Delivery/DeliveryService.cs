@@ -14,8 +14,8 @@ public interface IBbsSession
 /// with a growing wait while the BBS cannot be reached.
 /// </summary>
 /// <remarks>
-/// <para>A bulletin leaves the store's outbox only once the BBS has answered for it for good:
-/// accepted (FS + and a clean close), already had (FS -) or refused. Anything else (FS =, a
+/// <para>A bulletin leaves the store's outbox, for its archive, only once the BBS has answered
+/// for it for good: accepted (FS + and a clean close), already had (FS -) or refused. Anything else (FS =, a
 /// session that broke off, a BBS that cannot be reached) leaves it in the outbox, which is on disk,
 /// so a restart picks it up again. Nothing is lost, and nothing is delivered twice: the BBS's own
 /// BID check answers FS - to a bulletin it already took.</para>
@@ -161,6 +161,7 @@ public sealed class DeliveryService
 
         var byBid = bulletins.ToDictionary(b => b.Bid, StringComparer.OrdinalIgnoreCase);
         bool waitingOnBbs = false;
+        var answered = new List<(string Bid, BbsVerdict Verdict, string? Detail)>();
         foreach (var outcome in report.Outcomes)
         {
             var bulletin = byBid[outcome.Bid];
@@ -168,15 +169,7 @@ public sealed class DeliveryService
             {
                 case DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Refused:
                     var record = Record(bulletin, outcome);
-                    try
-                    {
-                        _intake.Acknowledge(bulletin.Bid);
-                    }
-                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                    {
-                        // It stays in the outbox and is offered again; the BBS answers FS -.
-                        _log($"store: cannot take {Ascii.Clean(bulletin.Bid)} out of the outbox: {Ascii.Clean(e.Message)}");
-                    }
+                    answered.Add((bulletin.Bid, Final(record.Verdict), record.Detail));
                     _log($"bbs: {Ascii.Clean(bulletin.Bid)} {Describe(record.Verdict)}{(record.Detail is null ? "" : ": " + Ascii.Clean(record.Detail))}");
                     break;
                 case DeliveryVerdict.Deferred or DeliveryVerdict.Unconfirmed:
@@ -188,6 +181,16 @@ public sealed class DeliveryService
                     waitingOnBbs = true;
                     break;
             }
+        }
+
+        // All of the session's final answers at once, so the mail list is rebuilt once, not per bulletin.
+        foreach (var (bid, e) in _intake.Acknowledge(answered))
+        {
+            // It stays in the outbox and is offered again, after the usual wait rather than
+            // straight away, since a disk that will not take a rename does not clear itself in
+            // a second; the BBS answers FS -.
+            _log($"store: cannot move {Ascii.Clean(bid)} out of the outbox: {Ascii.Clean(e.Message)}");
+            waitingOnBbs = true;
         }
 
         if (report.ReverseOffered > 0)
@@ -246,6 +249,14 @@ public sealed class DeliveryService
         await Task.WhenAny(waits).ConfigureAwait(false);
         await done.CancelAsync().ConfigureAwait(false);
     }
+
+    /// <summary>The archive's name for a final answer.</summary>
+    private static BbsVerdict Final(DeliveryVerdict verdict) => verdict switch
+    {
+        DeliveryVerdict.Accepted => BbsVerdict.Accepted,
+        DeliveryVerdict.AlreadyHad => BbsVerdict.AlreadyHad,
+        _ => BbsVerdict.Refused,
+    };
 
     internal static string Describe(DeliveryVerdict verdict) => verdict switch
     {

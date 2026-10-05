@@ -41,6 +41,11 @@
   // 12 is the most.
   "webSdrSlotsPerDay": 8,
 
+  // The receiver keeps its own copy of each bulletin once your BBS has answered for it, to
+  // read on the status page or send to the BBS again: for "days", and "maxMegabytes" in all,
+  // the oldest going first. 0 for either keeps none.
+  "archive": { "days": 30, "maxMegabytes": 50 },
+
   // To share your radio with LinBPQ packet, the receiver can retune it for each slot: add
   // "rig" and "bpq" as docs/receiver.md says under "Sharing a radio with LinBPQ".
 

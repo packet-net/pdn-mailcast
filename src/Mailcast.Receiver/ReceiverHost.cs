@@ -1,3 +1,4 @@
+using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
 using Mailcast.Receiver.Retune;
 
@@ -25,7 +26,12 @@ public sealed class ReceiverHost : IAsyncDisposable
         _config = config;
         _time = time;
         _log = log;
-        Intake = new Intake(config.StateDirectory, log);
+        Intake = new Intake(config.StateDirectory, log, new ReceiverStoreOptions
+        {
+            Time = time,
+            ArchiveRetention = TimeSpan.FromDays(config.Archive.Days),
+            ArchiveMaxBytes = config.Archive.MaxMegabytes * 1024L * 1024,
+        });
         Ledger = new DeliveryLedger(config.StateDirectory);
         Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Schedule);
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
@@ -444,7 +450,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Always delivers through the client for the configuration in force.</summary>
     private sealed class SwitchableSession(ReceiverHost host) : IBbsSession
     {
-        public Task<SessionReport> DeliverAsync(IReadOnlyList<Packet.Mailcast.Bulletin> bulletins, CancellationToken cancellation) =>
+        public Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation) =>
             host.Bbs.DeliverAsync(bulletins, cancellation);
     }
 }
