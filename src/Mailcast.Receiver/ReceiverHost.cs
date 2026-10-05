@@ -187,10 +187,14 @@ public sealed class ReceiverHost : IAsyncDisposable
                 {
                     AudioState = $"the web SDR is closed until {opens:HH:mm} UTC, {ListeningWindow.Describe(config.SlotStart)}";
                     _log($"audio: {AudioState}");
-                    await DelayAsync(opens - _time.GetUtcNow(), restart.Token).ConfigureAwait(false);
+                    // At most a minute at a time, then the clock again: a Pi that booted on
+                    // fake-hwclock's stale time is put right by NTP partway through the wait,
+                    // and one long timer would sleep straight through the real slot.
+                    await DelayAsync(Shorter(opens - _time.GetUtcNow(), ClockCheck), restart.Token).ConfigureAwait(false);
                     continue;
                 }
-                closeAt = new CancellationTokenSource(closes - _time.GetUtcNow(), _time);
+                closeAt = new CancellationTokenSource();
+                _ = CloseAtAsync(closes, closeAt, restart.Token);
             }
 
             using var window = closeAt;
@@ -242,6 +246,11 @@ public sealed class ReceiverHost : IAsyncDisposable
                 await pipeline.DisposeAsync().ConfigureAwait(false);
             }
 
+            if (pipeline.LeftStuck)
+            {
+                // The device is still held by the stuck read, so every reopen would fail.
+                throw new InvalidOperationException($"the read from {pipeline.Source} is stuck in the driver; restarting the service to let the device go");
+            }
             if (why is null || cancellation.IsCancellationRequested)
             {
                 continue;
@@ -258,6 +267,27 @@ public sealed class ReceiverHost : IAsyncDisposable
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
             AudioState = $"{why}; trying again shortly";
             await DelayAsync(wait, cancellation).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The longest any wait on the wall clock goes before looking at it again.</summary>
+    public static readonly TimeSpan ClockCheck = TimeSpan.FromSeconds(60);
+
+    private static TimeSpan Shorter(TimeSpan a, TimeSpan b) => a < b ? (a < TimeSpan.Zero ? TimeSpan.Zero : a) : b;
+
+    /// <summary>Cancels <paramref name="close"/> once the clock reads <paramref name="closes"/>, looking at it every minute.</summary>
+    private async Task CloseAtAsync(DateTimeOffset closes, CancellationTokenSource close, CancellationToken cancellation)
+    {
+        try
+        {
+            while (_time.GetUtcNow() < closes)
+            {
+                await Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation).ConfigureAwait(false);
+            }
+            await close.CancelAsync().ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException)
+        {
         }
     }
 

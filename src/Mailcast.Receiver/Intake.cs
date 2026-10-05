@@ -19,7 +19,11 @@ public sealed class Intake : IAsyncDisposable
     private readonly object _gate = new();
     // Bounded: frames come a few a minute, so a full queue means the store has stopped, and
     // memory should not be what finds that out. Frames are dropped, and counted, rather than waited for.
-    private readonly Channel<Item> _queue = Channel.CreateBounded<Item>(new BoundedChannelOptions(QueueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+    private readonly Channel<ReadOnlyMemory<byte>> _queue;
+    private readonly object _settledGate = new();
+    private TaskCompletionSource _settledChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private long _offered;
+    private long _settled;
     private readonly Action<string> _log;
     private readonly Task _worker;
     /// <summary>Frames that may wait for the store at once.</summary>
@@ -31,8 +35,19 @@ public sealed class Intake : IAsyncDisposable
 
     /// <summary>Opens the store under <paramref name="stateDirectory"/>/store.</summary>
     public Intake(string stateDirectory, Action<string> log)
+        : this(stateDirectory, log, QueueLength)
+    {
+    }
+
+    /// <summary>For tests: a store with a shorter queue.</summary>
+    internal Intake(string stateDirectory, Action<string> log, int queueLength)
     {
         _log = log;
+        // With DropWrite a write to a full queue still says it succeeded; this is the only place
+        // a dropped frame shows.
+        _queue = Channel.CreateBounded<ReadOnlyMemory<byte>>(
+            new BoundedChannelOptions(queueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite },
+            _ => Dropped());
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default);
         _worker = Task.Run(RunAsync);
     }
@@ -45,6 +60,9 @@ public sealed class Intake : IAsyncDisposable
 
     /// <summary>Broadcast frames heard since start.</summary>
     public long FramesHeard => Interlocked.Read(ref _framesHeard);
+
+    /// <summary>Broadcast frames dropped because the store was not keeping up.</summary>
+    public long FramesDropped => Interlocked.Read(ref _framesDropped);
 
     /// <summary>Broadcast frames that added a piece the store did not have.</summary>
     public long FramesStored => Interlocked.Read(ref _framesStored);
@@ -60,19 +78,56 @@ public sealed class Intake : IAsyncDisposable
             return false;
         }
         Interlocked.Increment(ref _framesHeard);
-        if (!_queue.Writer.TryWrite(new Item(payload, null)) && Interlocked.Increment(ref _framesDropped) % 100 == 1)
+        Interlocked.Increment(ref _offered);
+        if (!_queue.Writer.TryWrite(payload))
         {
-            _log($"store: the store is not keeping up; {Interlocked.Read(ref _framesDropped)} frame(s) dropped");
+            Settle(); // only after DisposeAsync
         }
         return true;
     }
 
-    /// <summary>Waits until every frame offered so far has been through the store.</summary>
+    /// <summary>
+    /// Waits until every frame offered so far has been through the store or been dropped. Counted
+    /// rather than marked with a queue entry, because a full queue would drop the marker too.
+    /// </summary>
     public async Task DrainAsync(CancellationToken cancellation)
     {
-        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await _queue.Writer.WriteAsync(new Item(default, done), cancellation).ConfigureAwait(false);
-        await done.Task.WaitAsync(cancellation).ConfigureAwait(false);
+        long target = Interlocked.Read(ref _offered);
+        while (true)
+        {
+            Task changed;
+            lock (_settledGate)
+            {
+                if (_settled >= target)
+                {
+                    return;
+                }
+                changed = _settledChanged.Task;
+            }
+            await changed.WaitAsync(cancellation).ConfigureAwait(false);
+        }
+    }
+
+    private void Dropped()
+    {
+        if (Interlocked.Increment(ref _framesDropped) % 100 == 1)
+        {
+            _log($"store: the store is not keeping up; {Interlocked.Read(ref _framesDropped)} frame(s) dropped");
+        }
+        Settle();
+    }
+
+    /// <summary>One more offered frame has been stored or dropped.</summary>
+    private void Settle()
+    {
+        TaskCompletionSource changed;
+        lock (_settledGate)
+        {
+            _settled++;
+            changed = _settledChanged;
+            _settledChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        changed.TrySetResult();
     }
 
     /// <summary>Rebuilt bulletins not yet handed to the BBS, oldest first.</summary>
@@ -123,39 +178,45 @@ public sealed class Intake : IAsyncDisposable
 
     private async Task RunAsync()
     {
-        await foreach (var (payload, done) in _queue.Reader.ReadAllAsync().ConfigureAwait(false))
+        await foreach (var payload in _queue.Reader.ReadAllAsync().ConfigureAwait(false))
         {
-            if (done is not null)
-            {
-                done.TrySetResult();
-                continue;
-            }
-
-            AcceptResult result;
             try
             {
-                lock (_gate)
-                {
-                    result = _store.Accept(payload.Span);
-                }
+                Accept(payload);
             }
-            catch (Exception e)
+            finally
             {
-                // The worker must outlive anything one frame does to the store, or every frame
-                // after it is lost without a word.
-                _log($"store: cannot keep a piece: {Ascii.Clean(e.Message)}");
-                continue;
+                Settle();
             }
+        }
+    }
 
-            try
+    private void Accept(ReadOnlyMemory<byte> payload)
+    {
+        AcceptResult result;
+        try
+        {
+            lock (_gate)
             {
-                FrameHeard?.Invoke();
-                Report(result);
+                result = _store.Accept(payload.Span);
             }
-            catch (Exception e)
-            {
-                _log($"store: a listener failed: {Ascii.Clean(e.Message)}");
-            }
+        }
+        catch (Exception e)
+        {
+            // The worker must outlive anything one frame does to the store, or every frame
+            // after it is lost without a word.
+            _log($"store: cannot keep a piece: {Ascii.Clean(e.Message)}");
+            return;
+        }
+
+        try
+        {
+            FrameHeard?.Invoke();
+            Report(result);
+        }
+        catch (Exception e)
+        {
+            _log($"store: a listener failed: {Ascii.Clean(e.Message)}");
         }
     }
 
@@ -186,7 +247,4 @@ public sealed class Intake : IAsyncDisposable
                 break;
         }
     }
-
-    /// <summary>A frame's payload, or with <paramref name="Done"/> set, a point in the queue for <see cref="DrainAsync"/>.</summary>
-    private readonly record struct Item(ReadOnlyMemory<byte> Payload, TaskCompletionSource? Done);
 }

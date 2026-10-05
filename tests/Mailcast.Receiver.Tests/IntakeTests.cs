@@ -43,4 +43,33 @@ public class IntakeTests
         Assert.True(intake.Offer(Ax25UiFrame.Build(OnAir.Source + "-3", OnAir.Destination, payload)));
         Assert.Equal(1, intake.FramesHeard);
     }
+
+    [Fact]
+    public async Task FullQueue_DropsAndCounts_AndDrainStillReturns()
+    {
+        using var dir = new TempDirectory();
+        await using var intake = new Intake(dir.Path, _ => { }, queueLength: 2);
+        var frames = Samples.Frames([Samples.Bulletin(1, bodyLines: 200)]);
+        Assert.True(frames.Count >= 8);
+        using var entered = new SemaphoreSlim(0);
+        using var release = new ManualResetEventSlim();
+        intake.FrameHeard += () =>
+        {
+            entered.Release();
+            release.Wait();
+        };
+
+        // The worker takes the first frame and is held; two more fill the queue; the rest drop.
+        intake.Offer(frames[0]);
+        await entered.WaitAsync();
+        for (int i = 1; i < 8; i++)
+        {
+            intake.Offer(frames[i]);
+        }
+        Assert.Equal(5, intake.FramesDropped);
+
+        release.Set();
+        await intake.DrainAsync(CancellationToken.None);
+        Assert.Equal(8, intake.FramesHeard);
+    }
 }

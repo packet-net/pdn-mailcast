@@ -67,6 +67,19 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>Completes when the audio ends: a recording played through, a source lost, or <see cref="DisposeAsync"/>.</summary>
     public Task Finished => _finished.Task;
 
+    /// <summary>
+    /// The audio thread was still stuck in a read when the pipeline was disposed, so the device was
+    /// left open. Nothing in this process can open it again (it would get EBUSY): the supervisor
+    /// ends the process, and systemd starts it afresh.
+    /// </summary>
+    public bool LeftStuck { get; private set; }
+
+    /// <summary>For tests: raised each time the starvation watch has set its next timer on the clock.</summary>
+    internal event Action? WatchWaiting;
+
+    /// <summary>For tests: raised once <see cref="DisposeAsync"/> has set its timer for the audio thread.</summary>
+    internal event Action? StopWaiting;
+
     /// <summary>Why the audio ended, if it ended on its own.</summary>
     public string? EndReason { get; private set; }
 
@@ -151,7 +164,9 @@ public sealed class AudioPipeline : IAsyncDisposable
         {
             while (!_stop.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(5), _time, _stop.Token).ConfigureAwait(false);
+                var tick = Task.Delay(TimeSpan.FromSeconds(5), _time, _stop.Token);
+                WatchWaiting?.Invoke();
+                await tick.ConfigureAwait(false);
                 if (_webSdr is { SessionLive: false })
                 {
                     Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
@@ -226,11 +241,14 @@ public sealed class AudioPipeline : IAsyncDisposable
             // still in it is worse than leaking it until the service restarts.
             try
             {
-                await _threadDone.Task.WaitAsync(StopWait, _time).ConfigureAwait(false);
+                var wait = _threadDone.Task.WaitAsync(StopWait, _time);
+                StopWaiting?.Invoke();
+                await wait.ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
                 stopped = false;
+                LeftStuck = true;
                 _log($"audio: the read from {_source} did not return within {StopWait.TotalSeconds:F0} s; leaving it");
             }
         }

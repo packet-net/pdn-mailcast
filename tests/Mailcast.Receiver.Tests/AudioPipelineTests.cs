@@ -32,26 +32,29 @@ public class AudioPipelineTests
         var input = new StuckInput();
         var log = new List<string>();
         var pipeline = AudioPipeline.ForInput(input, line => { lock (log) { log.Add(line); } }, time);
+        var watching = System.Threading.Channels.Channel.CreateUnbounded<bool>();
+        var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        pipeline.WatchWaiting += () => watching.Writer.TryWrite(true);
+        pipeline.StopWaiting += () => stopping.TrySetResult();
         await pipeline.StartAsync(CancellationToken.None);
 
-        // The watch looks every 5 s of the fake clock; move it on until the pipeline gives up.
-        for (int i = 0; i < 100_000 && !pipeline.Finished.IsCompleted; i++)
+        // The watch looks every 5 s of the fake clock. Each time it has set its timer, move the
+        // clock on to it; the sixth look is 30 s with no audio.
+        for (int look = 1; look <= 6; look++)
         {
-            time.Advance(TimeSpan.FromSeconds(1));
-            await Task.Yield();
+            Assert.False(pipeline.Finished.IsCompleted);
+            await watching.Reader.ReadAsync();
+            time.Advance(TimeSpan.FromSeconds(5));
         }
-
-        Assert.True(pipeline.Finished.IsCompleted);
+        await pipeline.Finished;
         Assert.Contains("no audio", pipeline.EndReason, StringComparison.Ordinal);
 
         // The read is still stuck, so disposing waits StopWait and then leaves the device alone.
         var disposing = pipeline.DisposeAsync().AsTask();
-        for (int i = 0; i < 100_000 && !disposing.IsCompleted; i++)
-        {
-            time.Advance(TimeSpan.FromSeconds(1));
-            await Task.Yield();
-        }
+        await stopping.Task;
+        time.Advance(AudioPipeline.StopWait);
         await disposing;
+        Assert.True(pipeline.LeftStuck);
         Assert.False(input.Disposed);
         lock (log)
         {
