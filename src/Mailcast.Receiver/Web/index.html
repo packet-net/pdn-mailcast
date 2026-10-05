@@ -11,7 +11,8 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
-  header { padding: 18px 24px 8px; }
+  header { padding: 18px 24px 8px; position: relative; }
+  #signOut { position: absolute; top: 20px; right: 24px; font-size: 14px; }
   header h1 { margin: 0; font-size: 22px; }
   header p { margin: 4px 0 0; color: var(--soft); }
   main { display: grid; gap: 16px; padding: 12px 24px 32px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
@@ -59,6 +60,7 @@
 <header>
   <h1>pdn-mailcast receiver</h1>
   <p id="summary">Loading...</p>
+  <a href="#" id="signOut" hidden>Sign out</a>
 </header>
 <main>
   <section>
@@ -168,6 +170,11 @@
         <label>Login <input id="login"></label>
         <label>Password <input id="password" type="password" autocomplete="new-password"></label>
       </div>
+      <div class="row">
+        <label>New page password <input id="pagePassword" type="password" autocomplete="new-password"></label>
+        <label id="currentPageLabel">Current page password <input id="currentPagePassword" type="password" autocomplete="current-password"></label>
+      </div>
+      <div class="muted" id="pageNote">The password for this page. Leave it empty to keep the one you have. Changing it signs out every other browser.</div>
       <button type="submit">Save</button>
       <div id="saved"></div>
     </form>
@@ -182,8 +189,11 @@ const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null;
 
-/* Asks the receiver and never throws. A refusal that is not JSON (401, 403, 421) and a receiver
-   that does not answer at all come back as a sentence in .error for the page to show. */
+/* Asks the receiver and never throws. A refusal that is not JSON (403, 421) and a receiver
+   that does not answer at all come back as a sentence in .error for the page to show. A 401
+   means this browser is no longer signed in: the page reloads, and the receiver shows the
+   sign-in page instead. */
+let signingIn = false;
 async function api(url, options) {
   let answer;
   try { answer = await fetch(url, options); }
@@ -194,8 +204,9 @@ async function api(url, options) {
     if (type.startsWith("application/json")) body = await answer.json(); else text = await answer.text();
   } catch { return { ok: false, status: answer.status, body: null, text: "", error: "The receiver's answer was cut short." }; }
   if (answer.ok) return { ok: true, status: answer.status, body, text, error: null };
-  const why = body && body.error ? body.error
-    : answer.status === 401 ? "This page needs its password: reload it to log in again."
+  if (answer.status === 401 && !signingIn) { signingIn = true; location.reload(); }
+  const why = answer.status === 401 ? "You are signed out: taking you to the sign-in page."
+    : body && body.error ? body.error
     : answer.status === 403 ? "Refused: this request came from another site."
     : answer.status === 421 ? "This page only answers to localhost."
     : text.trim() || `The receiver answered ${answer.status}.`;
@@ -494,7 +505,19 @@ async function loadSettings() {
   $("login").value = settings.bbs.login;
   $("command").value = settings.bbs.command;
   $("password").placeholder = settings.bbs.passwordSet ? "unchanged" : "not set";
+  const web = settings.web;
+  $("signOut").hidden = !web.passwordSet;
+  $("currentPageLabel").hidden = !web.passwordSet;
+  $("pagePassword").placeholder = web.passwordSet ? "unchanged" : "not set";
+  $("pageNote").textContent = web.passwordSet
+    ? "The password for this page. Leave it empty to keep the one you have. Changing it signs out every other browser."
+    : "This page has no password, so it only answers on this machine. Setting one means it asks for it here too.";
 }
+$("signOut").addEventListener("click", async e => {
+  e.preventDefault();
+  await api("logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  location.reload();
+});
 $("audioKind").addEventListener("change", () => {
   const k = $("audioKind").value, v = $("audioWhere");
   if (k === "ubersdr" && !v.value.startsWith("ubersdr:")) v.value = "ubersdr:wessex.zapto.org";
@@ -506,10 +529,13 @@ $("settings").addEventListener("submit", async e => {
   const form = {
     audio: $("audioWhere").value, type: $("type").value, host: $("host").value, port: Number($("port").value),
     login: $("login").value, password: $("password").value, command: $("command").value,
+    pagePassword: $("pagePassword").value, currentPagePassword: $("currentPagePassword").value,
   };
   const r = await api("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
   $("saved").innerHTML = r.ok ? '<span class="good">Saved. The receiver is using the new settings.</span>' : `<span class="bad">${esc(r.error)}</span>`;
   $("password").value = "";
+  $("pagePassword").value = "";
+  $("currentPagePassword").value = "";
   if (r.ok) { loadSettings(); refresh(); }
 });
 loadSettings();

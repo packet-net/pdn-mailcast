@@ -54,14 +54,15 @@ public sealed record WebSettings
     public int Port { get; init; } = 8130;
 
     /// <summary>
-    /// Whether the page is reachable from the local network as well as from this machine. It has
-    /// no login, so it is off unless asked for.
+    /// Whether the page is reachable from the local network as well as from this machine. Off
+    /// unless asked for, and it needs <see cref="Password"/>.
     /// </summary>
     public bool Lan { get; init; }
 
     /// <summary>
-    /// The page's password, which the browser asks for. Required when <see cref="Lan"/> is set,
-    /// since anything on the network could otherwise change the settings; optional otherwise.
+    /// The page's password, asked for on its sign-in page (or given by a script with HTTP Basic).
+    /// Required when <see cref="Lan"/> is set, since anything on the network could otherwise
+    /// change the settings; optional otherwise.
     /// </summary>
     public string Password { get; init; } = "";
 }

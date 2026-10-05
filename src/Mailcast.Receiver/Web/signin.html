@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in - pdn-mailcast receiver</title>
+<style>
+  :root { --ink: #1d2733; --soft: #5b6878; --line: #d9dfe6; --paper: #f6f8fa; --card: #ffffff; --bad: #c0392b; --accent: #2563a8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper);
+    min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+  main { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 22px 26px; width: 100%; max-width: 360px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  p { margin: 0 0 16px; color: var(--soft); }
+  form { display: grid; gap: 12px; }
+  label { display: grid; gap: 3px; font-size: 14px; color: var(--soft); }
+  label.check { display: flex; gap: 8px; align-items: center; color: var(--ink); }
+  input[type=password] { font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+  button { font: inherit; padding: 8px 18px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; justify-self: start; }
+  button:disabled { opacity: .45; cursor: default; }
+  #message { color: var(--bad); font-size: 14px; min-height: 1.45em; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>pdn-mailcast receiver</h1>
+  <p>Enter the page password to see this receiver.</p>
+  <form id="signin" method="post" action="{{action}}">
+    <label>Password
+      <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    </label>
+    <label class="check"><input id="remember" name="remember" type="checkbox" value="on"> Keep me signed in on this device</label>
+    <button type="submit" id="go">Sign in</button>
+    <p id="message" role="alert">{{message}}</p>
+  </form>
+</main>
+<script>
+"use strict";
+const form = document.getElementById("signin"), message = document.getElementById("message"), go = document.getElementById("go");
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  go.disabled = true;
+  message.textContent = "";
+  const body = JSON.stringify({ password: document.getElementById("password").value, remember: document.getElementById("remember").checked });
+  try {
+    const answer = await fetch(form.getAttribute("action"), { method: "POST", headers: { "Content-Type": "application/json" }, body });
+    if (answer.ok) { location.reload(); return; }
+    let why = "";
+    try { why = (await answer.json()).error || ""; } catch { }
+    message.textContent = why || `The receiver answered ${answer.status}.`;
+  } catch {
+    message.textContent = "The receiver is not answering.";
+  }
+  document.getElementById("password").value = "";
+  go.disabled = false;
+});
+</script>
+</body>
+</html>
