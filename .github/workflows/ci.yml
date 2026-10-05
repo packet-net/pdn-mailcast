@@ -57,6 +57,8 @@ jobs:
   # The receiver's .deb for amd64, kept as a build artifact (not published anywhere).
   receiver-deb:
     runs-on: ubuntu-latest
+    # A stalled mirror once held the install step for half an hour; fail it instead.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
