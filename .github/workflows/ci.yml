@@ -9,7 +9,9 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -24,7 +26,9 @@ jobs:
   # The receiver end to end: a day's slot modulated into a noisy recording, decoded by the
   # receiver and delivered into a real LinBPQ in docker (tests/Mailcast.Receiver.Tests/EndToEndTests.cs).
   receiver-end-to-end:
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -39,7 +43,9 @@ jobs:
   # committed vectors; this job also checks that the vectors are what the generator makes, and
   # that the crate decodes symbols made by Mailcast.RaptorQ.
   raptorq-interop:
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -56,7 +62,9 @@ jobs:
 
   # The receiver's .deb for amd64, kept as a build artifact (not published anywhere).
   receiver-deb:
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     # A stalled mirror once held the install step for half an hour; fail it instead.
     timeout-minutes: 15
     steps:
