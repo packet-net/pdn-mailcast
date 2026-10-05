@@ -1,8 +1,8 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
-using Bbs.Fbb;
-using Mailcast.Core;
+using Packet.Fbb;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver.Delivery;
 
@@ -53,7 +53,7 @@ public sealed record SessionReport(bool Graceful, string? Failure, IReadOnlyList
 /// propose every bulletin given, transfer those the BBS asks for, and close.
 /// </summary>
 /// <remarks>
-/// <para>The protocol is <see cref="FbbSession"/>, pdn-bbs's state machine (src/Mailcast.Fbb).
+/// <para>The protocol is <see cref="FbbSession"/>, the state machine from the Packet.Fbb package (packet-net/pdn-fbb), shared with pdn-bbs.
 /// This class is the transport around it, as pdn-bbs's FbbSessionRunner is: lines go out with
 /// CR LF, transfers go out raw, and everything received is fed back in.</para>
 /// <para>The receiver only ever sends. If the BBS has messages queued for the receiver's login

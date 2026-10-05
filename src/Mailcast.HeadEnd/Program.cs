@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Reflection;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd;
 using Mailcast.HeadEnd.Flex;
 using Mailcast.HeadEnd.Intake;

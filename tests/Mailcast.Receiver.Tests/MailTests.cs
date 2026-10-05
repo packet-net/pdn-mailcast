@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
 using Mailcast.Receiver.Web;
 using Microsoft.Extensions.Time.Testing;

@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Mailcast.Receiver.Tests;

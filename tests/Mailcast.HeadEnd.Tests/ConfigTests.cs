@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.HeadEnd.Tests;
 
@@ -218,7 +218,7 @@ public class SymbolSizeTests
         var small = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 240}}""");
         Assert.Equal(240, small.ToScheduleOptions().SymbolSize);
         var standard = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""");
-        Assert.Equal(Mailcast.Core.MailcastFrame.StandardSymbolSize, standard.ToScheduleOptions().SymbolSize);
+        Assert.Equal(Packet.Mailcast.MailcastFrame.StandardSymbolSize, standard.ToScheduleOptions().SymbolSize);
     }
 }
 

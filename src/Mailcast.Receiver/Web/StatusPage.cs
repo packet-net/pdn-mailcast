@@ -535,7 +535,7 @@ public sealed class StatusPage : IAsyncDisposable
     }
 
     /// <summary>One bulletin for the list: what it is, where it is, and what the BBS has said.</summary>
-    private object MailView(Mailcast.Core.MailEntry m)
+    private object MailView(Packet.Mailcast.MailEntry m)
     {
         string status;
         DeliveryRecord? last = null;
@@ -552,14 +552,14 @@ public sealed class StatusPage : IAsyncDisposable
         {
             status = m.Verdict switch
             {
-                Mailcast.Core.BbsVerdict.Accepted => "accepted by the BBS",
-                Mailcast.Core.BbsVerdict.AlreadyHad => "the BBS already had it",
+                Packet.Mailcast.BbsVerdict.Accepted => "accepted by the BBS",
+                Packet.Mailcast.BbsVerdict.AlreadyHad => "the BBS already had it",
                 _ => "refused by the BBS",
             };
         }
         return new
         {
-            id = Mailcast.Core.ObjectId.Format(m.ObjectId),
+            id = Packet.Mailcast.ObjectId.Format(m.ObjectId),
             waiting = m.Waiting,
             bid = m.Bid,
             from = m.From,
@@ -584,8 +584,8 @@ public sealed class StatusPage : IAsyncDisposable
     /// </summary>
     private async Task ServeBulletinAsync(HttpListenerContext context, string id)
     {
-        (Mailcast.Core.MailEntry Entry, byte[] Serialized)? found = null;
-        if (Mailcast.Core.ObjectId.TryParse(id, out ulong objectId))
+        (Packet.Mailcast.MailEntry Entry, byte[] Serialized)? found = null;
+        if (Packet.Mailcast.ObjectId.TryParse(id, out ulong objectId))
         {
             try
             {
@@ -618,7 +618,7 @@ public sealed class StatusPage : IAsyncDisposable
         }
         catch (DecoderFallbackException)
         {
-            return Mailcast.Core.Bulletin.TextEncoding.GetString(stored);
+            return Packet.Mailcast.Bulletin.TextEncoding.GetString(stored);
         }
     }
 
@@ -632,7 +632,7 @@ public sealed class StatusPage : IAsyncDisposable
         {
             return;
         }
-        if (form?.Id is not { } id || !Mailcast.Core.ObjectId.TryParse(id, out ulong objectId))
+        if (form?.Id is not { } id || !Packet.Mailcast.ObjectId.TryParse(id, out ulong objectId))
         {
             await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Say which bulletin, by its id." })).ConfigureAwait(false);
             return;
@@ -652,7 +652,7 @@ public sealed class StatusPage : IAsyncDisposable
             await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = $"That one was sent again a moment ago. Try again in {Math.Ceiling(left.TotalSeconds)} s." })).ConfigureAwait(false);
             return;
         }
-        (Mailcast.Core.ResendOutcome Outcome, Mailcast.Core.Bulletin? Bulletin) result;
+        (Packet.Mailcast.ResendOutcome Outcome, Packet.Mailcast.Bulletin? Bulletin) result;
         try
         {
             result = _host.Intake.Resend(objectId);
@@ -664,7 +664,7 @@ public sealed class StatusPage : IAsyncDisposable
         }
         switch (result.Outcome)
         {
-            case Mailcast.Core.ResendOutcome.Resent:
+            case Packet.Mailcast.ResendOutcome.Resent:
                 lock (_gate)
                 {
                     foreach (var old in _resentAt.Where(r => now - r.Value >= ResendCooldown).Select(r => r.Key).ToList())
@@ -678,7 +678,7 @@ public sealed class StatusPage : IAsyncDisposable
                 _host.Delivery.Nudge();
                 await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { resent = true, bid = b.Bid }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
                 break;
-            case Mailcast.Core.ResendOutcome.AlreadyWaiting:
+            case Packet.Mailcast.ResendOutcome.AlreadyWaiting:
                 await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = "It is already waiting for the BBS." })).ConfigureAwait(false);
                 break;
             default:

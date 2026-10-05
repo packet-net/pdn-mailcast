@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Packet.SoundModem.Waterfall;
 
 namespace Mailcast.Receiver.Tests;

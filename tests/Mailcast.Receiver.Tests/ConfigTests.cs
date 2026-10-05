@@ -57,7 +57,7 @@ public class ConfigTests
 
         var config = ReceiverConfig.Load(path);
 
-        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, Mailcast.Core.DaylightRule.Gb7rdg), config.Schedule);
+        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg), config.Schedule);
         Assert.Equal(8, config.WebSdrSlots.Count);
         Assert.False(config.SlotUtcWithoutEveryMinutes);
     }
@@ -78,7 +78,7 @@ public class ConfigTests
         var config = ReceiverConfig.Load(path);
 
         Assert.True(config.SlotUtcWithoutEveryMinutes);
-        Assert.Equal(new SlotSchedule(new TimeOnly(12, 0), 60, Mailcast.Core.DaylightRule.Gb7rdg), config.Schedule);
+        Assert.Equal(new SlotSchedule(new TimeOnly(12, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg), config.Schedule);
         // The same slots as 00:00 every hour, and the web SDR listens to the same ones too.
         Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60).FromAnchor.Order(), config.Schedule.FromAnchor.Order());
         Assert.Equal(new ReceiverConfig().WebSdrSlots, config.WebSdrSlots);
@@ -217,14 +217,14 @@ public class ConfigTests
         string path = Path.Combine(dir.Path, "receiver.json");
         File.WriteAllText(path, """{ "daylight": { "locator": "IO92", "afterSunriseMinutes": 60, "beforeSunsetMinutes": 0 } }""");
         var config = ReceiverConfig.Load(path);
-        Assert.Equal(new Mailcast.Core.DaylightRule("IO92", 60, 0), config.Schedule.Daylight);
+        Assert.Equal(new Packet.Mailcast.DaylightRule("IO92", 60, 0), config.Schedule.Daylight);
         config.Save(path);
         Assert.Equal(config, ReceiverConfig.Load(path));
 
         File.WriteAllText(path, """{ "daylight": null }""");
         Assert.Null(ReceiverConfig.Load(path).Schedule.Daylight);
-        Assert.Equal(Mailcast.Core.DaylightRule.Gb7rdg, new ReceiverConfig().Schedule.Daylight);
-        Assert.Equal(Mailcast.Core.DaylightRule.Gb7rdg, ReceiverConfig.Load(Path.Combine(AppContext.BaseDirectory, "receiver.example.json")).Schedule.Daylight);
+        Assert.Equal(Packet.Mailcast.DaylightRule.Gb7rdg, new ReceiverConfig().Schedule.Daylight);
+        Assert.Equal(Packet.Mailcast.DaylightRule.Gb7rdg, ReceiverConfig.Load(Path.Combine(AppContext.BaseDirectory, "receiver.example.json")).Schedule.Daylight);
     }
 
     [Theory]

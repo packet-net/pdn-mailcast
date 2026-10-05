@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.HeadEnd.Intake;
 
@@ -16,7 +16,7 @@ public enum OfferOutcome
 }
 
 /// <summary>
-/// Mailcast.Core's <see cref="HeadEndStore"/>, which keeps each bulletin's object from when it is
+/// Packet.Mailcast's <see cref="HeadEndStore"/>, which keeps each bulletin's object from when it is
 /// first seen, its first slot and its next ESI, made safe to share between the intakes and the slot.
 /// </summary>
 public sealed class RotationStore

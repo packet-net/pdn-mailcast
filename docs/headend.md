@@ -156,7 +156,7 @@ pdn-bbs speaks the same FBB B1F forwarding, and its `fbbTcp` listener (BPQ's FBB
 
 ## Bulletins by file
 
-`intake.dropDirectory` takes bulletin files too, checked every minute: one bulletin per file in Mailcast.Core's serialised form (a `Type:`, `From:`, `To:`, `At:`, `Bid:`, `Date:` and `Title:` header, a blank line, then the message text with its R: lines). A file taken in is deleted; one refused moves to `rejected/` with the reason in the journal. Name a file `.tmp` or start it with a dot while writing it, then rename it. Either way, only bulletins (type B) up to `intake.maxBulletinBytes` (32 KB) are taken, each BID once, and the next slot is the first it is carried in.
+`intake.dropDirectory` takes bulletin files too, checked every minute: one bulletin per file in Packet.Mailcast's serialised form (a `Type:`, `From:`, `To:`, `At:`, `Bid:`, `Date:` and `Title:` header, a blank line, then the message text with its R: lines). A file taken in is deleted; one refused moves to `rejected/` with the reason in the journal. Name a file `.tmp` or start it with a dot while writing it, then rename it. Either way, only bulletins (type B) up to `intake.maxBulletinBytes` (32 KB) are taken, each BID once, and the next slot is the first it is carried in.
 
 ## The Flex
 

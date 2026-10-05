@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Slot;
 
@@ -34,7 +34,7 @@ public interface ISlotPlanner
 }
 
 /// <summary>
-/// The planner on Mailcast.Core: the bulletins in rotation from the head end store, each with its
+/// The planner on Packet.Mailcast: the bulletins in rotation from the head end store, each with its
 /// object as first prepared, its first slot and its next ESI, through <see cref="BroadcastScheduler"/>.
 /// </summary>
 /// <remarks>

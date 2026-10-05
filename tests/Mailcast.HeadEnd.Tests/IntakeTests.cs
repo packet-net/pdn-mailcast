@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using Bbs.Fbb;
-using Mailcast.Core;
+using Packet.Fbb;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Intake;
 
 namespace Mailcast.HeadEnd.Tests;
@@ -41,7 +41,7 @@ public class IntakeTests
     }
 
     /// <summary>
-    /// A BBS with a telnet login in front of Mailcast.Fbb's answering side, the way a LinBPQ telnet
+    /// A BBS with a telnet login in front of Packet.Fbb's answering side, the way a LinBPQ telnet
     /// port with a BBS user behaves: it prompts, checks the login, sends its SID, and once the
     /// caller has nothing to send, proposes what it holds for the partner.
     /// </summary>

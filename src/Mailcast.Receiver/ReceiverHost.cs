@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
 
 namespace Mailcast.Receiver;
@@ -48,7 +48,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Whether <see cref="Schedule"/> comes from GB7RDG's directory rather than the config file.</summary>
     public bool ScheduleFromDirectory => Intake.HeardSchedule is not null;
 
-    private void OnScheduleHeard(Mailcast.Core.SlotTimetable heard)
+    private void OnScheduleHeard(Packet.Mailcast.SlotTimetable heard)
     {
         var schedule = SlotSchedule.From(heard);
         _log($"slots: GB7RDG's directory gives its slots as {schedule.Describe()}; using that instead of the config file's");

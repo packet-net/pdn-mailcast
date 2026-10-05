@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using Bbs.Fbb;
+using Packet.Fbb;
 using Mailcast.Receiver.Delivery;
 
 namespace Mailcast.Receiver.Tests;
@@ -132,7 +132,7 @@ public class BbsClientTests
     public async Task Deliver_BidTooLongForFbb_IsRefusedWithoutAConnection()
     {
         var bulletin = Samples.Bulletin(1) is var b
-            ? new Mailcast.Core.Bulletin(b.Type, b.From, b.To, b.At, "1234567890123", b.Title, b.Date, b.RoutingLines, b.Body)
+            ? new Packet.Mailcast.Bulletin(b.Type, b.From, b.To, b.At, "1234567890123", b.Title, b.Date, b.RoutingLines, b.Body)
             : null!;
 
         var report = await Client(1).DeliverAsync([bulletin], CancellationToken.None);

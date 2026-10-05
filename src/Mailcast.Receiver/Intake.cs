@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
 

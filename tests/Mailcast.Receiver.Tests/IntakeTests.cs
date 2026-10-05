@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Packet.SoundModem.Waterfall;
 
 namespace Mailcast.Receiver.Tests;

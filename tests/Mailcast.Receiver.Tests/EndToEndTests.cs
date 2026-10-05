@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
 using Packet.SoundModem.Waterfall;
 using Xunit.Abstractions;

@@ -28,6 +28,20 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>How long <see cref="DisposeAsync"/> waits for the audio thread to stop.</summary>
     public static readonly TimeSpan StopWait = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// The longest the modem may stay locked on one burst before it is made to listen afresh:
+    /// longer than any burst GB7RDG sends (its <c>maxBurstSeconds</c> is at most 120).
+    /// </summary>
+    /// <remarks>
+    /// pdn-soundmodem's MS110D receiver (0.83.0) can lock on a burst too weak to decode, a
+    /// preamble heard through a closed band, and then never let go: noise keeps its probes about
+    /// as strong as the weak signal was, so it never decides the signal has gone, and with no
+    /// EOM it demodulates noise for ever. That costs about nine times the idle CPU (a whole core
+    /// on a Pi) and leaves the receiver deaf to every later slot until it is restarted. Counted
+    /// in samples, so it does not depend on how fast the audio arrives.
+    /// </remarks>
+    public static readonly TimeSpan LongestBurst = TimeSpan.FromSeconds(150);
+
     private readonly AudioSource _source;
     private readonly Action<string> _log;
     private readonly TimeProvider _time;
@@ -38,6 +52,9 @@ public sealed class AudioPipeline : IAsyncDisposable
     private Task? _watch;
     private long _lastAudio;
     private bool _watchOff;
+    private long _lockLimitSamples = (long)(LongestBurst.TotalSeconds * OnAir.SampleRate);
+    private long _lockedSamples;
+    private int _locksReleased;
     private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _threadDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -91,9 +108,17 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>Why the audio ended, if it ended on its own.</summary>
     public string? EndReason { get; private set; }
 
+    /// <summary>How many times the modem has been made to let go of a lock that outlasted <see cref="LongestBurst"/>.</summary>
+    public int LocksReleased => Volatile.Read(ref _locksReleased);
+
     /// <summary>For tests: a pipeline over an input that is already open, watched as a sound card would be.</summary>
-    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true) =>
-        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), ReceiverConfig.DefaultDialKHz * 1000, log, time) { _input = input, _watchOff = !watch };
+    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true, TimeSpan? longestBurst = null) =>
+        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), ReceiverConfig.DefaultDialKHz * 1000, log, time)
+        {
+            _input = input,
+            _watchOff = !watch,
+            _lockLimitSamples = (long)((longestBurst ?? LongestBurst).TotalSeconds * OnAir.SampleRate),
+        };
 
     /// <summary>
     /// Builds a pipeline for <paramref name="source"/>, heard on the USB dial <paramref name="dialHz"/>.
@@ -215,13 +240,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                     continue;
                 }
                 Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
-                var samples = block.AsSpan(0, read);
-                SourceBlock?.Invoke(samples);
-                if (_input is AlsaAudioInput)
-                {
-                    Channel.NoteCardClipping(samples);
-                }
-                Channel.ProcessReceive(samples);
+                Feed(block.AsSpan(0, read), soundCard: _input is AlsaAudioInput);
             }
         }
         catch (Exception e)
@@ -234,6 +253,45 @@ public sealed class AudioPipeline : IAsyncDisposable
             _threadDone.TrySetResult();
             _finished.TrySetResult();
         }
+    }
+
+    /// <summary>One block through the modem and everything beside it, on the audio thread (or a test's).</summary>
+    internal void Feed(ReadOnlySpan<float> samples, bool soundCard = false)
+    {
+        SourceBlock?.Invoke(samples);
+        if (soundCard)
+        {
+            Channel.NoteCardClipping(samples);
+        }
+        Channel.ProcessReceive(samples);
+        ReleaseStuckLock(samples.Length);
+    }
+
+    /// <summary>
+    /// Makes the modem listen afresh once it has been locked on one burst for longer than
+    /// <see cref="LongestBurst"/> (see there for why it would not by itself). On the audio
+    /// thread, between blocks, which is where resetting the receiver is safe.
+    /// </summary>
+    private void ReleaseStuckLock(int samples)
+    {
+        if (!Channel.CarrierDetect)
+        {
+            _lockedSamples = 0;
+            return;
+        }
+        _lockedSamples += samples;
+        if (_lockedSamples < _lockLimitSamples)
+        {
+            return;
+        }
+        foreach (var modem in Channel.Modems.Values)
+        {
+            modem.ResetCarrierState();
+        }
+        Interlocked.Increment(ref _locksReleased);
+        _log($"audio: the modem had been locked on one burst for {_lockedSamples / OnAir.SampleRate} s, longer than any GB7RDG sends, "
+            + "so it was a signal too weak to read; listening afresh");
+        _lockedSamples = 0;
     }
 
     /// <inheritdoc />

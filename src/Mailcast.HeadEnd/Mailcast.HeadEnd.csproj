@@ -25,8 +25,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Mailcast.Core\Mailcast.Core.csproj" />
-    <ProjectReference Include="..\Mailcast.Fbb\Mailcast.Fbb.csproj" />
+    <ProjectReference Include="..\Packet.Mailcast\Packet.Mailcast.csproj" />
+    <PackageReference Include="Packet.Fbb" />
   </ItemGroup>
 
   <ItemGroup>
