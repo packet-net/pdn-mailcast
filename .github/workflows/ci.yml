@@ -15,8 +15,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Build (Release)
         run: dotnet build -c Release
       - name: Test
@@ -32,8 +40,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Pull LinBPQ
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
       - name: End-to-end test
@@ -49,8 +65,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Regenerate the crate's vectors and compare with the committed ones
         run: |
           cargo run --release --locked --manifest-path tools/raptorq-vectors/Cargo.toml -- generate "$RUNNER_TEMP/crate.json"
@@ -70,8 +94,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Build the .deb
         run: scripts/build-receiver-deb.sh linux-x64 0.1.0-ci${{ github.run_number }}
       - name: Install it in a clean Debian and run it
