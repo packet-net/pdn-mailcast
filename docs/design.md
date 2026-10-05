@@ -18,7 +18,7 @@ Two ideas make a one-way link work:
 | What is sent | Bulletins only. No personal mail. |
 | Who sends | GB7RDG, a Flex 6500 on 40 m. |
 | When | Daily, around midday, daytime NVIS. Planned as 12:00 UTC. |
-| Where | Within 7.050 to 7.053 MHz, the band plan's segment for automatically controlled data stations. |
+| Where | Centred on 7.0538 MHz (USB dial 7.052 MHz), occupying about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz. |
 | Receivers | Linux, with LinBPQ or FBB mail. |
 | Receiver packaging | One program with pdn-soundmodem's library embedded from NuGet. No separate pdn-soundmodem install and no KISS link. |
 | Fountain code | RaptorQ (RFC 6330). |
@@ -59,7 +59,7 @@ Measured once the core was built: the trained 64 KB dictionary brings a held-out
 
 ### Frequency
 
-The signal is centred on **7.0515 MHz**, the middle of the 7.050 to 7.053 segment. On USB, a dial of **7.0497 MHz** puts that centre at 1800 Hz audio, which is the MS110D standard's own audio centre. Receivers use the same dial.
+The signal is centred on **7.0538 MHz**. On USB, a dial of **7.052 MHz** puts that centre at 1800 Hz audio, which is the MS110D standard's own audio centre, and receivers tune there. The first plan was 7.0515 MHz, in the middle of 7.050 to 7.053, but on 2026-10-05 that turned out to sit on top of the UK HF packet channels, which wiped out most frames even with a strong signal. 7.0538 MHz keeps the whole signal above 7.052 MHz.
 
 How much of the 3 kHz segment the signal fills is still to be settled (see the filter study below). With the standard's suggested pulse shaping, MS110D occupies about 2.9 kHz, 99% of its power falling inside 7.0501 to 7.0529 MHz.
 
@@ -189,4 +189,4 @@ The output is a plot of frame loss against receive filter width, one line per tr
 ## Open questions
 
 - Which callsign the receiver logs into the local BBS as. It has to be a forwarding partner there, and a station that already forwards with GB7RDG directly may not want two sessions under one call. This gets settled by testing against LinBPQ and FBB.
-- Whether the Flex's transmit filter opens wide enough to reach 7.053 MHz from the node's current dial (7.04945 MHz), or whether the slot retunes the slice to 7.0497 MHz.
+- Settled 2026-10-05: the Flex's transmit filter opens to 5700 Hz from GB7RDG's dial (7.04975 MHz), so the slice does not need to retune.
