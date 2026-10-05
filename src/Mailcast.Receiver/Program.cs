@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Mailcast.Receiver;
+using Mailcast.Receiver.Web;
 
 const string DefaultConfig = "/etc/pdn-mailcast/receiver.json";
 
@@ -76,9 +77,27 @@ try
         return 0;
     }
 
+    await using var page = new StatusPage(host, configPath, Log);
+    try
+    {
+        page.Start();
+    }
+    catch (System.Net.HttpListenerException e)
+    {
+        // Receiving and delivering matter more than the page: carry on without it.
+        Log($"web: cannot serve the status page on port {config.Web.Port}: {e.Message}. Another program may have the port; "
+            + "set \"web\".\"port\" to another. Carrying on without the page.");
+    }
+
     await host.RunAsync(stop.Token);
     Log("stopped");
     return 0;
+}
+catch (InvalidOperationException e) when (!stop.IsCancellationRequested)
+{
+    // A loop died: exit non-zero so systemd starts the receiver again.
+    Log($"stopping: {e.Message}");
+    return 1;
 }
 catch (AudioSourceException e)
 {

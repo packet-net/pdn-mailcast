@@ -15,6 +15,22 @@ Each bulletin is cut into pieces and sent with some spare ones, so the receiver 
 
 The slot opens with 30 seconds of steady tone. The receiver measures it and logs how far off frequency it is and the signal-to-noise ratio, which is a handy check on your dial and your antenna.
 
+## Installing
+
+Install the .deb (amd64, arm64 or armhf):
+
+```
+sudo apt install ./pdn-mailcast-receiver_0.1.0_amd64.deb
+```
+
+It brings its own .NET runtime. It creates a `pdn-mailcast` system user, an example config in `/etc/pdn-mailcast/receiver.json` and a systemd service, but does not start the service: set up your BBS first (below), put the password in the config, then
+
+```
+sudo systemctl start pdn-mailcast-receiver
+```
+
+and open the status page at http://127.0.0.1:8130/.
+
 ## Configuration
 
 The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few settings:
@@ -93,6 +109,19 @@ Not tested yet: this is from FBB 7.0.11's documentation and source.
 
 4. In the receiver's config use `"type": "fbb"`, FBB's host and port, and the password. The receiver logs in as `.Q0CAST`: the dot asks FBB for a binary session, without which FBB would mangle the compressed transfers.
 
+## The status page
+
+http://127.0.0.1:8130/ shows:
+
+- the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
+- your BBS: where bulletins go, how many are waiting, and any problem reaching it;
+- a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away;
+- the input level, with the same target as pdn-soundmodem: peaks between -18 and -9 dBFS;
+- today's bulletins, how many pieces of each have arrived, and what the BBS said about each;
+- the settings: audio, and the BBS's address and login. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
+
+On this machine only, the page answers to `localhost` and nothing else. To reach it from your network, set `"lan": true` and a `"password"` in `web`; the browser asks for it (any user name). Use it on a network you trust: it is plain HTTP.
+
 ## What it logs
 
 Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 30 s`), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
@@ -105,5 +134,7 @@ You need the .NET 10 SDK.
 dotnet publish src/Mailcast.Receiver -c Release -o out
 out/pdn-mailcast-receiver --config src/Mailcast.Receiver/receiver.example.json
 ```
+
+`scripts/build-receiver-deb.sh linux-x64 0.1.0` builds the .deb into `artifacts/`.
 
 The test suite includes one test that decodes a simulated slot into a real LinBPQ in docker. It is tagged `Category=Docker`: `dotnet test --filter Category=Docker` runs it, and `--filter "Category!=Docker"` leaves it out.

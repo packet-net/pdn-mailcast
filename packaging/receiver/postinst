@@ -1,0 +1,46 @@
+#!/bin/sh
+set -e
+
+EXAMPLE=/usr/share/pdn-mailcast/receiver.example.json
+CONFIG=/etc/pdn-mailcast/receiver.json
+UNIT=pdn-mailcast-receiver.service
+
+case "$1" in
+  configure)
+    if ! getent passwd pdn-mailcast >/dev/null; then
+        adduser --system --no-create-home --home /var/lib/pdn-mailcast --group pdn-mailcast
+    fi
+    # The service writes its config back when settings are saved on its page, by writing a
+    # temporary file beside it and renaming it over the old one, so it needs the directory; the
+    # file itself only has to be readable. It holds the BBS password: nothing for anyone else.
+    install -d -o root -g pdn-mailcast -m 0770 /etc/pdn-mailcast
+    if [ ! -e "$CONFIG" ]; then
+        install -o root -g pdn-mailcast -m 0640 "$EXAMPLE" "$CONFIG"
+        echo "pdn-mailcast-receiver: put an example config in $CONFIG."
+        echo "  Set up your BBS for the receiver (see /usr/share/doc/pdn-mailcast-receiver/README.md),"
+        echo "  put its password in $CONFIG, then: systemctl start pdn-mailcast-receiver"
+        echo "  The status page is then at http://127.0.0.1:8130/"
+    fi
+    ;;
+esac
+
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
+    if command -v deb-systemd-helper >/dev/null; then
+        deb-systemd-helper unmask "$UNIT" >/dev/null || true
+        if deb-systemd-helper --quiet was-enabled "$UNIT"; then
+            deb-systemd-helper enable "$UNIT" >/dev/null || true
+        else
+            deb-systemd-helper update-state "$UNIT" >/dev/null || true
+        fi
+    fi
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then
+        systemctl --system daemon-reload >/dev/null || true
+        # Not started on a first install: the BBS has to be set up first. An upgrade restarts
+        # a receiver that was running, so it picks up the new binary.
+        if [ -n "${2:-}" ] && command -v deb-systemd-invoke >/dev/null; then
+            deb-systemd-invoke try-restart "$UNIT" >/dev/null || true
+        fi
+    fi
+fi
+
+exit 0
