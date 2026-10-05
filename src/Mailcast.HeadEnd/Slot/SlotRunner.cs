@@ -267,7 +267,9 @@ public sealed class SlotRunner
                 }
                 finally
                 {
-                    await slot.CancelAsync();
+                    // In line rather than CancelAsync, which finishes on another thread: the slot's own
+                    // loops stop before anything else runs, on virtual time too.
+                    slot.Cancel();
                     await Quietly(renewing);
                     await Quietly(watching);
                     if (_dropping is not null)
