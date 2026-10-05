@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.HeadEnd.Tests;
 

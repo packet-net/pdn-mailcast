@@ -1,14 +1,12 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Mailcast.Core/Mailcast.Core.csproj" />
-    <Project Path="src/Mailcast.Fbb/Mailcast.Fbb.csproj" />
+    <Project Path="src/Packet.Mailcast/Packet.Mailcast.csproj" />
     <Project Path="src/Mailcast.HeadEnd/Mailcast.HeadEnd.csproj" />
     <Project Path="src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj" />
     <Project Path="src/Mailcast.Receiver/Mailcast.Receiver.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Mailcast.Core.Tests/Mailcast.Core.Tests.csproj" />
-    <Project Path="tests/Mailcast.Fbb.Tests/Mailcast.Fbb.Tests.csproj" />
+    <Project Path="tests/Packet.Mailcast.Tests/Packet.Mailcast.Tests.csproj" />
     <Project Path="tests/Mailcast.HeadEnd.Tests/Mailcast.HeadEnd.Tests.csproj" />
     <Project Path="tests/Mailcast.RaptorQ.Tests/Mailcast.RaptorQ.Tests.csproj" />
     <Project Path="tests/Mailcast.Receiver.Tests/Mailcast.Receiver.Tests.csproj" />

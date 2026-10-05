@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
 

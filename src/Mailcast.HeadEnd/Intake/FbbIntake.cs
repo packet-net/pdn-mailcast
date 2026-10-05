@@ -1,12 +1,12 @@
 using System.Net.Sockets;
 using System.Text;
-using Bbs.Fbb;
-using Mailcast.Core;
+using Packet.Fbb;
+using Packet.Mailcast;
 
 namespace Mailcast.HeadEnd.Intake;
 
 /// <summary>
-/// Collects bulletins from the BBS as a forwarding partner, over FBB B1F with Mailcast.Fbb's
+/// Collects bulletins from the BBS as a forwarding partner, over FBB B1F with Packet.Fbb's
 /// session state machine: the head end calls the BBS, logs in, says it has nothing to send, and
 /// takes what the BBS proposes. Bulletins up to the size cap are accepted; bulletins over the cap
 /// or already held are answered <c>-</c>; personal mail and NTS traffic, which should never be

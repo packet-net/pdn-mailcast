@@ -22,8 +22,8 @@ dotnet test
 The code so far:
 
 - `src/Mailcast.RaptorQ`: RaptorQ (RFC 6330), with no dependency on the rest of the repo.
-- `src/Mailcast.Core`: the on-air frame format, the bulletin model, zstd compression with the trained dictionary, the directory, the head end's store and slot schedule, the daylight hours (a small sunrise and sunset calculator), and the receiver's symbol store.
-- `src/Mailcast.Fbb`: FBB compressed (B1F) forwarding, both the calling and the answering side, copied from pdn-bbs with its tests. The receiver uses it to hand bulletins to your BBS, and the head end to take them from GB7RDG's.
+- `src/Packet.Mailcast`: the core library, published as `Packet.Mailcast` on nuget.org: the on-air frame format, the bulletin model, zstd compression with the trained dictionary, the directory, the head end's store and slot schedule, the daylight hours (a small sunrise and sunset calculator), and the receiver's symbol store.
+- FBB compressed (B1F) forwarding, both the calling and the answering side, comes from the `Packet.Fbb` NuGet package ([packet-net/pdn-fbb](https://github.com/packet-net/pdn-fbb)), which pdn-bbs uses too. The receiver uses it to hand bulletins to your BBS, and the head end to take them from GB7RDG's.
 - `src/Mailcast.HeadEnd`: the head end, `pdn-mailcast-headend`: takes bulletins from GB7RDG's BBS as a forwarding partner and sends them every daylight hour through the station's pdn-soundmodem, or renders a slot to a WAV file offline. See [docs/headend.md](docs/headend.md); `scripts/build-headend-deb.sh linux-x64 VERSION` builds its .deb.
 - `src/Mailcast.Receiver`: the receiver, with pdn-soundmodem's MS110D modem embedded from NuGet.
 - `tools/Mailcast.DictionaryTool`: imports bulletins from a copy of a LinBPQ mail store, trains a dictionary, and compares compressed sizes.
@@ -39,8 +39,8 @@ To retrain the dictionary from a copy of a LinBPQ store (`DIRMES.SYS` and `Mail/
 
 ```
 dotnet run --project tools/Mailcast.DictionaryTool -- import-bpq <copy-of-bpq-dir> <bulletin-dir>
-dotnet run --project tools/Mailcast.DictionaryTool -- train <bulletin-dir> src/Mailcast.Core/Dictionaries/gb7rdg-1.zdict --size 65536 --no-7plus
-dotnet run --project tools/Mailcast.DictionaryTool -- evaluate <bulletin-dir> --dictionary src/Mailcast.Core/Dictionaries/gb7rdg-1.zdict
+dotnet run --project tools/Mailcast.DictionaryTool -- train <bulletin-dir> src/Packet.Mailcast/Dictionaries/gb7rdg-1.zdict --size 65536 --no-7plus
+dotnet run --project tools/Mailcast.DictionaryTool -- evaluate <bulletin-dir> --dictionary src/Packet.Mailcast/Dictionaries/gb7rdg-1.zdict
 ```
 
 A retrained dictionary needs a new dictionary ID, since receivers decompress by ID.
@@ -56,4 +56,4 @@ git push origin v0.3.0
 
 Or run the `release` workflow by hand with a `version` (without the `v`) and `publish` ticked; with `publish` left off it is a dry run that builds everything and keeps it as workflow artifacts. A version with a hyphen (`0.2.0-rc1`) becomes a prerelease, which the apt repo does not pick up.
 
-Either way the tests run first, including the LinBPQ ones in docker, and nothing is built if they fail. A release then has `pdn-mailcast-receiver` and `pdn-mailcast-headend` as `.deb` packages for amd64, arm64 and armhf, the `M0LTE.RaptorQ` NuGet package, a `SHA256SUMS` file and notes made from the merged PRs since the last tag. Finally it asks the packet-net apt repo to rebuild, and starts `nuget.yml`, which pushes the release's `.nupkg` to nuget.org through NuGet trusted publishing (no API key). To push an existing release's package by hand: `gh workflow run nuget.yml -f tag=v0.1.0`. Pull requests that change the packaging run the same build with publishing off.
+Either way the tests run first, including the LinBPQ ones in docker, and nothing is built if they fail. A release then has `pdn-mailcast-receiver` and `pdn-mailcast-headend` as `.deb` packages for amd64, arm64 and armhf, the `M0LTE.RaptorQ` and `Packet.Mailcast` NuGet packages, a `SHA256SUMS` file and notes made from the merged PRs since the last tag. Finally it asks the packet-net apt repo to rebuild, and starts `nuget.yml`, which pushes the release's `.nupkg` files to nuget.org through NuGet trusted publishing (no API key). To push an existing release's package by hand: `gh workflow run nuget.yml -f tag=v0.1.0`. Pull requests that change the packaging run the same build with publishing off.

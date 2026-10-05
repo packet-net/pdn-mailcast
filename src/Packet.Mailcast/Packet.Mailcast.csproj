@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Packet.Mailcast</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>Packet.Mailcast</PackageId>
+    <Description>pdn-mailcast's core: the on-air frame format, bulletins, zstd compression with the trained dictionary, the directory and timetable, the solar daylight window, the head end's store and schedule, and the receiver's symbol store.</Description>
+    <PackageTags>packet-radio;amateur-radio;bbs;raptorq;fountain-code</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZstdSharp.Port" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mailcast.RaptorQ\Mailcast.RaptorQ.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Dictionaries\*.zdict" LogicalName="Packet.Mailcast.Dictionaries.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Packet.Mailcast.Tests" />
+  </ItemGroup>
+
+</Project>

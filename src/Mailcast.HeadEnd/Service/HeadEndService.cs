@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Planning;
 using Mailcast.HeadEnd.Slot;
@@ -33,7 +33,7 @@ public sealed record SlotSchedule
         Timetable = new SlotTimetable(anchor, (int)every.TotalMinutes, daylight);
     }
 
-    /// <summary>The same, as Mailcast.Core and the directory have it.</summary>
+    /// <summary>The same, as Packet.Mailcast and the directory have it.</summary>
     public SlotTimetable Timetable { get; }
 
     /// <summary>The daylight rule, or null when every slot runs.</summary>

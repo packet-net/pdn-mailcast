@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Mailcast.Core;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver.Delivery;
 

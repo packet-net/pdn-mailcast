@@ -1,4 +1,4 @@
-using Mailcast.Core;
+using Packet.Mailcast;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Offline;
 using Mailcast.HeadEnd.Planning;
