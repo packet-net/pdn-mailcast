@@ -33,7 +33,8 @@ public sealed class RetuneStatusTests
             Web = FreeWeb(),
         };
         await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
-        await using var page = new StatusPage(host, null, _ => { });
+        var page = new StatusPage(host, null, _ => { });
+        using var closing = new PageCloser(page);
 
         string status = JsonSerializer.Serialize(page.Status(), ReceiverConfig.JsonLine);
         string settings = JsonSerializer.Serialize(StatusPage.SettingsView(config), ReceiverConfig.JsonLine);
@@ -52,9 +53,28 @@ public sealed class RetuneStatusTests
     {
         using var dir = new TempDirectory();
         await using var host = new ReceiverHost(new ReceiverConfig { Audio = "wav:/nonexistent.wav", StateDirectory = dir.Path, Web = FreeWeb() }, TimeProvider.System, _ => { });
-        await using var page = new StatusPage(host, null, _ => { });
+        var page = new StatusPage(host, null, _ => { });
+        using var closing = new PageCloser(page);
 
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(page.Status(), ReceiverConfig.JsonLine));
         Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("retune").ValueKind);
+    }
+
+    /// <summary>
+    /// Disposes a page that was never started. HttpListener binds its prefix even then, so a
+    /// port another test run took in the meantime makes it throw; that says nothing about this.
+    /// </summary>
+    private sealed class PageCloser(StatusPage page) : IDisposable
+    {
+        public void Dispose()
+        {
+            try
+            {
+                page.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (System.Net.HttpListenerException)
+            {
+            }
+        }
     }
 }
