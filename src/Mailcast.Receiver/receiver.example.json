@@ -28,9 +28,15 @@
     "password": ""
   },
 
-  // When GB7RDG's daily slot starts, UTC. A web SDR is only listened to from 15 minutes
-  // before to 90 minutes after, to save its daily listening allowance.
-  "slotUtc": "12:00",
+  // GB7RDG's slots: one at "slotUtc" (UTC), then one every "everyMinutes", so every hour
+  // on the hour. A sound card listens all the time.
+  "slotUtc": "00:00",
+  "everyMinutes": 60,
+
+  // A public web SDR allows each address about 3 hours a day, so it only listens to this many
+  // slots a day, spread evenly (8 is every 3 hours), from 2 minutes before each to 12 after.
+  // 12 is the most.
+  "webSdrSlotsPerDay": 8,
 
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

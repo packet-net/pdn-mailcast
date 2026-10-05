@@ -1,6 +1,6 @@
 namespace Mailcast.Receiver;
 
-/// <summary>One daily slot as this receiver heard it.</summary>
+/// <summary>One slot as this receiver heard it.</summary>
 /// <param name="Started">When the slot began: the start of its tone, or its first frame if no tone was heard.</param>
 /// <param name="Tone">The tone's measurement, if it was heard.</param>
 /// <param name="FramesHeard">Broadcast frames decoded in the slot.</param>
@@ -13,8 +13,12 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
 /// </summary>
 public sealed class SlotTracker
 {
-    /// <summary>Frames this long after the slot's last one start a new slot.</summary>
-    public static readonly TimeSpan Gap = TimeSpan.FromHours(1);
+    /// <summary>
+    /// Frames this long after the slot's last one start a new slot. A slot is a few minutes of
+    /// bursts and the next is at least 15 minutes after its start, so a quiet spell this long
+    /// means the slot has ended even when the next one's tone was missed.
+    /// </summary>
+    public static readonly TimeSpan Gap = TimeSpan.FromMinutes(10);
 
     private readonly TimeProvider _time;
     private readonly Action<string> _log;
@@ -68,7 +72,7 @@ public sealed class SlotTracker
         }
         if (frames == 1 || frames % 100 == 0)
         {
-            _log($"slot: {frames} broadcast frame{(frames == 1 ? "" : "s")} heard");
+            _log($"slot: {frames} frame{(frames == 1 ? "" : "s")} heard");
         }
     }
 }

@@ -108,22 +108,65 @@ public sealed record ReceiverConfig
     public WebSettings Web { get; init; } = new();
 
     /// <summary>
-    /// When the daily slot starts, UTC, as HH:mm. A web SDR is only listened to from 15 minutes
-    /// before it to 90 minutes after, because public UberSDR instances allow each address about
-    /// three hours a day. A sound card listens all the time.
+    /// When GB7RDG's slots are, UTC, as HH:mm: one slot starts here and then every
+    /// <see cref="EveryMinutes"/> round the clock. GB7RDG sends every hour on the hour, so
+    /// "00:00" and 60.
     /// </summary>
-    public string SlotUtc { get; init; } = "12:00";
+    public string SlotUtc { get; init; } = "00:00";
 
-    /// <summary>How long before the slot a web SDR is opened.</summary>
-    public static readonly TimeSpan WebSdrBefore = TimeSpan.FromMinutes(15);
+    /// <summary>
+    /// Minutes from one slot's start to the next: it divides a day (1440) and is at least
+    /// <see cref="ShortestEveryMinutes"/>. A config from before hourly slots has only
+    /// <see cref="SlotUtc"/>, and is read as one slot a day (1440).
+    /// </summary>
+    public int EveryMinutes { get; init; } = 60;
 
-    /// <summary>How long after the slot starts a web SDR is kept open.</summary>
-    public static readonly TimeSpan WebSdrAfter = TimeSpan.FromMinutes(90);
+    /// <summary>The shortest gap between slots accepted, as the head end does.</summary>
+    public const int ShortestEveryMinutes = 15;
 
-    /// <summary>The slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
+    /// <summary>
+    /// How many slots a day a web SDR is listened to, spread evenly through the day (8 of 24
+    /// hourly slots is every 3 hours). Public UberSDR receivers allow each address about three
+    /// hours a day, and each slot listened to takes <see cref="WebSdrMinutesPerSlot"/>, so
+    /// <see cref="MostWebSdrSlotsPerDay"/> is the most. A sound card listens to every slot.
+    /// </summary>
+    public int WebSdrSlotsPerDay { get; init; } = 8;
+
+    /// <summary>How long before a slot a web SDR is opened.</summary>
+    public static readonly TimeSpan WebSdrBefore = TimeSpan.FromMinutes(2);
+
+    /// <summary>How long after a slot starts a web SDR is kept open.</summary>
+    public static readonly TimeSpan WebSdrAfter = TimeSpan.FromMinutes(12);
+
+    /// <summary>A web SDR's listening allowance, in minutes a day: public UberSDR allows each address about three hours.</summary>
+    public const int WebSdrAllowanceMinutes = 180;
+
+    /// <summary>Minutes of the allowance one slot uses.</summary>
+    public static int WebSdrMinutesPerSlot => (int)(WebSdrBefore + WebSdrAfter).TotalMinutes;
+
+    /// <summary>The most slots a day a web SDR can be listened to inside its allowance.</summary>
+    public static int MostWebSdrSlotsPerDay => WebSdrAllowanceMinutes / WebSdrMinutesPerSlot;
+
+    /// <summary>
+    /// Set when the file had <c>slotUtc</c> but no <c>everyMinutes</c>, as before hourly slots,
+    /// so it was read as one slot a day; the receiver says so in its log.
+    /// </summary>
+    [JsonIgnore]
+    public bool DailyFromOldConfig { get; init; }
+
+    /// <summary>The first slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
+    [JsonIgnore]
     public TimeOnly SlotStart => TimeOnly.TryParseExact(SlotUtc, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)
         ? t
-        : throw new ConfigException($"\"slotUtc\" \"{SlotUtc}\" is not a time like 12:00");
+        : throw new ConfigException($"\"slotUtc\" \"{SlotUtc}\" is not a time like 00:00");
+
+    /// <summary>GB7RDG's slots.</summary>
+    [JsonIgnore]
+    public SlotSchedule Schedule => new(SlotStart, EveryMinutes);
+
+    /// <summary>The slots a web SDR is listened to, by time of day, earliest first.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<TimeOnly> WebSdrSlots => ListeningWindow.WebSdrSlots(Schedule, WebSdrSlotsPerDay);
 
     /// <summary>Where the pieces heard, the rebuilt bulletins and the delivery record are kept.</summary>
     public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast";
@@ -163,8 +206,21 @@ public sealed record ReceiverConfig
         }
 
         config ??= new ReceiverConfig();
+        if (HasOnlySlotUtc(text))
+        {
+            config = config with { EveryMinutes = 1440, DailyFromOldConfig = true };
+        }
         config.Validate();
         return config;
+    }
+
+    /// <summary>Whether a config file gives <c>slotUtc</c> but not <c>everyMinutes</c>, as one from before hourly slots does.</summary>
+    private static bool HasOnlySlotUtc(string text)
+    {
+        using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        return document.RootElement.ValueKind == JsonValueKind.Object
+            && document.RootElement.TryGetProperty("slotUtc", out _)
+            && !document.RootElement.TryGetProperty("everyMinutes", out _);
     }
 
     /// <summary>Writes the config file, to a temporary name first so a crash leaves the old one whole.</summary>
@@ -188,10 +244,26 @@ public sealed record ReceiverConfig
                 // The create mode is masked by the umask; this is the mode it should have.
                 File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
             }
-            stream.Write(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n"));
+            stream.Write(System.Text.Encoding.UTF8.GetBytes(ToJson() + "\n"));
             stream.Flush(flushToDisk: true);
         }
         File.Move(tmp, path, overwrite: true);
+    }
+
+    /// <summary>
+    /// The file's text. A config read from before hourly slots is written back without
+    /// <c>everyMinutes</c>, so saving the settings page does not quietly make one slot a day its
+    /// choice: it is still read as one slot a day, and the log still says how to change it.
+    /// </summary>
+    internal string ToJson()
+    {
+        if (!DailyFromOldConfig)
+        {
+            return JsonSerializer.Serialize(this, Json);
+        }
+        var node = JsonSerializer.SerializeToNode(this, Json)!.AsObject();
+        node.Remove("everyMinutes");
+        return node.ToJsonString(Json);
     }
 
     /// <summary>Throws <see cref="ConfigException"/> if a setting cannot work.</summary>
@@ -216,6 +288,16 @@ public sealed record ReceiverConfig
         }
         _ = AudioSource.Parse(Audio);
         _ = SlotStart;
+        if (EveryMinutes < ShortestEveryMinutes || 1440 % EveryMinutes != 0)
+        {
+            throw new ConfigException($"\"everyMinutes\" {EveryMinutes} must divide a day (1440) and be at least {ShortestEveryMinutes}; GB7RDG's is 60");
+        }
+        if (WebSdrSlotsPerDay < 1 || WebSdrSlotsPerDay > MostWebSdrSlotsPerDay)
+        {
+            throw new ConfigException(
+                $"\"webSdrSlotsPerDay\" {WebSdrSlotsPerDay} must be from 1 to {MostWebSdrSlotsPerDay}: each slot keeps a web SDR open {WebSdrMinutesPerSlot} minutes, "
+                + "and public UberSDR receivers allow each address about 3 hours a day");
+        }
         if (!(DialKHz >= LowestDialKHz && DialKHz <= HighestDialKHz))
         {
             throw new ConfigException(string.Create(System.Globalization.CultureInfo.InvariantCulture,

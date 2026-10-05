@@ -19,7 +19,9 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
     "command": "BBS"
   },
   "web": { "port": 8130, "lan": false, "password": "" },
-  "slotUtc": "12:00",
+  "slotUtc": "00:00",
+  "everyMinutes": 60,
+  "webSdrSlotsPerDay": 8,
   "stateDirectory": "/var/lib/pdn-mailcast"
 }
 ```
@@ -28,7 +30,8 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 - `dialKHz`: the USB dial in kHz, normally `7052.0` (7.052 MHz), which is also what you get if you leave it out. The web SDR is tuned there, and a radio on a sound card should be set there. The signal is centred 1800 Hz above the dial, on 7.0538 MHz. Only change it if the signal moves; anything from 1800 to 30000 kHz is accepted.
 - `bbs`: where your BBS is and how the receiver logs in. See below.
 - `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which your browser asks for (any user name).
-- `slotUtc`: when the daily slot starts. A web SDR is only listened to from 15 minutes before it to 90 minutes after: public UberSDR receivers allow each address about three hours a day. A sound card listens all the time.
+- `slotUtc` and `everyMinutes`: when GB7RDG's slots are, in UTC. One starts at `slotUtc` and then one every `everyMinutes`, round the clock. GB7RDG sends every hour on the hour, so `"00:00"` and `60`, which is also what you get if you leave them out. `everyMinutes` must divide a day (1440) and be at least 15. A config file from before hourly slots has only `slotUtc`; it is read as one slot a day at that time, and the log and the status page say so. A sound card listens all the time, whatever these say.
+- `webSdrSlotsPerDay`: how many slots a day a web SDR listens to, normally 8. Public UberSDR receivers allow each address about three hours a day, so a web SDR can't listen every hour. It listens to this many slots, spread evenly through the day starting at `slotUtc` (8 of the 24 hourly slots is 00:00, 03:00 and so on to 21:00 UTC), from 2 minutes before each slot to 12 minutes after. That is 14 minutes a slot, so 12 is the most. The log and the status page say which slots it listens to.
 - `stateDirectory`: where the pieces, the rebuilt bulletins and the record of deliveries are kept.
 
 To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.
@@ -86,18 +89,20 @@ Not tested yet: this is from FBB 7.0.11's documentation and source.
 
 http://127.0.0.1:8130/ shows:
 
+- when to listen: the frequency, the slots, the next slot, and for a web SDR the next slot it will listen to;
 - the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
 - your BBS: where bulletins go, how many are waiting, and any problem reaching it;
 - a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away;
 - the input level, with the same target as pdn-soundmodem: peaks between -18 and -9 dBFS;
-- today's bulletins, how many pieces of each have arrived, and what the BBS said about each;
+- what to try if nothing is heard;
+- the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the settings: audio, and the BBS's address and login. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
 
 On this machine only, the page answers to `localhost` and nothing else. To reach it from your network, set `"lan": true` and a `"password"` in `web`; the browser asks for it (any user name). Use it on a network you trust: it is plain HTTP.
 
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 30 s`), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, which slots a web SDR listens to, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 

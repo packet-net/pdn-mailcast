@@ -1,6 +1,6 @@
 # pdn-mailcast receiver
 
-Hears GB7RDG's daily bulletin transmission on 40 m and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
+Hears GB7RDG's bulletins on 40 m, sent every hour on the hour, and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
 
 You need a Linux machine (a Pi is fine) running LinBPQ with its mail.
 
@@ -44,11 +44,11 @@ sudo apt install pdn-mailcast-receiver
 sudo systemctl start pdn-mailcast-receiver
 ```
 
-Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appear in your BBS as they complete, usually during the midday slot.
+Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appear in your BBS as they complete. A web SDR is only listened to every 3 hours, to stay inside its allowance, so give it a few hours.
 
 ## Using your own radio instead
 
-Set your radio to USB on **7.052 MHz**, with its receive audio into a sound card. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
+Set your radio to USB on **7.052 MHz** (the signal is centred on 7.0538 MHz), with its receive audio into a sound card. It then hears every slot, not just some. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
 
 ## Linux FBB
 

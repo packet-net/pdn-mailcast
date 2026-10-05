@@ -4,7 +4,7 @@ using Packet.SoundModem.Ms110d;
 namespace Mailcast.Receiver.Tests;
 
 /// <summary>
-/// A slot as the receiver would hear it, made without a radio: the 30 s tone, then each frame as
+/// A slot as the receiver would hear it, made without a radio: the 10 s tone, then each frame as
 /// its own MS110D burst, all in seeded Gaussian noise, with some bursts lost to a "fade".
 /// </summary>
 internal static class SlotRecording
@@ -30,7 +30,7 @@ internal static class SlotRecording
         Silence(3);
         double toneAmplitude = Math.Sqrt(2 * burstPower);
         double toneHz = OnAir.CentreAudioHz + toneOffsetHz;
-        for (int i = 0; i < 30 * Rate; i++)
+        for (int i = 0; i < 10 * Rate; i++)
         {
             audio.Add((float)(toneAmplitude * Math.Sin(2 * Math.PI * toneHz * i / Rate)));
         }

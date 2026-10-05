@@ -36,6 +36,9 @@ public sealed class ReceiverHost : IAsyncDisposable
     public static string Version { get; } =
         typeof(ReceiverHost).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.0.0";
 
+    /// <summary>The clock the receiver runs on.</summary>
+    internal TimeProvider Time => _time;
+
     /// <summary>The configuration in force.</summary>
     public ReceiverConfig Config
     {
@@ -95,6 +98,12 @@ public sealed class ReceiverHost : IAsyncDisposable
     public async Task RunAsync(CancellationToken cancellation)
     {
         _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} (USB dial {OnAir.Mhz(Config.DialHz)} MHz), delivering to {DescribeBbs(Config.Bbs)}");
+        _log($"slots: GB7RDG's slots are {Config.Schedule.Describe()}");
+        if (Config.DailyFromOldConfig)
+        {
+            _log($"config: the config file gives \"slotUtc\" but not \"everyMinutes\", as before GB7RDG sent every hour, so this is read as one slot a day at {Config.SlotUtc} UTC. "
+                + "For every hour, set \"slotUtc\": \"00:00\" and \"everyMinutes\": 60");
+        }
         int pending = Intake.Pending().Count;
         if (pending > 0)
         {
@@ -147,6 +156,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal)
                 || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal)
+                || _config.EveryMinutes != config.EveryMinutes
+                || _config.WebSdrSlotsPerDay != config.WebSdrSlotsPerDay
                 || _config.DialKHz != config.DialKHz;
             _config = config;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
@@ -167,6 +178,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     private async Task SuperviseAudioAsync(CancellationToken cancellation)
     {
         int refusals = 0;
+        ReceiverConfig? described = null;
+        string? closedSaid = null;
         while (!cancellation.IsCancellationRequested)
         {
             using var restart = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -182,18 +195,30 @@ public sealed class ReceiverHost : IAsyncDisposable
             if (source.Kind == AudioSourceKind.UberSdr)
             {
                 // A public web SDR allows each address about three hours a day, so it is only
-                // listened to around the slot.
-                var (opens, closes) = ListeningWindow.Next(_time.GetUtcNow(), config.SlotStart);
+                // listened to around some of the slots.
+                var slots = config.WebSdrSlots;
+                if (!ReferenceEquals(described, config))
+                {
+                    described = config;
+                    _log($"audio: {ListeningWindow.Describe(config.Schedule, slots)}");
+                }
+                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), slots);
                 if (opens > _time.GetUtcNow())
                 {
-                    AudioState = $"the web SDR is closed until {opens:HH:mm} UTC, {ListeningWindow.Describe(config.SlotStart)}";
-                    _log($"audio: {AudioState}");
+                    AudioState = $"the web SDR is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot";
+                    if (AudioState != closedSaid)
+                    {
+                        // Said once per wait, not at every look at the clock.
+                        closedSaid = AudioState;
+                        _log($"audio: {AudioState}");
+                    }
                     // At most a minute at a time, then the clock again: a Pi that booted on
                     // fake-hwclock's stale time is put right by NTP partway through the wait,
                     // and one long timer would sleep straight through the real slot.
                     await ClockDelayAsync(Shorter(opens - _time.GetUtcNow(), ClockCheck), restart.Token).ConfigureAwait(false);
                     continue;
                 }
+                closedSaid = null;
                 closeAt = new CancellationTokenSource();
                 _ = CloseAtAsync(closes, closeAt, restart.Token);
             }
@@ -230,7 +255,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 if (window is { IsCancellationRequested: true } && !restart.IsCancellationRequested)
                 {
-                    _log("audio: the slot's listening window has ended; closing the web SDR until tomorrow");
+                    _log("audio: the slot's listening window has ended; closing the web SDR until its next slot");
                 }
             }
             catch (Exception e) when (!cancellation.IsCancellationRequested)
