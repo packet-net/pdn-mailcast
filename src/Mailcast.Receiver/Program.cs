@@ -84,13 +84,20 @@ try
     }
     catch (System.Net.HttpListenerException e)
     {
-        Log($"web: cannot serve the status page on port {config.Web.Port}: {e.Message}. Another program may have the port; set \"web\".\"port\" to another.");
-        return 2;
+        // Receiving and delivering matter more than the page: carry on without it.
+        Log($"web: cannot serve the status page on port {config.Web.Port}: {e.Message}. Another program may have the port; "
+            + "set \"web\".\"port\" to another. Carrying on without the page.");
     }
 
     await host.RunAsync(stop.Token);
     Log("stopped");
     return 0;
+}
+catch (InvalidOperationException e) when (!stop.IsCancellationRequested)
+{
+    // A loop died: exit non-zero so systemd starts the receiver again.
+    Log($"stopping: {e.Message}");
+    return 1;
 }
 catch (AudioSourceException e)
 {

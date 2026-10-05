@@ -24,6 +24,9 @@ public sealed class StatusPage : IAsyncDisposable
 {
     private const string WaterfallBase = "/waterfall/";
 
+    /// <summary>The largest settings form accepted.</summary>
+    public const int MaxFormBytes = 16 * 1024;
+
     private readonly ReceiverHost _host;
     private readonly string? _configPath;
     private readonly Action<string> _log;
@@ -49,7 +52,7 @@ public sealed class StatusPage : IAsyncDisposable
             _listener.Prefixes.Add($"http://127.0.0.1:{web.Port}/");
             _listener.Prefixes.Add($"http://localhost:{web.Port}/");
         }
-        Url = $"http://localhost:{web.Port}/";
+        Url = $"http://127.0.0.1:{web.Port}/";
         host.PipelineCreated += Attach;
     }
 
@@ -112,6 +115,16 @@ public sealed class StatusPage : IAsyncDisposable
     {
         try
         {
+            if (Refusal(context.Request) is { } refused)
+            {
+                if (refused.Status == 401)
+                {
+                    context.Response.Headers["WWW-Authenticate"] = "Basic realm=\"pdn-mailcast receiver\", charset=\"UTF-8\"";
+                }
+                await RespondAsync(context, refused.Status, "text/plain", refused.Why + "\n").ConfigureAwait(false);
+                return;
+            }
+
             string path = context.Request.Url?.AbsolutePath ?? "/";
             if (path.StartsWith(WaterfallBase, StringComparison.Ordinal) || path == "/waterfall")
             {
@@ -154,6 +167,68 @@ public sealed class StatusPage : IAsyncDisposable
         {
             // The browser went away.
         }
+    }
+
+    /// <summary>
+    /// Why a request is refused before it is looked at, or null to serve it:
+    /// <list type="bullet">
+    /// <item>On this machine only, a Host that is not this machine is refused, so a page
+    /// elsewhere cannot reach this one by pointing a name of its own at 127.0.0.1 (DNS rebinding).</item>
+    /// <item>With a password set (always, on the network), the browser's Basic login must give it.</item>
+    /// <item>A WebSocket or a POST that says it comes from another site is refused: a page the
+    /// operator has open elsewhere must not be able to change the settings (CSRF).</item>
+    /// </list>
+    /// </summary>
+    internal (int Status, string Why)? Refusal(HttpListenerRequest request)
+    {
+        var web = _host.Config.Web;
+        string host = request.Headers["Host"] ?? "";
+        if (!web.Lan && !IsLoopbackHost(host))
+        {
+            return (421, "This page only answers to localhost.");
+        }
+        if (web.Password.Length > 0 && !PasswordGiven(request.Headers["Authorization"], web.Password))
+        {
+            return (401, "This page needs its password (any user name).");
+        }
+        bool changes = request.HttpMethod != "GET" || request.IsWebSocketRequest;
+        string? origin = request.Headers["Origin"];
+        if (changes && origin is not null && !SameOrigin(origin, host))
+        {
+            return (403, "Refused: this request came from another site.");
+        }
+        return null;
+    }
+
+    internal static bool IsLoopbackHost(string host)
+    {
+        string name = host.StartsWith('[') ? host[..(host.IndexOf(']') + 1)] : host.Split(':')[0];
+        return name.Equals("localhost", StringComparison.OrdinalIgnoreCase) || name is "127.0.0.1" or "[::1]";
+    }
+
+    internal static bool SameOrigin(string origin, string host) =>
+        Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+        && string.Equals(uri.Authority, host, StringComparison.OrdinalIgnoreCase);
+
+    internal static bool PasswordGiven(string? authorization, string password)
+    {
+        if (authorization is null || !authorization.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        string decoded;
+        try
+        {
+            decoded = Encoding.UTF8.GetString(Convert.FromBase64String(authorization[6..].Trim()));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        int colon = decoded.IndexOf(':', StringComparison.Ordinal);
+        byte[] given = Encoding.UTF8.GetBytes(colon < 0 ? "" : decoded[(colon + 1)..]);
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(given, Encoding.UTF8.GetBytes(password));
     }
 
     /// <summary>What the page shows, in one object.</summary>
@@ -245,9 +320,22 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>Applies a settings form to <paramref name="current"/>; throws <see cref="ConfigException"/> for one that cannot work.</summary>
     internal static ReceiverConfig Apply(ReceiverConfig current, SettingsForm form)
     {
+        if (form.Audio is null || form.Host is null || form.Login is null || form.Command is null || form.Type is null)
+        {
+            throw new ConfigException("The form is missing a setting.");
+        }
         if (!Enum.TryParse<BbsKind>(form.Type, ignoreCase: true, out var kind))
         {
             throw new ConfigException($"\"{form.Type}\" is not a kind of BBS this receiver knows; use linBpq or fbb");
+        }
+        bool elsewhere = kind != current.Bbs.Type
+            || form.Port != current.Bbs.Port
+            || !string.Equals(form.Host.Trim(), current.Bbs.Host, StringComparison.OrdinalIgnoreCase);
+        if (elsewhere && string.IsNullOrEmpty(form.Password))
+        {
+            // Otherwise anything that could post this form could send the saved password to a
+            // BBS of its own choosing.
+            throw new ConfigException("The BBS's address or type has changed: enter its password again.");
         }
         var next = current with
         {
@@ -268,14 +356,37 @@ public sealed class StatusPage : IAsyncDisposable
 
     private async Task SaveSettingsAsync(HttpListenerContext context)
     {
-        SettingsForm? form;
+        if (!(context.Request.ContentType ?? "").Split(';')[0].Trim().Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            // A form a page elsewhere can post without asking (text/plain, a form encoding) is not one.
+            await RespondAsync(context, 415, "application/json", JsonSerializer.Serialize(new { error = "Settings are sent as application/json." })).ConfigureAwait(false);
+            return;
+        }
+        if (context.Request.ContentLength64 > MaxFormBytes)
+        {
+            await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
+            return;
+        }
+
+        SettingsForm? form = null;
+        var body = new MemoryStream();
+        var buffer = new byte[4096];
+        int read;
+        while ((read = await context.Request.InputStream.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+        {
+            body.Write(buffer, 0, read);
+            if (body.Length > MaxFormBytes)
+            {
+                await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
+                return;
+            }
+        }
         try
         {
-            form = await JsonSerializer.DeserializeAsync<SettingsForm>(context.Request.InputStream, ReceiverConfig.Json).ConfigureAwait(false);
+            form = JsonSerializer.Deserialize<SettingsForm>(body.ToArray(), ReceiverConfig.Json);
         }
         catch (JsonException)
         {
-            form = null;
         }
         if (form is null)
         {

@@ -11,15 +11,15 @@ case "$1" in
         adduser --system --no-create-home --home /var/lib/pdn-mailcast --group pdn-mailcast
     fi
     # The service writes its config back when settings are saved on its page, by writing a
-    # temporary file beside it and renaming it, so it needs the directory as well as the file.
-    # The file holds the BBS password: no access for anyone else.
+    # temporary file beside it and renaming it over the old one, so it needs the directory; the
+    # file itself only has to be readable. It holds the BBS password: nothing for anyone else.
     install -d -o root -g pdn-mailcast -m 0770 /etc/pdn-mailcast
     if [ ! -e "$CONFIG" ]; then
-        install -o root -g pdn-mailcast -m 0660 "$EXAMPLE" "$CONFIG"
+        install -o root -g pdn-mailcast -m 0640 "$EXAMPLE" "$CONFIG"
         echo "pdn-mailcast-receiver: put an example config in $CONFIG."
         echo "  Set up your BBS for the receiver (see /usr/share/doc/pdn-mailcast-receiver/README.md),"
         echo "  put its password in $CONFIG, then: systemctl start pdn-mailcast-receiver"
-        echo "  The status page is then at http://localhost:8073/"
+        echo "  The status page is then at http://127.0.0.1:8130/"
     fi
     ;;
 esac

@@ -20,11 +20,26 @@ StateDirectory=pdn-mailcast
 StateDirectoryMode=0750
 # audio: the sound card, for a receiver on a radio rather than a web SDR.
 SupplementaryGroups=audio
+# Files it makes (the pieces, the delivery record, a saved config) are for it alone; the config
+# is made group-readable explicitly when it is saved.
+UMask=0077
 NoNewPrivileges=true
 ProtectHome=true
-ProtectSystem=full
-# The status page writes settings back to the config file, so that one directory stays writable.
+# Everything read-only but /dev, /proc, /sys, the state directory and, because the status page
+# writes settings back to the config file, /etc/pdn-mailcast. /dev stays as it is, so the sound
+# card is reached through the audio group above.
+ProtectSystem=strict
 ReadWritePaths=/etc/pdn-mailcast
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# IP for the BBS and the web SDR, Unix sockets for .NET's own, netlink for its interface list.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+LockPersonality=true
+MemoryMax=1G
 
 [Install]
 WantedBy=multi-user.target
