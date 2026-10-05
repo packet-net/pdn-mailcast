@@ -48,7 +48,9 @@ permissions:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -99,13 +101,23 @@ jobs:
   # The whole suite, the docker LinBPQ tests included (the hosted runner has docker). Nothing is
   # built for release unless this passes.
   test:
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Pull LinBPQ
         timeout-minutes: 5
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
@@ -119,26 +131,34 @@ jobs:
   deb:
     needs: [version, test]
     name: deb ${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner == 'x64' && ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-24.04') || matrix.runner }}
     # A stalled mirror once held ci.yml's install step for half an hour; fail it instead.
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { rid: linux-x64, arch: amd64, runner: ubuntu-24.04, install_test: true }
+          - { rid: linux-x64, arch: amd64, runner: x64, install_test: true }
           - { rid: linux-arm64, arch: arm64, runner: ubuntu-24.04-arm, install_test: true }
           # No hosted armhf runner (and the arm64 hosts cannot run 32-bit code), so this is
           # published from x64 and checked by its contents only.
-          - { rid: linux-arm, arch: armhf, runner: ubuntu-24.04, install_test: false }
+          - { rid: linux-arm, arch: armhf, runner: x64, install_test: false }
     env:
       VERSION: ${{ needs.version.outputs.version }}
       ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
 
       - name: Preflight
         run: |
@@ -208,13 +228,23 @@ jobs:
 
   nupkg:
     needs: [version, test]
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
         with:
           dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Pack M0LTE.RaptorQ
         run: dotnet pack src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj -c Release -o artifacts -p:Version=${{ needs.version.outputs.version }}
       - name: Check the package
@@ -228,7 +258,9 @@ jobs:
   release:
     needs: [version, deb, nupkg]
     if: needs.version.outputs.publish == 'true'
-    runs-on: ubuntu-latest
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
       contents: write
