@@ -23,6 +23,7 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
   "everyMinutes": 60,
   "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
   "webSdrSlotsPerDay": 8,
+  "archive": { "days": 30, "maxMegabytes": 50 },
   "stateDirectory": "/var/lib/pdn-mailcast"
 }
 ```
@@ -34,7 +35,8 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 - `slotUtc` and `everyMinutes`: when GB7RDG's slots are, in UTC. One starts at `slotUtc` and then one every `everyMinutes`, round the clock, but only those in daylight run (see `daylight`). GB7RDG sends every hour on the hour, so `"00:00"` and `60`, which is also what you get if you leave them out. `everyMinutes` must divide a day (1440) and be at least 15. A config file from before hourly slots has only `slotUtc` (`"12:00"`); it is read as every 60 minutes from that time, which is the same hourly slots, so nothing needs changing. A sound card listens all the time, whatever these say. The receiver also uses the slots to make sense of what it hears: each frame counts for the slot whose start most recently passed, and a tone only counts as a slot's opening tone if it starts within 5 minutes of a slot's start, so someone tuning up near 7.0538 MHz isn't taken for GB7RDG.
 - `daylight`: GB7RDG only sends in daylight, because 40 m does not reach UK stations at night. A slot runs only if it starts between `afterSunriseMinutes` after sunrise and `beforeSunsetMinutes` before sunset at `locator` (a 4 or 6 character Maidenhead locator). The receiver works out sunrise and sunset itself, from the date, in UTC, so it needs no internet and summer time makes no difference. Left out, it is GB7RDG's own: IO91lk, 120 and 30, which today (5 October) is 09:00 to 17:00 UTC, in midwinter 11:00 to 15:00 and in midsummer 06:00 to 19:00. `"daylight": null` means every slot. You should not need to change it: once the receiver has heard GB7RDG's directory, which gives GB7RDG's own slots and daylight hours, it uses those instead of these settings, and says so in the log and on the status page. A sound card listens all the time anyway; the daylight hours only matter for a web SDR and for the "next slot" on the page.
 - `webSdrSlotsPerDay`: how many slots a day a web SDR listens to, normally 8. Public UberSDR receivers allow each address about three hours a day, so a web SDR can't listen every hour. It listens to this many of the day's daylight slots, spread evenly starting with the first (8 of the 9 on 5 October is 09:00 to 16:00 UTC; in midwinter there are only 5, so it hears them all), from 2 minutes before each slot to 12 minutes after. That is 14 minutes a slot, so 12 is the most. The log says which slots it listens to each day, and the status page shows them.
-- `stateDirectory`: where the pieces, the rebuilt bulletins and the record of deliveries are kept.
+- `archive`: how long the receiver keeps its own copy of each bulletin after your BBS has answered for it (see [Mail](#mail)). `days` is 30 and `maxMegabytes` 50 if you leave them out; the oldest copies go first once either is passed. `0` for either keeps no copies. Waiting bulletins are never removed, however old.
+- `stateDirectory`: where the pieces, the rebuilt bulletins, the copies kept and the record of deliveries are kept.
 
 To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.
 
@@ -98,13 +100,34 @@ http://127.0.0.1:8130/ shows:
 - the input level, with the same target as pdn-soundmodem: peaks between -18 and -9 dBFS;
 - what to try if nothing is heard;
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
+- the mail this receiver holds (see [Mail](#mail));
 - the settings: audio, and the BBS's address and login. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
 
 On this machine only, the page answers to `localhost` and nothing else. To reach it from your network, set `"lan": true` and a `"password"` in `web`; the browser asks for it (any user name). Use it on a network you trust: it is plain HTTP.
 
+## Mail
+
+The receiver keeps its own copy of every bulletin it rebuilds, so nothing is lost if the transfer to your BBS fails, or if the BBS later loses or refuses a bulletin.
+
+A rebuilt bulletin waits in the outbox until your BBS has answered for it: accepted, already had (it has that BID) or refused. Then it moves to the archive with that answer and when it came. Copies are kept for `archive.days` (30) and up to `archive.maxMegabytes` (50 MB) in all, the oldest going first. Bulletins still waiting are never removed. Only bulletins are kept; nothing else the receiver hears goes to the BBS or the archive.
+
+The status page's **Mail** section lists both, newest first, 25 to a page: BID, from, to, @, title, date, size, and status. A waiting bulletin shows the BBS's last answer, if any, and the next try. Click one to read the whole bulletin as it will reach the BBS: its header lines, its R: lines and its text. **Open as text** shows it on its own.
+
+**Send to BBS again** puts an archived bulletin back in the outbox, and the next session offers it. If your BBS still has it, it says so by its BID, nothing is sent twice, and the bulletin stays down as accepted. Each one sent again is logged, the same one can only be sent again once every 2 minutes, and at most 50 sent again can wait for the BBS at once.
+
+The copies are a convenience: if one cannot be written (a full disk, say), that is logged, and a bulletin your BBS has taken leaves the outbox all the same. A refused one is moved to `store/quarantine/` instead, so it is kept without holding up newer mail.
+
+The same is there for scripts, behind the page's password if it has one:
+
+- `GET /api/mail?offset=0&limit=50`: the list as JSON, newest first (at most 200 at a time).
+- `GET /api/mail/<id>`: one bulletin as plain text, with the `id` from the list.
+- `POST /api/mail/resend` with `{"id": "<id>"}` as `application/json`: sends one again. Like saving the settings, it is refused from another site.
+
+On disk they are in the state directory: waiting ones in `store/outbox/`, archived ones in `store/archive/`, one file each. A file that cannot be read is moved to `store/quarantine/` and logged, and the receiver carries on.
+
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), each bulletin as it completes, and what the BBS said about it. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), each bulletin as it completes, what the BBS said about it, and each one sent again from the page. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 

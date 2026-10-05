@@ -41,5 +41,10 @@
   // 12 is the most.
   "webSdrSlotsPerDay": 8,
 
+  // The receiver keeps its own copy of each bulletin once your BBS has answered for it, to
+  // read on the status page or send to the BBS again: for "days", and "maxMegabytes" in all,
+  // the oldest going first. 0 for either keeps none.
+  "archive": { "days": 30, "maxMegabytes": 50 },
+
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

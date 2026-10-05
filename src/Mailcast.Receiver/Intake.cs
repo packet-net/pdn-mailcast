@@ -33,14 +33,17 @@ public sealed class Intake : IAsyncDisposable
     private long _framesDropped;
     private long _framesStored;
 
-    /// <summary>Opens the store under <paramref name="stateDirectory"/>/store.</summary>
-    public Intake(string stateDirectory, Action<string> log)
-        : this(stateDirectory, log, QueueLength)
+    /// <summary>
+    /// Opens the store under <paramref name="stateDirectory"/>/store. <paramref name="options"/>
+    /// gives the clock and the archive's limits; the store's own log lines go to <paramref name="log"/>.
+    /// </summary>
+    public Intake(string stateDirectory, Action<string> log, ReceiverStoreOptions? options = null)
+        : this(stateDirectory, log, QueueLength, options)
     {
     }
 
     /// <summary>For tests: a store with a shorter queue.</summary>
-    internal Intake(string stateDirectory, Action<string> log, int queueLength)
+    internal Intake(string stateDirectory, Action<string> log, int queueLength, ReceiverStoreOptions? options = null)
     {
         _log = log;
         // With DropWrite a write to a full queue still says it succeeded; this is the only place
@@ -48,12 +51,22 @@ public sealed class Intake : IAsyncDisposable
         _queue = Channel.CreateBounded<ReadOnlyMemory<byte>>(
             new BoundedChannelOptions(queueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite },
             _ => Dropped());
-        _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default);
+        _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
+            (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)), PublishMailOnChange = false });
         _heardSchedule = _store.HeardSchedule;
+        _progress = (_store.Directory, _store.Progress());
         _worker = Task.Run(RunAsync);
     }
 
     private SlotTimetable? _heardSchedule;
+    private volatile Tuple<BroadcastDirectory?, IReadOnlyList<ObjectProgress>> _progressHeld = Tuple.Create<BroadcastDirectory?, IReadOnlyList<ObjectProgress>>(null, []);
+
+    /// <summary>The published progress: a reference swapped whole, so a reader never sees half of one.</summary>
+    private (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) _progress
+    {
+        get => (_progressHeld.Item1, _progressHeld.Item2);
+        set => _progressHeld = Tuple.Create(value.Directory, value.Progress);
+    }
 
     /// <summary>
     /// The head end's timetable from the newest directory that gave one, kept across restarts;
@@ -151,7 +164,7 @@ public sealed class Intake : IAsyncDisposable
         changed.TrySetResult();
     }
 
-    /// <summary>Rebuilt bulletins not yet handed to the BBS, oldest first.</summary>
+    /// <summary>Rebuilt bulletins not yet handed to the BBS, oldest first. Read from memory.</summary>
     public IReadOnlyList<Bulletin> Pending()
     {
         lock (_gate)
@@ -160,23 +173,120 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
-    /// <summary>Takes a bulletin out of the outbox once the BBS has answered for it.</summary>
-    public void Acknowledge(string bid)
+    /// <summary>Moves a bulletin from the outbox to the archive once the BBS has answered for it for good.</summary>
+    public void Acknowledge(string bid, BbsVerdict verdict, string? detail = null)
     {
+        MailParts? parts;
         lock (_gate)
         {
-            _store.Acknowledge(bid);
+            try
+            {
+                _store.Acknowledge(bid, verdict, detail);
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
+        }
+        Publish(parts);
+    }
+
+    /// <summary>
+    /// Moves every bulletin of one delivery session that the BBS has answered for good from the
+    /// outbox to the archive, and rebuilds the mail list once for the lot, outside the lock.
+    /// Returns those that could not be moved, with why; the rest are done.
+    /// </summary>
+    public IReadOnlyList<(string Bid, Exception Error)> Acknowledge(IReadOnlyList<(string Bid, BbsVerdict Verdict, string? Detail)> answers)
+    {
+        var failed = new List<(string, Exception)>();
+        MailParts? parts;
+        lock (_gate)
+        {
+            foreach (var (bid, verdict, detail) in answers)
+            {
+                try
+                {
+                    _store.Acknowledge(bid, verdict, detail);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    failed.Add((bid, e));
+                }
+            }
+            parts = _store.CaptureMail();
+        }
+        Publish(parts);
+        return failed;
+    }
+
+    /// <summary>Builds the mail list from what was captured under the lock, now that it is released.</summary>
+    private void Publish(MailParts? parts)
+    {
+        if (parts is not null)
+        {
+            _store.Publish(parts);
         }
     }
 
-    /// <summary>The newest directory heard, and how far each of its bulletins has got.</summary>
-    public (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) Progress()
+    /// <summary>
+    /// Every bulletin held, waiting or archived, newest first, as of the last change. Takes no
+    /// lock and reads no files, so the web page never waits for the store or makes it wait.
+    /// </summary>
+    public MailSnapshot Mail() => _store.Mail;
+
+    /// <summary>
+    /// One bulletin as stored, with its entry, or null. Reads the archive file without the
+    /// store's lock; only an unreadable one takes it, to quarantine the file.
+    /// </summary>
+    public (MailEntry Entry, byte[] Serialized)? ReadMail(ulong objectId)
     {
+        var held = _store.ReadMail(objectId, out bool unreadable);
+        if (unreadable)
+        {
+            MailParts? parts;
+            lock (_gate)
+            {
+                _store.ForgetUnreadable(objectId); // which reads it again first
+                parts = _store.CaptureMail();
+            }
+            Publish(parts);
+        }
+        return held;
+    }
+
+    /// <summary>Puts an archived bulletin back in the outbox, to be offered to the BBS again.</summary>
+    public (ResendOutcome Outcome, Bulletin? Bulletin) Resend(ulong objectId)
+    {
+        ResendOutcome outcome;
+        Bulletin? bulletin;
+        MailParts? parts;
         lock (_gate)
         {
-            return (_store.Directory, _store.Progress());
+            try
+            {
+                (outcome, bulletin) = _store.Resend(objectId);
+                _progress = (_store.Directory, _store.Progress());
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
         }
+        Publish(parts);
+        return (outcome, bulletin);
     }
+
+    /// <summary>
+    /// The newest directory heard, and how far each of its bulletins has got, as of the last
+    /// frame that changed it. Takes no lock: the store's thread keeps it up to date.
+    /// </summary>
+    public (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) Progress() => _progress;
+
+    /// <summary>For tests: how many times the mail list has been rebuilt.</summary>
+    internal long MailBuilds => _store.MailBuilds;
+
+    /// <summary>For tests: how many times the store has read the outbox or the archive from disk.</summary>
+    internal long StoreDiskReads => _store.DiskReads;
 
     /// <summary>How many objects have pieces held but are not yet rebuilt.</summary>
     public int PartialObjects
@@ -215,12 +325,25 @@ public sealed class Intake : IAsyncDisposable
     private void Accept(ReadOnlyMemory<byte> payload)
     {
         AcceptResult result;
+        MailParts? parts = null;
         try
         {
             lock (_gate)
             {
-                result = _store.Accept(payload.Span);
+                try
+                {
+                    result = _store.Accept(payload.Span);
+                    if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
+                    {
+                        _progress = (_store.Directory, _store.Progress());
+                    }
+                }
+                finally
+                {
+                    parts = _store.CaptureMail(); // null unless a bulletin completed or the archive was pruned
+                }
             }
+            Publish(parts);
         }
         catch (Exception e)
         {

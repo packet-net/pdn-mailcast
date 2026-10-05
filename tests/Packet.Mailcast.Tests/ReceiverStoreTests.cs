@@ -40,7 +40,7 @@ public class ReceiverStoreTests
         Assert.All(plan.Frames, f => Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(f.ToBytes()).Outcome));
 
         Assert.Equal(bulletins.OrderBy(b => b.Bid), store.Pending().OrderBy(b => b.Bid));
-        store.Acknowledge(bulletins[0].Bid);
+        store.Acknowledge(bulletins[0].Bid, BbsVerdict.Accepted);
         Assert.Equal(bulletins.Count - 1, store.Pending().Count);
         Assert.Equal(0, store.PartialObjects);
         Assert.Empty(Directory.EnumerateDirectories(Path.Combine(dir.Path, "objects")));
@@ -241,7 +241,7 @@ public class ReceiverStoreTests
         {
             store.Accept(obj.Frame(esi).ToBytes());
         }
-        store.Acknowledge(bulletin.Bid);
+        store.Acknowledge(bulletin.Bid, BbsVerdict.Accepted);
 
         time.Now += TimeSpan.FromDays(13);
         Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(obj.Frame(50).ToBytes()).Outcome);
@@ -326,10 +326,13 @@ public class ReceiverStoreTests
             store.Accept(obj.Frame(esi).ToBytes());
         }
         File.WriteAllText(Path.Combine(dir.Path, "outbox", "0000000000000001.bulletin"), "not a bulletin");
-        Assert.Equal([bulletin], store.Pending());
+        Assert.Equal([bulletin], store.Pending()); // the outbox is in memory, so it is only seen on opening
+
+        var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
+        Assert.Equal([bulletin], reopened.Pending());
         Assert.True(File.Exists(Path.Combine(dir.Path, "quarantine", "0000000000000001.bulletin")));
-        Assert.Single(log);
-        Assert.Equal([bulletin], store.Pending());
+        Assert.Single(log, l => l.Contains("quarantined", StringComparison.Ordinal));
+        Assert.Equal([bulletin], reopened.Pending());
     }
 
     [Fact]
@@ -410,7 +413,7 @@ public class ReceiverStoreTests
         }
         Assert.All(completed, b => Assert.Equal(bulletin, b));
         Assert.Equal(2, store.Pending().Count);
-        store.Acknowledge(bulletin.Bid);
+        store.Acknowledge(bulletin.Bid, BbsVerdict.Accepted);
         Assert.Empty(store.Pending());
     }
 
