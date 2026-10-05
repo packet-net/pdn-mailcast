@@ -1,0 +1,11 @@
+[package]
+name = "raptorq-vectors"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-only"
+description = "Generates RaptorQ interop vectors for Mailcast.RaptorQ from the independent raptorq crate, and decodes symbols made by Mailcast.RaptorQ"
+
+[dependencies]
+raptorq = "=2.0.1"
+serde_json = "1"

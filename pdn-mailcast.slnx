@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mailcast.RaptorQ.Tests/Mailcast.RaptorQ.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/RaptorQ.InteropExport/RaptorQ.InteropExport.csproj" />
+  </Folder>
+</Solution>

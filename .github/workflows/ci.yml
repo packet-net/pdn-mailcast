@@ -1,0 +1,40 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build (Release)
+        run: dotnet build -c Release
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+  # RaptorQ against the independent Rust raptorq crate, both ways. The C# tests already check the
+  # committed vectors; this job also checks that the vectors are what the generator makes, and
+  # that the crate decodes symbols made by Mailcast.RaptorQ.
+  raptorq-interop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Regenerate the crate's vectors and compare with the committed ones
+        run: |
+          cargo run --release --locked --manifest-path tools/raptorq-vectors/Cargo.toml -- generate "$RUNNER_TEMP/crate.json"
+          diff -q "$RUNNER_TEMP/crate.json" tests/Mailcast.RaptorQ.Tests/Vectors/raptorq-crate-2.0.1.json
+      - name: Encode with Mailcast.RaptorQ and decode with the crate
+        run: |
+          dotnet run -c Release --project tools/RaptorQ.InteropExport -- tests/Mailcast.RaptorQ.Tests/Vectors/raptorq-crate-2.0.1.json "$RUNNER_TEMP/ours.json"
+          cargo run --release --locked --manifest-path tools/raptorq-vectors/Cargo.toml -- check "$RUNNER_TEMP/ours.json"
