@@ -56,28 +56,46 @@ internal sealed partial class LinBpqContainer : IAsyncDisposable
     }
 
     /// <summary>Waits until BPQMail answers on the FBBPORT with its SID.</summary>
+    /// <remarks>
+    /// Each try gets ten seconds: while LinBPQ is starting, a connection can be accepted (by
+    /// docker's proxy, or by the node before its mail is up) and then answered with nothing.
+    /// That is a probe giving up and trying again, not anything measured.
+    /// </remarks>
     private async Task WaitForMailAsync(CancellationToken cancellation)
     {
+        string lastSeen = "";
         while (true)
         {
-            cancellation.ThrowIfCancellationRequested();
+            if (cancellation.IsCancellationRequested)
+            {
+                string logs = await DockerAsync(CancellationToken.None, "logs", Id);
+                throw new OperationCanceledException($"LinBPQ's mail never answered on its FBBPORT; last seen: {lastSeen}; container log: {logs}");
+            }
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            attempt.CancelAfter(TimeSpan.FromSeconds(10));
             try
             {
                 using var client = new TcpClient();
-                await client.ConnectAsync("127.0.0.1", FbbPort, cancellation);
+                await client.ConnectAsync("127.0.0.1", FbbPort, attempt.Token);
                 var stream = client.GetStream();
-                await stream.WriteAsync(Encoding.ASCII.GetBytes($"{Login}\r{Password}\rBBS\r"), cancellation);
-                string seen = await ReadUntilAsync(stream, ">", cancellation);
-                if (seen.Contains("[BPQ-", StringComparison.Ordinal))
+                await stream.WriteAsync(Encoding.ASCII.GetBytes($"{Login}\r{Password}\rBBS\r"), attempt.Token);
+                lastSeen = await ReadUntilAsync(stream, ">", attempt.Token);
+                if (lastSeen.Contains("[BPQ-", StringComparison.Ordinal))
                 {
-                    await stream.WriteAsync("FQ\r"u8.ToArray(), cancellation);
                     return;
                 }
             }
-            catch (Exception e) when (e is SocketException or IOException)
+            catch (Exception e) when (e is SocketException or IOException || (e is OperationCanceledException && !cancellation.IsCancellationRequested))
+            {
+                lastSeen = e.Message;
+            }
+            try
+            {
+                await Task.Delay(1000, cancellation);
+            }
+            catch (OperationCanceledException)
             {
             }
-            await Task.Delay(500, cancellation);
         }
     }
 
