@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Web\index.html" LogicalName="Mailcast.Receiver.Web.index.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Mailcast.Receiver.Tests" />
   </ItemGroup>
 

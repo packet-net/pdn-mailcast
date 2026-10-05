@@ -53,3 +53,25 @@ jobs:
         run: |
           dotnet run -c Release --project tools/RaptorQ.InteropExport -- tests/Mailcast.RaptorQ.Tests/Vectors/raptorq-crate-2.0.1.json "$RUNNER_TEMP/ours.json"
           cargo run --release --locked --manifest-path tools/raptorq-vectors/Cargo.toml -- check "$RUNNER_TEMP/ours.json"
+
+  # The receiver's .deb for amd64, kept as a build artifact (not published anywhere).
+  receiver-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the .deb
+        run: scripts/build-receiver-deb.sh linux-x64 0.1.0-ci${{ github.run_number }}
+      - name: Install it in a clean Debian and run it
+        run: |
+          docker run --rm -v "$PWD/artifacts:/a:ro" debian:bookworm sh -ec '
+            apt-get update -qq
+            apt-get install -y -qq /a/pdn-mailcast-receiver_*_amd64.deb
+            test -f /etc/pdn-mailcast/receiver.json
+            pdn-mailcast-receiver --version'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdn-mailcast-receiver-deb
+          path: artifacts/pdn-mailcast-receiver_*.deb

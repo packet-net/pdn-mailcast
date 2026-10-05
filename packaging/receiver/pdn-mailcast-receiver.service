@@ -1,0 +1,30 @@
+[Unit]
+Description=pdn-mailcast receiver: GB7RDG's daily bulletin broadcast into your BBS
+Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/src/Mailcast.Receiver/README.md
+After=network-online.target sound.target
+Wants=network-online.target
+ConditionPathExists=/etc/pdn-mailcast/receiver.json
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pdn-mailcast-receiver --config /etc/pdn-mailcast/receiver.json
+Restart=on-failure
+RestartSec=10
+# Exit 2 means the configuration is wrong, and the journal says what to fix. Restarting would
+# only bury that under copies of itself.
+RestartPreventExitStatus=2
+User=pdn-mailcast
+Group=pdn-mailcast
+# /var/lib/pdn-mailcast: the pieces heard, the rebuilt bulletins and the delivery record.
+StateDirectory=pdn-mailcast
+StateDirectoryMode=0750
+# audio: the sound card, for a receiver on a radio rather than a web SDR.
+SupplementaryGroups=audio
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=full
+# The status page writes settings back to the config file, so that one directory stays writable.
+ReadWritePaths=/etc/pdn-mailcast
+
+[Install]
+WantedBy=multi-user.target

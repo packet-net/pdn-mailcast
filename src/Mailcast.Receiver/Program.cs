@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Mailcast.Receiver;
+using Mailcast.Receiver.Web;
 
 const string DefaultConfig = "/etc/pdn-mailcast/receiver.json";
 
@@ -74,6 +75,17 @@ try
         }
         Log("decode: done");
         return 0;
+    }
+
+    await using var page = new StatusPage(host, configPath, Log);
+    try
+    {
+        page.Start();
+    }
+    catch (System.Net.HttpListenerException e)
+    {
+        Log($"web: cannot serve the status page on port {config.Web.Port}: {e.Message}. Another program may have the port; set \"web\".\"port\" to another.");
+        return 2;
     }
 
     await host.RunAsync(stop.Token);
