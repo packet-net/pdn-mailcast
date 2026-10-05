@@ -478,4 +478,80 @@ public class ServiceTests
         Assert.False(answer.Accepted);
         Assert.Contains("behind the last slot run", answer.Problem, StringComparison.Ordinal);
     }
+
+    // Hourly in daylight at GB7RDG: on 5 October 09:00 to 17:00 UTC, on the 6th likewise.
+    private static readonly SlotSchedule Daylight = new(new TimeOnly(0, 0), TimeSpan.FromHours(1), DaylightRule.Gb7rdg);
+
+    private static Head DaylightHead(TempDirectory dir, DateTimeOffset start) =>
+        new(dir, start, Daylight, ScheduleOptions.HourlyDaylight with { Timetable = Daylight.Timetable },
+            new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
+            catchUp: TimeSpan.FromMinutes(5));
+
+    [Fact]
+    public void NextSlot_Daylight_PassesOverTheDarkSlots()
+    {
+        var catchUp = TimeSpan.FromMinutes(5);
+        Assert.Equal(At(9), HeadEndService.NextSlot(At(3), Daylight, catchUp, null));
+        Assert.Equal(At(9), HeadEndService.NextSlot(At(8, 2), Daylight, catchUp, null));
+        Assert.Equal(At(9, 3), HeadEndService.NextSlot(At(9, 3), Daylight, catchUp, null));
+        var ran = new SlotReport { Slot = At(17), Day = Day1, Outcome = SlotOutcome.Completed, End = At(17, 3) };
+        Assert.Equal(At(9).AddDays(1), HeadEndService.NextSlot(At(17, 4), Daylight, catchUp, ran));
+        Assert.Equal(At(9).AddDays(1), HeadEndService.NextSlot(At(23), Daylight, catchUp, ran));
+        // A slot on demand at night counts as the last run; the next is still the morning's first.
+        var oneOff = ran with { Slot = At(21, 27), End = At(21, 30) };
+        Assert.Equal(At(9).AddDays(1), HeadEndService.NextSlot(At(21, 31), Daylight, catchUp, oneOff));
+        // Late, but not by more than the catch-up window: the slot still runs.
+        var stopped = ran with { Slot = At(16), Outcome = SlotOutcome.Aborted, Reason = "the head end is stopping", End = At(16, 1) };
+        Assert.Equal(At(16, 3), HeadEndService.NextSlot(At(16, 3), Daylight, catchUp, stopped));
+    }
+
+    [Fact]
+    public void Daylight_RunsOnlyTheDaylightSlots_SaysWhichOnceADay_AndARunNowAtNightStillRuns()
+    {
+        using var dir = new TempDirectory();
+        var head = DaylightHead(dir, At(15, 59, 30));
+        head.Store.Offer(Bulletins.Make(90, 3000), Day1);
+        RunNowAnswer? night = null;
+        head.Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = head.Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMinutes(30), head.Time); // 16:29:30
+            head.Store.Offer(Bulletins.Make(91, 3000), Day1);
+            await Task.Delay(TimeSpan.FromMinutes(240), head.Time); // 20:29:30
+            head.Store.Offer(Bulletins.Make(92, 3000), Day1);
+            night = head.Service.RequestRunNow("tester");
+            await Task.Delay(TimeSpan.FromHours(14), head.Time); // 10:29:30 on the 6th
+            await stop.CancelAsync();
+            await service;
+            return 0;
+        }, TimeSpan.FromHours(20));
+
+        // 16:00 for the first, 17:00 for the second, 20:29 on demand for the third, then nothing in
+        // the dark: all three repeats, due 5 hours on (21:00, 22:00, 01:29), wait for 09:00.
+        var leases = LeaseTimes(head);
+        Assert.True(night!.Accepted);
+        Assert.Equal(4, leases.Count);
+        Assert.InRange(leases[0], At(16), At(16, 2));
+        Assert.InRange(leases[1], At(17), At(17, 2));
+        Assert.InRange(leases[2], At(20, 29, 30), At(20, 31));
+        Assert.InRange(leases[3], At(9).AddDays(1), At(9, 2).AddDays(1));
+        Assert.Contains(head.Journal.Lines, l => l.StartsWith("slot 2026-10-06 10:00Z: skipped: nothing to send", StringComparison.Ordinal));
+        Assert.Equal(head.Sent().Count(), head.Sent().Distinct().Count());
+        Assert.Contains(head.Journal.Lines, l => l == "daylight 2026-10-05 at IO91lk: sunrise 06:11Z, sunset 17:33Z; 9 slots, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 and 17:00 UTC");
+        Assert.Single(head.Journal.Lines, l => l.StartsWith("daylight 2026-10-06 ", StringComparison.Ordinal));
+        Assert.DoesNotContain(head.Journal.Lines, l => l.StartsWith("slot 2026-10-05 18:00Z", StringComparison.Ordinal) || l.StartsWith("slot 2026-10-06 08:00Z", StringComparison.Ordinal));
+        Assert.Contains(head.Journal.Lines, l => l == "next slot 2026-10-06 09:00Z; 3 bulletins held");
+    }
+
+    [Fact]
+    public void Daylight_TheDirectoryCarriesTheTimetable()
+    {
+        using var dir = new TempDirectory();
+        var head = DaylightHead(dir, At(12));
+        head.Store.Offer(Bulletins.Make(93, 3000), Day1);
+        var plan = head.Planner.Plan(At(12));
+        Assert.Equal(Daylight.Timetable, plan.Broadcast!.Directory.Schedule);
+        Assert.Equal(Daylight.Timetable, BroadcastDirectory.Parse(plan.Broadcast.Directory.Serialize()).Schedule);
+    }
 }

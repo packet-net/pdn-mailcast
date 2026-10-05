@@ -13,7 +13,7 @@ public class DirectoryTests
             new DirectoryEntry(0x0000000000000001, 0, 7, "1_X", ""),
         ]);
         Assert.Equal(
-            "MAILCAST DIRECTORY 1\n2026-10-04\n0123456789abcdef\t1\t2345\t12345_GB7RDG\tTitle with  spaces\n0000000000000001\t0\t7\t1_X\t\n",
+            "MAILCAST DIRECTORY 1\n2026-10-04\n0123456789abcdef\t1\t2345\t12345_GB7RDG\tTitle with  spaces\ttype=1\n0000000000000001\t0\t7\t1_X\t\ttype=1\n",
             Encoding.Latin1.GetString(d.Serialize()));
         var back = BroadcastDirectory.Parse(d.Serialize());
         Assert.Equal(d.Date, back.Date);

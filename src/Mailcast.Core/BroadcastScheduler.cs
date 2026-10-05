@@ -100,7 +100,31 @@ public sealed record ScheduleOptions
         ExtraSymbols = 2,
     };
 
-    /// <summary>How many slots, counting its first, a bulletin stays in rotation.</summary>
+    /// <summary>
+    /// The head end's timetable, which the directory carries so receivers can follow it. With a
+    /// daylight rule, a carrying whose slot does not run (it is dark) moves to the next slot
+    /// that does, never to one an earlier carrying already has, and <see cref="CarryOverSlots"/>
+    /// counts only slots that run. Null for none: every slot runs, and the directory says nothing.
+    /// </summary>
+    public SlotTimetable? Timetable { get; init; }
+
+    /// <summary>
+    /// An hourly station that sends in daylight only. All of a day's carrying then has to fit in
+    /// the daylight slots, only 5 of them at GB7RDG in December, so each bulletin is carried less:
+    /// 1.2 K and two spare symbols in its first slot, enough to rebuild it from that slot alone
+    /// with about a fifth of the frames lost, then one repeat of 0.4 K 5 hours later (moved on to
+    /// the next daylight slot when that is dark) for a receiver that lost more. On GB7RDG's volume
+    /// that is about 4 minutes on the air in an average daylight slot in December, under 3 in
+    /// October and under 2 in June; the hourly station's five carryings would need more than
+    /// the 10 minute hard stop allows in every December slot.
+    /// </summary>
+    public static ScheduleOptions HourlyDaylight { get; } = Hourly with
+    {
+        SlotShares = [1.2, 0.4],
+        SlotOffsets = [0, 5],
+    };
+
+    /// <summary>How many slots, counting its first, a bulletin stays in rotation, without a daylight rule.</summary>
     public int SlotsInRotation => SlotOffsets[^1] + 1 + CarryOverSlots;
 }
 
@@ -224,8 +248,95 @@ public static class BroadcastScheduler
     }
 
     /// <summary>Whether a bulletin is in rotation in a slot: carried in it, or still owed from a carrying.</summary>
-    public static bool InRotation(CarriedBulletin carried, DateTimeOffset slot, ScheduleOptions options) =>
-        SlotIndex(carried, slot, options) is var i && i >= 0 && i < options.SlotsInRotation;
+    public static bool InRotation(CarriedBulletin carried, DateTimeOffset slot, ScheduleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(carried);
+        ArgumentNullException.ThrowIfNull(options);
+        if (carried.FirstSlot is not DateTimeOffset first)
+        {
+            return true;
+        }
+        if (options.Timetable?.Daylight is null)
+        {
+            return SlotIndex(carried, slot, options) is var i && i >= 0 && i < options.SlotsInRotation;
+        }
+        return slot >= first && slot < RotationEnd(first, options);
+    }
+
+    /// <summary>
+    /// The slot each carrying of a bulletin first carried at <paramref name="first"/> is due in,
+    /// one for each of <see cref="ScheduleOptions.SlotShares"/>: <paramref name="first"/>, then
+    /// the slots <see cref="ScheduleOptions.SlotOffsets"/> after it. With a daylight rule, a
+    /// carrying whose slot does not run moves on to the next slot that does and that no earlier
+    /// carrying has, so none is lost and none doubles up. <see cref="DateTimeOffset.MaxValue"/>
+    /// for one with no such slot within <see cref="SlotTimetable.SearchDays"/>.
+    /// </summary>
+    public static IReadOnlyList<DateTimeOffset> CarryingSlots(DateTimeOffset first, ScheduleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var length = TimeSpan.FromMinutes(options.SlotMinutes);
+        var slots = new DateTimeOffset[options.SlotOffsets.Count];
+        slots[0] = first;
+        var timetable = options.Timetable;
+        for (int c = 1; c < slots.Length; c++)
+        {
+            var nominal = first + (length * options.SlotOffsets[c]);
+            if (timetable?.Daylight is null)
+            {
+                slots[c] = nominal;
+                continue;
+            }
+            if (slots[c - 1] == DateTimeOffset.MaxValue)
+            {
+                slots[c] = DateTimeOffset.MaxValue;
+                continue;
+            }
+            var after = slots[c - 1].AddTicks(1);
+            slots[c] = timetable.NextActiveAtOrAfter(nominal > after ? nominal : after) ?? DateTimeOffset.MaxValue;
+        }
+        return slots;
+    }
+
+    /// <summary>
+    /// The first moment a bulletin first carried at <paramref name="first"/> is out of rotation:
+    /// the slot after its last carrying's <see cref="ScheduleOptions.CarryOverSlots"/> carry-over
+    /// slots, which with a daylight rule are slots that run.
+    /// </summary>
+    public static DateTimeOffset RotationEnd(DateTimeOffset first, ScheduleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var length = TimeSpan.FromMinutes(options.SlotMinutes);
+        if (options.Timetable?.Daylight is null)
+        {
+            return first + (length * options.SlotsInRotation);
+        }
+        var end = CarryingSlots(first, options)[^1];
+        for (int i = 0; i < options.CarryOverSlots && end != DateTimeOffset.MaxValue; i++)
+        {
+            end = options.Timetable!.NextActiveAfter(end) ?? DateTimeOffset.MaxValue;
+        }
+        return end == DateTimeOffset.MaxValue || DateTimeOffset.MaxValue - end < length ? DateTimeOffset.MaxValue : end + length;
+    }
+
+    /// <summary>
+    /// How many symbols an object of K source symbols, first carried at <paramref name="first"/>,
+    /// is due in total by the end of the slot at <paramref name="slot"/>: every carrying due at or
+    /// before it (<see cref="CarryingSlots"/>), or before it with <paramref name="before"/>.
+    /// </summary>
+    public static int DueAt(int sourceSymbols, DateTimeOffset first, DateTimeOffset slot, ScheduleOptions options, bool before = false)
+    {
+        var counts = SymbolsPerCarrying(sourceSymbols, options);
+        var slots = CarryingSlots(first, options);
+        int due = 0;
+        for (int c = 0; c < counts.Length; c++)
+        {
+            if (before ? slots[c] < slot : slots[c] <= slot)
+            {
+                due += counts[c];
+            }
+        }
+        return due;
+    }
 
     /// <summary>
     /// Plans a day's slot from bulletins alone, the slot at midnight UTC (see
@@ -252,7 +363,9 @@ public static class BroadcastScheduler
         var ordered = bulletins
             .Select(b => (b.Bulletin, b.FirstSeen, FirstSlot: b.FirstSlot ?? Midnight(b.FirstSeen)))
             .Select(b => (b.Bulletin, b.FirstSeen, b.FirstSlot, Index: Since(b.FirstSlot, slot, options)))
-            .Where(b => b.Index >= 0 && b.Index < options.SlotsInRotation)
+            .Where(b => options.Timetable?.Daylight is null
+                ? b.Index >= 0 && b.Index < options.SlotsInRotation
+                : slot >= b.FirstSlot && slot < RotationEnd(b.FirstSlot, options))
             .OrderBy(b => b.Bulletin.Bid.ToUpperInvariant(), StringComparer.Ordinal)
             .ThenBy(b => b.Index);
         foreach (var (bulletin, firstSeen, firstSlot, index) in ordered)
@@ -264,7 +377,8 @@ public static class BroadcastScheduler
                 continue;
             }
             var transfer = TransferObject.ForBulletin(bulletin, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
-            uint first = index == 0 ? 0 : (uint)DueBySlot(transfer.SourceSymbols, index - 1, options);
+            uint first = options.Timetable?.Daylight is not null ? (uint)DueAt(transfer.SourceSymbols, firstSlot, slot, options, before: true)
+                : index == 0 ? 0 : (uint)DueBySlot(transfer.SourceSymbols, index - 1, options);
             carried.Add(new CarriedBulletin(bulletin.Bid, bulletin.Title, serialized.Length, firstSeen, transfer, first, firstSlot));
         }
         var plan = Plan(carried, slot, seed, compression, options);
@@ -303,8 +417,8 @@ public static class BroadcastScheduler
 
         // This slot's bulletins in a fixed order, so the plan does not depend on the caller's order.
         var inRotation = carried
+            .Where(c => InRotation(c, slot, options))
             .Select(c => (Carried: c, Index: SlotIndex(c, slot, options)))
-            .Where(c => c.Index >= 0 && c.Index < options.SlotsInRotation)
             .OrderBy(c => c.Carried.Bid.ToUpperInvariant(), StringComparer.Ordinal)
             .ThenBy(c => c.Index)
             .ThenBy(c => c.Carried.Transfer.ObjectId)
@@ -324,14 +438,14 @@ public static class BroadcastScheduler
             // end whose every slot went out whole that is exactly this slot's share; frames a
             // cut-short or skipped slot did not send are added to the next slot's, and a second plan
             // of the same slot sends only what the first did not.
-            uint due = (uint)DueBySlot(c.Transfer.SourceSymbols, index, options);
+            uint due = (uint)DueAt(c.Transfer.SourceSymbols, c.FirstSlot ?? slot, slot, options);
             int count = c.NextEsi >= due ? 0 : (int)(due - c.NextEsi);
             scheduled.Add(new ScheduledObject(c.Transfer, index, c.NextEsi, count, c.Bid));
-            entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title));
+            entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind));
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
-        var directory = new BroadcastDirectory(today, entries);
+        var directory = new BroadcastDirectory(today, entries, options.Timetable);
         var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
         int bulletinFrames = scheduled.Sum(s => s.Count);
         int directoryFrames = Math.Max(
@@ -405,6 +519,10 @@ public static class BroadcastScheduler
         if (options.DirectoryEvery < 2)
         {
             throw new ArgumentException("DirectoryEvery must be at least 2.", nameof(options));
+        }
+        if (options.Timetable is { } timetable && timetable.EveryMinutes != options.SlotMinutes)
+        {
+            throw new ArgumentException("The timetable's interval must be SlotMinutes.", nameof(options));
         }
     }
 }

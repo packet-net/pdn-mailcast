@@ -1,10 +1,10 @@
 # pdn-mailcast design
 
-Status: draft, 2026-10-04; built and on the air since 2026-10-05, every hour since v0.2.0.
+Status: draft, 2026-10-04; built and on the air since 2026-10-05, every hour since v0.2.0, every daylight hour since v0.3.0.
 
 ## What it is
 
-Every hour on the hour, GB7RDG sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
+Every hour on the hour in daylight, GB7RDG sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
 
 Two ideas make a one-way link work:
 
@@ -17,7 +17,7 @@ Two ideas make a one-way link work:
 |---|---|
 | What is sent | Bulletins only. No personal mail. |
 | Who sends | GB7RDG, a Flex 6500 on 40 m. |
-| When | Every hour on the hour, a short slot of about 3 minutes on average. Until 2026-10-05 it was once a day at 12:00 UTC, which a head end can still be set to. |
+| When | Every hour on the hour in daylight, from 2 hours after sunrise to 30 minutes before sunset near Reading: 09:00 to 17:00 UTC in early October, 11:00 to 15:00 in midwinter, 06:00 to 19:00 in midsummer. A short slot of a few minutes. Until 2026-10-05 it was once a day at 12:00 UTC, which a head end can still be set to. |
 | Where | Centred on 7.0538 MHz (USB dial 7.052 MHz), occupying about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz. |
 | Receivers | Linux, with LinBPQ or FBB mail. |
 | Receiver packaging | One program with pdn-soundmodem's library embedded from NuGet. No separate pdn-soundmodem install and no KISS link. |
@@ -55,6 +55,14 @@ The first on-air runs, on 2026-10-05, used 240-byte pieces rather than 940, whic
 From v0.2.0 GB7RDG sends every hour on the hour instead. A bulletin goes out first in the slot after it arrives, with enough pieces to rebuild it from that slot alone (1.5 times its pieces, plus 2), then again 5, 10, 17 and 25 hours later with 0.7 times its pieces each time, always fresh ones. So it is heard in five different hours of the day over a little more than a day, and a listener who missed one hour gets it later. A web SDR receiver listens to every third slot, to stay inside its allowance; whichever third it hears, it gets at least 1.4 times each bulletin's pieces. [headend.md](headend.md) has the details and the settings.
 
 That is about twice as many pieces as the daily plan, plus a tone, idents and the directory every hour. On GB7RDG's volume, in 240-byte pieces, it comes to about 3 minutes on the air in an average hour (about 74 minutes a day), under 6 in 19 hours out of 20, and about 8 in the busiest hour.
+
+### Daylight
+
+40 m NVIS only carries over UK paths in daylight. On 2026-10-05, at GB7RDG (IO91lk, near Reading, sunrise about 06:10 UTC and sunset about 17:35), the slots at 07:12 and 18:00 UTC were heard by nobody, while those from 09:12 to 16:00 decoded well. From v0.3.0 GB7RDG keeps to the hourly slots that start between 2 hours after sunrise and 30 minutes before sunset. Sunrise and sunset come from a small solar calculator in the core library (NOAA's equations: the sun's declination, the equation of time and the hour angle), good to about a minute up to 60 degrees of latitude, so neither end needs the internet. Everything is UTC, so summer time plays no part.
+
+With only 5 daylight slots in December, the hourly plan's five carryings would not fit, so in daylight a bulletin goes out twice: 1.2 times its pieces plus 2 in its first slot, then 0.4 times 5 hours later, or in the next daylight slot if that is dark. On GB7RDG's volume that is about 4 minutes in an average December daylight slot, about 2.6 in October and 1.7 in June. The morning's first slot, which carries everything that came in overnight, is the long one, and in winter it reaches the 10 minute hard stop; the next slot sends the rest. [headend.md](headend.md) has the details.
+
+The head end's directory says when its slots are and what its daylight rule is, so a receiver that has heard it follows the head end even if its own settings differ.
 
 ## Each slot
 
@@ -106,7 +114,7 @@ GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports
 - **Selection.** BPQ's own forwarding rules choose what reaches the partner, so GB7RDG's existing filters apply unchanged. Bulletins over a size cap (32 KB to start) are skipped.
 - **Content.** Each bulletin is sent exactly as GB7RDG would forward it to a partner, routing (R:) lines included.
 - **Radio.** The head end does not embed the modem. It uses the pdn-soundmodem already running the Flex: a new `ms110d-wn4` modem entry on its own KISS port, plus the transmit lease. Two programs cannot share the radio cleanly.
-- **Schedule.** A slot every hour on the hour. Each bulletin goes out in five slots over a little more than a day. Its first slot gets enough to rebuild it; later ones send fresh pieces, never repeats.
+- **Schedule.** A slot every hour on the hour, in daylight. Each bulletin goes out in two daylight slots, five hours or a night apart. Its first slot gets enough to rebuild it; the later one sends fresh pieces, never repeats.
 
 ## On-air format
 
@@ -125,11 +133,32 @@ Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identificati
 
 A whole frame is then 987 bytes, 36 under IL2P's 1023-byte limit. Frames carry no source block number, so every object is a single RaptorQ block (up to 53 MB, far beyond any bulletin).
 
-An object is one byte saying what it is (1 a bulletin, 2 the directory) followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, when it first sees it, and sends those same bytes, with fresh pieces, in every later slot.
+An object is one byte saying what it is, its content type (below), followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, when it first sees it, and sends those same bytes, with fresh pieces, in every later slot.
+
+### Content types
+
+The object's first byte flags what the object carries, so this traffic is marked as packet mail bulletins and the same frames can later carry other things. Its low 7 bits are the content type:
+
+| Type | Meaning |
+|---|---|
+| 0 | Never used |
+| 1 | Packet mail bulletin (FBB/BPQ message format), serialised as below |
+| 2 | Directory |
+| 3 | DAPPS message (reserved) |
+| 4 to 111 | Unassigned; given out in this table |
+| 112 to 127 | Experiments; never assigned |
+
+Its top bit (128) says a metadata block follows the type byte: a 2-byte big-endian length, then that many bytes of the wrapper's own header, then the zstd frame. A reader skips a metadata block it does not understand. Types 1 and 2 are sent without one, exactly as before v0.3.0, so receivers already in the field read them unchanged.
+
+A receiver handles each object by its content type: bulletins go to the BBS as before, and the directory is read. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they log once as an object they cannot use and drop, so it never reaches their BBS either.
+
+### Bulletins
 
 A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`, `To`, `At`, `Bid`, `Date`, `Title`), an empty line, then the message text exactly as a forwarding partner would receive it, R: lines included. Readers ignore keys they don't know, so later versions can add some.
 
-A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs and titles. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. It goes out in every slot. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
+### The directory
+
+A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs, titles and content types. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. From v0.3.0 there are such fields, each `key=value`: every line has `type=1` (its content type; a line without one is a bulletin), and the first line also has the head end's slots, `slots=00:00/60` (the first slot's time and the minutes between slots), and its daylight rule, `daylight=IO91lk/120/30` (locator, minutes after sunrise, minutes before sunset). Receivers before v0.3.0 read the same entries and ignore the rest, so the version line stays `MAILCAST DIRECTORY 1`. A directory with no entries has nowhere to carry the slots, and a receiver keeps the last ones it heard. It goes out in every slot. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
 
 A receiver forgets which objects it has rebuilt after 14 days, and drops a partial object 14 days after its last new piece. The BBS's BID check remains the real duplicate filter.
 
@@ -146,7 +175,7 @@ One program and a small config.
 - **Audio.** A sound card on the receiver's radio, or an UberSDR web receiver such as `wessex.zapto.org`. pdn-soundmodem's library supports both. The receiver detects the MS110D speed automatically, so there are no mode settings.
 - **Decoding.** The library hands over each good frame. The receiver keeps every piece on disk, so partial bulletins survive restarts and add up across slots. If a rebuild does not match its object ID, the receiver keeps its pieces and, a few decodes per arriving piece, tries sets of them without the suspect ones; any set that rebuilds to the ID is accepted.
 - **Delivery.** Each rebuilt bulletin is checked against its object ID, decompressed, and offered to the local BBS over its telnet port as FBB B1F forwarding, again reusing pdn-bbs's code. The BBS accepts or rejects by BID as with any partner.
-- **Config.** The audio source, and the BBS host, port, login and password. Everything else is fixed.
+- **Config.** The audio source, and the BBS host, port, login and password. Everything else is fixed, or comes from the head end: the slot times and daylight hours default to GB7RDG's, and once the receiver has heard the directory it uses what that says. A web SDR receiver listens to 8 of each day's daylight slots.
 - **Packaging.** A .deb in the packet-net apt repo with a systemd service.
 
 ### Web page

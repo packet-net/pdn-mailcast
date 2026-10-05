@@ -49,8 +49,29 @@ public sealed class Intake : IAsyncDisposable
             new BoundedChannelOptions(queueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite },
             _ => Dropped());
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default);
+        _heardSchedule = _store.HeardSchedule;
         _worker = Task.Run(RunAsync);
     }
+
+    private SlotTimetable? _heardSchedule;
+
+    /// <summary>
+    /// The head end's timetable from the newest directory that gave one, kept across restarts;
+    /// null until one has been heard.
+    /// </summary>
+    public SlotTimetable? HeardSchedule
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _heardSchedule;
+            }
+        }
+    }
+
+    /// <summary>A directory gave a timetable different from the one held (raised on the worker).</summary>
+    public event Action<SlotTimetable>? ScheduleHeard;
 
     /// <summary>A bulletin has been rebuilt and is waiting in the outbox.</summary>
     public event Action<Bulletin>? BulletinCompleted;
@@ -236,6 +257,23 @@ public sealed class Intake : IAsyncDisposable
             case FrameOutcome.CompletedDirectory when result.Directory is { } directory:
                 Interlocked.Increment(ref _framesStored);
                 _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation");
+                SlotTimetable? changed = null;
+                lock (_gate)
+                {
+                    if (_store.HeardSchedule is { } heard && heard != _heardSchedule)
+                    {
+                        _heardSchedule = heard;
+                        changed = heard;
+                    }
+                }
+                if (changed is not null)
+                {
+                    ScheduleHeard?.Invoke(changed);
+                }
+                break;
+            case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
+                // Once per object: it is marked done, so its later frames are not rebuilt again.
+                _log($"object {ObjectId.Format(result.ObjectId ?? 0)} is a {ContentType.Describe(type)}, which this receiver does not handle; kept out of the BBS");
                 break;
             case FrameOutcome.UnknownDictionary:
                 _log("store: a frame uses a compression dictionary this receiver does not have; a newer receiver may be needed");

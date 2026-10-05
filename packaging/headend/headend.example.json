@@ -1,7 +1,7 @@
 {
   // pdn-mailcast-headend. Every key has a default except "station"."apiKey"; the service will not
   // start until that is set. docs/headend.md says what each one does. The slot settings here are
-  // GB7RDG's, a slot every hour on the hour; the rest are the defaults.
+  // GB7RDG's, a slot every hour on the hour in daylight; the rest are the defaults.
   "callsign": "GB7RDG",
   "destination": "MCAST",
   "stateDirectory": "/var/lib/pdn-mailcast-headend",
@@ -9,8 +9,9 @@
   // Frame size: the bytes of bulletin per frame, 64 to 940 in steps of 4. Smaller frames survive
   // fades and other stations better; docs/headend.md says more. How each bulletin is carried
   // ("slotShares", "slotOffsets", "extraSymbols", "carryOverSlots") is left to the defaults for
-  // the slot interval: for hourly, the first slot after it arrives and again 5, 10, 17 and 25
-  // hours later.
+  // the slot interval: for hourly in daylight, 1.2 times its pieces in the first slot after it
+  // arrives and 0.4 times again 5 hours later, or in the next daylight slot if that is dark.
+  // Without "daylight", the first slot and again 5, 10, 17 and 25 hours later.
   "schedule": {
     "symbolSize": 240
   },
@@ -18,9 +19,13 @@
   // A slot at "timeUtc" and then every "everyMinutes" (dividing a day, at least 15). Left out,
   // "everyMinutes" is 1440, one slot a day, and then "toneSeconds" is 30, "maxMinutes" 40 and
   // "catchUpMinutes" 30. Receivers expect GB7RDG every hour on the hour with a 10 s tone.
+  // "daylight" runs only the slots that start from "afterSunriseMinutes" after sunrise to
+  // "beforeSunsetMinutes" before sunset at "locator", worked out from the sun for each day, in
+  // UTC; left out, every slot runs. --run-now runs whatever the time.
   "slot": {
     "timeUtc": "00:00",
     "everyMinutes": 60,
+    "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
     "catchUpMinutes": 5,
     "requireClockSync": true,
     "retryMinutes": 5,

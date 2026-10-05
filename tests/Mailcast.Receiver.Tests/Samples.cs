@@ -53,6 +53,13 @@ internal static class Samples
             Compression.Default);
         return [.. plan.Frames.Select(f => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, f.ToBytes()))];
     }
+
+    /// <summary>A slot's frames as a head end with these options sends them, its directory carrying its timetable if it has one.</summary>
+    public static IReadOnlyList<byte[]> Frames(IEnumerable<Bulletin> bulletins, ScheduleOptions options, DateTimeOffset slot, int seed = 1)
+    {
+        var plan = BroadcastScheduler.Plan(bulletins.Select(b => new BroadcastBulletin(b, DateOnly.FromDateTime(slot.UtcDateTime), slot)), slot, seed, Compression.Default, options);
+        return [.. plan.Frames.Select(f => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, f.ToBytes()))];
+    }
 }
 
 /// <summary>A scratch directory removed when the test ends.</summary>

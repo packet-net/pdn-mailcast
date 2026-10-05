@@ -47,7 +47,8 @@ public class WebSdrWindowTests
         public Rig(DateTimeOffset start, Func<ReceiverConfig, ReceiverConfig>? configure = null)
         {
             Clock = new SteppableClock(start);
-            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path };
+            // Every slot, as before daylight hours; the daylight tests below set their own.
+            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Daylight = null };
             config = configure?.Invoke(config) ?? config;
             Host = new ReceiverHost(config, Clock, line => Log.Enqueue(line));
             Host.ClockWaiting += () => Waits.Writer.TryWrite(true);
@@ -212,5 +213,27 @@ public class WebSdrWindowTests
 
         await rig.Inputs.Reader.ReadAsync();
         Assert.DoesNotContain(rig.Log, l => l.Contains("closed until", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Daylight_ListensToEightOfTheDaysDaylightSlots_AndWaitsForTheMorningsFirst()
+    {
+        // 06:00 on 5 October: the first daylight slot is 09:00, so the window opens at 08:58.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Mailcast.Core.DaylightSettings() });
+        await rig.Waits.Reader.ReadAsync();
+
+        Assert.Contains("closed until 08:58 UTC, ready for the 09:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+        Assert.Contains(rig.Log, l => l.Contains("on 2026-10-05 the web SDR listens to 8 of the 9 daylight slots, at 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00 and 16:00 UTC", StringComparison.Ordinal));
+        Assert.Contains(rig.Log, l => l.Contains("every hour on the hour, in daylight: from 120 minutes after sunrise to 30 minutes before sunset at IO91lk", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Daylight_AfterTheDaysLastSlot_WaitsForTomorrowsFirst_AndSaysTomorrowsSlots()
+    {
+        await using var rig = new Rig(new DateTimeOffset(2026, 12, 21, 16, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Mailcast.Core.DaylightSettings() });
+        await rig.Waits.Reader.ReadAsync();
+
+        Assert.Contains("closed until 10:58 UTC, ready for the 11:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+        Assert.Contains(rig.Log, l => l.Contains("on 2026-12-22 the web SDR listens to all 5 daylight slots, at 11:00, 12:00, 13:00, 14:00 and 15:00 UTC", StringComparison.Ordinal));
     }
 }

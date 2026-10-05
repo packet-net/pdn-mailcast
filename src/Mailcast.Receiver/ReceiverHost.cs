@@ -26,10 +26,30 @@ public sealed class ReceiverHost : IAsyncDisposable
         _log = log;
         Intake = new Intake(config.StateDirectory, log);
         Ledger = new DeliveryLedger(config.StateDirectory);
-        Slots = new SlotTracker(time, log, ScheduleFor(AudioSource.Parse(config.Audio), config));
+        Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Schedule);
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
+        Intake.ScheduleHeard += OnScheduleHeard;
+    }
+
+    /// <summary>
+    /// GB7RDG's slots: as its newest directory gives them once one has been heard, and until then
+    /// as the config file does.
+    /// </summary>
+    public SlotSchedule Schedule => Intake.HeardSchedule is { } heard ? SlotSchedule.From(heard) : Config.Schedule;
+
+    /// <summary>Whether <see cref="Schedule"/> comes from GB7RDG's directory rather than the config file.</summary>
+    public bool ScheduleFromDirectory => Intake.HeardSchedule is not null;
+
+    private void OnScheduleHeard(Mailcast.Core.SlotTimetable heard)
+    {
+        var schedule = SlotSchedule.From(heard);
+        _log($"slots: GB7RDG's directory gives its slots as {schedule.Describe()}; using that instead of the config file's");
+        if (Slots.Schedule is not null)
+        {
+            Slots.Schedule = schedule;
+        }
     }
 
     /// <summary>This program's version, for the SID and the log.</summary>
@@ -98,7 +118,9 @@ public sealed class ReceiverHost : IAsyncDisposable
     public async Task RunAsync(CancellationToken cancellation)
     {
         _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} (USB dial {OnAir.Mhz(Config.DialHz)} MHz), delivering to {DescribeBbs(Config.Bbs)}");
-        _log($"slots: GB7RDG's slots are {Config.Schedule.Describe()}");
+        _log(ScheduleFromDirectory
+            ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's)"
+            : $"slots: GB7RDG's slots are {Schedule.Describe()}");
         if (Config.SlotUtcWithoutEveryMinutes)
         {
             _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
@@ -158,6 +180,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal)
                 || _config.EveryMinutes != config.EveryMinutes
                 || _config.WebSdrSlotsPerDay != config.WebSdrSlotsPerDay
+                || _config.Daylight != config.Daylight
                 || _config.DialKHz != config.DialKHz;
             _config = config;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
@@ -178,7 +201,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     private async Task SuperviseAudioAsync(CancellationToken cancellation)
     {
         int refusals = 0;
-        ReceiverConfig? described = null;
+        string? described = null;
         string? closedSaid = null;
         while (!cancellation.IsCancellationRequested)
         {
@@ -196,13 +219,16 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 // A public web SDR allows each address about three hours a day, so it is only
                 // listened to around some of the slots.
-                var slots = config.WebSdrSlots;
-                if (!ReferenceEquals(described, config))
+                // Said again whenever it changes: once a day with a daylight rule, as the days
+                // lengthen and shorten.
+                var schedule = Schedule;
+                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule, config.WebSdrSlotsPerDay);
+                string words = ListeningWindow.Describe(schedule, config.WebSdrSlotsPerDay, DateOnly.FromDateTime(slot.UtcDateTime));
+                if (words != described)
                 {
-                    described = config;
-                    _log($"audio: {ListeningWindow.Describe(config.Schedule, slots)}");
+                    described = words;
+                    _log($"audio: {words}");
                 }
-                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), slots);
                 if (opens > _time.GetUtcNow())
                 {
                     AudioState = $"the web SDR is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot";
@@ -227,7 +253,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
             CancellationToken token = running?.Token ?? restart.Token;
             var pipeline = PipelineFactory?.Invoke(source) ?? CreatePipeline(source, config);
-            Slots.Schedule = ScheduleFor(source, config);
+            Slots.Schedule = source.Kind == AudioSourceKind.Wav ? null : Schedule;
             lock (_gate)
             {
                 _pipeline = pipeline;
@@ -322,10 +348,6 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
         }
     }
-
-    /// <summary>The slots to group what is heard into: none for a recording, whose time of day is not known.</summary>
-    private static SlotSchedule? ScheduleFor(AudioSource source, ReceiverConfig config) =>
-        source.Kind == AudioSourceKind.Wav ? null : config.Schedule;
 
     /// <summary>The pipeline for <paramref name="source"/>, heard on <paramref name="config"/>'s dial.</summary>
     internal AudioPipeline CreatePipeline(AudioSource source, ReceiverConfig config) =>

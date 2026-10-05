@@ -1,6 +1,6 @@
 # pdn-mailcast receiver
 
-Hears GB7RDG's bulletins on 40 m, sent every hour on the hour, and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
+Hears GB7RDG's bulletins on 40 m, sent every hour on the hour in daylight, and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
 
 You need a Linux machine (a Pi is fine) running LinBPQ with its mail.
 
@@ -44,7 +44,7 @@ sudo apt install pdn-mailcast-receiver
 sudo systemctl start pdn-mailcast-receiver
 ```
 
-Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appear in your BBS as they complete. A web SDR is only listened to every 3 hours, to stay inside its allowance, so give it a few hours.
+Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appear in your BBS as they complete. A web SDR is only listened to in 8 of each day's daylight slots, to stay inside its allowance, so give it a few hours.
 
 ## Using your own radio instead
 

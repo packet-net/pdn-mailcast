@@ -28,6 +28,19 @@ public enum FrameOutcome
     CompletedDirectory,
 
     /// <summary>
+    /// The symbol completed an object of a content type this receiver knows but does not handle
+    /// (a DAPPS message): it is kept out of the BBS, and further frames of it are ignored.
+    /// <see cref="AcceptResult.ContentType"/> says which.
+    /// </summary>
+    CompletedUnhandled,
+
+    /// <summary>
+    /// The symbol completed an object of a content type this receiver does not know (an
+    /// experiment, or one assigned later): it is ignored, without error.
+    /// </summary>
+    CompletedUnknown,
+
+    /// <summary>
     /// The frame, or the object it completed, failed a check; <see cref="AcceptResult.Detail"/>
     /// says which. Symbols are not thrown away for this: an object that rebuilds wrong keeps its
     /// pieces (less any found to be bad) and waits for more.
@@ -41,7 +54,8 @@ public enum FrameOutcome
 /// <param name="Bulletin">The bulletin the frame completed, for <see cref="FrameOutcome.CompletedBulletin"/>.</param>
 /// <param name="Directory">The directory the frame completed, for <see cref="FrameOutcome.CompletedDirectory"/>.</param>
 /// <param name="Detail">Why, for <see cref="FrameOutcome.Rejected"/>.</param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null);
+/// <param name="ContentType">The object's content type, for <see cref="FrameOutcome.CompletedUnhandled"/> and <see cref="FrameOutcome.CompletedUnknown"/>.</param>
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null);
 
 /// <summary>How far one directory entry has got at this receiver.</summary>
 /// <param name="Entry">The directory's entry.</param>
@@ -164,6 +178,23 @@ public sealed class ReceiverStore
                 WriteDone(id);
             }
         }
+        var scheduleFile = Path.Combine(root, "schedule.txt");
+        if (File.Exists(scheduleFile))
+        {
+            var lines = Bulletin.TextEncoding.GetString(File.ReadAllBytes(scheduleFile)).Split('\n');
+            if (lines.Length >= 2
+                && DateOnly.TryParseExact(lines[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var heard)
+                && SlotTimetable.FromFields(lines[1].Split('\t')) is { } timetable)
+            {
+                HeardSchedule = timetable;
+                HeardScheduleDate = heard;
+            }
+            else
+            {
+                Log("schedule.txt unreadable, removed");
+                File.Delete(scheduleFile);
+            }
+        }
         var directoryFile = Path.Combine(root, "directory.txt");
         if (File.Exists(directoryFile))
         {
@@ -201,6 +232,15 @@ public sealed class ReceiverStore
 
     /// <summary>The newest directory heard, if any.</summary>
     public BroadcastDirectory? Directory { get; private set; }
+
+    /// <summary>
+    /// The head end's timetable from the newest directory heard that gave one, kept across
+    /// restarts in <c>schedule.txt</c>; null until one has been heard.
+    /// </summary>
+    public SlotTimetable? HeardSchedule { get; private set; }
+
+    /// <summary>The date of the directory <see cref="HeardSchedule"/> came from.</summary>
+    public DateOnly? HeardScheduleDate { get; private set; }
 
     /// <summary>How many objects have symbols held but are not yet rebuilt.</summary>
     public int PartialObjects => _instances.Values.Select(i => i.ObjectId).Distinct().Count();
@@ -438,9 +478,21 @@ public sealed class ReceiverStore
             Detail: $"rebuilt object does not match its ID; keeping its {instance.Symbols.Count} pieces and waiting for more");
     }
 
-    /// <summary>Unpacks an object that matches its ID.</summary>
+    /// <summary>Unpacks an object that matches its ID, by its content type.</summary>
     private AcceptResult? Finish(Instance instance, byte[] data)
     {
+        if (!ContentType.TryRead(data, out byte type, out _, out _))
+        {
+            return Unusable(instance, "matches its ID but its content type or metadata block is cut short");
+        }
+        if (type != (byte)ObjectKind.Bulletin && type != (byte)ObjectKind.Directory)
+        {
+            // Not for the BBS, whatever it is. Marked done so its later frames are ignored.
+            bool known = ContentType.IsKnown(type);
+            MarkDone(instance);
+            return new AcceptResult(known ? FrameOutcome.CompletedUnhandled : FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type);
+        }
+
         ObjectKind kind;
         byte[] content;
         try
@@ -474,6 +526,16 @@ public sealed class ReceiverStore
             {
                 DurableFile.WriteAtomically(Path.Combine(_root, "directory.txt"), content, flush: _options.FlushToDisk);
                 Directory = directory;
+            }
+            if (directory.Schedule is { } schedule && (HeardScheduleDate is null || directory.Date >= HeardScheduleDate))
+            {
+                if (schedule != HeardSchedule || directory.Date != HeardScheduleDate)
+                {
+                    DurableFile.WriteAtomically(Path.Combine(_root, "schedule.txt"), Bulletin.TextEncoding.GetBytes(
+                        directory.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\n" + string.Join('\t', schedule.ToFields()) + "\n"), flush: _options.FlushToDisk);
+                }
+                HeardSchedule = schedule;
+                HeardScheduleDate = directory.Date;
             }
             MarkDone(instance);
             return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory);

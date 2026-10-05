@@ -206,13 +206,14 @@ function schedule(s) {
   const tuning = kind === "web" ? `The web SDR is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
     : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
-    <dt>Slots</dt><dd>${esc(c.words)}</dd>
+    <dt>Slots</dt><dd>${esc(c.words)}${c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
+    <dt>Today</dt><dd>${c.today.length ? `${c.daylight ? "in daylight, " : ""}${c.today.join(", ")} UTC` : "no slots today"}</dd>
     <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
   if (web) {
     const all = web.slotsPerDay === c.slotsPerDay;
     rows += `<dt>Web SDR</dt><dd>${web.openNow ? `listening now, to the ${utc(web.slot)} slot`
       : `the next slot it listens to is ${at(web.slot)}`}.
-      ${all ? "It listens to every slot." : `It listens to ${web.slotsPerDay} of the ${c.slotsPerDay} slots a day (${web.times.join(", ")} UTC)
+      ${all ? "It listens to every slot today." : `It listens to ${web.slotsPerDay} of today's ${c.slotsPerDay} slots (${web.times.join(", ")} UTC)
       to stay inside its allowance of about 3 hours a day.`}</dd>`;
   }
   $("when").innerHTML = rows;
@@ -225,6 +226,7 @@ function schedule(s) {
     "The tone shows as a bright line on the dashed centre line, then the data fills the space between the blue edges.",
     "40 m changes through the day, so some slots may not reach you. Give it a few slots before changing anything.",
   ];
+  if (c.daylight) tips.splice(1, 0, `GB7RDG sends only in daylight, ${esc(c.daylight.words)}, because 40 m does not reach UK stations at night. Today that is ${c.today.length ? c.today.join(", ") + " UTC" : "no slots at all"}.`);
   if (kind === "radio") tips.push(`Check the radio is on USB at ${mhz(a.dialKHz)} MHz with a receive filter at least 3 kHz wide, and that the level meter moves.`);
   if (web) tips.push("If this web SDR never hears it, try another UberSDR receiver in the settings below.");
   tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
