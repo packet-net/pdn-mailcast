@@ -1,8 +1,8 @@
 [Unit]
 Description=pdn-mailcast receiver: GB7RDG's daily bulletin broadcast into your BBS
 Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/src/Mailcast.Receiver/README.md
-After=network-online.target sound.target
-Wants=network-online.target
+After=network-online.target sound.target time-sync.target
+Wants=network-online.target time-sync.target
 ConditionPathExists=/etc/pdn-mailcast/receiver.json
 
 [Service]
