@@ -16,7 +16,10 @@
 
   <PropertyGroup>
     <RootNamespace>Bbs.Fbb</RootNamespace>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackageId>M0LTE.Mailcast.Fbb</PackageId>
+    <Description>FBB compressed (B1F) BBS forwarding, both the calling and the answering side, as used by pdn-mailcast (from packet-net/pdn-bbs).</Description>
+    <PackageTags>packet-radio;amateur-radio;bbs;fbb;linbpq</PackageTags>
   </PropertyGroup>
 
 </Project>
