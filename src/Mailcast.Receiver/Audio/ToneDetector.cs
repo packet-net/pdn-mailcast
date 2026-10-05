@@ -20,10 +20,18 @@ public sealed record ToneReport(double FrequencyHz, double OffsetHz, double SnrD
 /// bins across the passband. A run of such blocks within a hertz or two of each other is the tone;
 /// when the run ends, its frequency (refined between bins, then averaged) and its SNR are
 /// reported.</para>
+/// <para>The CW ident follows the tone on the same frequency, often within a second, and a block
+/// of it has a strong line at 1800 Hz too. What tells them apart is the keying: a steady carrier
+/// keeps nearly all its power in the few bins of its line, while keyed CW puts half or more into
+/// sidebands either side (a dit at 20 wpm repeats about 8 times a second). So a block whose line
+/// holds less than <see cref="SteadyShare"/> of the power within 25 Hz of it, noise taken away,
+/// is keyed, and ends the run like silence does. Block power is no help here: the ident may be
+/// sent louder than the tone, and a fading tone changes power by more than keying does.</para>
 /// <para>A run is reported only if it lasted between <see cref="MinDuration"/> and
 /// <see cref="MaxDuration"/>: the slot's tone is 10 seconds, and a carrier that goes on much
-/// longer (a birdie, or a station tuning up) is not it. The blocks are just over a second, so a
-/// 10-second tone is measured as between about 8 and 11 seconds.</para>
+/// longer (a birdie, or a station tuning up) is not it. The blocks are just over a second, and a
+/// block the tone only partly fills may or may not count, so a 10-second tone is measured as
+/// between about 8 and 11.3 seconds.</para>
 /// <para>Time here is counted in samples, so the result does not depend on how fast the audio
 /// arrives. Not thread-safe: feed it from one thread.</para>
 /// </remarks>
@@ -33,7 +41,13 @@ public sealed class ToneDetector
     public static readonly TimeSpan MinDuration = TimeSpan.FromSeconds(7);
 
     /// <summary>The longest run reported.</summary>
-    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// The least share of the power near the line that the line itself holds in a block of
+    /// steady carrier; keyed CW holds 80% or less, and a steady tone 95% or more down to about -12 dB SNR.
+    /// </summary>
+    public const double SteadyShare = 0.87;
 
     private const int Rate = 8000;
     private const int Size = 8192;
@@ -46,6 +60,7 @@ public sealed class ToneDetector
     private const double StableHz = 2;
     private const int LobeBins = 3;
     private const int ExcludeBins = 20;
+    private const int SidebandBins = 26;
 
     private readonly double _expectedHz;
     private readonly Decimator _decimator;
@@ -150,7 +165,7 @@ public sealed class ToneDetector
             signal += _power[k] - noisePerBin;
         }
 
-        bool tone = signal > noisePerBin * Math.Pow(10, DetectDb / 10);
+        bool tone = signal > noisePerBin * Math.Pow(10, DetectDb / 10) && Steady(peak, signal, noisePerBin);
         double frequency = Refine(peak);
         if (tone && (_runBlocks == 0 || Math.Abs(frequency - (_runFrequencySum / _runBlocks)) <= StableHz))
         {
@@ -191,6 +206,20 @@ public sealed class ToneDetector
         _runBlocks = 0;
         _runFrequencySum = _runSignalSum = _runNoiseSum = 0;
         LiveFrequencyHz = null;
+    }
+
+    /// <summary>
+    /// Whether the line at <paramref name="peak"/> is a steady carrier rather than keyed: whether
+    /// it holds at least <see cref="SteadyShare"/> of the power within 25 Hz of it, noise taken away.
+    /// </summary>
+    private bool Steady(int peak, double line, double noisePerBin)
+    {
+        double near = 0;
+        for (int k = peak - SidebandBins; k <= peak + SidebandBins; k++)
+        {
+            near += _power[k] - noisePerBin;
+        }
+        return near <= 0 || line >= SteadyShare * near;
     }
 
     /// <summary>The peak's frequency between bins: a parabola through the log powers either side.</summary>

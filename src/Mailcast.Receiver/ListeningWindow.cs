@@ -19,6 +19,21 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes)
     /// <summary>The first slot that starts at or after <paramref name="now"/>.</summary>
     public DateTimeOffset NextStart(DateTimeOffset now) => ListeningWindow.NextStart(now, FromAnchor);
 
+    /// <summary>The latest slot that starts at or before <paramref name="at"/>.</summary>
+    public DateTimeOffset LatestStart(DateTimeOffset at)
+    {
+        var next = NextStart(at);
+        return next == at.ToUniversalTime() ? next : next.AddMinutes(-EveryMinutes);
+    }
+
+    /// <summary>The slot start nearest <paramref name="at"/>, before or after it.</summary>
+    public DateTimeOffset NearestStart(DateTimeOffset at)
+    {
+        var before = LatestStart(at);
+        var after = before.AddMinutes(EveryMinutes);
+        return at - before <= after - at ? before : after;
+    }
+
     /// <summary>The schedule in words, for the page and the log: "every hour on the hour".</summary>
     public string Describe() => EveryMinutes switch
     {

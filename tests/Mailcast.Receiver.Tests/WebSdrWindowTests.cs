@@ -174,16 +174,35 @@ public class WebSdrWindowTests
     }
 
     [Fact]
-    public async Task OldConfig_ListensToItsOneDailySlotAndSaysHowToChange()
+    public async Task OldConfig_IsHourlyFromItsSlotAndSaysSoInOneLine()
     {
-        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero),
-            c => c with { SlotUtc = "12:00", EveryMinutes = 1440, DailyFromOldConfig = true });
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 13, 20, 0, TimeSpan.Zero),
+            c => c with { SlotUtc = "12:00", SlotUtcWithoutEveryMinutes = true });
         await rig.Waits.Reader.ReadAsync();
 
+        Assert.Contains("closed until 14:58 UTC, ready for the 15:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+        Assert.Single(rig.Log, l => l.Contains("read as every 60 minutes from 12:00 UTC", StringComparison.Ordinal)
+            && l.Contains("nothing needs changing", StringComparison.Ordinal));
+        Assert.Contains(rig.Log, l => l.Contains("8 of the 24 slots a day, at 00:00, 03:00", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ClockPutBackBeforeTheOpening_ClosesWithinOneCheck()
+    {
+        // Open at 12:05, in the 12:00 slot's window, which opened at 11:58.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 5, 0, TimeSpan.Zero));
+        var input = await rig.Inputs.Reader.ReadAsync();
+        await rig.Waits.Reader.ReadAsync();
+
+        // The clock was fast: it is really 10:05. Still open until the next check...
+        rig.Clock.Step = -TimeSpan.FromHours(2);
+        Assert.False(input.Disposed);
+
+        // ...when the web SDR is closed until the window that really is next.
+        rig.Clock.Advance(ReceiverHost.ClockCheck);
+        await rig.Waits.Reader.ReadAsync();
+        Assert.True(input.Disposed);
         Assert.Contains("closed until 11:58 UTC, ready for the 12:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
-        Assert.Contains(rig.Log, l => l.Contains("read as one slot a day at 12:00 UTC", StringComparison.Ordinal)
-            && l.Contains("\"everyMinutes\": 60", StringComparison.Ordinal));
-        Assert.Contains(rig.Log, l => l.Contains("the one slot a day, at 12:00 UTC", StringComparison.Ordinal));
     }
 
     [Fact]

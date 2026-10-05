@@ -17,7 +17,7 @@ public class ConfigTests
         Assert.Equal("00:00", config.SlotUtc);
         Assert.Equal(60, config.EveryMinutes);
         Assert.Equal(8, config.WebSdrSlotsPerDay);
-        Assert.False(config.DailyFromOldConfig);
+        Assert.False(config.SlotUtcWithoutEveryMinutes);
     }
 
     [Fact]
@@ -31,11 +31,11 @@ public class ConfigTests
 
         Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60), config.Schedule);
         Assert.Equal(8, config.WebSdrSlots.Count);
-        Assert.False(config.DailyFromOldConfig);
+        Assert.False(config.SlotUtcWithoutEveryMinutes);
     }
 
     [Fact]
-    public void OldConfig_WithOnlySlotUtc_IsOneSlotADay_AndStaysSoWhenSaved()
+    public void OldConfig_WithOnlySlotUtc_IsHourlyFromThatTime()
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
@@ -49,14 +49,16 @@ public class ConfigTests
 
         var config = ReceiverConfig.Load(path);
 
-        Assert.True(config.DailyFromOldConfig);
-        Assert.Equal(new SlotSchedule(new TimeOnly(12, 0), 1440), config.Schedule);
-        Assert.Equal([new TimeOnly(12, 0)], config.WebSdrSlots);
+        Assert.True(config.SlotUtcWithoutEveryMinutes);
+        Assert.Equal(new SlotSchedule(new TimeOnly(12, 0), 60), config.Schedule);
+        // The same slots as 00:00 every hour, and the web SDR listens to the same ones too.
+        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60).FromAnchor.Order(), config.Schedule.FromAnchor.Order());
+        Assert.Equal(new ReceiverConfig().WebSdrSlots, config.WebSdrSlots);
 
-        // Saving from the page does not make one slot a day a choice the file states.
+        // Saved, it says so, and no note is needed any more.
         config.Save(path);
-        Assert.DoesNotContain("everyMinutes", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(config, ReceiverConfig.Load(path));
+        Assert.Contains("\"everyMinutes\": 60", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Equal(config with { SlotUtcWithoutEveryMinutes = false }, ReceiverConfig.Load(path));
     }
 
     [Fact]
@@ -68,7 +70,7 @@ public class ConfigTests
 
         var config = ReceiverConfig.Load(path);
 
-        Assert.False(config.DailyFromOldConfig);
+        Assert.False(config.SlotUtcWithoutEveryMinutes);
         Assert.Equal(12, config.Schedule.SlotsPerDay);
         Assert.Equal(12, config.WebSdrSlots.Count);
         config.Save(path);

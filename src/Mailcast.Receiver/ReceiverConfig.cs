@@ -117,7 +117,7 @@ public sealed record ReceiverConfig
     /// <summary>
     /// Minutes from one slot's start to the next: it divides a day (1440) and is at least
     /// <see cref="ShortestEveryMinutes"/>. A config from before hourly slots has only
-    /// <see cref="SlotUtc"/>, and is read as one slot a day (1440).
+    /// <see cref="SlotUtc"/> (12:00), and gets the default 60: the same hourly slots.
     /// </summary>
     public int EveryMinutes { get; init; } = 60;
 
@@ -148,11 +148,11 @@ public sealed record ReceiverConfig
     public static int MostWebSdrSlotsPerDay => WebSdrAllowanceMinutes / WebSdrMinutesPerSlot;
 
     /// <summary>
-    /// Set when the file had <c>slotUtc</c> but no <c>everyMinutes</c>, as before hourly slots,
-    /// so it was read as one slot a day; the receiver says so in its log.
+    /// Set when the file had <c>slotUtc</c> but no <c>everyMinutes</c>, as before hourly slots;
+    /// it is read as hourly from that time, and the receiver says so in its log.
     /// </summary>
     [JsonIgnore]
-    public bool DailyFromOldConfig { get; init; }
+    public bool SlotUtcWithoutEveryMinutes { get; init; }
 
     /// <summary>The first slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
     [JsonIgnore]
@@ -208,7 +208,7 @@ public sealed record ReceiverConfig
         config ??= new ReceiverConfig();
         if (HasOnlySlotUtc(text))
         {
-            config = config with { EveryMinutes = 1440, DailyFromOldConfig = true };
+            config = config with { SlotUtcWithoutEveryMinutes = true };
         }
         config.Validate();
         return config;
@@ -244,26 +244,10 @@ public sealed record ReceiverConfig
                 // The create mode is masked by the umask; this is the mode it should have.
                 File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
             }
-            stream.Write(System.Text.Encoding.UTF8.GetBytes(ToJson() + "\n"));
+            stream.Write(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n"));
             stream.Flush(flushToDisk: true);
         }
         File.Move(tmp, path, overwrite: true);
-    }
-
-    /// <summary>
-    /// The file's text. A config read from before hourly slots is written back without
-    /// <c>everyMinutes</c>, so saving the settings page does not quietly make one slot a day its
-    /// choice: it is still read as one slot a day, and the log still says how to change it.
-    /// </summary>
-    internal string ToJson()
-    {
-        if (!DailyFromOldConfig)
-        {
-            return JsonSerializer.Serialize(this, Json);
-        }
-        var node = JsonSerializer.SerializeToNode(this, Json)!.AsObject();
-        node.Remove("everyMinutes");
-        return node.ToJsonString(Json);
     }
 
     /// <summary>Throws <see cref="ConfigException"/> if a setting cannot work.</summary>

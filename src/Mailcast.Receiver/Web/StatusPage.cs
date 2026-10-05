@@ -268,6 +268,7 @@ public sealed class StatusPage : IAsyncDisposable
             slot = slot is null ? null : new
             {
                 started = slot.Started,
+                scheduled = slot.Scheduled,
                 framesHeard = slot.FramesHeard,
                 lastFrame = slot.LastFrame,
                 tone = slot.Tone is not { } tone ? null : new
@@ -322,7 +323,6 @@ public sealed class StatusPage : IAsyncDisposable
             words = schedule.Describe(),
             everyMinutes = schedule.EveryMinutes,
             slotUtc = config.SlotUtc,
-            oldConfig = config.DailyFromOldConfig,
             slotsPerDay = schedule.SlotsPerDay,
             next,
             // The slot before, while it may still be on: within the time a web SDR would stay open for it.
