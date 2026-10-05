@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Mailcast.Core/Mailcast.Core.csproj" />
+    <Project Path="src/Mailcast.Fbb/Mailcast.Fbb.csproj" />
     <Project Path="src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Mailcast.Core.Tests/Mailcast.Core.Tests.csproj" />
+    <Project Path="tests/Mailcast.Fbb.Tests/Mailcast.Fbb.Tests.csproj" />
     <Project Path="tests/Mailcast.RaptorQ.Tests/Mailcast.RaptorQ.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
