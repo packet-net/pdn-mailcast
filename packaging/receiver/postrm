@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+UNIT=pdn-mailcast-receiver.service
+
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then
+    systemctl --system daemon-reload >/dev/null || true
+fi
+
+if [ "$1" = "remove" ] && command -v deb-systemd-helper >/dev/null; then
+    deb-systemd-helper mask "$UNIT" >/dev/null || true
+fi
+
+if [ "$1" = "purge" ]; then
+    if command -v deb-systemd-helper >/dev/null; then
+        deb-systemd-helper purge "$UNIT" >/dev/null || true
+        deb-systemd-helper unmask "$UNIT" >/dev/null || true
+    fi
+    # The config is made by postinst, not shipped, so dpkg does not remove it on purge. The
+    # pieces and the delivery record in /var/lib/pdn-mailcast go too: purge means start again.
+    rm -f /etc/pdn-mailcast/receiver.json /etc/pdn-mailcast/receiver.json.tmp
+    rmdir --ignore-fail-on-non-empty /etc/pdn-mailcast 2>/dev/null || true
+    rm -rf /var/lib/pdn-mailcast
+    if getent passwd pdn-mailcast >/dev/null; then
+        deluser --system --quiet pdn-mailcast >/dev/null 2>&1 || true
+    fi
+fi
+
+exit 0

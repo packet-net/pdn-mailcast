@@ -4,7 +4,7 @@ A daily one-way HF broadcast of packet BBS bulletins, and a receiver that drops 
 
 GB7RDG sends the day's bulletins once a day on 40 m, around midday UK time. The receiver listens through a sound card on your radio, or through a public web SDR, and collects pieces of the broadcast until each bulletin is complete. It then hands the bulletin to your LinBPQ or FBB mail as an ordinary forwarding partner. Your BBS already rejects bulletins it has seen, so this is just one more route for mail to reach you.
 
-This is an experiment at an early stage: the libraries and the head end exist, the receiver does not yet, and nothing has been on the air. The plan is in [docs/design.md](docs/design.md).
+This is an experiment at an early stage: the libraries, the head end and the receiver exist, but nothing has been on the air yet. The plan is in [docs/design.md](docs/design.md). To run a receiver, see [src/Mailcast.Receiver/README.md](src/Mailcast.Receiver/README.md).
 
 ## Licence
 
@@ -25,6 +25,7 @@ The code so far:
 - `src/Mailcast.Core`: the on-air frame format, the bulletin model, zstd compression with the trained dictionary, the directory, the head end's store and daily schedule, and the receiver's symbol store.
 - `src/Mailcast.Fbb`: FBB compressed (B1F) forwarding, both the calling and the answering side, copied from pdn-bbs with its tests. The receiver uses it to hand bulletins to your BBS, and the head end to take them from GB7RDG's.
 - `src/Mailcast.HeadEnd`: the head end, `pdn-mailcast-headend`: takes bulletins from GB7RDG's BBS as a forwarding partner and broadcasts them once a day through the station's pdn-soundmodem, or renders a day's slot to a WAV file offline. See [docs/headend.md](docs/headend.md); `scripts/build-headend-deb.sh linux-x64 VERSION` builds its .deb.
+- `src/Mailcast.Receiver`: the receiver, with pdn-soundmodem's MS110D modem embedded from NuGet.
 - `tools/Mailcast.DictionaryTool`: imports bulletins from a copy of a LinBPQ mail store, trains a dictionary, and compares compressed sizes.
 - `tools/raptorq-vectors` and `tools/RaptorQ.InteropExport`: check our RaptorQ against the Rust `raptorq` crate, both ways. CI runs them; to run them by hand you also need cargo:
 

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Mailcast.Receiver</RootNamespace>
+    <AssemblyName>pdn-mailcast-receiver</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="pdn-soundmodem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mailcast.Core\Mailcast.Core.csproj" />
+    <ProjectReference Include="..\Mailcast.Fbb\Mailcast.Fbb.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Web\index.html" LogicalName="Mailcast.Receiver.Web.index.html" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mailcast.Receiver.Tests" />
+  </ItemGroup>
+
+</Project>
