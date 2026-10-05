@@ -34,14 +34,14 @@ It needs pdn-soundmodem with burst packing (#544) and the transmit lease (#545) 
   "mode": "ms110d-wn4",
   "subChannel": 4,
   "port": 8112,
-  "rfFrequency": 7051500,
-  "maxBurstSeconds": 60,
+  "rfFrequency": 7053800,
+  "maxBurstSeconds": 18,
   "burstGatherSeconds": 0.5,
   "identify": { "callsign": "GB7RDG", "intervalMinutes": 10 }
 }
 ```
 
-`rfFrequency` places the signal at 7.0515 MHz with the station's band plan; without one, `frequency` is the audio centre (1800 Hz on a 7.0497 MHz dial). The sub-channel and port are examples: use any free ones, and put the same numbers in the head end's `station.subChannel` and `station.kissPort`, with `station.kissPortNibble` 0 for a per-modem port. LinBPQ should not be given this port.
+`rfFrequency` places the signal at 7.0538 MHz with the station's band plan (receivers tune 7.052 MHz USB). Set `txAmplitude` to 1.0 on this entry (pdn-soundmodem 0.85.0 or later): the modem's default of 0.5 peaks at only about 0.38 of full scale, and on GB7RDG's Flex that is about 12 W of data against about 41 W at 1.0. Because the station's dial sits below the signal, the head end's `slot.toneHz` is the tone's audio frequency on that dial: 4050 Hz on GB7RDG, so the tone lands on 7.0538 MHz.
 
 ## GB7RDG's LinBPQ
 
