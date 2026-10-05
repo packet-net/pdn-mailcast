@@ -33,14 +33,17 @@ public sealed class Intake : IAsyncDisposable
     private long _framesDropped;
     private long _framesStored;
 
-    /// <summary>Opens the store under <paramref name="stateDirectory"/>/store.</summary>
-    public Intake(string stateDirectory, Action<string> log)
-        : this(stateDirectory, log, QueueLength)
+    /// <summary>
+    /// Opens the store under <paramref name="stateDirectory"/>/store. <paramref name="options"/>
+    /// gives the clock and the archive's limits; the store's own log lines go to <paramref name="log"/>.
+    /// </summary>
+    public Intake(string stateDirectory, Action<string> log, ReceiverStoreOptions? options = null)
+        : this(stateDirectory, log, QueueLength, options)
     {
     }
 
     /// <summary>For tests: a store with a shorter queue.</summary>
-    internal Intake(string stateDirectory, Action<string> log, int queueLength)
+    internal Intake(string stateDirectory, Action<string> log, int queueLength, ReceiverStoreOptions? options = null)
     {
         _log = log;
         // With DropWrite a write to a full queue still says it succeeded; this is the only place
@@ -48,7 +51,8 @@ public sealed class Intake : IAsyncDisposable
         _queue = Channel.CreateBounded<ReadOnlyMemory<byte>>(
             new BoundedChannelOptions(queueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite },
             _ => Dropped());
-        _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default);
+        _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
+            (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)) });
         _heardSchedule = _store.HeardSchedule;
         _worker = Task.Run(RunAsync);
     }
@@ -160,12 +164,39 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
-    /// <summary>Takes a bulletin out of the outbox once the BBS has answered for it.</summary>
-    public void Acknowledge(string bid)
+    /// <summary>Moves a bulletin from the outbox to the archive once the BBS has answered for it for good.</summary>
+    public void Acknowledge(string bid, BbsVerdict verdict, string? detail = null)
     {
         lock (_gate)
         {
-            _store.Acknowledge(bid);
+            _store.Acknowledge(bid, verdict, detail);
+        }
+    }
+
+    /// <summary>Every bulletin held, waiting or archived, newest first.</summary>
+    public IReadOnlyList<MailEntry> Mail()
+    {
+        lock (_gate)
+        {
+            return _store.Mail();
+        }
+    }
+
+    /// <summary>One bulletin as stored, with its entry, or null.</summary>
+    public (MailEntry Entry, byte[] Serialized)? ReadMail(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.ReadMail(objectId);
+        }
+    }
+
+    /// <summary>Puts an archived bulletin back in the outbox, to be offered to the BBS again.</summary>
+    public (ResendOutcome Outcome, Bulletin? Bulletin) Resend(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.Resend(objectId);
         }
     }
 

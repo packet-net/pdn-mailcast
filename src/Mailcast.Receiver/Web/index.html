@@ -41,7 +41,17 @@
   input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
   .row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
   button { font: inherit; padding: 7px 16px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; justify-self: start; }
-  #saved { font-size: 14px; }
+  #saved, #resent { font-size: 14px; }
+  button.plain { background: #e9edf1; color: var(--ink); }
+  button:disabled { opacity: .45; cursor: default; }
+  tr.pick { cursor: pointer; }
+  tr.pick:hover, tr.pick.open { background: #eef3f8; }
+  .pager { display: flex; gap: 10px; align-items: center; margin-top: 8px; font-size: 14px; }
+  .pager button { padding: 4px 12px; }
+  #viewer { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  #viewer .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  #viewText { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 520px; overflow: auto; margin: 0;
+    padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
   a { color: var(--accent); }
 </style>
 </head>
@@ -103,6 +113,27 @@
   </section>
 
   <section class="wide">
+    <h2>Mail</h2>
+    <p class="muted" id="mailNote">Every bulletin this receiver has rebuilt: those waiting for your BBS, and a copy of each one it has answered for.</p>
+    <div id="mail" class="muted">No bulletins yet.</div>
+    <div class="pager" id="pager" hidden>
+      <button type="button" class="plain" id="newer">Newer</button>
+      <span id="mailPage" class="muted"></span>
+      <button type="button" class="plain" id="older">Older</button>
+    </div>
+    <div id="viewer" hidden>
+      <div id="viewHead"></div>
+      <div class="tools">
+        <button type="button" id="resend">Send to BBS again</button>
+        <a id="raw" target="_blank" rel="noopener">Open as text</a>
+        <button type="button" class="plain" id="closeView">Close</button>
+        <span id="resent"></span>
+      </div>
+      <pre id="viewText"></pre>
+    </div>
+  </section>
+
+  <section class="wide">
     <h2>Settings</h2>
     <form id="settings">
       <label>Audio
@@ -141,7 +172,7 @@
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null;
@@ -236,6 +267,85 @@ function schedule(s) {
 const pct = db => Math.max(0, Math.min(100, (db + 60) / 60 * 100));
 setInterval(refresh, 3000);
 refresh();
+
+/* ---------- mail ---------- */
+// Bulletins are whatever came over the air, so nothing from one is ever put in as HTML: every
+// field goes in with textContent, through el() below.
+const PAGE = 25;
+let mailOffset = 0, mail = null, viewing = null;
+const size = n => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} kB`;
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text !== undefined && text !== null) e.textContent = String(text);
+  if (cls) e.className = cls;
+  return e;
+}
+function mailRow(m) {
+  const tr = el("tr", null, "pick" + (viewing === m.id ? " open" : ""));
+  tr.dataset.id = m.id;
+  tr.append(el("td", m.bid, "num"), el("td", m.from), el("td", m.to), el("td", m.at), el("td", m.title),
+    el("td", when(m.date), "num"), el("td", size(m.size), "num"));
+  const st = el("td", m.status, m.waiting ? "warn" : m.verdict === "refused" ? "bad" : "good");
+  if (m.waiting && m.lastAttempt) st.append(el("div", `last try ${when(m.lastAttempt)}`, "muted"));
+  if (m.waiting && m.nextAttempt) st.append(el("div", `next try ${when(m.nextAttempt)}`, "muted"));
+  if (m.detail) st.append(el("div", m.detail, "muted"));
+  st.append(el("div", `${m.waiting ? "in the outbox since" : "answered"} ${when(m.time)}`, "muted"));
+  tr.append(st);
+  return tr;
+}
+async function refreshMail() {
+  try {
+    mail = await (await fetch(`api/mail?offset=${mailOffset}&limit=${PAGE}`)).json();
+  } catch { return; }
+  if (mail.total > 0 && mailOffset >= mail.total) { mailOffset = Math.max(0, mailOffset - PAGE); return refreshMail(); }
+  $("mailNote").textContent = `${mail.waiting} waiting for your BBS, ${mail.archived} kept after the BBS answered `
+    + `(each kept ${mail.archive.days} days, ${mail.archive.maxMegabytes} MB at most). Click one to read it.`;
+  const box = $("mail");
+  if (!mail.items.length) { box.className = "muted"; box.textContent = "No bulletins yet."; $("pager").hidden = true; return; }
+  box.className = "";
+  const table = el("table"), head = el("tr");
+  for (const h of ["BID", "From", "To", "@", "Title", "Date", "Size", "Status"]) head.append(el("th", h));
+  table.append(head, ...mail.items.map(mailRow));
+  box.replaceChildren(table);
+  $("pager").hidden = mail.total <= PAGE;
+  $("mailPage").textContent = `${mailOffset + 1} to ${Math.min(mail.total, mailOffset + PAGE)} of ${mail.total}`;
+  $("newer").disabled = mailOffset === 0;
+  $("older").disabled = mailOffset + PAGE >= mail.total;
+}
+$("newer").addEventListener("click", () => { mailOffset = Math.max(0, mailOffset - PAGE); refreshMail(); });
+$("older").addEventListener("click", () => { mailOffset += PAGE; refreshMail(); });
+$("mail").addEventListener("click", e => {
+  const row = e.target.closest("tr.pick");
+  if (row) view(mail.items.find(m => m.id === row.dataset.id));
+});
+function said(text, cls) { $("resent").replaceChildren(el("span", text, cls)); }
+async function view(m) {
+  if (!m) return;
+  viewing = m.id;
+  $("viewer").hidden = false;
+  $("resent").replaceChildren();
+  const dl = el("dl");
+  for (const [k, v] of [["BID", m.bid], ["From", m.from], ["To", m.to + (m.at ? "@" + m.at : "")], ["Title", m.title],
+    ["Status", m.status + (m.detail ? ": " + m.detail : "")]]) dl.append(el("dt", k), el("dd", v));
+  $("viewHead").replaceChildren(dl);
+  $("resend").hidden = m.waiting;
+  $("raw").href = `api/mail/${encodeURIComponent(m.id)}`;
+  $("viewText").textContent = "Loading...";
+  const answer = await fetch(`api/mail/${encodeURIComponent(m.id)}`);
+  if (!answer.ok) { $("viewText").textContent = "This bulletin is no longer held."; return; }
+  $("viewText").textContent = await answer.text();
+  refreshMail();
+}
+$("closeView").addEventListener("click", () => { viewing = null; $("viewer").hidden = true; refreshMail(); });
+$("resend").addEventListener("click", async () => {
+  if (!viewing) return;
+  const answer = await fetch("api/mail/resend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: viewing }) });
+  const body = await answer.json();
+  if (answer.ok) said("Back in the outbox: it goes to the BBS at the next session.", "good"); else said(body.error, "bad");
+  if (answer.ok) { $("resend").hidden = true; mailOffset = 0; refreshMail(); refresh(); }
+});
+setInterval(refreshMail, 5000);
+refreshMail();
 
 /* ---------- spectrogram ---------- */
 const canvas = $("spectro"), ctx = canvas.getContext("2d");

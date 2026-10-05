@@ -14,8 +14,8 @@ public interface IBbsSession
 /// with a growing wait while the BBS cannot be reached.
 /// </summary>
 /// <remarks>
-/// <para>A bulletin leaves the store's outbox only once the BBS has answered for it for good:
-/// accepted (FS + and a clean close), already had (FS -) or refused. Anything else (FS =, a
+/// <para>A bulletin leaves the store's outbox, for its archive, only once the BBS has answered
+/// for it for good: accepted (FS + and a clean close), already had (FS -) or refused. Anything else (FS =, a
 /// session that broke off, a BBS that cannot be reached) leaves it in the outbox, which is on disk,
 /// so a restart picks it up again. Nothing is lost, and nothing is delivered twice: the BBS's own
 /// BID check answers FS - to a bulletin it already took.</para>
@@ -170,12 +170,15 @@ public sealed class DeliveryService
                     var record = Record(bulletin, outcome);
                     try
                     {
-                        _intake.Acknowledge(bulletin.Bid);
+                        _intake.Acknowledge(bulletin.Bid, Final(record.Verdict), record.Detail);
                     }
                     catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                     {
-                        // It stays in the outbox and is offered again; the BBS answers FS -.
-                        _log($"store: cannot take {Ascii.Clean(bulletin.Bid)} out of the outbox: {Ascii.Clean(e.Message)}");
+                        // It stays in the outbox and is offered again, after the usual wait
+                        // rather than straight away, since a full disk does not clear itself
+                        // in a second; the BBS answers FS -.
+                        _log($"store: cannot move {Ascii.Clean(bulletin.Bid)} from the outbox to the archive: {Ascii.Clean(e.Message)}");
+                        waitingOnBbs = true;
                     }
                     _log($"bbs: {Ascii.Clean(bulletin.Bid)} {Describe(record.Verdict)}{(record.Detail is null ? "" : ": " + Ascii.Clean(record.Detail))}");
                     break;
@@ -246,6 +249,14 @@ public sealed class DeliveryService
         await Task.WhenAny(waits).ConfigureAwait(false);
         await done.CancelAsync().ConfigureAwait(false);
     }
+
+    /// <summary>The archive's name for a final answer.</summary>
+    private static BbsVerdict Final(DeliveryVerdict verdict) => verdict switch
+    {
+        DeliveryVerdict.Accepted => BbsVerdict.Accepted,
+        DeliveryVerdict.AlreadyHad => BbsVerdict.AlreadyHad,
+        _ => BbsVerdict.Refused,
+    };
 
     internal static string Describe(DeliveryVerdict verdict) => verdict switch
     {

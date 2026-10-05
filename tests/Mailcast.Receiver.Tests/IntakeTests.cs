@@ -1,3 +1,4 @@
+using Mailcast.Core;
 using Packet.SoundModem.Waterfall;
 
 namespace Mailcast.Receiver.Tests;
@@ -25,7 +26,7 @@ public class IntakeTests
         await using (var reopened = new Intake(dir.Path, _ => { }))
         {
             Assert.Equal(bulletins.OrderBy(b => b.Bid), reopened.Pending().OrderBy(b => b.Bid));
-            reopened.Acknowledge("2_GB7RDG");
+            reopened.Acknowledge("2_GB7RDG", BbsVerdict.Accepted);
             Assert.Equal(2, reopened.Pending().Count);
         }
     }
