@@ -4,18 +4,18 @@ Status: draft, 2026-10-04. Nothing is built yet.
 
 ## What it is
 
-Once a day, GB7RDG broadcasts its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the broadcast, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the broadcast never needs to know who is listening or what they hold.
+Once a day, GB7RDG sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
 
 Two ideas make a one-way link work:
 
-- **Fountain coding.** Each bulletin is cut into pieces, and the sender can make as many different pieces as it likes. Any set of pieces slightly larger than the bulletin rebuilds it, whichever ones they are. A receiver that misses a third of the broadcast in a fade still gets its bulletins, and pieces heard on different days add together.
-- **Frames that are either perfect or absent.** The broadcast uses pdn-soundmodem's MS110D modes (MIL-STD-188-110D Appendix D), which carry IL2P frames with a CRC. A frame arrives intact or is discarded. That is exactly the kind of loss fountain codes handle best.
+- **Fountain coding.** Each bulletin is cut into pieces, and the sender can make as many different pieces as it likes. Any set of pieces slightly larger than the bulletin rebuilds it, whichever ones they are. A receiver that misses a third of the transmission in a fade still gets its bulletins, and pieces heard on different days add together.
+- **Frames that are either perfect or absent.** The transmission uses pdn-soundmodem's MS110D modes (MIL-STD-188-110D Appendix D), which carry IL2P frames with a CRC. A frame arrives intact or is discarded. That is exactly the kind of loss fountain codes handle best.
 
 ## Decisions so far
 
 | Question | Decision |
 |---|---|
-| What is broadcast | Bulletins only. No personal mail. |
+| What is sent | Bulletins only. No personal mail. |
 | Who sends | GB7RDG, a Flex 6500 on 40 m. |
 | When | Daily, around midday, daytime NVIS. Planned as 12:00 UTC. |
 | Where | Within 7.050 to 7.053 MHz, the band plan's segment for automatically controlled data stations. |
@@ -83,7 +83,7 @@ MS110D's PSK signal peaks at about twice its average power. If 40 W is the Flex'
 
 GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports, on the same slice and the same transmitter. During the slot, none of that traffic may key the radio.
 
-**What exists today:** `POST /api/config` applies a one-run configuration. That configuration could be one without LinBPQ's ports and with only the broadcast modem, and the next restart returns to the file. It works, but it costs two restarts a day. Each restart drops LinBPQ's KISS links (they come back within about 25 seconds) and kills any HF sessions in progress. If the head end died mid-slot, the station would stay in broadcast mode until something restarted it, so it needs a systemd timer on the node as a backstop.
+**What exists today:** `POST /api/config` applies a one-run configuration. That configuration could be one without LinBPQ's ports and with only the bulletin modem, and the next restart returns to the file. It works, but it costs two restarts a day. Each restart drops LinBPQ's KISS links (they come back within about 25 seconds) and kills any HF sessions in progress. If the head end died mid-slot, the station would stay in its bulletin-only configuration until something restarted it, so it needs a systemd timer on the node as a backstop.
 
 **Proposed instead:** a small addition to pdn-soundmodem, a transmit lease.
 
@@ -96,7 +96,7 @@ GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports
 
 - **Source.** A forwarding partner of GB7RDG's BBS that accepts bulletins only and refuses everything else. pdn-bbs already has LinBPQ-compatible FBB B1F forwarding, which is reused here, so this keeps working when GB7RDG moves to packet.net.
 - **Selection.** BPQ's own forwarding rules choose what reaches the partner, so GB7RDG's existing filters apply unchanged. Bulletins over a size cap (32 KB to start) are skipped.
-- **Content.** Each bulletin is broadcast exactly as GB7RDG would forward it to a partner, routing (R:) lines included.
+- **Content.** Each bulletin is sent exactly as GB7RDG would forward it to a partner, routing (R:) lines included.
 - **Radio.** The head end does not embed the modem. It uses the pdn-soundmodem already running the Flex: a new `ms110d-wn4` modem entry on its own KISS port, plus the transmit lease. Two programs cannot share the radio cleanly.
 - **Schedule.** A daily timer. Each bulletin stays in rotation for three days. Its first day gets most of its pieces; later days send fresh pieces, never repeats.
 
@@ -127,7 +127,7 @@ A receiver forgets which objects it has rebuilt after 14 days, and drops a parti
 
 The format is published here in full, because amateur transmissions must not obscure their meaning. Compression and coding are allowed; encryption is not.
 
-The dictionary ships with the receiver. Later it can also be broadcast as an object of its own, so receivers can pick up a retrained dictionary without an upgrade.
+The dictionary ships with the receiver. Later it can also be sent as an object of its own, so receivers can pick up a retrained dictionary without an upgrade.
 
 No RaptorQ implementation exists for .NET, so we write one from RFC 6330 and check it against an existing implementation such as the Rust `raptorq` crate. ZstdSharp.Port, which is pure managed code, covers zstd with dictionaries.
 

@@ -7,8 +7,8 @@ Depends: @DEPENDS@
 Section: hamradio
 Priority: optional
 Homepage: https://github.com/packet-net/pdn-mailcast
-Description: receiver for GB7RDG's daily packet bulletin broadcast
- Listens to GB7RDG's daily bulletin broadcast on 40 m, through a sound card
+Description: receiver for GB7RDG's daily packet bulletin transmission
+ Listens to GB7RDG's daily bulletin transmission on 40 m, through a sound card
  on your radio or the Wessex web SDR, rebuilds each bulletin from the pieces
  it hears, and hands it to your local LinBPQ or FBB mail as a forwarding
  partner would. It never transmits. Self-contained: it bundles its own .NET
