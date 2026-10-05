@@ -1,0 +1,326 @@
+name: release
+
+# The release pipeline, after pdn-soundmodem's and pdn-bbs's: test, then build the two Debian
+# packages (pdn-mailcast-receiver and pdn-mailcast-headend) for amd64, arm64 and armhf and the
+# M0LTE.RaptorQ NuGet package, attach them to a GitHub Release, and tell packet-net/apt.
+#
+# - A `v*` tag builds and publishes.
+# - workflow_dispatch builds everything and leaves it as workflow artifacts, releasing nothing:
+#   a full dry run. Set `publish: true` to also cut the GitHub Release and notify apt.
+# - A pull request that touches the release machinery runs the same build with publish off, so
+#   a change to the packaging proves itself before it merges.
+#
+# Unlike the siblings this runs on GitHub-hosted runners, as ci.yml does, and builds each
+# architecture on a runner of its own where one exists (ubuntu-24.04-arm for arm64). armhf has
+# no hosted runner, so it is published from x64; that is fine here because both programs are
+# plain self-contained .NET (no NativeAOT, which cannot cross-link, and no trimming), and the
+# .NET runtime pack for linux-arm is the same files whatever builds it.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, without the leading v (e.g. 0.2.0 or 0.2.0-rc1)'
+        required: true
+      publish:
+        description: 'Also cut the GitHub Release and notify the apt repo'
+        type: boolean
+        default: false
+      push_nuget:
+        description: 'Also push M0LTE.RaptorQ to nuget.org (needs publish, and NUGET_API_KEY)'
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'scripts/**'
+      - 'packaging/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'src/**/*.csproj'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      publish: ${{ steps.version.outputs.publish }}
+      push_nuget: ${{ steps.version.outputs.push_nuget }}
+    steps:
+      - name: Resolve version
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          INPUT_PUSH_NUGET: ${{ inputs.push_nuget }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN: ${{ github.run_number }}
+        run: |
+          case "$EVENT" in
+            push) version="${GITHUB_REF#refs/tags/v}" ;;
+            workflow_dispatch) version="${INPUT_VERSION#v}" ;;
+            # Never published; a version that says where it came from.
+            pull_request) version="0.0.0-pr${PR}.${RUN}" ;;
+          esac
+          if [ -z "$version" ]; then
+            echo "::error::no version (tag v* or the version input is required)"
+            exit 1
+          fi
+          # Debian is stricter than SemVer: a version must start with a digit.
+          case "$version" in
+            [0-9]*) ;;
+            *) echo "::error::version '$version' must start with a digit"; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          # A hyphen means a SemVer prerelease (0.2.0-rc1); mark the release accordingly.
+          # apt reads releases/latest, which never shows a prerelease, so one stays off apt.
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          if [ "$EVENT" = "push" ] || { [ "$EVENT" = "workflow_dispatch" ] && [ "$INPUT_PUBLISH" = "true" ]; }; then
+            publish=true
+          else
+            publish=false
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          if [ "$publish" = "true" ] && [ "$INPUT_PUSH_NUGET" = "true" ]; then
+            echo "push_nuget=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push_nuget=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version $version, publish $publish"
+
+  # The whole suite, the docker LinBPQ tests included (the hosted runner has docker). Nothing is
+  # built for release unless this passes.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pull LinBPQ
+        timeout-minutes: 5
+        run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
+      - name: Build (Release)
+        run: dotnet build -c Release
+      - name: Test
+        # A normal run is a few minutes; a hang must not hold the release for hours.
+        timeout-minutes: 20
+        run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+
+  deb:
+    needs: [version, test]
+    name: deb ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    # A stalled mirror once held ci.yml's install step for half an hour; fail it instead.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, arch: amd64, runner: ubuntu-24.04, install_test: true }
+          - { rid: linux-arm64, arch: arm64, runner: ubuntu-24.04-arm, install_test: true }
+          # No hosted armhf runner (and the arm64 hosts cannot run 32-bit code), so this is
+          # published from x64 and checked by its contents only.
+          - { rid: linux-arm, arch: armhf, runner: ubuntu-24.04, install_test: false }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Preflight
+        run: |
+          command -v dpkg-deb >/dev/null || { echo "::error::dpkg-deb is missing: this job needs a Debian-family runner"; exit 1; }
+          command -v readelf >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq binutils; }
+
+      - name: Build the receiver .deb
+        run: scripts/build-receiver-deb.sh ${{ matrix.rid }} "$VERSION"
+
+      - name: Build the head end .deb
+        run: scripts/build-headend-deb.sh ${{ matrix.rid }} "$VERSION"
+
+      - name: Verify .deb contents
+        run: |
+          set -euo pipefail
+          for pkg in pdn-mailcast-receiver pdn-mailcast-headend; do
+            deb="artifacts/${pkg}_${VERSION}_${ARCH}.deb"
+            echo "::group::$(basename "$deb")"
+            test -f "$deb" || { echo "::error::$deb was not built"; exit 1; }
+            dpkg-deb --info "$deb"
+            # Capture the listing once and match it in memory: piping dpkg-deb into grep -q
+            # gives dpkg-deb a SIGPIPE, which pipefail turns into a failure.
+            listing="$(dpkg-deb --contents "$deb")"
+            case "$pkg" in
+              pdn-mailcast-receiver) lib=usr/lib/pdn-mailcast share=usr/share/pdn-mailcast example=receiver.example.json ;;
+              pdn-mailcast-headend)  lib=usr/lib/pdn-mailcast-headend share=usr/share/pdn-mailcast-headend example=headend.example.json ;;
+            esac
+            grep -q "$lib/$pkg\$" <<<"$listing"
+            grep -q "usr/bin/$pkg ->" <<<"$listing"
+            grep -q "lib/systemd/system/$pkg\.service\$" <<<"$listing"
+            # postinst seeds the config from this path; if it moves, install breaks.
+            grep -q "$share/$example\$" <<<"$listing"
+            [ "$(dpkg-deb -f "$deb" Package)" = "$pkg" ]
+            [ "$(dpkg-deb -f "$deb" Version)" = "$VERSION" ]
+            [ "$(dpkg-deb -f "$deb" Architecture)" = "$ARCH" ]
+            # The build scripts read the libc6 floor out of the binaries; an unversioned libc6
+            # here means that came unstuck.
+            dpkg-deb -f "$deb" Depends | grep -qE 'libc6 \(>= [0-9]+\.[0-9]+\)'
+            echo "::endgroup::"
+          done
+
+      - name: Install both in a clean Debian and run them
+        if: matrix.install_test
+        timeout-minutes: 10
+        run: |
+          docker run --rm -e VERSION -v "$PWD/artifacts:/a:ro" debian:bookworm sh -ec '
+            apt-get update -qq
+            apt-get install -y -qq /a/pdn-mailcast-receiver_*.deb /a/pdn-mailcast-headend_*.deb
+            test -f /etc/pdn-mailcast/receiver.json
+            test -f /etc/pdn-mailcast-headend/headend.json
+            for p in pdn-mailcast-receiver pdn-mailcast-headend; do
+              out="$($p --version)"
+              echo "$out"
+              case "$out" in
+                "$p $VERSION"|"$p $VERSION+"*) ;;
+                *) echo "$p reports \"$out\", expected version $VERSION" >&2; exit 1 ;;
+              esac
+            done'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdn-mailcast-deb-${{ matrix.arch }}
+          path: artifacts/pdn-mailcast-*_${{ needs.version.outputs.version }}_${{ matrix.arch }}.deb
+          if-no-files-found: error
+
+  nupkg:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pack M0LTE.RaptorQ
+        run: dotnet pack src/Mailcast.RaptorQ/Mailcast.RaptorQ.csproj -c Release -o artifacts -p:Version=${{ needs.version.outputs.version }}
+      - name: Check the package
+        run: test -f "artifacts/M0LTE.RaptorQ.${{ needs.version.outputs.version }}.nupkg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdn-mailcast-nupkg
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+  release:
+    needs: [version, deb, nupkg]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      APT_DISPATCH_TOKEN: ${{ secrets.APT_DISPATCH_TOKEN }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the release notes are written from first-parent history between tags
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pdn-mailcast-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: ./artifacts
+        run: |
+          set -euo pipefail
+          ls -l
+          [ "$(find . -maxdepth 1 -name '*.deb' | wc -l)" = 6 ] || { echo "::error::expected six .debs"; exit 1; }
+          sha256sum ./*.deb ./*.nupkg | sed 's# \./# #' > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release-notes.py "$TAG" > "$RUNNER_TEMP/relnotes.md"
+          cat "$RUNNER_TEMP/relnotes.md"
+          prerelease=""
+          if [ "$PRERELEASE" = "true" ]; then prerelease="--prerelease"; fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG exists: replacing its assets and notes"
+            gh release upload "$TAG" ./artifacts/*.deb ./artifacts/*.nupkg ./artifacts/SHA256SUMS --clobber
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/relnotes.md"
+          else
+            gh release create "$TAG" \
+              ./artifacts/*.deb ./artifacts/*.nupkg ./artifacts/SHA256SUMS \
+              --target "$GITHUB_SHA" \
+              --title "pdn-mailcast $VERSION" \
+              --notes-file "$RUNNER_TEMP/relnotes.md" \
+              $prerelease
+          fi
+
+      - name: Tell the apt repo to rebuild
+        # Last, and only after the GitHub Release exists: packet-net/apt indexes whatever is on
+        # releases/latest when it runs, so dispatching earlier would re-index the previous one.
+        # The same dispatch as pdn-soundmodem and pdn-bbs, but a warning rather than a failure
+        # when the token is not visible here: this repo is new, and the org secret has to be
+        # granted to it (and the repo added to packet-net/apt's sources.txt) before apt can
+        # carry it. Until then apt's daily rebuild would not pick it up either.
+        if: env.APT_DISPATCH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.APT_DISPATCH_TOKEN }}
+        run: |
+          # gh api --input - with a JSON body, not -f client_payload[...]=...: gh's -f does not
+          # do curl-style bracket nesting, so the nested object has to arrive as JSON.
+          payload=$(printf '{"event_type":"release-published","client_payload":{"repo":"%s","tag":"%s"}}' \
+            "$GITHUB_REPOSITORY" "$TAG")
+          printf '%s' "$payload" | gh api -X POST repos/packet-net/apt/dispatches --input -
+
+      - name: Warn if APT_DISPATCH_TOKEN missing
+        if: env.APT_DISPATCH_TOKEN == ''
+        run: echo "::warning::APT_DISPATCH_TOKEN is not visible to this repo, so packet-net/apt was not told about $TAG (the GitHub Release still has the .debs). Grant the org secret to pdn-mailcast and add it to packet-net/apt's sources.txt."
+
+      # Off unless a dispatch asks for it (push_nuget: true), and never on a tag push: whether
+      # M0LTE.RaptorQ goes to nuget.org is still to be decided, so for now the package is only
+      # attached to the release. Once it should ship, dispatch with push_nuget, or make this
+      # step's condition the publish flag alone.
+      - name: Push M0LTE.RaptorQ to nuget.org
+        if: needs.version.outputs.push_nuget == 'true' && env.NUGET_API_KEY != ''
+        run: |
+          dotnet nuget push "./artifacts/M0LTE.RaptorQ.${VERSION}.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${NUGET_API_KEY}" \
+            --skip-duplicate
+
+      - name: Warn if NUGET_API_KEY missing
+        if: needs.version.outputs.push_nuget == 'true' && env.NUGET_API_KEY == ''
+        run: echo "::warning::NUGET_API_KEY is not visible to this repo, so the NuGet push was skipped (the GitHub Release still has the .nupkg)."
