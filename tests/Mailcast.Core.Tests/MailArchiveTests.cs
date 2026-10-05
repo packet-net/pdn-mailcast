@@ -41,7 +41,7 @@ public class MailArchiveTests
         Assert.Empty(Directory.EnumerateFiles(Path.Combine(dir.Path, "outbox")));
         foreach (var reader in new[] { store, new ReceiverStore(dir.Path, Compression.Default, options) })
         {
-            var mail = reader.Mail();
+            var mail = reader.Mail.NewestFirst;
             Assert.Equal([refused.Bid, alreadyHad.Bid, accepted.Bid], mail.Select(m => m.Bid)); // newest answer first
             Assert.All(mail, m => Assert.False(m.Waiting));
             Assert.Equal([BbsVerdict.Refused, BbsVerdict.AlreadyHad, BbsVerdict.Accepted], mail.Select(m => m.Verdict!.Value));
@@ -75,14 +75,17 @@ public class MailArchiveTests
 
         time.Now = Start + TimeSpan.FromDays(30);
         store.Expire();
-        Assert.Equal(3, store.Mail().Count(m => !m.Waiting)); // day 0 is exactly 30 days old: still kept
+        Assert.Equal(3, store.Mail.NewestFirst.Count(m => !m.Waiting)); // day 0 is exactly 30 days old: still kept
 
         time.Now = Start + TimeSpan.FromDays(35);
-        Assert.Equal([TestBulletins.Make(13, 1000).Bid, TestBulletins.Make(12, 1000).Bid], store.Mail().Where(m => !m.Waiting).Select(m => m.Bid));
+        Assert.Equal(3, store.Mail.Archived); // listing never prunes
+        store.Expire();
+        Assert.Equal([TestBulletins.Make(13, 1000).Bid, TestBulletins.Make(12, 1000).Bid], store.Mail.NewestFirst.Where(m => !m.Waiting).Select(m => m.Bid));
         Assert.Equal(2, Directory.EnumerateFiles(ArchiveFolder(dir)).Count());
 
         time.Now = Start + TimeSpan.FromDays(400);
-        Assert.Equal([waiting.Bid], store.Mail().Select(m => m.Bid));
+        store.Expire();
+        Assert.Equal([waiting.Bid], store.Mail.NewestFirst.Select(m => m.Bid));
         Assert.Equal([waiting], store.Pending());
         Assert.Empty(Directory.EnumerateFiles(ArchiveFolder(dir)));
     }
@@ -104,14 +107,14 @@ public class MailArchiveTests
             time.Now += TimeSpan.FromMinutes(1);
         }
 
-        var archived = store.Mail().Where(m => !m.Waiting).Select(m => m.Bid).ToList();
+        var archived = store.Mail.NewestFirst.Where(m => !m.Waiting).Select(m => m.Bid).ToList();
         Assert.Equal([bulletins[4].Bid, bulletins[3].Bid], archived);
         Assert.True(Directory.EnumerateFiles(ArchiveFolder(dir)).Sum(f => new FileInfo(f).Length) <= 2 * fileSize);
         Assert.Equal([waiting], store.Pending());
 
         // The cap holds across a restart with a smaller one.
         var smaller = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, ArchiveMaxBytes = fileSize });
-        Assert.Equal([bulletins[4].Bid], smaller.Mail().Where(m => !m.Waiting).Select(m => m.Bid));
+        Assert.Equal([bulletins[4].Bid], smaller.Mail.NewestFirst.Where(m => !m.Waiting).Select(m => m.Bid));
     }
 
     [Fact]
@@ -129,15 +132,23 @@ public class MailArchiveTests
         Assert.Equal(ResendOutcome.Resent, outcome);
         Assert.Equal(bulletin, resent);
         Assert.Equal([bulletin], store.Pending());
-        Assert.True(Assert.Single(store.Mail()).Waiting);
-        Assert.Empty(Directory.EnumerateFiles(ArchiveFolder(dir)));
+        Assert.True(Assert.Single(store.Mail.NewestFirst).Waiting); // listed once, as waiting
+        Assert.Single(Directory.EnumerateFiles(ArchiveFolder(dir))); // the archive keeps its copy meanwhile
         Assert.Equal(ResendOutcome.AlreadyWaiting, store.Resend(id).Outcome);
 
+        // The BBS still has it: it stays down as accepted, which says more.
         time.Now += TimeSpan.FromHours(1);
         store.Acknowledge(bulletin.Bid, BbsVerdict.AlreadyHad);
-        var entry = Assert.Single(store.Mail());
-        Assert.Equal(BbsVerdict.AlreadyHad, entry.Verdict);
+        var entry = Assert.Single(store.Mail.NewestFirst);
+        Assert.Equal(BbsVerdict.Accepted, entry.Verdict);
+        Assert.Equal("offered again; the BBS already had it", entry.Detail);
         Assert.Equal(time.Now, entry.Time);
+
+        // Refused after that is recorded as it is.
+        Assert.Equal(ResendOutcome.Resent, store.Resend(id).Outcome);
+        store.Acknowledge(bulletin.Bid, BbsVerdict.Refused, "FS R");
+        Assert.Equal(BbsVerdict.Refused, Assert.Single(store.Mail.NewestFirst).Verdict);
+        Assert.Equal(BbsVerdict.Refused, Assert.Single(new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast).Mail.NewestFirst).Verdict);
     }
 
     [Fact]
@@ -173,7 +184,7 @@ public class MailArchiveTests
 
         var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
 
-        Assert.True(Assert.Single(reopened.Mail()).Waiting);
+        Assert.True(Assert.Single(reopened.Mail.NewestFirst).Waiting);
         Assert.Equal([bulletin], reopened.Pending());
     }
 
@@ -192,7 +203,7 @@ public class MailArchiveTests
         var log = new List<string>();
         var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
 
-        Assert.Equal([bulletin.Bid], reopened.Mail().Select(m => m.Bid));
+        Assert.Equal([bulletin.Bid], reopened.Mail.NewestFirst.Select(m => m.Bid));
         Assert.True(File.Exists(Path.Combine(dir.Path, "quarantine", "0000000000000001.mail")));
         Assert.True(File.Exists(Path.Combine(dir.Path, "quarantine", "0000000000000002.mail")));
         Assert.True(File.Exists(Path.Combine(ArchiveFolder(dir), "notes.txt")));
@@ -214,7 +225,7 @@ public class MailArchiveTests
 
         Assert.Null(store.ReadMail(id));
         Assert.Equal(ResendOutcome.NotFound, store.Resend(id).Outcome);
-        Assert.Empty(store.Mail());
+        Assert.Empty(store.Mail.NewestFirst);
         Assert.True(File.Exists(Path.Combine(dir.Path, "quarantine", ObjectId.Format(id) + ".mail")));
         Assert.Single(log, l => l.Contains("quarantined", StringComparison.Ordinal));
     }
@@ -229,7 +240,112 @@ public class MailArchiveTests
 
         store.Acknowledge(bulletin.Bid, BbsVerdict.Accepted);
 
-        Assert.Empty(store.Mail());
+        Assert.Empty(store.Mail.NewestFirst);
         Assert.False(Directory.Exists(ArchiveFolder(dir)));
+    }
+
+    [Theory]
+    [InlineData(BbsVerdict.Accepted)]
+    [InlineData(BbsVerdict.AlreadyHad)]
+    public void ArchiveThatCannotBeWritten_ForMailTheBbsHas_StillEmptiesTheOutbox(BbsVerdict verdict)
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
+        var bulletin = TestBulletins.Make(70, 1500);
+        Rebuild(store, bulletin);
+        File.WriteAllText(ArchiveFolder(dir), "a file where the archive folder should be"); // as good as a full disk
+
+        store.Acknowledge(bulletin.Bid, verdict);
+
+        Assert.Empty(store.Pending());
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(dir.Path, "outbox")));
+        Assert.Empty(store.Mail.NewestFirst);
+        Assert.Single(log, l => l.Contains("cannot keep a copy of " + bulletin.Bid, StringComparison.Ordinal));
+        Assert.Empty(new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast).Pending());
+    }
+
+    [Fact]
+    public void ArchiveThatCannotBeWritten_ForRefusedMail_LeavesItInTheOutbox()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
+        var bulletin = TestBulletins.Make(71, 1500);
+        Rebuild(store, bulletin);
+        File.WriteAllText(ArchiveFolder(dir), "a file where the archive folder should be");
+
+        Assert.ThrowsAny<IOException>(() => store.Acknowledge(bulletin.Bid, BbsVerdict.Refused));
+
+        Assert.Equal([bulletin], store.Pending()); // the BBS does not have it, so this is its only copy
+        Assert.True(Assert.Single(store.Mail.NewestFirst).Waiting);
+    }
+
+    [Fact]
+    public void StartUp_ReadsOnlyTheHeaders_AndABadBodyIsFoundWhenRead()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        var time = new ManualTime(Start);
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var good = TestBulletins.Make(80, 20000);
+        var spoiled = TestBulletins.Make(81, 1500);
+        ulong goodId = Rebuild(store, good);
+        ulong spoiledId = Rebuild(store, spoiled);
+        store.Acknowledge(good.Bid, BbsVerdict.Accepted, "fine");
+        store.Acknowledge(spoiled.Bid, BbsVerdict.Refused);
+        var before = store.Mail.NewestFirst.ToDictionary(m => m.ObjectId);
+        // One that only a whole read finds wrong: a sender with a space in it, which the header
+        // lines carry well enough but no bulletin may have.
+        string spoiledFile = Path.Combine(ArchiveFolder(dir), ObjectId.Format(spoiledId) + ".mail");
+        string text = File.ReadAllText(spoiledFile, System.Text.Encoding.Latin1);
+        File.WriteAllText(spoiledFile, text.Replace("From: G4ABC\n", "From: G4 ABC\n", StringComparison.Ordinal), System.Text.Encoding.Latin1);
+        // One whose bulletin header never ends within what start-up reads.
+        string endless = Path.Combine(ArchiveFolder(dir), "00000000000000ee.mail");
+        File.WriteAllText(endless, "Mailcast-Archive: 1\nAnswered: 2026-10-04T12:00:00Z\nVerdict: accepted\n\nTitle: " + new string('x', MailArchive.MaxHeaderBytes) + "\n\n");
+
+        var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, Log = log.Add });
+
+        var after = reopened.Mail.NewestFirst.ToDictionary(m => m.ObjectId);
+        Assert.Equal([goodId, spoiledId], after.Keys.Order());
+        Assert.Equal(before[goodId], after[goodId]); // the same entry, size and all, from its headers alone
+        Assert.Equal(before[spoiledId] with { From = "G4 ABC", Size = before[spoiledId].Size + 1 }, after[spoiledId]);
+        Assert.Single(log, l => l.Contains("00000000000000ee.mail unreadable, quarantined", StringComparison.Ordinal));
+
+        Assert.Equal(good.Serialize(), reopened.ReadMail(goodId)!.Value.Serialized);
+        Assert.Null(reopened.ReadMail(spoiledId)); // read whole only now, and quarantined
+        Assert.Equal([goodId], reopened.Mail.NewestFirst.Select(m => m.ObjectId));
+        Assert.True(File.Exists(Path.Combine(dir.Path, "quarantine", ObjectId.Format(spoiledId) + ".mail")));
+    }
+
+    [Fact]
+    public void Snapshot_PagesNewestFirst_WithoutCopying()
+    {
+        using var dir = new TempDirectory();
+        var time = new ManualTime(Start);
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var bids = new List<string>();
+        for (int i = 0; i < 6; i++)
+        {
+            var b = TestBulletins.Make(90 + i, 800);
+            Rebuild(store, b);
+            if (i % 2 == 0)
+            {
+                store.Acknowledge(b.Bid, BbsVerdict.Accepted);
+            }
+            bids.Insert(0, b.Bid);
+            time.Now += TimeSpan.FromMinutes(1);
+        }
+
+        var mail = store.Mail;
+        Assert.Equal(bids, mail.NewestFirst.Select(m => m.Bid));
+        Assert.Equal((6, 3, 3), (mail.Count, mail.Waiting, mail.Archived));
+        Assert.Equal(bids[2..4], mail.Page(2, 2).Select(m => m.Bid));
+        Assert.Empty(mail.Page(10, 5));
+        Assert.Equal([bids[5]], mail.Page(5, 50).Select(m => m.Bid));
+
+        // A snapshot taken earlier stays as it was.
+        store.Acknowledge(bids[0], BbsVerdict.Accepted);
+        Assert.Equal(3, mail.Waiting);
+        Assert.Equal(2, store.Mail.Waiting);
     }
 }

@@ -96,7 +96,7 @@ public class MailTests
 
         Assert.NotNull(await service.DeliverPendingAsync(CancellationToken.None)); // 4 is to be offered later
 
-        var mail = intake.Mail().ToDictionary(m => m.Bid);
+        var mail = intake.Mail().NewestFirst.ToDictionary(m => m.Bid);
         Assert.Equal(BbsVerdict.Accepted, mail["1_GB7RDG"].Verdict);
         Assert.Equal(BbsVerdict.AlreadyHad, mail["2_GB7RDG"].Verdict);
         Assert.Equal(BbsVerdict.Refused, mail["3_GB7RDG"].Verdict);
@@ -152,11 +152,19 @@ public class MailTests
         Assert.Equal("accepted", again.GetProperty("verdict").GetString());
         Assert.Equal(Start + TimeSpan.FromDays(2), again.GetProperty("time").GetDateTimeOffset());
 
-        // Sent again while the BBS still has it, the BBS says so by its BID.
+        // Not again straight away: each one is a session with the BBS.
+        var tooSoon = await http.SendAsync(Resend(id));
+        Assert.Equal(HttpStatusCode.TooManyRequests, tooSoon.StatusCode);
+        Assert.Contains("Try again in 120 s", await tooSoon.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        time.Advance(StatusPage.ResendCooldown);
+
+        // Sent again while the BBS still has it, the BBS says so by its BID, and it stays down as accepted.
         Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Resend(id))).StatusCode);
         Assert.Null(await host.Delivery.DeliverPendingAsync(CancellationToken.None));
         Assert.Equal(2, bbs.Taken.Count);
-        Assert.Equal("alreadyHad", Assert.Single(await MailAsync(http)).GetProperty("verdict").GetString());
+        var kept = Assert.Single(await MailAsync(http));
+        Assert.Equal("accepted", kept.GetProperty("verdict").GetString());
+        Assert.Equal("offered again; the BBS already had it", kept.GetProperty("detail").GetString());
     }
 
     [Fact]
@@ -213,7 +221,7 @@ public class MailTests
             Assert.DoesNotContain(sink, mail, StringComparison.Ordinal);
         }
         Assert.Contains("e.textContent = String(text)", mail, StringComparison.Ordinal);
-        Assert.Contains("$(\"viewText\").textContent = await answer.text()", mail, StringComparison.Ordinal);
+        Assert.Contains("$(\"viewText\").textContent = r.text", mail, StringComparison.Ordinal);
     }
 
     private static string PageSource()
@@ -267,7 +275,7 @@ public class MailTests
         var bulletin = Samples.Bulletin(9);
         await RebuildAsync(host.Intake, bulletin);
         host.Intake.Acknowledge(bulletin.Bid, BbsVerdict.Accepted);
-        string id = ObjectId.Format(Assert.Single(host.Intake.Mail()).ObjectId);
+        string id = ObjectId.Format(Assert.Single(host.Intake.Mail().NewestFirst).ObjectId);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync("api/mail")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync($"api/mail/{id}")).StatusCode);
@@ -340,7 +348,7 @@ public class MailTests
 
         var log = new List<string>();
         await using var host = new ReceiverHost(config with { StateDirectory = dir.Path }, time, log.Add);
-        var waiting = Assert.Single(host.Intake.Mail());
+        var waiting = Assert.Single(host.Intake.Mail().NewestFirst);
         Assert.True(waiting.Waiting);
         Assert.Equal(bulletin, Assert.Single(host.Intake.Pending()));
 
@@ -348,7 +356,7 @@ public class MailTests
 
         Assert.Empty(host.Intake.Pending());
         Assert.Single(Directory.EnumerateFiles(Path.Combine(store, "archive"), "*.mail"));
-        Assert.Equal(BbsVerdict.Accepted, Assert.Single(host.Intake.Mail()).Verdict);
+        Assert.Equal(BbsVerdict.Accepted, Assert.Single(host.Intake.Mail().NewestFirst).Verdict);
         Assert.DoesNotContain(log, l => l.Contains("quarantined", StringComparison.Ordinal));
     }
 
@@ -369,8 +377,62 @@ public class MailTests
         var log = new List<string>();
         await using var host = new ReceiverHost(Config(dir.Path, 1, 8011), time, log.Add);
 
-        Assert.Equal([good.Bid], host.Intake.Mail().Select(m => m.Bid));
+        Assert.Equal([good.Bid], host.Intake.Mail().NewestFirst.Select(m => m.Bid));
         Assert.True(File.Exists(Path.Combine(dir.Path, "store", "quarantine", "00000000000000ff.mail")));
         Assert.Contains(log, l => l.StartsWith("store: archive file 00000000000000ff.mail unreadable, quarantined", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StatusAndMailRequests_ReadNoFiles()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(21), Samples.Bulletin(22), Samples.Bulletin(23));
+        host.Intake.Acknowledge("21_GB7RDG", BbsVerdict.Accepted);
+        host.Intake.Acknowledge("22_GB7RDG", BbsVerdict.Refused, "FS R");
+        long before = host.Intake.StoreDiskReads;
+
+        for (int i = 0; i < 5; i++)
+        {
+            _ = JsonSerializer.Serialize(page.Status(), ReceiverConfig.JsonLine);
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("api/status")).StatusCode);
+            var list = await http.GetFromJsonAsync<JsonElement>("api/mail?offset=1&limit=1");
+            Assert.Equal(3, list.GetProperty("total").GetInt32());
+            Assert.Equal(1, list.GetProperty("waiting").GetInt32());
+            Assert.Equal(1, (await http.GetFromJsonAsync<JsonElement>("api/status")).GetProperty("bbs").GetProperty("waiting").GetInt32());
+            Assert.Single(host.Intake.Pending());
+        }
+
+        Assert.Equal(before, host.Intake.StoreDiskReads);
+    }
+
+    [Fact]
+    public async Task ArchiveFileThatCannotBeRead_IsAnErrorOnThePage_NotAHangUp()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(24));
+        host.Intake.Acknowledge("24_GB7RDG", BbsVerdict.Accepted);
+        string id = ObjectId.Format(Assert.Single(host.Intake.Mail().NewestFirst).ObjectId);
+        string file = Path.Combine(dir.Path, "store", "archive", id + ".mail");
+        File.Delete(file);
+        Directory.CreateDirectory(file); // reading it now fails as a file system error, not as bad content
+
+        var raw = await http.GetAsync($"api/mail/{id}");
+        var resend = await http.SendAsync(Resend(id));
+
+        Assert.Equal(HttpStatusCode.InternalServerError, raw.StatusCode);
+        Assert.Contains("Cannot read that bulletin", await raw.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.InternalServerError, resend.StatusCode);
+        Assert.Contains("Cannot put it back", (await resend.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, (await http.GetAsync("api/mail")).StatusCode);
     }
 }

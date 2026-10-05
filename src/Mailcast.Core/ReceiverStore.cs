@@ -148,14 +148,20 @@ public sealed record ReceiverStoreOptions
 /// <para>
 /// <see cref="Acknowledge"/> moves a bulletin from the outbox to the archive with the BBS's
 /// answer: the archive copy is on disk, folder included, before the outbox file is deleted.
-/// <see cref="Resend"/> moves one back the same way. A crash between the two steps leaves the
-/// bulletin in both; it is then waiting, and offered again, which the BBS answers by its BID.
+/// <see cref="Resend"/> copies one back to the outbox, the archive keeping its copy until the
+/// BBS answers again. A bulletin in both, after a resend or a crash between the two steps of an
+/// acknowledgement, is waiting, and offered again, which the BBS answers by its BID.
+/// </para>
+/// <para>
+/// The outbox and the archive's index are held in memory, read from disk only when the store
+/// is opened, so <see cref="Pending"/> and <see cref="Mail"/> read no files.
 /// </para>
 /// <para>
 /// Done markers, partial objects and archived bulletins expire (<see cref="ReceiverStoreOptions"/>),
 /// so the store does not grow without bound. Expiry never touches the outbox.
 /// </para>
-/// <para>Not thread-safe: use one store from one thread.</para>
+/// <para>Not thread-safe: use one store from one thread, except <see cref="Mail"/> and
+/// <see cref="ReadMail(ulong, out bool)"/>, which any thread may call.</para>
 /// </remarks>
 public sealed class ReceiverStore
 {
@@ -167,6 +173,9 @@ public sealed class ReceiverStore
     private readonly string _outbox;
     private readonly string _quarantine;
     private readonly MailArchive _archive;
+    private readonly Dictionary<string, OutboxItem> _outboxItems = new(StringComparer.Ordinal);
+    private volatile MailSnapshot _mail = MailSnapshot.Empty;
+    private long _diskReads;
     private readonly Compression _compression;
     private readonly ReceiverStoreOptions _options;
     private readonly Dictionary<string, Instance> _instances = [];
@@ -225,7 +234,9 @@ public sealed class ReceiverStore
                 File.Delete(scheduleFile);
             }
         }
-        _archive = new MailArchive(Path.Combine(root, "archive"), _quarantine, _options.ArchiveRetention, _options.ArchiveMaxBytes, _options.Time, _options.FlushToDisk, Log);
+        LoadOutbox();
+        _archive = new MailArchive(Path.Combine(root, "archive"), _quarantine, _options.ArchiveRetention, _options.ArchiveMaxBytes, _options.Time, _options.FlushToDisk, Log, CountRead);
+        Publish();
         var directoryFile = Path.Combine(root, "directory.txt");
         if (File.Exists(directoryFile))
         {
@@ -334,106 +345,147 @@ public sealed class ReceiverStore
     }
 
     /// <summary>
-    /// Rebuilt bulletins not yet acknowledged, oldest file first. An outbox file that cannot be
-    /// read is moved to the quarantine folder and logged.
+    /// Rebuilt bulletins not yet acknowledged, oldest first. Held in memory: the outbox folder is
+    /// read once, when the store is opened, and an unreadable file in it is quarantined then.
     /// </summary>
-    public IReadOnlyList<Bulletin> Pending() => [.. ReadOutbox().Select(o => o.Bulletin)];
+    public IReadOnlyList<Bulletin> Pending() =>
+        [.. _outboxItems.Values.OrderBy(o => o.Written).ThenBy(o => o.Name, StringComparer.Ordinal).Select(o => o.Bulletin)];
+
+    /// <summary>
+    /// The bulletins held, waiting or archived, newest first, as of the last change. Safe to read
+    /// from any thread: it is replaced, never changed, and reading it touches no files.
+    /// </summary>
+    public MailSnapshot Mail => _mail;
+
+    /// <summary>How many times the store has read the disk for the outbox or the archive (for tests).</summary>
+    public long DiskReads => Interlocked.Read(ref _diskReads);
 
     /// <summary>
     /// Takes a bulletin out of the outbox once the BBS has answered for it for good, and keeps it
     /// in the archive with that answer (unless the archive is turned off). Every outbox file with
-    /// this BID goes. Its object stays marked as rebuilt. Throws if a file cannot be written or
-    /// removed; the bulletin then stays in the outbox.
+    /// this BID goes. Its object stays marked as rebuilt.
     /// </summary>
+    /// <remarks>
+    /// The archive copy is a convenience: if it cannot be written for a bulletin the BBS has
+    /// (accepted or already had), that is logged and the bulletin leaves the outbox anyway, or a
+    /// full disk would have it offered again for ever. A refused one, which the BBS does not have,
+    /// stays in the outbox instead, and this throws; so it does if an outbox file cannot be removed.
+    /// </remarks>
     public void Acknowledge(string bid, BbsVerdict verdict, string? detail = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(bid);
-        foreach (var held in ReadOutbox())
+        try
         {
-            if (!string.Equals(held.Bulletin.Bid, bid, StringComparison.OrdinalIgnoreCase))
+            foreach (var held in _outboxItems.Values.Where(o => string.Equals(o.Bulletin.Bid, bid, StringComparison.OrdinalIgnoreCase)).ToList())
             {
-                continue;
-            }
-            if (held.ObjectId is ulong id)
-            {
-                _archive.Add(id, held.Serialized, held.Bulletin, verdict, detail); // on disk before the outbox file goes
-            }
-            File.Delete(held.File);
-        }
-    }
-
-    /// <summary>
-    /// Every bulletin held, newest first: those waiting in the outbox (by when they went in) and
-    /// those in the archive (by when the BBS answered). One in both, after a crash between the
-    /// steps of a move, is listed once, as waiting. Prunes the archive first.
-    /// </summary>
-    public IReadOnlyList<MailEntry> Mail()
-    {
-        _archive.Prune();
-        var result = new List<MailEntry>();
-        var waiting = new HashSet<ulong>();
-        foreach (var held in ReadOutbox())
-        {
-            if (held.ObjectId is ulong id)
-            {
-                waiting.Add(id);
-                result.Add(MailEntry.Of(id, held.Bulletin, held.Serialized.Length, held.Written, null, null));
+                if (held.ObjectId is ulong id)
+                {
+                    try
+                    {
+                        _archive.Add(id, held.Serialized, held.Bulletin, verdict, detail); // on disk before the outbox file goes
+                    }
+                    catch (Exception e) when ((e is IOException or UnauthorizedAccessException) && verdict != BbsVerdict.Refused)
+                    {
+                        Log($"archive: cannot keep a copy of {bid}: {e.Message}; the BBS has it, so it leaves the outbox all the same");
+                    }
+                }
+                File.Delete(Path.Combine(_outbox, held.Name));
+                _outboxItems.Remove(held.Name);
             }
         }
-        result.AddRange(_archive.Entries.Where(e => !waiting.Contains(e.ObjectId)));
-        return [.. result.OrderByDescending(e => e.Time).ThenBy(e => e.ObjectId)];
+        finally
+        {
+            Publish();
+        }
     }
 
     /// <summary>
     /// One bulletin as stored, from the outbox if it is waiting or else from the archive, with its
-    /// entry; null if neither has it.
+    /// entry; null if neither has it. Safe from any thread: it reads <see cref="Mail"/> and, for an
+    /// archived one, its file. <paramref name="unreadable"/> says the archive file would not read;
+    /// pass the ID to <see cref="ForgetUnreadable"/> (on the store's own thread) to quarantine it.
     /// </summary>
+    public (MailEntry Entry, byte[] Serialized)? ReadMail(ulong objectId, out bool unreadable)
+    {
+        unreadable = false;
+        var mail = _mail;
+        if (mail.WaitingBytes(objectId) is { } waiting)
+        {
+            return (mail.NewestFirst.First(e => e.ObjectId == objectId), waiting);
+        }
+        try
+        {
+            CountRead();
+            return MailArchive.ReadFile(objectId, _archive.PathOf(objectId));
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+        catch (FormatException)
+        {
+            unreadable = true;
+            return null;
+        }
+    }
+
+    /// <summary>One bulletin as stored, as <see cref="ReadMail(ulong, out bool)"/>, quarantining an archive file that does not read.</summary>
     public (MailEntry Entry, byte[] Serialized)? ReadMail(ulong objectId)
     {
-        string file = OutboxPath(objectId);
-        if (File.Exists(file))
+        var held = ReadMail(objectId, out bool unreadable);
+        if (unreadable)
         {
-            try
-            {
-                var bytes = File.ReadAllBytes(file);
-                var bulletin = Bulletin.Parse(bytes);
-                var written = new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero);
-                return (MailEntry.Of(objectId, bulletin, bytes.Length, written, null, null), bytes);
-            }
-            catch (FileNotFoundException)
-            {
-                // delivered a moment ago: look in the archive
-            }
-            catch (FormatException)
-            {
-                _ = Pending(); // quarantines it
-                return null;
-            }
+            ForgetUnreadable(objectId);
         }
-        return _archive.Read(objectId);
+        return held;
+    }
+
+    /// <summary>Forgets an archived bulletin whose file would not read, and quarantines the file.</summary>
+    public void ForgetUnreadable(ulong objectId)
+    {
+        if (_archive.Contains(objectId))
+        {
+            _archive.Unreadable(objectId, "does not read as an archived bulletin");
+            Publish();
+        }
     }
 
     /// <summary>
     /// Puts an archived bulletin back in the outbox, so the next session offers it to the BBS
-    /// again: written to the outbox, folder flushed, before it leaves the archive.
+    /// again. The archive keeps its copy, with the old answer, until the BBS answers again; until
+    /// then the bulletin is listed as waiting.
     /// </summary>
     public (ResendOutcome Outcome, Bulletin? Bulletin) Resend(ulong objectId)
     {
-        if (File.Exists(OutboxPath(objectId)))
+        string name = OutboxName(objectId);
+        if (_outboxItems.ContainsKey(name))
         {
             return (ResendOutcome.AlreadyWaiting, null);
         }
-        if (_archive.Read(objectId) is not { } held)
+        if (!_archive.Contains(objectId))
         {
             return (ResendOutcome.NotFound, null);
         }
-        var bulletin = Bulletin.Parse(held.Serialized);
-        DurableFile.WriteAtomically(OutboxPath(objectId), held.Serialized, _options.Time.GetUtcNow(), _options.FlushToDisk);
+        byte[] serialized;
+        try
+        {
+            CountRead();
+            serialized = MailArchive.ReadFile(objectId, _archive.PathOf(objectId)).Serialized;
+        }
+        catch (FormatException)
+        {
+            ForgetUnreadable(objectId);
+            return (ResendOutcome.NotFound, null);
+        }
+        var bulletin = Bulletin.Parse(serialized);
+        var now = _options.Time.GetUtcNow();
+        DurableFile.WriteAtomically(Path.Combine(_outbox, name), serialized, now, _options.FlushToDisk);
+        _outboxItems[name] = new OutboxItem(name, objectId, serialized, bulletin, now);
         if (!_done.ContainsKey(objectId))
         {
             WriteDone(objectId); // as for any outbox file: later frames of it are not collected again
         }
-        _archive.Remove(objectId);
+        Publish();
         return (ResendOutcome.Resent, bulletin);
     }
 
@@ -444,7 +496,16 @@ public sealed class ReceiverStore
         {
             return [];
         }
-        var result = new List<ObjectProgress>();
+        // The fullest instance of each object, found in one pass rather than once per entry.
+        var fullest = new Dictionary<ulong, Instance>();
+        foreach (var instance in _instances.Values)
+        {
+            if (!fullest.TryGetValue(instance.ObjectId, out var best) || instance.Symbols.Count > best.Symbols.Count)
+            {
+                fullest[instance.ObjectId] = instance;
+            }
+        }
+        var result = new List<ObjectProgress>(Directory.Entries.Count);
         foreach (var entry in Directory.Entries)
         {
             if (_done.ContainsKey(entry.ObjectId))
@@ -452,7 +513,7 @@ public sealed class ReceiverStore
                 result.Add(new ObjectProgress(entry, true, 0, 0));
                 continue;
             }
-            var held = _instances.Values.Where(i => i.ObjectId == entry.ObjectId).OrderByDescending(i => i.Symbols.Count).FirstOrDefault();
+            var held = fullest.GetValueOrDefault(entry.ObjectId);
             result.Add(held is null
                 ? new ObjectProgress(entry, false, 0, 0)
                 : new ObjectProgress(entry, false, held.Symbols.Count, held.Oti.SourceBlockSymbols(0)));
@@ -465,16 +526,21 @@ public sealed class ReceiverStore
     /// objects whose last piece is older than <see cref="ReceiverStoreOptions.PartialRetention"/>,
     /// and archived bulletins past <see cref="ReceiverStoreOptions.ArchiveRetention"/> or over
     /// <see cref="ReceiverStoreOptions.ArchiveMaxBytes"/>. Runs by itself at most hourly as frames
-    /// arrive, and the archive is also pruned whenever it is added to or listed.
+    /// arrive, and the archive is also pruned whenever it is added to.
     /// </summary>
     public void Expire()
     {
         var now = _options.Time.GetUtcNow();
         _lastExpiry = now;
+        int archived = _archive.Count;
         _archive.Prune();
+        if (_archive.Count != archived)
+        {
+            Publish();
+        }
         foreach (var (id, when) in _done.ToList())
         {
-            if (now - when > _options.DoneRetention && !File.Exists(OutboxPath(id)))
+            if (now - when > _options.DoneRetention && !_outboxItems.ContainsKey(OutboxName(id)))
             {
                 File.Delete(DonePath(id));
                 _done.Remove(id);
@@ -641,7 +707,11 @@ public sealed class ReceiverStore
             return Unusable(instance, "is a bulletin that does not parse: " + e.Message);
         }
 
-        DurableFile.WriteAtomically(OutboxPath(instance.ObjectId), content, _options.Time.GetUtcNow(), _options.FlushToDisk); // flushes the outbox folder too
+        var written = _options.Time.GetUtcNow();
+        string name = OutboxName(instance.ObjectId);
+        DurableFile.WriteAtomically(Path.Combine(_outbox, name), content, written, _options.FlushToDisk); // flushes the outbox folder too
+        _outboxItems[name] = new OutboxItem(name, instance.ObjectId, content, bulletin, written);
+        Publish();
         MarkDone(instance);
         return new AcceptResult(FrameOutcome.CompletedBulletin, instance.ObjectId, Bulletin: bulletin);
     }
@@ -758,45 +828,87 @@ public sealed class ReceiverStore
 
     private void Log(string message) => _options.Log?.Invoke(message);
 
-    /// <summary>The outbox's readable files, oldest first; unreadable ones are quarantined and logged.</summary>
-    private List<(string File, ulong? ObjectId, byte[] Serialized, Bulletin Bulletin, DateTimeOffset Written)> ReadOutbox()
+    private void CountRead() => Interlocked.Increment(ref _diskReads);
+
+    /// <summary>Reads the outbox into memory, once, when the store is opened; unreadable files are quarantined and logged.</summary>
+    private void LoadOutbox()
     {
-        var result = new List<(string, ulong?, byte[], Bulletin, DateTimeOffset)>();
-        var files = System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin")
-            .Select(f => (File: f, Time: File.GetLastWriteTimeUtc(f)))
-            .OrderBy(f => f.Time)
-            .ThenBy(f => f.File, StringComparer.Ordinal)
-            .ToList();
-        foreach (var (file, time) in files)
+        CountRead();
+        foreach (var file in System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin").ToList())
         {
-            byte[] bytes;
+            string name = Path.GetFileName(file);
             try
             {
-                bytes = File.ReadAllBytes(file);
-            }
-            catch (FileNotFoundException)
-            {
-                continue;
-            }
-            try
-            {
-                var bulletin = Bulletin.Parse(bytes);
+                CountRead();
+                var bytes = File.ReadAllBytes(file);
+                var written = new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero);
                 ulong? id = ObjectId.TryParse(Path.GetFileNameWithoutExtension(file), out ulong parsed) ? parsed : null;
-                result.Add((file, id, bytes, bulletin, new DateTimeOffset(time, TimeSpan.Zero)));
+                _outboxItems[name] = new OutboxItem(name, id, bytes, Bulletin.Parse(bytes), written);
             }
             catch (FormatException e)
             {
-                System.IO.Directory.CreateDirectory(_quarantine);
-                File.Move(file, Path.Combine(_quarantine, Path.GetFileName(file)), overwrite: true);
-                Log($"outbox file {Path.GetFileName(file)} unreadable, quarantined: {e.Message}");
+                try
+                {
+                    System.IO.Directory.CreateDirectory(_quarantine);
+                    File.Move(file, Path.Combine(_quarantine, name), overwrite: true);
+                    Log($"outbox file {name} unreadable, quarantined: {e.Message}");
+                }
+                catch (Exception move) when (move is IOException or UnauthorizedAccessException)
+                {
+                    Log($"outbox file {name} unreadable ({e.Message}) and cannot be quarantined: {move.Message}");
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Log($"outbox file {name} cannot be read, skipped until the next start: {e.Message}");
             }
         }
-        return result;
     }
+
+    /// <summary>
+    /// Makes a new <see cref="Mail"/> from the outbox and the archive, after any change to either:
+    /// both are in memory and in time order, so this is one merge.
+    /// </summary>
+    private void Publish()
+    {
+        var waiting = _outboxItems.Values
+            .Where(o => o.ObjectId is not null)
+            .GroupBy(o => o.ObjectId!.Value)
+            .Select(g => g.First())
+            .OrderByDescending(o => o.Written)
+            .ThenByDescending(o => o.ObjectId)
+            .ToList();
+        var bytes = waiting.ToDictionary(o => o.ObjectId!.Value, o => o.Serialized);
+        var result = new List<MailEntry>(waiting.Count + _archive.Count);
+        int w = 0;
+        foreach (var archived in _archive.NewestFirst())
+        {
+            if (bytes.ContainsKey(archived.ObjectId))
+            {
+                continue; // sent again, or left in both by a crash: it is waiting
+            }
+            while (w < waiting.Count && waiting[w].Written >= archived.Time)
+            {
+                result.Add(Entry(waiting[w++]));
+            }
+            result.Add(archived);
+        }
+        while (w < waiting.Count)
+        {
+            result.Add(Entry(waiting[w++]));
+        }
+        _mail = new MailSnapshot([.. result], waiting.Count, bytes);
+
+        static MailEntry Entry(OutboxItem o) => MailEntry.Of(o.ObjectId!.Value, o.Bulletin, o.Serialized.Length, o.Written, null, null);
+    }
+
+    private static string OutboxName(ulong objectId) => ObjectId.Format(objectId) + ".bulletin";
+
+    /// <summary>A bulletin in the outbox: its file name, its object if the name gives one, and when it went in.</summary>
+    private sealed record OutboxItem(string Name, ulong? ObjectId, byte[] Serialized, Bulletin Bulletin, DateTimeOffset Written);
 
     private string DonePath(ulong objectId) => Path.Combine(_doneDir, ObjectId.Format(objectId));
 
-    private string OutboxPath(ulong objectId) => Path.Combine(_outbox, ObjectId.Format(objectId) + ".bulletin");
 
     private static string KeyOf(ulong objectId, ushort dictionaryId, ObjectTransmissionInformation oti) =>
         $"{ObjectId.Format(objectId)}-{dictionaryId:x4}-{Convert.ToHexStringLower(oti.ToBytes())}";

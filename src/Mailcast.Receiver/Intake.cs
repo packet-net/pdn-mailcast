@@ -54,10 +54,19 @@ public sealed class Intake : IAsyncDisposable
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
             (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)) });
         _heardSchedule = _store.HeardSchedule;
+        _progress = (_store.Directory, _store.Progress());
         _worker = Task.Run(RunAsync);
     }
 
     private SlotTimetable? _heardSchedule;
+    private volatile Tuple<BroadcastDirectory?, IReadOnlyList<ObjectProgress>> _progressHeld = Tuple.Create<BroadcastDirectory?, IReadOnlyList<ObjectProgress>>(null, []);
+
+    /// <summary>The published progress: a reference swapped whole, so a reader never sees half of one.</summary>
+    private (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) _progress
+    {
+        get => (_progressHeld.Item1, _progressHeld.Item2);
+        set => _progressHeld = Tuple.Create(value.Directory, value.Progress);
+    }
 
     /// <summary>
     /// The head end's timetable from the newest directory that gave one, kept across restarts;
@@ -155,7 +164,7 @@ public sealed class Intake : IAsyncDisposable
         changed.TrySetResult();
     }
 
-    /// <summary>Rebuilt bulletins not yet handed to the BBS, oldest first.</summary>
+    /// <summary>Rebuilt bulletins not yet handed to the BBS, oldest first. Read from memory.</summary>
     public IReadOnlyList<Bulletin> Pending()
     {
         lock (_gate)
@@ -173,41 +182,50 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
-    /// <summary>Every bulletin held, waiting or archived, newest first.</summary>
-    public IReadOnlyList<MailEntry> Mail()
-    {
-        lock (_gate)
-        {
-            return _store.Mail();
-        }
-    }
+    /// <summary>
+    /// Every bulletin held, waiting or archived, newest first, as of the last change. Takes no
+    /// lock and reads no files, so the web page never waits for the store or makes it wait.
+    /// </summary>
+    public MailSnapshot Mail() => _store.Mail;
 
-    /// <summary>One bulletin as stored, with its entry, or null.</summary>
+    /// <summary>
+    /// One bulletin as stored, with its entry, or null. Reads the archive file without the
+    /// store's lock; only an unreadable one takes it, to quarantine the file.
+    /// </summary>
     public (MailEntry Entry, byte[] Serialized)? ReadMail(ulong objectId)
     {
-        lock (_gate)
+        var held = _store.ReadMail(objectId, out bool unreadable);
+        if (unreadable)
         {
-            return _store.ReadMail(objectId);
+            lock (_gate)
+            {
+                _store.ForgetUnreadable(objectId);
+            }
         }
+        return held;
     }
 
     /// <summary>Puts an archived bulletin back in the outbox, to be offered to the BBS again.</summary>
     public (ResendOutcome Outcome, Bulletin? Bulletin) Resend(ulong objectId)
     {
+        ResendOutcome outcome;
+        Bulletin? bulletin;
         lock (_gate)
         {
-            return _store.Resend(objectId);
+            (outcome, bulletin) = _store.Resend(objectId);
+            _progress = (_store.Directory, _store.Progress());
         }
+        return (outcome, bulletin);
     }
 
-    /// <summary>The newest directory heard, and how far each of its bulletins has got.</summary>
-    public (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) Progress()
-    {
-        lock (_gate)
-        {
-            return (_store.Directory, _store.Progress());
-        }
-    }
+    /// <summary>
+    /// The newest directory heard, and how far each of its bulletins has got, as of the last
+    /// frame that changed it. Takes no lock: the store's thread keeps it up to date.
+    /// </summary>
+    public (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) Progress() => _progress;
+
+    /// <summary>For tests: how many times the store has read the outbox or the archive from disk.</summary>
+    internal long StoreDiskReads => _store.DiskReads;
 
     /// <summary>How many objects have pieces held but are not yet rebuilt.</summary>
     public int PartialObjects
@@ -251,6 +269,10 @@ public sealed class Intake : IAsyncDisposable
             lock (_gate)
             {
                 result = _store.Accept(payload.Span);
+                if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
+                {
+                    _progress = (_store.Directory, _store.Progress());
+                }
             }
         }
         catch (Exception e)

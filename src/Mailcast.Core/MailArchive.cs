@@ -17,7 +17,7 @@ public enum BbsVerdict
 }
 
 /// <summary>One bulletin the receiver holds, waiting in the outbox or kept in the archive.</summary>
-/// <param name="ObjectId">The broadcast object it was rebuilt from, which names its files.</param>
+/// <param name="ObjectId">The object it was rebuilt from, which names its files.</param>
 /// <param name="Waiting">True if it is in the outbox, waiting for the BBS; false if archived.</param>
 /// <param name="Type">The message type, B for a bulletin.</param>
 /// <param name="Bid">Its BID.</param>
@@ -40,6 +40,51 @@ public sealed record MailEntry(
 }
 
 /// <summary>
+/// The bulletins held, newest first, as they were at one moment. It never changes, so it can be
+/// read from any thread while the store goes on.
+/// </summary>
+public sealed class MailSnapshot
+{
+    private readonly MailEntry[] _newestFirst;
+    private readonly Dictionary<ulong, byte[]> _waiting;
+
+    /// <summary>Nothing held.</summary>
+    public static readonly MailSnapshot Empty = new([], 0, []);
+
+    internal MailSnapshot(MailEntry[] newestFirst, int waiting, Dictionary<ulong, byte[]> waitingBytes)
+    {
+        _newestFirst = newestFirst;
+        Waiting = waiting;
+        _waiting = waitingBytes;
+    }
+
+    /// <summary>How many bulletins are held in all.</summary>
+    public int Count => _newestFirst.Length;
+
+    /// <summary>How many are waiting in the outbox.</summary>
+    public int Waiting { get; }
+
+    /// <summary>How many are archived and not waiting.</summary>
+    public int Archived => _newestFirst.Length - Waiting;
+
+    /// <summary>Every bulletin held, newest first.</summary>
+    public IReadOnlyList<MailEntry> NewestFirst => _newestFirst;
+
+    /// <summary>Up to <paramref name="limit"/> entries from <paramref name="offset"/>, newest first, without copying the rest.</summary>
+    public IReadOnlyList<MailEntry> Page(int offset, int limit)
+    {
+        offset = Math.Clamp(offset, 0, _newestFirst.Length);
+        return new ArraySegment<MailEntry>(_newestFirst, offset, Math.Clamp(limit, 0, _newestFirst.Length - offset));
+    }
+
+    /// <summary>Whether a bulletin is waiting in the outbox.</summary>
+    public bool IsWaiting(ulong objectId) => _waiting.ContainsKey(objectId);
+
+    /// <summary>A waiting bulletin as the outbox holds it, if it is waiting.</summary>
+    internal byte[]? WaitingBytes(ulong objectId) => _waiting.GetValueOrDefault(objectId);
+}
+
+/// <summary>
 /// The receiver's own copies of bulletins the BBS has answered for, with the answer, kept for a
 /// while so that nothing is lost if the BBS later loses or refuses mail.
 /// </summary>
@@ -55,16 +100,24 @@ public sealed record MailEntry(
 ///
 /// Type: B ...                the bulletin's own header block and message text
 /// </code>
-/// <para>An index of what is held is kept in memory, so listing and pruning read no files.
-/// Entries go oldest answer first once older than the retention or once the archive is over its
-/// size cap. A file that cannot be read is moved to the quarantine folder and logged.</para>
-/// <para>Not thread-safe; the <see cref="ReceiverStore"/> that owns it is used from one thread.</para>
+/// <para>An index of what is held is kept in memory in answer order, so listing and pruning read
+/// no files; at start-up only each file's header lines are read. Entries go oldest answer first
+/// once older than the retention or once the archive is over its size cap, checked when one is
+/// added and when the store expires old things. A file that cannot be read is moved to the
+/// quarantine folder and logged.</para>
+/// <para>Not thread-safe, except <see cref="ReadFile"/>; the <see cref="ReceiverStore"/> that
+/// owns it is used from one thread.</para>
 /// </remarks>
 internal sealed class MailArchive
 {
     private const string Extension = ".mail";
     private const string Magic = "Mailcast-Archive";
     private const string DateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+
+    /// <summary>The most of a file read at start-up to find its two header blocks.</summary>
+    internal const int MaxHeaderBytes = 16 * 1024;
+
+    private static readonly string[] BulletinKeys = ["Type", "From", "To", "At", "Bid", "Date", "Title"];
 
     private readonly string _folder;
     private readonly string _quarantine;
@@ -73,14 +126,17 @@ internal sealed class MailArchive
     private readonly TimeProvider _time;
     private readonly bool _flush;
     private readonly Action<string> _log;
+    private readonly Action _countRead;
     private readonly Dictionary<ulong, (MailEntry Entry, long FileBytes)> _index = [];
+    private readonly SortedSet<(DateTimeOffset Time, ulong Id)> _order = [];
     private long _totalBytes;
 
     /// <summary>
-    /// Opens the archive in <paramref name="folder"/>, reading what is there. A missing folder is
-    /// an empty archive. Nothing here throws: unreadable files are quarantined or skipped, and logged.
+    /// Opens the archive in <paramref name="folder"/>, reading the header lines of what is there.
+    /// A missing folder is an empty archive. Nothing here throws: unreadable files are quarantined
+    /// or skipped, and logged. <paramref name="countRead"/> is called for each read of the disk.
     /// </summary>
-    public MailArchive(string folder, string quarantine, TimeSpan retention, long maxBytes, TimeProvider time, bool flush, Action<string> log)
+    public MailArchive(string folder, string quarantine, TimeSpan retention, long maxBytes, TimeProvider time, bool flush, Action<string> log, Action countRead)
     {
         _folder = folder;
         _quarantine = quarantine;
@@ -89,6 +145,7 @@ internal sealed class MailArchive
         _time = time;
         _flush = flush;
         _log = log;
+        _countRead = countRead;
         if (!System.IO.Directory.Exists(folder))
         {
             return; // an install from before the archive, or nothing answered yet
@@ -96,6 +153,7 @@ internal sealed class MailArchive
         List<string> files;
         try
         {
+            _countRead();
             files = [.. System.IO.Directory.EnumerateFiles(folder, "*" + Extension)];
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -112,9 +170,9 @@ internal sealed class MailArchive
             }
             try
             {
-                var bytes = File.ReadAllBytes(file);
-                var (entry, _) = Parse(id, bytes);
-                Index(entry, bytes.Length);
+                _countRead();
+                var (entry, fileBytes) = ReadHeader(id, file);
+                Index(entry, fileBytes);
             }
             catch (FormatException e)
             {
@@ -131,8 +189,8 @@ internal sealed class MailArchive
     /// <summary>Whether anything is kept at all: a retention or size cap of zero keeps nothing.</summary>
     public bool Enabled => _retention > TimeSpan.Zero && _maxBytes > 0;
 
-    /// <summary>What is held, in no particular order.</summary>
-    public IEnumerable<MailEntry> Entries => _index.Values.Select(v => v.Entry);
+    /// <summary>What is held, newest answer first.</summary>
+    public IEnumerable<MailEntry> NewestFirst() => _order.Reverse().Select(k => _index[k.Id].Entry);
 
     /// <summary>How many bulletins are held.</summary>
     public int Count => _index.Count;
@@ -143,15 +201,25 @@ internal sealed class MailArchive
     /// <summary>Whether a bulletin is held.</summary>
     public bool Contains(ulong objectId) => _index.ContainsKey(objectId);
 
+    /// <summary>Where a bulletin's file is.</summary>
+    public string PathOf(ulong objectId) => Path.Combine(_folder, ObjectId.Format(objectId) + Extension);
+
     /// <summary>
     /// Keeps <paramref name="serialized"/> (the bulletin as the outbox held it) with the BBS's
-    /// answer, replacing any copy already held, then prunes. Throws on a write that fails.
+    /// answer, replacing any copy already held, then prunes. An answer of already had to a
+    /// bulletin the archive has as accepted (sent again, or offered twice after a crash) keeps
+    /// accepted: the BBS has it either way, and accepted says more. Throws on a write that fails.
     /// </summary>
     public void Add(ulong objectId, ReadOnlySpan<byte> serialized, Bulletin bulletin, BbsVerdict verdict, string? detail)
     {
         if (!Enabled)
         {
             return;
+        }
+        if (verdict == BbsVerdict.AlreadyHad && _index.TryGetValue(objectId, out var held) && held.Entry.Verdict == BbsVerdict.Accepted)
+        {
+            verdict = BbsVerdict.Accepted;
+            detail = "offered again; the BBS already had it";
         }
         var now = _time.GetUtcNow();
         now = new DateTimeOffset(now.Ticks - (now.Ticks % TimeSpan.TicksPerSecond), TimeSpan.Zero);
@@ -178,66 +246,29 @@ internal sealed class MailArchive
     }
 
     /// <summary>
-    /// The bulletin as it was stored, and its entry, or null if it is not held. A file that turns
-    /// out to be unreadable is quarantined and forgotten.
+    /// Reads a held bulletin's file whole: its entry and the bulletin as stored. Safe from any
+    /// thread, since it only reads. Throws <see cref="FormatException"/> for a file that does not
+    /// read, and <see cref="IOException"/> (including <see cref="FileNotFoundException"/>) or
+    /// <see cref="UnauthorizedAccessException"/> for one that cannot be read.
     /// </summary>
-    public (MailEntry Entry, byte[] Serialized)? Read(ulong objectId)
-    {
-        if (!_index.ContainsKey(objectId))
-        {
-            return null;
-        }
-        string file = PathOf(objectId);
-        byte[] bytes;
-        try
-        {
-            bytes = File.ReadAllBytes(file);
-        }
-        catch (FileNotFoundException)
-        {
-            Forget(objectId);
-            return null;
-        }
-        try
-        {
-            var (entry, serialized) = Parse(objectId, bytes);
-            return (entry, serialized);
-        }
-        catch (FormatException e)
-        {
-            Forget(objectId);
-            Quarantine(file, e.Message);
-            return null;
-        }
-    }
+    public static (MailEntry Entry, byte[] Serialized) ReadFile(ulong objectId, string file) => Parse(objectId, File.ReadAllBytes(file));
 
-    /// <summary>Removes a bulletin from the archive (it has gone back to the outbox).</summary>
-    public void Remove(ulong objectId)
+    /// <summary>Forgets a bulletin whose file turned out to be unreadable, and quarantines the file.</summary>
+    public void Unreadable(ulong objectId, string why)
     {
-        if (!_index.ContainsKey(objectId))
-        {
-            return;
-        }
-        File.Delete(PathOf(objectId));
         Forget(objectId);
-        if (_flush)
-        {
-            DurableFile.FlushDirectory(_folder);
-        }
+        Quarantine(PathOf(objectId), why);
     }
 
-    /// <summary>Drops entries past the retention, then the oldest until the archive is within its size cap.</summary>
+    /// <summary>Drops entries past the retention, then the oldest until the archive is within its size cap; only the oldest is looked at.</summary>
     public void Prune()
     {
-        if (_index.Count == 0)
-        {
-            return;
-        }
         var now = _time.GetUtcNow();
         int dropped = 0;
-        foreach (var (id, (entry, _)) in _index.OrderBy(e => e.Value.Entry.Time).ThenBy(e => e.Key).ToList())
+        while (_order.Count > 0)
         {
-            if (now - entry.Time <= _retention && _totalBytes <= _maxBytes)
+            var (time, id) = _order.Min;
+            if (now - time <= _retention && _totalBytes <= _maxBytes)
             {
                 break;
             }
@@ -262,6 +293,7 @@ internal sealed class MailArchive
     private void Index(MailEntry entry, long fileBytes)
     {
         _index[entry.ObjectId] = (entry, fileBytes);
+        _order.Add((entry.Time, entry.ObjectId));
         _totalBytes += fileBytes;
     }
 
@@ -269,6 +301,7 @@ internal sealed class MailArchive
     {
         if (_index.Remove(objectId, out var held))
         {
+            _order.Remove((held.Entry.Time, objectId));
             _totalBytes -= held.FileBytes;
         }
     }
@@ -287,9 +320,81 @@ internal sealed class MailArchive
         }
     }
 
-    private string PathOf(ulong objectId) => Path.Combine(_folder, ObjectId.Format(objectId) + Extension);
+    /// <summary>
+    /// Reads only a file's header lines, the archive's and the bulletin's, for the index: the
+    /// text is not read until the bulletin is. Throws <see cref="FormatException"/>.
+    /// </summary>
+    internal static (MailEntry Entry, long FileBytes) ReadHeader(ulong objectId, string file)
+    {
+        using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
+        long length = stream.Length;
+        var buffer = new byte[(int)Math.Min(length, MaxHeaderBytes)];
+        int read = 0, archiveEnd = -1, bulletinStart = 0, bulletinEnd = -1;
+        // A little at a time: the headers are normally well inside the first 1 KB.
+        while (bulletinEnd < 0 && read < buffer.Length)
+        {
+            int n = stream.Read(buffer, read, Math.Min(1024, buffer.Length - read));
+            if (n <= 0)
+            {
+                break;
+            }
+            read += n;
+            var seen = buffer.AsSpan(0, read);
+            if (archiveEnd < 0 && (archiveEnd = seen.IndexOf("\n\n"u8)) >= 0)
+            {
+                bulletinStart = archiveEnd + 2;
+            }
+            if (archiveEnd >= 0 && read > bulletinStart)
+            {
+                bulletinEnd = seen[bulletinStart..].IndexOf("\n\n"u8);
+            }
+        }
+        var span = buffer.AsSpan(0, read);
+        if (archiveEnd < 0)
+        {
+            throw new FormatException("no end to the archive header");
+        }
+        if (bulletinEnd < 0)
+        {
+            throw new FormatException("no end to the bulletin header in the first " + MaxHeaderBytes / 1024 + " KB");
+        }
+        var (time, verdict, detail) = ArchiveFields(Bulletin.TextEncoding.GetString(span[..archiveEnd]));
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string line in Bulletin.TextEncoding.GetString(span.Slice(bulletinStart, bulletinEnd)).Split('\n'))
+        {
+            int colon = line.IndexOf(':', StringComparison.Ordinal);
+            if (colon <= 0)
+            {
+                throw new FormatException("a bulletin header line without a key");
+            }
+            int valueStart = colon + 1 < line.Length && line[colon + 1] == ' ' ? colon + 2 : colon + 1;
+            if (!fields.TryAdd(line[..colon], line[valueStart..]))
+            {
+                throw new FormatException($"the bulletin header has {line[..colon]} twice");
+            }
+        }
+        foreach (var key in BulletinKeys)
+        {
+            if (!fields.ContainsKey(key))
+            {
+                throw new FormatException($"the bulletin header has no {key}");
+            }
+        }
+        if (fields["Type"] is not { Length: 1 } type || type[0] is < 'A' or > 'Z')
+        {
+            throw new FormatException("the bulletin type is not one letter");
+        }
+        if (!DateTimeOffset.TryParseExact(fields["Date"], DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var date))
+        {
+            throw new FormatException("the bulletin date is not yyyy-MM-ddTHH:mm:ssZ");
+        }
+        long size = length - bulletinStart;
+        var entry = new MailEntry(objectId, false, type[0], fields["Bid"], fields["From"], fields["To"], fields["At"], fields["Title"],
+            date, (int)Math.Min(size, int.MaxValue), time, verdict, detail);
+        return (entry, length);
+    }
 
-    /// <summary>Reads an archive file: its entry, and the bulletin as stored. Throws <see cref="FormatException"/>.</summary>
+    /// <summary>Reads an archive file whole: its entry, and the bulletin as stored. Throws <see cref="FormatException"/>.</summary>
     internal static (MailEntry Entry, byte[] Serialized) Parse(ulong objectId, byte[] bytes)
     {
         int split = bytes.AsSpan().IndexOf("\n\n"u8);
@@ -297,13 +402,21 @@ internal sealed class MailArchive
         {
             throw new FormatException("no end to the archive header");
         }
+        var (time, verdict, detail) = ArchiveFields(Bulletin.TextEncoding.GetString(bytes, 0, split));
+        byte[] serialized = bytes[(split + 2)..];
+        var bulletin = Bulletin.Parse(serialized);
+        return (MailEntry.Of(objectId, bulletin, serialized.Length, time, verdict, detail), serialized);
+    }
+
+    private static (DateTimeOffset Time, BbsVerdict Verdict, string? Detail) ArchiveFields(string header)
+    {
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in Bulletin.TextEncoding.GetString(bytes, 0, split).Split('\n'))
+        foreach (string line in header.Split('\n'))
         {
             int colon = line.IndexOf(':', StringComparison.Ordinal);
             if (colon <= 0)
             {
-                throw new FormatException("a header line without a key");
+                throw new FormatException("an archive header line without a key");
             }
             fields[line[..colon]] = line[(colon + 1)..].TrimStart(' ');
         }
@@ -320,9 +433,7 @@ internal sealed class MailArchive
         {
             throw new FormatException("no Verdict");
         }
-        byte[] serialized = bytes[(split + 2)..];
-        var bulletin = Bulletin.Parse(serialized);
-        return (MailEntry.Of(objectId, bulletin, serialized.Length, time, verdict, fields.GetValueOrDefault("Detail")), serialized);
+        return (time, verdict, fields.GetValueOrDefault("Detail"));
     }
 
     private static string Token(BbsVerdict verdict) => verdict switch

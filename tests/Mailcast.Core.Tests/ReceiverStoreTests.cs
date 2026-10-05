@@ -326,10 +326,13 @@ public class ReceiverStoreTests
             store.Accept(obj.Frame(esi).ToBytes());
         }
         File.WriteAllText(Path.Combine(dir.Path, "outbox", "0000000000000001.bulletin"), "not a bulletin");
-        Assert.Equal([bulletin], store.Pending());
+        Assert.Equal([bulletin], store.Pending()); // the outbox is in memory, so it is only seen on opening
+
+        var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
+        Assert.Equal([bulletin], reopened.Pending());
         Assert.True(File.Exists(Path.Combine(dir.Path, "quarantine", "0000000000000001.bulletin")));
-        Assert.Single(log);
-        Assert.Equal([bulletin], store.Pending());
+        Assert.Single(log, l => l.Contains("quarantined", StringComparison.Ordinal));
+        Assert.Equal([bulletin], reopened.Pending());
     }
 
     [Fact]

@@ -32,6 +32,11 @@ public sealed class StatusPage : IAsyncDisposable
 
     private const string MailBase = "/api/mail/";
 
+    /// <summary>How soon one bulletin can be sent to the BBS again after the last time.</summary>
+    public static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
+
+    private readonly Dictionary<ulong, DateTimeOffset> _resentAt = [];
+
     private readonly ReceiverHost _host;
     private readonly string? _configPath;
     private readonly Action<string> _log;
@@ -267,7 +272,7 @@ public sealed class StatusPage : IAsyncDisposable
                 target = ReceiverHost.DescribeBbs(config.Bbs),
                 lastFailure = _host.Delivery.LastFailure,
                 nextAttempt = _host.Delivery.NextAttempt,
-                waiting = _host.Intake.Pending().Count,
+                waiting = _host.Intake.Mail().Waiting, // from memory: this page is asked every few seconds
             },
             markers = new
             {
@@ -516,16 +521,16 @@ public sealed class StatusPage : IAsyncDisposable
     {
         int offset = Math.Max(0, int.TryParse(query["offset"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int o) ? o : 0);
         int limit = int.TryParse(query["limit"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int l) ? Math.Clamp(l, 1, MaxMailPage) : 50;
-        var mail = _host.Intake.Mail();
+        var mail = _host.Intake.Mail(); // in memory, newest first, already counted: no files, no lock, no sorting
         return new
         {
             total = mail.Count,
-            waiting = mail.Count(m => m.Waiting),
-            archived = mail.Count(m => !m.Waiting),
+            waiting = mail.Waiting,
+            archived = mail.Archived,
             offset,
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
-            items = mail.Skip(offset).Take(limit).Select(MailView),
+            items = mail.Page(offset, limit).Select(MailView).ToList(),
         };
     }
 
@@ -579,7 +584,20 @@ public sealed class StatusPage : IAsyncDisposable
     /// </summary>
     private async Task ServeBulletinAsync(HttpListenerContext context, string id)
     {
-        if (!Mailcast.Core.ObjectId.TryParse(id, out ulong objectId) || _host.Intake.ReadMail(objectId) is not { } held)
+        (Mailcast.Core.MailEntry Entry, byte[] Serialized)? found = null;
+        if (Mailcast.Core.ObjectId.TryParse(id, out ulong objectId))
+        {
+            try
+            {
+                found = _host.Intake.ReadMail(objectId);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                await RespondAsync(context, 500, "text/plain; charset=utf-8", $"Cannot read that bulletin: {Ascii.Clean(e.Message)}\n").ConfigureAwait(false);
+                return;
+            }
+        }
+        if (found is not { } held)
         {
             await RespondAsync(context, 404, "text/plain; charset=utf-8", "No such bulletin.\n").ConfigureAwait(false);
             return;
@@ -619,6 +637,21 @@ public sealed class StatusPage : IAsyncDisposable
             await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Say which bulletin, by its id." })).ConfigureAwait(false);
             return;
         }
+        var now = _host.Time.GetUtcNow();
+        TimeSpan? wait = null;
+        lock (_gate)
+        {
+            if (!_host.Intake.Mail().IsWaiting(objectId) && _resentAt.TryGetValue(objectId, out var last) && now - last < ResendCooldown)
+            {
+                wait = ResendCooldown - (now - last);
+            }
+        }
+        if (wait is TimeSpan left)
+        {
+            // Each one sent again is a session with the BBS; a script or a stuck key should not make dozens.
+            await RespondAsync(context, 429, "application/json", JsonSerializer.Serialize(new { error = $"That one was sent again a moment ago. Try again in {Math.Ceiling(left.TotalSeconds)} s." })).ConfigureAwait(false);
+            return;
+        }
         (Mailcast.Core.ResendOutcome Outcome, Mailcast.Core.Bulletin? Bulletin) result;
         try
         {
@@ -632,6 +665,14 @@ public sealed class StatusPage : IAsyncDisposable
         switch (result.Outcome)
         {
             case Mailcast.Core.ResendOutcome.Resent:
+                lock (_gate)
+                {
+                    foreach (var old in _resentAt.Where(r => now - r.Value >= ResendCooldown).Select(r => r.Key).ToList())
+                    {
+                        _resentAt.Remove(old);
+                    }
+                    _resentAt[objectId] = now;
+                }
                 var b = result.Bulletin!;
                 _log($"mail: {Ascii.Clean(b.Bid)} \"{Ascii.Clean(b.Title)}\" put back in the outbox from the web page ({context.Request.RemoteEndPoint?.Address}), to be offered to the BBS again");
                 _host.Delivery.Nudge();

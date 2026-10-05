@@ -177,11 +177,31 @@ const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null;
 
+/* Asks the receiver and never throws. A refusal that is not JSON (401, 403, 421) and a receiver
+   that does not answer at all come back as a sentence in .error for the page to show. */
+async function api(url, options) {
+  let answer;
+  try { answer = await fetch(url, options); }
+  catch { return { ok: false, status: 0, body: null, text: "", error: "The receiver is not answering." }; }
+  const type = answer.headers.get("Content-Type") || "";
+  let body = null, text = "";
+  try {
+    if (type.startsWith("application/json")) body = await answer.json(); else text = await answer.text();
+  } catch { return { ok: false, status: answer.status, body: null, text: "", error: "The receiver's answer was cut short." }; }
+  if (answer.ok) return { ok: true, status: answer.status, body, text, error: null };
+  const why = body && body.error ? body.error
+    : answer.status === 401 ? "This page needs its password: reload it to log in again."
+    : answer.status === 403 ? "Refused: this request came from another site."
+    : answer.status === 421 ? "This page only answers to localhost."
+    : text.trim() || `The receiver answered ${answer.status}.`;
+  return { ok: false, status: answer.status, body, text, error: why };
+}
+
 /* ---------- status ---------- */
 async function refresh() {
-  try {
-    status = await (await fetch("api/status")).json();
-  } catch { $("summary").textContent = "The receiver is not answering."; return; }
+  const r = await api("api/status");
+  if (!r.ok) { $("summary").textContent = r.error; return; }
+  status = r.body;
   const s = status;
   $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
   schedule(s);
@@ -294,9 +314,10 @@ function mailRow(m) {
   return tr;
 }
 async function refreshMail() {
-  try {
-    mail = await (await fetch(`api/mail?offset=${mailOffset}&limit=${PAGE}`)).json();
-  } catch { return; }
+  const r = await api(`api/mail?offset=${mailOffset}&limit=${PAGE}`);
+  if (!r.ok) { $("mailNote").textContent = r.error; $("mailNote").className = "bad"; return; }
+  mail = r.body;
+  $("mailNote").className = "muted";
   if (mail.total > 0 && mailOffset >= mail.total) { mailOffset = Math.max(0, mailOffset - PAGE); return refreshMail(); }
   $("mailNote").textContent = `${mail.waiting} waiting for your BBS, ${mail.archived} kept after the BBS answered `
     + `(each kept ${mail.archive.days} days, ${mail.archive.maxMegabytes} MB at most). Click one to read it.`;
@@ -331,18 +352,17 @@ async function view(m) {
   $("resend").hidden = m.waiting;
   $("raw").href = `api/mail/${encodeURIComponent(m.id)}`;
   $("viewText").textContent = "Loading...";
-  const answer = await fetch(`api/mail/${encodeURIComponent(m.id)}`);
-  if (!answer.ok) { $("viewText").textContent = "This bulletin is no longer held."; return; }
-  $("viewText").textContent = await answer.text();
+  const r = await api(`api/mail/${encodeURIComponent(m.id)}`);
+  if (!r.ok) { $("viewText").textContent = r.status === 404 ? "This bulletin is no longer held." : r.error; return; }
+  $("viewText").textContent = r.text;
   refreshMail();
 }
 $("closeView").addEventListener("click", () => { viewing = null; $("viewer").hidden = true; refreshMail(); });
 $("resend").addEventListener("click", async () => {
   if (!viewing) return;
-  const answer = await fetch("api/mail/resend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: viewing }) });
-  const body = await answer.json();
-  if (answer.ok) said("Back in the outbox: it goes to the BBS at the next session.", "good"); else said(body.error, "bad");
-  if (answer.ok) { $("resend").hidden = true; mailOffset = 0; refreshMail(); refresh(); }
+  const r = await api("api/mail/resend", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: viewing }) });
+  if (r.ok) said("Back in the outbox: it goes to the BBS at the next session.", "good"); else said(r.error, "bad");
+  if (r.ok) { $("resend").hidden = true; mailOffset = 0; refreshMail(); refresh(); }
 });
 setInterval(refreshMail, 5000);
 refreshMail();
@@ -444,7 +464,9 @@ function level(msg) {
 /* ---------- settings ---------- */
 let settings = null;
 async function loadSettings() {
-  settings = await (await fetch("api/settings")).json();
+  const r = await api("api/settings");
+  if (!r.ok) { $("saved").innerHTML = `<span class="bad">Cannot load the settings: ${esc(r.error)}</span>`; return; }
+  settings = r.body;
   const a = settings.audio;
   const kind = a.startsWith("ubersdr:") ? "ubersdr" : a.startsWith("wav:") ? "wav" : "alsa";
   $("audioKind").value = kind;
@@ -471,11 +493,10 @@ $("settings").addEventListener("submit", async e => {
     audio: $("audioWhere").value, type: $("type").value, host: $("host").value, port: Number($("port").value),
     login: $("login").value, password: $("password").value, command: $("command").value,
   };
-  const answer = await fetch("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-  const body = await answer.json();
-  $("saved").innerHTML = answer.ok ? '<span class="good">Saved. The receiver is using the new settings.</span>' : `<span class="bad">${esc(body.error)}</span>`;
+  const r = await api("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+  $("saved").innerHTML = r.ok ? '<span class="good">Saved. The receiver is using the new settings.</span>' : `<span class="bad">${esc(r.error)}</span>`;
   $("password").value = "";
-  if (answer.ok) { loadSettings(); refresh(); }
+  if (r.ok) { loadSettings(); refresh(); }
 });
 loadSettings();
 </script>
