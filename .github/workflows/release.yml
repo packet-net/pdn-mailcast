@@ -2,7 +2,8 @@ name: release
 
 # The release pipeline, after pdn-soundmodem's and pdn-bbs's: test, then build the two Debian
 # packages (pdn-mailcast-receiver and pdn-mailcast-headend) for amd64, arm64 and armhf and the
-# M0LTE.RaptorQ NuGet package, attach them to a GitHub Release, and tell packet-net/apt.
+# M0LTE.RaptorQ NuGet package, attach them to a GitHub Release, tell packet-net/apt, and hand
+# the .nupkg to nuget.yml for nuget.org.
 #
 # - A `v*` tag builds and publishes.
 # - workflow_dispatch builds everything and leaves it as workflow artifacts, releasing nothing:
@@ -27,10 +28,6 @@ on:
         required: true
       publish:
         description: 'Also cut the GitHub Release and notify the apt repo'
-        type: boolean
-        default: false
-      push_nuget:
-        description: 'Also push M0LTE.RaptorQ to nuget.org (needs publish, and NUGET_API_KEY)'
         type: boolean
         default: false
   pull_request:
@@ -58,7 +55,6 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       publish: ${{ steps.version.outputs.publish }}
-      push_nuget: ${{ steps.version.outputs.push_nuget }}
     steps:
       - name: Resolve version
         id: version
@@ -66,7 +62,6 @@ jobs:
           EVENT: ${{ github.event_name }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_PUBLISH: ${{ inputs.publish }}
-          INPUT_PUSH_NUGET: ${{ inputs.push_nuget }}
           PR: ${{ github.event.pull_request.number }}
           RUN: ${{ github.run_number }}
         run: |
@@ -99,11 +94,6 @@ jobs:
             publish=false
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          if [ "$publish" = "true" ] && [ "$INPUT_PUSH_NUGET" = "true" ]; then
-            echo "push_nuget=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "push_nuget=false" >> "$GITHUB_OUTPUT"
-          fi
           echo "version $version, publish $publish"
 
   # The whole suite, the docker LinBPQ tests included (the hosted runner has docker). Nothing is
@@ -242,8 +232,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      actions: write # to dispatch nuget.yml
     env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       APT_DISPATCH_TOKEN: ${{ secrets.APT_DISPATCH_TOKEN }}
       VERSION: ${{ needs.version.outputs.version }}
       TAG: ${{ needs.version.outputs.tag }}
@@ -311,18 +301,10 @@ jobs:
         if: env.APT_DISPATCH_TOKEN == ''
         run: echo "::warning::APT_DISPATCH_TOKEN is not visible to this repo, so packet-net/apt was not told about $TAG (the GitHub Release still has the .debs). Grant the org secret to pdn-mailcast and add it to packet-net/apt's sources.txt."
 
-      # Off unless a dispatch asks for it (push_nuget: true), and never on a tag push: whether
-      # M0LTE.RaptorQ goes to nuget.org is still to be decided, so for now the package is only
-      # attached to the release. Once it should ship, dispatch with push_nuget, or make this
-      # step's condition the publish flag alone.
+      # The NuGet push lives in nuget.yml, which nuget.org's trusted publishing policy names, and
+      # pushes the .nupkg attached to this release. Dispatching it (GITHUB_TOKEN may trigger a
+      # workflow_dispatch) keeps the OIDC login out of this job.
       - name: Push M0LTE.RaptorQ to nuget.org
-        if: needs.version.outputs.push_nuget == 'true' && env.NUGET_API_KEY != ''
-        run: |
-          dotnet nuget push "./artifacts/M0LTE.RaptorQ.${VERSION}.nupkg" \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key "${NUGET_API_KEY}" \
-            --skip-duplicate
-
-      - name: Warn if NUGET_API_KEY missing
-        if: needs.version.outputs.push_nuget == 'true' && env.NUGET_API_KEY == ''
-        run: echo "::warning::NUGET_API_KEY is not visible to this repo, so the NuGet push was skipped (the GitHub Release still has the .nupkg)."
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nuget.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG"

@@ -1,0 +1,52 @@
+name: nuget
+
+# Pushes M0LTE.RaptorQ to nuget.org from a GitHub Release's .nupkg, with NuGet trusted
+# publishing (OIDC), so there is no long-lived API key anywhere. The nuget.org trusted
+# publishing policy names this file, so keep its name.
+#
+# release.yml dispatches this once it has published a release. To push a release's package by
+# hand: gh workflow run nuget.yml -f tag=v0.1.0
+#
+# It pushes the .nupkg already attached to the release rather than building one, so a NuGet
+# push never rebuilds (and never changes) anything the release or the apt repo already carries.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag whose M0LTE.RaptorQ .nupkg to push (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download the package from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'M0LTE.RaptorQ.*.nupkg' --dir pkg
+          ls -l pkg
+          [ "$(find pkg -name '*.nupkg' | wc -l)" = 1 ] || { echo "::error::expected one M0LTE.RaptorQ .nupkg on $TAG"; exit 1; }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Log in to nuget.org (trusted publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: tomf84
+
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push pkg/*.nupkg --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
