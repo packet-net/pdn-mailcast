@@ -61,7 +61,9 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | Audio | A radio on 7.052 MHz USB into a sound card (listens all the time), or a public UberSDR web receiver (listens to 8 slots a day, 14 minutes each, inside the 3 hours a day such receivers allow) |
 | Delivery | Logs in to the listener's LinBPQ or Linux FBB as forwarding partner Q0CAST and offers each rebuilt bulletin by FBB B1F; the BBS keeps or refuses it by BID like any partner |
 | Durability | Rebuilt bulletins stay in an on-disk outbox until the BBS has answered; partial objects and completed markers expire after 14 days |
-| Status | Local web page with level meter, spectrogram, the tone's frequency offset and signal-to-noise, today's slot times and bulletin progress |
+| Mail | The receiver keeps its own copy of every bulletin (30 days or 50 MB unless set), readable on the status page, and any of them can be sent to the BBS again |
+| Sharing a radio | If the radio is also a LinBPQ packet radio, the receiver turns LinBPQ's transmitter off on that port (`XMITOFF`), tunes the rig to 7.052 MHz by Hamlib rigctld (flrig works through `rigctld -m 4`) from a minute before each slot to 12 minutes after, then puts the rig back and turns the port on again; it gives the rig back at once if it ever sees PTT on |
+| Status | Local web page with level meter, spectrogram, the tone's frequency offset and signal-to-noise, today's slot times and bulletin progress; open on the local network only with a password, behind a sign-in page |
 
 ## Measured on air, 2026-10-05
 
@@ -80,7 +82,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 
 | Component | Where | Licence |
 |---|---|---|
-| Head end, receiver, core library | github.com/packet-net/pdn-mailcast; the core library is Packet.Mailcast on nuget.org | AGPL-3.0-or-later |
-| RaptorQ | M0LTE.RaptorQ on nuget.org, checked byte for byte against the Rust `raptorq` crate | AGPL-3.0-or-later |
+| Head end, receiver, core library | github.com/packet-net/pdn-mailcast; the core library is Packet.Mailcast on nuget.org | AGPL-3.0-only |
+| RaptorQ | M0LTE.RaptorQ on nuget.org, checked byte for byte against the Rust `raptorq` crate | AGPL-3.0-only |
 | FBB forwarding | Packet.Fbb on nuget.org, from github.com/packet-net/pdn-fbb, shared with pdn-bbs | AGPL-3.0-or-later |
 | Modem, transmit lease, rig control | github.com/packet-net/pdn-soundmodem | AGPL-3.0-or-later, with some files GPL-3.0 (see its LICENSING.md) |
