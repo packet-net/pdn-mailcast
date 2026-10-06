@@ -938,6 +938,8 @@ public sealed class StatusPage : IAsyncDisposable
     {
         audio = config.Audio,
         dialKHz = config.DialKHz,
+        sources = config.AcceptedSources,
+        sourcesSet = config.Sources is not null,
         bbs = new
         {
             type = config.Bbs.Type,
@@ -958,10 +960,10 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>
     /// The form's answer. An empty password keeps the one already set; so does an empty
     /// <paramref name="PagePassword"/>, the page's own, which needs <paramref name="CurrentPagePassword"/>
-    /// to change once there is one.
+    /// to change once there is one. A null <paramref name="Sources"/> keeps the callsigns accepted as they are.
     /// </summary>
     internal sealed record SettingsForm(string Audio, string Type, string Host, int Port, string Login, string? Password, string Command,
-        string? PagePassword = null, string? CurrentPagePassword = null);
+        string? PagePassword = null, string? CurrentPagePassword = null, IReadOnlyList<string?>? Sources = null);
 
     /// <summary>Applies a settings form to <paramref name="current"/>; throws <see cref="ConfigException"/> for one that cannot work.</summary>
     internal static ReceiverConfig Apply(ReceiverConfig current, SettingsForm form)
@@ -997,6 +999,7 @@ public sealed class StatusPage : IAsyncDisposable
             },
             // The caller has checked CurrentPagePassword: it needs the sign-in throttle.
             Web = string.IsNullOrEmpty(form.PagePassword) ? current.Web : current.Web with { Password = form.PagePassword },
+            Sources = form.Sources is null ? current.Sources : CallsignList.Parse(form.Sources),
         };
         next.Validate();
         return next;

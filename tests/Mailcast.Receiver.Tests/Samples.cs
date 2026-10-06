@@ -10,6 +10,9 @@ internal static class Samples
 {
     public static readonly DateOnly Day = new(2026, 10, 4);
 
+    /// <summary>The callsign the head end sends as today.</summary>
+    public const string Source = "GB7RDG";
+
     /// <summary>A bulletin shaped like one GB7RDG forwards, with its R: lines.</summary>
     public static Bulletin Bulletin(int number, string from = "G4ABC", string to = "ALL", string at = "GBR", int bodyLines = 20, string? title = null, DateTimeOffset? date = null)
     {
@@ -51,14 +54,14 @@ internal static class Samples
             Day.AddDays(dayOffset),
             seed,
             Compression.Default);
-        return [.. plan.Frames.Select(f => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, f.ToBytes()))];
+        return [.. plan.Frames.Select(f => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, f.ToBytes()))];
     }
 
     /// <summary>A slot's frames as a head end with these options sends them, its directory carrying its timetable if it has one.</summary>
     public static IReadOnlyList<byte[]> Frames(IEnumerable<Bulletin> bulletins, ScheduleOptions options, DateTimeOffset slot, int seed = 1)
     {
         var plan = BroadcastScheduler.Plan(bulletins.Select(b => new BroadcastBulletin(b, DateOnly.FromDateTime(slot.UtcDateTime), slot)), slot, seed, Compression.Default, options);
-        return [.. plan.Frames.Select(f => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, f.ToBytes()))];
+        return [.. plan.Frames.Select(f => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, f.ToBytes()))];
     }
 }
 

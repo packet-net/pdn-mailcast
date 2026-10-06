@@ -15,7 +15,7 @@ public class IonosphereTests
     private static readonly IonoReading Reading = IonoEvaluator.Evaluate(
         [new IonoSounding("RL052", Sounded, IonoSource.Giro, 6.05, M3000: 3.3)], new IonoSettings(), Sounded.AddMinutes(10));
 
-    private static byte[] Ax25(MailcastFrame frame) => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, frame.ToBytes());
+    private static byte[] Ax25(MailcastFrame frame) => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, frame.ToBytes());
 
     [Fact]
     public async Task TheReading_IsShownAndKept_ButNeverWaitsForTheBbs()

@@ -9,6 +9,10 @@
   // a sound card. The signal is centred 1800 Hz above it, on 7.0538 MHz.
   "dialKHz": 7052.0,
 
+  // The callsigns the broadcast is accepted from, any SSID. GB7RDG sends it today, and it may
+  // move to M0LTE. Frames from anyone else are ignored. Left out, it is these two.
+  "sources": ["GB7RDG", "M0LTE"],
+
   // Your BBS. "type" is "linBpq" or "fbb". For LinBPQ the port is the FBBPORT in its
   // Telnet port, and the login is the USER= name you made for the receiver.
   "bbs": {

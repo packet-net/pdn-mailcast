@@ -82,9 +82,9 @@ public sealed record ArchiveSettings
 }
 
 /// <summary>
-/// The receiver's configuration file. Only what a station has to choose is here; the broadcast's
-/// own details (callsigns, the modem, where the signal sits above the dial) are fixed in
-/// <see cref="OnAir"/>.
+/// The receiver's configuration file. Only what a station has to choose is here, and the
+/// callsigns the broadcast may come from; the broadcast's other details (its destination, the
+/// modem, where the signal sits above the dial) are fixed in <see cref="OnAir"/>.
 /// </summary>
 public sealed record ReceiverConfig
 {
@@ -117,6 +117,25 @@ public sealed record ReceiverConfig
     /// <summary>The signal's centre in Hz: the dial plus <see cref="OnAir.CentreAudioHz"/>.</summary>
     [JsonIgnore]
     public double CentreHz => DialHz + OnAir.CentreAudioHz;
+
+    /// <summary>
+    /// The callsigns accepted when the file has no <c>"sources"</c>, as files from before the
+    /// setting do: GB7RDG, and M0LTE, which the broadcast may move to. The only place in the
+    /// code these are written.
+    /// </summary>
+    public static readonly CallsignList DefaultSources = CallsignList.Parse(["GB7RDG", "M0LTE"]);
+
+    /// <summary>
+    /// <c>"sources"</c>: the base callsigns broadcast frames are accepted from, any SSID; frames
+    /// from anyone else are somebody else's traffic. Null when the file leaves it out, which
+    /// means <see cref="DefaultSources"/>; see <see cref="AcceptedSources"/>.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CallsignList? Sources { get; init; }
+
+    /// <summary>The callsigns frames are accepted from: <see cref="Sources"/>, or <see cref="DefaultSources"/> without it.</summary>
+    [JsonIgnore]
+    public CallsignList AcceptedSources => Sources ?? DefaultSources;
 
     /// <summary>The BBS the bulletins go to.</summary>
     public BbsSettings Bbs { get; init; } = new();
@@ -274,6 +293,10 @@ public sealed record ReceiverConfig
         }
 
         config ??= new ReceiverConfig();
+        if (config.Sources is null && Has(text, "sources"))
+        {
+            throw new ConfigException($"\"sources\" is null: give the callsigns the broadcast comes from, such as [\"GB7RDG\", \"M0LTE\"], or leave it out for {DefaultSources}");
+        }
         if (HasOnlySlotUtc(text))
         {
             config = config with { SlotUtcWithoutEveryMinutes = true };

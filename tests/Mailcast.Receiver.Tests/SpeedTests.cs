@@ -197,7 +197,7 @@ public class SpeedTests
     {
         var payload = new byte[120];
         new Random(seed).NextBytes(payload);
-        byte[] frame = Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, payload);
+        byte[] frame = Ax25UiFrame.Build(Samples.Source, OnAir.Destination, payload);
         return new Ms110dModem(Rate, _ => { }, new Ms110dTxSettings { WaveformNumber = wn }).Modulate(frame, 0);
     }
 

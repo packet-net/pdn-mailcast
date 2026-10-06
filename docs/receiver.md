@@ -10,6 +10,7 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 {
   "audio": "ubersdr:wessex.zapto.org",
   "dialKHz": 7052.0,
+  "sources": ["GB7RDG", "M0LTE"],
   "bbs": {
     "type": "linBpq",
     "host": "127.0.0.1",
@@ -29,6 +30,7 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 
 - `audio`: `ubersdr:wessex.zapto.org` for the web SDR, an ALSA device such as `plughw:CARD=Device,DEV=0` for your radio's sound card, or `wav:/path/to/file.wav` to decode a recording.
 - `dialKHz`: the USB dial in kHz, normally `7052.0` (7.052 MHz), which is also what you get if you leave it out. The web SDR is tuned there, and a radio on a sound card should be set there. The signal is centred 1800 Hz above the dial, on 7.0538 MHz. Only change it if the signal moves; anything from 1800 to 30000 kHz is accepted.
+- `sources`: the callsigns the broadcast is accepted from. GB7RDG sends it today, and it may move to M0LTE, so the default is `["GB7RDG", "M0LTE"]`. Each is a callsign of 1 to 6 letters and digits; any SSID is accepted, so `M0LTE` also takes `M0LTE-1`, and one written with an SSID counts as the callsign without it. Frames from anyone else are ignored, and the log names the first few such callsigns once each. A config file from before this setting has no `sources`; the receiver uses the default and says so in the log, so it keeps hearing the broadcast. An empty list is refused. You can also change it on the status page.
 - `bbs`: where your BBS is and how the receiver logs in. See below.
 - `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which you enter on the page's sign-in page. See [On your network](#on-your-network).
 - `slotUtc` and `everyMinutes`: when GB7RDG's slots are, in UTC. One starts at `slotUtc` and then one every `everyMinutes`, round the clock, but only those in daylight run (see `daylight`). GB7RDG sends every hour on the hour, so `"00:00"` and `60`, which is also what you get if you leave them out. `everyMinutes` must divide a day (1440) and be at least 15. A config file from before hourly slots has only `slotUtc` (`"12:00"`); it is read as every 60 minutes from that time, which is the same hourly slots, so nothing needs changing. A sound card listens all the time, whatever these say. The receiver also uses the slots to make sense of what it hears: each frame counts for the slot whose start most recently passed, and a tone only counts as a slot's opening tone if it starts within 5 minutes of a slot's start, so someone tuning up near 7.0538 MHz isn't taken for GB7RDG.
@@ -186,7 +188,7 @@ http://127.0.0.1:8130/ shows:
 - what to try if nothing is heard;
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the mail this receiver holds (see [Mail](#mail));
-- the settings: audio, the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
+- the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
 
 On this machine only, the page answers to `localhost` and nothing else.
 

@@ -1,11 +1,11 @@
 namespace Mailcast.Receiver;
 
-/// <summary>The transmission's fixed details, from docs/design.md.</summary>
+/// <summary>
+/// The transmission's fixed details, from docs/design.md. The callsigns it may come from are a
+/// setting: <see cref="ReceiverConfig.Sources"/>.
+/// </summary>
 public static class OnAir
 {
-    /// <summary>The station that sends the broadcast.</summary>
-    public const string Source = "GB7RDG";
-
     /// <summary>The AX.25 destination every broadcast frame carries.</summary>
     public const string Destination = "MCAST";
 

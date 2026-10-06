@@ -64,7 +64,7 @@ public class ModemLockTests
     {
         var payload = new byte[200];
         new Random(seed).NextBytes(payload);
-        return Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, payload);
+        return Ax25UiFrame.Build(Samples.Source, OnAir.Destination, payload);
     }
 
     private static void Feed(AudioPipeline pipeline, float[] audio)

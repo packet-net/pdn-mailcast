@@ -17,6 +17,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | Power | 50 W setting on a Flex 6500; measured forward power about 41 W median during data, 44 W during the tone; SWR 1.02 to 1.09 |
 | Transmit level | pdn-soundmodem `txAmplitude` 1.0 (data peaks at about 0.75 of full scale; the tone at 0.8) |
 | Identification | AX.25 source callsign GB7RDG on every frame, plus CW ident GB7RDG at 20 wpm on the signal centre at the start of each slot and when the transmitter is released |
+| Accepted sources | Frames may come from GB7RDG or M0LTE; receivers accept both (the receiver's `sources` setting), so the broadcast can move to M0LTE without a receiver update |
 
 ## Timetable
 
