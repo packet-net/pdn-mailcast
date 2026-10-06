@@ -19,10 +19,11 @@ public enum ObjectKind : byte
     DappsMessage = 3,
 
     /// <summary>
-    /// The head end's ionosonde reading: a fixed binary record, not compressed and sent with
-    /// dictionary 0 (see <see cref="Propagation.IonoRecord"/>). Observe only, never for the BBS.
+    /// A propagation reading from the head end, one object per source (the ionosonde now): a
+    /// short binary record, not compressed and sent with dictionary 0 (see
+    /// <see cref="Propagation.IonoRecord"/>). Observe only, never for the BBS.
     /// </summary>
-    Ionosphere = 4,
+    Propagation = 4,
 }
 
 /// <summary>
@@ -58,7 +59,7 @@ public static class ContentType
         (byte)ObjectKind.Bulletin => "packet mail bulletin (FBB/BPQ message format)",
         (byte)ObjectKind.Directory => "directory",
         (byte)ObjectKind.DappsMessage => "DAPPS message",
-        (byte)ObjectKind.Ionosphere => "ionosonde reading",
+        (byte)ObjectKind.Propagation => "propagation reading",
         >= FirstExperimental and <= LastExperimental => $"experimental content type {type}",
         _ => $"unassigned content type {type}",
     };
@@ -100,7 +101,7 @@ public static class ContentType
 /// <summary>
 /// An object ready to send: one octet of content type (<see cref="ContentType"/>), an optional
 /// metadata block, then the zstd-compressed content, RaptorQ coded as one source block. The one
-/// exception is <see cref="ObjectKind.Ionosphere"/>, a short record sent as it is. These
+/// exception is <see cref="ObjectKind.Propagation"/>, a short record sent as it is. These
 /// octets are what the OTI's transfer length counts, what the object ID hashes (after the
 /// dictionary ID), and what a receiver rebuilds.
 /// </summary>
@@ -182,7 +183,7 @@ public sealed class TransferObject
     /// <summary>
     /// A short record of <paramref name="type"/>, not compressed and with dictionary 0, as one
     /// symbol of exactly its own length rounded up to <paramref name="alignment"/>, so that every
-    /// frame of it is small and any one rebuilds it: how <see cref="ObjectKind.Ionosphere"/> is sent.
+    /// frame of it is small and any one rebuilds it: how <see cref="ObjectKind.Propagation"/> is sent.
     /// </summary>
     public static TransferObject ForRecord(byte type, ReadOnlySpan<byte> record, int alignment = MailcastFrame.StandardAlignment)
     {
@@ -237,9 +238,9 @@ public sealed class TransferObject
         {
             throw new InvalidDataException("Not a mailcast object.");
         }
-        if (type == (byte)ObjectKind.Ionosphere)
+        if (type == (byte)ObjectKind.Propagation)
         {
-            return (ObjectKind.Ionosphere, content.ToArray()); // a record, not compressed
+            return (ObjectKind.Propagation, content.ToArray()); // a record, not compressed
         }
         return ((ObjectKind)type, compression.Decompress(content, dictionaryId));
     }

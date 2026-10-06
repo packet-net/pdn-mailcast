@@ -194,11 +194,11 @@ public class IonosphereTests
     private static IonoReading Sample() => IonoEvaluator.Evaluate([Chilton(6.05, m3000: 3.3)], Settings, Now);
 
     [Fact]
-    public void Record_IsUnder24Octets_AndRoundTrips()
+    public void Record_Is24Octets_AndRoundTrips()
     {
         var reading = Sample();
         byte[] bytes = IonoRecord.Encode(reading);
-        Assert.Equal(23, bytes.Length);
+        Assert.Equal(24, bytes.Length);
         Assert.Equal(4, bytes[0]);
         Assert.True(IonoRecord.TryDecode(bytes, out var back));
         Assert.Equal(reading.State, back.State);
@@ -213,21 +213,28 @@ public class IonosphereTests
         Assert.Equal(reading.Describe(Now), back.Describe(Now));
 
         // Nothing at all: no foF2, no MUF, no skip zone.
-        var bare = new IonoReading { Station = "DB049", SoundingTimeUtc = Sounded };
+        var bare = new IonoReading { Station = "DB049", SoundingTimeUtc = Sounded, Source = IonoSource.Giro };
         Assert.True(IonoRecord.TryDecode(IonoRecord.Encode(bare), out var bareBack));
         Assert.Equal((null, null, null, null, null), (bareBack.FoF2, bareBack.Mufd100, bareBack.Mufd500, bareBack.Mufd1000, bareBack.SkipZoneKm));
         Assert.Throws<ArgumentException>(() => IonoRecord.Encode(IonoReading.None));
+        Assert.Throws<ArgumentException>(() => IonoRecord.Encode(reading with { Source = IonoSource.None }));
 
         // A later version's longer record is read as far as this one goes; a cut-short one is not.
         Assert.True(IonoRecord.TryDecode([.. bytes, 7, 7], out _));
-        Assert.False(IonoRecord.TryDecode(bytes.AsSpan(0, 22), out _));
+        Assert.False(IonoRecord.TryDecode(bytes.AsSpan(0, 23), out _));
+
+        // Another source (PSK Reporter spots, say, one day) shares the common part; this version
+        // does not read it as an ionosonde, and a receiver ignores it quietly.
+        byte[] spots = [.. bytes.AsSpan(0, 1 + IonoRecord.CommonLength)];
+        spots[2] = 3;
+        Assert.False(IonoRecord.TryDecode(spots, out _));
     }
 
     [Fact]
     public void Object_IsOneSmallSymbol_AndEitherFrameAloneRebuildsIt()
     {
         var obj = IonoRecord.ToTransferObject(Sample());
-        Assert.Equal((1, 24, 23L, (ushort)0), (obj.SourceSymbols, obj.Oti.SymbolSize, obj.Length, obj.DictionaryId));
+        Assert.Equal((1, 24, 24L, (ushort)0), (obj.SourceSymbols, obj.Oti.SymbolSize, obj.Length, obj.DictionaryId));
         Assert.Equal(ObjectId.Of(0, obj.Bytes), obj.ObjectId);
         foreach (uint esi in new uint[] { 0, 1 })
         {
@@ -238,7 +245,7 @@ public class IonosphereTests
             decoder.Add(new PayloadId(0, frame.EncodingSymbolId), frame.Symbol.Span);
             Assert.Equal(obj.Bytes.ToArray(), decoder.TryDecode());
         }
-        // ESI 0 is the object itself and its one octet of padding: 55 octets a frame, 71 as AX.25.
+        // ESI 0 is the object itself: 55 octets a frame, 71 as AX.25.
         Assert.Equal(24, obj.Frame(0).Symbol.Length);
         Assert.Equal(55, obj.Frame(0).ToBytes().Length);
     }
@@ -258,6 +265,14 @@ public class IonosphereTests
         Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(newer.Frame(0).ToBytes()).Outcome);
         Assert.Equal(FrameOutcome.CompletedIonosphere, store.Accept(older.Frame(0).ToBytes()).Outcome);
         Assert.Equal(6.05, store.Ionosphere!.FoF2); // the older sounding does not replace the newer
+        // A source this version does not know: ignored quietly, marked done, the reading kept.
+        byte[] other = [.. IonoRecord.Encode(Sample()).AsSpan(1, IonoRecord.CommonLength)];
+        other[1] = 3;
+        var spots = TransferObject.ForRecord((byte)ObjectKind.Propagation, other);
+        Assert.Equal(FrameOutcome.CompletedUnknown, store.Accept(spots.Frame(0).ToBytes()).Outcome);
+        Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(spots.Frame(1).ToBytes()).Outcome);
+        Assert.Equal(6.05, store.Ionosphere!.FoF2);
+
         Assert.Empty(store.Pending());
         Assert.Equal(0, store.PartialObjects);
         Assert.Empty(log);
@@ -308,9 +323,9 @@ public class IonosphereTests
         Assert.Equal(20, with.Frames.Count);
         Assert.Equal(2, with.ExtraFrames);
         Assert.Equal(without.BulletinFrames - 2, with.BulletinFrames);
-        Assert.Equal(2, with.Frames.Count(f => f.DictionaryId == 0 && f.Oti.TransferLength == 23));
+        Assert.Equal(2, with.Frames.Count(f => f.DictionaryId == 0 && f.Oti.TransferLength == IonoRecord.ObjectLength));
         // Never first (the directory is), and not in the directory.
-        Assert.NotEqual(23, with.Frames[0].Oti.TransferLength);
+        Assert.NotEqual(IonoRecord.ObjectLength, with.Frames[0].Oti.TransferLength);
         Assert.Equal(2, with.Directory.Entries.Count);
         Assert.DoesNotContain(with.Directory.Entries, e => e.ObjectId == extras[0].ObjectId);
 

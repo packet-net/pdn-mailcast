@@ -751,7 +751,7 @@ public sealed class ReceiverStore
         {
             return Unusable(instance, "matches its ID but its content type or metadata block is cut short");
         }
-        if (type == (byte)ObjectKind.Ionosphere)
+        if (type == (byte)ObjectKind.Propagation)
         {
             // Observe only, never for the BBS. Marked done either way, so its later frames are ignored.
             MarkDone(instance);
