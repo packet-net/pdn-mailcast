@@ -1,0 +1,9 @@
+Bid: TMGA7C_DB0HB
+Title: AGCW-Telegramm 41/26 vom 2026-10-05
+Size: 3179
+FirstSeen: 2026-10-05
+Object: 4255fd53de6ad59f
+Dictionary: 1
+Oti: 000000058a0000f001000104
+NextEsi: 10
+FirstSlot: 2026-10-06T09:00Z

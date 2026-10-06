@@ -37,13 +37,13 @@ A few settings have a different default for a daily station and for anything mor
 | `slot.toneSeconds` | 30 | 10, which receivers expect from an hourly station |
 | `slot.maxMinutes` | 40 | 10, so a slot ends while a web SDR receiver, which listens to 12 minutes past, is still there |
 | `slot.catchUpMinutes` | 30 | 5 |
-| how bulletins are carried | three days running | five slots over a little more than a day, or with `daylight` two daylight slots (see below) |
+| how bulletins are carried | three days running (the shares rule) | each slot filled to its airtime budget (the budget rule, see below) |
 
 ## What happens in each slot
 
 At each slot the head end:
 
-1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the slot's frames. If no bulletin has anything due, it keys nothing and waits for the next slot.
+1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the slot's frames. If no bulletin has anything to send, it keys nothing, not even the directory, and waits for the next slot. Under the budget rule that only happens when nothing is in rotation.
 2. Checks that the system clock is synchronised (the kernel's own flag, as timedatectl shows it), and keys nothing until it is (`slot.requireClockSync`); a slot it skips for this is retried. It never runs a slot earlier than the last one it ran, whatever the clock says.
 3. Reads the Flex's frequency reference and PA temperature, if configured, and logs whether it is GPS locked. It does not start with the PA already over the limit.
 4. Opens the bulletin modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and tells the station to send each burst anyway once it has waited 10 s for a clear channel (`station.maxCarrierWaitSeconds`).
@@ -58,7 +58,40 @@ Whatever was not sent is owed: the next slot sends it on top of its own share, w
 
 ## How each bulletin is carried
 
-### In daylight (GB7RDG)
+### Fill to budget (the default for hourly slots)
+
+Each slot is filled to an airtime budget with fresh pieces of every bulletin in rotation, the least covered first. A bulletin's coverage is the pieces sent of it so far divided by its K (the number of pieces it is cut into), so new bulletins come first. Each slot first gives every bulletin enough that any 3 slots rebuild it (a third of K plus a spare piece), then shares the rest out, still the least covered first, but never more than 0.6 K of one bulletin in one slot. So a bulletin is spread over the day's slots rather than spent in one, a quiet day sends short slots, and a busy day sends full ones. A bulletin retires after 6 K in all, or 36 hours after its first slot, whichever comes first; it then leaves the slots and the directory.
+
+The budget is 10 minutes on the air (`schedule.budgetMinutes`, `slot.maxMinutes` if left out), tone, pause, gaps and closing ident included. A slot is never filled closer to the 10 minute hard stop than the 2 minutes it may wait for a clear channel before its tone (`schedule.marginSeconds`, `slot.channelWaitSeconds` if left out), so GB7RDG's slots are filled to 8 minutes. The estimate counts the frames as the station packs them into 18 s bursts (`station.maxBurstSeconds`), each burst's preamble and coding from the modem's own modulator for the slot's waveform, about 3 s to take the lease, the tone plus 1 s, the pause, 2.5 s more per burst than its airtime (gathering, keying and the acknowledgement, measured), the 1 s gaps and 8 s for the closing ident. Against GB7RDG's slots:
+
+| Slot | Frames | Bursts | Measured, start to release | Estimate |
+|---|---|---|---|---|
+| 2026-10-05 16:00 (30 s tone) | 41 | 7 | 161.5 s | 162.5 s |
+| 2026-10-06 09:00 (10 s tone) | 33 | 6 | 119.7 s | 120.5 s |
+
+On an October day with about 20 bulletins that is 9 slots of 7.4 to 8 minutes on WN4, 140 to 152 frames each, carrying 22 to 27 bulletins; each bulletin gets about 6 K over about 10 slots, any 3 of which rebuild it. `tests/Mailcast.HeadEnd.Tests/BudgetTests.cs` checks this, a busy day and a quiet one, at both rates.
+
+A bulletin that has had pieces sent but has no `FirstSlot` in its `state.txt` (one an older head end sent) is in rotation again from its `NextEsi`, and its next slot counts as its first.
+
+The settings, in `schedule`:
+
+- `rule`: `"budget"`, or `"shares"` for the fixed shares below. Left out, `budget` for anything but a daily station, unless the shares keys are set.
+- `budgetMinutes`: 10 (`slot.maxMinutes`).
+- `marginSeconds`: 120 (`slot.channelWaitSeconds`, or 0 without a tone).
+- `spreadSlots`: 3, so any 3 slots rebuild a bulletin.
+- `slotCap`: 0.6, as a multiple of K.
+- `retireCoverage`: 6, as a multiple of K.
+- `retireHours`: 36.
+
+### A waveform per slot
+
+`schedule.modes` lists waveforms the slots take in turn, for example `["ms110d-wn4", "ms110d-wn3"]` to compare 1200 and 600 bps on real mail. Consecutive slots take turns, and the next day starts one further on, so each hour gets each waveform on alternate days. Left out, every slot goes on `station.mode` and the modem is left alone.
+
+With `modes` set, the head end switches the broadcast modem before each slot with a KISS SETHW frame on its KISS port (the waveform number, then 0 for the short interleaver), and waits for pdn-soundmodem's echo, which confirms it. It takes effect from the next burst, and nothing of ours is queued then. If no echo comes in 5 s it keys nothing and tries again like any slot skipped at the station. After the release it switches the modem back to `station.mode`, and it does the same when it starts, so a slot cut off by a crash never leaves WN3 set for long. The setting lives in pdn-soundmodem's memory only, so a pdn-soundmodem restart also puts it back.
+
+Receivers need do nothing: pdn-soundmodem's MS110D receiver reads each burst's waveform from its preamble (autobaud), and every mailcast receiver release uses it. A WN3 frame takes about twice as long, so a WN3 slot carries about half as much: alternating WN4 and WN3 on an October day, a bulletin gets about 4.7 K over about 14 slots, and a listener needs about 5 of them rather than 3. The journal's slot lines, the slot report (`mode`) and the directory (`mode=ms110d-wn3`) all name each slot's waveform.
+
+### The shares rule: in daylight (GB7RDG until fill to budget)
 
 A bulletin's first slot is the first slot planned after it is taken in, which for one that arrives at night is the morning's first. That slot carries 1.2 times its K (the number of pieces it is cut into) plus 2 spare pieces, enough to rebuild it from that slot alone with about a fifth of the frames lost. It goes out once more 5 hours later with 0.4 K of fresh pieces, for a receiver that lost more. A repeat that falls in the dark moves to the next daylight slot, so none is lost; if a bulletin has several repeats, each moves to a slot of its own, never one an earlier carrying already has, and the carry-over slots count only daylight slots. Pieces never repeat, whatever moves where.
 
@@ -74,7 +107,7 @@ Why less than the hourly plan below: all of a day's carrying has to fit in the d
 
 A web SDR receiver hears 8 of each day's daylight slots (see the receiver's documentation): in December that is all of them, and in June 8 of 14. It rebuilds a bulletin from its first slot alone, so on these settings it gets those whose first slot it hears: all of them in December, about 19 in 20 in October, and about 5 in 6 in June. A receiver on its own radio hears everything.
 
-### Every hour
+### The shares rule: every hour
 
 A bulletin's first slot is the first slot planned after it is taken in. That slot carries enough of it for a clean rebuild from that slot alone: 1.5 times its K (the number of pieces it is cut into) plus 2 spare pieces, which still rebuilds it with a fifth of the frames lost. It then goes out again with fresh pieces, never repeats, 5, 10, 17 and 25 hours later, 0.7 K each time, so a listener who missed that hour still gets it, and it is heard in five different hours of the day over a little more than a day. Pieces from different slots add together at the receiver.
 
@@ -84,9 +117,9 @@ If a repeat's slot is skipped or cut short, the next slot makes up what it owed.
 
 On GB7RDG's volume (about 25 bulletins a day, about 200 KB, about 60 KB once compressed, in 240-byte pieces on WN4 in 18 s bursts), that is about 3 minutes on the air in an average hour, tone and idents included (about 74 minutes a day), under 6 in 19 hours out of 20, and up to about 8 in the busiest. `tests/Mailcast.HeadEnd.Tests/AirtimeBudgetTests.cs` checks it on a sample of that size.
 
-### The settings
+### The shares rule's settings
 
-The settings, in `schedule`, are there to tune it; left out, they are the defaults above:
+With `"rule": "shares"`, these settings, in `schedule`, tune it; left out, they are the defaults above:
 
 - `slotShares`: the pieces for each carrying, as a multiple of K, the first for the first slot: `[1.2, 0.4]` with `daylight`, `[1.5, 0.7, 0.7, 0.7, 0.7]` without. Each is rounded up on its own.
 - `slotOffsets`: which slot each carrying is in, counted in slots (hours) from the first, dark ones included: `[0, 5]` with `daylight`, `[0, 5, 10, 17, 25]` without. One for each share, starting at 0. Give shares without offsets and they are spread over the same span.
@@ -95,13 +128,13 @@ The settings, in `schedule`, are there to tune it; left out, they are the defaul
 
 For another interval the defaults keep the same hours, in that interval's slots. A daily station's defaults are three days running, `[1.4, 0.3, 0.3]` with 1 spare piece. The daily station's old keys `daysCarried`, `totalOverhead` and `dayShares` still work: each day's share of the total becomes a slot share, the carryings a day apart. A config can use those or the new ones, not both.
 
-A bulletin first carried before this release is counted as first carried at midnight UTC on the day it was taken in.
+Under the shares rule, a bulletin first carried before slots had times is counted as first carried at midnight UTC on the day it was taken in.
 
 ## A slot on demand
 
 `pdn-mailcast-headend --run-now` asks the running head end for a slot now, between the scheduled ones, for a test transmission say. It goes through the status listener: `POST /run` on `status.bind` and `status.port` (127.0.0.1:8216), and only from the same machine, so nothing on the LAN can key the transmitter. The head end answers 202 with the slot it started, named by the minute it starts in, or 409 if a slot is already running, a one-off is already starting, or the clock is behind the last slot run. The journal says who asked (the `X-Requested-By` header, which `--run-now` fills with the user, and the address).
 
-It is a whole slot with the usual checks: the clock, the lease, the tone, the bursts and the idents. It runs whatever the time, daylight or not. It counts like any other slot, so no piece is ever sent twice: it sends whatever is owed and the first share of anything new, and the directory even if nothing else is due. A bulletin first carried in a one-off slot at night has its repeat in daylight like any other. The schedule carries on as before; the next scheduled slot still runs, and sends nothing again that the one-off sent.
+It is a whole slot with the usual checks: the clock, the lease, the tone, the bursts and the idents. It runs whatever the time, daylight or not. It counts like any other slot, so no piece is ever sent twice: it sends what a scheduled slot would (a full slot under the budget rule; what is owed and the first share of anything new under the shares rule), and the directory even if nothing else is due. A bulletin first carried in a one-off slot at night has its repeat in daylight like any other. The schedule carries on as before; the next scheduled slot still runs, and sends nothing again that the one-off sent.
 
 ## How the bursts are paced
 
@@ -164,16 +197,16 @@ With `flex.enabled`, the head end opens its own API session to the Flex for the 
 
 ## Status
 
-`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation, whether the tone went, the PA temperature maximum, the reference state, and who asked for it if it was a one-off (`requestedBy`). The journal carries the same in plain lines, each slot named by its start, and with `daylight`, once a day, that day's sunrise, sunset and slots, for example:
+`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation, whether the tone went, the PA temperature maximum, the reference state, who asked for it if it was a one-off (`requestedBy`), its waveform (`mode`) and the planner's estimate of its time on the air (`estimatedSeconds`). `recent-slots.json` in the state directory keeps the same for the last slots. The journal carries the same in plain lines, each slot named by its start, and with `daylight`, once a day, that day's sunrise, sunset and slots, for example:
 
 ```
 daylight 2026-10-05 at IO91lk: sunrise 06:11Z, sunset 17:33Z; 9 slots, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 and 17:00 UTC
 next slot 2026-10-05 13:00Z; 38 bulletins held
-slot 2026-10-05 13:00Z: starting at 13:00:03Z, 64 frames for 38 bulletins in 10 bursts, about 2.6 min on the air
+slot 2026-10-05 13:00Z: starting at 13:00:03Z, 64 frames for 38 bulletins in 10 bursts on ms110d-wn4, about 3.6 min on the air with the tone and idents
 slot 2026-10-05 13:00Z: Flex reference GPS locked (GPSDO locked)
 slot 2026-10-05 13:00Z: transmit lease taken for sub-channel 4, 120 s, renewed every 30 s
 slot 2026-10-05 13:00Z: calibration tone sent, 10 s at 1800 Hz
-slot 2026-10-05 13:00Z: done, 13:00:03 to 13:03:21Z, 64 of 64 frames sent in 10 bursts, 38 bulletins in rotation, tone sent, PA max 41.0 C, reference GPS locked (GPSDO locked)
+slot 2026-10-05 13:00Z: done, 13:00:03 to 13:03:21Z, 64 of 64 frames sent in 10 bursts on ms110d-wn4, 38 bulletins in rotation, tone sent, PA max 41.0 C, reference GPS locked (GPSDO locked)
 slots today (2026-10-05): 14, 13 completed, 0 cut short, 1 skipped
 ```
 

@@ -46,6 +46,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>When each frame reached the station, with whether the lease was ours then.</summary>
     public List<(DateTimeOffset At, bool LeaseHeld, byte[] Frame)> Frames { get; } = [];
 
+    /// <summary>Each SETHW the head end sent, with when and whether the lease was held then.</summary>
+    public List<(DateTimeOffset At, bool LeaseHeld, byte[] Payload)> SetHardware { get; } = [];
+
+    /// <summary>Whether the modem applies SETHW and echoes it, as pdn-soundmodem's MS110D modem does; false is a modem that refuses it.</summary>
+    public bool AppliesSetHardware { get; set; } = true;
+
+    /// <summary>The waveform number the modem transmits on now, as the last SETHW it applied left it.</summary>
+    public int? Waveform { get; private set; }
+
     /// <summary>Frames the station dropped without keying them.</summary>
     public int Dropped { get; private set; }
 
@@ -184,6 +193,20 @@ public sealed class FakeStation : IStationApi, IKissConnector
         private int _acked;
 
         public ChannelReader<ushort> Acks => _acks.Reader;
+
+        public async Task<bool> SetHardwareAsync(ReadOnlyMemory<byte> payload, TimeSpan wait, TimeProvider time, CancellationToken cancellation)
+        {
+            station.SetHardware.Add((station._time.GetUtcNow(), station.LeaseHeld, payload.ToArray()));
+            if (station.AppliesSetHardware)
+            {
+                await Task.Yield();
+                station.Waveform = payload.Span[0];
+                return true;
+            }
+            // Refused: nothing comes back, so the head end waits out its time.
+            await Task.Delay(wait, time, cancellation);
+            return false;
+        }
 
         public Task SendAsync(ushort id, ReadOnlyMemory<byte> ax25, CancellationToken cancellation)
         {

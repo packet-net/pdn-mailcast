@@ -31,6 +31,12 @@ public sealed record SlotSettings
     /// <summary>The AX.25 destination of every frame.</summary>
     public string Destination { get; init; } = "MCAST";
 
+    /// <summary>The broadcast modem's configured mode, which a slot goes out on unless its plan names another.</summary>
+    public string Mode { get; init; } = "ms110d-wn4";
+
+    /// <summary>How long to wait for the modem to confirm a change of waveform (its SETHW echo).</summary>
+    public TimeSpan SetHardwareWait { get; init; } = TimeSpan.FromSeconds(5);
+
     /// <summary>The broadcast modem's sub-channel on the station, which the lease and the tone name.</summary>
     public int SubChannel { get; init; }
 
@@ -168,4 +174,10 @@ public sealed record SlotReport
 
     /// <summary>Who asked for a one-off slot (<c>POST /run</c>), or null for a scheduled one.</summary>
     public string? RequestedBy { get; init; }
+
+    /// <summary>The waveform the slot went out on (or would have), as pdn-soundmodem names it; null in a report from before this was kept.</summary>
+    public string? Mode { get; init; }
+
+    /// <summary>The planner's estimate of the slot's time on the air, from its start to the end of the closing ident, in seconds.</summary>
+    public double? EstimatedSeconds { get; init; }
 }

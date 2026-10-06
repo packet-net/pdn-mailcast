@@ -64,6 +64,22 @@ With only 5 daylight slots in December, the hourly plan's five carryings would n
 
 The head end's directory says when its slots are and what its daylight rule is, so a receiver that has heard it follows the head end even if its own settings differ.
 
+### Filling each slot
+
+The fixed shares left most slots short and some empty: on 2026-10-06 the 09:00 slot carried only the two bulletins that came in overnight, and at 10:00 nothing was due, so nothing at all went out, not even the directory. Twenty older bulletins sat in the store unsent, because an older head end had sent them without recording their first slot.
+
+So the head end now fills every slot to an airtime budget instead (the "budget" rule, the default for hourly slots). Each slot sends fresh pieces of every bulletin in rotation, the least covered first, where coverage is the pieces sent so far divided by K. Every bulletin first gets enough that any three slots rebuild it (a third of K plus a spare piece), and then the rest goes to the least covered, up to 0.6 K of one bulletin in one slot. That spreads each bulletin over the day rather than spending one slot on it, so a quiet day sends short slots and a busy day full ones. A bulletin retires after 6 K in all or 36 hours after its first slot. Bulletins with pieces sent but no first slot, as an older head end left them, are simply back in rotation from where they stopped.
+
+The budget is 10 minutes on the air, tone, pause, gaps and closing ident included, but a slot is only filled to 8: the 2 minutes the head end may wait for a clear channel before its tone are kept back, so even then it ends inside the 10 minute hard stop. The estimate comes from the modem's own modulator, the burst packing and a measured 2.5 s per burst; on GB7RDG's slots of 2026-10-05 16:00 and 2026-10-06 09:00 it came within about a second of what happened.
+
+On an October day with about 20 bulletins, that means 9 slots of 7.4 to 8 minutes at WN4, each carrying 22 to 27 bulletins, about 70 minutes a day on the air. Each bulletin gets about 6 K over about 10 slots, and any 3 of them rebuild it.
+
+The old fixed shares are still there, as `"rule": "shares"`.
+
+### A waveform per slot
+
+To compare 1200 and 600 bps on real mail, the slots can take turns between waveforms, WN4 and WN3 say. Before each slot the head end switches pdn-soundmodem's MS110D modem with a KISS SETHW frame, which takes effect from the next burst, and switches it back after the release. Receivers need do nothing: pdn-soundmodem's MS110D receiver reads the waveform from each burst's preamble (autobaud), and that is the modem in every mailcast receiver release. A WN3 frame takes about twice as long, so a WN3 slot carries about half as much. The slot report, the journal and the directory (`mode=ms110d-wn3`) say which waveform each slot used.
+
 ## Each slot
 
 1. The head end listens first. If the channel is busy, it waits, up to a limit.
@@ -158,7 +174,7 @@ A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`
 
 ### The directory
 
-A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs, titles and content types. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. From v0.3.0 there are such fields, each `key=value`: every line has `type=1` (its content type; a line without one is a bulletin), and the first line also has the head end's slots, `slots=00:00/60` (the first slot's time and the minutes between slots), and its daylight rule, `daylight=IO91lk/120/30` (locator, minutes after sunrise, minutes before sunset). Receivers before v0.3.0 read the same entries and ignore the rest, so the version line stays `MAILCAST DIRECTORY 1`. A directory with no entries has nowhere to carry the slots, and a receiver keeps the last ones it heard. It goes out in every slot. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
+A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs, titles and content types. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. From v0.3.0 there are such fields, each `key=value`: every line has `type=1` (its content type; a line without one is a bulletin), and the first line also has the head end's slots, `slots=00:00/60` (the first slot's time and the minutes between slots), and its daylight rule, `daylight=IO91lk/120/30` (locator, minutes after sunrise, minutes before sunset). Receivers before v0.3.0 read the same entries and ignore the rest, so the version line stays `MAILCAST DIRECTORY 1`. A directory with no entries has nowhere to carry the slots, and a receiver keeps the last ones it heard. The first line may also name the slot's waveform, `mode=ms110d-wn4`, for the record. It goes out in every slot that keys. A slot with no bulletin pieces to send keys nothing, not even the directory; under the budget rule that only happens when nothing is in rotation. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
 
 A receiver forgets which objects it has rebuilt after 14 days, and drops a partial object 14 days after its last new piece. The BBS's BID check remains the real duplicate filter.
 
