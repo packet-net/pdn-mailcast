@@ -31,7 +31,7 @@ public sealed record FeedbackSources
     /// <summary>The channel measurement for a slot (by its scheduled start), if there is one.</summary>
     public Func<DateTimeOffset, ReportChannel?> Channel { get; init; } = _ => null;
 
-    /// <summary>The receiver's 6 character locator, from the position a web SDR reports; null for a sound card.</summary>
+    /// <summary>The receiver's locator, from the position a web SDR reports (6 characters, or 4 if that is all it gives); null for a sound card.</summary>
     public Func<string?> Locator { get; init; } = () => null;
 
     /// <summary>Where the audio comes from, for the report: <c>sc</c> or the web SDR's host.</summary>
@@ -339,6 +339,18 @@ public sealed class FeedbackService
                     }
                 }
             }
+            // A slot's channel measurement can finish after its window closes: picked up once it has.
+            foreach (var record in _state.Days)
+            {
+                for (int i = 0; i < record.Slots.Count; i++)
+                {
+                    if (record.Slots[i].Channel is null && _sources.Channel(record.Slots[i].Slot) is { } measured)
+                    {
+                        record.Slots[i] = record.Slots[i] with { Channel = measured };
+                        changed = true;
+                    }
+                }
+            }
             if (changed)
             {
                 Save();
@@ -392,7 +404,7 @@ public sealed class FeedbackService
             s.Verdict is null ? [] : s.Verdict.Split('+'),
             // The measurement may have finished after the slot's window closed.
             _sources.Channel(s.Slot) ?? s.Channel)).ToList();
-        string? locator = _sources.Locator() is { Length: 6 } l && Maidenhead.TryParse(l, out _, out _)
+        string? locator = _sources.Locator() is { } l && Maidenhead.TryParse(l, out _, out _)
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,

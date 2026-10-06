@@ -47,4 +47,26 @@ public static class Maidenhead
         TryParse(locator, out double lat, out double lon)
             ? (lat, lon)
             : throw new FormatException($"'{locator}' is not a 4 or 6 character Maidenhead locator such as IO91 or IO91lk.");
+
+    /// <summary>
+    /// The 6 character locator (IO91lk) of a place in degrees, north and east positive; null for
+    /// a latitude or longitude that is not finite or not on the Earth.
+    /// </summary>
+    public static string? Format(double latitude, double longitude)
+    {
+        if (!double.IsFinite(latitude) || !double.IsFinite(longitude) || latitude is < -90 or > 90 || longitude is < -180 or > 180)
+        {
+            return null;
+        }
+        // The north pole and the antimeridian's east side belong to the last square.
+        double lon = Math.Min(longitude + 180, 359.999999);
+        double lat = Math.Min(latitude + 90, 179.999999);
+        int field1 = (int)(lon / 20), field2 = (int)(lat / 10);
+        int square1 = (int)(lon % 20 / 2), square2 = (int)(lat % 10);
+        int sub1 = (int)(lon % 2 * 12), sub2 = (int)(lat % 1 * 24);
+        return string.Concat(
+            (char)('A' + field1), (char)('A' + field2),
+            (char)('0' + square1), (char)('0' + square2),
+            (char)('a' + sub1), (char)('a' + sub2));
+    }
 }

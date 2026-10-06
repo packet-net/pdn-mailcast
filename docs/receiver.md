@@ -144,7 +144,7 @@ The title is `MCR <callsign> <date>`, the date in UTC. Here is a whole day from 
 ```
 MCR G4ABC 2026-10-06
 
-MCR1 0.6.0 IO91lk wessex.zapto.org 12/12 1:BBS1
+MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b
 10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b
 11 W4 214 18 +1.2 IG 2 1.8/-16 0.31 0.18 279 b
@@ -180,10 +180,10 @@ When the slot's channel was measured, six more follow:
 8. The 2F path's delay after the first, ms, and its power against the first, dB, as `1.9/-17`. Without a locator to name the hops, it is the second path's.
 9. The delay spread, ms.
 10. The Doppler spread, Hz.
-11. The virtual height, km.
+11. The virtual height, km. Without the web SDR's position it is worked out for a 150 km path.
 12. What it was measured from: `b` the bursts, `p` a probe.
 
-A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, so the format can grow there without a new number. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
+A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, so the format can grow there without a new number. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
 
 ## The receiver's login on your BBS
 

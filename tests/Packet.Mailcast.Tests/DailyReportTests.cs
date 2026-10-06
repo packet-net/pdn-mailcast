@@ -136,7 +136,7 @@ public class DailyReportTests
     {
         // The example in docs/receiver.md, "The daily report's format".
         string body = string.Join("\r\n",
-            "MCR1 0.6.0 IO91lk wessex.zapto.org 12/12 1:BBS1",
+            "MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1",
             "09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b",
             "10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b",
             "11 W4 214 18 +1.2 IG 2 1.8/-16 0.31 0.18 279 b",
@@ -155,5 +155,25 @@ public class DailyReportTests
         Assert.Null(report.Slots[3].Channel!.TwoFDelayMs);
         Assert.Null(report.Slots[8].Channel);
         Assert.Equal(["IP"], report.Slots[8].Verdicts);
+    }
+
+    [Theory]
+    [InlineData(51.5, -0.12, "IO91wm")]
+    [InlineData(-33.87, 151.21, "QF56od")]
+    [InlineData(40.75, -73.99, "FN30as")]
+    [InlineData(90, 180, "RR99xx")]
+    public void Maidenhead_Format_GivesSixCharacters(double latitude, double longitude, string expected)
+    {
+        Assert.Equal(expected, Maidenhead.Format(latitude, longitude));
+    }
+
+    [Fact]
+    public void Maidenhead_Format_RoundTripsALocatorsCentre_AndRefusesNonsense()
+    {
+        var (lat, lon) = Maidenhead.Parse("IO91lk");
+        Assert.Equal("IO91lk", Maidenhead.Format(lat, lon));
+        Assert.Null(Maidenhead.Format(double.NaN, 0));
+        Assert.Null(Maidenhead.Format(91, 0));
+        Assert.Null(Maidenhead.Format(0, -181));
     }
 }
