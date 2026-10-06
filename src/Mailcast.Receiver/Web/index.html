@@ -304,10 +304,9 @@ async function refresh() {
 function iono(s) {
   const i = s.iono;
   if (!i) return;
-  const head = { GOOD: ["40 m is good", "good"], MARGINAL: ["40 m is patchy", "warn"], POOR: ["40 m is closed", "bad"] }[i.state]
-    || ["No fresh reading", "muted"];
+  const tone = { GOOD: "good", MARGINAL: "warn", POOR: "bad" }[i.state] || "muted";
   $("iono").className = "";
-  $("iono").innerHTML = `<div class="big ${head[1]}">${head[0]}</div>
+  $("iono").innerHTML = `<div class="big ${tone}">${esc(i.headline)}</div>
     <div>${esc(i.words)}</div>
     ${i.distanceWords ? `<div class="muted">${esc(i.distanceWords)}.</div>` : ""}
     <div class="muted">From the ionosonde reading GB7RDG sends in each slot. A guide only: it does not change what is sent.</div>`;

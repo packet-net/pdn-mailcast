@@ -742,7 +742,8 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>
     /// The ionosonde tile: the head end's newest reading, aged by this receiver's clock and
-    /// UNKNOWN once its sounding is older than 45 minutes, with the sentence the page shows.
+    /// UNKNOWN once its sounding is older than <see cref="IonoSettings.DefaultStaleAfter"/>, the
+    /// head end's own default, with the words the page shows.
     /// Null until one has been heard.
     /// </summary>
     internal static object? IonoView(IonoReading? heard, DateTimeOffset now)
@@ -751,7 +752,7 @@ public sealed class StatusPage : IAsyncDisposable
         {
             return null;
         }
-        var r = heard.AsOf(now, new IonoSettings().StaleAfter);
+        var r = heard.AsOf(now, IonoSettings.DefaultStaleAfter);
         return new
         {
             state = r.State,
@@ -773,7 +774,8 @@ public sealed class StatusPage : IAsyncDisposable
                 new { km = 500, mufMhz = r.Mufd500, verdict = r.At500, words = IonoReading.Words(r.At500) },
                 new { km = 1000, mufMhz = r.Mufd1000, verdict = r.At1000, words = IonoReading.Words(r.At1000) },
             },
-            words = r.Describe(now),
+            headline = r.Headline(),
+            words = r.Summary(now),
             distanceWords = r.State == IonoState.Unknown ? null : r.Distances(),
         };
     }

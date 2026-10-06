@@ -108,7 +108,7 @@ public class IonosphereTests
         var plan = Planner(state, 5, () => Marginal).Planner.Plan(Slot);
         string line = HeadEndService.IonosphereLine(plan, Slot)!;
         Assert.Equal(
-            "ionosonde: MARGINAL, Chilton RL052 at 2026-10-06 13:48Z (12 min old, PROPquest): foF2 6.05 MHz, MUF 6.05/6.83/8.76 MHz at 100/500/1000 km (MUFs estimated from foF2 and M(3000)F2); 100 km closed, 500 km closed, 1000 km good; skip zone about 570 km; sent in 2 frames",
+            "ionosonde: MARGINAL, Chilton RL052 at 2026-10-06 13:48Z (12 min old, PROPquest): foF2 6.05 MHz, MUF 6.65/8.21/11.64 MHz at 100/500/1000 km (MUFs estimated from foF2 and M(3000)F2); 100 km closed, 500 km open, just, 1000 km good; skip zone about 280 km; sent in 2 frames",
             line);
         Assert.All(line, c => Assert.InRange(c, ' ', '~'));
     }
@@ -124,7 +124,7 @@ public class IonosphereTests
         var iono = json.RootElement.GetProperty("iono");
         Assert.Equal("MARGINAL", iono.GetProperty("state").GetString());
         Assert.Equal(6.05, iono.GetProperty("foF2").GetDouble());
-        Assert.Equal(570, iono.GetProperty("skipZoneKm").GetInt32());
+        Assert.Equal(280, iono.GetProperty("skipZoneKm").GetInt32());
         Assert.Equal("RL052", iono.GetProperty("station").GetString());
         Assert.Equal(22, iono.GetProperty("ageMinutes").GetInt32());
         Assert.Equal("propquest", iono.GetProperty("source").GetString());
@@ -141,6 +141,86 @@ public class IonosphereTests
         var again = new StatusStore(state.Path, time);
         Assert.Equal(Marginal, again.LastSlot!.Ionosphere);
         Assert.False(JsonDocument.Parse(again.Render()).RootElement.TryGetProperty("iono", out var off) && off.ValueKind != JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void Status_SurvivesNonFiniteValues_InTheReportItSavesAfterKeying()
+    {
+        var time = new FakeTimeProvider(Slot.AddMinutes(10));
+        using var state = new TempDirectory();
+        var status = new StatusStore(state.Path, time)
+        {
+            Ionosphere = () => new IonoReading { State = IonoState.Marginal, FoF2 = double.PositiveInfinity, Mufd500 = double.NaN, SoundingTimeUtc = Slot, Source = IonoSource.Giro },
+        };
+        var report = new SlotReport
+        {
+            Slot = Slot,
+            Day = DateOnly.FromDateTime(Slot.UtcDateTime),
+            Outcome = SlotOutcome.Completed,
+            PaTemperatureMaxC = double.NaN,
+            EstimatedSeconds = double.PositiveInfinity,
+            Ionosphere = new IonoReading { FoF2 = double.NegativeInfinity, SoundingTimeUtc = Slot, Source = IonoSource.Giro },
+        };
+        status.RecordSlot(report);
+        Assert.Null(status.LastWriteProblem);
+        using var json = JsonDocument.Parse(status.Render());
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("iono").GetProperty("foF2").ValueKind);
+        Assert.Equal("NaN", json.RootElement.GetProperty("lastSlot").GetProperty("paTemperatureMaxC").GetString());
+        var again = new StatusStore(state.Path, time);
+        Assert.True(double.IsNaN(again.LastSlot!.PaTemperatureMaxC!.Value));
+        Assert.True(double.IsPositiveInfinity(again.LastSlot.EstimatedSeconds!.Value));
+        Assert.Null(again.LastSlot.Ionosphere!.FoF2);
+    }
+
+    [Fact]
+    public void TheSameReadingTwice_CarriesOnWithFreshEsis_AndAnOldOneIsNotSent()
+    {
+        using var state = new TempDirectory();
+        var (planner, _) = Planner(state, 40, () => Marginal);
+        var first = planner.Plan(Slot);
+        var firstEsis = Reading(first).Select(f => f.Esi).ToList();
+        Assert.Equal([0u, 1u], firstEsis);
+        planner.RecordQueued(first, first.Frames.Count);
+        // The same object again (planned in the same minute, say, after a restart): ESIs 2 and 3.
+        var second = planner.Plan(Slot);
+        Assert.Equal(Reading(first)[0].ObjectId, Reading(second)[0].ObjectId);
+        Assert.Equal([2u, 3u], Reading(second).Select(f => f.Esi));
+        Assert.All(Reading(second), f =>
+        {
+            Assert.True(MailcastFrame.TryParse(f.Payload, out var m));
+            var decoder = new Mailcast.RaptorQ.ObjectDecoder(m!.Oti);
+            decoder.Add(new Mailcast.RaptorQ.PayloadId(0, m.EncodingSymbolId), m.Symbol.Span);
+            Assert.NotNull(decoder.TryDecode());
+        });
+
+        // 255 minutes old or more: not sent at all, so the record's age byte never caps.
+        using var other = new TempDirectory();
+        var old = Planner(other, 40, () => Marginal.AsOf(Slot.AddMinutes(-12 + 255), TimeSpan.FromMinutes(45))).Planner.Plan(Slot);
+        Assert.Equal(0, old.IonosphereFrames);
+        Assert.False(StoreSlotPlanner.Sendable(Marginal with { AgeMinutes = 255 }));
+        Assert.True(StoreSlotPlanner.Sendable(Marginal with { AgeMinutes = 254 }));
+    }
+
+    private static List<SlotFrame> Reading(SlotPlan plan) =>
+        [.. plan.Frames.Where(f => MailcastFrame.TryParse(f.Payload, out var m) && m!.Oti.TransferLength == IonoRecord.ObjectLength)];
+
+    [Fact]
+    public void AOneOffSlot_WithNothingDue_CarriesTheReadingInItsPlan_AndTheSharesRuleDoesToo()
+    {
+        using var state = new TempDirectory();
+        var (planner, _) = Planner(state, 0, () => Marginal);
+        var oneOff = planner.Plan(Slot, evenIfNothingDue: true);
+        Assert.Equal(2, oneOff.IonosphereFrames);
+        Assert.Equal(2, Reading(oneOff).Count);
+        Assert.Equal(oneOff.Frames.Count, oneOff.Broadcast!.Frames.Count); // in the plan the store commits from
+
+        using var shares = new TempDirectory();
+        var options = ScheduleOptions.Hourly;
+        var store = new RotationStore(shares.Path, Compression.Default, options, new MemoryJournal());
+        store.Offer(Bulletins.Make(9, 3000), new DateOnly(2026, 10, 6));
+        var plan = new StoreSlotPlanner(store, Compression.Default, options, ionosphere: () => Marginal).Plan(Slot);
+        Assert.Equal(2, plan.IonosphereFrames);
+        Assert.Equal(2, Reading(plan).Count);
     }
 
     [Fact]

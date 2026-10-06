@@ -92,23 +92,22 @@ public sealed class IonosondeMonitor : IDisposable
         }
         while (!cancellation.IsCancellationRequested)
         {
-            DateTimeOffset now = _time.GetUtcNow();
-            if (ShouldPoll(now, wanted))
+            try
             {
-                try
+                if (ShouldPoll(_time.GetUtcNow(), wanted))
                 {
                     await PollAsync(cancellation).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-                {
-                    return;
-                }
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
 #pragma warning disable CA1031 // a reading is observe only: nothing here may stop the head end
-                catch (Exception e)
+            catch (Exception e)
 #pragma warning restore CA1031
-                {
-                    _log($"ionosonde: poll failed: {Plain(e.Message)}");
-                }
+            {
+                _log($"ionosonde: poll failed: {Plain(e.Message)}");
             }
             try
             {

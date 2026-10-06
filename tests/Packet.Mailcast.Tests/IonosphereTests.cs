@@ -44,17 +44,19 @@ public class IonosphereTests
     }
 
     [Fact]
-    public void FoF2Of605_WithoutMufds_IsEstimatedFromM3000_AndIsMarginalLikeOn20261006()
+    public void FoF2Of605_WithoutMufds_IsEstimatedByP533_AndIsMarginalLikeOn20261006()
     {
         // The day's peak: nothing heard within 221 km, bulletins rebuilt at 502 and 534 km.
         var r = IonoEvaluator.Evaluate([Chilton(6.05, m3000: 3.3)], Settings, Now);
         Assert.Equal(IonoState.Marginal, r.State);
         Assert.Equal(MufMethod.Estimated, r.Method);
-        Assert.Equal(6.05, r.Mufd100);
-        Assert.Equal(6.83, r.Mufd500!.Value, 2);
-        Assert.Equal(8.765, r.Mufd1000!.Value, 3);
-        Assert.Equal((PathVerdict.Closed, PathVerdict.Closed, PathVerdict.Reliable), (r.At100, r.At500, r.At1000));
-        Assert.Equal(570, r.SkipZoneKm);
+        Assert.Equal(6.651, r.Mufd100!.Value, 0.001);
+        Assert.Equal(8.211, r.Mufd500!.Value, 0.001);
+        Assert.Equal(11.643, r.Mufd1000!.Value, 0.001);
+        Assert.Equal((PathVerdict.Closed, PathVerdict.Open, PathVerdict.Reliable), (r.At100, r.At500, r.At1000));
+        // Found along the curve, not between the three points: the MUF reaches 7.1 MHz at 280 km.
+        Assert.Equal(280, r.SkipZoneKm);
+        Assert.Equal("Open from about 280 km", r.Headline());
     }
 
     [Fact]
@@ -65,6 +67,7 @@ public class IonosphereTests
         Assert.Equal((PathVerdict.Reliable, PathVerdict.Reliable, PathVerdict.Reliable), (r.At100, r.At500, r.At1000));
         Assert.Equal(0, r.SkipZoneKm);
         Assert.Equal("40 m: open from 0 km out to 1000 km", r.Band());
+        Assert.Equal("Open near and far", r.Headline());
     }
 
     [Fact]
@@ -74,6 +77,7 @@ public class IonosphereTests
         Assert.Equal(IonoState.Marginal, r.State);
         Assert.Equal(PathVerdict.Open, r.At100);
         Assert.Equal(0, r.SkipZoneKm);
+        Assert.Equal("Open, but only just", r.Headline());
     }
 
     [Fact]
@@ -85,6 +89,8 @@ public class IonosphereTests
         Assert.Equal(9.0, r.FoF2);
         Assert.Equal(46, r.AgeMinutes);
         Assert.Equal("Ionosphere: no fresh reading. Last: Chilton foF2 9.00 MHz at 13:56 UTC (46 min old). Too old to judge 40 m by.", r.Describe(Now));
+        Assert.Equal("Chilton foF2 9.00 MHz at 13:56 UTC (46 min old). Too old to judge 40 m by.", r.Summary(Now));
+        Assert.Equal("No fresh reading", r.Headline());
 
         // 45 minutes is still fresh, and a fresh reading goes UNKNOWN as it ages.
         var fresh = IonoEvaluator.Evaluate([old], Settings, Now.AddMinutes(-1));
@@ -124,14 +130,72 @@ public class IonosphereTests
     }
 
     [Fact]
-    public void Secant_TiesTheEstimateToFoF2AndToMuf3000()
+    public void BasicMuf_IsItuRP533s()
     {
-        Assert.Equal(6.0, IonoEvaluator.EstimateMuf(6.0, 3.2, 100));
-        Assert.Equal(6.0 * 3.2, IonoEvaluator.EstimateMuf(6.0, 3.2, 3000)!.Value, 6);
+        // ITU-R P.533 section 3.5.1.1 (P.1240 section 3.1), worked by hand from its equations 3
+        // to 6 with fH 1.2 MHz and x = 2: B = 3.3633, dmax 4000 km (capped), C(3000) = 0.81965.
+        Assert.Equal(6.651, IonoEvaluator.EstimateMuf(6.05, 3.3, 100)!.Value, 0.001);
+        Assert.Equal(8.211, IonoEvaluator.EstimateMuf(6.05, 3.3, 500)!.Value, 0.001);
+        Assert.Equal(11.643, IonoEvaluator.EstimateMuf(6.05, 3.3, 1000)!.Value, 0.001);
+        // The review's ITU-R P.533 figure for this sounding at 500 km: about 8.2 MHz.
+        Assert.InRange(IonoEvaluator.EstimateMuf(6.05, 3.3, 500)!.Value, 8.1, 8.3);
+        // Its ends: at 0 km C(D) is 0, so foF2 plus half the gyrofrequency; at 3000 km C(D)/C(3000)
+        // is 1, so B x foF2 plus the x-wave term a quarter of the way to dmax.
+        double b = 3.3 - 0.124 + ((3.3 * 3.3) - 4) * (0.0215 + (0.005 * Math.Sin((7.854 / 2) - 1.9635)));
+        Assert.Equal(6.05 + 0.6, IonoEvaluator.EstimateMuf(6.05, 3.3, 0)!.Value, 6);
+        Assert.Equal((b * 6.05) + (0.6 * 0.25), IonoEvaluator.EstimateMuf(6.05, 3.3, 3000)!.Value, 6);
+        // Without M(3000)F2 only 100 km has a MUF, foF2 itself.
+        Assert.Equal(6.0, IonoEvaluator.EstimateMuf(6.0, null, 100));
         Assert.Null(IonoEvaluator.EstimateMuf(6.0, null, 500));
         // M(3000) from MUF(3000) / foF2 when the source gives only those.
         var s = new IonoSounding("RL052", Sounded, IonoSource.PropQuest, 6.0, Muf3000: 19.2);
         Assert.Equal(IonoEvaluator.EstimateMuf(6.0, 3.2, 1000), IonoEvaluator.MufAt(s, 1000).Muf);
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.NaN)]
+    [InlineData(1e300)]
+    [InlineData(0.1)]
+    [InlineData(51.0)]
+    public void ImplausibleValues_AreNoValues_SoNothingNonFiniteComesOut(double bad)
+    {
+        var s = new IonoSounding("RL052", Sounded, IonoSource.Giro, bad, Muf3000: bad, M3000: bad, Mufd100: bad, Mufd500: bad, Mufd1000: bad);
+        Assert.Equal((null, null, null, null, null, null), (s.FoF2, s.Muf3000, s.M3000, s.Mufd100, s.Mufd500, s.Mufd1000));
+        Assert.False(s.Usable);
+        Assert.False((s with { FoF2 = bad }).Usable);
+        var r = new IonoReading { FoF2 = bad, Mufd100 = bad, Mufd500 = bad, Mufd1000 = bad };
+        Assert.Equal((null, null, null, null), (r.FoF2, r.Mufd100, r.Mufd500, r.Mufd1000));
+    }
+
+    [Fact]
+    public void AHugeM3000_IsRefused_RatherThanOverflowing()
+    {
+        // MUF(3000) 49 MHz over foF2 0.6 MHz would be M = 82: not believed, so no MUF beyond 100 km.
+        var r = IonoEvaluator.Evaluate([new IonoSounding("RL052", Sounded, IonoSource.PropQuest, 0.6, Muf3000: 49)], Settings, Now);
+        Assert.Null(r.Mufd500);
+        Assert.Null(IonoEvaluator.EstimateMuf(6.0, 1e300, 1000));
+        Assert.Null(IonoEvaluator.EstimateMuf(6.0, 6.5, 1000));
+        Assert.NotNull(IonoEvaluator.EstimateMuf(6.0, 6.0, 1000));
+        foreach (double? v in new[] { r.FoF2, r.Mufd100, r.Mufd500, r.Mufd1000 })
+        {
+            Assert.True(v is null || double.IsFinite(v.Value));
+        }
+    }
+
+    [Fact]
+    public void Band_SaysWhatIsOpen_EvenWithoutTheNearestDistance()
+    {
+        // 100 km unknown (a measured MUFD at 500 and 1000 only, and no foF2).
+        var r = IonoEvaluator.Evaluate([new IonoSounding("RL052", Sounded, IonoSource.PropQuest, null, Mufd500: 7.5, Mufd1000: 9.5)], Settings, Now);
+        Assert.Equal((PathVerdict.NoData, PathVerdict.Open, PathVerdict.Reliable), (r.At100, r.At500, r.At1000));
+        Assert.Equal(IonoState.Marginal, r.State);
+        Assert.Null(r.SkipZoneKm);
+        Assert.Equal("40 m: open at 500 and 1000 km", r.Band());
+        Assert.Equal("Open at some distances", r.Headline());
+        var closed = IonoEvaluator.Evaluate([new IonoSounding("RL052", Sounded, IonoSource.PropQuest, null, Mufd500: 6.5, Mufd1000: 6.9)], Settings, Now);
+        Assert.Equal("40 m: closed at 500 and 1000 km, no MUF for the rest", closed.Band());
     }
 
     [Fact]
@@ -146,7 +210,7 @@ public class IonosphereTests
 
         // As judged just after the last sounding: Fairford, estimated, open only far out.
         var r = IonoEvaluator.Evaluate(soundings, Settings, new DateTimeOffset(2026, 10, 6, 13, 20, 0, TimeSpan.Zero));
-        Assert.Equal(("FF051", IonoState.Marginal, MufMethod.Estimated, PathVerdict.Closed), (r.Station, r.State, r.Method, r.At500));
+        Assert.Equal(("FF051", IonoState.Marginal, MufMethod.Estimated, PathVerdict.Closed, PathVerdict.Open), (r.Station, r.State, r.Method, r.At100, r.At500));
         // And at the moment it was fetched, four hours on: UNKNOWN.
         Assert.Equal(IonoState.Unknown, IonoEvaluator.Evaluate(soundings, Settings, new DateTimeOffset(2026, 10, 6, 17, 24, 0, TimeSpan.Zero)).State);
     }
@@ -171,6 +235,66 @@ public class IonosphereTests
     }
 
     [Fact]
+    public void Giro_RefusesAWebPage_AndSkipsLinesThatDoNotFitTheColumns_AndNonFiniteValues()
+    {
+        Assert.Throws<FormatException>(() => GiroParser.Parse("<html><title>GIRO</title><p># DIDBase is down</p></html>"));
+        Assert.Throws<FormatException>(() => GiroParser.Parse("# Global Ionospheric Radio Observatory (GIRO)\n# nothing else\n"));
+
+        string text = Fixture("giro-FF051-2026-10-06.txt")
+            .Replace("2026-10-06T12:30:00.000Z  90  5.713 // 18.563 // 3.26 //  6.43 //", "2026-10-06T12:30:00.000Z  90  5.713 // 18.563 //", StringComparison.Ordinal)
+            .Replace("2026-10-06T12:37:30.000Z  95  5.663", "2026-10-06T12:37:30.000Z  95 Infinity", StringComparison.Ordinal)
+            .Replace("2026-10-06T12:45:00.000Z  95  5.613 // 18.527 // 3.31", "2026-10-06T12:45:00.000Z  95  5.613 // 1e999 // NaN", StringComparison.Ordinal);
+        var soundings = GiroParser.Parse(text);
+        Assert.DoesNotContain(soundings, s => s.Time == new DateTimeOffset(2026, 10, 6, 12, 30, 0, TimeSpan.Zero));
+        // An infinite foF2 is no foF2, and with no foF2 the sounding says nothing about 40 m.
+        Assert.DoesNotContain(soundings, s => s.Time == new DateTimeOffset(2026, 10, 6, 12, 37, 30, TimeSpan.Zero));
+        var huge = soundings.Single(s => s.Time == new DateTimeOffset(2026, 10, 6, 12, 45, 0, TimeSpan.Zero));
+        Assert.Equal((5.613, null, null), (huge.FoF2!.Value, huge.Muf3000, huge.M3000));
+    }
+
+    [Fact]
+    public void PropQuest_NonFiniteValues_AreMissing()
+    {
+        string json = """
+            {"Observations":[{"DATE_TODAY":"2026-10-06,2026-10-06,2026-10-06","TIME_TODAY":"12:00,12:05,12:10",
+            "foF2_TODAY":"Infinity,1e999,6.1","MUFD3000_TODAY":"20,20,NaN","MUFD1000_TODAY":"null,null,-Infinity",
+            "MUFD500_TODAY":"null,null,null","MUFD100_TODAY":"null,null,null","OBSERVATORY_TODAY":"RL052,RL052,RL052"}]}
+            """;
+        var s = Assert.Single(PropQuestParser.Parse(json));
+        Assert.Equal((6.1, null, null), (s.FoF2!.Value, s.Muf3000, s.Mufd1000));
+    }
+
+    [Fact]
+    public void FrameOutcomes_KeepTheirOldNumbers()
+    {
+        // As in every release before the reading: a new outcome only ever goes at the end.
+        Assert.Equal(
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            new[]
+            {
+                FrameOutcome.NotAFrame, FrameOutcome.AlreadyComplete, FrameOutcome.UnknownDictionary, FrameOutcome.Duplicate,
+                FrameOutcome.Stored, FrameOutcome.CompletedBulletin, FrameOutcome.CompletedDirectory, FrameOutcome.CompletedUnhandled,
+                FrameOutcome.CompletedUnknown, FrameOutcome.Rejected, FrameOutcome.CompletedIonosphere,
+            }.Select(o => (int)o));
+    }
+
+    [Fact]
+    public void ExtraObjects_KeepTheirNextEsi_SoTheSameObjectNeverRepeatsOne()
+    {
+        using var dir = new TempDirectory();
+        var slot = new DateTimeOffset(2026, 10, 6, 15, 0, 0, TimeSpan.Zero);
+        var store = new HeadEndStore(dir.Path, Compression.Default, Budgeted);
+        store.Offer(TestBulletins.Make(1, 3000), new DateOnly(2026, 10, 6));
+        var obj = IonoRecord.ToTransferObject(Sample());
+        var plan = BroadcastScheduler.Plan(store.InRotation(slot), slot, 1, Compression.Default, Budgeted, store.DirectoryNextEsi, Frames(20), null, [obj.Frame(0), obj.Frame(1)]);
+        Assert.Equal([obj.ObjectId], plan.ExtraObjects);
+        Assert.Equal(0u, store.DirectoryNextEsi(obj.ObjectId));
+        store.Commit(plan);
+        Assert.Equal(2u, store.DirectoryNextEsi(obj.ObjectId));
+        Assert.Equal(2u, new HeadEndStore(dir.Path, Compression.Default, Budgeted).DirectoryNextEsi(obj.ObjectId)); // across a restart
+    }
+
+    [Fact]
     public void PropQuest_RealAnswer_ReadsBothDays_AndNullsAreMissing()
     {
         var soundings = PropQuestParser.Parse(Fixture("propquest-RL052-FF051-2026-10-05-06.json"));
@@ -183,10 +307,10 @@ public class IonosphereTests
         var last = soundings[^1];
         Assert.Equal((new DateTimeOffset(2026, 10, 6, 13, 0, 0, TimeSpan.Zero), 5.7), (last.Time, last.FoF2!.Value));
 
-        // At 11:35 the peak is the reading: estimated, open only from about 600 km.
+        // At 11:35 the peak is the reading: estimated, open only from about 280 km.
         var r = IonoEvaluator.Evaluate(soundings, Settings, new DateTimeOffset(2026, 10, 6, 11, 35, 0, TimeSpan.Zero));
         Assert.Equal(("FF051", IonoState.Marginal, IonoSource.PropQuest, MufMethod.Estimated), (r.Station, r.State, r.Source, r.Method));
-        Assert.InRange(r.SkipZoneKm!.Value, 500, 700);
+        Assert.Equal(280, r.SkipZoneKm);
         Assert.Throws<FormatException>(() => PropQuestParser.Parse("{}"));
         Assert.Throws<FormatException>(() => PropQuestParser.Parse("not json"));
     }
@@ -343,9 +467,10 @@ public class IonosphereTests
         var slot = new DateTimeOffset(2026, 10, 6, 15, 0, 0, TimeSpan.Zero);
         var extras = new[] { IonoRecord.ToTransferObject(Sample()).Frame(0), IonoRecord.ToTransferObject(Sample()).Frame(1) };
 
-        // Nothing in rotation: no bulletin frames, so the slot keys nothing, reading or not.
+        // Nothing in rotation: no bulletin frames, so a scheduled slot keys nothing, reading or not
+        // (the planner sends a plan without bulletin frames only for a one-off slot).
         var empty = BroadcastScheduler.Plan([], slot, 1, Compression.Default, Budgeted, null, Frames(20), null, extras);
-        Assert.Equal((0, 0), (empty.BulletinFrames, empty.ExtraFrames));
+        Assert.Equal(0, empty.BulletinFrames);
 
         // Room for the directory and one bulletin frame only: the bulletin frame goes, the reading does not.
         var carried = new[] { Held(1, 9000) };

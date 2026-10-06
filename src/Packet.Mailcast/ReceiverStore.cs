@@ -36,12 +36,6 @@ public enum FrameOutcome
     CompletedUnhandled,
 
     /// <summary>
-    /// The symbol completed an ionosonde reading (content type 4), which is in the result. It is
-    /// never for the BBS; the newest is kept in <see cref="ReceiverStore.Ionosphere"/>.
-    /// </summary>
-    CompletedIonosphere,
-
-    /// <summary>
     /// The symbol completed an object of a content type this receiver does not know (an
     /// experiment, or one assigned later): it is ignored, without error.
     /// </summary>
@@ -53,6 +47,13 @@ public enum FrameOutcome
     /// pieces (less any found to be bad) and waits for more.
     /// </summary>
     Rejected,
+
+    /// <summary>
+    /// The symbol completed an ionosonde reading (content type 4), which is in the result. It is
+    /// never for the BBS; the newest is kept in <see cref="ReceiverStore.Ionosphere"/>. Last, so
+    /// the values before it are what they always were.
+    /// </summary>
+    CompletedIonosphere,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>

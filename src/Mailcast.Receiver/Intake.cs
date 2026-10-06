@@ -418,7 +418,7 @@ public sealed class Intake : IAsyncDisposable
                     _ionosphere = _store.Ionosphere;
                 }
                 DateTimeOffset now = _time.GetUtcNow();
-                _log(Ascii.Clean(reading.AsOf(now, new IonoSettings().StaleAfter).Describe(now)));
+                _log(Ascii.Clean(reading.AsOf(now, IonoSettings.DefaultStaleAfter).Describe(now)));
                 break;
             case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
                 // Once per object: it is marked done, so its later frames are not rebuilt again.

@@ -6,11 +6,9 @@ namespace Packet.Mailcast.Propagation;
 /// </summary>
 /// <remarks>
 /// <para>The MUF at a distance is the ionosonde's own MUF(D) for it when the source gives one.
-/// Otherwise it is estimated: foF2 itself at 100 km, where the path is nearly vertical, and beyond
-/// that the flat-earth secant law, with the layer's height chosen so the same law gives the
-/// measured MUF(3000) at 3000 km: MUF(d) = foF2 x sqrt(1 + (M(3000)F2^2 - 1) x (d / 3000)^2).
-/// That ties the estimate to what the ionosonde saw at both ends; it is a rough guide in between,
-/// and it ignores the earth's curvature and D-layer absorption.</para>
+/// Otherwise it is the F2 layer's basic MUF by ITU-R P.533 section 3.5.1.1 (the same as ITU-R
+/// P.1240 section 3.1) from foF2 and M(3000)F2: see <see cref="EstimateMuf"/>. Without
+/// M(3000)F2 only 100 km has a MUF, foF2 itself. D-layer absorption is not modelled.</para>
 /// <para>A distance is open when its MUF is at least <see cref="IonoSettings.OpenMhz"/>, and
 /// reliable when <see cref="IonoSettings.ReliableFactor"/> times it still is. GOOD is reliable at
 /// 100 and 500 km; POOR is closed at all three distances; MARGINAL is anything open in between;
@@ -95,11 +93,13 @@ public static class IonoEvaluator
         return new IonoReading
         {
             State = state,
-            FoF2 = sounding.FoF2 > 0 ? sounding.FoF2 : null,
+            FoF2 = sounding.FoF2,
             Mufd100 = m100,
             Mufd500 = m500,
             Mufd1000 = m1000,
-            SkipZoneKm = SkipZone(m100, m500, m1000, settings.OpenMhz),
+            SkipZoneKm = method == MufMethod.Estimated
+                ? SkipZoneAlong(km => MufAt(sounding, km).Muf, settings.OpenMhz)
+                : SkipZone(m100, m500, m1000, settings.OpenMhz),
             Station = sounding.Station.ToUpperInvariant(),
             SoundingTimeUtc = sounding.Time.ToUniversalTime(),
             AgeMinutes = age,
@@ -150,36 +150,61 @@ public static class IonoEvaluator
             1000 => sounding.Mufd1000,
             _ => null,
         };
-        if (measured is > 0)
+        if (IonoLimits.Frequency(measured) is { } m)
         {
-            return (measured, true);
+            return (m, true);
         }
-        if (sounding.FoF2 is not (> 0 and var foF2))
+        if (sounding.FoF2 is not { } foF2)
         {
             return (null, false);
         }
-        double? m3000 = sounding.M3000 is > 1 ? sounding.M3000 : sounding.Muf3000 / foF2;
+        double? m3000 = sounding.M3000 ?? IonoLimits.M3000(sounding.Muf3000 / foF2);
         return (EstimateMuf(foF2, m3000, distanceKm), false);
     }
 
     /// <summary>
-    /// The flat-earth secant estimate of the MUF at <paramref name="distanceKm"/>: foF2 at 100 km
-    /// or less; beyond, foF2 x sqrt(1 + (M^2 - 1) x (d / 3000)^2) with M = M(3000)F2, which is
-    /// the secant law for a mirror at the height that makes it give MUF(3000) at 3000 km. Null
-    /// beyond 100 km without a usable M(3000)F2.
+    /// The gyrofrequency at 300 km over southern England, MHz, for the basic MUF's x-wave term:
+    /// about 43,000 nT there (49,000 nT at the ground, falling off as a dipole's) at 28 Hz a nT.
+    /// ITU-R P.533 takes it from a field model at the path's midpoint.
+    /// </summary>
+    public const double GyroMhz = 1.2;
+
+    /// <summary>
+    /// The F2 layer's basic MUF for a ground distance up to dmax, by ITU-R P.533 equations 3 to 6
+    /// (section 3.5.1.1; also ITU-R P.1240 section 3.1), as ITU-R Study Group 3's reference code
+    /// (ITURHFProp, P533/MUFBasic.c) works it:
+    /// <code>
+    /// MUF(D) = (1 + (C(D) / C(3000)) x (B - 1)) x foF2 + (fH / 2) x (1 - D / dmax)
+    /// B      = M - 0.124 + (M^2 - 4) x (0.0215 + 0.005 sin(7.854 / x - 1.9635))
+    /// dmax   = 4780 + (12610 + 2140 / x^2 - 49720 / x^4 + 688900 / x^6) x (1 / B - 0.303), at most 4000 km
+    /// C(D)   = 0.74 - 0.591 Z - 0.424 Z^2 - 0.090 Z^3 + 0.088 Z^4 + 0.181 Z^5 + 0.096 Z^6, Z = 1 - 2D / dmax
+    /// </code>
+    /// with M = M(3000)F2, fH = <see cref="GyroMhz"/> and x = foF2 / foE, taken as 2 (its floor,
+    /// and the reference code's value without foE; from 2 to 6 it moves the MUF by about 1%).
+    /// Null without a usable M(3000)F2, except at 100 km or less, where it is foF2 itself.
     /// </summary>
     public static double? EstimateMuf(double foF2, double? m3000, int distanceKm)
     {
-        if (distanceKm <= 100)
-        {
-            return foF2;
-        }
-        if (m3000 is not (> 1 and var m))
+        if (IonoLimits.Frequency(foF2) is null)
         {
             return null;
         }
-        double ratio = distanceKm / 3000.0;
-        return foF2 * Math.Sqrt(1 + ((m * m) - 1) * ratio * ratio);
+        if (IonoLimits.M3000(m3000) is not { } m)
+        {
+            return distanceKm <= 100 ? foF2 : null;
+        }
+        const double x = 2;
+        double b = m - 0.124 + ((m * m) - 4) * (0.0215 + (0.005 * Math.Sin((7.854 / x) - 1.9635)));
+        double dmax = Math.Min(4000, 4780 + ((12610 + (2140 / (x * x)) - (49720 / Math.Pow(x, 4)) + (688900 / Math.Pow(x, 6))) * ((1 / b) - 0.303)));
+        double d = Math.Min(distanceKm, dmax);
+        double muf = ((1 + (C(d, dmax) / C(3000, dmax) * (b - 1))) * foF2) + (GyroMhz / 2 * (1 - (d / dmax)));
+        return IonoLimits.Frequency(muf);
+    }
+
+    private static double C(double d, double dmax)
+    {
+        double z = 1 - (2 * d / dmax);
+        return 0.74 - (0.591 * z) - (0.424 * z * z) - (0.090 * Math.Pow(z, 3)) + (0.088 * Math.Pow(z, 4)) + (0.181 * Math.Pow(z, 5)) + (0.096 * Math.Pow(z, 6));
     }
 
     /// <summary>
@@ -208,6 +233,32 @@ public static class IonoEvaluator
             {
                 double km = points[i - 1].Km + ((openMhz - before) / (here - before) * (points[i].Km - points[i - 1].Km));
                 return (int)(Math.Round(km / 10, MidpointRounding.AwayFromZero) * 10);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The skip zone's radius, km to the nearest 10, when the MUF is known at every distance (as
+    /// estimated): 0 when open at 100 km, else the first 10 km step out to 1000 km at which it
+    /// is open, null if none is.
+    /// </summary>
+    public static int? SkipZoneAlong(Func<int, double?> mufAt, double openMhz)
+    {
+        ArgumentNullException.ThrowIfNull(mufAt);
+        if (mufAt(100) is not { } near)
+        {
+            return null;
+        }
+        if (near >= openMhz)
+        {
+            return 0;
+        }
+        for (int km = 110; km <= 1000; km += 10)
+        {
+            if (mufAt(km) is { } m && m >= openMhz)
+            {
+                return km;
             }
         }
         return null;

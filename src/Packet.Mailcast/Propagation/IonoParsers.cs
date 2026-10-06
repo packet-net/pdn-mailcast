@@ -30,7 +30,11 @@ public static partial class GiroParser
     {
         ArgumentNullException.ThrowIfNull(text);
         var lines = text.Split('\n');
-        if (!lines.Any(l => l.Contains("GIRO", StringComparison.Ordinal) || l.Contains("DIDBase", StringComparison.Ordinal)))
+        // DIDBase's own header: a comment block naming GIRO, then either the column line or a
+        // status line saying there is no data. A web page that only mentions GIRO is neither.
+        bool header = lines.Length > 0 && lines[0].StartsWith("# Global Ionospheric Radio Observatory (GIRO)", StringComparison.Ordinal);
+        bool columnsOrStatus = lines.Any(l => l.StartsWith("# Time ", StringComparison.Ordinal) || l.StartsWith("# STATUS: ERROR", StringComparison.Ordinal));
+        if (!header || !columnsOrStatus)
         {
             throw new FormatException("Not a GIRO DIDBase answer.");
         }
@@ -63,15 +67,14 @@ public static partial class GiroParser
                 continue;
             }
             string[] cells = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (cells.Length < 2 || !DateTimeOffset.TryParse(cells[0], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var time))
+            if (cells.Length != columns.Length || !DateTimeOffset.TryParse(cells[0], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var time))
             {
                 continue;
             }
             double? Value(string name)
             {
                 int i = Array.IndexOf(columns, name);
-                return i > 0 && i < cells.Length
-                    && double.TryParse(cells[i], NumberStyles.Float, CultureInfo.InvariantCulture, out double v) && v > 0 ? v : null;
+                return i > 0 && i < cells.Length ? Number(cells[i]) : null;
             }
             int cs = Array.IndexOf(columns, "CS");
             if (cs > 0 && cs < cells.Length && int.TryParse(cells[cs], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int confidence)
@@ -91,6 +94,10 @@ public static partial class GiroParser
         }
         return [.. soundings.OrderBy(s => s.Time)];
     }
+
+    /// <summary>A plain decimal number, finite, or null: no "Infinity", "NaN" or exponents.</summary>
+    internal static double? Number(string text) =>
+        double.TryParse(text.Trim(), NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out double v) && double.IsFinite(v) ? v : null;
 
     [GeneratedRegex(@"URSI-Code\s+([A-Za-z]{2}\d{3})")]
     private static partial Regex UrsiCode();
@@ -176,6 +183,5 @@ public static class PropQuestParser
     }
 
     private static double? At(string[]? series, int i) =>
-        series is not null && i < series.Length
-        && double.TryParse(series[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double v) && v > 0 ? v : null;
+        series is not null && i < series.Length ? GiroParser.Number(series[i]) : null;
 }

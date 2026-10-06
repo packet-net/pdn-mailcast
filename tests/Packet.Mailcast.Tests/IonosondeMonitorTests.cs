@@ -25,12 +25,16 @@ public class IonosondeMonitorTests
 
         public int To(string host) => Requests.Count(r => r.RequestUri!.Host == host);
 
+        /// <summary>Done with the first request.</summary>
+        public TaskCompletionSource FirstRequest { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             lock (Requests)
             {
                 Requests.Add(request);
             }
+            FirstRequest.TrySetResult();
             return request.RequestUri!.Host == "lgdc.uml.edu" ? Giro(request) : PropQuest(request);
         }
     }
@@ -162,10 +166,7 @@ public class IonosondeMonitorTests
         Assert.True(monitor.ShouldPoll(Start, _ => true));
         using var stop = new CancellationTokenSource();
         Task loop = monitor.RunAsync(_ => true, stop.Token);
-        for (int i = 0; i < 100 && monitor.LastPoll is null; i++)
-        {
-            await Task.Delay(20);
-        }
+        await net.FirstRequest.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(Start, monitor.LastPoll);
         Assert.False(monitor.ShouldPoll(Start.AddMinutes(14), null));
         Assert.True(monitor.ShouldPoll(Start.AddMinutes(15), null));

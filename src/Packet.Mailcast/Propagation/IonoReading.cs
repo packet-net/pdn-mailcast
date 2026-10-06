@@ -107,8 +107,34 @@ public sealed record IonoSounding(
     double? Mufd500 = null,
     double? Mufd1000 = null)
 {
+    // Every value is checked on the way in: one that is not finite and plausible is no value.
+    private readonly double? _foF2 = IonoLimits.Frequency(FoF2);
+    private readonly double? _muf3000 = IonoLimits.Frequency(Muf3000);
+    private readonly double? _m3000 = IonoLimits.M3000(M3000);
+    private readonly double? _mufd100 = IonoLimits.Frequency(Mufd100);
+    private readonly double? _mufd500 = IonoLimits.Frequency(Mufd500);
+    private readonly double? _mufd1000 = IonoLimits.Frequency(Mufd1000);
+
+    /// <summary>The F2 layer's critical frequency, MHz, if plausible.</summary>
+    public double? FoF2 { get => _foF2; init => _foF2 = IonoLimits.Frequency(value); }
+
+    /// <summary>MUF(3000)F2, MHz, if plausible.</summary>
+    public double? Muf3000 { get => _muf3000; init => _muf3000 = IonoLimits.Frequency(value); }
+
+    /// <summary>M(3000)F2, if plausible.</summary>
+    public double? M3000 { get => _m3000; init => _m3000 = IonoLimits.M3000(value); }
+
+    /// <summary>The ionosonde's own MUF for 100 km, MHz, if plausible.</summary>
+    public double? Mufd100 { get => _mufd100; init => _mufd100 = IonoLimits.Frequency(value); }
+
+    /// <summary>The ionosonde's own MUF for 500 km, MHz, if plausible.</summary>
+    public double? Mufd500 { get => _mufd500; init => _mufd500 = IonoLimits.Frequency(value); }
+
+    /// <summary>The ionosonde's own MUF for 1000 km, MHz, if plausible.</summary>
+    public double? Mufd1000 { get => _mufd1000; init => _mufd1000 = IonoLimits.Frequency(value); }
+
     /// <summary>Whether it says anything about 40 m: a foF2 or a MUF.</summary>
-    public bool Usable => FoF2 > 0 || Mufd100 > 0 || Mufd500 > 0 || Mufd1000 > 0;
+    public bool Usable => FoF2 is not null || Mufd100 is not null || Mufd500 is not null || Mufd1000 is not null;
 }
 
 /// <summary>
@@ -123,8 +149,11 @@ public sealed record IonoSettings
     /// <summary>A distance is reliable when this times its MUF is still at least <see cref="OpenMhz"/>.</summary>
     public double ReliableFactor { get; init; } = 0.85;
 
+    /// <summary>The default for <see cref="StaleAfter"/>, which a receiver uses too: 45 minutes.</summary>
+    public static readonly TimeSpan DefaultStaleAfter = TimeSpan.FromMinutes(45);
+
     /// <summary>A sounding older than this says nothing about now: the reading is UNKNOWN, with the last values and their age.</summary>
-    public TimeSpan StaleAfter { get; init; } = TimeSpan.FromMinutes(45);
+    public TimeSpan StaleAfter { get; init; } = DefaultStaleAfter;
 
     /// <summary>
     /// The ionosondes, best first: the first with a fresh sounding is used. Chilton (RL052) is
@@ -140,20 +169,25 @@ public sealed record IonoSettings
 /// </summary>
 public sealed record IonoReading
 {
+    private readonly double? _foF2;
+    private readonly double? _mufd100;
+    private readonly double? _mufd500;
+    private readonly double? _mufd1000;
+
     /// <summary>The verdict as a whole.</summary>
     public IonoState State { get; init; }
 
     /// <summary>foF2, MHz.</summary>
-    public double? FoF2 { get; init; }
+    public double? FoF2 { get => _foF2; init => _foF2 = IonoLimits.Frequency(value); }
 
     /// <summary>The MUF for 100 km, MHz.</summary>
-    public double? Mufd100 { get; init; }
+    public double? Mufd100 { get => _mufd100; init => _mufd100 = IonoLimits.Frequency(value); }
 
     /// <summary>The MUF for 500 km, MHz.</summary>
-    public double? Mufd500 { get; init; }
+    public double? Mufd500 { get => _mufd500; init => _mufd500 = IonoLimits.Frequency(value); }
 
     /// <summary>The MUF for 1000 km, MHz.</summary>
-    public double? Mufd1000 { get; init; }
+    public double? Mufd1000 { get => _mufd1000; init => _mufd1000 = IonoLimits.Frequency(value); }
 
     /// <summary>
     /// The skip zone's radius, km: the shortest distance at which 40 m is open, interpolated
@@ -217,42 +251,56 @@ public sealed record IonoReading
     public string StationName => IonoStations.Name(Station);
 
     /// <summary>
-    /// The reading in a sentence or two, plain ASCII, as the receiver's page and the journal show
+    /// The reading in a sentence or two, plain ASCII, as the receiver's log and the journal show
     /// it: "Ionosphere: Chilton foF2 6.05 MHz at 14:30 UTC (12 min old). 40 m: closed at 100 km,
-    /// open from about 570 km."
+    /// open from about 220 km."
     /// </summary>
-    public string Describe(DateTimeOffset now)
+    public string Describe(DateTimeOffset now) => !HasSounding
+        ? "Ionosphere: no reading yet."
+        : "Ionosphere: " + (State == IonoState.Unknown ? "no fresh reading. Last: " : "") + Summary(now);
+
+    /// <summary>
+    /// The same without the "Ionosphere:" in front or the "no fresh reading", for a page that
+    /// says those already: "Chilton foF2 6.05 MHz at 14:30 UTC (12 min old). 40 m: ...".
+    /// </summary>
+    public string Summary(DateTimeOffset now)
     {
         if (!HasSounding)
         {
-            return "Ionosphere: no reading yet.";
+            return "No reading yet.";
         }
-        var text = new StringBuilder("Ionosphere: ");
-        if (State == IonoState.Unknown)
-        {
-            text.Append("no fresh reading. Last: ");
-        }
-        text.Append(StationName);
+        var text = new StringBuilder(StationName);
         text.Append(FoF2 is { } f ? string.Create(CultureInfo.InvariantCulture, $" foF2 {f:0.00} MHz") : " no foF2");
         text.Append(' ').Append(When(SoundingTimeUtc!.Value, now));
         int age = IonoEvaluator.AgeMinutes(SoundingTimeUtc.Value, now);
         text.Append(string.Create(CultureInfo.InvariantCulture, $" ({Age(age)} old)."));
-        if (State == IonoState.Unknown)
-        {
-            text.Append(" Too old to judge 40 m by.");
-            return text.ToString();
-        }
-        text.Append(' ').Append(Band()).Append('.');
+        text.Append(State == IonoState.Unknown ? " Too old to judge 40 m by." : $" {Band()}.");
         return text.ToString();
     }
 
     /// <summary>
-    /// 40 m in words, from the skip zone: "40 m: closed at 100 km, open from about 570 km", "40 m:
-    /// open from 0 km out to 1000 km", "40 m: closed at 100, 500 and 1000 km".
+    /// A few words for the top of a tile: "Open near and far", "Open from about 220 km",
+    /// "Open, but only just", "Closed", "No fresh reading".
+    /// </summary>
+    public string Headline() => State switch
+    {
+        IonoState.Good => "Open near and far",
+        IonoState.Poor => "Closed",
+        IonoState.Marginal when SkipZoneKm is > 0 and var k => string.Create(CultureInfo.InvariantCulture, $"Open from about {k} km"),
+        IonoState.Marginal when SkipZoneKm == 0 => "Open, but only just",
+        IonoState.Marginal => "Open at some distances",
+        _ => HasSounding ? "No fresh reading" : "No reading yet",
+    };
+
+    /// <summary>
+    /// 40 m in words, from the skip zone and the three verdicts: "40 m: closed at 100 km, open
+    /// from about 220 km", "40 m: open from 0 km out to 1000 km", "40 m: open at 500 and 1000 km",
+    /// "40 m: closed at 100, 500 and 1000 km".
     /// </summary>
     public string Band()
     {
-        if (At100 == PathVerdict.NoData && At500 == PathVerdict.NoData && At1000 == PathVerdict.NoData)
+        PathVerdict[] all = [At100, At500, At1000];
+        if (all.All(v => v == PathVerdict.NoData))
         {
             return "40 m: no MUF to judge by";
         }
@@ -264,10 +312,21 @@ public sealed record IonoReading
         {
             return string.Create(CultureInfo.InvariantCulture, $"40 m: closed at 100 km, open from about {skip} km");
         }
-        return At100 == PathVerdict.Closed && At500 == PathVerdict.Closed && At1000 == PathVerdict.Closed
-            ? "40 m: closed at 100, 500 and 1000 km"
-            : "40 m: not open where there is a MUF to judge by";
+        var open = IonoEvaluator.DistancesKm.Where((_, i) => all[i] is PathVerdict.Open or PathVerdict.Reliable).ToList();
+        if (open.Count > 0)
+        {
+            return "40 m: open at " + Join(open) + " km";
+        }
+        var closed = IonoEvaluator.DistancesKm.Where((_, i) => all[i] == PathVerdict.Closed).ToList();
+        return "40 m: closed at " + Join(closed) + " km" + (closed.Count < 3 ? ", no MUF for the rest" : "");
     }
+
+    private static string Join(List<int> km) => km.Count switch
+    {
+        1 => km[0].ToString(CultureInfo.InvariantCulture),
+        2 => string.Create(CultureInfo.InvariantCulture, $"{km[0]} and {km[1]}"),
+        _ => string.Create(CultureInfo.InvariantCulture, $"{km[0]}, {km[1]} and {km[2]}"),
+    };
 
     /// <summary>The three distances in words: "100 km closed, 500 km closed, 1000 km good".</summary>
     public string Distances() => string.Create(CultureInfo.InvariantCulture,
@@ -330,6 +389,30 @@ public sealed record IonoReading
     private static string Age(int minutes) => minutes < 120
         ? string.Create(CultureInfo.InvariantCulture, $"{minutes} min")
         : string.Create(CultureInfo.InvariantCulture, $"{minutes / 60} h {minutes % 60} min");
+}
+
+/// <summary>What a value must be to be believed: anything else, infinities and NaN included, is no value.</summary>
+public static class IonoLimits
+{
+    /// <summary>The lowest foF2 or MUF believed, MHz.</summary>
+    public const double LowestMhz = 0.5;
+
+    /// <summary>The highest foF2 or MUF believed, MHz.</summary>
+    public const double HighestMhz = 50;
+
+    /// <summary>The lowest M(3000)F2 believed (above it, strictly).</summary>
+    public const double LowestM3000 = 1;
+
+    /// <summary>The highest M(3000)F2 believed.</summary>
+    public const double HighestM3000 = 6;
+
+    /// <summary>A frequency if it is finite and from <see cref="LowestMhz"/> to <see cref="HighestMhz"/>, else null.</summary>
+    public static double? Frequency(double? mhz) =>
+        mhz is { } v && double.IsFinite(v) && v >= LowestMhz && v <= HighestMhz ? v : null;
+
+    /// <summary>An M(3000)F2 if it is finite, above <see cref="LowestM3000"/> and at most <see cref="HighestM3000"/>, else null.</summary>
+    public static double? M3000(double? m) =>
+        m is { } v && double.IsFinite(v) && v > LowestM3000 && v <= HighestM3000 ? v : null;
 }
 
 /// <summary>The ionosondes this code knows by name.</summary>

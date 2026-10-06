@@ -200,14 +200,15 @@ public sealed record ScheduledObject(TransferObject Transfer, int SlotIndex, uin
 /// <summary>One slot's plan: the directory, every object's share, and the frames in sending order.</summary>
 public sealed class SlotBroadcast
 {
-    internal SlotBroadcast(DateTimeOffset slot, BroadcastDirectory directory, IReadOnlyList<ScheduledObject> objects, IReadOnlyList<MailcastFrame> frames, IReadOnlyList<Bulletin> skipped, int extraFrames = 0)
+    internal SlotBroadcast(DateTimeOffset slot, BroadcastDirectory directory, IReadOnlyList<ScheduledObject> objects, IReadOnlyList<MailcastFrame> frames, IReadOnlyList<Bulletin> skipped, IReadOnlyList<MailcastFrame>? extras = null)
     {
         Slot = slot;
         Directory = directory;
         Objects = objects;
         Frames = frames;
         Skipped = skipped;
-        ExtraFrames = extraFrames;
+        ExtraFrames = extras?.Count ?? 0;
+        ExtraObjects = extras is null ? [] : [.. extras.Select(f => f.ObjectId).Distinct()];
     }
 
     /// <summary>The slot's start.</summary>
@@ -233,6 +234,13 @@ public sealed class SlotBroadcast
     /// reading): in <see cref="Frames"/> and the airtime, but not in <see cref="Objects"/> or the directory.
     /// </summary>
     public int ExtraFrames { get; }
+
+    /// <summary>
+    /// The objects of the extra frames. <see cref="HeadEndStore.Commit(SlotBroadcast, int)"/>
+    /// keeps the next ESI of each by object ID, as for a directory, so an object sent again
+    /// never repeats an ESI.
+    /// </summary>
+    public IReadOnlyList<ulong> ExtraObjects { get; }
 
     /// <summary>Bulletins in their carrying slots that were left out: too large, or a BID already taken.</summary>
     public IReadOnlyList<Bulletin> Skipped { get; }
@@ -743,8 +751,9 @@ public static class BroadcastScheduler
             }
         }
 
-        // Then any extra frames, spread evenly, never before the directory's first.
-        if (extras.Count > 0 && bulletinFrames > 0)
+        // Then any extra frames, spread evenly, never before the directory's first. A plan with
+        // no bulletin frames keys nothing on a schedule; a one-off slot sends them all the same.
+        if (extras.Count > 0)
         {
             int before = frames.Count;
             for (int i = extras.Count - 1; i >= 0; i--)
@@ -752,7 +761,7 @@ public static class BroadcastScheduler
                 int place = 1 + (int)((((2L * i) + 1) * before) / (2L * extras.Count));
                 frames.Insert(Math.Min(place, frames.Count), extras[i]);
             }
-            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras.Count);
+            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras);
         }
         return new SlotBroadcast(slot, directory, scheduled, frames, []);
     }

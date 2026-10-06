@@ -203,12 +203,12 @@ The head end keeps an eye on the ionosphere over Reading and tells receivers wha
 
 It asks GIRO first, then PROPquest, for Chilton, then Fairford, then Dourbes, at most every 15 minutes and only from an hour before a slot to a quarter of an hour after one. A source that answers 429 or 5xx, or not at all, is left alone for longer each time (15 minutes, then 30, up to 4 hours, or its Retry-After). The asking never holds a slot up: a slot takes whatever reading is at hand, and a failure only ever makes the reading UNKNOWN. Soundings often reach both sources hours late, so UNKNOWN (no sounding in the last 45 minutes) is common; the reading then gives the last values and their age.
 
-A distance counts as open when its MUF is at least 7.1 MHz and reliable when 0.85 times it is. GOOD means reliable at 100 and 500 km, POOR closed at all three, MARGINAL anything between. Where the source has no MUF for a distance, it is estimated from foF2 and M(3000)F2 ([design.md](design.md#the-ionosonde-reading) has the formula). It does not model D-layer absorption. The thresholds and stations are in `ionosphere` in the configuration (`openMhz`, `reliableFactor`, `staleMinutes`, `stations`); `"stations": []` turns it off.
+A distance counts as open when its MUF is at least 7.1 MHz and reliable when 0.85 times it is. GOOD means reliable at 100 and 500 km, POOR closed at all three, MARGINAL anything between. Where the source has no MUF for a distance, it is worked out from foF2 and M(3000)F2 by ITU-R P.533's basic MUF ([design.md](design.md#the-ionosonde-reading) has the details). It does not model D-layer absorption. The thresholds and stations are in `ionosphere` in the configuration (`openMhz`, `reliableFactor`, `staleMinutes`, `stations`); `"stations": []` turns it off.
 
 Each slot logs one line about it, for example:
 
 ```
-ionosonde: MARGINAL, Chilton RL052 at 2026-10-06 11:30Z (12 min old, GIRO): foF2 6.05 MHz, MUF 6.05/6.83/8.76 MHz at 100/500/1000 km (MUFs estimated from foF2 and M(3000)F2); 100 km closed, 500 km closed, 1000 km good; skip zone about 570 km; sent in 2 frames
+ionosonde: MARGINAL, Fairford FF051 at 2026-10-06 11:30Z (12 min old, PROPquest): foF2 6.05 MHz, MUF 6.65/8.21/11.64 MHz at 100/500/1000 km (MUFs estimated from foF2 and M(3000)F2); 100 km closed, 500 km open, just, 1000 km good; skip zone about 280 km; sent in 2 frames
 ```
 
 Requests carry the User-Agent `pdn-mailcast-headend/VERSION (+https://github.com/packet-net/pdn-mailcast; GB7RDG)`, with the station's callsign.

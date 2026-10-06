@@ -66,8 +66,11 @@ public interface ISlotPlanner
 /// </param>
 public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null) : ISlotPlanner
 {
-    /// <summary>Frames of the reading in each slot: ESI 0 and ESI 1, either of which rebuilds it alone.</summary>
+    /// <summary>Frames of the reading in each slot, either of which rebuilds it alone.</summary>
     public const int IonosphereFrames = 2;
+
+    /// <summary>A reading at least this old is not sent: it is UNKNOWN long before, and the record's age stops at 255.</summary>
+    public const int OldestSentMinutes = 255;
 
     private readonly SlotSettings _settings = settings ?? new SlotSettings();
 
@@ -78,27 +81,46 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         TimeSpan late = time is null ? TimeSpan.Zero : time.GetUtcNow() - slot;
         SlotBudget? budget = Budget(waveform, late);
         IonoReading? reading = Reading();
-        IReadOnlyList<MailcastFrame> extras = reading is { HasSounding: true } ? ReadingFrames(reading) : [];
+        IReadOnlyList<MailcastFrame> extras = Sendable(reading) ? ReadingFrames(reading!, store.NextEsi) : [];
         SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras);
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
             return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
-        if (broadcast.BulletinFrames == 0 && extras.Count > 0)
-        {
-            // A one-off slot with nothing due sends the directory; the reading goes with it.
-            frames.AddRange(extras.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)));
-            return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, extras.Count);
-        }
         return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, broadcast.ExtraFrames);
     }
 
-    /// <summary>The reading's frames: ESI 0, the object itself, and ESI 1, a repair symbol that also rebuilds it alone.</summary>
-    public static IReadOnlyList<MailcastFrame> ReadingFrames(IonoReading reading)
+    /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>
+    public static bool Sendable(IonoReading? reading) =>
+        reading is { HasSounding: true, AgeMinutes: < OldestSentMinutes };
+
+    /// <summary>
+    /// The reading's frames: <see cref="IonosphereFrames"/> fresh ESIs from where the object last
+    /// got to (<paramref name="nextEsi"/>, by object ID; 0 for a new one), each one that rebuilds
+    /// the object on its own. The object normally changes every slot, as its age does, so these
+    /// are ESI 0 and 1; if the same object comes round again its ESIs carry on, never repeat.
+    /// </summary>
+    public static IReadOnlyList<MailcastFrame> ReadingFrames(IonoReading reading, Func<ulong, uint>? nextEsi = null)
     {
         var transfer = IonoRecord.ToTransferObject(reading);
-        return [.. Enumerable.Range(0, IonosphereFrames).Select(esi => transfer.Frame((uint)esi))];
+        var frames = new List<MailcastFrame>(IonosphereFrames);
+        for (uint esi = nextEsi?.Invoke(transfer.ObjectId) ?? 0; frames.Count < IonosphereFrames && esi <= Mailcast.RaptorQ.PayloadId.MaxEncodingSymbolId; esi++)
+        {
+            var frame = transfer.Frame(esi);
+            if (RebuildsAlone(frame, transfer))
+            {
+                frames.Add(frame);
+            }
+        }
+        return frames;
+    }
+
+    private static bool RebuildsAlone(MailcastFrame frame, TransferObject transfer)
+    {
+        var decoder = new Mailcast.RaptorQ.ObjectDecoder(frame.Oti);
+        decoder.Add(new Mailcast.RaptorQ.PayloadId(0, frame.EncodingSymbolId), frame.Symbol.Span);
+        return decoder.TryDecode() is { } rebuilt && rebuilt.AsSpan().SequenceEqual(transfer.Bytes);
     }
 
     private IonoReading? Reading()

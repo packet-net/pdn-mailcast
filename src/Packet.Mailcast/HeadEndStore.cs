@@ -172,6 +172,15 @@ public sealed class HeadEndStore
                 next[frame.ObjectId] = after;
             }
         }
+        foreach (ulong id in broadcast.ExtraObjects)
+        {
+            // An extra (the propagation reading): kept by object ID, like the directory.
+            if (next.TryGetValue(id, out uint extraNext) && extraNext > DirectoryNextEsi(id))
+            {
+                _directoryEsis[id] = (broadcast.Date, extraNext);
+                SaveDirectory(id, broadcast.Date, extraNext);
+            }
+        }
         foreach (var o in broadcast.Objects)
         {
             if (o.Bid is null)

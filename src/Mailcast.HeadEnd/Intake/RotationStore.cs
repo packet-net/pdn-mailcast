@@ -85,6 +85,15 @@ public sealed class RotationStore
         }
     }
 
+    /// <summary>The first ESI not yet sent of a directory or an extra object (the propagation reading), by object ID.</summary>
+    public uint NextEsi(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.DirectoryNextEsi(objectId);
+        }
+    }
+
     /// <summary>Records that the first <paramref name="framesQueued"/> frames of a plan were handed to the modem.</summary>
     public void Commit(SlotBroadcast plan, int framesQueued)
     {

@@ -33,7 +33,7 @@ public class IonosphereTests
             Assert.Equal(6.05, intake.Ionosphere!.FoF2);
         }
         Assert.Equal(
-            ["Ionosphere: Chilton foF2 6.05 MHz at 14:30 UTC (12 min old). 40 m: closed at 100 km, open from about 570 km."],
+            ["Ionosphere: Chilton foF2 6.05 MHz at 14:30 UTC (12 min old). 40 m: closed at 100 km, open from about 280 km."],
             log);
 
         await using var reopened = new Intake(dir.Path, _ => { }, new ReceiverStoreOptions { Time = time });
@@ -48,15 +48,18 @@ public class IonosphereTests
         Assert.Equal("MARGINAL", json.GetProperty("state").GetString());
         Assert.Equal(12, json.GetProperty("ageMinutes").GetInt32());
         Assert.Equal("Chilton", json.GetProperty("stationName").GetString());
-        Assert.Equal(570, json.GetProperty("skipZoneKm").GetInt32());
-        Assert.Equal("Ionosphere: Chilton foF2 6.05 MHz at 14:30 UTC (12 min old). 40 m: closed at 100 km, open from about 570 km.", json.GetProperty("words").GetString());
-        Assert.Equal("100 km closed, 500 km closed, 1000 km good", json.GetProperty("distanceWords").GetString());
+        Assert.Equal(280, json.GetProperty("skipZoneKm").GetInt32());
+        Assert.Equal("Open from about 280 km", json.GetProperty("headline").GetString());
+        Assert.Equal("Chilton foF2 6.05 MHz at 14:30 UTC (12 min old). 40 m: closed at 100 km, open from about 280 km.", json.GetProperty("words").GetString());
+        Assert.Equal("100 km closed, 500 km open, just, 1000 km good", json.GetProperty("distanceWords").GetString());
         var distances = json.GetProperty("distances").EnumerateArray().Select(d => (d.GetProperty("km").GetInt32(), d.GetProperty("verdict").GetString())).ToList();
-        Assert.Equal([(100, "closed"), (500, "closed"), (1000, "reliable")], distances);
+        Assert.Equal([(100, "closed"), (500, "open"), (1000, "reliable")], distances);
 
         // An hour on and nothing newer heard: the page says it is too old to go by.
         var old = JsonSerializer.SerializeToElement(StatusPage.IonoView(Reading, Sounded.AddMinutes(70)), ReceiverConfig.JsonLine);
         Assert.Equal("UNKNOWN", old.GetProperty("state").GetString());
+        Assert.Equal("No fresh reading", old.GetProperty("headline").GetString());
+        Assert.DoesNotContain("no fresh reading", old.GetProperty("words").GetString(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(JsonValueKind.Null, old.GetProperty("distanceWords").ValueKind);
         Assert.Contains("Too old to judge 40 m by", old.GetProperty("words").GetString(), StringComparison.Ordinal);
     }
