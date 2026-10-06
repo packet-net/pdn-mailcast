@@ -180,4 +180,10 @@ public sealed record SlotReport
 
     /// <summary>The planner's estimate of the slot's time on the air, from its start to the end of the closing ident, in seconds.</summary>
     public double? EstimatedSeconds { get; init; }
+
+    /// <summary>The ionosonde reading as the slot was planned; null when the head end takes none. Observe only.</summary>
+    public Packet.Mailcast.Propagation.IonoReading? Ionosphere { get; init; }
+
+    /// <summary>How many of the planned frames carried the reading (content type 4).</summary>
+    public int IonosphereFrames { get; init; }
 }

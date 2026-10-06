@@ -337,13 +337,34 @@ public sealed class HeadEndService(
         }
 
         SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null);
+        if (IonosphereLine(plan, time.GetUtcNow()) is { } line)
+        {
+            // Observe only: the reading is in the plan already, and nothing here depends on it.
+            journal.Write(line);
+        }
         SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform);
+        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
         status.SetBulletinsHeld(store.Count);
         SlotsToday today = status.SlotsToday;
         journal.Write($"slots today ({today.Date:yyyy-MM-dd}): {today.Slots}, {today.Completed} completed, {today.Aborted} cut short, {today.Skipped} skipped");
         return report;
+    }
+
+    /// <summary>The slot's one journal line on the ionosonde reading, and whether it went in the slot; null when the head end takes none.</summary>
+    public static string? IonosphereLine(SlotPlan plan, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Ionosphere is not { } reading)
+        {
+            return null;
+        }
+        return reading.JournalLine(now) + "; " + (plan.IonosphereFrames > 0
+            ? $"sent in {plan.IonosphereFrames} frames"
+            : !reading.HasSounding ? "nothing to send"
+            : plan.Frames.Count == 0 ? "not sent: this slot sends nothing"
+            : "not sent: no room in this slot");
     }
 
     /// <summary>

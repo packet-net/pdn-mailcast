@@ -85,6 +85,11 @@
   </section>
 
   <section>
+    <h2>Ionosphere</h2>
+    <div id="iono" class="muted">No reading heard yet. GB7RDG sends one in each slot.</div>
+  </section>
+
+  <section>
     <h2>Your BBS</h2>
     <dl id="bbs"></dl>
   </section>
@@ -252,6 +257,7 @@ async function refresh() {
   }
 
   speed(s);
+  iono(s);
 
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
@@ -293,6 +299,17 @@ async function refresh() {
     : `The level is ${whose(s)} own. Any level is fine short of clipping.`;
   $("band").style.left = pct(lvl.lowDbFs) + "%";
   $("band").style.width = (pct(lvl.highDbFs) - pct(lvl.lowDbFs)) + "%";
+}
+/* the head end's ionosonde reading: is 40 m open from Reading, and how far out */
+function iono(s) {
+  const i = s.iono;
+  if (!i) return;
+  const tone = { GOOD: "good", MARGINAL: "warn", POOR: "bad" }[i.state] || "muted";
+  $("iono").className = "";
+  $("iono").innerHTML = `<div class="big ${tone}">${esc(i.headline)}</div>
+    <div>${esc(i.words)}</div>
+    ${i.distanceWords ? `<div class="muted">${esc(i.distanceWords)}.</div>` : ""}
+    <div class="muted">From the ionosonde reading GB7RDG sends in each slot. A guide only: it does not change what is sent.</div>`;
 }
 /* the speed the frames are coming at, by the modem's autobaud */
 function speed(s) {

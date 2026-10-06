@@ -99,6 +99,18 @@
     }
   },
 
+  // The ionosonde reading: is 40 m open from Reading, and how far out. Observe only: it is logged,
+  // reported and sent to receivers as a tiny object, and never changes what or when the head end
+  // sends. A distance (100, 500, 1000 km) is open when its MUF is at least "openMhz", reliable
+  // when "reliableFactor" times it still is; a sounding older than "staleMinutes" is UNKNOWN. The
+  // first of "stations" with a fresh sounding is used; [] turns the reading off.
+  "ionosphere": {
+    "openMhz": 7.1,
+    "reliableFactor": 0.85,
+    "staleMinutes": 45,
+    "stations": ["RL052", "FF051", "DB049"]
+  },
+
   // GET /status for the state; POST /run (pdn-mailcast-headend --run-now) for a one-off slot,
   // accepted only from this machine.
   "status": {

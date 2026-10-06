@@ -34,6 +34,8 @@ public sealed record HeadEndConfig
 
     public StatusConfig Status { get; init; } = new();
 
+    public IonosphereConfig Ionosphere { get; init; } = new();
+
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -371,6 +373,7 @@ public sealed record HeadEndConfig
                 problems.Add("\"intake\".\"fbb\".\"pollMinutes\" must be above 0");
             }
         }
+        Ionosphere.Validate(problems);
         if (problems.Count > 0)
         {
             throw new ConfigException($"{source}: {string.Join("; ", problems)}");
@@ -760,6 +763,54 @@ public sealed record FbbIntakeConfig
 
     /// <summary>How long one session may take before it is dropped.</summary>
     public double SessionTimeoutSeconds { get; init; } = 300;
+}
+
+/// <summary>
+/// The ionosonde reading, which the head end logs, reports and sends as content type 4. Observe
+/// only: it never changes what or when the head end sends. These thresholds are all there is.
+/// </summary>
+public sealed record IonosphereConfig
+{
+    /// <summary>A distance is open when its MUF is at least this, MHz.</summary>
+    public double OpenMhz { get; init; } = 7.1;
+
+    /// <summary>A distance is reliable when this times its MUF is still at least <see cref="OpenMhz"/>.</summary>
+    public double ReliableFactor { get; init; } = 0.85;
+
+    /// <summary>A sounding older than this, minutes, makes the reading UNKNOWN.</summary>
+    public double StaleMinutes { get; init; } = 45;
+
+    /// <summary>The ionosondes by URSI code, best first; empty turns the reading off.</summary>
+    public IReadOnlyList<string> Stations { get; init; } = ["RL052", "FF051", "DB049"];
+
+    /// <summary>As the core library takes them.</summary>
+    public Packet.Mailcast.Propagation.IonoSettings ToSettings() => new()
+    {
+        OpenMhz = OpenMhz,
+        ReliableFactor = ReliableFactor,
+        StaleAfter = TimeSpan.FromMinutes(StaleMinutes),
+        Stations = [.. Stations.Select(s => s.ToUpperInvariant())],
+    };
+
+    internal void Validate(List<string> problems)
+    {
+        if (!(OpenMhz > 0 && OpenMhz < 30))
+        {
+            problems.Add("\"ionosphere\".\"openMhz\" must be above 0 and below 30");
+        }
+        if (!(ReliableFactor > 0 && ReliableFactor <= 1))
+        {
+            problems.Add("\"ionosphere\".\"reliableFactor\" must be above 0 and at most 1");
+        }
+        if (!(StaleMinutes > 0 && StaleMinutes <= 1440))
+        {
+            problems.Add("\"ionosphere\".\"staleMinutes\" must be above 0 and at most 1440");
+        }
+        if (Stations is null || Stations.Any(s => s is null || !System.Text.RegularExpressions.Regex.IsMatch(s, "^[A-Za-z]{2}[0-9]{3}$")))
+        {
+            problems.Add("\"ionosphere\".\"stations\" must be URSI codes such as \"RL052\"");
+        }
+    }
 }
 
 public sealed record StatusConfig

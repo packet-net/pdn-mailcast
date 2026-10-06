@@ -200,13 +200,15 @@ public sealed record ScheduledObject(TransferObject Transfer, int SlotIndex, uin
 /// <summary>One slot's plan: the directory, every object's share, and the frames in sending order.</summary>
 public sealed class SlotBroadcast
 {
-    internal SlotBroadcast(DateTimeOffset slot, BroadcastDirectory directory, IReadOnlyList<ScheduledObject> objects, IReadOnlyList<MailcastFrame> frames, IReadOnlyList<Bulletin> skipped)
+    internal SlotBroadcast(DateTimeOffset slot, BroadcastDirectory directory, IReadOnlyList<ScheduledObject> objects, IReadOnlyList<MailcastFrame> frames, IReadOnlyList<Bulletin> skipped, IReadOnlyList<MailcastFrame>? extras = null)
     {
         Slot = slot;
         Directory = directory;
         Objects = objects;
         Frames = frames;
         Skipped = skipped;
+        ExtraFrames = extras?.Count ?? 0;
+        ExtraObjects = extras is null ? [] : [.. extras.Select(f => f.ObjectId).Distinct()];
     }
 
     /// <summary>The slot's start.</summary>
@@ -226,6 +228,19 @@ public sealed class SlotBroadcast
 
     /// <summary>How many of <see cref="Frames"/> carry bulletins rather than the directory.</summary>
     public int BulletinFrames => Objects.Where(o => o.Bid is not null).Sum(o => o.Count);
+
+    /// <summary>
+    /// How many of <see cref="Frames"/> are the extra frames the plan was given (the ionosonde
+    /// reading): in <see cref="Frames"/> and the airtime, but not in <see cref="Objects"/> or the directory.
+    /// </summary>
+    public int ExtraFrames { get; }
+
+    /// <summary>
+    /// The objects of the extra frames. <see cref="HeadEndStore.Commit(SlotBroadcast, int)"/>
+    /// keeps the next ESI of each by object ID, as for a directory, so an object sent again
+    /// never repeats an ESI.
+    /// </summary>
+    public IReadOnlyList<ulong> ExtraObjects { get; }
 
     /// <summary>Bulletins in their carrying slots that were left out: too large, or a BID already taken.</summary>
     public IReadOnlyList<Bulletin> Skipped { get; }
@@ -516,7 +531,30 @@ public static class BroadcastScheduler
     /// </param>
     /// <param name="budget">The slot's airtime budget, which the budget rule needs and the shares rule ignores.</param>
     /// <param name="mode">The waveform the slot goes out on, which the directory names; null names none.</param>
-    public static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options = null, Func<ulong, uint>? directoryNextEsi = null, SlotBudget? budget = null, string? mode = null)
+    /// <param name="extras">
+    /// Frames of objects outside the rotation to send as well (the ionosonde reading), placed
+    /// among the others. Under the budget rule their airtime counts against the budget, so they
+    /// take the place of bulletin frames; they never make a slot key on their own, and if with
+    /// them no bulletin frame would fit where some would without, they are left out.
+    /// </param>
+    public static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options, Func<ulong, uint>? directoryNextEsi, SlotBudget? budget, string? mode, IReadOnlyList<MailcastFrame>? extras)
+    {
+        var plan = Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, extras ?? [], out bool anyRoom);
+        if (extras is { Count: > 0 } && plan.BulletinFrames == 0 && anyRoom)
+        {
+            return Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, [], out _);
+        }
+        return plan;
+    }
+
+    /// <summary>
+    /// Plans a slot from the bulletins in rotation: the same with no extra frames
+    /// (<see cref="Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?, IReadOnlyList{MailcastFrame}?)"/>).
+    /// </summary>
+    public static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options = null, Func<ulong, uint>? directoryNextEsi = null, SlotBudget? budget = null, string? mode = null) =>
+        Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, null);
+
+    private static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options, Func<ulong, uint>? directoryNextEsi, SlotBudget? budget, string? mode, IReadOnlyList<MailcastFrame> extras, out bool anyRoom)
     {
         ArgumentNullException.ThrowIfNull(carried);
         ArgumentNullException.ThrowIfNull(compression);
@@ -556,9 +594,10 @@ public static class BroadcastScheduler
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 
         int[] counts;
+        anyRoom = false;
         if (options.Budget is { } rule)
         {
-            counts = Fill(bulletins.Select(b => b.Carried).ToList(), directoryObject, options, rule, budget!);
+            counts = Fill(bulletins.Select(b => b.Carried).ToList(), directoryObject, options, rule, budget!, extras, out anyRoom);
         }
         else
         {
@@ -577,7 +616,7 @@ public static class BroadcastScheduler
 
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, counts, seed, options);
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, counts, seed, options, extras);
             if (budget is null || options.Budget is null || plan.BulletinFrames == 0
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {
@@ -609,9 +648,10 @@ public static class BroadcastScheduler
     /// next symbol would take the slot over budget. Room is first each bulletin's floor
     /// (<see cref="FloorSymbols"/>), then its slot cap, and never past its retiring coverage.
     /// </summary>
-    private static int[] Fill(List<CarriedBulletin> bulletins, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget)
+    private static int[] Fill(List<CarriedBulletin> bulletins, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, out bool anyRoom)
     {
         var counts = new int[bulletins.Count];
+        int[] extraLengths = [.. extras.Select(f => f.ToBytes().Length)];
         var room = new int[bulletins.Count];
         var lengths = new int[bulletins.Count];
         var floor = new int[bulletins.Count];
@@ -628,11 +668,13 @@ public static class BroadcastScheduler
         bool Fits()
         {
             int directoryFrames = DirectoryFrames(directory, bulletinLengths.Count, options);
-            var all = new List<int>(directoryFrames + bulletinLengths.Count);
+            var all = new List<int>(directoryFrames + bulletinLengths.Count + extraLengths.Length);
             all.AddRange(Enumerable.Repeat(directoryLength, directoryFrames));
             all.AddRange(bulletinLengths);
+            all.AddRange(extraLengths);
             return budget.Airtime(all) <= budget.Limit;
         }
+        anyRoom = room.Any(r => r > 0);
         foreach (var limit in new[] { floor, room })
         {
             var queue = new PriorityQueue<int, (double Coverage, int Order)>();
@@ -661,7 +703,7 @@ public static class BroadcastScheduler
     }
 
     /// <summary>Makes the slot's frames from each bulletin's count: the directory's share, then the interleaving.</summary>
-    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, int[] counts, int seed, ScheduleOptions options)
+    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, int[] counts, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras)
     {
         var scheduled = new List<ScheduledObject>();
         for (int i = 0; i < bulletins.Count; i++)
@@ -707,6 +749,19 @@ public static class BroadcastScheduler
                 var o = order[nextBulletin++];
                 frames.Add(scheduled[o.Object].Transfer.Frame(scheduled[o.Object].FirstEsi + (uint)o.Index));
             }
+        }
+
+        // Then any extra frames, spread evenly, never before the directory's first. A plan with
+        // no bulletin frames keys nothing on a schedule; a one-off slot sends them all the same.
+        if (extras.Count > 0)
+        {
+            int before = frames.Count;
+            for (int i = extras.Count - 1; i >= 0; i--)
+            {
+                int place = 1 + (int)((((2L * i) + 1) * before) / (2L * extras.Count));
+                frames.Insert(Math.Min(place, frames.Count), extras[i]);
+            }
+            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras);
         }
         return new SlotBroadcast(slot, directory, scheduled, frames, []);
     }

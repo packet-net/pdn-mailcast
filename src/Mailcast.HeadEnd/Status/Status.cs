@@ -25,6 +25,9 @@ public sealed class StatusStore
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        // A NaN or an infinity anywhere (a PA reading, an estimate) is written as a string
+        // rather than refused: the report is saved after the slot has keyed, and must never fail.
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     /// <summary>How many slot reports are kept for <see cref="SlotsToday"/>: two days of 15-minute slots, with retries.</summary>
@@ -74,6 +77,12 @@ public sealed class StatusStore
             }
         }
     }
+
+    /// <summary>The ionosonde reading as of now, for <c>iono</c> in the status document; null leaves it out.</summary>
+    public Func<Packet.Mailcast.Propagation.IonoReading>? Ionosphere { get; set; }
+
+    /// <summary>Why the last slot report could not be saved, if it could not; null when it was.</summary>
+    public string? LastWriteProblem { get; private set; }
 
     /// <summary>The last slot, if any.</summary>
     public SlotReport? LastSlot
@@ -153,13 +162,23 @@ public sealed class StatusStore
             {
                 _recent.RemoveRange(0, _recent.Count - RecentKept);
             }
-            if (_path is not null)
+            LastWriteProblem = null;
+            try
             {
-                WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(report, Json));
+                if (_path is not null)
+                {
+                    WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(report, Json));
+                }
+                if (_recentPath is not null)
+                {
+                    WriteAtomically(_recentPath, JsonSerializer.SerializeToUtf8Bytes(_recent, Json));
+                }
             }
-            if (_recentPath is not null)
+            catch (Exception e) when (e is NotSupportedException or ArgumentException or InvalidOperationException)
             {
-                WriteAtomically(_recentPath, JsonSerializer.SerializeToUtf8Bytes(_recent, Json));
+                // Something in the report cannot be written: it is kept in memory, and the slot,
+                // which has already gone out, counts all the same.
+                LastWriteProblem = e.Message;
             }
         }
     }
@@ -173,6 +192,20 @@ public sealed class StatusStore
             stream.Flush(flushToDisk: true);
         }
         File.Move(temporary, path, overwrite: true);
+    }
+
+    private Packet.Mailcast.Propagation.IonoReading? Reading()
+    {
+        try
+        {
+            return Ionosphere?.Invoke();
+        }
+#pragma warning disable CA1031 // observe only: the status page must not fail for it
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return null;
+        }
     }
 
     /// <summary>The status document.</summary>
@@ -191,8 +224,16 @@ public sealed class StatusStore
                 bulletinsHeld = _bulletinsHeld,
                 lastIntake = _lastIntake,
                 lastSlot = _lastSlot,
+                iono = Reading(),
             };
-            return JsonSerializer.Serialize(document, Json);
+            try
+            {
+                return JsonSerializer.Serialize(document, Json);
+            }
+            catch (Exception e) when (e is NotSupportedException or ArgumentException or InvalidOperationException)
+            {
+                return JsonSerializer.Serialize(new { service = "pdn-mailcast-headend", version = Program.Version, state = _state, error = e.Message }, Json);
+            }
         }
     }
 }

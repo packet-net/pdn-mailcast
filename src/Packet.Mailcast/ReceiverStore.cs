@@ -1,5 +1,6 @@
 using System.Globalization;
 using Mailcast.RaptorQ;
+using Packet.Mailcast.Propagation;
 
 namespace Packet.Mailcast;
 
@@ -46,6 +47,13 @@ public enum FrameOutcome
     /// pieces (less any found to be bad) and waits for more.
     /// </summary>
     Rejected,
+
+    /// <summary>
+    /// The symbol completed an ionosonde reading (content type 4), which is in the result. It is
+    /// never for the BBS; the newest is kept in <see cref="ReceiverStore.Ionosphere"/>. Last, so
+    /// the values before it are what they always were.
+    /// </summary>
+    CompletedIonosphere,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>
@@ -94,7 +102,8 @@ public sealed class MailParts
 /// <param name="Directory">The directory the frame completed, for <see cref="FrameOutcome.CompletedDirectory"/>.</param>
 /// <param name="Detail">Why, for <see cref="FrameOutcome.Rejected"/>.</param>
 /// <param name="ContentType">The object's content type, for <see cref="FrameOutcome.CompletedUnhandled"/> and <see cref="FrameOutcome.CompletedUnknown"/>.</param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null);
+/// <param name="Ionosphere">The reading the frame completed, for <see cref="FrameOutcome.CompletedIonosphere"/>.</param>
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null);
 
 /// <summary>How far one directory entry has got at this receiver.</summary>
 /// <param name="Entry">The directory's entry.</param>
@@ -276,6 +285,19 @@ public sealed class ReceiverStore
         LoadOutbox();
         _archive = new MailArchive(Path.Combine(root, "archive"), _quarantine, _options.ArchiveRetention, _options.ArchiveMaxBytes, _options.Time, _options.FlushToDisk, Log, CountRead);
         Publish(CaptureMail()!);
+        var ionosphereFile = Path.Combine(root, IonosphereFile);
+        if (File.Exists(ionosphereFile))
+        {
+            if (IonoRecord.TryDecode(File.ReadAllBytes(ionosphereFile), out var held))
+            {
+                Ionosphere = held;
+            }
+            else
+            {
+                Log($"{IonosphereFile} unreadable, removed");
+                File.Delete(ionosphereFile);
+            }
+        }
         var directoryFile = Path.Combine(root, "directory.txt");
         if (File.Exists(directoryFile))
         {
@@ -313,6 +335,15 @@ public sealed class ReceiverStore
 
     /// <summary>The newest directory heard, if any.</summary>
     public BroadcastDirectory? Directory { get; private set; }
+
+    /// <summary>Where the newest ionosonde reading is kept, as the object that carried it, under the store's folder.</summary>
+    public const string IonosphereFile = "ionosphere.bin";
+
+    /// <summary>
+    /// The ionosonde reading with the newest sounding heard (content type 4), kept across
+    /// restarts; null until one has been heard. As sent: its age is as of then.
+    /// </summary>
+    public IonoReading? Ionosphere { get; private set; }
 
     /// <summary>
     /// The head end's timetable from the newest directory heard that gave one, kept across
@@ -720,6 +751,21 @@ public sealed class ReceiverStore
         if (!ContentType.TryRead(data, out byte type, out _, out _))
         {
             return Unusable(instance, "matches its ID but its content type or metadata block is cut short");
+        }
+        if (type == (byte)ObjectKind.Propagation)
+        {
+            // Observe only, never for the BBS. Marked done either way, so its later frames are ignored.
+            MarkDone(instance);
+            if (!IonoRecord.TryDecode(data, out var reading))
+            {
+                return new AcceptResult(FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type);
+            }
+            if (Ionosphere?.SoundingTimeUtc is not { } held || reading.SoundingTimeUtc >= held)
+            {
+                DurableFile.WriteAtomically(Path.Combine(_root, IonosphereFile), data, flush: _options.FlushToDisk);
+                Ionosphere = reading;
+            }
+            return new AcceptResult(FrameOutcome.CompletedIonosphere, instance.ObjectId, ContentType: type, Ionosphere: reading);
         }
         if (type != (byte)ObjectKind.Bulletin && type != (byte)ObjectKind.Directory)
         {

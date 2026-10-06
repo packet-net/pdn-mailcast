@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Mailcast.Receiver.Delivery;
+using Packet.Mailcast.Propagation;
 using Packet.SoundModem.Audio;
 using Packet.SoundModem.Waterfall;
 
@@ -712,6 +713,7 @@ public sealed class StatusPage : IAsyncDisposable
                 },
             },
             framesHeard = _host.Intake.FramesHeard,
+            iono = IonoView(_host.Intake.Ionosphere, _host.Time.GetUtcNow()),
             directory = directory is null ? null : new { date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), entries = directory.Entries.Count },
             bulletins = progress.Select(p =>
             {
@@ -735,6 +737,46 @@ public sealed class StatusPage : IAsyncDisposable
                 said = DeliveryService.Describe(r.Verdict),
                 detail = r.Detail,
             }),
+        };
+    }
+
+    /// <summary>
+    /// The ionosonde tile: the head end's newest reading, aged by this receiver's clock and
+    /// UNKNOWN once its sounding is older than <see cref="IonoSettings.DefaultStaleAfter"/>, the
+    /// head end's own default, with the words the page shows.
+    /// Null until one has been heard.
+    /// </summary>
+    internal static object? IonoView(IonoReading? heard, DateTimeOffset now)
+    {
+        if (heard is null)
+        {
+            return null;
+        }
+        var r = heard.AsOf(now, IonoSettings.DefaultStaleAfter);
+        return new
+        {
+            state = r.State,
+            foF2 = r.FoF2,
+            mufd100 = r.Mufd100,
+            mufd500 = r.Mufd500,
+            mufd1000 = r.Mufd1000,
+            skipZoneKm = r.SkipZoneKm,
+            station = r.Station,
+            stationName = r.StationName,
+            soundingTimeUtc = r.SoundingTimeUtc,
+            ageMinutes = r.AgeMinutes,
+            ageWhenSent = heard.AgeMinutes,
+            source = r.Source,
+            method = r.Method,
+            distances = new[]
+            {
+                new { km = 100, mufMhz = r.Mufd100, verdict = r.At100, words = IonoReading.Words(r.At100) },
+                new { km = 500, mufMhz = r.Mufd500, verdict = r.At500, words = IonoReading.Words(r.At500) },
+                new { km = 1000, mufMhz = r.Mufd1000, verdict = r.At1000, words = IonoReading.Words(r.At1000) },
+            },
+            headline = r.Headline(),
+            words = r.Summary(now),
+            distanceWords = r.State == IonoState.Unknown ? null : r.Distances(),
         };
     }
 

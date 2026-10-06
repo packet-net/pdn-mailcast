@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using Packet.Mailcast;
+using Packet.Mailcast.Propagation;
 
 namespace Mailcast.Receiver;
 
@@ -54,11 +55,21 @@ public sealed class Intake : IAsyncDisposable
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
             (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)), PublishMailOnChange = false });
         _heardSchedule = _store.HeardSchedule;
+        _ionosphere = _store.Ionosphere;
+        _time = (options ?? new ReceiverStoreOptions()).Time;
         _progress = (_store.Directory, _store.Progress());
         _worker = Task.Run(RunAsync);
     }
 
     private SlotTimetable? _heardSchedule;
+    private volatile IonoReading? _ionosphere;
+    private readonly TimeProvider _time;
+
+    /// <summary>
+    /// The newest ionosonde reading heard from the head end (content type 4), kept across
+    /// restarts; null until one has been heard. Its age is as sent: see <see cref="IonoReading.AsOf"/>.
+    /// </summary>
+    public IonoReading? Ionosphere => _ionosphere;
     private volatile Tuple<BroadcastDirectory?, IReadOnlyList<ObjectProgress>> _progressHeld = Tuple.Create<BroadcastDirectory?, IReadOnlyList<ObjectProgress>>(null, []);
 
     /// <summary>The published progress: a reference swapped whole, so a reader never sees half of one.</summary>
@@ -398,6 +409,16 @@ public sealed class Intake : IAsyncDisposable
                 {
                     ScheduleHeard?.Invoke(changed);
                 }
+                break;
+            case FrameOutcome.CompletedIonosphere when result.Ionosphere is { } reading:
+                // Once per object, so once a slot at most. Never for the BBS.
+                Interlocked.Increment(ref _framesStored);
+                lock (_gate)
+                {
+                    _ionosphere = _store.Ionosphere;
+                }
+                DateTimeOffset now = _time.GetUtcNow();
+                _log(Ascii.Clean(reading.AsOf(now, IonoSettings.DefaultStaleAfter).Describe(now)));
                 break;
             case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
                 // Once per object: it is marked done, so its later frames are not rebuilt again.

@@ -197,9 +197,25 @@ pdn-bbs speaks the same FBB B1F forwarding, and its `fbbTcp` listener (BPQ's FBB
 
 With `flex.enabled`, the head end opens its own API session to the Flex for the length of each slot. It is a second, non-GUI client that only reads: it subscribes to the radio's status (for the frequency reference) and its meters (for PA temperature), with the radio's keepalive on so a dead session is noticed, and never asks for a slice, a DAX stream or the transmitter, so it cannot disturb pdn-soundmodem's slice. A PA reading older than 15 s (`flex.paStaleSeconds`) counts as none. If the radio cannot be reached, or the readings stop during the slot, the head end logs it and carries on without the PA watch, or with `"whenUnreachable": "skip"` skips the slot or stops it.
 
+## The ionosonde reading
+
+The head end keeps an eye on the ionosphere over Reading and tells receivers what it sees: whether 40 m is open at 100, 500 and 1000 km, and where the skip zone ends. It is observe only. It never changes what or when the head end sends; its two small frames go in slots that key anyway, inside the airtime budget, and a slot with nothing else to send still keys nothing.
+
+It asks GIRO first, then PROPquest, for Chilton, then Fairford, then Dourbes, at most every 15 minutes and only from an hour before a slot to a quarter of an hour after one. A source that answers 429 or 5xx, or not at all, is left alone for longer each time (15 minutes, then 30, up to 4 hours, or its Retry-After). The asking never holds a slot up: a slot takes whatever reading is at hand, and a failure only ever makes the reading UNKNOWN. Soundings often reach both sources hours late, so UNKNOWN (no sounding in the last 45 minutes) is common; the reading then gives the last values and their age.
+
+A distance counts as open when its MUF is at least 7.1 MHz and reliable when 0.85 times it is. GOOD means reliable at 100 and 500 km, POOR closed at all three, MARGINAL anything between. Where the source has no MUF for a distance, it is worked out from foF2 and M(3000)F2 by ITU-R P.533's basic MUF ([design.md](design.md#the-ionosonde-reading) has the details). It does not model D-layer absorption. The thresholds and stations are in `ionosphere` in the configuration (`openMhz`, `reliableFactor`, `staleMinutes`, `stations`); `"stations": []` turns it off.
+
+Each slot logs one line about it, for example:
+
+```
+ionosonde: MARGINAL, Fairford FF051 at 2026-10-06 11:30Z (12 min old, PROPquest): foF2 6.05 MHz, MUF 6.65/8.21/11.64 MHz at 100/500/1000 km (MUFs estimated from foF2 and M(3000)F2); 100 km closed, 500 km open, just, 1000 km good; skip zone about 280 km; sent in 2 frames
+```
+
+Requests carry the User-Agent `pdn-mailcast-headend/VERSION (+https://github.com/packet-net/pdn-mailcast; GB7RDG)`, with the station's callsign.
+
 ## Status
 
-`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation, whether the tone went, the PA temperature maximum, the reference state, who asked for it if it was a one-off (`requestedBy`), its waveform (`mode`) and the planner's estimate of its time on the air (`estimatedSeconds`). `recent-slots.json` in the state directory keeps the same for the last slots. The journal carries the same in plain lines, each slot named by its start, and with `daylight`, once a day, that day's sunrise, sunset and slots, for example:
+`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation, whether the tone went, the PA temperature maximum, the reference state, who asked for it if it was a one-off (`requestedBy`), its waveform (`mode`), the planner's estimate of its time on the air (`estimatedSeconds`), and the ionosonde reading it planned with (`ionosphere`) and how many frames carried it (`ionosphereFrames`). `iono` is the reading as of now: `state`, `foF2`, `mufd100`, `mufd500`, `mufd1000`, `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes`, `source`, `method`, and the verdict at each distance (`at100`, `at500`, `at1000`). `recent-slots.json` in the state directory keeps the same for the last slots. The journal carries the same in plain lines, each slot named by its start, and with `daylight`, once a day, that day's sunrise, sunset and slots, for example:
 
 ```
 daylight 2026-10-05 at IO91lk: sunrise 06:11Z, sunset 17:33Z; 9 slots, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 and 17:00 UTC
