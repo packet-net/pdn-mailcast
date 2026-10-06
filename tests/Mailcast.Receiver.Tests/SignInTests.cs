@@ -721,4 +721,135 @@ public class SignInTests
         Assert.False(settings.GetProperty("web").GetProperty("passwordSet").GetBoolean());
         Assert.DoesNotContain("name=\"password\"", await (await GetAsync(r, "/")).Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
+
+    private const string ChromeAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+    private const string FirefoxAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0";
+
+    /// <summary>
+    /// The headers each sends, as captured, to a page on a plain-HTTP network address. A browser
+    /// sends no Sec-Fetch-* there: it only sends those to HTTPS and to localhost.
+    /// </summary>
+    public static TheoryData<string, string, string, (string, string)[]> Clients() => new()
+    {
+        { "Chrome opening the page", "GET", "/", [("User-Agent", ChromeAgent),
+            ("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"),
+            ("Accept-Language", "en-GB,en;q=0.9"), ("Upgrade-Insecure-Requests", "1")] },
+        { "Firefox opening the page", "GET", "/", [("User-Agent", FirefoxAgent),
+            ("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+            ("Accept-Language", "en-GB,en;q=0.5"), ("Upgrade-Insecure-Requests", "1"), ("Priority", "u=0, i")] },
+        { "Firefox opening the waterfall", "GET", "/waterfall/", [("User-Agent", FirefoxAgent),
+            ("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")] },
+        { "the page's own poll", "GET", "api/status", [("User-Agent", ChromeAgent), ("Accept", "*/*"), ("Referer", "http://10.45.0.235:8130/")] },
+        { "the page's own post", "POST", "api/mail/resend", [("User-Agent", FirefoxAgent), ("Accept", "*/*")] },
+        { "the favicon", "GET", "/favicon.ico", [("User-Agent", ChromeAgent),
+            ("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"), ("Referer", "http://10.45.0.235:8130/")] },
+        { "the waterfall's socket", "GET", "/waterfall/ws", [("User-Agent", FirefoxAgent), ("Accept", "*/*"),
+            ("Connection", "keep-alive, Upgrade"), ("Upgrade", "websocket"), ("Sec-WebSocket-Version", "13"), ("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")] },
+    };
+
+    public static TheoryData<string, (string, string)[]> Scripts() => new()
+    {
+        { "curl", [("User-Agent", "curl/8.14.1"), ("Accept", "*/*")] },
+        { "wget", [("User-Agent", "Wget/1.25.0"), ("Accept", "*/*"), ("Accept-Encoding", "identity")] },
+        { "python-requests", [("User-Agent", "python-requests/2.32.3"), ("Accept", "*/*"), ("Accept-Encoding", "gzip, deflate"), ("Connection", "keep-alive")] },
+    };
+
+    private static HttpRequestMessage WithHeaders(string method, string url, (string Name, string Value)[] headers, string? basic = null)
+    {
+        var request = Request(new HttpMethod(method), url, json: method == "POST" ? new { id = "1" } : null);
+        foreach (var (name, value) in headers)
+        {
+            if (name is "Connection" or "Upgrade")
+            {
+                continue; // HttpClient sets these itself; the WebSocket's are below
+            }
+            Assert.True(request.Headers.TryAddWithoutValidation(name, value), name);
+        }
+        if (headers.Any(h => h.Name == "Upgrade"))
+        {
+            request.Headers.TryAddWithoutValidation("Connection", "Upgrade");
+            request.Headers.TryAddWithoutValidation("Upgrade", "websocket");
+        }
+        if (basic is not null)
+        {
+            request.Headers.TryAddWithoutValidation("Authorization", Basic(basic));
+        }
+        return request;
+    }
+
+    [Theory]
+    [MemberData(nameof(Clients))]
+    public async Task Browser_OverPlainHttp_WithoutSecFetch_IsNeverAskedForBasic_AndItsBasicIsNotCounted(string who, string method, string url, (string, string)[] headers)
+    {
+        using var dir = new TempDirectory();
+        await using var r = await StartAsync(dir.Path, new FakeTimeProvider(Start));
+        Assert.DoesNotContain(headers, h => h.Item1.StartsWith("Sec-Fetch", StringComparison.Ordinal));
+
+        var answer = await r.SendAsync(WithHeaders(method, url, headers));
+        Assert.Empty(answer.Headers.WwwAuthenticate);
+        string body = await answer.Content.ReadAsStringAsync();
+        bool page = method == "GET" && !url.StartsWith("api/", StringComparison.Ordinal) && !url.EndsWith("/ws", StringComparison.Ordinal);
+        if (page)
+        {
+            // Pages, the favicon among them, get the sign-in page: harmless where an image was wanted.
+            Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+            Assert.Contains("name=\"password\"", body, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, answer.StatusCode);
+        }
+
+        // A Basic login it remembers, right or wrong, neither lets it in nor counts against it.
+        Assert.Equal(HttpStatusCode.Unauthorized == answer.StatusCode ? HttpStatusCode.Unauthorized : HttpStatusCode.OK,
+            (await r.SendAsync(WithHeaders(method, url, headers, Password))).StatusCode);
+        for (int i = 0; i < 2 * SignInThrottle.MaxFailures; i++)
+        {
+            var wrong = await r.SendAsync(WithHeaders(method, url, headers, Wrong));
+            Assert.Empty(wrong.Headers.WwwAuthenticate);
+            Assert.DoesNotContain("not right", await wrong.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+        Assert.DoesNotContain(r.Log, l => l.Contains("wrong passwords", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.OK, (await SignInAsync(r, Password)).StatusCode);
+        _ = who;
+    }
+
+    [Theory]
+    [MemberData(nameof(Scripts))]
+    public async Task Script_IsAskedForBasic_AndItsBasicWorksAndIsCounted(string who, (string, string)[] headers)
+    {
+        using var dir = new TempDirectory();
+        await using var r = await StartAsync(dir.Path, new FakeTimeProvider(Start));
+
+        foreach (string url in new[] { "/", "api/status" })
+        {
+            var asked = await r.SendAsync(WithHeaders("GET", url, headers));
+            Assert.Equal(HttpStatusCode.Unauthorized, asked.StatusCode);
+            Assert.Contains("Basic", asked.Headers.WwwAuthenticate.ToString(), StringComparison.Ordinal);
+        }
+        Assert.Equal(HttpStatusCode.OK, (await r.SendAsync(WithHeaders("GET", "api/mail", headers, Password))).StatusCode);
+
+        for (int i = 0; i < SignInThrottle.MaxFailures; i++)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await r.SendAsync(WithHeaders("GET", "api/status", headers, Wrong))).StatusCode);
+        }
+        Assert.Equal((HttpStatusCode)429, (await r.SendAsync(WithHeaders("GET", "api/status", headers, Password))).StatusCode);
+        Assert.Single(r.Log, l => l.Contains("wrong passwords", StringComparison.Ordinal));
+        _ = who;
+    }
+
+    [Theory]
+    [InlineData(null, ChromeAgent, "*/*", true)]
+    [InlineData(null, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1", null, true)]
+    [InlineData(null, null, "text/html,*/*;q=0.8", true)]
+    [InlineData("navigate", null, null, true)]
+    [InlineData(null, "curl/8.14.1", "*/*", false)]
+    [InlineData(null, "Wget/1.25.0", "*/*", false)]
+    [InlineData(null, "python-requests/2.32.3", "*/*", false)]
+    [InlineData(null, null, null, false)]
+    [InlineData(null, null, "application/json", false)]
+    public void IsBrowser_ByItsHeaders(string? secFetchMode, string? userAgent, string? accept, bool browser)
+    {
+        Assert.Equal(browser, StatusPage.IsBrowser(secFetchMode, userAgent, accept));
+    }
 }
