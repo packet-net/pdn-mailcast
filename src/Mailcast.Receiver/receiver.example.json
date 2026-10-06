@@ -49,5 +49,9 @@
   // To share your radio with LinBPQ packet, the receiver can retune it for each slot: add
   // "rig" and "bpq" as docs/receiver.md says under "Sharing a radio with LinBPQ".
 
+  // To run commands of your own before and after each slot (to stop another program that
+  // shares your radio, and start it again), add "hooks" as docs/receiver.md says under
+  // "Running your own commands around each slot".
+
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

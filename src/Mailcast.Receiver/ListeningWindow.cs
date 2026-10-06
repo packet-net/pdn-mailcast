@@ -136,6 +136,27 @@ public static class ListeningWindow
     }
 
     /// <summary>
+    /// A sound card's window around the slot in progress at <paramref name="now"/>, or else the
+    /// next that runs: the same as a web SDR's, from <see cref="ReceiverConfig.WebSdrBefore"/>
+    /// before the slot to <see cref="ReceiverConfig.WebSdrAfter"/> after, but around every slot
+    /// that runs. A sound card listens all the time; this is when the hooks run. Null when no slot
+    /// runs in the year ahead.
+    /// </summary>
+    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot)? SoundCard(DateTimeOffset now, SlotSchedule schedule)
+    {
+        ArgumentNullException.ThrowIfNull(schedule);
+        var timetable = schedule.Timetable;
+        var utc = now.ToUniversalTime();
+        if (timetable.ActiveAtOrBefore(utc) is { } latest && utc < latest + ReceiverConfig.WebSdrAfter)
+        {
+            return (latest - ReceiverConfig.WebSdrBefore, latest + ReceiverConfig.WebSdrAfter, latest);
+        }
+        return timetable.NextActiveAtOrAfter(utc) is { } next
+            ? (next - ReceiverConfig.WebSdrBefore, next + ReceiverConfig.WebSdrAfter, next)
+            : null;
+    }
+
+    /// <summary>
     /// The window in progress at <paramref name="now"/>, or else the next one, for slots at
     /// <paramref name="slots"/> each day. Its opening is at or before <paramref name="now"/>
     /// exactly when the web SDR should be open now.

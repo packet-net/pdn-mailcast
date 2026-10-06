@@ -1,4 +1,5 @@
 using System.Globalization;
+using Mailcast.Receiver.Hooks;
 using Packet.SoundModem.Rig;
 
 namespace Mailcast.Receiver.Retune;
@@ -42,6 +43,10 @@ public enum RetuneStage
 /// file says where to) and only then turns LinBPQ's transmit back on.</para>
 /// <para>A port the sysop had already turned off is left off afterwards.</para>
 /// <para>With <see cref="RigSettings.DedicatedRadio"/> and no <c>bpq</c>, only the tuning is done.</para>
+/// <para>With the config's <c>hooks</c>, the retuner runs them too, in order: "before" first,
+/// started its timeout earlier than <see cref="Lead"/> so it has finished by then, and only if it
+/// worked is LinBPQ held off and the rig tuned; "after" once the rig is back and LinBPQ released,
+/// and as the receiver stops.</para>
 /// </remarks>
 public sealed class Retuner : IAsyncDisposable
 {
@@ -75,6 +80,7 @@ public sealed class Retuner : IAsyncDisposable
     private readonly Func<bool> _onRadio;
     private readonly RigTuning _tuning;
     private readonly BpqNodeSettings? _bpq;
+    private readonly SlotHooks? _hooks;
     private readonly string _file;
     private readonly string _rigRestoreFile;
     private readonly object _gate = new();
@@ -97,15 +103,16 @@ public sealed class Retuner : IAsyncDisposable
     /// <summary>
     /// A retuner for <paramref name="config"/>'s <c>rig</c> and <c>bpq</c>. Slots come from
     /// <paramref name="schedule"/>, read afresh each time; a slot is only retuned for when
-    /// <paramref name="onRadio"/> says the audio comes from the radio.
+    /// <paramref name="onRadio"/> says the audio comes from the radio. <paramref name="hooks"/>,
+    /// if given, are run around each slot it retunes for.
     /// </summary>
-    public Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log)
-        : this(config, schedule, onRadio, time, log, time)
+    public Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null)
+        : this(config, schedule, onRadio, time, log, time, hooks)
     {
     }
 
     /// <summary>As the public one, with rig control on a clock of its own, so a test can step its polls by themselves.</summary>
-    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime)
+    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         var rig = config.Rig ?? throw new ArgumentException("the config has no \"rig\"", nameof(config));
@@ -113,6 +120,7 @@ public sealed class Retuner : IAsyncDisposable
         _log = log;
         _schedule = schedule;
         _onRadio = onRadio;
+        _hooks = hooks;
         _bpq = config.Bpq;
         _owedPort = _bpq?.HfPort ?? 0;
         _tuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
@@ -255,6 +263,13 @@ public sealed class Retuner : IAsyncDisposable
                 ? $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot; \"dedicatedRadio\" says nothing else transmits on it"
                 : $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot, with LinBPQ port {_bpq.HfPort}'s transmit held off meanwhile through its node at {_bpq.Host}:{_bpq.Port} as {_bpq.User}");
             Recover();
+            if (_hooks is not null)
+            {
+                // A slot whose window the receiver stopped in last time is not run again: its
+                // "after" runs instead, once the rig is back.
+                _hooks.Recover();
+                _finished = _hooks.RecoveredSlot ?? _finished;
+            }
             await Rig.StartAsync(cancellation).ConfigureAwait(false);
             await SayPortAsync(cancellation).ConfigureAwait(false);
             while (!cancellation.IsCancellationRequested)
@@ -369,6 +384,12 @@ public sealed class Retuner : IAsyncDisposable
             await GiveBackAsync(cancellation).ConfigureAwait(false);
             return;
         }
+        if (_hooks is not null && _hooks.AfterOwedTo(this, unowned: _onRadio()))
+        {
+            // The rig is back and LinBPQ released (or never held off): the hook's turn.
+            await _hooks.AfterAsync(this, unowned: _onRadio()).ConfigureAwait(false);
+            return;
+        }
 
         var now = _time.GetUtcNow();
         if (NextSlotFrom(now) is not { } slot)
@@ -377,7 +398,7 @@ public sealed class Retuner : IAsyncDisposable
             await WaitAsync(Check, cancellation).ConfigureAwait(false);
             return;
         }
-        var opens = slot - Lead;
+        var opens = slot - Lead - HookLead;
         lock (_gate)
         {
             _nextSlot = slot;
@@ -419,6 +440,38 @@ public sealed class Retuner : IAsyncDisposable
         var closes = slot + After;
         try
         {
+            if (_hooks is { Configured: true } hooks)
+            {
+                SetState(RetuneStage.Idle, $"running the \"before\" command for the {Hhmm(slot)} UTC slot");
+                var start = await hooks.BeforeAsync(slot, this, "; so the radio is not retuned and LinBPQ is not held off for that slot, as whatever it was to stop may still be transmitting", cancellation).ConfigureAwait(false);
+                if (start != BeforeOutcome.Ok)
+                {
+                    if (start == BeforeOutcome.Busy)
+                    {
+                        // A web SDR's window from before the audio source changed: its "after"
+                        // has not run, so neither does this slot's "before".
+                        Warn($"retune: not retuning for the {Hhmm(slot)} UTC slot: the hooks are still running for a window from before the audio source changed");
+                    }
+                    NoteProblem(start == BeforeOutcome.Busy
+                        ? $"the hooks were still running for another window, so the radio was not retuned for the {Hhmm(slot)} UTC slot"
+                        : $"the \"before\" command failed, so the radio was not retuned for the {Hhmm(slot)} UTC slot");
+                    SetState(RetuneStage.Idle, start == BeforeOutcome.Busy
+                        ? $"not retuning for the {Hhmm(slot)} UTC slot: the hooks are still running for another window"
+                        : $"not retuning for the {Hhmm(slot)} UTC slot: the \"before\" command failed; \"after\" runs at {Hhmm(closes)} UTC");
+                    while (_time.GetUtcNow() < closes)
+                    {
+                        await WaitAsync(Shorter(closes - _time.GetUtcNow(), Check), cancellation).ConfigureAwait(false);
+                    }
+                    return;
+                }
+                var holdAt = slot - Lead;
+                while (_time.GetUtcNow() < holdAt)
+                {
+                    SetState(RetuneStage.Idle, $"the \"before\" command is done; retuning at {Hhmm(holdAt)} UTC for the {Hhmm(slot)} UTC slot");
+                    await WaitAsync(Shorter(holdAt - _time.GetUtcNow(), Check), cancellation).ConfigureAwait(false);
+                }
+            }
+
             if (_bpq is not null && Node is not null)
             {
                 SetState(RetuneStage.HoldingTransmitOff, $"turning LinBPQ port {_bpq.HfPort}'s transmit off for the {Hhmm(slot)} UTC slot");
@@ -466,11 +519,12 @@ public sealed class Retuner : IAsyncDisposable
                     if (_time.GetUtcNow() >= closes)
                     {
                         // A following slot whose window would open before this one closes keeps the radio.
-                        if (_schedule().Timetable.NextActiveAfter(slot) is { } next && next - Lead <= closes)
+                        if (_schedule().Timetable.NextActiveAfter(slot) is { } next && next - Lead - HookLead <= closes)
                         {
                             _finished = slot;
                             slot = next;
                             closes = next + After;
+                            _hooks?.Extend(slot);
                             _log($"retune: the {Hhmm(slot)} UTC slot follows straight on, so the rig stays tuned until {Hhmm(closes)} UTC");
                             SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
                         }
@@ -811,8 +865,26 @@ public sealed class Retuner : IAsyncDisposable
         return why.Length == 0;
     }
 
-    /// <summary>Puts the rig back and turns LinBPQ on, if it safely can, as the receiver stops.</summary>
+    /// <summary>
+    /// Puts the rig back and turns LinBPQ on, if it safely can, as the receiver stops; then runs
+    /// the "after" hook if it is owed.
+    /// </summary>
     private async Task StopAsync()
+    {
+        try
+        {
+            await PutBackAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            if (_hooks is not null)
+            {
+                await _hooks.AfterAsync(this, unowned: true, " as the receiver stops").ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task PutBackAsync()
     {
         try
         {
@@ -888,6 +960,9 @@ public sealed class Retuner : IAsyncDisposable
             Warn($"retune: WARNING - cannot remove {_file} ({Ascii.Clean(e.Message)}); the next start-up sends XMITOFF 0 again, which does no harm");
         }
     }
+
+    /// <summary>How much earlier than <see cref="Lead"/> a slot's work starts: the "before" hook's timeout, so it is done by then.</summary>
+    private TimeSpan HookLead => _hooks is { Configured: true } hooks ? hooks.BeforeLead : TimeSpan.Zero;
 
     /// <summary>How long to ask rig control for: past the next renewal, never past its cap.</summary>
     private TimeSpan Length(DateTimeOffset closes)

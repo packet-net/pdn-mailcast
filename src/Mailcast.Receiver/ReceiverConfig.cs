@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Mailcast.Receiver.Hooks;
 using Mailcast.Receiver.Retune;
 using Packet.Mailcast;
 
@@ -212,6 +213,12 @@ public sealed record ReceiverConfig
     /// </summary>
     public BpqNodeSettings? Bpq { get; init; }
 
+    /// <summary>
+    /// Programs to run before and after each slot the receiver listens to, for a radio shared
+    /// with something else. Null (the default) runs nothing.
+    /// </summary>
+    public HooksSettings? Hooks { get; init; }
+
     internal static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -240,6 +247,22 @@ public sealed record ReceiverConfig
         try
         {
             config = JsonSerializer.Deserialize<ReceiverConfig>(text, Json);
+        }
+        catch (JsonException e) when (e.Path?.StartsWith("$.hooks", StringComparison.Ordinal) == true)
+        {
+            if (System.Text.RegularExpressions.Regex.Match(e.Message, "property '([^']*)' could not be mapped") is { Success: true } unknown)
+            {
+                // The path may or may not end with the unknown key itself: "$.hooks.befor", or "$.hooks.before(.timeout)".
+                string name = unknown.Groups[1].Value;
+                string[] parts = e.Path.Split('.');
+                bool inHook = parts.Length > 3 || (parts.Length == 3 && parts[2] != name);
+                throw new ConfigException(inHook
+                    ? $"the config file {path}: \"{name}\" is not a setting of a hook (at {e.Path}): a hook has \"command\", \"args\" and \"timeoutSeconds\""
+                    : $"the config file {path}: \"{name}\" is not a setting of \"hooks\": it has \"before\" and \"after\"");
+            }
+            throw new ConfigException(
+                $"the config file {path} has a \"hooks\" setting that cannot be read (at {e.Path}): give each hook as "
+                + "{ \"command\": \"/full/path/to/program\", \"args\": [\"a list\", \"of strings\"], \"timeoutSeconds\": 30 }");
         }
         catch (JsonException e)
         {
@@ -370,6 +393,7 @@ public sealed record ReceiverConfig
         }
         Rig?.Validate();
         Bpq?.Validate();
+        Hooks?.Validate();
         if (Rig is { DedicatedRadio: false } && Bpq is null)
         {
             throw new ConfigException(

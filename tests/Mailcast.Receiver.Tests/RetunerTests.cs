@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using Mailcast.Receiver.Hooks;
 using Mailcast.Receiver.Retune;
 using Microsoft.Extensions.Time.Testing;
 using Packet.Mailcast;
@@ -15,7 +16,7 @@ namespace Mailcast.Receiver.Tests;
 /// test wants a poll, and each poll is waited for by seeing rig control set its next timer.
 /// Nothing here is timed.
 /// </summary>
-public sealed class RetunerTests
+public sealed partial class RetunerTests
 {
     /// <summary>Where the station keeps the radio for packet: 7.048 MHz USB.</summary>
     private const long PacketDialHz = 7_048_000;
@@ -55,7 +56,8 @@ public sealed class RetunerTests
             Func<bool>? onRadio = null,
             BpqNodeSettings? bpq = null,
             Func<BpqNodeSettings, BpqNodeSettings>? adjust = null,
-            SlotSchedule? schedule = null)
+            SlotSchedule? schedule = null,
+            HooksSettings? hooks = null)
         {
             _ownFakes = rig is null;
             Rig = rig ?? new FakeRigctld(PacketDialHz, "USB", 2400);
@@ -81,10 +83,17 @@ public sealed class RetunerTests
                 Daylight = null,
                 Rig = new RigSettings { Rigctld = Rig.Endpoint.ToString(), DedicatedRadio = dedicated },
                 Bpq = settings is null ? null : adjust?.Invoke(settings) ?? settings,
+                Hooks = hooks,
             };
             Config.Validate();
             var slots = schedule ?? Config.Schedule;
-            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime);
+            // The hooks' lines go in with the rig's and LinBPQ's events too, to see the order.
+            Hooks = hooks is null ? null : new SlotHooks(() => Config, Clock, line =>
+            {
+                Log.Enqueue(line);
+                Events.Enqueue(line);
+            });
+            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
             Retuner.Rig.Changed += RigChanges.Enqueue;
         }
@@ -102,6 +111,8 @@ public sealed class RetunerTests
         public ReceiverConfig Config { get; }
 
         public Retuner Retuner { get; }
+
+        public SlotHooks? Hooks { get; }
 
         public ConcurrentQueue<string> Log { get; } = new();
 
@@ -208,6 +219,9 @@ public sealed class RetunerTests
 
         public int Index(string evt) => Events.ToList().IndexOf(evt);
 
+        /// <summary>Where the first event starting with <paramref name="start"/> is, or -1.</summary>
+        public int IndexStarting(string start) => Events.ToList().FindIndex(e => e.StartsWith(start, StringComparison.Ordinal));
+
         public int LastIndex(string evt) => Events.ToList().LastIndexOf(evt);
 
         public async Task StopAsync()
@@ -219,6 +233,7 @@ public sealed class RetunerTests
                 _run = null;
             }
             await Retuner.DisposeAsync();
+            Hooks?.Dispose();
         }
 
         public async ValueTask DisposeAsync()

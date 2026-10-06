@@ -1,5 +1,6 @@
 using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
+using Mailcast.Receiver.Hooks;
 using Mailcast.Receiver.Retune;
 
 namespace Mailcast.Receiver;
@@ -38,9 +39,43 @@ public sealed class ReceiverHost : IAsyncDisposable
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
         Intake.ScheduleHeard += OnScheduleHeard;
+        Hooks = new SlotHooks(() => Config, time, log);
         if (config.Rig is not null)
         {
-            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log);
+            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks);
+        }
+    }
+
+    /// <summary>The config's <c>hooks</c>, run around each slot listened to.</summary>
+    public SlotHooks Hooks { get; }
+
+    /// <summary>Whether the retuner runs the hooks, in step with its own work: it is retuning the radio the audio comes from.</summary>
+    internal bool RetunerRunsHooks => Retuner is not null && AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa;
+
+    /// <summary>
+    /// The listening window the hooks run around, in progress at <paramref name="at"/> or else
+    /// the next: a web SDR's own, or for a sound card the same around every slot that runs. None
+    /// for a recording, or with no slot in the year ahead.
+    /// </summary>
+    internal HookWindow? HookWindowAt(DateTimeOffset at)
+    {
+        var config = Config;
+        try
+        {
+            switch (AudioSource.Parse(config.Audio).Kind)
+            {
+                case AudioSourceKind.UberSdr:
+                    var (opens, closes, slot) = ListeningWindow.Next(at, Schedule, config.WebSdrSlotsPerDay);
+                    return new HookWindow(opens, closes, slot);
+                case AudioSourceKind.Alsa:
+                    return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
+                default:
+                    return null;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 
@@ -168,6 +203,13 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Retuner.SayIfLeftOver(Config.StateDirectory, _log);
         }
+        if (Config.Hooks is { } hooks && Hooks.Configured)
+        {
+            _log("hooks: "
+                + (hooks.Before is { } b ? $"\"before\" each slot listened to runs {b.Describe()}, started {b.TimeoutSeconds} s ahead so it is done in time" : "no \"before\"")
+                + (hooks.After is { } a ? $"; \"after\" runs {a.Describe()}" : "; no \"after\""));
+        }
+        Hooks.Recover();
 
         using var stopOthers = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         Task delivery = Delivery.RunAsync(stopOthers.Token);
@@ -176,22 +218,33 @@ public sealed class ReceiverHost : IAsyncDisposable
         // putting the rig back and LinBPQ on the air on its way out; if it ends any other way,
         // that is a failure like the others', and systemd's restart picks up where it left off.
         Task retune = Retuner?.RunAsync(stopOthers.Token) ?? DelayAsync(Timeout.InfiniteTimeSpan, stopOthers.Token);
-        Task first = await Task.WhenAny(delivery, audio, retune).ConfigureAwait(false);
-        await stopOthers.CancelAsync().ConfigureAwait(false);
+        // The hooks around a web SDR's or a sound card's windows; the retuner runs its own.
+        Task hookLoop = Hooks.RunAsync(() => RetunerRunsHooks, HookWindowAt, stopOthers.Token);
+        Task first;
         try
         {
-            await Task.WhenAll(delivery, audio, retune).ConfigureAwait(false);
+            first = await Task.WhenAny(delivery, audio, retune, hookLoop).ConfigureAwait(false);
+            await stopOthers.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                await Task.WhenAll(delivery, audio, retune, hookLoop).ConfigureAwait(false);
+            }
+            catch (Exception) when (first.IsFaulted || first == retune || first == hookLoop)
+            {
+            }
         }
-        catch (Exception) when (first.IsFaulted || first == retune)
+        finally
         {
+            // "after" always runs once "before" has, whatever stopped the receiver.
+            await Hooks.FinishAsync().ConfigureAwait(false);
         }
-        if (first == retune && !cancellation.IsCancellationRequested && !first.IsFaulted)
+        if ((first == retune || first == hookLoop) && !cancellation.IsCancellationRequested && !first.IsFaulted)
         {
-            throw new InvalidOperationException("the retune loop stopped on its own");
+            throw new InvalidOperationException($"the {(first == retune ? "retune" : "hooks")} loop stopped on its own");
         }
         if (first.IsFaulted)
         {
-            string which = first == delivery ? "delivery" : first == audio ? "audio" : "retune";
+            string which = first == delivery ? "delivery" : first == audio ? "audio" : first == retune ? "retune" : "hooks";
             throw new InvalidOperationException($"the {which} loop failed: {Ascii.Clean(first.Exception!.GetBaseException().Message)}", first.Exception);
         }
     }
@@ -461,6 +514,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             await Retuner.DisposeAsync().ConfigureAwait(false);
         }
         await Intake.DisposeAsync().ConfigureAwait(false);
+        Hooks.Dispose();
     }
 
     /// <summary>Always delivers through the client for the configuration in force.</summary>

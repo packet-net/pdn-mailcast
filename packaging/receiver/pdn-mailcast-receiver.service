@@ -13,6 +13,12 @@ RestartSec=10
 # Exit 2 means the configuration is wrong, and the journal says what to fix. Restarting would
 # only bury that under copies of itself.
 RestartPreventExitStatus=2
+# On stop, SIGTERM goes to the receiver alone, not to a hook command it is running: the receiver
+# lets the hook finish, then runs "after" if it is owed (each up to 300 s), and puts a shared
+# radio back. Anything still running at TimeoutStopSec is killed, and an "after" that did not
+# finish is run again at the next start.
+KillMode=mixed
+TimeoutStopSec=400
 User=pdn-mailcast
 Group=pdn-mailcast
 # /var/lib/pdn-mailcast: the pieces heard, the rebuilt bulletins and the delivery record.
