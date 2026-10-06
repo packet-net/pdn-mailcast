@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <None Include="LinBpq\*" CopyToOutputDirectory="PreserveNewest" LinkBase="LinBpq" />
+    <None Include="Updates\Packages-*" CopyToOutputDirectory="PreserveNewest" LinkBase="Updates" />
     <None Include="..\..\src\Mailcast.Receiver\receiver.example.json" CopyToOutputDirectory="PreserveNewest" Link="receiver.example.json" />
   </ItemGroup>
 

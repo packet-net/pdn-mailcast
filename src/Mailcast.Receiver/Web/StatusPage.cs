@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Mailcast.Receiver.Delivery;
+using Mailcast.Receiver.Updates;
 using Packet.Mailcast.Propagation;
 using Packet.SoundModem.Audio;
 using Packet.SoundModem.Waterfall;
@@ -87,6 +88,9 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>How the wait for a wrong password is done, for a test to hold it; null waits on the host's clock.</summary>
     internal Func<TimeSpan, Task>? Pause { get; init; }
+
+    /// <summary>The check for a newer version, whose finding the page shows; null shows none.</summary>
+    public UpdateCheck? Updates { get; init; }
 
     /// <summary>The signed-in browsers, for tests.</summary>
     internal SessionStore Sessions => _sessions;
@@ -648,6 +652,8 @@ public sealed class StatusPage : IAsyncDisposable
         return new
         {
             version = ReceiverHost.Version,
+            // Whether the apt repository has a newer receiver; null when nothing checks (tests).
+            update = Updates?.View(),
             audio = new
             {
                 source = config.Audio,

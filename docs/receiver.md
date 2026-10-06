@@ -174,6 +174,7 @@ Not tested yet: this is from FBB 7.0.11's documentation and source.
 
 http://127.0.0.1:8130/ shows:
 
+- when a newer version is out, a banner at the top: "Version 0.7.0 is available (you have 0.6.0)", a link to what's new, and the command to upgrade, ready to copy. If you installed from packet-net's apt repository that is `sudo apt update && sudo apt install --only-upgrade pdn-mailcast-receiver`; if you installed the .deb by hand, it links the new .deb for your machine and gives `sudo apt install ./pdn-mailcast-receiver_0.7.0_amd64.deb`. Upgrade between slots: in daylight, after :13 and before :58 past the hour; at night, any time. See [Checking for updates](#checking-for-updates);
 - at the top, the speed: GB7RDG takes turns on 1200 bps (MS110D WN4) and 600 bps (WN3), and the modem reads either. The tile shows the burst being heard now, or else the last one frames came from, then the frames of the last slot at each speed, and the speed GB7RDG's directory gave for that slot if one was rebuilt in it. The speed is what the modem locked to at the start of each burst. Before anything is heard it says "Not heard yet.";
 - when to listen: the frequency, the slots and today's slot times, whether they come from GB7RDG's directory or your config, the next slot, and for a web SDR which one it is (its address, and once it has been opened, the callsign, name and location it gives), which of today's slots it listens to and the next of them;
 - the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
@@ -188,7 +189,7 @@ http://127.0.0.1:8130/ shows:
 
 On this machine only, the page answers to `localhost` and nothing else.
 
-Scripts can read the same from `GET /api/status`. For the speed: `slot.waveform` is the waveform most of the last slot's frames came on (`ms110d-wn4`), or `mixed` if two tie; `slot.frameCounts` has the frames on each; `slot.listedWaveform` is the directory's, if one was rebuilt in that slot; and `burst` is the burst now (`live: true`) or the last one frames came from, with its `waveform` and `bps`, or null before any. `iono` is the ionosonde reading, or null before one is heard: `state` (`GOOD`, `MARGINAL`, `POOR` or `UNKNOWN`), `foF2`, `mufd100`, `mufd500`, `mufd1000` (MHz), `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes` (by this receiver's clock), `source`, `method`, `distances` (each with `km`, `mufMhz` and `verdict`), and `headline` and `words`, what the page shows. For a web SDR, `audio.webSdr` says which: its `host` (`wessex.zapto.org`), a `url` for its own page, and `about`, what it says about itself once opened (callsign, name and location), or null before then.
+Scripts can read the same from `GET /api/status`. For the speed: `slot.waveform` is the waveform most of the last slot's frames came on (`ms110d-wn4`), or `mixed` if two tie; `slot.frameCounts` has the frames on each; `slot.listedWaveform` is the directory's, if one was rebuilt in that slot; and `burst` is the burst now (`live: true`) or the last one frames came from, with its `waveform` and `bps`, or null before any. `iono` is the ionosonde reading, or null before one is heard: `state` (`GOOD`, `MARGINAL`, `POOR` or `UNKNOWN`), `foF2`, `mufd100`, `mufd500`, `mufd1000` (MHz), `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes` (by this receiver's clock), `source`, `method`, `distances` (each with `km`, `mufMhz` and `verdict`), and `headline` and `words`, what the page shows. `update` is the update check: `latest` (the newest in the apt repository, or null before a check has worked), `current`, `newer`, `checkedAt`, and when newer, `release` (its release notes), `command` and, for a .deb installed by hand, `download`. For a web SDR, `audio.webSdr` says which: its `host` (`wessex.zapto.org`), a `url` for its own page, and `about`, what it says about itself once opened (callsign, name and location), or null before then.
 
 ### On your network
 
@@ -203,6 +204,10 @@ To reach the page from other computers, set `"lan": true` and a `"password"` in 
 A password set without `lan` works the same way on this machine.
 
 Use it on a network you trust: it is plain HTTP, so the password and the sign-in cookie cross the network unencrypted, and the cookie isn't marked Secure, since that would stop it working over HTTP. The cookie can't be read by scripts on the page. Browsers don't send it with requests started by pages on other machines, though they do for other pages on the same machine name, whatever their port. So, as before, any change (saving the settings, sending mail again, signing in or out) is refused unless it comes from this page itself, at this address and port. The signed-in browsers are kept in `web-sessions.json` in the state directory, readable only by the receiver, which holds a hash of each one, not the cookie itself and not the password. To sign everyone out, stop the receiver and delete it.
+
+### Checking for updates
+
+To know when there is a new version, the receiver reads packet-net's apt package list (https://packet-net.github.io/apt/Packages, about 75 kB) a minute or two after it starts, then every six hours. It sends its version in the User-Agent and nothing else, and it never downloads or installs anything. It tells an apt install from a hand-installed .deb by looking for packet-net.github.io in `/etc/apt/sources.list.d/`. If it can't reach the list, the page just shows no banner, and the log says why once.
 
 ## Mail
 
@@ -226,7 +231,7 @@ On disk they are in the state directory: waiting ones in `store/outbox/`, archiv
 
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, each ionosonde reading as it arrives (one line a slot), what the BBS said about it, and each one sent again from the page. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, each ionosonde reading as it arrives (one line a slot), what the BBS said about it, each one sent again from the page, and a newer version once when it is first seen (`update: version 0.7.0 is available (you have 0.6.0); the status page says how to upgrade`). The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 
