@@ -163,7 +163,11 @@ public sealed partial class BbsClient : IBbsSession
         return new SessionReport(graceful, failure, [.. bulletins.Select(b => outcomes[b.Bid])], run.ReverseOffered);
     }
 
-    /// <summary>Builds the message as a partner sends it: FA B from @at to BID, the routing lines and body as text.</summary>
+    /// <summary>
+    /// Builds the message as a partner sends it: FA B from @at to BID, the routing lines and body
+    /// as text. A message of type P goes as a personal one, FA P from @at to MID: that is how the
+    /// daily report (see <see cref="Feedback.FeedbackService"/>) reaches M0LTE through the BBS.
+    /// </summary>
     internal static FbbOutboundMessage ToOutbound(Bulletin bulletin, string fallbackAt) => new()
     {
         MessageType = bulletin.Type is 'P' or 'B' or 'T' ? bulletin.Type : 'B',

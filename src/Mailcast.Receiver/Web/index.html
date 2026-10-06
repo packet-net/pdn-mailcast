@@ -55,6 +55,8 @@
   .pager button { padding: 4px 12px; }
   #viewer { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
   #viewer .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  #feedbackText { margin: 10px 0 0; padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
+    font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; overflow: auto; }
   #viewText { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 520px; overflow: auto; margin: 0;
     padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
   a { color: var(--accent); }
@@ -158,6 +160,12 @@
   <section class="wide">
     <h2>What the BBS said</h2>
     <div id="deliveries" class="muted">Nothing delivered yet.</div>
+  </section>
+
+  <section class="wide" id="feedbackBox" hidden>
+    <h2>Daily report</h2>
+    <dl id="feedback"></dl>
+    <pre id="feedbackText" hidden></pre>
   </section>
 
   <section class="wide">
@@ -379,6 +387,7 @@ async function refresh() {
   iono(s);
   pskr(s);
   update(s);
+  feedback(s);
 
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
@@ -447,6 +456,19 @@ $("updateCopy").addEventListener("click", async () => {
   setTimeout(() => { $("updateCopy").textContent = "Copy"; }, 3000);
 });
 
+/* the daily report to M0LTE, when "feedback" is on in the config */
+function feedback(s) {
+  const f = s.feedback;
+  $("feedbackBox").hidden = !(f && f.enabled);
+  if (!f || !f.enabled) return;
+  const tone = { accepted: "good", refused: "bad" }[f.answer] || "";
+  $("feedback").innerHTML = `<dt>Goes to</dt><dd>${esc(f.to)}, through your BBS, every day half an hour after the last slot</dd>
+    ${f.lastSent ? `<dt>Last sent</dt><dd>${when(f.lastSent)}</dd>` : ""}
+    ${f.lastAnswer ? `<dt>The BBS said</dt><dd class="${tone}">${esc(f.lastAnswer)}</dd>` : ""}
+    ${f.next ? `<dt>Next</dt><dd>${when(f.next)}</dd>` : ""}`;
+  $("feedbackText").hidden = !f.text;
+  if (f.text && $("feedbackText").textContent !== f.text) $("feedbackText").textContent = f.text;
+}
 /* the head end's ionosonde reading: is 40 m open from Reading, and how far out */
 function iono(s) {
   const i = s.iono;

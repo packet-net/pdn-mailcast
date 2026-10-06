@@ -144,6 +144,9 @@ public sealed class SlotHooks : IDisposable
     /// <summary>For tests: raised with the delay each time <see cref="RunAsync"/> has set a timer on the clock.</summary>
     internal event Action<TimeSpan>? Waiting;
 
+    /// <summary>Raised when a hook command fails, for the daily report's error count.</summary>
+    internal event Action? Warned;
+
     /// <summary>
     /// At start-up, once: a note left by a receiver that stopped part way through a window means
     /// "after" is owed for it. Says so in the log; whichever runs the hooks then runs it.
@@ -220,6 +223,10 @@ public sealed class SlotHooks : IDisposable
                 _log($"hooks: running \"before\" for the {Hhmm(slot)} UTC slot: {before.Describe()}");
                 var result = await Runner.RunAsync(before, Environment(SlotHookEnvironment.BeforeName, slot, config, null), "hooks: before", cancellation).ConfigureAwait(false);
                 ok = result.Ok;
+                if (!ok)
+                {
+                    Warned?.Invoke();
+                }
                 _log(ok
                     ? $"hooks: \"before\" {result.Describe()}"
                     : $"hooks: WARNING - \"before\" for the {Hhmm(slot)} UTC slot {result.Describe()}{consequence}");
@@ -296,6 +303,10 @@ public sealed class SlotHooks : IDisposable
                 _log($"hooks: running \"after\" for {which}{why}: {after.Describe()}");
                 var result = await Runner.RunAsync(after, Environment(SlotHookEnvironment.AfterName, owed.Slot, config, owed.BeforeOk), "hooks: after", CancellationToken.None).ConfigureAwait(false);
                 done = result.Ok;
+                if (!done)
+                {
+                    Warned?.Invoke();
+                }
                 _log(done
                     ? $"hooks: \"after\" {result.Describe()}"
                     : $"hooks: WARNING - \"after\" for {which} {result.Describe()}; keeping {_file}, so it is run again when the receiver next starts");

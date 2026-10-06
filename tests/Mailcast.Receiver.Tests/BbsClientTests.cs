@@ -141,4 +141,37 @@ public class BbsClientTests
         Assert.Equal(DeliveryVerdict.Refused, outcome.Verdict);
         Assert.Null(report.Failure);
     }
+
+    [Fact]
+    public async Task Deliver_DailyReport_IsProposedAsAPersonalMessage()
+    {
+        await using var bbs = new FakeBbs();
+        var report = new Packet.Mailcast.Bulletin('P', "G4ABC", Feedback.FeedbackSettings.To, Feedback.FeedbackSettings.At, "G4ABC_61006",
+            "MCR G4ABC 2026-10-06", new DateTimeOffset(2026, 10, 6, 18, 30, 0, TimeSpan.Zero), [], "MCR1 0.6.0 - sc 0/0 0\r\n10 W4 150 16 +1.2 IG\r\n");
+
+        var session = await Client(bbs.Port).DeliverAsync([report], CancellationToken.None);
+
+        Assert.True(session.Graceful, session.Failure);
+        Assert.Equal(DeliveryVerdict.Accepted, Assert.Single(session.Outcomes).Verdict);
+        var taken = Assert.Single(bbs.Taken);
+        var fa = Assert.IsType<FaProposal>(taken.Proposal);
+        Assert.Equal(('P', "G4ABC", "GB7RDG.#42.GBR.EURO", "M0LTE", "G4ABC_61006"), (fa.MessageType, fa.From, fa.AtBbs, fa.To, fa.Bid));
+        Assert.Equal("MCR G4ABC 2026-10-06", taken.Title);
+        Assert.Equal(report.Body, taken.Body);
+    }
+
+    [Fact]
+    public async Task Deliver_DailyReportTheBbsWantsLater_IsDeferred()
+    {
+        await using var bbs = new FakeBbs();
+        bbs.Later["G4ABC_61006"] = true;
+        var report = new Packet.Mailcast.Bulletin('P', "G4ABC", "M0LTE", "GB7RDG.#42.GBR.EURO", "G4ABC_61006",
+            "MCR G4ABC 2026-10-06", new DateTimeOffset(2026, 10, 6, 18, 30, 0, TimeSpan.Zero), [], "MCR1 0.6.0 - sc 0/0 0\r\n");
+
+        var session = await Client(bbs.Port).DeliverAsync([report], CancellationToken.None);
+
+        Assert.True(session.Graceful, session.Failure);
+        Assert.Equal(DeliveryVerdict.Deferred, Assert.Single(session.Outcomes).Verdict);
+        Assert.Empty(bbs.Taken);
+    }
 }

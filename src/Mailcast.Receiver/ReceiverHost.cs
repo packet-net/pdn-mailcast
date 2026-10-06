@@ -1,7 +1,9 @@
 using Packet.Mailcast;
 using Mailcast.Receiver.Delivery;
+using Mailcast.Receiver.Feedback;
 using Mailcast.Receiver.Hooks;
 using Mailcast.Receiver.Retune;
+using Packet.Mailcast.Feedback;
 
 namespace Mailcast.Receiver;
 
@@ -47,6 +49,46 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks);
         }
+        Feedback = CreateFeedback();
+    }
+
+    /// <summary>The daily report to the broadcast's author, when the config's <c>feedback</c> turns it on.</summary>
+    public FeedbackService Feedback { get; }
+
+    private FeedbackService CreateFeedback()
+    {
+        AudioSourceKind Kind() => AudioSource.Parse(Config.Audio).Kind;
+        var feedback = new FeedbackService(new FeedbackSources
+        {
+            Settings = () => Config.Feedback,
+            Schedule = () => Kind() == AudioSourceKind.Wav ? null : Schedule,
+            Listened = day => Kind() == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day),
+            LastSlot = () => Slots.Last,
+            Ionosphere = () => Intake.Ionosphere,
+            Audio = () => AudioSource.Parse(Config.Audio) is { Kind: AudioSourceKind.UberSdr } web ? WebSdrHost(web) : "sc",
+        }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
+        Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
+        Delivery.SessionFinished += report =>
+        {
+            feedback.NoteDelivered(report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted));
+            if (report.Failure is not null)
+            {
+                feedback.NoteError(ReportErrors.Bbs);
+            }
+        };
+        AudioChanged += audio =>
+        {
+            if (audio.Phase == AudioPhase.Failed)
+            {
+                feedback.NoteError(ReportErrors.Audio);
+            }
+        };
+        Hooks.Warned += () => feedback.NoteError(ReportErrors.Hook);
+        if (Retuner is not null)
+        {
+            Retuner.ProblemNoted += () => feedback.NoteError(ReportErrors.Rig);
+        }
+        return feedback;
     }
 
     /// <summary>The config's <c>hooks</c>, run around each slot listened to.</summary>
@@ -287,16 +329,18 @@ public sealed class ReceiverHost : IAsyncDisposable
         Task retune = Retuner?.RunAsync(stopOthers.Token) ?? DelayAsync(Timeout.InfiniteTimeSpan, stopOthers.Token);
         // The hooks around a web SDR's or a sound card's windows; the retuner runs its own.
         Task hookLoop = Hooks.RunAsync(() => RetunerRunsHooks, HookWindowAt, stopOthers.Token);
+        // The daily report catches and logs its own problems, and ends only when the others do.
+        Task feedback = Feedback.RunAsync(stopOthers.Token);
         Task first;
         try
         {
-            first = await Task.WhenAny(delivery, audio, retune, hookLoop).ConfigureAwait(false);
+            first = await Task.WhenAny(delivery, audio, retune, hookLoop, feedback).ConfigureAwait(false);
             await stopOthers.CancelAsync().ConfigureAwait(false);
             try
             {
-                await Task.WhenAll(delivery, audio, retune, hookLoop).ConfigureAwait(false);
+                await Task.WhenAll(delivery, audio, retune, hookLoop, feedback).ConfigureAwait(false);
             }
-            catch (Exception) when (first.IsFaulted || first == retune || first == hookLoop)
+            catch (Exception) when (first.IsFaulted || first == retune || first == hookLoop || first == feedback)
             {
             }
         }
@@ -305,13 +349,13 @@ public sealed class ReceiverHost : IAsyncDisposable
             // "after" always runs once "before" has, whatever stopped the receiver.
             await Hooks.FinishAsync().ConfigureAwait(false);
         }
-        if ((first == retune || first == hookLoop) && !cancellation.IsCancellationRequested && !first.IsFaulted)
+        if ((first == retune || first == hookLoop || first == feedback) && !cancellation.IsCancellationRequested && !first.IsFaulted)
         {
-            throw new InvalidOperationException($"the {(first == retune ? "retune" : "hooks")} loop stopped on its own");
+            throw new InvalidOperationException($"the {(first == retune ? "retune" : first == hookLoop ? "hooks" : "feedback")} loop stopped on its own");
         }
         if (first.IsFaulted)
         {
-            string which = first == delivery ? "delivery" : first == audio ? "audio" : first == retune ? "retune" : "hooks";
+            string which = first == delivery ? "delivery" : first == audio ? "audio" : first == retune ? "retune" : first == hookLoop ? "hooks" : "feedback";
             throw new InvalidOperationException($"the {which} loop failed: {Ascii.Clean(first.Exception!.GetBaseException().Message)}", first.Exception);
         }
     }
@@ -656,17 +700,31 @@ public sealed class ReceiverHost : IAsyncDisposable
         await Intake.DisposeAsync().ConfigureAwait(false);
         await ChannelWatch.DisposeAsync().ConfigureAwait(false);
         Hooks.Dispose();
+        _bbsTurn.Dispose();
     }
 
     /// <summary>A web SDR's address as an operator writes it, such as wessex.zapto.org; for a sound card or recording, its setting.</summary>
     internal static string WebSdrHost(AudioSource source) =>
         source.Kind == AudioSourceKind.UberSdr ? Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target).ToString() : source.ToString();
 
-    /// <summary>Always delivers through the client for the configuration in force.</summary>
+    /// <summary>One session with the BBS at a time: the bulletins' and the daily report's.</summary>
+    private readonly SemaphoreSlim _bbsTurn = new(1, 1);
+
+    /// <summary>Always delivers through the client for the configuration in force, one session at a time.</summary>
     private sealed class SwitchableSession(ReceiverHost host) : IBbsSession
     {
-        public Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation) =>
-            host.Bbs.DeliverAsync(bulletins, cancellation);
+        public async Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)
+        {
+            await host._bbsTurn.WaitAsync(cancellation).ConfigureAwait(false);
+            try
+            {
+                return await host.Bbs.DeliverAsync(bulletins, cancellation).ConfigureAwait(false);
+            }
+            finally
+            {
+                host._bbsTurn.Release();
+            }
+        }
     }
 }
 
