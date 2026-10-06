@@ -36,6 +36,8 @@ public sealed record HeadEndConfig
 
     public IonosphereConfig Ionosphere { get; init; } = new();
 
+    public PskReporterConfig PskReporter { get; init; } = new();
+
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -374,6 +376,7 @@ public sealed record HeadEndConfig
             }
         }
         Ionosphere.Validate(problems);
+        PskReporter.Validate(problems);
         if (problems.Count > 0)
         {
             throw new ConfigException($"{source}: {string.Join("; ", problems)}");
@@ -809,6 +812,35 @@ public sealed record IonosphereConfig
         if (Stations is null || Stations.Any(s => s is null || !System.Text.RegularExpressions.Regex.IsMatch(s, "^[A-Za-z]{2}[0-9]{3}$")))
         {
             problems.Add("\"ionosphere\".\"stations\" must be URSI codes such as \"RL052\"");
+        }
+    }
+}
+
+/// <summary>
+/// The PSK Reporter reading: live 40 and 80 m spots between UK and Irish stations, which the head
+/// end logs, reports and sends (40 m) as content type 4, source 3. Observe only, like the
+/// ionosonde's. The window and thresholds are fixed (<see cref="Packet.Mailcast.Propagation.PskEvaluator"/>).
+/// </summary>
+public sealed record PskReporterConfig
+{
+    /// <summary>Whether to take the reading at all.</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>The MQTT broker.</summary>
+    public string Host { get; init; } = Packet.Mailcast.Propagation.PskReporterMonitor.DefaultHost;
+
+    /// <summary>Its port, plain MQTT.</summary>
+    public int Port { get; init; } = Packet.Mailcast.Propagation.PskReporterMonitor.DefaultPort;
+
+    internal void Validate(List<string> problems)
+    {
+        if (Enabled && string.IsNullOrWhiteSpace(Host))
+        {
+            problems.Add("\"pskReporter\".\"host\" must name the MQTT broker");
+        }
+        if (Port is < 1 or > 65535)
+        {
+            problems.Add("\"pskReporter\".\"port\" must be 1 to 65535");
         }
     }
 }

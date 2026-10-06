@@ -155,13 +155,13 @@ The object's first byte flags what the object carries, so this traffic is marked
 | 1 | Packet mail bulletin (FBB/BPQ message format), serialised as below |
 | 2 | Directory |
 | 3 | DAPPS message (reserved) |
-| 4 | Propagation reading, one object per source (the ionosonde for now): a short record, not compressed, sent with dictionary 0 (see below) |
+| 4 | Propagation reading, one object per source (the ionosonde, and live PSK Reporter spots): a short record, not compressed, sent with dictionary 0 (see below) |
 | 5 to 111 | Unassigned; given out in this table |
 | 112 to 127 | Experiments; never assigned |
 
 Its top bit (128) says a metadata block follows the type byte: a 2-byte big-endian length, then that many bytes of the wrapper's own header, then the zstd frame. A reader skips a metadata block it does not understand. Types 1 and 2 are sent without one, exactly as before v0.3.0, so receivers already in the field read them unchanged.
 
-A receiver handles each object by its content type: bulletins go to the BBS as before, the directory is read, and from v0.6.0 the ionosonde's propagation reading is shown. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they drop as an object they cannot use, with a line in the log for each of its frames they hear, so it never reaches their BBS either.
+A receiver handles each object by its content type: bulletins go to the BBS as before, the directory is read, and from v0.6.0 the ionosonde's propagation reading is shown, and now PSK Reporter's beside it. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they drop as an object they cannot use, with a line in the log for each of its frames they hear, so it never reaches their BBS either.
 
 ### The ionosonde reading
 
@@ -171,12 +171,12 @@ The head end asks GIRO's DIDBase (`lgdc.uml.edu/fastchar/getbest`), then PROPque
 
 A distance is open when its MUF is at least 7.1 MHz, and reliable when 0.85 times its MUF is. The skip zone is where the MUF first reaches 7.1 MHz: along the P.533 curve in 10 km steps when the MUFs are estimated, and on straight lines between the three distances when they are measured. The reading as a whole is GOOD when 100 and 500 km are reliable, POOR when all three distances are closed, MARGINAL in between, and UNKNOWN with no sounding or one more than 45 minutes old, when it gives the last values and their age and never extrapolates. Users are spread from 0 to 1000 km, so the three distances matter more than the one word: on 2026-10-06, with Fairford's foF2 peaking at 6.05 MHz (Chilton had no data that day), stations within 221 km heard nothing all day while those at 502 and 534 km rebuilt most of the bulletins. For that sounding the reading gives MUFs of 6.65, 8.21 and 11.64 MHz at 100, 500 and 1000 km, and a skip zone of about 280 km.
 
-Type 4 is for propagation readings in general, one object per source, so a later source (live PSK Reporter spots, say) fits without a new format. Each record starts with a part any source can fill, the verdict at the same three distances included, and the source's own numbers follow. After the type byte:
+Type 4 is for propagation readings in general, one object per source, so a second source, live PSK Reporter spots (source 3, [below](#the-psk-reporter-reading)), fits without a new format. Each record starts with a part any source can fill, the verdict at the same three distances included, and the source's own numbers follow. After the type byte:
 
 | Offset | Size | Meaning |
 |---|---|---|
 | 0 | 1 | Record version, 1 |
-| 1 | 1 | Source: 1 ionosonde by GIRO, 2 ionosonde by PROPquest; 3 is kept for PSK Reporter spots |
+| 1 | 1 | Source: 1 ionosonde by GIRO, 2 ionosonde by PROPquest, 3 PSK Reporter spots |
 | 2 | 4 | Observation time, minutes since 1970-01-01 00:00 UTC |
 | 6 | 1 | Its age when sent, in minutes, up to 255 |
 | 7 | 1 | Verdict at 100 km in bits 0 and 1, 500 km in bits 2 and 3, 1000 km in bits 4 and 5 (0 unknown, 1 closed, 2 open, 3 reliable); state in bits 6 and 7 (0 UNKNOWN, 1 POOR, 2 MARGINAL, 3 GOOD) |
@@ -192,6 +192,35 @@ Then, for an ionosonde:
 | 17, 19, 21 | 2 each | MUF at 100, 500 and 1000 km, the same way |
 
 All numbers are big-endian. A later version only adds bytes at the end, and a reader that does not know a source can still use the common part. The ionosonde's object is 24 bytes, one RaptorQ symbol, so each of its frames is 55 bytes and either one rebuilds it: the head end sends two fresh ESIs, normally 0 and 1, each checked to rebuild the object on its own. It is not listed in the directory. The sounding time and age are in it, so each slot's reading is nearly always a new object; if the same object comes round again, the head end keeps its next ESI by object ID, as for the directory, and never repeats one. A reading with no sounding, or one 255 minutes old or more, is not sent.
+
+### The PSK Reporter reading
+
+The ionosonde says what the ionosphere could carry; PSK Reporter says what it is carrying. So the head end also listens to PSK Reporter's public MQTT feed (`mqtt.pskreporter.info:1883`) for FT8, FT4 and WSPR spots on 40 and 80 m with both ends in the UK or Ireland, and from the last 30 minutes of them works out whether 40 m is open at 100, 500 and 1000 km. Like the ionosonde's reading, it is observe only and never changes what or when anything is sent.
+
+It subscribes narrowly, to 128 topics in one go: `pskr/filter/v2/{40m,80m}/+/+/+/+/+/{sender's country}/{receiver's country}` for every pair of England (223), Wales (294), Scotland (279), Northern Ireland (265), Ireland (245), the Isle of Man (114), Guernsey (106) and Jersey (122). The feed gives countries as these DXCC entity numbers, the same in the topic and in the payload's `sa` and `ra`. The payload's locators are used, not the topic's, which cut them to 4 characters. QoS 0 and a clean session, so the broker keeps nothing for us; a lost connection is made again after 5 s, then 10, 20 and so on up to 5 minutes, starting again from 5 s only after a connection that lasted a minute and brought spots. Plain MQTT on port 1883 can't be trusted, so anything out of bounds is thrown away: packets over 4 KB, payloads over 1 KB, callsigns that aren't 3 to 15 of A to Z, 0 to 9, the slash and the hyphen, and over-long fields. At most 20,000 spots, about 4 MB, are held; past that new spots are dropped until the once-a-minute prune.
+
+Each spot goes in a bin by the great-circle distance between the two locators: 30 to 250 km stands for 100 km, 250 to 700 for 500, and 700 to 1200 for 1000. Paths under 30 km (ground wave, or two stations in one square) are left out.
+
+- A distance is open with at least 5 spots from at least 4 different callsigns.
+- Silence is not proof of closure. A distance is closed only when it has at most 2 spots and there is evidence the band is in use: at least 40 spots from 12 stations at the other distances on the same band, or, for 40 m, 80 m busy at that distance (10 spots from 6 stations). Far fewer pairs of stations are 700 to 1200 km apart, so 1000 km is closed by the other distances only if the other band has at least 3 spots out there too.
+- Anything else is unknown, and so is every distance when the feed was up for less than 20 of the 30 minutes.
+- The skip zone is 0 when 100 km is open. When 100 km is closed and a further distance is open, it is where the 40 m spots start: the 5th percentile of their distances, and at least the third shortest, to the nearest 10 km.
+- The state uses the ionosonde's words: GOOD is open at 100 and 500 km, MARGINAL open somewhere else, POOR closed somewhere and open nowhere, UNKNOWN otherwise.
+- Each bin's median SNR needs 5 SNRs. The feed sometimes gives none, and such a spot still counts.
+
+Open here means open for FT8, which decodes signals far weaker than MS110D needs. So an open verdict says the path exists, not that the mailcast will get through it; the median SNRs, sent with each verdict, are the better guide to that. Closed is the stronger statement: if FT8 can't get through, neither can we.
+
+PSK Reporter reports each pair of stations only every 5 or 6 minutes, and spots arrive a minute or so late (some much later), which is why the window is half an hour and the thresholds count stations as well as spots. 80 m is judged the same way for the head end's log and status, but only 40 m goes on the air.
+
+After the common part, for source 3:
+
+| Offset | Size | Meaning |
+|---|---|---|
+| 9 | 1 | Window, minutes (30) |
+| 10 | 1 | Bits 0 to 2: closed at 100, 500 or 1000 km because 80 m is busy there; bits 3 to 5: closed there because 40 m is busy at the other distances; bit 7: the feed was down too long to judge by |
+| 11, 16, 21 | 5 each | 100, 500 and 1000 km: spots (2 bytes), stations (2), median SNR in dB (1, signed, -128 for none) |
+
+In the common part a verdict is 0 unknown, 1 closed or 2 open (never 3), and the observation time is the end of the window. The object is 27 bytes, one 28-byte symbol, so each frame is 59 bytes, and the head end sends two in each slot that keys, beside the ionosonde's two, either one rebuilding it. If the two readings together would leave no room for any bulletin frame, PSK Reporter's go first. An UNKNOWN reading is still sent, with its counts; with no reading at all (the feed never came up) nothing is. Receivers from before this know type 4 but not source 3, and drop the object quietly.
 
 ### Bulletins
 

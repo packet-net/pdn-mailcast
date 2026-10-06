@@ -720,6 +720,7 @@ public sealed class StatusPage : IAsyncDisposable
             },
             framesHeard = _host.Intake.FramesHeard,
             iono = IonoView(_host.Intake.Ionosphere, _host.Time.GetUtcNow()),
+            pskReporter = PskView(_host.Intake.PskReporter, _host.Time.GetUtcNow()),
             directory = directory is null ? null : new { date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), entries = directory.Entries.Count },
             bulletins = progress.Select(p =>
             {
@@ -783,6 +784,45 @@ public sealed class StatusPage : IAsyncDisposable
             headline = r.Headline(),
             words = r.Summary(now),
             distanceWords = r.State == IonoState.Unknown ? null : r.Distances(),
+        };
+    }
+
+    /// <summary>
+    /// The PSK Reporter part of the propagation tile: the head end's newest reading of live 40 m
+    /// spots between UK and Irish stations, aged by this receiver's clock and UNKNOWN once older
+    /// than <see cref="PskEvaluator.StaleAfter"/>, with the words the page shows. Null until one
+    /// has been heard.
+    /// </summary>
+    internal static object? PskView(PskReading? heard, DateTimeOffset now)
+    {
+        if (heard is null)
+        {
+            return null;
+        }
+        var r = heard.AsOf(now, PskEvaluator.StaleAfter);
+        return new
+        {
+            state = r.State,
+            observedUtc = r.ObservedUtc,
+            ageMinutes = r.AgeMinutes,
+            windowMinutes = r.WindowMinutes,
+            feedDown = r.FeedDown,
+            skipZoneKm = r.SkipZoneKm,
+            distances = (r.Forty?.Bins ?? []).Select(b => new
+            {
+                km = b.Km,
+                fromKm = b.FromKm,
+                toKm = b.ToKm,
+                verdict = b.Verdict,
+                spots = b.Spots,
+                stations = b.Stations,
+                snrMedianDb = b.SnrMedianDb,
+                closedBy = b.ClosedBy,
+                words = PskReading.Words(b.Verdict),
+            }),
+            headline = r.Headline(),
+            words = r.Summary(now),
+            distanceWords = r.FeedDown || TimeSpan.FromMinutes(r.AgeMinutes ?? 0) > PskEvaluator.StaleAfter ? null : PskReading.Distances(r.Forty),
         };
     }
 

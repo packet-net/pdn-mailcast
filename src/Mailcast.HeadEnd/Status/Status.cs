@@ -83,6 +83,12 @@ public sealed class StatusStore
     /// <summary>The ionosonde reading as of now, for <c>iono</c> in the status document; null leaves it out.</summary>
     public Func<Packet.Mailcast.Propagation.IonoReading>? Ionosphere { get; set; }
 
+    /// <summary>The PSK Reporter reading as of now, for <c>pskReporter</c> in the status document; null leaves it out.</summary>
+    public Func<Packet.Mailcast.Propagation.PskReading>? PskReporter { get; set; }
+
+    /// <summary>How the PSK Reporter feed is doing, for <c>pskReporterFeed</c>; null leaves it out.</summary>
+    public Func<Packet.Mailcast.Propagation.PskFeedStatus>? PskReporterFeed { get; set; }
+
     /// <summary>Why the last slot report could not be saved, if it could not; null when it was.</summary>
     public string? LastWriteProblem { get; private set; }
 
@@ -196,6 +202,21 @@ public sealed class StatusStore
         File.Move(temporary, path, overwrite: true);
     }
 
+    private static T? Observed<T>(Func<T>? read)
+        where T : class
+    {
+        try
+        {
+            return read?.Invoke();
+        }
+#pragma warning disable CA1031 // observe only: the status page must not fail for it
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return null;
+        }
+    }
+
     private Packet.Mailcast.Propagation.IonoReading? Reading()
     {
         try
@@ -227,6 +248,8 @@ public sealed class StatusStore
                 lastIntake = _lastIntake,
                 lastSlot = _lastSlot,
                 iono = Reading(),
+                pskReporter = Observed(PskReporter),
+                pskReporterFeed = Observed(PskReporterFeed),
             };
             try
             {

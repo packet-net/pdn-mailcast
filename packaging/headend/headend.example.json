@@ -111,6 +111,16 @@
     "stations": ["RL052", "FF051", "DB049"]
   },
 
+  // The PSK Reporter reading: the last 30 minutes of FT8, FT4 and WSPR spots on 40 and 80 m
+  // between stations in the UK and Ireland, from PSK Reporter's public MQTT feed, say whether
+  // 40 m is open at 100, 500 and 1000 km. Observe only, like the ionosonde's; 40 m is sent to
+  // receivers, 80 m is only shown here. "enabled": false turns it off.
+  "pskReporter": {
+    "enabled": true,
+    "host": "mqtt.pskreporter.info",
+    "port": 1883
+  },
+
   // GET /status for the state; POST /run (pdn-mailcast-headend --run-now) for a one-off slot,
   // accepted only from this machine.
   "status": {

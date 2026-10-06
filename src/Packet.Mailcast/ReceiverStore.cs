@@ -54,6 +54,12 @@ public enum FrameOutcome
     /// the values before it are what they always were.
     /// </summary>
     CompletedIonosphere,
+
+    /// <summary>
+    /// The symbol completed a PSK Reporter reading (content type 4, source 3), which is in the
+    /// result. Never for the BBS; the newest is kept in <see cref="ReceiverStore.PskReporter"/>.
+    /// </summary>
+    CompletedPskReporter,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>
@@ -103,7 +109,8 @@ public sealed class MailParts
 /// <param name="Detail">Why, for <see cref="FrameOutcome.Rejected"/>.</param>
 /// <param name="ContentType">The object's content type, for <see cref="FrameOutcome.CompletedUnhandled"/> and <see cref="FrameOutcome.CompletedUnknown"/>.</param>
 /// <param name="Ionosphere">The reading the frame completed, for <see cref="FrameOutcome.CompletedIonosphere"/>.</param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null);
+/// <param name="PskReporter">The reading the frame completed, for <see cref="FrameOutcome.CompletedPskReporter"/>.</param>
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null);
 
 /// <summary>How far one directory entry has got at this receiver.</summary>
 /// <param name="Entry">The directory's entry.</param>
@@ -298,6 +305,19 @@ public sealed class ReceiverStore
                 File.Delete(ionosphereFile);
             }
         }
+        var pskFile = Path.Combine(root, PskReporterFile);
+        if (File.Exists(pskFile))
+        {
+            if (PskRecord.TryDecode(File.ReadAllBytes(pskFile), out var held))
+            {
+                PskReporter = held;
+            }
+            else
+            {
+                Log($"{PskReporterFile} unreadable, removed");
+                File.Delete(pskFile);
+            }
+        }
         var directoryFile = Path.Combine(root, "directory.txt");
         if (File.Exists(directoryFile))
         {
@@ -344,6 +364,15 @@ public sealed class ReceiverStore
     /// restarts; null until one has been heard. As sent: its age is as of then.
     /// </summary>
     public IonoReading? Ionosphere { get; private set; }
+
+    /// <summary>Where the newest PSK Reporter reading is kept, as the object that carried it, under the store's folder.</summary>
+    public const string PskReporterFile = "pskreporter.bin";
+
+    /// <summary>
+    /// The newest PSK Reporter reading heard (content type 4, source 3), kept across restarts;
+    /// null until one has been heard. As sent: its age is as of then.
+    /// </summary>
+    public PskReading? PskReporter { get; private set; }
 
     /// <summary>
     /// The head end's timetable from the newest directory heard that gave one, kept across
@@ -756,6 +785,15 @@ public sealed class ReceiverStore
         {
             // Observe only, never for the BBS. Marked done either way, so its later frames are ignored.
             MarkDone(instance);
+            if (PskRecord.TryDecode(data, out var spots))
+            {
+                if (PskReporter?.ObservedUtc is not { } heard || spots.ObservedUtc >= heard)
+                {
+                    DurableFile.WriteAtomically(Path.Combine(_root, PskReporterFile), data, flush: _options.FlushToDisk);
+                    PskReporter = spots;
+                }
+                return new AcceptResult(FrameOutcome.CompletedPskReporter, instance.ObjectId, ContentType: type, PskReporter: spots);
+            }
             if (!IonoRecord.TryDecode(data, out var reading))
             {
                 return new AcceptResult(FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type);

@@ -13,7 +13,9 @@ namespace Mailcast.HeadEnd.Planning;
 /// <param name="Waveform">The waveform the slot goes out on; null for the broadcast modem's own, left as it is.</param>
 /// <param name="Ionosphere">The ionosonde reading as the slot was planned; null when the head end takes none.</param>
 /// <param name="IonosphereFrames">How many of <paramref name="Frames"/> carry the reading (content type 4).</param>
-public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0)
+/// <param name="PskReporter">The PSK Reporter reading as the slot was planned; null when the head end takes none.</param>
+/// <param name="PskReporterFrames">How many of <paramref name="Frames"/> carry it (content type 4, source 3).</param>
+public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0)
 {
     /// <summary>A plan with nothing in it.</summary>
     public static SlotPlan Empty(DateTimeOffset slot) => new(slot, [], 0, null);
@@ -64,10 +66,19 @@ public interface ISlotPlanner
 /// frames of content type 4, inside the airtime budget. It never decides whether or when a slot
 /// keys, nor what else goes in it beyond the room its frames take.
 /// </param>
-public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null) : ISlotPlanner
+/// <param name="pskReporter">
+/// The PSK Reporter reading as of now (<see cref="PskReporterMonitor.Current"/>), which must
+/// answer at once; null sends none. Carried the same way as the ionosonde's, in
+/// <see cref="PskReporterFrames"/> more frames. When the two readings together would leave no
+/// room for any bulletin frame, this one is dropped first.
+/// </param>
+public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null) : ISlotPlanner
 {
     /// <summary>Frames of the reading in each slot, either of which rebuilds it alone.</summary>
     public const int IonosphereFrames = 2;
+
+    /// <summary>Frames of the PSK Reporter reading in each slot, either of which rebuilds it alone.</summary>
+    public const int PskReporterFrames = 2;
 
     /// <summary>A reading at least this old is not sent: it is UNKNOWN long before, and the record's age stops at 255.</summary>
     public const int OldestSentMinutes = 255;
@@ -81,14 +92,24 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         TimeSpan late = time is null ? TimeSpan.Zero : time.GetUtcNow() - slot;
         SlotBudget? budget = Budget(waveform, late);
         IonoReading? reading = Reading();
-        IReadOnlyList<MailcastFrame> extras = Sendable(reading) ? ReadingFrames(reading!, store.NextEsi) : [];
+        PskReading? spots = Spots();
+        IReadOnlyList<MailcastFrame> ionoFrames = Sendable(reading) ? ReadingFrames(reading!, store.NextEsi) : [];
+        IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
+        IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
         SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras);
+        if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
+        {
+            // Both readings would crowd out every bulletin frame: PSK Reporter's go first, and the
+            // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
+            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames);
+        }
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
-            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading);
+            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, broadcast.ExtraFrames);
+        bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
+        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0);
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>
@@ -101,11 +122,21 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
     /// the object on its own. The object normally changes every slot, as its age does, so these
     /// are ESI 0 and 1; if the same object comes round again its ESIs carry on, never repeat.
     /// </summary>
-    public static IReadOnlyList<MailcastFrame> ReadingFrames(IonoReading reading, Func<ulong, uint>? nextEsi = null)
+    public static IReadOnlyList<MailcastFrame> ReadingFrames(IonoReading reading, Func<ulong, uint>? nextEsi = null) =>
+        RecordFrames(IonoRecord.ToTransferObject(reading), IonosphereFrames, nextEsi);
+
+    /// <summary>Whether a PSK Reporter reading goes on the air: it has an observation, UNKNOWN or not, under <see cref="OldestSentMinutes"/> old.</summary>
+    public static bool Sendable(PskReading? reading) =>
+        reading is { HasObservation: true, AgeMinutes: < OldestSentMinutes };
+
+    /// <summary>The PSK Reporter reading's frames, the same way as the ionosonde's: <see cref="PskReporterFrames"/> fresh ESIs, each one that rebuilds the object on its own.</summary>
+    public static IReadOnlyList<MailcastFrame> ReadingFrames(PskReading reading, Func<ulong, uint>? nextEsi = null) =>
+        RecordFrames(PskRecord.ToTransferObject(reading), PskReporterFrames, nextEsi);
+
+    private static List<MailcastFrame> RecordFrames(TransferObject transfer, int count, Func<ulong, uint>? nextEsi)
     {
-        var transfer = IonoRecord.ToTransferObject(reading);
-        var frames = new List<MailcastFrame>(IonosphereFrames);
-        for (uint esi = nextEsi?.Invoke(transfer.ObjectId) ?? 0; frames.Count < IonosphereFrames && esi <= Mailcast.RaptorQ.PayloadId.MaxEncodingSymbolId; esi++)
+        var frames = new List<MailcastFrame>(count);
+        for (uint esi = nextEsi?.Invoke(transfer.ObjectId) ?? 0; frames.Count < count && esi <= Mailcast.RaptorQ.PayloadId.MaxEncodingSymbolId; esi++)
         {
             var frame = transfer.Frame(esi);
             if (RebuildsAlone(frame, transfer))
@@ -121,6 +152,24 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         var decoder = new Mailcast.RaptorQ.ObjectDecoder(frame.Oti);
         decoder.Add(new Mailcast.RaptorQ.PayloadId(0, frame.EncodingSymbolId), frame.Symbol.Span);
         return decoder.TryDecode() is { } rebuilt && rebuilt.AsSpan().SequenceEqual(transfer.Bytes);
+    }
+
+    private PskReading? Spots()
+    {
+        if (pskReporter is null)
+        {
+            return null;
+        }
+        try
+        {
+            return pskReporter();
+        }
+#pragma warning disable CA1031 // observe only: a reading that cannot be had is no reading, never a failed slot
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return PskReading.None;
+        }
     }
 
     private IonoReading? Reading()
