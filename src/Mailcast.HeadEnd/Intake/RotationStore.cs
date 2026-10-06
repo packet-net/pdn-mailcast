@@ -64,12 +64,15 @@ public sealed class RotationStore
         }
     }
 
-    /// <summary>Plans a slot from the bulletins in rotation, filling it to <paramref name="budget"/> under the budget rule.</summary>
-    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, SlotBudget? budget = null, string? mode = null)
+    /// <summary>
+    /// Plans a slot from the bulletins in rotation, filling it to <paramref name="budget"/> under
+    /// the budget rule, with <paramref name="extras"/> (the ionosonde reading's frames) counted in.
+    /// </summary>
+    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, SlotBudget? budget = null, string? mode = null, IReadOnlyList<MailcastFrame>? extras = null)
     {
         lock (_gate)
         {
-            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode);
+            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode, extras);
         }
     }
 

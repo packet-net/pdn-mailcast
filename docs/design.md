@@ -143,7 +143,7 @@ Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identificati
 
 A whole frame is then 987 bytes, 36 under IL2P's 1023-byte limit. Frames carry no source block number, so every object is a single RaptorQ block (up to 53 MB, far beyond any bulletin).
 
-An object is one byte saying what it is, its content type (below), followed by one zstd frame, which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, when it first sees it, and sends those same bytes, with fresh pieces, in every later slot.
+An object is one byte saying what it is, its content type (below), followed by one zstd frame (the ionosonde reading, type 4, is the one exception: a short record sent as it is), which carries zstd's own dictionary ID and a content checksum; a receiver refuses a zstd frame without the checksum. Objects are content-addressed: the object field is a hash of the dictionary ID and these bytes, so every rebuilt object checks itself against its own ID, with or without the directory, and two different objects can never share pieces. The head end compresses each bulletin once, when it first sees it, and sends those same bytes, with fresh pieces, in every later slot.
 
 ### Content types
 
@@ -155,12 +155,37 @@ The object's first byte flags what the object carries, so this traffic is marked
 | 1 | Packet mail bulletin (FBB/BPQ message format), serialised as below |
 | 2 | Directory |
 | 3 | DAPPS message (reserved) |
-| 4 to 111 | Unassigned; given out in this table |
+| 4 | Ionosonde reading: a 22-byte record, not compressed, sent with dictionary 0 (see below) |
+| 5 to 111 | Unassigned; given out in this table |
 | 112 to 127 | Experiments; never assigned |
 
 Its top bit (128) says a metadata block follows the type byte: a 2-byte big-endian length, then that many bytes of the wrapper's own header, then the zstd frame. A reader skips a metadata block it does not understand. Types 1 and 2 are sent without one, exactly as before v0.3.0, so receivers already in the field read them unchanged.
 
-A receiver handles each object by its content type: bulletins go to the BBS as before, and the directory is read. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they log once as an object they cannot use and drop, so it never reaches their BBS either.
+A receiver handles each object by its content type: bulletins go to the BBS as before, the directory is read, and from v0.6.0 the ionosonde reading is shown. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they drop as an object they cannot use, with a line in the log for each of its frames they hear, so it never reaches their BBS either.
+
+### The ionosonde reading
+
+From v0.6.0 the head end also says whether 40 m is open from Reading, by the nearest ionosonde, and sends that in each slot that keys anyway. It is observe only: it never changes what or when the head end sends, beyond the room its two frames take inside the airtime budget. A slot with nothing else to send still keys nothing.
+
+The head end asks GIRO's DIDBase (`lgdc.uml.edu/fastchar/getbest`), then PROPquest, for Chilton (RL052), then Fairford (FF051), then Dourbes (DB049), at most every 15 minutes and only near a slot, backing off when a source answers 429 or 5xx or not at all. It drops GIRO soundings with an autoscaling confidence score under 50. It takes the first station with a sounding no older than 45 minutes, and works out the MUF at 100, 500 and 1000 km: the ionosonde's own MUF(D) when the source gives it, otherwise foF2 at 100 km, and beyond that a flat-earth secant estimate, MUF(d) = foF2 x sqrt(1 + (M(3000)F2^2 - 1) x (d / 3000)^2), which gives foF2 near the station and the measured MUF(3000) at 3000 km. D-layer absorption is not modelled, so an open path can still be too weak at midday. Nor is the geomagnetic field: there is no DEGRADED state for a high Kp, since it would mean a second source to trust for a word that changes nothing on the air.
+
+A distance is open when its MUF is at least 7.1 MHz, and reliable when 0.85 times its MUF is. The skip zone is where the MUF, taken as straight lines between the three distances, first reaches 7.1 MHz. The reading as a whole is GOOD when 100 and 500 km are reliable, POOR when all three distances are closed, MARGINAL in between, and UNKNOWN with no sounding or one more than 45 minutes old, when it gives the last values and their age and never extrapolates. Users are spread from 0 to 1000 km, so the three distances matter more than the one word: on 2026-10-06, with Chilton's foF2 at 6.05 MHz, stations within 221 km heard nothing all day while those at 502 and 534 km rebuilt most of the bulletins.
+
+The record, after the type byte:
+
+| Offset | Size | Meaning |
+|---|---|---|
+| 0 | 1 | Record version, 1 |
+| 1 | 5 | Station, its URSI code in ASCII, such as `RL052` |
+| 6 | 4 | Sounding time, minutes since 1970-01-01 00:00 UTC |
+| 10 | 2 | foF2 in 10 kHz units; 0xFFFF for none |
+| 12, 14, 16 | 2 each | MUF at 100, 500 and 1000 km, the same way |
+| 18 | 1 | Skip zone in 10 km units; 0xFF when not open within 1000 km |
+| 19 | 1 | State in bits 0 to 2 (0 UNKNOWN, 1 POOR, 2 MARGINAL, 3 GOOD), method in bits 3 and 4 (1 measured, 2 estimated, 3 mixed), source in bits 5 and 6 (1 GIRO, 2 PROPquest) |
+| 20 | 1 | Verdict at 100 km in bits 0 and 1, 500 km in bits 2 and 3, 1000 km in bits 4 and 5 (1 closed, 2 open, 3 reliable) |
+| 21 | 1 | The sounding's age when sent, in minutes, up to 255 |
+
+All numbers are big-endian. A later version only adds bytes at the end. The object is 23 bytes, one RaptorQ symbol of 24 bytes, so each of its frames is 55 bytes and either one rebuilds it: the head end sends ESI 0 and ESI 1. It is not listed in the directory. The sounding time and age are in it, so each slot's reading is a new object. A reading with no sounding at all is not sent.
 
 ### Bulletins
 

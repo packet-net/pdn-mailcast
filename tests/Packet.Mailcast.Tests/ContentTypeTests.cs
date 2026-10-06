@@ -127,7 +127,8 @@ public class ContentTypeTests
         Assert.Equal("packet mail bulletin (FBB/BPQ message format)", ContentType.Describe(1));
         Assert.Equal("directory", ContentType.Describe(2));
         Assert.Equal("DAPPS message", ContentType.Describe(3));
-        Assert.Equal("unassigned content type 4", ContentType.Describe(4));
+        Assert.Equal("ionosonde reading", ContentType.Describe(4));
+        Assert.Equal("unassigned content type 5", ContentType.Describe(5));
         Assert.Equal("experimental content type 112", ContentType.Describe(0x70));
         Assert.True(ContentType.IsKnown(3));
         Assert.False(ContentType.IsKnown(0x70));

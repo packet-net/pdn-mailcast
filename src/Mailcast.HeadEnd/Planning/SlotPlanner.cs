@@ -1,4 +1,5 @@
 using Packet.Mailcast;
+using Packet.Mailcast.Propagation;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Slot;
 
@@ -10,7 +11,9 @@ namespace Mailcast.HeadEnd.Planning;
 /// <param name="BulletinsInRotation">How many bulletins the slot's directory lists.</param>
 /// <param name="Broadcast">The core's plan, which a commit refers back to.</param>
 /// <param name="Waveform">The waveform the slot goes out on; null for the broadcast modem's own, left as it is.</param>
-public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null)
+/// <param name="Ionosphere">The ionosonde reading as the slot was planned; null when the head end takes none.</param>
+/// <param name="IonosphereFrames">How many of <paramref name="Frames"/> carry the reading (content type 4).</param>
+public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0)
 {
     /// <summary>A plan with nothing in it.</summary>
     public static SlotPlan Empty(DateTimeOffset slot) => new(slot, [], 0, null);
@@ -55,8 +58,17 @@ public interface ISlotPlanner
 /// <param name="settings">How the slot runs, for the airtime estimate.</param>
 /// <param name="fillLimit">What the budget rule fills a slot to, tone and idents included, for a slot that starts this late: <see cref="HeadEndConfig.FillLimitAfter"/>.</param>
 /// <param name="time">The clock, which says how late a slot is planned; null plans every slot as on time.</param>
-public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null) : ISlotPlanner
+/// <param name="ionosphere">
+/// The ionosonde reading as of now (<see cref="IonosondeMonitor.Current"/>), which must answer at
+/// once; null sends none. A slot that keys anyway carries it in <see cref="IonosphereFrames"/>
+/// frames of content type 4, inside the airtime budget. It never decides whether or when a slot
+/// keys, nor what else goes in it beyond the room its frames take.
+/// </param>
+public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null) : ISlotPlanner
 {
+    /// <summary>Frames of the reading in each slot: ESI 0 and ESI 1, either of which rebuilds it alone.</summary>
+    public const int IonosphereFrames = 2;
+
     private readonly SlotSettings _settings = settings ?? new SlotSettings();
 
     /// <inheritdoc />
@@ -65,13 +77,46 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         SlotWaveform? waveform = waveforms?.For(slot);
         TimeSpan late = time is null ? TimeSpan.Zero : time.GetUtcNow() - slot;
         SlotBudget? budget = Budget(waveform, late);
-        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode);
+        IonoReading? reading = Reading();
+        IReadOnlyList<MailcastFrame> extras = reading is { HasSounding: true } ? ReadingFrames(reading) : [];
+        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras);
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
-            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform);
+            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform);
+        if (broadcast.BulletinFrames == 0 && extras.Count > 0)
+        {
+            // A one-off slot with nothing due sends the directory; the reading goes with it.
+            frames.AddRange(extras.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)));
+            return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, extras.Count);
+        }
+        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, broadcast.ExtraFrames);
+    }
+
+    /// <summary>The reading's frames: ESI 0, the object itself, and ESI 1, a repair symbol that also rebuilds it alone.</summary>
+    public static IReadOnlyList<MailcastFrame> ReadingFrames(IonoReading reading)
+    {
+        var transfer = IonoRecord.ToTransferObject(reading);
+        return [.. Enumerable.Range(0, IonosphereFrames).Select(esi => transfer.Frame((uint)esi))];
+    }
+
+    private IonoReading? Reading()
+    {
+        if (ionosphere is null)
+        {
+            return null;
+        }
+        try
+        {
+            return ionosphere();
+        }
+#pragma warning disable CA1031 // observe only: a reading that cannot be had is no reading, never a failed slot
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return IonoReading.None;
+        }
     }
 
     /// <summary>

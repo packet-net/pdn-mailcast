@@ -75,6 +75,9 @@ public sealed class StatusStore
         }
     }
 
+    /// <summary>The ionosonde reading as of now, for <c>iono</c> in the status document; null leaves it out.</summary>
+    public Func<Packet.Mailcast.Propagation.IonoReading>? Ionosphere { get; set; }
+
     /// <summary>The last slot, if any.</summary>
     public SlotReport? LastSlot
     {
@@ -175,6 +178,20 @@ public sealed class StatusStore
         File.Move(temporary, path, overwrite: true);
     }
 
+    private Packet.Mailcast.Propagation.IonoReading? Reading()
+    {
+        try
+        {
+            return Ionosphere?.Invoke();
+        }
+#pragma warning disable CA1031 // observe only: the status page must not fail for it
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return null;
+        }
+    }
+
     /// <summary>The status document.</summary>
     public string Render()
     {
@@ -191,6 +208,7 @@ public sealed class StatusStore
                 bulletinsHeld = _bulletinsHeld,
                 lastIntake = _lastIntake,
                 lastSlot = _lastSlot,
+                iono = Reading(),
             };
             return JsonSerializer.Serialize(document, Json);
         }

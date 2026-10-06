@@ -17,6 +17,12 @@ public enum ObjectKind : byte
 
     /// <summary>A DAPPS message. Reserved: receivers know it, keep it out of the BBS and log it once.</summary>
     DappsMessage = 3,
+
+    /// <summary>
+    /// The head end's ionosonde reading: a fixed binary record, not compressed and sent with
+    /// dictionary 0 (see <see cref="Propagation.IonoRecord"/>). Observe only, never for the BBS.
+    /// </summary>
+    Ionosphere = 4,
 }
 
 /// <summary>
@@ -52,6 +58,7 @@ public static class ContentType
         (byte)ObjectKind.Bulletin => "packet mail bulletin (FBB/BPQ message format)",
         (byte)ObjectKind.Directory => "directory",
         (byte)ObjectKind.DappsMessage => "DAPPS message",
+        (byte)ObjectKind.Ionosphere => "ionosonde reading",
         >= FirstExperimental and <= LastExperimental => $"experimental content type {type}",
         _ => $"unassigned content type {type}",
     };
@@ -92,7 +99,8 @@ public static class ContentType
 
 /// <summary>
 /// An object ready to send: one octet of content type (<see cref="ContentType"/>), an optional
-/// metadata block, then the zstd-compressed content, RaptorQ coded as one source block. These
+/// metadata block, then the zstd-compressed content, RaptorQ coded as one source block. The one
+/// exception is <see cref="ObjectKind.Ionosphere"/>, a short record sent as it is. These
 /// octets are what the OTI's transfer length counts, what the object ID hashes (after the
 /// dictionary ID), and what a receiver rebuilds.
 /// </summary>
@@ -171,6 +179,26 @@ public sealed class TransferObject
         return Pack(type, content, withMetadata ? metadata.ToArray() : null, dictionaryId, compression, symbolSize, alignment);
     }
 
+    /// <summary>
+    /// A short record of <paramref name="type"/>, not compressed and with dictionary 0, as one
+    /// symbol of exactly its own length rounded up to <paramref name="alignment"/>, so that every
+    /// frame of it is small and any one rebuilds it: how <see cref="ObjectKind.Ionosphere"/> is sent.
+    /// </summary>
+    public static TransferObject ForRecord(byte type, ReadOnlySpan<byte> record, int alignment = MailcastFrame.StandardAlignment)
+    {
+        if (type is 0 or >= ContentType.MetadataFollows)
+        {
+            throw new ArgumentOutOfRangeException(nameof(type), "A content type is 1 to 127.");
+        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(record.Length, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(alignment, 1);
+        var bytes = new byte[1 + record.Length];
+        bytes[0] = type;
+        record.CopyTo(bytes.AsSpan(1));
+        int symbolSize = (bytes.Length + alignment - 1) / alignment * alignment;
+        return new TransferObject(bytes, Compression.NoDictionary, new ObjectTransmissionInformation(bytes.Length, symbolSize, 1, 1, alignment));
+    }
+
     /// <summary>An object kept from an earlier day, exactly as it was first prepared.</summary>
     public static TransferObject FromStored(ReadOnlySpan<byte> bytes, ushort dictionaryId, ObjectTransmissionInformation oti) =>
         new(bytes.ToArray(), dictionaryId, oti);
@@ -208,6 +236,10 @@ public sealed class TransferObject
         if (!ContentType.TryRead(data, out byte type, out _, out var content) || !ContentType.IsKnown(type))
         {
             throw new InvalidDataException("Not a mailcast object.");
+        }
+        if (type == (byte)ObjectKind.Ionosphere)
+        {
+            return (ObjectKind.Ionosphere, content.ToArray()); // a record, not compressed
         }
         return ((ObjectKind)type, compression.Decompress(content, dictionaryId));
     }

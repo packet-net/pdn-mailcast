@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using Packet.Mailcast;
+using Packet.Mailcast.Propagation;
 using Mailcast.HeadEnd;
 using Mailcast.HeadEnd.Flex;
 using Mailcast.HeadEnd.Intake;
@@ -227,7 +228,11 @@ public static partial class Program
         SlotSettings settings = config.ToSlotSettings();
         Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time);
+        var schedule = config.ToSlotSchedule();
+        var ionoSettings = config.Ionosphere.ToSettings();
+        using var ionosonde = new IonosondeMonitor(ionoSettings, IonosondeMonitor.UserAgentFor(Version, config.Callsign), time, journal.Write);
+        Func<IonoReading>? reading = ionoSettings.Stations.Count == 0 ? null : () => ionosonde.Current;
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -254,13 +259,16 @@ public static partial class Program
             ? $"flex: reading PA temperature and reference from {config.Flex.Host}, stopping at {config.Flex.PaTemperatureLimitC:0.#} C"
             : "flex: not configured, so no PA temperature watch and no reference check");
 
-        var status = new StatusStore(config.StateDirectory, time);
+        var status = new StatusStore(config.StateDirectory, time) { Ionosphere = reading };
+        journal.Write(reading is null
+            ? "ionosonde: off (\"ionosphere\".\"stations\" is empty)"
+            : string.Create(CultureInfo.InvariantCulture, $"ionosonde: observe only, from {string.Join(", ", ionoSettings.Stations)} by GIRO then PROPquest, at most every {IonosondeMonitor.PollEvery.TotalMinutes:0} min near a slot; open at {ionoSettings.OpenMhz:0.###} MHz, reliable at {ionoSettings.ReliableFactor:0.###} of the MUF, stale after {ionoSettings.StaleAfter.TotalMinutes:0} min"));
         journal.Write(config.Slot.EveryMinutes == 1440
             ? $"schedule: a slot every day at {config.Slot.TimeUtc}Z"
             : $"schedule: a slot every {config.Slot.EveryMinutes} min, counted from {config.Slot.TimeUtc}Z");
         journal.Write(Describe(config, scheduleOptions, waveforms));
         using var service = new HeadEndService(
-            config.ToSlotSchedule(), TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
+            schedule, TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
             planner, store, intakes, runner, status, journal, time);
         await using StatusServer? server = string.IsNullOrWhiteSpace(config.Status.Bind) ? null : new StatusServer(config.Status.Bind, config.Status.Port, status, service.RequestRunNow);
         if (server is not null)
@@ -282,11 +290,19 @@ public static partial class Program
             // "modes" may since have been taken out of the configuration: put it back whatever it says.
             await runner.PutWaveformBackAsync(stop.Token);
         }
+        // In the background and observe only: a slot never waits for it.
+        Task ionosondeLoop = reading is null ? Task.CompletedTask : Task.Run(() => ionosonde.RunAsync(t => WantReading(schedule, t), stop.Token));
         await service.RunAsync(stop.Token);
+        await ionosondeLoop;
         fbbIntake?.Dispose();
         journal.Write("pdn-mailcast-headend stopped");
         return 0;
     }
+
+    /// <summary>Whether to keep the ionosonde reading fresh at <paramref name="t"/>: from an hour before a slot to a quarter of an hour after.</summary>
+    internal static bool WantReading(SlotSchedule schedule, DateTimeOffset t) =>
+        schedule.NextActiveAfter(t) - t <= TimeSpan.FromHours(1)
+        || (schedule.ActiveAtOrBefore(t) is { } last && t - last <= TimeSpan.FromMinutes(15));
 
     /// <summary>One journal line on how bulletins are carried and on which waveforms.</summary>
     internal static string Describe(HeadEndConfig config, ScheduleOptions options, Waveforms waveforms)
