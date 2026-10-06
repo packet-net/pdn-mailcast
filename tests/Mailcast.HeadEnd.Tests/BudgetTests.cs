@@ -175,7 +175,8 @@ public class BudgetTests(ITestOutputHelper output)
         // 271-octet mailcast frames (240-octet symbols) as AX.25 UI frames.
         int[] lengths = [.. Enumerable.Repeat(271 + MailcastFrame.Ax25UiOverhead, frames)];
         var sizes = model.BurstSizes(lengths);
-        TimeSpan toRelease = model.Slot(lengths, sizes) - SlotAirtime.ClosingIdent;
+        // Both slots went out before the channel probe, which the model now counts after the tone.
+        TimeSpan toRelease = model.Slot(lengths, sizes) - SlotAirtime.ClosingIdent - ChannelProbe.Airtime;
         output.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"{frames} frames: {sizes.Count} bursts ({string.Join(" ", sizes)}), {model.Bursts(lengths, sizes).TotalSeconds:0.0} s of bursts, {toRelease.TotalSeconds:0.0} s to the release against {seconds:0.0} s measured, {(toRelease + SlotAirtime.ClosingIdent).TotalMinutes:0.00} min with the closing ident"));
         Assert.Equal(bursts, sizes.Count);
@@ -189,7 +190,7 @@ public class BudgetTests(ITestOutputHelper output)
         int[] lengths = [.. Enumerable.Repeat(271 + MailcastFrame.Ax25UiOverhead, 60)];
         var wn4 = new SlotAirtime(settings, Measure("ms110d-wn4"));
         var wn3 = new SlotAirtime(settings, Measure("ms110d-wn3"));
-        TimeSpan fixedPart = wn4.Slot([]) + SlotAirtime.StartDelay + settings.ToneLength + SlotAirtime.ToneDelay + settings.PauseAfterTone + SlotAirtime.ClosingIdent;
+        TimeSpan fixedPart = wn4.Slot([]) + SlotAirtime.StartDelay + settings.ToneLength + ChannelProbe.Airtime + SlotAirtime.ToneDelay + settings.PauseAfterTone + SlotAirtime.ClosingIdent;
         double ratio = (wn3.Slot(lengths) - fixedPart) / (wn4.Slot(lengths) - fixedPart);
         output.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"60 frames: {wn4.Slot(lengths).TotalMinutes:0.00} min on WN4 in {wn4.BurstSizes(lengths).Count} bursts, {wn3.Slot(lengths).TotalMinutes:0.00} min on WN3 in {wn3.BurstSizes(lengths).Count} bursts; the frames take {ratio:0.00} times as long"));

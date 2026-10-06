@@ -164,13 +164,37 @@ public class StationTests
     {
         using var handler = new Handler((_, _) => ((HttpStatusCode)status, body));
         using var api = Client(handler);
-        var answer = await api.SendToneAsync(4, 1800, 30, CancellationToken.None);
+        var answer = await api.SendToneAsync(4, 1800, 30, null, CancellationToken.None);
         Assert.Equal(expected, answer.Outcome);
+        Assert.Equal(status, answer.Status);
+        Assert.False(answer.KnowsProbe);
         var request = handler.Requests.Single();
         Assert.Equal("/api/txtest", request.Path);
         Assert.False(request.Body!["twoTone"]!.GetValue<bool>());
         Assert.Equal(1800, request.Body["toneHz"]!.GetValue<double>());
         Assert.Equal(30, request.Body["seconds"]!.GetValue<double>());
         Assert.Equal(4, request.Body["subChannel"]!.GetValue<int>());
+        Assert.Null(request.Body["probe"]);
+    }
+
+    [Theory]
+    [InlineData(200, """{"transmitted": true, "sent": "4050 Hz for 10 s, then the probe", "probe": "zc255-2400-rrc015-v1", "probeComplete": true}""", ToneOutcome.Sent, true, "zc255-2400-rrc015-v1", true)]
+    [InlineData(200, """{"transmitted": true, "sent": "4050 Hz for 10 s", "probe": null, "probeComplete": false}""", ToneOutcome.Sent, true, null, false)]
+    [InlineData(200, """{"transmitted": true, "sent": "4050 Hz for 10 s", "refused": null, "failed": null}""", ToneOutcome.Sent, false, null, null)]
+    [InlineData(409, """{"transmitted": false, "refused": "a 18.0 s test is over this station's 15 s limit (txTest.maxSeconds), so nothing was transmitted", "probe": null, "probeComplete": null}""", ToneOutcome.Refused, true, null, null)]
+    public async Task StationApiClient_AsksForTheProbeAfterTheTone_AndReadsWhatBecameOfIt(int status, string body, ToneOutcome expected, bool knows, string? id, bool? complete)
+    {
+        using var handler = new Handler((_, _) => ((HttpStatusCode)status, body));
+        using var api = Client(handler);
+        var answer = await api.SendToneAsync(4, 4050, 10, new ProbeRequest("zc255", 1.5, 4050), CancellationToken.None);
+        Assert.Equal(expected, answer.Outcome);
+        Assert.Equal(knows, answer.KnowsProbe);
+        Assert.Equal(id, answer.ProbeId);
+        Assert.Equal(complete, answer.ProbeComplete);
+        var probe = handler.Requests.Single().Body!["probe"]!.AsObject();
+        Assert.Equal(["kind", "gapSeconds", "audioHz"], probe.Select(p => p.Key));
+        Assert.Equal("zc255", probe["kind"]!.GetValue<string>());
+        Assert.Equal(1.5, probe["gapSeconds"]!.GetValue<double>());
+        Assert.Equal(4050, probe["audioHz"]!.GetValue<double>());
     }
 }

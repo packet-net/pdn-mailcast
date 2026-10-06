@@ -16,6 +16,11 @@ namespace Mailcast.HeadEnd.Slot;
 /// station answers "the channel did not clear" when it never got to send it: that is the channel
 /// check. The station's CW ident falls due with the first transmission, so a short pause after
 /// the tone lets it go before the first burst.</para>
+/// <para><b>The channel probe.</b> The tone is asked for with the channel probe after it, in the
+/// same keyup (<see cref="ChannelProbe"/>), on the tone's audio frequency. A station too old to
+/// know the probe sends the tone alone, which is logged; one that refuses the pair (a tone so long
+/// that the two pass its <c>txTest.maxSeconds</c>) is asked at once for the tone alone. The
+/// probe never costs a slot its tone or its frames.</para>
 /// <para><b>Pacing.</b> One burst's worth of frames is queued at a time, written together so the
 /// modem packs them (it gathers frames queued together for <c>burstGatherSeconds</c>), and the
 /// next burst is queued only once every frame of this one has been acknowledged (ACKMODE: the
@@ -193,6 +198,7 @@ public sealed class SlotRunner
         private int _renewals;
         private bool _leaseTaken;
         private bool _toneSent;
+        private string? _probeId;
 
         public void Dispose()
         {
@@ -531,24 +537,28 @@ public sealed class SlotRunner
             }
             DateTimeOffset giveUp = Now + S.ChannelWait;
             bool saidBusy = false;
+            // The probe goes on the tone's own audio frequency, so it lands where the tone does on the air.
+            ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, S.ToneHz);
             while (_abort is null)
             {
                 bool? busy = await ChannelBusyAsync(cancellation);
                 if (busy != true)
                 {
-                    ToneAnswer answer;
-                    try
+                    ToneAnswer answer = await SendToneAsync(probe, cancellation);
+                    if (answer.Outcome != ToneOutcome.Sent && probe is not null && answer.Status is 400 or 409
+                        && await ChannelBusyAsync(cancellation) != true)
                     {
-                        answer = await owner._station.SendToneAsync(S.SubChannel, S.ToneHz, S.ToneLength.TotalSeconds, cancellation);
-                    }
-                    catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
-                    {
-                        answer = new ToneAnswer(ToneOutcome.Failed, e.Message);
+                        // Refused with the probe for a reason other than the channel, most likely a
+                        // tone so long that the two pass the station's txTest.maxSeconds: the tone
+                        // alone, at once, so the probe never costs the slot its tone.
+                        Say($"the station would not send the tone with the channel probe ({answer.Message}); asking for the tone alone");
+                        probe = null;
+                        answer = await SendToneAsync(null, cancellation);
                     }
                     if (answer.Outcome == ToneOutcome.Sent)
                     {
                         _toneSent = true;
-                        Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {S.ToneHz:0} Hz");
+                        Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {S.ToneHz:0} Hz{(probe is null ? "" : ProbeLine(answer))}");
                         if (_abort is null && S.PauseAfterTone > TimeSpan.Zero)
                         {
                             await Task.Delay(S.PauseAfterTone, owner._time, cancellation);
@@ -581,6 +591,35 @@ public sealed class SlotRunner
                 await Task.Delay(TimeSpan.FromSeconds(5), owner._time, cancellation);
             }
             return (null, null);
+        }
+
+        private async Task<ToneAnswer> SendToneAsync(ProbeRequest? probe, CancellationToken cancellation)
+        {
+            try
+            {
+                return await owner._station.SendToneAsync(S.SubChannel, S.ToneHz, S.ToneLength.TotalSeconds, probe, cancellation);
+            }
+            catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
+            {
+                return new ToneAnswer(ToneOutcome.Failed, e.Message);
+            }
+        }
+
+        /// <summary>What became of the probe that was asked for with a tone that went out, for the tone's journal line.</summary>
+        private string ProbeLine(ToneAnswer answer)
+        {
+            if (!answer.KnowsProbe)
+            {
+                return ", without the channel probe: the station does not know it (pdn-soundmodem 0.87.2 or later sends it)";
+            }
+            if (answer.ProbeComplete == true && answer.ProbeId is string id)
+            {
+                _probeId = id;
+                return $", then the channel probe ({id}, {ChannelProbe.Airtime.TotalSeconds:0} s more)";
+            }
+            return answer.ProbeComplete == false
+                ? ", but the channel probe after it was cut short or kept off the air"
+                : ", but the station did not say whether the channel probe went";
         }
 
         private async Task BurstsAsync(IKissLink link, IReadOnlyList<int> sizes, CancellationToken cancellation)
@@ -800,6 +839,8 @@ public sealed class SlotRunner
                 Bursts = _bursts,
                 BulletinsInRotation = bulletins,
                 ToneSent = _toneSent,
+                ProbeSent = _probeId is not null,
+                ProbeId = _probeId,
                 Reference = _reference,
                 PaTemperatureMaxC = _paMax,
                 LeaseTaken = _leaseTaken,
@@ -813,7 +854,7 @@ public sealed class SlotRunner
             switch (outcome)
             {
                 case SlotOutcome.Completed:
-                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {bulletins} bulletins in rotation, tone {(_toneSent ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
+                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {bulletins} bulletins in rotation, tone {(_toneSent ? "sent" : "not sent")}, probe {(_probeId is not null ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
                     break;
                 case SlotOutcome.Aborted:
                     Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode} ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");

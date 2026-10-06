@@ -71,8 +71,8 @@ public class AirtimeBudgetTests(ITestOutputHelper output)
             }
             var frames = plan.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
             var bursts = runner.BurstSizes(frames);
-            // The bursts, the tone, the pause for the opening ident, a second between bursts and the closing ident.
-            TimeSpan onAir = runner.Airtime(frames, bursts) + settings.ToneLength + settings.PauseAfterTone + (settings.BurstGap * (bursts.Count - 1)) + TimeSpan.FromSeconds(8);
+            // The bursts, the tone and the channel probe, the pause for the opening ident, a second between bursts and the closing ident.
+            TimeSpan onAir = runner.Airtime(frames, bursts) + settings.ToneLength + ChannelProbe.Airtime + settings.PauseAfterTone + (settings.BurstGap * (bursts.Count - 1)) + TimeSpan.FromSeconds(8);
             keyed.Add((slot, onAir));
         }
 

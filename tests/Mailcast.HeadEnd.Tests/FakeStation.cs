@@ -76,6 +76,21 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Whether the station answers tones at all: false answers 404 as with txTest off.</summary>
     public bool ToneAvailable { get; set; } = true;
 
+    /// <summary>
+    /// Whether the station knows the channel probe (pdn-soundmodem 0.87.2 and later): false is an
+    /// older one, which ignores the field, sends the tone alone and leaves the probe keys out of its answer.
+    /// </summary>
+    public bool KnowsProbe { get; set; } = true;
+
+    /// <summary>The probe is cut short (a Stop): the answer says <c>probeComplete</c> false.</summary>
+    public bool CutsProbeShort { get; set; }
+
+    /// <summary>The station's <c>txTest.maxSeconds</c>: a tone with a probe that would pass it is refused (409), a tone alone is cut to it.</summary>
+    public double MaxSeconds { get; set; } = 30;
+
+    /// <summary>Every tone request, with the probe it asked for.</summary>
+    public List<(DateTimeOffset At, double Seconds, ProbeRequest? Probe)> ToneRequests { get; } = [];
+
     /// <summary>The modem stops acknowledging after this many frames, though it still transmits.</summary>
     public int? SilentAfterFrames { get; set; }
 
@@ -143,24 +158,48 @@ public sealed class FakeStation : IStationApi, IKissConnector
         return true;
     }
 
-    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, CancellationToken cancellation)
+    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation)
     {
+        ToneRequests.Add((_time.GetUtcNow(), seconds, probe));
         if (!ToneAvailable)
         {
             await Task.Yield();
-            return new ToneAnswer(ToneOutcome.Refused, "HTTP 404: no transmitter test here");
+            return new ToneAnswer(ToneOutcome.Refused, "HTTP 404: no transmitter test here") { Status = 404 };
+        }
+        bool withProbe = probe is not null && KnowsProbe;
+        double probeSeconds = ChannelProbe.Airtime.TotalSeconds;
+        if (withProbe && seconds + probeSeconds > MaxSeconds)
+        {
+            await Task.Yield();
+            return new ToneAnswer(ToneOutcome.Refused, $"HTTP 409: a {seconds + probeSeconds:0.0} s test is over this station's {MaxSeconds:0} s limit (txTest.maxSeconds), so nothing was transmitted")
+            {
+                Status = 409,
+                KnowsProbe = true,
+            };
         }
         DateTimeOffset giveUp = _time.GetUtcNow() + TimeSpan.FromSeconds(60);
         while (ChannelBusy)
         {
             if (_time.GetUtcNow() >= giveUp)
             {
-                return new ToneAnswer(ToneOutcome.Refused, "HTTP 409: the test was withdrawn and nothing was transmitted");
+                return new ToneAnswer(ToneOutcome.Refused, "HTTP 409: the test was withdrawn and nothing was transmitted") { Status = 409, KnowsProbe = KnowsProbe };
             }
             await Task.Delay(TimeSpan.FromSeconds(1), _time, cancellation);
         }
-        await KeyAsync(TimeSpan.FromSeconds(seconds), $"tone {toneHz} Hz", cancellation);
-        return new ToneAnswer(ToneOutcome.Sent, "tone");
+        if (!withProbe)
+        {
+            await KeyAsync(TimeSpan.FromSeconds(Math.Min(seconds, MaxSeconds)), $"tone {toneHz} Hz", cancellation);
+            return new ToneAnswer(ToneOutcome.Sent, "tone") { Status = 200, KnowsProbe = KnowsProbe };
+        }
+        double keyed = seconds + (CutsProbeShort ? probeSeconds / 2 : probeSeconds);
+        await KeyAsync(TimeSpan.FromSeconds(keyed), $"tone {toneHz} Hz and probe {probe!.Kind} at {probe.AudioHz} Hz", cancellation);
+        return new ToneAnswer(ToneOutcome.Sent, "tone and probe")
+        {
+            Status = 200,
+            KnowsProbe = true,
+            ProbeId = CutsProbeShort ? null : ChannelProbe.Descriptor.Id,
+            ProbeComplete = !CutsProbeShort,
+        };
     }
 
     public Task<IKissLink> ConnectAsync(CancellationToken cancellation) => Task.FromResult<IKissLink>(new FakeLink(this));

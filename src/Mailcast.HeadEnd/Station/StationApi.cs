@@ -31,7 +31,29 @@ public enum ToneOutcome
 }
 
 /// <summary>What the station said to a tone request.</summary>
-public sealed record ToneAnswer(ToneOutcome Outcome, string Message);
+public sealed record ToneAnswer(ToneOutcome Outcome, string Message)
+{
+    /// <summary>The HTTP status, or null when the request itself failed.</summary>
+    public int? Status { get; init; }
+
+    /// <summary>
+    /// True when the answer carried the probe's keys (<c>probe</c> and <c>probeComplete</c>), as
+    /// pdn-soundmodem 0.87.2 and later always do. An older station leaves them out and sends the tone alone.
+    /// </summary>
+    public bool KnowsProbe { get; init; }
+
+    /// <summary>The probe's id when all of it went out, else null.</summary>
+    public string? ProbeId { get; init; }
+
+    /// <summary>True when all of the probe went out, false when it was cut short or kept off the air, null when the station did not say.</summary>
+    public bool? ProbeComplete { get; init; }
+}
+
+/// <summary>A channel probe to follow the tone, as <c>POST /api/txtest</c> takes it.</summary>
+/// <param name="Kind">The probe's kind, <c>zc255</c>.</param>
+/// <param name="GapSeconds">The silence between the tone and the probe.</param>
+/// <param name="AudioHz">The probe's audio centre.</param>
+public sealed record ProbeRequest(string Kind, double GapSeconds, double AudioHz);
 
 /// <summary>The parts of pdn-soundmodem's HTTP API the head end uses.</summary>
 public interface IStationApi
@@ -57,11 +79,11 @@ public interface IStationApi
     Task<bool> DropQueuedAsync(int subChannel, CancellationToken cancellation);
 
     /// <summary>
-    /// Sends a single tone as the lease holder (<c>POST /api/txtest</c> naming the sub-channel).
-    /// The station waits for a clear channel first, up to its own limit (60 s), and answers when
-    /// the tone is over.
+    /// Sends a single tone as the lease holder (<c>POST /api/txtest</c> naming the sub-channel),
+    /// followed in the same keyup by <paramref name="probe"/> when one is given. The station waits
+    /// for a clear channel first, up to its own limit (60 s), and answers when the keyup is over.
     /// </summary>
-    Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, CancellationToken cancellation);
+    Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation);
 }
 
 /// <summary><see cref="IStationApi"/> over HTTP.</summary>
@@ -142,7 +164,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, CancellationToken cancellation)
+    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation)
     {
         var body = new JsonObject
         {
@@ -151,6 +173,15 @@ public sealed class StationApiClient : IStationApi, IDisposable
             ["seconds"] = seconds,
             ["subChannel"] = subChannel,
         };
+        if (probe is not null)
+        {
+            body["probe"] = new JsonObject
+            {
+                ["kind"] = probe.Kind,
+                ["gapSeconds"] = probe.GapSeconds,
+                ["audioHz"] = probe.AudioHz,
+            };
+        }
         HttpStatusCode status;
         JsonNode? json;
         string text;
@@ -163,14 +194,22 @@ public sealed class StationApiClient : IStationApi, IDisposable
             return new ToneAnswer(ToneOutcome.Failed, e.Message);
         }
 
+        bool knowsProbe = json is JsonObject answer && answer.ContainsKey("probe") && answer.ContainsKey("probeComplete");
+        string? probeId = knowsProbe && json!["probe"] is JsonNode id && id.GetValueKind() == JsonValueKind.String ? id.GetValue<string>() : null;
+        bool? probeComplete = knowsProbe && json!["probeComplete"] is JsonNode done && done.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? done.GetValue<bool>() : null;
         if (status == HttpStatusCode.OK && json?["transmitted"]?.GetValue<bool>() == true)
         {
-            return new ToneAnswer(ToneOutcome.Sent, json["sent"]?.ToString() ?? "sent");
+            return new ToneAnswer(ToneOutcome.Sent, json["sent"]?.ToString() ?? "sent")
+            {
+                Status = (int)status,
+                KnowsProbe = knowsProbe,
+                ProbeId = probeId,
+                ProbeComplete = probeComplete,
+            };
         }
         string why = Describe(json, text);
-        return status == HttpStatusCode.Conflict || status == HttpStatusCode.NotFound
-            ? new ToneAnswer(ToneOutcome.Refused, $"HTTP {(int)status}: {why}")
-            : new ToneAnswer(ToneOutcome.Failed, $"HTTP {(int)status}: {why}");
+        ToneOutcome outcome = status == HttpStatusCode.Conflict || status == HttpStatusCode.NotFound ? ToneOutcome.Refused : ToneOutcome.Failed;
+        return new ToneAnswer(outcome, $"HTTP {(int)status}: {why}") { Status = (int)status, KnowsProbe = knowsProbe };
     }
 
     private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation)
