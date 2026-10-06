@@ -30,7 +30,10 @@ public static class InterlockFile
     public static string PathIn(string stateDirectory) => System.IO.Path.Combine(stateDirectory, Name);
 
     /// <summary>Writes the note so that after a crash the file is either the old one or this one, whole.</summary>
-    public static void Write(string path, Note note)
+    public static void Write(string path, Note note) => WriteDurably(path, JsonSerializer.SerializeToUtf8Bytes(note, ReceiverConfig.Json));
+
+    /// <summary>Writes <paramref name="content"/> to <paramref name="path"/> so that after a crash the file is either the old one or this one, whole.</summary>
+    internal static void WriteDurably(string path, byte[] content)
     {
         string? directory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
         if (directory is not null)
@@ -40,7 +43,7 @@ public static class InterlockFile
         string tmp = path + ".tmp";
         using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
-            stream.Write(JsonSerializer.SerializeToUtf8Bytes(note, ReceiverConfig.Json));
+            stream.Write(content);
             stream.Flush(flushToDisk: true);
         }
         File.Move(tmp, path, overwrite: true);
