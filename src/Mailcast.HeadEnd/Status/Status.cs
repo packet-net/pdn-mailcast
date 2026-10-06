@@ -25,8 +25,10 @@ public sealed class StatusStore
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-        // A NaN or an infinity anywhere (a PA reading, an estimate) is written as a string
-        // rather than refused: the report is saved after the slot has keyed, and must never fail.
+        // A NaN or an infinity in a double? (a PA reading, an estimate) is written as null, which
+        // any JSON reader takes. The report is saved after the slot has keyed and must never fail,
+        // so a plain double, should one ever be added, is still written as a string, not refused.
+        Converters = { new FiniteOrNullConverter() },
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 

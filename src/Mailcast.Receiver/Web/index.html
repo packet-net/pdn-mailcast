@@ -58,6 +58,14 @@
   #viewText { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 520px; overflow: auto; margin: 0;
     padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; }
   a { color: var(--accent); }
+  #update { margin: 10px 24px 0; padding: 12px 16px; background: #eaf2fb; border: 1px solid #b9d2ee; border-radius: 10px; }
+  #update[hidden] { display: none; }
+  #update strong { font-size: 16px; }
+  #update p { margin: 4px 0; }
+  #update .cmd { display: flex; gap: 8px; align-items: stretch; margin: 8px 0 4px; flex-wrap: wrap; }
+  #updateCmd { flex: 1 1 320px; margin: 0; padding: 7px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+  #updateCopy { padding: 4px 12px; }
 </style>
 </head>
 <body>
@@ -66,6 +74,12 @@
   <p id="summary">Loading...</p>
   <a href="#" id="signOut" hidden>Sign out</a>
 </header>
+<div id="update" hidden>
+  <strong id="updateTitle"></strong>
+  <p id="updateWhat"></p>
+  <div class="cmd"><pre id="updateCmd"></pre><button type="button" class="plain" id="updateCopy">Copy</button></div>
+  <p class="muted">Best done between slots: in daylight, after :13 and before :58 past the hour. At night, any time.</p>
+</div>
 <main>
   <section>
     <h2>Speed</h2>
@@ -258,6 +272,7 @@ async function refresh() {
 
   speed(s);
   iono(s);
+  update(s);
 
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
@@ -300,6 +315,32 @@ async function refresh() {
   $("band").style.left = pct(lvl.lowDbFs) + "%";
   $("band").style.width = (pct(lvl.highDbFs) - pct(lvl.lowDbFs)) + "%";
 }
+/* a newer version in the apt repository, with the commands to install it */
+function update(s) {
+  const u = s.update;
+  $("update").hidden = !(u && u.newer);
+  if (!u || !u.newer) return;
+  $("updateTitle").textContent = `Version ${u.latest} is available (you have ${u.current}).`;
+  const notes = `<a href="${esc(u.release)}" target="_blank" rel="noopener">See what's new</a>`;
+  $("updateWhat").innerHTML = u.download
+    ? `${notes}. Download <a href="${esc(u.download)}">${esc(u.download.split("/").pop())}</a>, then in the folder you saved it to:`
+    : `${notes}. To upgrade:`;
+  if ($("updateCmd").textContent !== u.command) $("updateCmd").textContent = u.command;
+}
+$("updateCopy").addEventListener("click", async () => {
+  const text = $("updateCmd").textContent;
+  try { await navigator.clipboard.writeText(text); $("updateCopy").textContent = "Copied"; }
+  catch {
+    /* No clipboard over plain HTTP from another machine: select it to copy by hand. */
+    const range = document.createRange();
+    range.selectNodeContents($("updateCmd"));
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    $("updateCopy").textContent = "Selected: press Ctrl+C";
+  }
+  setTimeout(() => { $("updateCopy").textContent = "Copy"; }, 3000);
+});
+
 /* the head end's ionosonde reading: is 40 m open from Reading, and how far out */
 function iono(s) {
   const i = s.iono;

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Mailcast.Receiver;
+using Mailcast.Receiver.Updates;
 using Mailcast.Receiver.Web;
 
 const string DefaultConfig = "/etc/pdn-mailcast/receiver.json";
@@ -77,7 +78,12 @@ try
         return 0;
     }
 
-    await using var page = new StatusPage(host, configPath, Log);
+    // Looks for a newer version in the apt repository, for the page; it runs on its own and
+    // never holds up anything else.
+    using var updates = new UpdateCheck(TimeProvider.System, Log);
+    _ = updates.RunAsync(stop.Token);
+
+    await using var page = new StatusPage(host, configPath, Log) { Updates = updates };
     try
     {
         page.Start();

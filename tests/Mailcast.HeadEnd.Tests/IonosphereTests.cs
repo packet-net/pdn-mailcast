@@ -165,11 +165,55 @@ public class IonosphereTests
         Assert.Null(status.LastWriteProblem);
         using var json = JsonDocument.Parse(status.Render());
         Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("iono").GetProperty("foF2").ValueKind);
-        Assert.Equal("NaN", json.RootElement.GetProperty("lastSlot").GetProperty("paTemperatureMaxC").GetString());
+        // Written as null, not as the string "NaN", so any JSON reader takes the saved report.
+        var lastSlot = json.RootElement.GetProperty("lastSlot");
+        Assert.Equal(JsonValueKind.Null, lastSlot.GetProperty("paTemperatureMaxC").ValueKind);
+        Assert.Equal(JsonValueKind.Null, lastSlot.GetProperty("estimatedSeconds").ValueKind);
+        foreach (string file in Directory.GetFiles(state.Path, "*.json"))
+        {
+            string saved = File.ReadAllText(file);
+            Assert.DoesNotContain("NaN", saved, StringComparison.Ordinal);
+            Assert.DoesNotContain("Infinity", saved, StringComparison.Ordinal);
+        }
         var again = new StatusStore(state.Path, time);
-        Assert.True(double.IsNaN(again.LastSlot!.PaTemperatureMaxC!.Value));
-        Assert.True(double.IsPositiveInfinity(again.LastSlot.EstimatedSeconds!.Value));
+        Assert.Null(again.LastSlot!.PaTemperatureMaxC);
+        Assert.Null(again.LastSlot.EstimatedSeconds);
         Assert.Null(again.LastSlot.Ionosphere!.FoF2);
+    }
+
+    [Fact]
+    public void Status_RoundTripsFiniteValues_AndReadsOldNaNStringsAsNull()
+    {
+        var time = new FakeTimeProvider(Slot.AddMinutes(10));
+        using var state = new TempDirectory();
+        var report = new SlotReport
+        {
+            Slot = Slot,
+            Day = DateOnly.FromDateTime(Slot.UtcDateTime),
+            Outcome = SlotOutcome.Completed,
+            PaTemperatureMaxC = 41.25,
+            EstimatedSeconds = null,
+            Ionosphere = Marginal,
+        };
+        new StatusStore(state.Path, time).RecordSlot(report);
+        var again = new StatusStore(state.Path, time).LastSlot!;
+        Assert.Equal(41.25, again.PaTemperatureMaxC);
+        Assert.Null(again.EstimatedSeconds);
+        Assert.Equal(Marginal, again.Ionosphere);
+        Assert.Equal(report, again);
+
+        // A report saved before non-finite values were written as null has them as strings.
+        string path = Path.Combine(state.Path, "last-slot.json");
+        string old = File.ReadAllText(path)
+            .Replace("\"paTemperatureMaxC\": 41.25", "\"paTemperatureMaxC\": \"NaN\"", StringComparison.Ordinal)
+            .Replace("\"estimatedSeconds\": null", "\"estimatedSeconds\": \"-Infinity\"", StringComparison.Ordinal);
+        Assert.Contains("\"NaN\"", old, StringComparison.Ordinal);
+        Assert.Contains("\"-Infinity\"", old, StringComparison.Ordinal);
+        File.WriteAllText(path, old);
+        var older = new StatusStore(state.Path, time).LastSlot!;
+        Assert.Null(older.PaTemperatureMaxC);
+        Assert.Null(older.EstimatedSeconds);
+        Assert.Equal(Marginal, older.Ionosphere);
     }
 
     [Fact]
