@@ -182,6 +182,7 @@ http://127.0.0.1:8130/ shows:
 - your BBS: where bulletins go, how many are waiting, and any problem reaching it;
 - a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away. While there is no audio it says why instead: between a web SDR's slots it says when the spectrogram comes back, and for a sound card that can't be opened it gives the reason and when the receiver tries again;
 - the input level. For a sound card it has the same target as pdn-soundmodem: peaks between -18 and -9 dBFS. For a web SDR (or a recording) the level isn't yours to set and the modem copes with any level short of clipping, so it only warns about clipping;
+- the channel: what the radio path from GB7RDG was like in the last slot, and over the last day (see [The Channel tile](#the-channel-tile));
 - what to try if nothing is heard;
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the mail this receiver holds (see [Mail](#mail));
@@ -208,6 +209,22 @@ Use it on a network you trust: it is plain HTTP, so the password and the sign-in
 ### Checking for updates
 
 To know when there is a new version, the receiver reads packet-net's apt package list (https://packet-net.github.io/apt/Packages, about 75 kB) a minute or two after it starts, then every six hours. It sends its version in the User-Agent and nothing else, and it never downloads or installs anything. It tells an apt install from a hand-installed .deb by looking for packet-net.github.io in `/etc/apt/sources.list.d/`. If it can't reach the list, the page just shows no banner, and the log says why once.
+
+### The Channel tile
+
+Once a slot is over, the receiver works out what the path from GB7RDG was like, from the data bursts it decoded. Every burst it decodes can be made again exactly, so each one is a known signal to measure the path with, about 20 times a second. It needs no extra airtime and works down to about 1 dB signal to noise. Only the bursts it decoded count: a slot it could not read says "Not enough decoded to measure."
+
+The tile says it in a line, such as "Last slot (16:00 UTC): 2 paths: 1 hop, and 2 hops 1.9 ms later, 17 dB weaker. Reflection about 290 km up. Doppler spread 0.2 Hz: steady (good for 1200 bps)." Below that:
+
+- the delay profile: how much signal arrived how long after the first path, with each path marked. One hop off the F layer is 1F, two hops 2F, and so on; 1E (the E layer) is only considered more than 300 km from Reading. Naming the hops needs to know where your receiver is, which a web SDR says; with a sound card the paths are shown without names. The height comes from the time between the first two hops, and hardly depends on the distance, so it is given either way;
+- the delay spread (how much the echoes smear each symbol), the Doppler spread (how much the moving layer blurs the frequency), how deep the fades went (how far the signal fell below its middle level a tenth of the time), and how long the signal stays steady;
+- a strip of the last 24 hours, one column per hourly slot, with a dot for each path at its delay, darker for stronger.
+
+Doppler spread under 0.5 Hz is steady and good for 1200 bps; up to 1 Hz, 1200 bps should still cope; beyond that, 600 bps copes better. It is a guide, and it changes nothing about what is sent.
+
+The measuring runs on a thread of its own after the slot, never alongside the decoding, and rests between bursts so it uses at most half of one core. On a Raspberry Pi 4 a slot of 7 bursts takes about 5 seconds of one core. It only keeps bursts it read frames from, heard within 15 minutes of a slot's start: at most 12 of them (and 4 minutes of audio, about 25 MB) per slot until then. A burst longer than the 75 s of audio it keeps is left out, and the log and tile say so. The results for the last day are kept in `channel.json` in the state directory. `--decode` measures too, after delivering, and only logs the result.
+
+In `GET /api/status`, `channel` has the last slot: `slot`, `basis` (`bursts`), `enough`, `modes` (each with `label`, `delayMs` after the first, `powerDb` against the strongest, `dopplerShiftHz`, `dopplerSpreadHz` and `seenIn`), `delaySpreadMs`, `dopplerSpreadHz`, `fadeDb`, `coherenceS`, `virtualHeightKm`, `snrDb`, `offsetHz`, `distanceKm` (null when the receiver's position is not known), `words`, `tooLong` (bursts left out since start), the `profile` (`startMs`, `stepMs`, `db`), and `history`, the last day's slots. Before anything has been measured, `slot` is null.
 
 ## Mail
 
