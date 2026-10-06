@@ -133,8 +133,7 @@ public sealed class SlotRunner
         }
         try
         {
-            await using IKissLink link = await _kiss.ConnectAsync(cancellation);
-            bool back = await link.SetHardwareAsync(payload, _settings.SetHardwareWait, _time, cancellation);
+            bool back = await SetOnFreshLinkAsync(payload, cancellation);
             _journal.Write(back
                 ? $"station: broadcast modem set to {_settings.Mode}"
                 : $"station: WARNING - the broadcast modem did not confirm {_settings.Mode} (no SETHW echo); each slot sets its own waveform anyway");
@@ -146,6 +145,15 @@ public sealed class SlotRunner
             _journal.Write($"station: could not set the broadcast modem to {_settings.Mode} ({e.Message}); each slot sets its own waveform anyway");
             return false;
         }
+    }
+
+    /// <summary>Sends SETHW on a KISS connection of its own and waits for the echo, at most 30 s in all.</summary>
+    private async Task<bool> SetOnFreshLinkAsync(byte[] payload, CancellationToken cancellation)
+    {
+        using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30), _time);
+        using var either = CancellationTokenSource.CreateLinkedTokenSource(cancellation, limit.Token);
+        await using IKissLink link = await _kiss.ConnectAsync(either.Token);
+        return await link.SetHardwareAsync(payload, _settings.SetHardwareWait, _time, either.Token);
     }
 
     /// <summary>How a slot is named in the journal: its start, UTC, to the minute.</summary>
@@ -164,8 +172,9 @@ public sealed class SlotRunner
         private readonly string _mode = waveform?.Mode ?? owner._settings.Mode;
         private TimeSpan? _estimate;
         private bool _waveformSet;
+        private DateTimeOffset _deadline;
         /// <summary>How long the modem may gather the first frame of a burst before contending.</summary>
-        private static readonly TimeSpan Gather = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan Gather = SlotAirtime.Gather;
 
         private readonly SemaphoreSlim _leaseGate = new(1, 1);
         private readonly CancellationTokenSource _aborted = new();
@@ -202,6 +211,9 @@ public sealed class SlotRunner
         public async Task<SlotReport> ExecuteAsync(CancellationToken cancellation)
         {
             _start = Now;
+            // The hard stop counts from the slot's own start, so a late slot (a catch-up or a retry)
+            // ends when an on-time one would, while a web SDR receiver is still listening.
+            _deadline = (slot < _start ? slot : _start) + S.MaxSlotLength;
             if (requestedBy is not null)
             {
                 Say($"a one-off slot, asked for by {requestedBy}");
@@ -251,6 +263,9 @@ public sealed class SlotRunner
                 {
                     if (waveform?.SetHardware is { } payload)
                     {
+                        // Counted as set before it is written: once written, the modem may have
+                        // applied it whatever answer comes back, so every way out puts it back.
+                        _waveformSet = true;
                         bool set;
                         try
                         {
@@ -264,7 +279,6 @@ public sealed class SlotRunner
                         {
                             return Finish(SlotOutcome.Skipped, $"the modem did not confirm the change to {_mode} within {S.SetHardwareWait.TotalSeconds:0} s (no SETHW echo; pdn-soundmodem's journal says why), so nothing was sent", retryable: true);
                         }
-                        _waveformSet = true;
                         Say($"modem switched to {_mode}");
                     }
 
@@ -336,7 +350,7 @@ public sealed class SlotRunner
             {
                 return;
             }
-            bool back;
+            bool back = false;
             try
             {
                 using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30), owner._time);
@@ -344,11 +358,22 @@ public sealed class SlotRunner
             }
             catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
             {
-                back = false;
+                // The slot's connection failed; a new one below.
+            }
+            if (!back)
+            {
+                try
+                {
+                    back = await owner.SetOnFreshLinkAsync(payload, CancellationToken.None);
+                }
+                catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
+                {
+                    back = false;
+                }
             }
             Say(back
                 ? $"modem put back on {S.Mode}"
-                : $"WARNING - could not put the modem back on {S.Mode}; it stays on {_mode} until the next slot or the head end's next start");
+                : $"WARNING - could not put the modem back on {S.Mode}; it may stay on {_mode} until the next slot or the head end's next start");
         }
 
         private async Task<string?> ReadFlexAsync(CancellationToken cancellation)
@@ -571,7 +596,10 @@ public sealed class SlotRunner
                 var batch = frames.Skip(next).Take(count).Select(owner.Ax25).ToList();
                 TimeSpan airtime = _airtime.Burst([.. batch.Select(b => b.Length)]);
 
-                if (Now + airtime > _start + S.MaxSlotLength)
+                // The latest this burst and the closing ident after it could end: gathered, a carrier
+                // wait the station cuts off, its airtime and the station's own delay, then the ident.
+                // Nothing keys past the hard stop, however busy the channel.
+                if (Now + Gather + S.MaxCarrierWait + airtime + SlotAirtime.BurstDelay + SlotAirtime.ClosingIdent > _deadline)
                 {
                     Abort($"the {S.MaxSlotLength.TotalMinutes:0} min maximum slot length would be passed by the next burst");
                     return;

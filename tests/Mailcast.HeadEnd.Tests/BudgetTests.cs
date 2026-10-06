@@ -42,7 +42,7 @@ public class BudgetTests(ITestOutputHelper output)
             Options = Config.ToScheduleOptions();
             Settings = Config.ToSlotSettings();
             Waveforms = Config.ToWaveforms(Measure);
-            Planner = new StoreSlotPlanner(new RotationStore(_state.Path, Compression.Default, Options, new MemoryJournal()), Compression.Default, Options, Waveforms, Settings, Config.FillLimit);
+            Planner = new StoreSlotPlanner(new RotationStore(_state.Path, Compression.Default, Options, new MemoryJournal()), Compression.Default, Options, Waveforms, Settings, Config.FillLimitAfter);
         }
 
         public HeadEndConfig Config { get; }
@@ -203,7 +203,7 @@ public class BudgetTests(ITestOutputHelper output)
     public void BusyDay_FillsEverySlot_AndNeverPassesTheBudget(string modes)
     {
         using var headEnd = new HeadEnd(modes);
-        Assert.Equal(TimeSpan.FromMinutes(8), headEnd.Config.FillLimit);
+        Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(131), headEnd.Config.FillLimit);
         // Three times GB7RDG's volume, most of it there before the first slot.
         var arrivals = Arrivals(October, 2, 60);
         var results = Simulate(headEnd, October, 2, arrivals);
@@ -260,7 +260,7 @@ public class BudgetTests(ITestOutputHelper output)
         var rush = Simulate(busy, day, 1, fifty);
         output.WriteLine("busy day");
         Print(rush);
-        Assert.All(rush, r => Assert.True(r.OnAir > TimeSpan.FromMinutes(7.5) && r.OnAir <= TimeSpan.FromMinutes(8), $"{r.Slot:HH:mm}: {r.OnAir.TotalMinutes:0.0} min"));
+        Assert.All(rush, r => Assert.True(r.OnAir > busy.Config.FillLimit - TimeSpan.FromSeconds(30) && r.OnAir <= busy.Config.FillLimit, $"{r.Slot:HH:mm}: {r.OnAir.TotalMinutes:0.0} min"));
         var afternoon = rush.Single(r => r.Slot == day.AddHours(14));
         Assert.True(afternoon.Symbols.ContainsKey(Bulletins.Make(999, 2000).Bid), "a bulletin arriving mid-afternoon goes in the next slot");
         Assert.Equal(51, rush.SelectMany(r => r.Symbols.Keys).Distinct(StringComparer.Ordinal).Count());
@@ -367,7 +367,7 @@ public class BudgetTests(ITestOutputHelper output)
         var before = store.InRotation(morning).ToDictionary(c => c.Bid, StringComparer.Ordinal);
         Assert.Equal(stranded.Select(b => b.Bid).Order(), before.Keys.Order());
         Assert.All(before.Values, c => Assert.True(c.NextEsi > 0 && c.FirstSlot is null));
-        var planner = new StoreSlotPlanner(store, Compression.Default, options, config.ToWaveforms(Measure), config.ToSlotSettings(), config.FillLimit);
+        var planner = new StoreSlotPlanner(store, Compression.Default, options, config.ToWaveforms(Measure), config.ToSlotSettings(), config.FillLimitAfter);
         var plan = planner.Plan(morning);
         planner.RecordQueued(plan, plan.Frames.Count);
         Assert.All(plan.Broadcast!.Objects.Where(o => o.Bid is not null), o =>
@@ -402,7 +402,7 @@ public class BudgetTests(ITestOutputHelper output)
 
         using var state = new TempDirectory();
         var options = config.ToScheduleOptions();
-        var planner = new StoreSlotPlanner(new RotationStore(state.Path, Compression.Default, options, new MemoryJournal()), Compression.Default, options, config.ToWaveforms(Measure), config.ToSlotSettings(), config.FillLimit);
+        var planner = new StoreSlotPlanner(new RotationStore(state.Path, Compression.Default, options, new MemoryJournal()), Compression.Default, options, config.ToWaveforms(Measure), config.ToSlotSettings(), config.FillLimitAfter);
         var plan = BroadcastScheduler.Plan(held, ten, 1, Compression.Default, options, null, planner.Budget(config.ToWaveforms(Measure).For(ten)), "ms110d-wn4");
         Assert.True(plan.BulletinFrames > 0);
         Assert.All(plan.Objects.Where(o => o.Bid is not null), o => Assert.True(o.Count > 0));
@@ -418,7 +418,7 @@ public class BudgetTests(ITestOutputHelper output)
         using var state = new TempDirectory();
         var config = Gb7rdg();
         var options = config.ToScheduleOptions();
-        var planner = new StoreSlotPlanner(new RotationStore(state.Path, Compression.Default, options, new MemoryJournal()), Compression.Default, options, config.ToWaveforms(Measure), config.ToSlotSettings(), config.FillLimit);
+        var planner = new StoreSlotPlanner(new RotationStore(state.Path, Compression.Default, options, new MemoryJournal()), Compression.Default, options, config.ToWaveforms(Measure), config.ToSlotSettings(), config.FillLimitAfter);
         var plan = planner.Plan(new DateTimeOffset(2026, 10, 6, 10, 0, 0, TimeSpan.Zero));
         Assert.Empty(plan.Frames);
         Assert.Null(plan.Broadcast);

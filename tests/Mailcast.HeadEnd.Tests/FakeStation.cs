@@ -52,6 +52,12 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Whether the modem applies SETHW and echoes it, as pdn-soundmodem's MS110D modem does; false is a modem that refuses it.</summary>
     public bool AppliesSetHardware { get; set; } = true;
 
+    /// <summary>The next SETHW is applied but its echo never comes, as if lost: the head end hears nothing, yet the modem has changed.</summary>
+    public bool NextEchoLost { get; set; }
+
+    /// <summary>The next SETHW is applied, then the KISS connection it came on breaks before the echo.</summary>
+    public bool NextSetHardwareBreaksLink { get; set; }
+
     /// <summary>The waveform number the modem transmits on now, as the last SETHW it applied left it.</summary>
     public int? Waveform { get; private set; }
 
@@ -189,6 +195,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
         private readonly Channel<ushort> _acks = Channel.CreateUnbounded<ushort>();
         private readonly List<(ushort Id, int Generation)> _queued = [];
         private bool _transmitting;
+        private bool _broken;
         private int _writes;
         private int _acked;
 
@@ -196,7 +203,27 @@ public sealed class FakeStation : IStationApi, IKissConnector
 
         public async Task<bool> SetHardwareAsync(ReadOnlyMemory<byte> payload, TimeSpan wait, TimeProvider time, CancellationToken cancellation)
         {
+            if (_broken)
+            {
+                throw new IOException("Broken pipe");
+            }
             station.SetHardware.Add((station._time.GetUtcNow(), station.LeaseHeld, payload.ToArray()));
+            if (station.NextSetHardwareBreaksLink)
+            {
+                station.NextSetHardwareBreaksLink = false;
+                station.Waveform = payload.Span[0];
+                _broken = true;
+                _acks.Writer.TryComplete();
+                await Task.Yield();
+                return false;
+            }
+            if (station.NextEchoLost)
+            {
+                station.NextEchoLost = false;
+                station.Waveform = payload.Span[0];
+                await Task.Delay(wait, time, cancellation);
+                return false;
+            }
             if (station.AppliesSetHardware)
             {
                 await Task.Yield();

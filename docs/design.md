@@ -66,19 +66,13 @@ The head end's directory says when its slots are and what its daylight rule is, 
 
 ### Filling each slot
 
-The fixed shares left most slots short and some empty: on 2026-10-06 the 09:00 slot carried only the two bulletins that came in overnight, and at 10:00 nothing was due, so nothing at all went out, not even the directory. Twenty older bulletins sat in the store unsent, because an older head end had sent them without recording their first slot.
+The fixed shares left most slots short and some empty: on 2026-10-06 the 09:00 slot carried only the two bulletins that came in overnight, and at 10:00 nothing was due, so nothing went out, not even the directory. Twenty older bulletins sat unsent, because an older head end had not recorded their first slot.
 
-So the head end now fills every slot to an airtime budget instead (the "budget" rule, the default for hourly slots). Each slot sends fresh pieces of every bulletin in rotation, the least covered first, where coverage is the pieces sent so far divided by K. Every bulletin first gets enough that any three slots rebuild it (a third of K plus a spare piece), and then the rest goes to the least covered, up to 0.6 K of one bulletin in one slot. That spreads each bulletin over the day rather than spending one slot on it, so a quiet day sends short slots and a busy day full ones. A bulletin retires after 6 K in all or 36 hours after its first slot. Bulletins with pieces sent but no first slot, as an older head end left them, are simply back in rotation from where they stopped.
-
-The budget is 10 minutes on the air, tone, pause, gaps and closing ident included, but a slot is only filled to 8: the 2 minutes the head end may wait for a clear channel before its tone are kept back, so even then it ends inside the 10 minute hard stop. The estimate comes from the modem's own modulator, the burst packing and a measured 2.5 s per burst; on GB7RDG's slots of 2026-10-05 16:00 and 2026-10-06 09:00 it came within about a second of what happened.
-
-On an October day with about 20 bulletins, that means 9 slots of 7.4 to 8 minutes at WN4, each carrying 22 to 27 bulletins, about 70 minutes a day on the air. Each bulletin gets about 6 K over about 10 slots, and any 3 of them rebuild it.
-
-The old fixed shares are still there, as `"rule": "shares"`.
+So the head end now fills every slot to an airtime budget instead (the default for hourly slots). Each slot sends fresh pieces of every bulletin in rotation, the least covered first, spread so that a few slots rebuild each one, until it retires after 6 times its pieces or 36 hours. The stranded bulletins rejoin from where they stopped. A slot is filled to a little under 8 minutes, so even after the longest wait for a clear channel it ends inside the 10 minute hard stop, and a slot that starts late is filled less, so it ends when an on-time one would. In a simulated October day of about 20 bulletins that is 9 slots of 7.4 to 7.8 minutes. The old fixed shares are still there, as `"rule": "shares"`. [headend.md](headend.md) has the details.
 
 ### A waveform per slot
 
-To compare 1200 and 600 bps on real mail, the slots can take turns between waveforms, WN4 and WN3 say. Before each slot the head end switches pdn-soundmodem's MS110D modem with a KISS SETHW frame, which takes effect from the next burst, and switches it back after the release. Receivers need do nothing: pdn-soundmodem's MS110D receiver reads the waveform from each burst's preamble (autobaud), and that is the modem in every mailcast receiver release. A WN3 frame takes about twice as long, so a WN3 slot carries about half as much. The slot report, the journal and the directory (`mode=ms110d-wn3`) say which waveform each slot used.
+To compare 1200 and 600 bps on real mail, slots can take turns between waveforms, WN4 and WN3 say. The head end switches pdn-soundmodem's modem before each slot and back afterwards. Receivers need do nothing, since every mailcast receiver reads the waveform from each burst (autobaud). A WN3 slot carries about half as much. The slot report, the journal and the directory say which waveform each slot used.
 
 ## Each slot
 
@@ -87,7 +81,7 @@ To compare 1200 and 600 bps on real mail, the slots can take turns between wavef
 3. 10 seconds of steady tone at the centre frequency (30 for a daily station), then a CW ident.
 4. Bursts of up to 18 seconds, each with its own MS110D preamble, so a receiver that tunes in late or loses sync in a fade picks up at the next burst.
 5. A CW ident at least every 10 minutes and at the end.
-6. The lease is released and normal packet service resumes. An hourly slot never runs past 10 minutes from its start; anything left goes in the next one.
+6. The lease is released and normal packet service resumes. Nothing keys past 10 minutes from the slot's time, closing ident included: before each burst the head end allows for the longest it could wait for the channel, and stops if that would run over. Anything left goes in the next slot.
 
 ### Frequency
 

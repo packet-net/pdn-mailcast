@@ -77,6 +77,9 @@ public sealed class SlotAirtime(SlotSettings settings, IAirtime airtime)
     /// <summary>How much longer each burst takes than the modem's airtime for it.</summary>
     public static readonly TimeSpan BurstDelay = TimeSpan.FromSeconds(2.5);
 
+    /// <summary>The longest the modem may gather a burst's first frame before it contends for the channel.</summary>
+    public static readonly TimeSpan Gather = TimeSpan.FromSeconds(1);
+
     /// <summary>The station's closing CW ident after the release.</summary>
     public static readonly TimeSpan ClosingIdent = TimeSpan.FromSeconds(8);
 

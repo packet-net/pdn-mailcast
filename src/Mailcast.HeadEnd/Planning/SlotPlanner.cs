@@ -53,8 +53,9 @@ public interface ISlotPlanner
 /// <param name="options">The scheduler's options.</param>
 /// <param name="waveforms">Each slot's waveform; null sends every slot on the modem's own, and needs the shares rule.</param>
 /// <param name="settings">How the slot runs, for the airtime estimate.</param>
-/// <param name="fillLimit">What the budget rule fills a slot to, tone and idents included.</param>
-public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, TimeSpan? fillLimit = null) : ISlotPlanner
+/// <param name="fillLimit">What the budget rule fills a slot to, tone and idents included, for a slot that starts this late: <see cref="HeadEndConfig.FillLimitAfter"/>.</param>
+/// <param name="time">The clock, which says how late a slot is planned; null plans every slot as on time.</param>
+public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null) : ISlotPlanner
 {
     private readonly SlotSettings _settings = settings ?? new SlotSettings();
 
@@ -62,7 +63,8 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
     public SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false)
     {
         SlotWaveform? waveform = waveforms?.For(slot);
-        SlotBudget? budget = Budget(waveform);
+        TimeSpan late = time is null ? TimeSpan.Zero : time.GetUtcNow() - slot;
+        SlotBudget? budget = Budget(waveform, late);
         SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode);
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
@@ -72,19 +74,22 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform);
     }
 
-    /// <summary>The budget rule's budget for a slot on <paramref name="waveform"/>; null under the shares rule.</summary>
-    public SlotBudget? Budget(SlotWaveform? waveform)
+    /// <summary>
+    /// The budget rule's budget for a slot on <paramref name="waveform"/> that starts
+    /// <paramref name="late"/> after its time; null under the shares rule.
+    /// </summary>
+    public SlotBudget? Budget(SlotWaveform? waveform, TimeSpan late = default)
     {
         if (options.Budget is null)
         {
             return null;
         }
-        if (waveform is null || fillLimit is not TimeSpan limit)
+        if (waveform is null || fillLimit is null)
         {
             throw new InvalidOperationException("The budget rule needs each slot's waveform and the fill limit.");
         }
         var model = new SlotAirtime(_settings, waveform.Airtime);
-        return new SlotBudget(limit, model.ForPayloads);
+        return new SlotBudget(fillLimit(late > TimeSpan.Zero ? late : TimeSpan.Zero), model.ForPayloads);
     }
 
     /// <inheritdoc />

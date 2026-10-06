@@ -26,8 +26,8 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | Daylight window | From 2 hours after sunrise to 30 minutes before sunset at IO91lk, by a built-in solar calculation (no internet); about 09:00 to 17:00 UTC in October, 11:00 to 15:00 in December, 06:00 to 19:00 in June |
 | Why daylight | 40 m NVIS only carries the UK paths in daylight: on 2026-10-05 slots at 07:12 and 18:00 UTC were heard by none of nine UK and Irish web SDRs |
 | Slot sequence | Listen for a clear channel (up to 2 min), take the transmit lease, 10 s tone at 7.0538 MHz, 8 s pause, bursts with 1 s gaps, release the lease, closing CW ident |
-| Slot limit | 10 minutes hard stop; the budget rule fills a slot to 8, keeping back the 2 minute clear-channel wait |
-| Typical airtime | Head end 0.3.0: about 2.5 minutes per slot in October, about 4 in December. Budget rule: up to 8 minutes in every slot while bulletins are in rotation, about 70 minutes a day in October at WN4 |
+| Slot limit | 10 minutes from the slot's time, closing ident included; nothing keys past it. The budget rule fills a slot to about 7.8 minutes, keeping back the 2 minute clear-channel wait and a carrier wait, and fills a late slot less |
+| Typical airtime | Head end 0.3.0: about 2.5 minutes per slot in October, about 4 in December. Budget rule: up to about 7.8 minutes in every slot while bulletins are in rotation, about 70 minutes a day in October at WN4 |
 | Timetable announcement | Sent in every slot inside the directory, so receivers follow GB7RDG without configuration |
 
 ## Framing and coding

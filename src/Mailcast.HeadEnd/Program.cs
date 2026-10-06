@@ -149,7 +149,7 @@ public static partial class Program
             var store = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
             SlotSettings settings = config.ToSlotSettings();
             Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
-            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimit);
+            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter);
 
             SlotPlan plan = planner.Plan(slot);
             SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
@@ -227,7 +227,7 @@ public static partial class Program
         SlotSettings settings = config.ToSlotSettings();
         Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimit);
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -276,9 +276,10 @@ public static partial class Program
             }
         }
 
-        if (waveforms.SetOnModem)
+        if (Waveforms.SetHardwarePayload(config.Station.Mode) is not null)
         {
-            // A slot cut off by a crash or a stop may have left the modem on its own waveform.
+            // A slot cut off by a crash or a stop may have left the modem on another waveform, and
+            // "modes" may since have been taken out of the configuration: put it back whatever it says.
             await runner.PutWaveformBackAsync(stop.Token);
         }
         await service.RunAsync(stop.Token);
@@ -298,7 +299,7 @@ public static partial class Program
             return $"carrying: fixed shares {string.Join(", ", options.SlotShares.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture)))} K in slots {string.Join(", ", options.SlotOffsets)} after the first; {modes}";
         }
         return string.Create(CultureInfo.InvariantCulture,
-            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel wait), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, retired after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h; {modes}");
+            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, retired after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h; {modes}");
     }
 
     private static async Task<int> RunNowAsync(HeadEndConfig config)

@@ -108,26 +108,34 @@ public sealed record HeadEndConfig
         ?? (Slot.EveryMinutes == MinutesPerDay || Schedule.UsesShareKeys ? ScheduleRule.Shares : ScheduleRule.Budget);
 
     /// <summary>
-    /// What the budget rule fills each slot to, tone and idents included: <c>schedule.budgetMinutes</c>
-    /// (<c>slot.maxMinutes</c> if left out), but never more than <c>slot.maxMinutes</c> less
-    /// <see cref="Margin"/>, so a slot that waits its longest for a clear channel still ends
-    /// before the hard stop.
+    /// What the budget rule fills each slot to, tone and idents included, when it starts on time:
+    /// <see cref="FillLimitAfter"/> with no lateness.
     /// </summary>
-    public TimeSpan FillLimit
+    public TimeSpan FillLimit => FillLimitAfter(TimeSpan.Zero);
+
+    /// <summary>
+    /// What the budget rule fills a slot to when it starts <paramref name="late"/> after its time
+    /// (a catch-up or a retry): <c>schedule.budgetMinutes</c> (<c>slot.maxMinutes</c> if left out),
+    /// but never more than <c>slot.maxMinutes</c> less the lateness and <see cref="Margin"/>, so a
+    /// slot that waits its longest for a clear channel still ends before the hard stop, which counts
+    /// from the slot's own time. Zero or less fills nothing.
+    /// </summary>
+    public TimeSpan FillLimitAfter(TimeSpan late)
     {
-        get
-        {
-            TimeSpan budget = TimeSpan.FromMinutes(Schedule.BudgetMinutes ?? Slot.Max);
-            TimeSpan most = TimeSpan.FromMinutes(Slot.Max) - Margin;
-            return budget < most ? budget : most;
-        }
+        TimeSpan budget = TimeSpan.FromMinutes(Schedule.BudgetMinutes ?? Slot.Max);
+        TimeSpan most = TimeSpan.FromMinutes(Slot.Max) - (late > TimeSpan.Zero ? late : TimeSpan.Zero) - Margin;
+        return budget < most ? budget : most;
     }
 
     /// <summary>
     /// Time kept back from the hard stop: <c>schedule.marginSeconds</c>, or left out the longest the
-    /// slot waits for a clear channel before its tone (<c>slot.channelWaitSeconds</c>; none without a tone).
+    /// slot waits for a clear channel before its tone (<c>slot.channelWaitSeconds</c>; none without a
+    /// tone), and always the room the runner's hard-stop check needs for the last burst: the modem's
+    /// gather and one carrier wait (<c>station.maxCarrierWaitSeconds</c>).
     /// </summary>
-    public TimeSpan Margin => TimeSpan.FromSeconds(Schedule.MarginSeconds ?? (Slot.Tone > 0 ? Slot.ChannelWaitSeconds : 0));
+    public TimeSpan Margin =>
+        TimeSpan.FromSeconds(Schedule.MarginSeconds ?? (Slot.Tone > 0 ? Slot.ChannelWaitSeconds : 0))
+        + SlotAirtime.Gather + TimeSpan.FromSeconds(Station.MaxCarrierWaitSeconds);
 
     /// <summary>The waveforms the slots take in turn: <c>schedule.modes</c>, or the broadcast modem's own mode alone.</summary>
     public IReadOnlyList<string> Modes => Schedule.Modes ?? [Station.Mode];

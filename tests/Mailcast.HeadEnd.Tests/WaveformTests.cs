@@ -89,13 +89,18 @@ public class WaveformTests
         Assert.Equal(0.6, rule.SlotCap);
         Assert.Equal(6.0, rule.RetireCoverage);
         Assert.Equal(TimeSpan.FromHours(36), rule.RetireAfter);
-        // A 10 minute budget and hard stop, less the 2 minute clear-channel wait.
-        Assert.Equal(TimeSpan.FromMinutes(8), hourly.FillLimit);
+        // A 10 minute budget and hard stop, less the 2 minute clear-channel wait, the gather and one carrier wait.
+        Assert.Equal(TimeSpan.FromSeconds(131), hourly.Margin);
+        Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(131), hourly.FillLimit);
+        // A slot that starts late fills less, so it ends when an on-time one would.
+        Assert.Equal(TimeSpan.FromMinutes(5) - TimeSpan.FromSeconds(131), hourly.FillLimitAfter(TimeSpan.FromMinutes(5)));
+        // Without a tone there is no clear-channel wait, but the carrier wait is still kept back.
+        Assert.Equal(TimeSpan.FromSeconds(11), HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60, "toneSeconds": 0}}""").Margin);
 
         var tuned = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"budgetMinutes": 6, "slotCap": 0.5, "retireCoverage": 4, "retireHours": 24}}""");
         Assert.Equal(TimeSpan.FromMinutes(6), tuned.FillLimit);
         Assert.Equal(new BudgetRule { SlotCap = 0.5, RetireCoverage = 4, RetireAfter = TimeSpan.FromHours(24) }, tuned.ToScheduleOptions().Budget);
-        Assert.Equal(TimeSpan.FromMinutes(9.5), HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 30}}""").FillLimit);
+        Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(41), HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 30}}""").FillLimit);
 
         // The rule before, by name or by its keys, and a daily station by default.
         Assert.Null(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "shares"}}""").ToScheduleOptions().Budget);
@@ -214,6 +219,57 @@ public class WaveformTests
     }
 
     [Fact]
+    public void Run_PutsTheWaveformBack_WhenTheEchoIsLost()
+    {
+        // The modem applied WN3 but its echo never came: the slot is skipped, and WN4 goes back anyway.
+        var rig = new Rig();
+        rig.Station.NextEchoLost = true;
+        var report = rig.Run(new SlotWaveform("ms110d-wn3", FakeAirtime.For(rig.Station), [3, 0]));
+        Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.Empty(rig.Station.Keyups);
+        Assert.Equal([[3, 0], [4, 0]], rig.Station.SetHardware.Select(s => s.Payload));
+        Assert.Equal(4, rig.Station.Waveform);
+    }
+
+    [Fact]
+    public void Run_PutsTheWaveformBack_WhenStoppedWhileWaitingForTheEcho()
+    {
+        var rig = new Rig();
+        rig.Station.NextEchoLost = true;
+        CancellationTokenSource? stop = null;
+        Exception? thrown = null;
+        rig.Time.Run(async () =>
+        {
+            stop = new CancellationTokenSource(TimeSpan.FromSeconds(2), rig.Time);
+            try
+            {
+                await rig.Runner.RunAsync(rig.Time.GetUtcNow(), [.. Enumerable.Range(0, 6).Select(i => FakeAirtime.Frame(i))], 2, stop.Token, null, null, new SlotWaveform("ms110d-wn3", FakeAirtime.For(rig.Station), [3, 0]));
+            }
+            catch (OperationCanceledException e)
+            {
+                thrown = e;
+            }
+            return 0;
+        });
+        stop!.Dispose();
+        Assert.NotNull(thrown);
+        Assert.Empty(rig.Station.LeaseRequests);
+        Assert.Equal(4, rig.Station.Waveform);
+    }
+
+    [Fact]
+    public void Run_PutsTheWaveformBack_OnANewConnection_WhenTheLinkFailsAfterTheWrite()
+    {
+        var rig = new Rig();
+        rig.Station.NextSetHardwareBreaksLink = true;
+        var report = rig.Run(new SlotWaveform("ms110d-wn3", FakeAirtime.For(rig.Station), [3, 0]));
+        Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.Empty(rig.Station.Keyups);
+        Assert.Equal(4, rig.Station.Waveform);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("modem put back on ms110d-wn4", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void StartUp_PutsTheModemOnTheConfiguredWaveform()
     {
         // As after a head end that died mid-slot with WN3 set.
@@ -238,7 +294,7 @@ public class WaveformTests
         var store = new RotationStore(state.Path, Compression.Default, options, new MemoryJournal());
         store.Offer(Bulletins.Make(71, 3000), new DateOnly(2026, 10, 6));
         var waveforms = config.ToWaveforms(LinearAirtime.Measure);
-        var planner = new StoreSlotPlanner(store, Compression.Default, options, waveforms, config.ToSlotSettings(), config.FillLimit);
+        var planner = new StoreSlotPlanner(store, Compression.Default, options, waveforms, config.ToSlotSettings(), config.FillLimitAfter);
         var slot = new DateTimeOffset(2026, 10, 6, 11, 0, 0, TimeSpan.Zero);
         var plan = planner.Plan(slot);
 
