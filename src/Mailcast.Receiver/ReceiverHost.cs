@@ -66,7 +66,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             switch (AudioSource.Parse(config.Audio).Kind)
             {
                 case AudioSourceKind.UberSdr:
-                    var (opens, closes, slot) = ListeningWindow.Next(at, Schedule, config.WebSdrSlotsPerDay);
+                    var (opens, closes, slot) = ListeningWindow.Next(at, Schedule);
                     return new HookWindow(opens, closes, slot);
                 case AudioSourceKind.Alsa:
                     return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
@@ -167,6 +167,24 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     private AudioCondition _audio = new("starting", AudioPhase.Starting);
 
+    /// <summary>
+    /// What the web SDR said about itself when it was last opened (its callsign, name and
+    /// location), kept between slots while the audio setting is the same; null before it has
+    /// been opened, or if it would not say.
+    /// </summary>
+    public string? WebSdrAbout
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _webSdrAbout is { } about && about.Source == _config.Audio ? about.Words : null;
+            }
+        }
+    }
+
+    private (string Source, string Words)? _webSdrAbout;
+
     /// <summary>For tests: raised each time <see cref="Audio"/> changes.</summary>
     internal event Action<AudioCondition>? AudioChanged;
 
@@ -193,6 +211,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         if (Config.SlotUtcWithoutEveryMinutes)
         {
             _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
+        }
+        if (Config.WebSdrSlotsPerDayIgnored)
+        {
+            _log("config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every daylight slot that fits in its allowance");
         }
         int pending = Intake.Pending().Count;
         if (pending > 0)
@@ -279,7 +301,6 @@ public sealed class ReceiverHost : IAsyncDisposable
             bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal)
                 || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal)
                 || _config.EveryMinutes != config.EveryMinutes
-                || _config.WebSdrSlotsPerDay != config.WebSdrSlotsPerDay
                 || _config.Daylight != config.Daylight
                 || _config.DialKHz != config.DialKHz;
             _config = config;
@@ -322,8 +343,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // Said again whenever it changes: once a day with a daylight rule, as the days
                 // lengthen and shorten.
                 var schedule = Schedule;
-                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule, config.WebSdrSlotsPerDay);
-                string words = ListeningWindow.Describe(schedule, config.WebSdrSlotsPerDay, DateOnly.FromDateTime(slot.UtcDateTime));
+                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule);
+                string words = ListeningWindow.Describe(schedule, DateOnly.FromDateTime(slot.UtcDateTime));
                 if (words != described)
                 {
                     described = words;
@@ -331,7 +352,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 if (opens > _time.GetUtcNow())
                 {
-                    Audio = new($"the web SDR is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
+                    Audio = new($"the web SDR {WebSdrHost(source)} is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
                     if (AudioState != closedSaid)
                     {
                         // Said once per wait, not at every look at the clock.
@@ -367,6 +388,13 @@ public sealed class ReceiverHost : IAsyncDisposable
                 PipelineCreated?.Invoke(pipeline);
                 Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
                 await pipeline.StartAsync(token).ConfigureAwait(false);
+                if (pipeline.WebSdrDescription is { } about)
+                {
+                    lock (_gate)
+                    {
+                        _webSdrAbout = (config.Audio, about);
+                    }
+                }
                 Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
                 refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
@@ -518,6 +546,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         await Intake.DisposeAsync().ConfigureAwait(false);
         Hooks.Dispose();
     }
+
+    /// <summary>A web SDR's address as an operator writes it, such as wessex.zapto.org; for a sound card or recording, its setting.</summary>
+    internal static string WebSdrHost(AudioSource source) =>
+        source.Kind == AudioSourceKind.UberSdr ? Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target).ToString() : source.ToString();
 
     /// <summary>Always delivers through the client for the configuration in force.</summary>
     private sealed class SwitchableSession(ReceiverHost host) : IBbsSession

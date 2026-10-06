@@ -115,7 +115,7 @@ public sealed partial class RetunerTests
         Assert.False(s.Hooks.AfterOwedTo(webSdrWindows, unowned: true));
         await s.Hooks.AfterAsync(webSdrWindows, unowned: true);
         using var stopLoop = new CancellationTokenSource();
-        var loop = s.Hooks.RunAsync(() => false, at => ListeningWindow.Next(at, s.Config.Schedule, 8) is var (o, c, slot) ? new HookWindow(o, c, slot) : null, stopLoop.Token);
+        var loop = s.Hooks.RunAsync(() => false, at => ListeningWindow.Next(at, s.Config.Schedule) is var (o, c, slot) ? new HookWindow(o, c, slot) : null, stopLoop.Token);
         Assert.Single(HookScript.Runs(record));
         Assert.Equal(BulletinDialHz, s.Rig.DialHz);
 

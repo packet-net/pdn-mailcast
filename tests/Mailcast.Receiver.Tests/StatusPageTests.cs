@@ -127,8 +127,8 @@ public class StatusPageTests
     [Theory]
     // During a slot the web SDR listens to, during one it doesn't, between slots, and around midnight.
     [InlineData("2026-10-05T12:05:00Z", "2026-10-05T13:00:00Z", "2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", true)]
-    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T15:00:00Z", false)]
-    [InlineData("2026-10-05T13:20:00Z", "2026-10-05T14:00:00Z", null, "2026-10-05T15:00:00Z", false)]
+    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T14:00:00Z", false)]
+    [InlineData("2026-10-05T13:20:00Z", "2026-10-05T14:00:00Z", null, "2026-10-05T14:00:00Z", false)]
     [InlineData("2026-10-05T23:59:00Z", "2026-10-06T00:00:00Z", null, "2026-10-06T00:00:00Z", true)]
     [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
     public void Schedule_GivesTheNextSlot_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
@@ -149,8 +149,9 @@ public class StatusPageTests
         var web = schedule.GetProperty("webSdr");
         Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
         Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
-        Assert.Equal(8, web.GetProperty("times").GetArrayLength());
-        Assert.Equal("03:00", web.GetProperty("times")[1].GetString());
+        // Without daylight hours, 12 of the 24, every other hour.
+        Assert.Equal(12, web.GetProperty("times").GetArrayLength());
+        Assert.Equal("02:00", web.GetProperty("times")[1].GetString());
     }
 
     [Fact]
@@ -185,8 +186,9 @@ public class StatusPageTests
         var web = schedule.GetProperty("webSdr");
         Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
         Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
-        // 8 of the 9, spread from the first: all but 17:00.
-        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"], web.GetProperty("times").EnumerateArray().Select(e => e.GetString()));
+        // Every one of the 9, 17:00 too: they all fit in the allowance.
+        Assert.Equal(9, web.GetProperty("slotsPerDay").GetInt32());
+        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"], web.GetProperty("times").EnumerateArray().Select(e => e.GetString()));
     }
 
     [Fact]

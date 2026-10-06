@@ -144,14 +144,6 @@ public sealed record ReceiverConfig
     /// <summary>The shortest gap between slots accepted, as the head end does.</summary>
     public const int ShortestEveryMinutes = 15;
 
-    /// <summary>
-    /// How many slots a day a web SDR is listened to, spread evenly through the day (8 of 24
-    /// hourly slots is every 3 hours). Public UberSDR receivers allow each address about three
-    /// hours a day, and each slot listened to takes <see cref="WebSdrMinutesPerSlot"/>, so
-    /// <see cref="MostWebSdrSlotsPerDay"/> is the most. A sound card listens to every slot.
-    /// </summary>
-    public int WebSdrSlotsPerDay { get; init; } = 8;
-
     /// <summary>How long before a slot a web SDR is opened.</summary>
     public static readonly TimeSpan WebSdrBefore = TimeSpan.FromMinutes(2);
 
@@ -164,7 +156,11 @@ public sealed record ReceiverConfig
     /// <summary>Minutes of the allowance one slot uses.</summary>
     public static int WebSdrMinutesPerSlot => (int)(WebSdrBefore + WebSdrAfter).TotalMinutes;
 
-    /// <summary>The most slots a day a web SDR can be listened to inside its allowance.</summary>
+    /// <summary>
+    /// The most slots a day a web SDR can be listened to inside its allowance: 12. It listens to
+    /// every daylight slot that fits (see <see cref="ListeningWindow.WebSdrSlotsOn"/>); a sound
+    /// card listens to every slot.
+    /// </summary>
     public static int MostWebSdrSlotsPerDay => WebSdrAllowanceMinutes / WebSdrMinutesPerSlot;
 
     /// <summary>
@@ -173,6 +169,14 @@ public sealed record ReceiverConfig
     /// </summary>
     [JsonIgnore]
     public bool SlotUtcWithoutEveryMinutes { get; init; }
+
+    /// <summary>
+    /// Set when the file had <c>webSdrSlotsPerDay</c>, from 0.5.1 and before. It is no longer
+    /// used: the key is ignored, not refused, so those files keep working, and the receiver says
+    /// so in its log. Saving the settings leaves it out.
+    /// </summary>
+    [JsonIgnore]
+    public bool WebSdrSlotsPerDayIgnored { get; init; }
 
     /// <summary>The first slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
     [JsonIgnore]
@@ -194,7 +198,7 @@ public sealed record ReceiverConfig
 
     /// <summary>The slots a web SDR would listen to without a daylight rule, by time of day, earliest first.</summary>
     [JsonIgnore]
-    public IReadOnlyList<TimeOnly> WebSdrSlots => ListeningWindow.WebSdrSlots(Schedule, WebSdrSlotsPerDay);
+    public IReadOnlyList<TimeOnly> WebSdrSlots => ListeningWindow.WebSdrSlots(Schedule);
 
     /// <summary>Where the pieces heard, the rebuilt bulletins and the delivery record are kept.</summary>
     public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast";
@@ -274,6 +278,10 @@ public sealed record ReceiverConfig
         {
             config = config with { SlotUtcWithoutEveryMinutes = true };
         }
+        if (Has(text, "webSdrSlotsPerDay"))
+        {
+            config = config with { WebSdrSlotsPerDayIgnored = true };
+        }
         config.Validate();
         return config;
     }
@@ -285,6 +293,13 @@ public sealed record ReceiverConfig
         return document.RootElement.ValueKind == JsonValueKind.Object
             && document.RootElement.TryGetProperty("slotUtc", out _)
             && !document.RootElement.TryGetProperty("everyMinutes", out _);
+    }
+
+    /// <summary>Whether a config file gives <paramref name="key"/> at the top level, whatever its value.</summary>
+    private static bool Has(string text, string key)
+    {
+        using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        return document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty(key, out _);
     }
 
     /// <summary>Writes the config file, to a temporary name first so a crash leaves the old one whole.</summary>
@@ -351,12 +366,6 @@ public sealed record ReceiverConfig
         if (Daylight?.Problem(EveryMinutes, SlotStart) is { } daylightProblem)
         {
             throw new ConfigException($"\"daylight\": {daylightProblem}; GB7RDG's is {{ \"locator\": \"IO91lk\", \"afterSunriseMinutes\": 120, \"beforeSunsetMinutes\": 30 }}");
-        }
-        if (WebSdrSlotsPerDay < 1 || WebSdrSlotsPerDay > MostWebSdrSlotsPerDay)
-        {
-            throw new ConfigException(
-                $"\"webSdrSlotsPerDay\" {WebSdrSlotsPerDay} must be from 1 to {MostWebSdrSlotsPerDay}: each slot keeps a web SDR open {WebSdrMinutesPerSlot} minutes, "
-                + "and public UberSDR receivers allow each address about 3 hours a day");
         }
         if (!(DialKHz >= LowestDialKHz && DialKHz <= HighestDialKHz))
         {

@@ -127,6 +127,12 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>For tests: raised once <see cref="DisposeAsync"/> has set its timer for the audio thread.</summary>
     internal event Action? StopWaiting;
 
+    /// <summary>
+    /// What the web SDR says about itself once open, as its <c>/api/description</c> gives it:
+    /// callsign, name and location. Null for other sources, or a web SDR that would not say.
+    /// </summary>
+    public string? WebSdrDescription { get; private set; }
+
     /// <summary>Why the audio ended, if it ended on its own.</summary>
     public string? EndReason { get; private set; }
 
@@ -134,10 +140,11 @@ public sealed class AudioPipeline : IAsyncDisposable
     public int LocksReleased => Volatile.Read(ref _locksReleased);
 
     /// <summary>For tests: a pipeline over an input that is already open, watched as a sound card would be.</summary>
-    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true, TimeSpan? longestBurst = null) =>
+    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true, TimeSpan? longestBurst = null, string? webSdrDescription = null) =>
         new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), ReceiverConfig.DefaultDialKHz * 1000, log, time)
         {
             _input = input,
+            WebSdrDescription = webSdrDescription,
             _watchOff = !watch,
             _lockLimitSamples = (long)((longestBurst ?? LongestBurst).TotalSeconds * OnAir.SampleRate),
         };
@@ -191,8 +198,9 @@ public sealed class AudioPipeline : IAsyncDisposable
                 };
                 _input = web;
                 _webSdr = web;
+                WebSdrDescription = web.ReceiverDescription is { Length: > 0 } about ? Ascii.Clean(about) : null;
                 _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(DialHz + OnAir.CentreAudioHz)} MHz"
-                    + (web.ReceiverDescription is { } about ? $" ({Ascii.Clean(about)})" : ""));
+                    + (WebSdrDescription is { } said ? $" ({said})" : ""));
                 break;
 
             case AudioSourceKind.Wav:

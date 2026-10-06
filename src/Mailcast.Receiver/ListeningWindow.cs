@@ -73,43 +73,45 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
 }
 
 /// <summary>
-/// When a web SDR is listened to: a few of the day's slots, spread evenly, each from a little
-/// before its start to a little after, so as to stay inside a public receiver's daily allowance.
+/// When a web SDR is listened to: every daylight slot that fits in its allowance, each from a little before its
+/// start to a little after, so as to stay inside a public receiver's daily allowance.
 /// </summary>
 public static class ListeningWindow
 {
     /// <summary>
-    /// The <paramref name="perDay"/> slots a web SDR listens to, spread evenly through the day
-    /// starting with the anchor (8 of 24 hourly slots from 00:00 is every 3 hours from 00:00),
-    /// sorted by time of day. Every slot, if there are no more than <paramref name="perDay"/>.
+    /// The slots a web SDR listens to without a daylight rule: as many as fit in its allowance
+    /// (<see cref="ReceiverConfig.MostWebSdrSlotsPerDay"/>), spread evenly through the day starting
+    /// with the anchor (12 of 24 hourly slots from 00:00 is every other hour from 00:00), sorted by
+    /// time of day. With no daylight there is no morning or afternoon to prefer. Every slot, if
+    /// there are no more than that.
     /// </summary>
-    public static IReadOnlyList<TimeOnly> WebSdrSlots(SlotSchedule schedule, int perDay)
+    public static IReadOnlyList<TimeOnly> WebSdrSlots(SlotSchedule schedule)
     {
+        ArgumentNullException.ThrowIfNull(schedule);
         var all = schedule.FromAnchor;
-        int n = Math.Clamp(perDay, 1, all.Count);
+        int n = Math.Min(ReceiverConfig.MostWebSdrSlotsPerDay, all.Count);
         return [.. Enumerable.Range(0, n).Select(i => all[i * all.Count / n]).Order()];
     }
 
     /// <summary>
-    /// The slots a web SDR listens to on a UTC day: <paramref name="perDay"/> of the day's slots,
-    /// spread evenly. Without a daylight rule they are <see cref="WebSdrSlots"/>, the same every
-    /// day; with one they are spread over that day's daylight slots, starting with its first.
-    /// Every slot of the day, if there are no more than <paramref name="perDay"/>.
+    /// The slots a web SDR listens to on a UTC day. Without a daylight rule they are
+    /// <see cref="WebSdrSlots"/>, the same every day. With one, they are every daylight slot that
+    /// fits in its allowance, which is all of them for most of the year, and near midsummer, when
+    /// there are more, the latest that fit.
     /// </summary>
-    public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(SlotSchedule schedule, int perDay, DateOnly day)
+    public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(SlotSchedule schedule, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         if (schedule.Daylight is null)
         {
-            return [.. WebSdrSlots(schedule, perDay).Select(t => new DateTimeOffset(day.ToDateTime(t, DateTimeKind.Utc)))];
+            return [.. WebSdrSlots(schedule).Select(t => new DateTimeOffset(day.ToDateTime(t, DateTimeKind.Utc)))];
         }
         var active = schedule.ActiveOn(day);
-        if (active.Count == 0)
-        {
-            return [];
-        }
-        int n = Math.Clamp(perDay, 1, active.Count);
-        return [.. Enumerable.Range(0, n).Select(i => active[i * active.Count / n])];
+        // When there are more daylight slots than fit in the allowance (near midsummer), the
+        // earliest morning ones are left out, not the late afternoon ones: late afternoon is often
+        // the best time for 40 m to reach stations near GB7RDG, and an early morning slot hears little.
+        int n = Math.Min(ReceiverConfig.MostWebSdrSlotsPerDay, active.Count);
+        return [.. active.Skip(active.Count - n)];
     }
 
     /// <summary>
@@ -117,13 +119,13 @@ public static class ListeningWindow
     /// <see cref="ReceiverConfig.WebSdrBefore"/> before one of <see cref="WebSdrSlotsOn"/> to
     /// <see cref="ReceiverConfig.WebSdrAfter"/> after it.
     /// </summary>
-    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot) Next(DateTimeOffset now, SlotSchedule schedule, int perDay)
+    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot) Next(DateTimeOffset now, SlotSchedule schedule)
     {
         var utc = now.ToUniversalTime();
         var today = DateOnly.FromDateTime(utc.UtcDateTime);
         for (int d = -1; d <= SlotTimetable.SearchDays; d++)
         {
-            foreach (var start in WebSdrSlotsOn(schedule, perDay, today.AddDays(d)))
+            foreach (var start in WebSdrSlotsOn(schedule, today.AddDays(d)))
             {
                 var closes = start + ReceiverConfig.WebSdrAfter;
                 if (utc < closes)
@@ -207,24 +209,24 @@ public static class ListeningWindow
     /// <see cref="Describe(SlotSchedule, IReadOnlyList{TimeOnly})"/> without a daylight rule, and
     /// with one, which of that day's daylight slots.
     /// </summary>
-    public static string Describe(SlotSchedule schedule, int perDay, DateOnly day)
+    public static string Describe(SlotSchedule schedule, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         if (schedule.Daylight is null)
         {
-            return Describe(schedule, WebSdrSlots(schedule, perDay));
+            return Describe(schedule, WebSdrSlots(schedule));
         }
         var active = schedule.ActiveOn(day);
-        var listened = WebSdrSlotsOn(schedule, perDay, day);
+        var listened = WebSdrSlotsOn(schedule, day);
+        var skipped = active.Except(listened).ToList();
         string which = active.Count == 0 ? "no slots, as none is in daylight"
-            : listened.Count == active.Count ? (active.Count == 1 ? $"the one daylight slot, at {SlotTimetable.Times(listened)}" : $"all {active.Count} daylight slots, at {SlotTimetable.Times(listened)}")
-            : $"{listened.Count} of the {active.Count} daylight slots, at {SlotTimetable.Times(listened)}";
+            : skipped.Count == 0 ? (active.Count == 1 ? $"the one daylight slot, at {SlotTimetable.Times(listened)}" : $"all {active.Count} daylight slots, at {SlotTimetable.Times(listened)}")
+            : $"{listened.Count} of the {active.Count} daylight slots, at {SlotTimetable.Times(listened)}, and skips {SlotTimetable.Times(skipped)}";
         return string.Create(CultureInfo.InvariantCulture,
             $"on {day:yyyy-MM-dd} the web SDR listens to {which}, from {ReceiverConfig.WebSdrBefore.TotalMinutes:F0} minutes before each to {ReceiverConfig.WebSdrAfter.TotalMinutes:F0} after, to stay inside its listening allowance of about 3 hours a day");
     }
 
     /// <summary>What the web SDR listens to, in words, for the page and the log.</summary>
     public static string Describe(SlotSchedule schedule, IReadOnlyList<TimeOnly> slots) => string.Create(CultureInfo.InvariantCulture,
-        $"the web SDR listens to {(slots.Count == schedule.SlotsPerDay ? (slots.Count == 1 ? "the one slot" : $"all {slots.Count} slots") : $"{slots.Count} of the {schedule.SlotsPerDay} slots")} a day, at {Times(slots)}, "
-        + $"from {ReceiverConfig.WebSdrBefore.TotalMinutes:F0} minutes before each to {ReceiverConfig.WebSdrAfter.TotalMinutes:F0} after, to stay inside its listening allowance of about 3 hours a day");
+        $"the web SDR listens to {(slots.Count == schedule.SlotsPerDay ? (slots.Count == 1 ? "the one slot" : $"all {slots.Count} slots") : $"{slots.Count} of the {schedule.SlotsPerDay} slots")} a day, at {Times(slots)}, {(slots.Count < schedule.SlotsPerDay ? $"and skips the other {schedule.SlotsPerDay - slots.Count}, " : "")}from {ReceiverConfig.WebSdrBefore.TotalMinutes:F0} minutes before each to {ReceiverConfig.WebSdrAfter.TotalMinutes:F0} after, to stay inside its listening allowance of about 3 hours a day");
 }

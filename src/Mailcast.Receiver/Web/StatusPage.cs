@@ -661,6 +661,7 @@ public sealed class StatusPage : IAsyncDisposable
                 retryAt = _host.Audio.RetryAt,
                 dialKHz = config.DialKHz,
                 centreKHz = config.CentreHz / 1000,
+                webSdr = WebSdrView(config.Audio, _host.WebSdrAbout),
             },
             bbs = new
             {
@@ -767,6 +768,22 @@ public sealed class StatusPage : IAsyncDisposable
         _ => "soundCard",
     };
 
+    /// <summary>
+    /// Which web SDR the audio comes from, for the page: its address from the config, a link to
+    /// its own page, and once it has been opened, what it says about itself (callsign, name and
+    /// location). Null for a sound card or a recording.
+    /// </summary>
+    internal static object? WebSdrView(string audio, string? about)
+    {
+        var source = AudioSource.Parse(audio);
+        if (source.Kind != AudioSourceKind.UberSdr)
+        {
+            return null;
+        }
+        var endpoint = Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target);
+        return new { host = endpoint.ToString(), url = endpoint.PublicUrl, about };
+    }
+
     internal static string AudioPhaseName(AudioPhase phase) => phase switch
     {
         AudioPhase.Closed => "closed",
@@ -792,8 +809,8 @@ public sealed class StatusPage : IAsyncDisposable
         var today = DateOnly.FromDateTime(now.UtcDateTime);
         var todays = schedule.ActiveOn(today);
         bool webSdr = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.UberSdr;
-        var (opens, closes, listenSlot) = ListeningWindow.Next(now, schedule, config.WebSdrSlotsPerDay);
-        var listened = ListeningWindow.WebSdrSlotsOn(schedule, config.WebSdrSlotsPerDay, today);
+        var (opens, closes, listenSlot) = ListeningWindow.Next(now, schedule);
+        var listened = ListeningWindow.WebSdrSlotsOn(schedule, today);
         static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         return new
         {

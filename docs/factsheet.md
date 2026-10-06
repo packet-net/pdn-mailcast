@@ -58,7 +58,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | | |
 |---|---|
 | Software | pdn-mailcast receiver (Linux, amd64, arm64 and armhf; from the packet-net apt repo) |
-| Audio | A radio on 7.052 MHz USB into a sound card (listens all the time), or a public UberSDR web receiver (listens to 8 slots a day, 14 minutes each, inside the 3 hours a day such receivers allow) |
+| Audio | A radio on 7.052 MHz USB into a sound card (listens all the time), or a public UberSDR web receiver (listens to every daylight slot, 14 minutes each, up to 12 a day to stay inside the 3 hours a day such receivers allow) |
 | Delivery | Logs in to the listener's LinBPQ or Linux FBB as forwarding partner Q0CAST and offers each rebuilt bulletin by FBB B1F; the BBS keeps or refuses it by BID like any partner |
 | Durability | Rebuilt bulletins stay in an on-disk outbox until the BBS has answered; partial objects and completed markers expire after 14 days |
 | Mail | The receiver keeps its own copy of every bulletin (30 days or 50 MB unless set), readable on the status page, and any of them can be sent to the BBS again |
