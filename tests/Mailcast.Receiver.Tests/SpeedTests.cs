@@ -257,7 +257,7 @@ public class SpeedTests
     {
         using var dir = new TempDirectory();
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path };
-        await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(At(12, 5)), _ => { });
         var page = new StatusPage(host, null, _ => { });
 
         var level = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine).GetProperty("level");

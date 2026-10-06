@@ -175,9 +175,9 @@ Not tested yet: this is from FBB 7.0.11's documentation and source.
 
 http://127.0.0.1:8130/ shows:
 
+- at the top, the speed: GB7RDG takes turns on 1200 bps (MS110D WN4) and 600 bps (WN3), and the modem reads either. The tile shows the burst being heard now, or else the last one frames came from, then the frames of the last slot at each speed, and the speed GB7RDG's directory gave for that slot if one was rebuilt in it. The speed is what the modem locked to at the start of each burst. Before anything is heard it says "Not heard yet.";
 - when to listen: the frequency, the slots and today's slot times, whether they come from GB7RDG's directory or your config, the next slot, and for a web SDR which of today's slots it listens to and the next of them;
 - the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
-- the speed: GB7RDG takes turns on 1200 bps (MS110D WN4) and 600 bps (WN3), and the modem reads either. The tile shows the burst being heard now, or else the last one frames came from, then how many frames of the last slot came at each speed, and the speed GB7RDG's directory gave for the slot when one was rebuilt in it. The speed is what the modem itself locked to at the start of each burst. Before anything is heard it says "Not heard yet.";
 - your BBS: where bulletins go, how many are waiting, and any problem reaching it;
 - a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away. While there is no audio it says why instead: between a web SDR's slots it says when the spectrogram comes back, and for a sound card that can't be opened it gives the reason and when the receiver tries again;
 - the input level. For a sound card it has the same target as pdn-soundmodem: peaks between -18 and -9 dBFS. For a web SDR (or a recording) the level isn't yours to set and the modem copes with any level short of clipping, so it only warns about clipping;
