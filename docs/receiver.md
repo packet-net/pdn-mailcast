@@ -160,7 +160,7 @@ Fields are separated by one space, and `-` means not known. The first line is th
 
 1. `MCR1`: format 1.
 2. The receiver's version.
-3. Its 6 character locator, if the config or the web SDR gives one.
+3. The web SDR's 6 character locator, from the position it reports, or `-` for a sound card.
 4. Where the audio came from: `sc` for a sound card, or the web SDR's address.
 5. Bulletins rebuilt / delivered to the BBS that day.
 6. Errors: `0`, or how many, a colon, and how many of each kind: `BBS` (a session with the BBS failed), `AUD` (the audio failed or was lost), `RIG` (a problem retuning the radio), `HOOK` (a hook command failed).

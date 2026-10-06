@@ -28,7 +28,7 @@ public sealed record FeedbackSources
     /// <summary>The channel measurement for a slot (by its scheduled start), if there is one.</summary>
     public Func<DateTimeOffset, ReportChannel?> Channel { get; init; } = _ => null;
 
-    /// <summary>The receiver's 6 character locator, if the config or the web SDR gives one.</summary>
+    /// <summary>The receiver's 6 character locator, from the position a web SDR reports; null for a sound card.</summary>
     public Func<string?> Locator { get; init; } = () => null;
 
     /// <summary>Where the audio comes from, for the report: <c>sc</c> or the web SDR's host.</summary>
