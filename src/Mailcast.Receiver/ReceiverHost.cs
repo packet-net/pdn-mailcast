@@ -38,6 +38,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
+        Intake.DirectoryHeard += directory => Slots.OnDirectory(directory.Mode);
         Intake.ScheduleHeard += OnScheduleHeard;
         Hooks = new SlotHooks(() => Config, time, log);
         if (config.Rig is not null)
@@ -499,7 +500,8 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     private void Attach(AudioPipeline pipeline)
     {
-        pipeline.Channel.FrameReceived += (_, frame) => Intake.Offer(frame);
+        // On the audio thread, while the modem is still locked to the burst the frame came on.
+        pipeline.Channel.FrameReceived += (_, frame) => Intake.Offer(frame, pipeline.FrameWaveform);
         pipeline.Tone.ToneMeasured += Slots.OnTone;
     }
 

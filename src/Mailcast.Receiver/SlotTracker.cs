@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 
 namespace Mailcast.Receiver;
@@ -8,7 +9,32 @@ namespace Mailcast.Receiver;
 /// <param name="FramesHeard">Frames decoded in the slot.</param>
 /// <param name="LastFrame">When the newest of them arrived.</param>
 /// <param name="Scheduled">The scheduled start of the slot, when the receiver knows the schedule (not for a recording).</param>
-public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int FramesHeard, DateTimeOffset? LastFrame, DateTimeOffset? Scheduled = null);
+public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int FramesHeard, DateTimeOffset? LastFrame, DateTimeOffset? Scheduled = null)
+{
+    /// <summary>Frames heard on each waveform, by the modem's autobaud (<c>ms110d-wn4</c>). Frames whose waveform it could not say are not in it.</summary>
+    public ImmutableSortedDictionary<string, int> FrameCounts { get; init; } = ImmutableSortedDictionary<string, int>.Empty;
+
+    /// <summary>The waveform GB7RDG's directory said this slot went out on, if a directory completed in it.</summary>
+    public string? ListedWaveform { get; init; }
+
+    /// <summary>The waveform most of the slot's frames came on, <c>mixed</c> if two or more tie for most, or null if none is known.</summary>
+    public string? Waveform
+    {
+        get
+        {
+            if (FrameCounts.IsEmpty)
+            {
+                return null;
+            }
+            int most = FrameCounts.Values.Max();
+            var top = FrameCounts.Where(c => c.Value == most).Select(c => c.Key).ToList();
+            return top.Count == 1 ? top[0] : Mixed;
+        }
+    }
+
+    /// <summary>What <see cref="Waveform"/> says when no one waveform has the most frames.</summary>
+    public const string Mixed = "mixed";
+}
 
 /// <summary>
 /// Groups what the receiver hears into GB7RDG's slots and keeps the latest.
@@ -106,11 +132,12 @@ public sealed class SlotTracker
         _log($"tone: {measured}");
     }
 
-    /// <summary>A frame was heard.</summary>
-    public void OnFrame()
+    /// <summary>A frame was heard, on <paramref name="waveform"/> by the modem's autobaud (null if it cannot say).</summary>
+    public void OnFrame(string? waveform = null)
     {
         var now = _time.GetUtcNow();
         int frames;
+        bool newWaveform = false;
         lock (_gate)
         {
             if (_schedule is { } schedule)
@@ -126,11 +153,44 @@ public sealed class SlotTracker
                 _current = new SlotSummary(now, null, 0, null);
             }
             _current = _current with { FramesHeard = _current.FramesHeard + 1, LastFrame = now };
+            if (waveform is not null)
+            {
+                newWaveform = !_current.FrameCounts.TryGetValue(waveform, out int had);
+                _current = _current with { FrameCounts = _current.FrameCounts.SetItem(waveform, had + 1) };
+            }
             frames = _current.FramesHeard;
         }
-        if (frames == 1 || frames % 100 == 0)
+        string on = waveform is null ? "" : $" on {Mailcast.Receiver.Waveform.Words(waveform)}";
+        if (frames == 1)
         {
-            _log($"slot: {frames} frame{(frames == 1 ? "" : "s")} heard");
+            _log($"slot: 1 frame heard{on}");
+        }
+        else if (newWaveform)
+        {
+            _log($"slot: frame {frames} heard{on}, a different waveform from the frames before it");
+        }
+        else if (frames % 100 == 0)
+        {
+            _log($"slot: {frames} frames heard");
+        }
+    }
+
+    /// <summary>
+    /// A directory was rebuilt, naming the waveform the slot went out on (<paramref name="mode"/>,
+    /// null from a head end that does not say): kept beside the slot's frames as a cross-check.
+    /// </summary>
+    public void OnDirectory(string? mode)
+    {
+        if (mode is null)
+        {
+            return;
+        }
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { ListedWaveform = mode };
+            }
         }
     }
 }
