@@ -65,6 +65,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             Listened = day => Kind() == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day),
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
+            PskReporter = () => Intake.PskReporter,
             Audio = () => AudioSource.Parse(Config.Audio) is { Kind: AudioSourceKind.UberSdr } web ? WebSdrHost(web) : "sc",
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();

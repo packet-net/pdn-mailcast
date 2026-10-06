@@ -25,6 +25,9 @@ public sealed record FeedbackSources
     /// <summary>The newest ionosonde reading heard, if any.</summary>
     public Func<IonoReading?> Ionosphere { get; init; } = () => null;
 
+    /// <summary>The newest PSK Reporter reading heard, if any.</summary>
+    public Func<PskReading?> PskReporter { get; init; } = () => null;
+
     /// <summary>The channel measurement for a slot (by its scheduled start), if there is one.</summary>
     public Func<DateTimeOffset, ReportChannel?> Channel { get; init; } = _ => null;
 
@@ -289,9 +292,16 @@ public sealed class FeedbackService
     {
         var today = DateOnly.FromDateTime(now.UtcDateTime);
         var heard = _sources.LastSlot();
-        string? verdict = _sources.Ionosphere() is { HasSounding: true } reading
-            ? "I" + StateLetter(reading.AsOf(now, IonoSettings.DefaultStaleAfter).State)
-            : null;
+        var verdicts = new List<string>();
+        if (_sources.Ionosphere() is { HasSounding: true } reading)
+        {
+            verdicts.Add("I" + StateLetter(reading.AsOf(now, IonoSettings.DefaultStaleAfter).State));
+        }
+        if (_sources.PskReporter() is { HasObservation: true } spots)
+        {
+            verdicts.Add("P" + StateLetter(spots.AsOf(now, PskEvaluator.StaleAfter).State));
+        }
+        string? verdict = verdicts.Count == 0 ? null : string.Join('+', verdicts);
         lock (_gate)
         {
             bool changed = false;
@@ -379,7 +389,7 @@ public sealed class FeedbackService
             s.Frames,
             s.SnrDb,
             s.OffsetHz,
-            s.Verdict is null ? [] : [s.Verdict],
+            s.Verdict is null ? [] : s.Verdict.Split('+'),
             // The measurement may have finished after the slot's window closed.
             _sources.Channel(s.Slot) ?? s.Channel)).ToList();
         string? locator = _sources.Locator() is { Length: 6 } l && Maidenhead.TryParse(l, out _, out _)

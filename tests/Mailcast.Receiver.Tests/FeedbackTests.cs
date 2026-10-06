@@ -46,6 +46,8 @@ public class FeedbackTests
 
         public IonoReading? Iono { get; set; }
 
+        public PskReading? Psk { get; set; }
+
         public Dictionary<DateTimeOffset, ReportChannel> Channels { get; } = [];
 
         public FeedbackSettings? Settings { get; set; } = settings ?? new FeedbackSettings { Enabled = true, Callsign = "g4abc" };
@@ -57,6 +59,7 @@ public class FeedbackTests
             Listened = Schedule.ActiveOn,
             LastSlot = () => Last,
             Ionosphere = () => Iono,
+            PskReporter = () => Psk,
             Channel = slot => Channels.GetValueOrDefault(slot),
             Locator = () => "io91LK",
             Audio = () => "sc",
@@ -165,6 +168,7 @@ public class FeedbackTests
         await rig.AtAsync(service, Slots[0].AddMinutes(30));
         await rig.AtAsync(service, Slots[1].AddMinutes(3));
         rig.Iono = IonoEvaluator.Evaluate([new IonoSounding("RL052", Slots[2], IonoSource.Giro, 6.05, M3000: 3.3)], new IonoSettings(), Slots[2].AddMinutes(5));
+        rig.Psk = new PskReading { State = IonoState.Good, ObservedUtc = Slots[2].AddMinutes(2) };
         rig.Channels[Slots[2]] = new ReportChannel(2, 1.94, -16.6, 0.347, 0.214, 287, 'b');
         await rig.AtAsync(service, Slots[2].AddMinutes(5));
         rig.Last = new SlotSummary(Slots[2], null, 7, Slots[2].AddMinutes(6), Slots[2]);
@@ -182,7 +186,7 @@ public class FeedbackTests
         Assert.Equal("MCR1 0.6.0 IO91lk sc 1/1 3:AUD1,BBS2", lines[0]);
         Assert.Equal(3, lines.Length);
         Assert.Equal($"{Slots[1]:HH} - 0 - - -", lines[1]);
-        Assert.Equal($"{Slots[2]:HH} - 7 - - IM 2 1.9/-17 0.35 0.21 287 b", lines[2]);
+        Assert.Equal($"{Slots[2]:HH} - 7 - - IM+PG 2 1.9/-17 0.35 0.21 287 b", lines[2]);
     }
 
     [Fact]

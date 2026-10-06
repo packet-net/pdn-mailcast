@@ -172,7 +172,7 @@ Then one line for each slot listened to, in order:
 3. Frames heard.
 4. The tone's signal to noise, dB in 3 kHz.
 5. The tone's offset from 1800 Hz, Hz.
-6. The propagation verdict heard for the slot: `I` for the ionosonde, then `G` good, `M` marginal, `P` poor or `U` unknown. More than one are joined by `+`.
+6. The propagation verdicts heard for the slot: `I` for the ionosonde or `P` for PSK Reporter, then `G` good, `M` marginal, `P` poor or `U` unknown, joined by `+` when there are both, such as `IG+PM`.
 
 When the slot's channel was measured, six more follow:
 

@@ -32,7 +32,7 @@ public sealed record ReportChannel(
 /// <param name="OffsetHz">The tone's offset from 1800 Hz; null if no tone was heard.</param>
 /// <param name="Verdicts">
 /// The propagation verdicts heard for the slot, each two letters: the source (<c>I</c> the
-/// ionosonde) and its state (<c>G</c> good, <c>M</c> marginal, <c>P</c> poor, <c>U</c> unknown).
+/// ionosonde, <c>P</c> PSK Reporter) and its state (<c>G</c> good, <c>M</c> marginal, <c>P</c> poor, <c>U</c> unknown).
 /// Empty if none was heard.
 /// </param>
 /// <param name="Channel">The channel measurement, if there was one.</param>
