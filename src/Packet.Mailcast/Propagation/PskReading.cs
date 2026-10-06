@@ -112,31 +112,36 @@ public sealed record PskReading
         };
     }
 
-    /// <summary>A few words for the top of the tile: "Open from about 260 km", "Open near and far", "Closed", "Too few spots to say".</summary>
+    /// <summary>
+    /// A few words for the top of the tile, saying whose verdict it is: "FT8 spots: open from
+    /// about 260 km", "FT8 spots: open near and far", "FT8 spots: closed", "FT8 spots: too few to
+    /// say". FT8 decodes far weaker signals than the mailcast needs, so these never promise that
+    /// GB7RDG will be heard.
+    /// </summary>
     public string Headline()
     {
         if (!HasObservation)
         {
-            return "No reading yet";
+            return "No PSK Reporter reading yet";
         }
         if (FeedDown)
         {
-            return "No verdict: the feed was down";
+            return "No verdict: the PSK Reporter feed was down";
         }
         return State switch
         {
-            IonoState.Good => "Open near and far",
-            IonoState.Poor => "Closed",
-            IonoState.Marginal when SkipZoneKm is > 0 and var k => string.Create(CultureInfo.InvariantCulture, $"Open from about {k} km"),
-            IonoState.Marginal => "Open at some distances",
-            _ => AgeMinutes is { } age && TimeSpan.FromMinutes(age) > PskEvaluator.StaleAfter ? "No fresh reading" : "Too few spots to say",
+            IonoState.Good => "FT8 spots: open near and far",
+            IonoState.Poor => "FT8 spots: closed",
+            IonoState.Marginal when SkipZoneKm is > 0 and var k => string.Create(CultureInfo.InvariantCulture, $"FT8 spots: open from about {k} km"),
+            IonoState.Marginal => "FT8 spots: open at some distances",
+            _ => AgeMinutes is { } age && TimeSpan.FromMinutes(age) > PskEvaluator.StaleAfter ? "No fresh PSK Reporter reading" : "FT8 spots: too few to say",
         };
     }
 
     /// <summary>
-    /// The reading in a sentence, plain ASCII, for the page: "PSK Reporter (last 30 min, 40 m
-    /// FT8/FT4/WSPR): open at 500 km (25 spots, 12 stations) and 1000 km (16 spots, 9 stations),
-    /// nothing under 250 km despite 41 spots further out."
+    /// The reading in a sentence, plain ASCII, for the page: "40 m FT8/FT4/WSPR spots (PSK
+    /// Reporter, last 30 min): open at 500 km (25 spots, 12 stations, median -11 dB) and 1000 km
+    /// (16 spots, 9 stations, median -13 dB), nothing under 250 km despite 41 spots further out."
     /// </summary>
     public string Summary(DateTimeOffset now)
     {
@@ -145,9 +150,9 @@ public sealed record PskReading
             return "PSK Reporter: no reading yet.";
         }
         int age = IonoEvaluator.AgeMinutes(ObservedUtc!.Value, now);
-        var text = new StringBuilder(string.Create(CultureInfo.InvariantCulture, $"PSK Reporter (last {WindowMinutes} min"));
+        var text = new StringBuilder(string.Create(CultureInfo.InvariantCulture, $"40 m FT8/FT4/WSPR spots (PSK Reporter, last {WindowMinutes} min"));
         text.Append(age >= 1 ? string.Create(CultureInfo.InvariantCulture, $" to {ObservedUtc.Value.UtcDateTime:HH:mm} UTC, {age} min ago") : "");
-        text.Append(", 40 m FT8/FT4/WSPR): ");
+        text.Append("): ");
         if (FeedDown)
         {
             return text.Append("the feed was down for too much of that time to judge by.").ToString();
@@ -159,7 +164,7 @@ public sealed record PskReading
         return text.Append(Band(Forty)).Append('.').ToString();
     }
 
-    /// <summary>"PSK Reporter: " and <see cref="Summary"/>'s words, for a receiver's log.</summary>
+    /// <summary><see cref="Summary"/>'s words, for a receiver's log.</summary>
     public string Describe(DateTimeOffset now) => Summary(now);
 
     /// <summary>
@@ -176,7 +181,7 @@ public sealed record PskReading
         var open = band.Bins.Where(b => b.Verdict is PathVerdict.Open or PathVerdict.Reliable).ToList();
         if (open.Count > 0)
         {
-            parts.Add("open at " + JoinAnd(open.Select(b => string.Create(CultureInfo.InvariantCulture, $"{b.Km} km ({Counts(b)})"))));
+            parts.Add("open at " + JoinAnd(open.Select(b => string.Create(CultureInfo.InvariantCulture, $"{b.Km} km ({Counts(b)}{Median(b)})"))));
         }
         foreach (var b in band.Bins.Where(b => b.Verdict == PathVerdict.Closed))
         {
@@ -207,7 +212,9 @@ public sealed record PskReading
     public static string Distances(PskBandReading? band, bool judged = true) => band is null
         ? "no spots"
         : string.Join(", ", band.Bins.Select(b =>
-            string.Create(CultureInfo.InvariantCulture, $"{b.Km} km {(judged ? Words(b.Verdict) : "not judged")} ({Counts(b)}{(b.SnrMedianDb is { } snr ? $", median {snr} dB" : "")})")));
+            string.Create(CultureInfo.InvariantCulture, $"{b.Km} km {(judged ? Words(b.Verdict) : "not judged")} ({Counts(b)}{Median(b)})")));
+
+    private static string Median(PskBin b) => b.SnrMedianDb is { } snr ? string.Create(CultureInfo.InvariantCulture, $", median {snr} dB") : "";
 
     /// <summary>One distance's verdict in a word or two.</summary>
     public static string Words(PathVerdict verdict) => verdict switch

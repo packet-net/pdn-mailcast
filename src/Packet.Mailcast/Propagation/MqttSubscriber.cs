@@ -12,8 +12,8 @@ namespace Packet.Mailcast.Propagation;
 /// </summary>
 internal sealed class MqttSubscriber(Stream stream) : IAsyncDisposable
 {
-    /// <summary>The longest packet taken: a spot is about 200 octets, so anything this size is not one.</summary>
-    public const int MostPacket = 16 * 1024;
+    /// <summary>The longest packet taken: a spot is about 250 octets with its topic, so anything this size is not one.</summary>
+    public const int MostPacket = 4 * 1024;
 
     private readonly SemaphoreSlim _writing = new(1, 1);
 

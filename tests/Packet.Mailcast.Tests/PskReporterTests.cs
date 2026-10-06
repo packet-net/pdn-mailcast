@@ -125,7 +125,7 @@ public class PskReporterTests
         var nothing = Evaluate([]);
         Assert.Equal((PathVerdict.NoData, PathVerdict.NoData, PathVerdict.NoData), (nothing.At100, nothing.At500, nothing.At1000));
         Assert.Equal(IonoState.Unknown, nothing.State);
-        Assert.Equal("Too few spots to say", nothing.Headline());
+        Assert.Equal("FT8 spots: too few to say", nothing.Headline());
 
         // A little activity further out is not enough to call the short paths closed.
         var thin = Evaluate(Many(39, 400, 20));
@@ -153,7 +153,7 @@ public class PskReporterTests
         var near = r.Forty!.At(100)!;
         Assert.Equal((PathVerdict.Closed, PskEvidence.EightyMetres), (near.Verdict, near.ClosedBy));
         Assert.Equal(IonoState.Poor, r.State);
-        Assert.Equal("Closed", r.Headline());
+        Assert.Equal("FT8 spots: closed", r.Headline());
         Assert.Equal(PathVerdict.Open, r.Eighty!.At(100)!.Verdict);
         // 80 m itself is never judged closed by 40 m.
         Assert.Equal(PathVerdict.NoData, Evaluate(Many(10, 120, 6)).Eighty!.At(100)!.Verdict);
@@ -175,18 +175,69 @@ public class PskReporterTests
         Assert.Equal(IonoState.Marginal, r.State);
         // The 5th percentile of 120 distances is the 7th shortest: 300 to 306 km, so about 300.
         Assert.Equal(300, r.SkipZoneKm);
-        Assert.Equal("Open from about 300 km", r.Headline());
+        Assert.Equal("FT8 spots: open from about 300 km", r.Headline());
         var far = r.Forty!.At(500)!;
         Assert.Equal((85, -9), (far.Spots, far.SnrMedianDb));
         Assert.Equal(
-            "PSK Reporter (last 30 min, 40 m FT8/FT4/WSPR): open at 500 km (85 spots, 20 stations) and 1000 km (35 spots, 14 stations), nothing under 250 km despite 120 spots further out.",
+            "40 m FT8/FT4/WSPR spots (PSK Reporter, last 30 min): open at 500 km (85 spots, 20 stations, median -9 dB) and 1000 km (35 spots, 14 stations, median -11 dB), nothing under 250 km despite 120 spots further out.",
             r.Summary(Now));
         Assert.Equal("100 km closed (0 spots), 500 km open (85 spots, 20 stations, median -9 dB), 1000 km open (35 spots, 14 stations, median -11 dB)", PskReading.Distances(r.Forty));
 
         // Open close in too: no skip zone, GOOD.
         var good = Evaluate([.. spots, .. Many(8, 90, 6)]);
         Assert.Equal((IonoState.Good, 0), (good.State, good.SkipZoneKm));
-        Assert.Equal("Open near and far", good.Headline());
+        Assert.Equal("FT8 spots: open near and far", good.Headline());
+    }
+
+    [Fact]
+    public void AQuiet1000Km_IsOnlyClosed_WithSomeLongPathsOnTheOtherBand()
+    {
+        // Few UK and Irish stations are 700 to 1200 km apart, so quiet there proves little alone.
+        var alone = Evaluate(Many(60, 400, 20));
+        Assert.Equal((PathVerdict.Closed, PathVerdict.NoData), (alone.At100, alone.At1000));
+        var withEighty = Evaluate([.. Many(60, 400, 20), .. Many(3, 800, 3, PskBand.Eighty)]);
+        Assert.Equal((PathVerdict.Closed, PskEvidence.OtherDistances), (withEighty.Forty!.At(1000)!.Verdict, withEighty.Forty.At(1000)!.ClosedBy));
+        // And the same for 80 m, by 40 m's long paths.
+        var eighty = Evaluate([.. Many(60, 400, 20, PskBand.Eighty), .. Many(3, 800, 3)]);
+        Assert.Equal(PathVerdict.Closed, eighty.Eighty!.At(1000)!.Verdict);
+        Assert.Equal(PathVerdict.NoData, Evaluate(Many(60, 400, 20, PskBand.Eighty)).Eighty!.At(1000)!.Verdict);
+    }
+
+    [Theory]
+    [InlineData("\"sc\":\"G1A\"", "\"sc\":\"G1\"")] // too short
+    [InlineData("\"sc\":\"G1A\"", "\"sc\":\"G1ABCDEFGHIJKLMN\"")] // 16 characters
+    [InlineData("\"sc\":\"G1A\"", "\"sc\":\"G1A B\"")]
+    [InlineData("\"sc\":\"G1A\"", "\"sc\":\"G1A<b>\"")]
+    [InlineData("\"rc\":\"G2B\"", "\"rc\":\"G2B\\u0000\"")]
+    [InlineData("\"sl\":\"IO91\"", "\"sl\":\"IO91lkIO91lkIO91lkxx\"")]
+    [InlineData("\"sl\":\"IO91\"", "\"sl\":\"IO91lkAB\"")] // characters 7 and 8 must be digits
+    [InlineData("\"sl\":\"IO91\"", "\"sl\":\"IO91lk12zz\"")] // 9 and 10 letters A to X
+    [InlineData("\"md\":\"FT8\"", "\"md\":\"FT8FT8FT8FT8FT8FT8FT8\"")]
+    [InlineData("\"sa\":223", "\"sa\":4294967519")] // 2^32 + 223 is not England
+    [InlineData("\"sa\":223", "\"sa\":-223")]
+    [InlineData("\"t\":1791315000", "\"t\":99999999999999")]
+    [InlineData("\"sq\":1", "\"sq\":-1")]
+    public void AnyFieldOutOfBounds_IsNotASpot(string field, string bad)
+    {
+        const string good = "{\"sq\":1,\"md\":\"FT8\",\"rp\":-5,\"t\":1791315000,\"sc\":\"G1A\",\"sl\":\"IO91\",\"rc\":\"G2B\",\"rl\":\"IO93\",\"sa\":223,\"ra\":223,\"b\":\"40m\"}";
+        Assert.True(PskFeed.TryParse(System.Text.Encoding.UTF8.GetBytes(good), out _));
+        Assert.Contains(field, good, StringComparison.Ordinal);
+        Assert.False(PskFeed.TryParse(System.Text.Encoding.UTF8.GetBytes(good.Replace(field, bad, StringComparison.Ordinal)), out _));
+    }
+
+    [Fact]
+    public void HugeCallsignsAndPayloads_AreRefused_WithoutBeingKept()
+    {
+        string call = new('G', 7000);
+        string payload = "{\"sq\":1,\"md\":\"FT8\",\"rp\":-5,\"t\":1791315000,\"sc\":\"" + call + "\",\"sl\":\"IO91\",\"rc\":\"G2B\",\"rl\":\"IO93\",\"sa\":223,\"ra\":223,\"b\":\"40m\"}";
+        Assert.False(PskFeed.TryParse(System.Text.Encoding.UTF8.GetBytes(payload), out _));
+        // Even a payload whose fields are all fine is refused past 1 KB: padding is not a spot.
+        string padded = "{\"x\":\"" + new string(' ', 1100) + "\",\"sq\":1,\"md\":\"FT8\",\"rp\":-5,\"t\":1791315000,\"sc\":\"G1A\",\"sl\":\"IO91\",\"rc\":\"G2B\",\"rl\":\"IO93\",\"sa\":223,\"ra\":223,\"b\":\"40m\"}";
+        Assert.False(PskFeed.TryParse(System.Text.Encoding.UTF8.GetBytes(padded), out _));
+        Assert.Equal("G4ABC/P", PskFeed.Callsign("g4abc/p"));
+        Assert.Equal("G4WNC-1", PskFeed.Callsign("G4WNC-1")); // as in the live sample
+        Assert.Null(PskFeed.Callsign(call));
+        Assert.True(PskFeed.TryLocate("IO91lk12ab", out _, out _));
     }
 
     [Fact]
@@ -207,7 +258,7 @@ public class PskReporterTests
         Assert.True(shortUp.FeedDown);
         Assert.Equal((IonoState.Unknown, PathVerdict.NoData), (shortUp.State, shortUp.At500));
         Assert.Equal(60, shortUp.Forty!.At(500)!.Spots);
-        Assert.Equal("No verdict: the feed was down", shortUp.Headline());
+        Assert.Equal("No verdict: the PSK Reporter feed was down", shortUp.Headline());
         Assert.Contains("the feed was down for too much of that time", shortUp.Summary(Now), StringComparison.Ordinal);
         Assert.Contains("500 km not judged (60 spots", shortUp.JournalLine(Now), StringComparison.Ordinal);
 

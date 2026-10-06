@@ -11,7 +11,8 @@ namespace Packet.Mailcast.Propagation;
 /// <param name="Messages">Messages taken since the head end started.</param>
 /// <param name="Reconnects">Connections made after the first.</param>
 /// <param name="Problem">What went wrong last, while it is going wrong; null when connected.</param>
-public sealed record PskFeedStatus(bool Connected, DateTimeOffset? Since, DateTimeOffset? LastMessage, int SpotsHeld, long Messages, int Reconnects, string? Problem);
+/// <param name="Dropped">Spots not kept because the most that are held already were.</param>
+public sealed record PskFeedStatus(bool Connected, DateTimeOffset? Since, DateTimeOffset? LastMessage, int SpotsHeld, long Messages, int Reconnects, string? Problem, long Dropped = 0);
 
 /// <summary>
 /// Keeps the PSK Reporter reading up to date in the background: subscribes to PSK Reporter's
@@ -22,9 +23,11 @@ public sealed record PskFeedStatus(bool Connected, DateTimeOffset? Since, DateTi
 /// <remarks>
 /// <para>QoS 0 with a clean session, so the broker keeps nothing for us. A lost connection is
 /// made again after 5 s, then 10, 20 and so on up to <see cref="MostBackoff"/>, and from the start
-/// again once a connection has lasted a minute. No word from the broker for one and a half
-/// keep-alives (a PINGREQ goes every half) counts as lost. Narrow topics keep it to a couple of
-/// spots a second, and at most <see cref="MostSpots"/> are held.</para>
+/// again once a connection has lasted a minute and brought spots. No word from the broker for
+/// one and a half keep-alives (a PINGREQ goes every half) counts as lost. Narrow topics keep it
+/// to a couple of spots a second. At most <see cref="MostSpots"/> spots and about
+/// <see cref="MostBytes"/> are held: when full, new spots are dropped until the once-a-minute
+/// prune, which also trims to nine tenths of either, oldest first, so a flood costs O(1) a spot.</para>
 /// </remarks>
 public sealed class PskReporterMonitor
 {
@@ -55,6 +58,12 @@ public sealed class PskReporterMonitor
     /// <summary>The most spots held: far more than half an hour of UK and Irish 40 and 80 m.</summary>
     public const int MostSpots = 20_000;
 
+    /// <summary>The most memory the held spots may take, roughly, in octets.</summary>
+    public const long MostBytes = 4 * 1024 * 1024;
+
+    /// <summary>How often the held spots are pruned.</summary>
+    public static readonly TimeSpan PruneEvery = TimeSpan.FromMinutes(1);
+
     private readonly TimeProvider _time;
     private readonly Action<string> _log;
     private readonly Func<CancellationToken, Task<Stream>> _connect;
@@ -72,6 +81,11 @@ public sealed class PskReporterMonitor
     private int _connections;
     private string? _problem;
     private int _failures;
+    private long _bytes;
+    private long _dropped;
+    private bool _full;
+    private int _sessionSpots;
+    private volatile bool _wantedFailing;
 
     /// <summary>A monitor that connects to <paramref name="host"/>, or with <paramref name="connect"/>, for tests.</summary>
     /// <param name="callsign">The head end's callsign, in the MQTT client id with a random suffix.</param>
@@ -122,6 +136,18 @@ public sealed class PskReporterMonitor
         }
     }
 
+    /// <summary>Roughly what the held spots take, octets (see <see cref="Cost"/>).</summary>
+    internal long HeldBytes
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _bytes;
+            }
+        }
+    }
+
     /// <summary>How the feed is doing.</summary>
     public PskFeedStatus Feed
     {
@@ -129,7 +155,7 @@ public sealed class PskReporterMonitor
         {
             lock (_gate)
             {
-                return new PskFeedStatus(_connectedSince is not null, _connectedSince ?? _downSince, _lastMessage, _spots.Count, _messages, Math.Max(0, _connections - 1), _connectedSince is null ? _problem : null);
+                return new PskFeedStatus(_connectedSince is not null, _connectedSince ?? _downSince, _lastMessage, _spots.Count, _messages, Math.Max(0, _connections - 1), _connectedSince is null ? _problem : null, _dropped);
             }
         }
     }
@@ -140,7 +166,26 @@ public sealed class PskReporterMonitor
     /// </summary>
     public async Task RunAsync(Func<DateTimeOffset, bool>? wanted, CancellationToken cancellation)
     {
-        bool Wanted() => wanted?.Invoke(_time.GetUtcNow()) ?? true;
+        bool Wanted()
+        {
+            try
+            {
+                bool want = wanted?.Invoke(_time.GetUtcNow()) ?? true;
+                _wantedFailing = false;
+                return want;
+            }
+#pragma warning disable CA1031 // observe only: a schedule that cannot be read keeps the feed, it never stops the loop
+            catch (Exception e)
+#pragma warning restore CA1031
+            {
+                if (!_wantedFailing)
+                {
+                    _wantedFailing = true;
+                    _log($"pskreporter: cannot tell whether a slot is near ({Plain(e.Message)}); staying subscribed");
+                }
+                return true;
+            }
+        }
         while (!cancellation.IsCancellationRequested)
         {
             try
@@ -174,8 +219,10 @@ public sealed class PskReporterMonitor
                     problem = Plain(e is OperationCanceledException ? "no answer in time" : e.Message);
                 }
                 Down(problem);
-                if (_time.GetUtcNow() - started >= Settled)
+                if (_time.GetUtcNow() - started >= Settled && _sessionSpots > 0)
                 {
+                    // A connection that lasted and brought spots: start the backoff afresh. One
+                    // that took the subscription and then sent nothing does not count.
                     _failures = 0;
                 }
                 _failures++;
@@ -206,38 +253,74 @@ public sealed class PskReporterMonitor
             _messages++;
             _lastMessage = now;
         }
-        return PskFeed.TryParse(payload, out var spot) && Add(spot);
+        if (!PskFeed.TryParse(payload, out var spot))
+        {
+            return false;
+        }
+        Interlocked.Increment(ref _sessionSpots);
+        return Add(spot);
     }
 
-    /// <summary>Holds a spot, unless it is a repeat or outside the window.</summary>
+    /// <summary>Roughly what holding a spot costs, octets: the entry, its place in the set, and its two callsigns.</summary>
+    internal static long Cost(PskSpot spot) => 96 + (24 + (2L * spot.Sender.Length)) + (24 + (2L * spot.Receiver.Length));
+
+    /// <summary>Holds a spot, unless it is a repeat, outside the window, or there is no room until the next prune. O(1) but for that prune, once a minute.</summary>
     internal bool Add(PskSpot spot)
     {
         DateTimeOffset now = _time.GetUtcNow();
+        bool startedDropping = false, kept = false;
         lock (_gate)
         {
-            if (spot.Time <= now - PskEvaluator.Window || spot.Time > now + PskEvaluator.MostAhead || !_seen.Add(spot.Sequence))
-            {
-                return false;
-            }
-            _spots.Add(spot);
-            if (now - _lastPrune >= TimeSpan.FromMinutes(1) || _spots.Count > MostSpots)
+            if (now - _lastPrune >= PruneEvery)
             {
                 Prune(now);
             }
-            return true;
+            if (spot.Time <= now - PskEvaluator.Window || spot.Time > now + PskEvaluator.MostAhead || _seen.Contains(spot.Sequence))
+            {
+                return false;
+            }
+            long cost = Cost(spot);
+            if (_spots.Count >= MostSpots || _bytes + cost > MostBytes)
+            {
+                _dropped++;
+                startedDropping = !_full;
+                _full = true;
+            }
+            else
+            {
+                _seen.Add(spot.Sequence);
+                _spots.Add(spot);
+                _bytes += cost;
+                kept = true;
+            }
         }
+        if (startedDropping)
+        {
+            _log(string.Create(CultureInfo.InvariantCulture, $"pskreporter: holding as many spots as it will ({MostSpots}, about {MostBytes / (1024 * 1024)} MB); new ones are dropped until older ones go"));
+        }
+        return kept;
     }
 
+    /// <summary>Once a minute: spots out of the window go, then if still above nine tenths of the limits the oldest, in one pass.</summary>
     private void Prune(DateTimeOffset now)
     {
         _lastPrune = now;
         DateTimeOffset oldest = now - PskEvaluator.Window;
         _spots.RemoveAll(s => s.Time <= oldest);
-        if (_spots.Count > MostSpots)
+        long bytes = _spots.Sum(Cost);
+        if (_spots.Count > MostSpots * 9 / 10 || bytes > MostBytes * 9 / 10)
         {
             _spots.Sort((a, b) => a.Time.CompareTo(b.Time));
-            _spots.RemoveRange(0, _spots.Count - MostSpots);
+            int drop = 0;
+            while (drop < _spots.Count && (_spots.Count - drop > MostSpots * 9 / 10 || bytes > MostBytes * 9 / 10))
+            {
+                bytes -= Cost(_spots[drop]);
+                drop++;
+            }
+            _spots.RemoveRange(0, drop);
         }
+        _bytes = bytes;
+        _full = false;
         _seen.Clear();
         foreach (var s in _spots)
         {
@@ -269,6 +352,7 @@ public sealed class PskReporterMonitor
         await using (mqtt.ConfigureAwait(false))
         {
             Up();
+            _sessionSpots = 0;
             using var session = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             var state = new SessionState(_time.GetUtcNow());
             Task watchdog = WatchAsync(mqtt, state, wanted, session);
@@ -293,6 +377,13 @@ public sealed class PskReporterMonitor
                     return true;
                 }
                 throw new IOException(state.Ended);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                // Stopping: say goodbye, briefly, by the wall clock whatever clock the rest runs on.
+                using var quick = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await mqtt.DisconnectAsync(quick.Token).ConfigureAwait(false);
+                throw;
             }
             catch (EndOfStreamException)
             {

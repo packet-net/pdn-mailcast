@@ -59,16 +59,34 @@ public static class PskFeed
             from receiver in Entities
             select $"pskr/filter/v2/{band}/+/+/+/+/+/{sender}/{receiver}"];
 
+    /// <summary>The longest payload taken: a real spot is about 200 octets.</summary>
+    public const int MostPayload = 1024;
+
+    /// <summary>The longest string field taken, before unescaping: a locator is 10, a mode or band a few.</summary>
+    public const int MostField = 16;
+
+    /// <summary>
+    /// The shortest and longest callsign taken, of A to Z, 0 to 9, the slash and the hyphen (the
+    /// live feed has receivers such as G4WNC-1).
+    /// </summary>
+    public const int ShortestCall = 3, LongestCall = 15;
+
     /// <summary>
     /// A spot from a payload, or false for anything this reading does not count: another band or
-    /// mode, an end outside the UK and Ireland, a locator that is not one, or JSON that is not a spot.
+    /// mode, an end outside the UK and Ireland, a callsign or locator that is not one, a field
+    /// longer than any real one, or JSON that is not a spot. Nothing in a payload, however long
+    /// or strange, is kept beyond these bounds: a broker on plain MQTT is not to be trusted.
     /// </summary>
     public static bool TryParse(ReadOnlySpan<byte> payload, out PskSpot spot)
     {
         spot = default;
+        if (payload.Length > MostPayload)
+        {
+            return false;
+        }
         try
         {
-            var reader = new Utf8JsonReader(payload);
+            var reader = new Utf8JsonReader(payload, new JsonReaderOptions { MaxDepth = 4 });
             long? sq = null, t = null, tTx = null, sa = null, ra = null;
             int? rp = null;
             string? md = null, sc = null, sl = null, rc = null, rl = null, b = null;
@@ -78,7 +96,11 @@ public static class PskFeed
             }
             while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
             {
-                string name = reader.GetString()!;
+                // Matched in place: a property name is never turned into a string.
+                int field = reader.ValueTextEquals("sq") ? 1 : reader.ValueTextEquals("t") ? 2 : reader.ValueTextEquals("t_tx") ? 3
+                    : reader.ValueTextEquals("sa") ? 4 : reader.ValueTextEquals("ra") ? 5 : reader.ValueTextEquals("rp") ? 6
+                    : reader.ValueTextEquals("md") ? 7 : reader.ValueTextEquals("sc") ? 8 : reader.ValueTextEquals("sl") ? 9
+                    : reader.ValueTextEquals("rc") ? 10 : reader.ValueTextEquals("rl") ? 11 : reader.ValueTextEquals("b") ? 12 : 0;
                 if (!reader.Read())
                 {
                     return false;
@@ -88,20 +110,20 @@ public static class PskFeed
                     reader.Skip();
                     continue;
                 }
-                switch (name)
+                switch (field)
                 {
-                    case "sq": sq = Long(ref reader); break;
-                    case "t": t = Long(ref reader); break;
-                    case "t_tx": tTx = Long(ref reader); break;
-                    case "sa": sa = Long(ref reader); break;
-                    case "ra": ra = Long(ref reader); break;
-                    case "rp": rp = Long(ref reader) is { } v and >= -99 and <= 99 ? (int)v : null; break;
-                    case "md": md = Text(ref reader); break;
-                    case "sc": sc = Text(ref reader); break;
-                    case "sl": sl = Text(ref reader); break;
-                    case "rc": rc = Text(ref reader); break;
-                    case "rl": rl = Text(ref reader); break;
-                    case "b": b = Text(ref reader); break;
+                    case 1: sq = Long(ref reader); break;
+                    case 2: t = Long(ref reader); break;
+                    case 3: tTx = Long(ref reader); break;
+                    case 4: sa = Long(ref reader); break;
+                    case 5: ra = Long(ref reader); break;
+                    case 6: rp = Long(ref reader) is { } v and >= -99 and <= 99 ? (int)v : null; break;
+                    case 7: md = Text(ref reader); break;
+                    case 8: sc = Text(ref reader); break;
+                    case 9: sl = Text(ref reader); break;
+                    case 10: rc = Text(ref reader); break;
+                    case 11: rl = Text(ref reader); break;
+                    case 12: b = Text(ref reader); break;
                     default: break;
                 }
             }
@@ -118,21 +140,44 @@ public static class PskFeed
             {
                 return false;
             }
-            if (sq is not { } sequence || (tTx ?? t) is not { } when || md is null || !Modes.Contains(md)
-                || sa is not { } from || ra is not { } to || !Entities.Contains((int)from) || !Entities.Contains((int)to)
-                || string.IsNullOrWhiteSpace(sc) || string.IsNullOrWhiteSpace(rc)
+            if (sq is not (> 0 and { } sequence) || (tTx ?? t) is not (>= EarliestTime and <= LatestTime and { } when) || md is null || !Modes.Contains(md)
+                || !IsEntity(sa) || !IsEntity(ra)
+                || Callsign(sc) is not { } sender || Callsign(rc) is not { } receiver
                 || !TryLocate(sl, out double lat1, out double lon1) || !TryLocate(rl, out double lat2, out double lon2))
             {
                 return false;
             }
             spot = new PskSpot(sequence, DateTimeOffset.FromUnixTimeSeconds(when), band,
-                (int)Math.Round(DistanceKm(lat1, lon1, lat2, lon2)), rp, sc.Trim().ToUpperInvariant(), rc.Trim().ToUpperInvariant());
+                (int)Math.Round(DistanceKm(lat1, lon1, lat2, lon2)), rp, sender, receiver);
             return true;
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or ArgumentOutOfRangeException)
         {
             return false;
         }
+    }
+
+    // 2000-01-01 to 2100-01-01: anything else is not a time this feed sends.
+    private const long EarliestTime = 946_684_800, LatestTime = 4_102_444_800;
+
+    /// <summary>Whether a country field is one of <see cref="Entities"/>, checked before any narrowing, so 2^32 + 223 is not England.</summary>
+    private static bool IsEntity(long? value) => value is > 0 and < 1000 && Entities.Contains((int)value.Value);
+
+    /// <summary>A callsign in capitals, or null unless it is <see cref="ShortestCall"/> to <see cref="LongestCall"/> of A to Z, 0 to 9, the slash and the hyphen.</summary>
+    public static string? Callsign(string? text)
+    {
+        if (text is null || text.Length is < ShortestCall or > LongestCall)
+        {
+            return null;
+        }
+        foreach (char c in text)
+        {
+            if (!(char.IsAsciiLetterOrDigit(c) || c is '/' or '-'))
+            {
+                return null;
+            }
+        }
+        return text.ToUpperInvariant();
     }
 
     /// <summary>
@@ -147,7 +192,16 @@ public static class PskFeed
         {
             return false;
         }
-        string l = locator.Trim();
+        string l = locator;
+        // Characters 7 and 8 are digits and 9 and 10 letters A to X: checked, though only the first 6 are used.
+        if (l.Length is 8 or 10 && !(char.IsAsciiDigit(l[6]) && char.IsAsciiDigit(l[7])))
+        {
+            return false;
+        }
+        if (l.Length == 10 && !(char.ToUpperInvariant(l[8]) is >= 'A' and <= 'X' && char.ToUpperInvariant(l[9]) is >= 'A' and <= 'X'))
+        {
+            return false;
+        }
         return l.Length switch
         {
             4 or 6 => Maidenhead.TryParse(l, out latitude, out longitude),
@@ -172,5 +226,5 @@ public static class PskFeed
         : null;
 
     private static string? Text(ref Utf8JsonReader reader) =>
-        reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+        reader.TokenType == JsonTokenType.String && !reader.HasValueSequence && reader.ValueSpan.Length <= MostField ? reader.GetString() : null;
 }

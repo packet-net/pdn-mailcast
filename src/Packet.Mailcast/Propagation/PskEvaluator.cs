@@ -15,8 +15,10 @@ namespace Packet.Mailcast.Propagation;
 /// people are on and the band works elsewhere: at least <see cref="ElsewhereSpots"/> spots from
 /// <see cref="ElsewhereStations"/> stations on the same band at the other distances, or, for
 /// 40 m, 80 m busy at the same distance (<see cref="EightySpots"/> spots, <see cref="EightyStations"/>
-/// stations). Anything else is no data, and so is everything when the feed was down for more
-/// than a third of the window.</para>
+/// stations). 1000 km is closed by the other distances only if the other band has at least
+/// <see cref="FarOtherBandSpots"/> spots from 700 to 1200 km too: far fewer pairs of UK and Irish
+/// stations are that far apart, so quiet there is weaker evidence. Anything else is no data, and
+/// so is everything when the feed was down for more than a third of the window.</para>
 /// <para>The skip zone is 0 when 100 km is open. When 100 km is closed and a further distance is
 /// open, it is the 5th percentile of the band's spot distances, and at least the third shortest,
 /// to the nearest 10 km: where spots start to be common.</para>
@@ -62,6 +64,9 @@ public static class PskEvaluator
     /// <summary>Different callsigns in those.</summary>
     public const int EightyStations = 6;
 
+    /// <summary>Spots the other band needs from 700 to 1200 km before a quiet 1000 km counts as closed by the other distances.</summary>
+    public const int FarOtherBandSpots = 3;
+
     /// <summary>SNRs a median needs: a median of one or two is noise.</summary>
     public const int MedianSpots = 5;
 
@@ -80,8 +85,8 @@ public static class PskEvaluator
         bool down = !connected || feedUp < LeastCoverage;
         var eightyCounts = Count(recent, PskBand.Eighty);
         var fortyCounts = Count(recent, PskBand.Forty);
-        var eighty = Judge(PskBand.Eighty, eightyCounts, null, recent, down);
-        var forty = Judge(PskBand.Forty, fortyCounts, eightyCounts, recent, down);
+        var eighty = Judge(PskBand.Eighty, eightyCounts, fortyCounts, eightyIsEvidence: false, recent, down);
+        var forty = Judge(PskBand.Forty, fortyCounts, eightyCounts, eightyIsEvidence: true, recent, down);
         return new PskReading
         {
             ObservedUtc = now,
@@ -160,7 +165,7 @@ public static class PskEvaluator
         return counts;
     }
 
-    private static PskBandReading Judge(PskBand band, Counts[] counts, Counts[]? eighty, List<PskSpot> recent, bool down)
+    private static PskBandReading Judge(PskBand band, Counts[] counts, Counts[] other, bool eightyIsEvidence, List<PskSpot> recent, bool down)
     {
         var bins = new List<PskBin>(Bins.Count);
         for (int i = 0; i < Bins.Count; i++)
@@ -179,12 +184,13 @@ public static class PskEvaluator
                 {
                     int elsewhereSpots = counts.Where((_, j) => j != i).Sum(o => o.Spots);
                     int elsewhereStations = counts.Where((_, j) => j != i).SelectMany(o => o.Stations).Distinct(StringComparer.Ordinal).Count();
-                    if (elsewhereSpots >= ElsewhereSpots && elsewhereStations >= ElsewhereStations)
+                    bool far = i == Bins.Count - 1;
+                    if (elsewhereSpots >= ElsewhereSpots && elsewhereStations >= ElsewhereStations && (!far || other[i].Spots >= FarOtherBandSpots))
                     {
                         verdict = PathVerdict.Closed;
                         why = PskEvidence.OtherDistances;
                     }
-                    else if (eighty is not null && eighty[i].Spots >= EightySpots && eighty[i].Stations.Count >= EightyStations)
+                    else if (eightyIsEvidence && other[i].Spots >= EightySpots && other[i].Stations.Count >= EightyStations)
                     {
                         verdict = PathVerdict.Closed;
                         why = PskEvidence.EightyMetres;

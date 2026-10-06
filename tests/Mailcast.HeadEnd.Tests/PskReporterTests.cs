@@ -129,6 +129,51 @@ public class PskReporterTests
     }
 
     [Fact]
+    public void WhenTheReadingsCrowdOutBulletins_PskReportersGoFirst_AndTheIonosondesStay()
+    {
+        // A slot planned later and later has less and less room. Somewhere both readings would
+        // leave no room for a bulletin frame while the ionosonde's alone still would.
+        var options = Config.ToScheduleOptions();
+        SlotPlan PlanAt(int late)
+        {
+            using var state = new TempDirectory();
+            var store = new RotationStore(state.Path, Compression.Default, options, new MemoryJournal());
+            store.Offer(Bulletins.Make(700, 3000), new DateOnly(2026, 10, 6));
+            var planner = new StoreSlotPlanner(store, Compression.Default, options, Config.ToWaveforms(LinearAirtime.Measure), Config.ToSlotSettings(), Config.FillLimitAfter, new FakeTimeProvider(Slot.AddSeconds(late)), () => Iono, () => Spots);
+            return planner.Plan(Slot);
+        }
+        // The latest start that still sends anything, found by halving: room only shrinks with lateness.
+        int sends = 0, silent = 10 * 60;
+        Assert.NotEmpty(PlanAt(sends).Frames);
+        Assert.Empty(PlanAt(silent).Frames);
+        while (silent - sends > 1)
+        {
+            int mid = (sends + silent) / 2;
+            if (PlanAt(mid).Frames.Count > 0)
+            {
+                sends = mid;
+            }
+            else
+            {
+                silent = mid;
+            }
+        }
+        // Just before it, the room for one bulletin frame and some readings runs out.
+        bool sawIonosondeAlone = false;
+        for (int late = sends; late >= Math.Max(0, sends - 30) && !sawIonosondeAlone; late--)
+        {
+            var plan = PlanAt(late);
+            // Never PSK Reporter's without the ionosonde's, and never either if no bulletin frame fits.
+            Assert.False(plan.PskReporterFrames > 0 && plan.IonosphereFrames == 0, $"{late} s late");
+            Assert.True(plan.Broadcast!.BulletinFrames > 0, $"{late} s late");
+            Assert.Equal(plan.IonosphereFrames, Of(plan, IonoRecord.ObjectLength).Count);
+            Assert.Equal(plan.PskReporterFrames, Of(plan, PskRecord.ObjectLength).Count);
+            sawIonosondeAlone = plan.IonosphereFrames == 2 && plan.PskReporterFrames == 0;
+        }
+        Assert.True(sawIonosondeAlone, "no lateness left room for the ionosonde's frames but not PSK Reporter's");
+    }
+
+    [Fact]
     public void TheJournalLine_IsPlainAscii_WithBothBands()
     {
         using var state = new TempDirectory();

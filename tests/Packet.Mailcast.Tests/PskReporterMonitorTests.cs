@@ -94,12 +94,21 @@ public class PskReporterMonitorTests
         await Eventually(() => monitor.Feed.Connected);
         Assert.Equal(1, monitor.Feed.Reconnects);
 
-        // Up for over a minute, then lost: back to 5 s.
-        for (int i = 0; i < 5; i++)
-        {
-            time.Advance(TimeSpan.FromSeconds(15));
-            await Task.Delay(2);
-        }
+        // Up for over a minute but with no spots, then lost: that does not count, so 40 s.
+        await Hold(c, time, TimeSpan.FromSeconds(75));
+        dropped = time.GetUtcNow();
+        c.Close();
+        await Eventually(() => !monitor.Feed.Connected);
+        c = await broker.NextAsync(time);
+        Gap(dropped, broker.Attempts[^1], 40);
+        await c.AcceptAsync();
+        await Eventually(() => monitor.Feed.Connected);
+
+        // Up for over a minute with spots, then lost: back to 5 s.
+        long before = monitor.Feed.Messages;
+        await c.PublishAsync("pskr/filter/v2/40m/FT8/G4AAA/M0BBB/IO91/IO86/223/279", Payload(5, time.GetUtcNow().AddMinutes(-1), "G4AAA", "IO91lk", "M0BBB", "IO86ha"));
+        await Eventually(() => monitor.Feed.Messages > before);
+        await Hold(c, time, TimeSpan.FromSeconds(75));
         dropped = time.GetUtcNow();
         c.Close();
         await Eventually(() => !monitor.Feed.Connected);
@@ -190,6 +199,168 @@ public class PskReporterMonitorTests
 
         await stop.CancelAsync();
         await run.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task ASlowLorisBroker_IsGivenUpOn_WhileConnecting_AndOnceSubscribed()
+    {
+        var time = new FakeTimeProvider(Start);
+        var broker = new FakeBroker(time);
+        var monitor = new PskReporterMonitor("GB7RDG", time, null, broker.Connect);
+        using var stop = new CancellationTokenSource();
+        Task run = monitor.RunAsync(null, stop.Token);
+
+        // CONNACK one octet at a time, too slowly: the 30 s connect limit ends it.
+        var c = await broker.NextAsync(time);
+        DateTimeOffset opened = broker.Attempts[^1];
+        await c.ReadPacketAsync();
+        await c.SendAsync([0x20]);
+        var next = await broker.NextAsync(time);
+        Assert.InRange((broker.Attempts[^1] - opened).TotalSeconds, 35, 37); // 30 s, then the first 5 s wait
+
+        // Subscribed, then a PUBLISH dribbled out an octet every 10 s, never finished: a packet
+        // that never completes is no word from the broker, so 90 s ends it.
+        await next.AcceptAsync(answerPings: false);
+        await Eventually(() => monitor.Feed.Connected);
+        DateTimeOffset subscribed = time.GetUtcNow();
+        byte[] dribble = [0x30, 0x7F, 0x00, 0x05, (byte)'p', (byte)'s', (byte)'k', (byte)'r', (byte)'/'];
+        int attempts = broker.Attempts.Count;
+        for (int i = 0; i < dribble.Length && broker.Attempts.Count == attempts; i++)
+        {
+            await next.SendAsync([dribble[i]]);
+            for (int s = 0; s < 10 && broker.Attempts.Count == attempts; s++)
+            {
+                time.Advance(TimeSpan.FromSeconds(1));
+                await Task.Delay(3);
+            }
+        }
+        await broker.NextAsync(time);
+        Assert.InRange((broker.Attempts[^1] - subscribed).TotalSeconds, 90, 112);
+        Assert.Contains("no word from the broker", monitor.Feed.Problem ?? "", StringComparison.Ordinal);
+
+        await stop.CancelAsync();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task AnOversizedPacket_EndsTheConnection_WithoutReadingIt()
+    {
+        // A remaining length of 5000 octets: more than any spot, so it is refused before any is read.
+        await using var mqtt = new MqttSubscriber(new MemoryStream([0x30, 0x88, 0x27, .. new byte[100]]));
+        var e = await Assert.ThrowsAsync<IOException>(() => mqtt.ReadAsync(CancellationToken.None));
+        Assert.Contains("5000-octet packet", e.Message, StringComparison.Ordinal);
+        await using var bad = new MqttSubscriber(new MemoryStream([0x30, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]));
+        await Assert.ThrowsAsync<IOException>(() => bad.ReadAsync(CancellationToken.None));
+
+        // And the monitor connects again after it.
+        var time = new FakeTimeProvider(Start);
+        var broker = new FakeBroker(time);
+        var monitor = new PskReporterMonitor("GB7RDG", time, null, broker.Connect);
+        using var stop = new CancellationTokenSource();
+        Task run = monitor.RunAsync(null, stop.Token);
+        var c = await broker.NextAsync(time);
+        await c.AcceptAsync();
+        await c.SendAsync([0x30, 0x88, 0x27]);
+        await broker.NextAsync(time);
+        Assert.Contains("5000-octet packet", monitor.Feed.Problem ?? "", StringComparison.Ordinal);
+        await stop.CancelAsync();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task OnStop_ItSaysDisconnect()
+    {
+        var time = new FakeTimeProvider(Start);
+        var broker = new FakeBroker(time);
+        var monitor = new PskReporterMonitor("GB7RDG", time, null, broker.Connect);
+        using var stop = new CancellationTokenSource();
+        Task run = monitor.RunAsync(null, stop.Token);
+        var c = await broker.NextAsync(time);
+        await c.AcceptAsync();
+        await Eventually(() => monitor.Feed.Connected);
+        await stop.CancelAsync();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        await Eventually(() => c.Received.Contains((byte)14));
+    }
+
+    [Fact]
+    public async Task AScheduleThatThrows_IsLoggedOnce_AndTheFeedStays()
+    {
+        var time = new FakeTimeProvider(Start);
+        var broker = new FakeBroker(time);
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>(); // written on the monitor's thread
+        var monitor = new PskReporterMonitor("GB7RDG", time, log.Enqueue, broker.Connect);
+        using var stop = new CancellationTokenSource();
+        Task run = monitor.RunAsync(_ => throw new InvalidOperationException("no timetable"), stop.Token);
+        var c = await broker.NextAsync(time);
+        await c.AcceptAsync();
+        await Hold(c, time, TimeSpan.FromMinutes(2));
+        Assert.True(monitor.Feed.Connected);
+        Assert.Single(log, l => l == "pskreporter: cannot tell whether a slot is near (no timetable); staying subscribed");
+        Assert.False(run.IsCompleted);
+        await stop.CancelAsync();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task AFlood_StaysBounded_InMemoryAndTime_AndCurrentNeverWaitsLong()
+    {
+        // 1000 spots a second for 60 s, all new and inside the window: far past what is held.
+        var time = new FakeTimeProvider(Start);
+        var monitor = new PskReporterMonitor("GB7RDG", time, null, (_) => throw new IOException("not used"));
+        var payloads = Enumerable.Range(0, 60_000).Select(i =>
+            Payload(10_000 + i, Start.AddMinutes(-2), $"G{i % 9}X{i % 997}", "IO91lk", $"M{i % 7}Y{i % 991}", "IO86ha")).ToList();
+        var slowestCurrent = TimeSpan.Zero;
+        long currents = 0;
+        using var reading = new CancellationTokenSource();
+        var reader = Task.Run(() =>
+        {
+            // Another thread asking for the reading all the while, as a slot or /status would.
+            while (!reading.IsCancellationRequested)
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                _ = monitor.Current;
+                if (watch.Elapsed > slowestCurrent)
+                {
+                    slowestCurrent = watch.Elapsed;
+                }
+                currents++;
+                Thread.Sleep(5);
+            }
+        });
+        var slowestOffer = TimeSpan.Zero;
+        var all = System.Diagnostics.Stopwatch.StartNew();
+        foreach (var p in payloads)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            monitor.Offer(p);
+            if (watch.Elapsed > slowestOffer)
+            {
+                slowestOffer = watch.Elapsed;
+            }
+            time.Advance(TimeSpan.FromMilliseconds(1));
+        }
+        all.Stop();
+        await reading.CancelAsync();
+        await reader;
+
+        Assert.True(all.Elapsed < TimeSpan.FromSeconds(10), $"60000 spots took {all.Elapsed}");
+        Assert.True(slowestOffer < TimeSpan.FromMilliseconds(250), $"slowest spot {slowestOffer}");
+        Assert.True(slowestCurrent < TimeSpan.FromMilliseconds(500), $"slowest reading {slowestCurrent} of {currents}");
+        Assert.InRange(monitor.Feed.SpotsHeld, 1, PskReporterMonitor.MostSpots);
+        Assert.InRange(monitor.HeldBytes, 1, PskReporterMonitor.MostBytes);
+        Assert.Equal(60_000, monitor.Feed.Messages);
+        Assert.True(monitor.Feed.Dropped > 30_000, $"{monitor.Feed.Dropped} dropped");
+    }
+
+    /// <summary>Keeps a connection up for <paramref name="span"/> of fake time, the broker answering pings.</summary>
+    private static async Task Hold(FakeConnection c, FakeTimeProvider time, TimeSpan span)
+    {
+        for (var held = TimeSpan.Zero; held < span; held += TimeSpan.FromSeconds(5))
+        {
+            time.Advance(TimeSpan.FromSeconds(5));
+            await Task.Delay(3);
+        }
     }
 
     [Theory]

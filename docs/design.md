@@ -197,16 +197,18 @@ All numbers are big-endian. A later version only adds bytes at the end, and a re
 
 The ionosonde says what the ionosphere could carry; PSK Reporter says what it is carrying. So the head end also listens to PSK Reporter's public MQTT feed (`mqtt.pskreporter.info:1883`) for FT8, FT4 and WSPR spots on 40 and 80 m with both ends in the UK or Ireland, and from the last 30 minutes of them works out whether 40 m is open at 100, 500 and 1000 km. Like the ionosonde's reading, it is observe only and never changes what or when anything is sent.
 
-It subscribes narrowly, to 128 topics in one go: `pskr/filter/v2/{40m,80m}/+/+/+/+/+/{sender's country}/{receiver's country}` for every pair of England (223), Wales (294), Scotland (279), Northern Ireland (265), Ireland (245), the Isle of Man (114), Guernsey (106) and Jersey (122). The feed gives countries as these DXCC entity numbers, the same in the topic and in the payload's `sa` and `ra`. The payload's locators are used, not the topic's, which cut them to 4 characters. QoS 0 and a clean session, so the broker keeps nothing for us; a lost connection is made again after 5 s, then 10, 20 and so on up to 5 minutes.
+It subscribes narrowly, to 128 topics in one go: `pskr/filter/v2/{40m,80m}/+/+/+/+/+/{sender's country}/{receiver's country}` for every pair of England (223), Wales (294), Scotland (279), Northern Ireland (265), Ireland (245), the Isle of Man (114), Guernsey (106) and Jersey (122). The feed gives countries as these DXCC entity numbers, the same in the topic and in the payload's `sa` and `ra`. The payload's locators are used, not the topic's, which cut them to 4 characters. QoS 0 and a clean session, so the broker keeps nothing for us; a lost connection is made again after 5 s, then 10, 20 and so on up to 5 minutes, starting again from 5 s only after a connection that lasted a minute and brought spots. Plain MQTT on port 1883 can't be trusted, so anything out of bounds is thrown away: packets over 4 KB, payloads over 1 KB, callsigns that aren't 3 to 15 of A to Z, 0 to 9, the slash and the hyphen, and over-long fields. At most 20,000 spots, about 4 MB, are held; past that new spots are dropped until the once-a-minute prune.
 
 Each spot goes in a bin by the great-circle distance between the two locators: 30 to 250 km stands for 100 km, 250 to 700 for 500, and 700 to 1200 for 1000. Paths under 30 km (ground wave, or two stations in one square) are left out.
 
 - A distance is open with at least 5 spots from at least 4 different callsigns.
-- Silence is not proof of closure. A distance is closed only when it has at most 2 spots and there is evidence the band is in use: at least 40 spots from 12 stations at the other distances on the same band, or, for 40 m, 80 m busy at that distance (10 spots from 6 stations).
+- Silence is not proof of closure. A distance is closed only when it has at most 2 spots and there is evidence the band is in use: at least 40 spots from 12 stations at the other distances on the same band, or, for 40 m, 80 m busy at that distance (10 spots from 6 stations). Far fewer pairs of stations are 700 to 1200 km apart, so 1000 km is closed by the other distances only if the other band has at least 3 spots out there too.
 - Anything else is unknown, and so is every distance when the feed was up for less than 20 of the 30 minutes.
 - The skip zone is 0 when 100 km is open. When 100 km is closed and a further distance is open, it is where the 40 m spots start: the 5th percentile of their distances, and at least the third shortest, to the nearest 10 km.
 - The state uses the ionosonde's words: GOOD is open at 100 and 500 km, MARGINAL open somewhere else, POOR closed somewhere and open nowhere, UNKNOWN otherwise.
 - Each bin's median SNR needs 5 SNRs. The feed sometimes gives none, and such a spot still counts.
+
+Open here means open for FT8, which decodes signals far weaker than MS110D needs. So an open verdict says the path exists, not that the mailcast will get through it; the median SNRs, sent with each verdict, are the better guide to that. Closed is the stronger statement: if FT8 can't get through, neither can we.
 
 PSK Reporter reports each pair of stations only every 5 or 6 minutes, and spots arrive a minute or so late (some much later), which is why the window is half an hour and the thresholds count stations as well as spots. 80 m is judged the same way for the head end's log and status, but only 40 m goes on the air.
 
@@ -218,7 +220,7 @@ After the common part, for source 3:
 | 10 | 1 | Bits 0 to 2: closed at 100, 500 or 1000 km because 80 m is busy there; bits 3 to 5: closed there because 40 m is busy at the other distances; bit 7: the feed was down too long to judge by |
 | 11, 16, 21 | 5 each | 100, 500 and 1000 km: spots (2 bytes), stations (2), median SNR in dB (1, signed, -128 for none) |
 
-In the common part a verdict is 0 unknown, 1 closed or 2 open (never 3), and the observation time is the end of the window. The object is 27 bytes, one 28-byte symbol, so each frame is 59 bytes, and the head end sends two in each slot that keys, beside the ionosonde's two, either one rebuilding it. An UNKNOWN reading is still sent, with its counts; with no reading at all (the feed never came up) nothing is. Receivers from before this know type 4 but not source 3, and drop the object quietly.
+In the common part a verdict is 0 unknown, 1 closed or 2 open (never 3), and the observation time is the end of the window. The object is 27 bytes, one 28-byte symbol, so each frame is 59 bytes, and the head end sends two in each slot that keys, beside the ionosonde's two, either one rebuilding it. If the two readings together would leave no room for any bulletin frame, PSK Reporter's go first. An UNKNOWN reading is still sent, with its counts; with no reading at all (the feed never came up) nothing is. Receivers from before this know type 4 but not source 3, and drop the object quietly.
 
 ### Bulletins
 

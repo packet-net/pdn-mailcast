@@ -69,7 +69,8 @@ public interface ISlotPlanner
 /// <param name="pskReporter">
 /// The PSK Reporter reading as of now (<see cref="PskReporterMonitor.Current"/>), which must
 /// answer at once; null sends none. Carried the same way as the ionosonde's, in
-/// <see cref="PskReporterFrames"/> more frames: both readings go in a slot, or neither.
+/// <see cref="PskReporterFrames"/> more frames. When the two readings together would leave no
+/// room for any bulletin frame, this one is dropped first.
 /// </param>
 public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null) : ISlotPlanner
 {
@@ -96,13 +97,19 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
         SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras);
+        if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
+        {
+            // Both readings would crowd out every bulletin frame: PSK Reporter's go first, and the
+            // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
+            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames);
+        }
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
             return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
-        bool carried = broadcast.ExtraFrames > 0;
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, carried ? ionoFrames.Count : 0, spots, carried ? spotFrames.Count : 0);
+        bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
+        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0);
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>

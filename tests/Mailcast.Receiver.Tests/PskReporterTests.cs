@@ -46,7 +46,7 @@ public class PskReporterTests
             Assert.Null(intake.Ionosphere);
         }
         Assert.Equal(
-            ["PSK Reporter (last 30 min to 14:00 UTC, 3 min ago, 40 m FT8/FT4/WSPR): open at 500 km (25 spots, 12 stations) and 1000 km (16 spots, 9 stations), nothing under 250 km despite 41 spots further out."],
+            ["40 m FT8/FT4/WSPR spots (PSK Reporter, last 30 min to 14:00 UTC, 3 min ago): open at 500 km (25 spots, 12 stations, median -11 dB) and 1000 km (16 spots, 9 stations, median -13 dB), nothing under 250 km despite 41 spots further out."],
             log);
 
         await using var reopened = new Intake(dir.Path, _ => { }, new ReceiverStoreOptions { Time = time });
@@ -61,9 +61,9 @@ public class PskReporterTests
         Assert.Equal("MARGINAL", json.GetProperty("state").GetString());
         Assert.Equal(5, json.GetProperty("ageMinutes").GetInt32());
         Assert.Equal(30, json.GetProperty("windowMinutes").GetInt32());
-        Assert.Equal("Open from about 520 km", json.GetProperty("headline").GetString());
+        Assert.Equal("FT8 spots: open from about 520 km", json.GetProperty("headline").GetString());
         Assert.Equal(
-            "PSK Reporter (last 30 min to 14:00 UTC, 5 min ago, 40 m FT8/FT4/WSPR): open at 500 km (25 spots, 12 stations) and 1000 km (16 spots, 9 stations), nothing under 250 km despite 41 spots further out.",
+            "40 m FT8/FT4/WSPR spots (PSK Reporter, last 30 min to 14:00 UTC, 5 min ago): open at 500 km (25 spots, 12 stations, median -11 dB) and 1000 km (16 spots, 9 stations, median -13 dB), nothing under 250 km despite 41 spots further out.",
             json.GetProperty("words").GetString());
         Assert.Equal(
             "100 km closed (0 spots), 500 km open (25 spots, 12 stations, median -11 dB), 1000 km open (16 spots, 9 stations, median -13 dB)",
@@ -77,13 +77,13 @@ public class PskReporterTests
         // An hour on and nothing newer heard: too old to go by.
         var old = JsonSerializer.SerializeToElement(StatusPage.PskView(Reading, Observed.AddMinutes(60)), ReceiverConfig.JsonLine);
         Assert.Equal("UNKNOWN", old.GetProperty("state").GetString());
-        Assert.Equal("No fresh reading", old.GetProperty("headline").GetString());
+        Assert.Equal("No fresh PSK Reporter reading", old.GetProperty("headline").GetString());
         Assert.Equal(JsonValueKind.Null, old.GetProperty("distanceWords").ValueKind);
         Assert.EndsWith("too old to judge 40 m by.", old.GetProperty("words").GetString(), StringComparison.Ordinal);
 
         // A head end whose feed was down says so.
         var down = JsonSerializer.SerializeToElement(StatusPage.PskView(PskEvaluator.Evaluate(Spots(), Observed, TimeSpan.Zero), Observed), ReceiverConfig.JsonLine);
-        Assert.Equal("No verdict: the feed was down", down.GetProperty("headline").GetString());
+        Assert.Equal("No verdict: the PSK Reporter feed was down", down.GetProperty("headline").GetString());
         Assert.Equal(JsonValueKind.Null, down.GetProperty("distanceWords").ValueKind);
     }
 }
