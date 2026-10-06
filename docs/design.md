@@ -8,7 +8,7 @@ Every hour on the hour in daylight, GB7RDG sends its recent bulletins on 40 m. N
 
 Two ideas make a one-way link work:
 
-- **Fountain coding.** Each bulletin is cut into pieces, and the sender can make as many different pieces as it likes. Any set of pieces slightly larger than the bulletin rebuilds it, whichever ones they are. A receiver that misses a third of the transmission in a fade still gets its bulletins, and pieces heard in different slots add together.
+- **Fountain coding.** Each bulletin is cut into pieces, and the sender can make as many different pieces as it likes. Any set of pieces slightly larger than the bulletin rebuilds it, whichever ones they are. A receiver that misses a third of the transmission in a fade still gets its bulletins, and pieces heard in different slots add together. Using a fountain code was Perry M0PYL's idea.
 - **Frames that are either perfect or absent.** The transmission uses pdn-soundmodem's MS110D modes (MIL-STD-188-110D Appendix D), which carry IL2P frames with a CRC. A frame arrives intact or is discarded. That is exactly the kind of loss fountain codes handle best.
 
 ## Decisions so far

@@ -6,6 +6,10 @@ GB7RDG sends its bulletins on 40 m every hour on the hour in daylight, when 40 m
 
 This is an experiment at an early stage: the libraries, the head end and the receiver exist, and GB7RDG has been on the air with them since 2026-10-05. The plan is in [docs/design.md](docs/design.md), and the figures in [docs/factsheet.md](docs/factsheet.md). To run a receiver, see [src/Mailcast.Receiver/README.md](src/Mailcast.Receiver/README.md).
 
+## Credits
+
+The idea of sending the bulletins with a fountain code, so that a one-way link can work at all, came from Perry M0PYL.
+
 ## Licence
 
 AGPL-3.0. See [LICENSE](LICENSE).
