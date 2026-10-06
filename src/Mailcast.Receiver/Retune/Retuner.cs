@@ -987,7 +987,11 @@ public sealed class Retuner : IAsyncDisposable
             _lastProblem = Ascii.Clean(text);
             _lastProblemAt = _time.GetUtcNow();
         }
+        ProblemNoted?.Invoke();
     }
+
+    /// <summary>Raised for each problem noted, for the daily report's error count.</summary>
+    internal event Action? ProblemNoted;
 
     private void Warn(string line) => _log(Ascii.Clean(line));
 

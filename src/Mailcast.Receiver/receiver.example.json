@@ -54,5 +54,9 @@
   // shares your radio, and start it again), add "hooks" as docs/receiver.md says under
   // "Running your own commands around each slot".
 
+  // To send M0LTE a short report each day of what your receiver heard, add
+  // "feedback": { "enabled": true, "callsign": "your callsign" }, as docs/receiver.md says
+  // under "Sending a daily report".
+
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

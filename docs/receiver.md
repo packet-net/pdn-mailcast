@@ -123,6 +123,68 @@ sudo -u pdn-mailcast ssh-copy-id -i /var/lib/pdn-mailcast/.ssh/id_ed25519 ardop@
 
 Then try it as that user, `sudo -u pdn-mailcast /usr/local/bin/mailcast-hook stop` and `start` again, and restart the receiver.
 
+## Sending a daily report
+
+You can help by sending M0LTE a short report each day of what your receiver heard. It is off unless you turn it on:
+
+```json
+"feedback": { "enabled": true, "callsign": "G4ABC" }
+```
+
+- `callsign` is yours, with no SSID, and the report comes from it. It has to look like a callsign, or the receiver won't start.
+- The report goes to `M0LTE@GB7RDG.#42.GBR.EURO` as a personal message, through your own BBS, in the same session the bulletins use. Your BBS sends it on like any other personal mail, so it needs a route towards GB7RDG; most UK BBSes have one.
+- It goes about 30 minutes after the day's last daylight slot (17:30 UTC in early October), once a day at most. If the receiver was off at that time, it sends that day's report when it next starts, once.
+- If your BBS asks for it later, or can't be reached, the receiver tries again after 1 hour, then 2, then every 4 hours, at most 6 times a day, until the next day's report is due. If your BBS refuses it, it isn't sent again; the status page shows what was said.
+- It is small and plain text: about 500 bytes for a 9-slot autumn day, and about 760 for a 14-slot midsummer one. The status page shows the last one as sent, what the BBS said, and when the next goes. The receiver keeps its notes for it in `feedback.json` in the state directory.
+
+### The daily report's format
+
+The title is `MCR <callsign> <date>`, the date in UTC. Here is a whole day from a web SDR:
+
+```
+MCR G4ABC 2026-10-06
+
+MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
+09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b
+10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b
+11 W4 214 18 +1.2 IG 2 1.8/-16 0.31 0.18 279 b
+12 W3 190 19 +1.1 IG 1 - 0.12 0.15 - b
+13 W4 220 19 +1.1 IG 2 1.8/-19 0.29 0.17 276 b
+14 W3 185 17 +1.0 IG 2 1.9/-15 0.36 0.22 284 b
+15 W4 162 13 +1.0 IM 2 2.0/-12 0.47 0.38 296 b
+16 W3 97 8 +0.9 IM 3 2.2/-10 0.61 0.55 310 b
+17 - 0 3 +0.8 IP
+```
+
+Fields are separated by one space, and `-` means not known. The first line is the header:
+
+1. `MCR1`: format 1.
+2. The receiver's version.
+3. The web SDR's 6 character locator, from the position it reports, or `-` for a sound card.
+4. Where the audio came from: `sc` for a sound card, or the web SDR's name, such as `wessex.zapto.org`. A web SDR on your own network (an IP address, `localhost`, or a name like `sdr.local` or `sdr.lan`) is just `sdr`, so the report never carries your addresses.
+5. Bulletins rebuilt / delivered to the BBS that day.
+6. Errors: `0`, or how many, a colon, and how many of each kind: `BBS` (a session with the BBS failed), `AUD` (the audio failed or was lost), `RIG` (a problem retuning the radio), `HOOK` (a hook command failed).
+
+Then one line for each slot listened to, in order:
+
+1. The hour, UTC (`HHMM` if the slot isn't on the hour).
+2. The waveform most frames came on: `W4` (1200 bps), `W3` (600 bps), or `WX` if they tied.
+3. Frames heard.
+4. The tone's signal to noise, dB in 3 kHz.
+5. The tone's offset from 1800 Hz, Hz.
+6. The propagation verdicts heard for the slot: `I` for the ionosonde or `P` for PSK Reporter, then `G` good, `M` marginal, `P` poor or `U` unknown, joined by `+` when there are both, such as `IG+PM`.
+
+When the slot's channel was measured, six more follow:
+
+7. How many paths (modes) there were.
+8. The 2F path's delay after the first, ms, and its power against the first, dB, as `1.9/-17`. Without a locator to name the hops, it is the second path's.
+9. The delay spread, ms.
+10. The Doppler spread, Hz.
+11. The virtual height, km. Without the web SDR's position it is worked out for a 150 km path.
+12. What it was measured from: `b` the bursts, `p` a probe.
+
+A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
+
 ## The receiver's login on your BBS
 
 The receiver logs in as **Q0CAST**. It needs a login of its own:
@@ -188,11 +250,12 @@ http://127.0.0.1:8130/ shows:
 - what to try if nothing is heard;
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the mail this receiver holds (see [Mail](#mail));
+- the daily report, if you have turned it on: the last one as sent, what your BBS said, and when the next goes (see [Sending a daily report](#sending-a-daily-report));
 - the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
 
 On this machine only, the page answers to `localhost` and nothing else.
 
-Scripts can read the same from `GET /api/status`. For the speed: `slot.waveform` is the waveform most of the last slot's frames came on (`ms110d-wn4`), or `mixed` if two tie; `slot.frameCounts` has the frames on each; `slot.listedWaveform` is the directory's, if one was rebuilt in that slot; and `burst` is the burst now (`live: true`) or the last one frames came from, with its `waveform` and `bps`, or null before any. `iono` is the ionosonde reading, or null before one is heard: `state` (`GOOD`, `MARGINAL`, `POOR` or `UNKNOWN`), `foF2`, `mufd100`, `mufd500`, `mufd1000` (MHz), `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes` (by this receiver's clock), `source`, `method`, `distances` (each with `km`, `mufMhz` and `verdict`), and `headline` and `words`, what the page shows. `pskReporter` is the PSK Reporter reading, or null before one is heard: `state`, `observedUtc`, `ageMinutes`, `windowMinutes`, `feedDown`, `skipZoneKm`, `distances` (each with `km`, `fromKm`, `toKm`, `verdict`, `spots`, `stations`, `snrMedianDb` and `closedBy`), and `headline`, `words` and `distanceWords`. `update` is the update check: `latest` (the newest in the apt repository, or null before a check has worked), `current`, `newer`, `checkedAt`, and when newer, `release` (its release notes), `command` and, for a .deb installed by hand, `download`. For a web SDR, `audio.webSdr` says which: its `host` (`wessex.zapto.org`), a `url` for its own page, and `about`, what it says about itself once opened (callsign, name and location), or null before then.
+Scripts can read the same from `GET /api/status`. For the speed: `slot.waveform` is the waveform most of the last slot's frames came on (`ms110d-wn4`), or `mixed` if two tie; `slot.frameCounts` has the frames on each; `slot.listedWaveform` is the directory's, if one was rebuilt in that slot; and `burst` is the burst now (`live: true`) or the last one frames came from, with its `waveform` and `bps`, or null before any. `iono` is the ionosonde reading, or null before one is heard: `state` (`GOOD`, `MARGINAL`, `POOR` or `UNKNOWN`), `foF2`, `mufd100`, `mufd500`, `mufd1000` (MHz), `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes` (by this receiver's clock), `source`, `method`, `distances` (each with `km`, `mufMhz` and `verdict`), and `headline` and `words`, what the page shows. `pskReporter` is the PSK Reporter reading, or null before one is heard: `state`, `observedUtc`, `ageMinutes`, `windowMinutes`, `feedDown`, `skipZoneKm`, `distances` (each with `km`, `fromKm`, `toKm`, `verdict`, `spots`, `stations`, `snrMedianDb` and `closedBy`), and `headline`, `words` and `distanceWords`. `update` is the update check: `latest` (the newest in the apt repository, or null before a check has worked), `current`, `newer`, `checkedAt`, and when newer, `release` (its release notes), `command` and, for a .deb installed by hand, `download`. `feedback` is the daily report: `enabled`, and when it is on, `lastSent`, `lastAnswer` (what the BBS said, in words), `next` (when the next goes, or the last is tried again) and `text` (the last report, title first). For a web SDR, `audio.webSdr` says which: its `host` (`wessex.zapto.org`), a `url` for its own page, and `about`, what it says about itself once opened (callsign, name and location), or null before then.
 
 ### On your network
 
@@ -250,7 +313,7 @@ On disk they are in the state directory: waiting ones in `store/outbox/`, archiv
 
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, each ionosonde reading as it arrives (one line a slot), what the BBS said about it, each one sent again from the page, and a newer version once when it is first seen (`update: version 0.7.0 is available (you have 0.6.0); the status page says how to upgrade`). The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, each ionosonde reading as it arrives (one line a slot), what the BBS said about it, each one sent again from the page, a newer version once when it is first seen (`update: version 0.7.0 is available (you have 0.6.0); the status page says how to upgrade`), and with the daily report on, what your BBS said about it (`feedback: the report for 2026-10-06 (MCR G4ABC 2026-10-06, 458 bytes) was accepted by the BBS`). The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Mailcast.Receiver.Feedback;
 using Mailcast.Receiver.Hooks;
 using Mailcast.Receiver.Retune;
 using Packet.Mailcast;
@@ -242,6 +243,12 @@ public sealed record ReceiverConfig
     /// </summary>
     public HooksSettings? Hooks { get; init; }
 
+    /// <summary>
+    /// A short daily report of what this receiver heard, sent as a personal mail through the BBS
+    /// to the broadcast's author. Null (the default) or not enabled sends nothing.
+    /// </summary>
+    public FeedbackSettings? Feedback { get; init; }
+
     internal static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -286,6 +293,12 @@ public sealed record ReceiverConfig
             throw new ConfigException(
                 $"the config file {path} has a \"hooks\" setting that cannot be read (at {e.Path}): give each hook as "
                 + "{ \"command\": \"/full/path/to/program\", \"args\": [\"a list\", \"of strings\"], \"timeoutSeconds\": 30 }");
+        }
+        catch (JsonException e) when (e.Path?.StartsWith("$.feedback", StringComparison.Ordinal) == true)
+        {
+            throw new ConfigException(System.Text.RegularExpressions.Regex.Match(e.Message, "property '([^']*)' could not be mapped") is { Success: true } unknown
+                ? $"the config file {path}: \"{unknown.Groups[1].Value}\" is not a setting of \"feedback\": it has only \"enabled\" and \"callsign\""
+                : $"the config file {path} has a \"feedback\" setting that cannot be read (at {e.Path}): give it as {{ \"enabled\": true, \"callsign\": \"G4ABC\" }}");
         }
         catch (JsonException e)
         {
@@ -426,6 +439,7 @@ public sealed record ReceiverConfig
         Rig?.Validate();
         Bpq?.Validate();
         Hooks?.Validate();
+        Feedback?.Validate();
         if (Rig is { DedicatedRadio: false } && Bpq is null)
         {
             throw new ConfigException(

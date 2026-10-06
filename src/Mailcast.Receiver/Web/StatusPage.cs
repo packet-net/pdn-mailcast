@@ -723,6 +723,8 @@ public sealed class StatusPage : IAsyncDisposable
             framesHeard = _host.Intake.FramesHeard,
             iono = IonoView(_host.Intake.Ionosphere, _host.Time.GetUtcNow()),
             pskReporter = PskView(_host.Intake.PskReporter, _host.Time.GetUtcNow()),
+            // The daily report, when the config's "feedback" turns it on.
+            feedback = _host.Feedback.View(),
             directory = directory is null ? null : new { date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), entries = directory.Entries.Count },
             bulletins = progress.Select(p =>
             {

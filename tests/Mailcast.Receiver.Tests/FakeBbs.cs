@@ -31,6 +31,9 @@ internal sealed class FakeBbs : IAsyncDisposable
     /// <summary>BIDs the BBS already has: proposals of these are answered FS -.</summary>
     public ConcurrentDictionary<string, bool> Known { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>BIDs the BBS wants later: proposals of these are answered FS =.</summary>
+    public ConcurrentDictionary<string, bool> Later { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Messages taken, in order.</summary>
     public ConcurrentQueue<TakenMessage> Taken { get; } = new();
 
@@ -140,7 +143,9 @@ internal sealed class FakeBbs : IAsyncDisposable
                     break;
                 case FbbProposalsReceived proposals:
                     var answers = proposals.Proposals
-                        .Select(p => p is FaProposal fa && Known.ContainsKey(fa.Bid) ? FsAnswer.AlreadyHave : FsAnswer.Accept)
+                        .Select(p => p is FaProposal fa && Known.ContainsKey(fa.Bid) ? FsAnswer.AlreadyHave
+                            : p is FaProposal later && Later.ContainsKey(later.Bid) ? FsAnswer.Defer
+                            : FsAnswer.Accept)
                         .ToList();
                     foreach (var next in session.Advance(new FbbProposalDecisions(answers)))
                     {
