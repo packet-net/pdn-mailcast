@@ -809,8 +809,8 @@ public sealed class StatusPage : IAsyncDisposable
         var today = DateOnly.FromDateTime(now.UtcDateTime);
         var todays = schedule.ActiveOn(today);
         bool webSdr = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.UberSdr;
-        var (opens, closes, listenSlot) = ListeningWindow.Next(now, schedule, config.WebSdrSlotsPerDay);
-        var listened = ListeningWindow.WebSdrSlotsOn(schedule, config.WebSdrSlotsPerDay, today);
+        var (opens, closes, listenSlot) = ListeningWindow.Next(now, schedule);
+        var listened = ListeningWindow.WebSdrSlotsOn(schedule, today);
         static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         return new
         {

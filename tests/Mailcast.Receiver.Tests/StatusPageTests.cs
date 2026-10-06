@@ -127,13 +127,13 @@ public class StatusPageTests
     [Theory]
     // During a slot the web SDR listens to, during one it doesn't, between slots, and around midnight.
     [InlineData("2026-10-05T12:05:00Z", "2026-10-05T13:00:00Z", "2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", true)]
-    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T15:00:00Z", false)]
-    [InlineData("2026-10-05T13:20:00Z", "2026-10-05T14:00:00Z", null, "2026-10-05T15:00:00Z", false)]
+    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T14:00:00Z", false)]
+    [InlineData("2026-10-05T13:20:00Z", "2026-10-05T14:00:00Z", null, "2026-10-05T14:00:00Z", false)]
     [InlineData("2026-10-05T23:59:00Z", "2026-10-06T00:00:00Z", null, "2026-10-06T00:00:00Z", true)]
     [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
     public void Schedule_GivesTheNextSlot_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
     {
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Daylight = null, WebSdrSlotsPerDay = 8 };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Daylight = null };
 
         var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
 
@@ -149,8 +149,9 @@ public class StatusPageTests
         var web = schedule.GetProperty("webSdr");
         Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
         Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
-        Assert.Equal(8, web.GetProperty("times").GetArrayLength());
-        Assert.Equal("03:00", web.GetProperty("times")[1].GetString());
+        // Without daylight hours, 12 of the 24, every other hour.
+        Assert.Equal(12, web.GetProperty("times").GetArrayLength());
+        Assert.Equal("02:00", web.GetProperty("times")[1].GetString());
     }
 
     [Fact]

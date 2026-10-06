@@ -66,7 +66,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             switch (AudioSource.Parse(config.Audio).Kind)
             {
                 case AudioSourceKind.UberSdr:
-                    var (opens, closes, slot) = ListeningWindow.Next(at, Schedule, config.WebSdrSlotsPerDay);
+                    var (opens, closes, slot) = ListeningWindow.Next(at, Schedule);
                     return new HookWindow(opens, closes, slot);
                 case AudioSourceKind.Alsa:
                     return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
@@ -212,6 +212,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
         }
+        if (Config.WebSdrSlotsPerDayIgnored)
+        {
+            _log("config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every daylight slot that fits in its allowance");
+        }
         int pending = Intake.Pending().Count;
         if (pending > 0)
         {
@@ -297,7 +301,6 @@ public sealed class ReceiverHost : IAsyncDisposable
             bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal)
                 || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal)
                 || _config.EveryMinutes != config.EveryMinutes
-                || _config.WebSdrSlotsPerDay != config.WebSdrSlotsPerDay
                 || _config.Daylight != config.Daylight
                 || _config.DialKHz != config.DialKHz;
             _config = config;
@@ -340,8 +343,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // Said again whenever it changes: once a day with a daylight rule, as the days
                 // lengthen and shorten.
                 var schedule = Schedule;
-                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule, config.WebSdrSlotsPerDay);
-                string words = ListeningWindow.Describe(schedule, config.WebSdrSlotsPerDay, DateOnly.FromDateTime(slot.UtcDateTime));
+                var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule);
+                string words = ListeningWindow.Describe(schedule, DateOnly.FromDateTime(slot.UtcDateTime));
                 if (words != described)
                 {
                     described = words;

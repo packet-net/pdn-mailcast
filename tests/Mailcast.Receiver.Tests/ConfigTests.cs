@@ -16,7 +16,7 @@ public class ConfigTests
         Assert.Equal(7052.0, config.DialKHz);
         Assert.Equal("00:00", config.SlotUtc);
         Assert.Equal(60, config.EveryMinutes);
-        Assert.Null(config.WebSdrSlotsPerDay);
+        Assert.False(config.WebSdrSlotsPerDayIgnored);
         Assert.False(config.SlotUtcWithoutEveryMinutes);
         Assert.Equal(new ArchiveSettings { Days = 30, MaxMegabytes = 50 }, config.Archive);
     }
@@ -89,23 +89,25 @@ public class ConfigTests
         Assert.Equal(config with { SlotUtcWithoutEveryMinutes = false }, ReceiverConfig.Load(path));
     }
 
-    [Fact]
-    public void WebSdrSlotsPerDay_LeftOut_StaysLeftOutWhenSaved_AndGivenIsKept()
+    [Theory]
+    [InlineData("8")]
+    [InlineData("0")]
+    [InlineData("24")]
+    [InlineData("null")]
+    [InlineData("\"lots\"")]
+    public void WebSdrSlotsPerDay_FromAnOldFile_IsIgnoredNotRefused_AndLeftOutWhenSaved(string value)
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, "{}");
+        File.WriteAllText(path, $$"""{ "audio": "ubersdr:wessex.zapto.org", "webSdrSlotsPerDay": {{value}} }""");
 
         var config = ReceiverConfig.Load(path);
+
+        Assert.True(config.WebSdrSlotsPerDayIgnored);
+        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, config.WebSdrSlots.Count);
         config.Save(path);
-
-        Assert.Null(config.WebSdrSlotsPerDay);
         Assert.DoesNotContain("webSdrSlotsPerDay", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Null(ReceiverConfig.Load(path).WebSdrSlotsPerDay);
-
-        File.WriteAllText(path, """{ "webSdrSlotsPerDay": 8 }""");
-        ReceiverConfig.Load(path).Save(path);
-        Assert.Equal(8, ReceiverConfig.Load(path).WebSdrSlotsPerDay);
+        Assert.False(ReceiverConfig.Load(path).WebSdrSlotsPerDayIgnored);
     }
 
     [Fact]
@@ -113,7 +115,7 @@ public class ConfigTests
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, """{ "slotUtc": "00:30", "everyMinutes": 120, "webSdrSlotsPerDay": 12 }""");
+        File.WriteAllText(path, """{ "slotUtc": "00:30", "everyMinutes": 120 }""");
 
         var config = ReceiverConfig.Load(path);
 
@@ -197,9 +199,6 @@ public class ConfigTests
     [InlineData("""{ "everyMinutes": 10 }""", "everyMinutes")]
     [InlineData("""{ "everyMinutes": 50 }""", "everyMinutes")]
     [InlineData("""{ "everyMinutes": 2880 }""", "everyMinutes")]
-    [InlineData("""{ "webSdrSlotsPerDay": 0 }""", "webSdrSlotsPerDay")]
-    [InlineData("""{ "webSdrSlotsPerDay": 13 }""", "3 hours")]
-    [InlineData("""{ "webSdrSlotsPerDay": 24 }""", "webSdrSlotsPerDay")]
     [InlineData("""{ "dialKHz": 7.052 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": 0 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": -7052 }""", "dialKHz")]

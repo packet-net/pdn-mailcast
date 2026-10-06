@@ -31,15 +31,12 @@
   // GB7RDG's slots: one at "slotUtc" (UTC), then one every "everyMinutes", so every hour
   // on the hour, but only in daylight: from 2 hours after sunrise to 30 minutes before sunset
   // near Reading (IO91lk). Once the receiver has heard GB7RDG's directory, which gives its
-  // slots, it uses that instead. A sound card listens all the time.
+  // slots, it uses that instead. A sound card listens all the time. A web SDR listens from 2
+  // minutes before each daylight slot to 12 after, which is every slot for most of the year;
+  // near midsummer it skips the earliest morning ones to stay inside its 3 hours a day.
   "slotUtc": "00:00",
   "everyMinutes": 60,
   "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
-
-  // A public web SDR allows each address about 3 hours a day. Each slot takes 14 minutes, from
-  // 2 minutes before it to 12 after, so up to 12 slots a day fit. It listens to every daylight
-  // slot that fits, which is all of them for most of the year; near midsummer it leaves out the
-  // earliest morning ones. To listen to fewer, add "webSdrSlotsPerDay", from 1 to 12.
 
   // The receiver keeps its own copy of each bulletin once your BBS has answered for it, to
   // read on the status page or send to the BBS again: for "days", and "maxMegabytes" in all,
