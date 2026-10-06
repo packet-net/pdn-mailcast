@@ -116,7 +116,23 @@ public sealed class ReceiverHost : IAsyncDisposable
     }
 
     /// <summary>A sentence on what the audio is doing, for the page and the log.</summary>
-    public string AudioState { get; private set; } = "starting";
+    public string AudioState => Audio.Words;
+
+    /// <summary>What the audio is doing, for the page: in words, and the parts the page needs to explain it.</summary>
+    public AudioCondition Audio
+    {
+        get => _audio;
+        private set
+        {
+            _audio = value;
+            AudioChanged?.Invoke(value);
+        }
+    }
+
+    private AudioCondition _audio = new("starting", AudioPhase.Starting);
+
+    /// <summary>For tests: raised each time <see cref="Audio"/> changes.</summary>
+    internal event Action<AudioCondition>? AudioChanged;
 
     /// <summary>
     /// Raised on the audio supervisor for each new pipeline before its audio starts, so the page
@@ -261,7 +277,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 if (opens > _time.GetUtcNow())
                 {
-                    AudioState = $"the web SDR is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot";
+                    Audio = new($"the web SDR is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
                     if (AudioState != closedSaid)
                     {
                         // Said once per wait, not at every look at the clock.
@@ -295,9 +311,9 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 Attach(pipeline);
                 PipelineCreated?.Invoke(pipeline);
-                AudioState = $"opening {pipeline.Source}";
+                Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
                 await pipeline.StartAsync(token).ConfigureAwait(false);
-                AudioState = $"listening to {pipeline.Source}";
+                Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
                 refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
                 await pipeline.Finished.WaitAsync(token).ConfigureAwait(false);
@@ -342,13 +358,13 @@ public sealed class ReceiverHost : IAsyncDisposable
             if (pipeline.Source.Kind == AudioSourceKind.Wav)
             {
                 _log($"audio: {why}; the receiver keeps running to deliver what it rebuilt");
-                AudioState = why;
+                Audio = new(why, AudioPhase.Ended, Problem: why);
                 await WaitForRestartAsync(cancellation).ConfigureAwait(false);
                 continue;
             }
             TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)] : AudioRetry;
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
-            AudioState = $"{why}; trying again shortly";
+            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait);
             await DelayAsync(wait, cancellation).ConfigureAwait(false);
         }
     }
@@ -454,3 +470,32 @@ public sealed class ReceiverHost : IAsyncDisposable
             host.Bbs.DeliverAsync(bulletins, cancellation);
     }
 }
+
+/// <summary>Where the audio is: what the status page shows in place of the spectrogram while there is none.</summary>
+public enum AudioPhase
+{
+    /// <summary>The receiver has only just started.</summary>
+    Starting,
+
+    /// <summary>A web SDR, closed between the slots it listens to.</summary>
+    Closed,
+
+    /// <summary>Opening the source.</summary>
+    Opening,
+
+    /// <summary>Audio is coming in.</summary>
+    Listening,
+
+    /// <summary>The source could not be opened or stopped; it is tried again at <see cref="AudioCondition.RetryAt"/>.</summary>
+    Failed,
+
+    /// <summary>A recording has played to its end.</summary>
+    Ended,
+}
+
+/// <summary>
+/// What the audio is doing: <paramref name="Words"/> for the log and the page's summary, and for a
+/// web SDR closed between slots when it opens again (<paramref name="Reopens"/>) and for which slot,
+/// or for a source that failed, why (<paramref name="Problem"/>) and when it is tried again.
+/// </summary>
+public sealed record AudioCondition(string Words, AudioPhase Phase, DateTimeOffset? Reopens = null, DateTimeOffset? ForSlot = null, string? Problem = null, DateTimeOffset? RetryAt = null);

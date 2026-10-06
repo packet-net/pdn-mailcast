@@ -31,6 +31,10 @@
   .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 80px; }
   .bar > span { display: block; height: 100%; background: var(--accent); }
   #spectro { width: 100%; height: 260px; display: block; background: #0d1117; border-radius: 6px; }
+  .spectroBox { position: relative; }
+  #specNotice { position: absolute; inset: 0; margin: 0; padding: 18px 24px; display: grid; place-items: center; text-align: center;
+    color: #d6dde6; font-size: 15px; background: rgba(13,17,23,.85); border-radius: 6px; }
+  #specNotice[hidden] { display: none; }
   .meter { position: relative; height: 14px; background: #e9edf1; border-radius: 7px; margin: 8px 0 4px; overflow: hidden; }
   .meter .band { position: absolute; top: 0; bottom: 0; background: #cdebd8; }
   .meter .peak { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent); opacity: .8; }
@@ -86,7 +90,10 @@
 
   <section class="wide">
     <h2>Spectrogram</h2>
-    <canvas id="spectro"></canvas>
+    <div class="spectroBox">
+      <canvas id="spectro"></canvas>
+      <p id="specNotice" hidden></p>
+    </div>
     <div class="legend">
       <span><i style="background:#7ec8ff"></i>signal edges</span>
       <span><i style="background:#ffffff"></i>centre, 1800 Hz</span>
@@ -221,6 +228,7 @@ async function refresh() {
   const s = status;
   $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
   schedule(s);
+  spectrogram(s);
 
   if (s.slot) {
     const t = s.slot.tone;
@@ -452,12 +460,13 @@ function markers() {
 
 function connect() {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${scheme}://${location.host}${location.pathname.replace(/[^/]*$/, "")}waterfall/ws`);
+  const socket = new WebSocket(`${scheme}://${location.host}${location.pathname.replace(/[^/]*$/, "")}waterfall/ws`);
+  ws = socket;
   ws.binaryType = "arraybuffer";
   ws.onmessage = e => {
     if (typeof e.data === "string") {
       const msg = JSON.parse(e.data);
-      if (msg.type === "ping") ws.send(JSON.stringify({ type: "pong" }));
+      if (msg.type === "ping") socket.send(JSON.stringify({ type: "pong" }));
       else if (msg.type === "config") cfg = msg;
       else if (msg.type === "level") level(msg);
       return;
@@ -466,9 +475,43 @@ function connect() {
     if (bytes[0] !== 0x01 || !cfg) return;
     line(bytes.subarray(5));
   };
-  ws.onclose = () => setTimeout(connect, 3000);
+  ws.onclose = () => { if (ws === socket) ws = null; };
 }
-connect();
+
+/* The spectrogram is only asked for while the status says audio is coming in. Between a web
+   SDR's slots, or while a sound card is missing, there is nothing to draw and the WebSocket would
+   only be refused, so the page says why instead and asks again with the next status (every 3 s).
+   A WebSocket that closes is not opened again until the status says the audio is back. */
+const hhmm = t => new Date(t).toISOString().slice(11, 16);
+function audioNote(s) {
+  const a = s.audio;
+  if (a.live) return null;
+  const again = a.retryAt ? ` The receiver tries again at ${new Date(a.retryAt).toISOString().slice(11, 19)} UTC.` : " The receiver keeps trying.";
+  switch (a.phase) {
+    case "closed":
+      return `The web SDR is closed between slots. The spectrogram comes back at ${utc(a.reopens)}, ready for the ${hhmm(a.forSlot)} slot.`;
+    case "failed":
+      return a.kind === "soundCard" ? `No audio from the sound card: ${a.problem}.${again} Check the radio is on and its USB lead is in, and the audio setting below.`
+        : a.kind === "webSdr" ? `No audio from the web SDR: ${a.problem}.${again}`
+        : `Cannot play the recording: ${a.problem}.`;
+    case "ended":
+      return "The recording has played to its end.";
+    case "opening":
+      return a.kind === "webSdr" ? "Opening the web SDR..." : a.kind === "soundCard" ? "Opening the sound card..." : "Opening the recording...";
+    default:
+      return "Waiting for audio...";
+  }
+}
+let audioLive = false;
+function spectrogram(s) {
+  const note = audioNote(s), box = $("specNotice");
+  box.hidden = !note;
+  box.textContent = note || "";
+  if (s.audio.live && !ws) connect();
+  if (!s.audio.live && ws) { const old = ws; ws = null; old.close(); }
+  if (!s.audio.live && audioLive) { ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  audioLive = s.audio.live;
+}
 
 let levelTimer = null;
 function level(msg) {
