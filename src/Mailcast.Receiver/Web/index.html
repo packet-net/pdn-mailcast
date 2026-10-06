@@ -66,6 +66,9 @@
   #updateCmd { flex: 1 1 320px; margin: 0; padding: 7px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px;
     font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
   #updateCopy { padding: 4px 12px; }
+  #channel svg { width: 100%; height: auto; display: block; margin-top: 8px; }
+  #channel svg text { font: 11px system-ui, sans-serif; fill: var(--soft); }
+  #channel .head { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -111,6 +114,11 @@
   <section id="retuneBox" hidden>
     <h2>Sharing the radio</h2>
     <dl id="retune"></dl>
+  </section>
+
+  <section>
+    <h2>Channel</h2>
+    <div id="channel" class="muted">Measured after each slot, from the bursts this receiver decodes. Nothing measured yet.</div>
   </section>
 
   <section class="wide">
@@ -248,6 +256,95 @@ async function api(url, options) {
   return { ok: false, status: answer.status, body, text, error: why };
 }
 
+/* ---------- channel: the radio path from GB7RDG, measured from the bursts decoded ---------- */
+const svgNs = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs, title) {
+  const e = document.createElementNS(svgNs, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (title) { const t = document.createElementNS(svgNs, "title"); t.textContent = title; e.appendChild(t); }
+  return e;
+}
+const hopWords = l => l === "1E" ? "1 hop, E layer" : l ? `${l[0]} hop${l[0] === "1" ? "" : "s"}` : "another path";
+/* the slot's delay profile: power against delay after the first path, the modes marked */
+function channelProfile(c) {
+  const W = 320, H = 110, L = 34, R = 8, T = 16, B = 22, floor = -40;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Delay profile of the last slot" });
+  const p = c.profile, x0 = p.startMs, x1 = p.startMs + p.stepMs * (p.db.length - 1);
+  const x = ms => L + (ms - x0) / (x1 - x0) * (W - L - R), y = db => T + (Math.max(floor, Math.min(0, db)) / floor) * (H - T - B);
+  for (const db of [0, -20, -40]) {
+    svg.appendChild(svgEl("line", { x1: L, x2: W - R, y1: y(db), y2: y(db), stroke: "var(--line)", "stroke-width": 1 }));
+    svg.appendChild(svgEl("text", { x: L - 4, y: y(db) + 4, "text-anchor": "end" })).textContent = `${db}`;
+  }
+  for (let ms = 0; ms <= x1; ms += 2) svg.appendChild(svgEl("text", { x: x(ms), y: H - 6, "text-anchor": "middle" })).textContent = ms;
+  svg.appendChild(svgEl("text", { x: W - R, y: H - 6, "text-anchor": "end" })).textContent = "ms";
+  svg.appendChild(svgEl("text", { x: L - 4, y: 10, "text-anchor": "end" })).textContent = "dB";
+  const pts = p.db.map((db, i) => db === null ? null : `${x(x0 + i * p.stepMs).toFixed(1)},${y(db).toFixed(1)}`).filter(Boolean);
+  svg.appendChild(svgEl("polyline", { points: pts.join(" "), fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round" }));
+  for (const m of c.modes) {
+    const tip = `${hopWords(m.label)}: ${m.delayMs.toFixed(2)} ms after the first, ${m.powerDb.toFixed(1)} dB` + (m.dopplerSpreadHz !== null ? `, Doppler spread ${m.dopplerSpreadHz} Hz` : "");
+    svg.appendChild(svgEl("circle", { cx: x(m.delayMs), cy: y(m.powerDb), r: 4.5, fill: "var(--accent)", stroke: "var(--card)", "stroke-width": 2 }, tip));
+    if (m.label) svg.appendChild(svgEl("text", { x: x(m.delayMs), y: Math.max(11, y(m.powerDb) - 8), "text-anchor": "middle" })).textContent = m.label;
+    svg.appendChild(svgEl("rect", { x: x(m.delayMs) - 10, y: T - 6, width: 20, height: H - T - B + 12, fill: "transparent" }, tip));
+  }
+  return svg;
+}
+/* the last 24 hours: one column per hour, a dot per mode at its delay, darker for stronger */
+function channelStrip(c) {
+  const W = 320, H = 74, L = 34, R = 8, T = 6, B = 18, top = 5;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Paths heard in each slot over the last 24 hours" });
+  const hour = 3600e3, end = Math.floor(Date.now() / hour) * hour, start = end - 23 * hour;
+  const cw = (W - L - R) / 24, x = t => L + ((t - start) / hour) * cw + cw / 2, y = ms => T + (Math.min(ms, top) / top) * (H - T - B);
+  for (const ms of [0, top]) svg.appendChild(svgEl("text", { x: L - 4, y: y(ms) + 4, "text-anchor": "end" })).textContent = `${ms} ms`;
+  for (let t = start + hour; t <= end; t += hour) {
+    if (new Date(t).getUTCHours() % 6 === 0) svg.appendChild(svgEl("text", { x: x(t), y: H - 4, "text-anchor": "middle" })).textContent = new Date(t).toISOString().slice(11, 13);
+  }
+  for (const h of c.history) {
+    const t = Math.floor(new Date(h.slot).getTime() / hour) * hour;
+    if (t < start) continue;
+    svg.appendChild(svgEl("rect", { x: x(t) - cw / 2 + 1, y: T, width: cw - 2, height: H - T - B, rx: 2, fill: h.enough ? "var(--paper)" : "var(--line)" },
+      `${utc(h.slot)}: ${h.words}`));
+    for (const m of h.modes) {
+      const shade = Math.max(0.15, 1 + m.powerDb / 25);
+      svg.appendChild(svgEl("circle", { cx: x(t), cy: y(m.delayMs), r: 3.5, fill: "var(--accent)", "fill-opacity": shade.toFixed(2) },
+        `${utc(h.slot)}: ${hopWords(m.label)}, ${m.delayMs.toFixed(1)} ms, ${m.powerDb.toFixed(0)} dB`));
+    }
+  }
+  return svg;
+}
+function channel(s) {
+  const c = s.channel, box = $("channel");
+  if (!c) return;
+  if (!c.slot) {
+    box.className = "muted";
+    box.textContent = c.waiting ? `${c.words} ${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from this slot, measured once it is over.` : c.words;
+    return;
+  }
+  box.className = "";
+  box.innerHTML = `<div><span class="head">Last slot (${utc(c.slot)}):</span> ${esc(c.words)}</div>`;
+  if (c.enough && c.profile) {
+    box.appendChild(channelProfile(c));
+    const rows = [];
+    if (c.delaySpreadMs !== null) rows.push(["Delay spread", `${c.delaySpreadMs} ms`]);
+    if (c.fadeDb !== null) rows.push(["Fading", `${c.fadeDb} dB below its middle level, a tenth of the time`]);
+    if (c.coherenceS !== null) rows.push(["Steady for", c.coherenceAtLeast ? `${c.coherenceS} s or more` : `about ${c.coherenceS} s`]);
+    rows.push(["Measured from", `${c.measurements} burst${c.measurements === 1 ? "" : "s"}${c.snrDb !== null ? `, signal to noise ${c.snrDb} dB` : ""}`]);
+    rows.push(["Path", c.distanceKm !== null ? `${c.distanceKm} km from GB7RDG (IO91lk) to ${esc(c.locator)}` : `set "locator" in receiver.json to name the hops`]);
+    const dl = document.createElement("dl");
+    dl.style.marginTop = "8px";
+    dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    box.appendChild(dl);
+  }
+  if (c.history.length) {
+    const cap = document.createElement("div");
+    cap.className = "muted";
+    cap.style.marginTop = "10px";
+    cap.textContent = "Last 24 hours, by hour (UTC): each dot a path, at its delay; darker is stronger. Grey: too little decoded.";
+    box.appendChild(cap);
+    box.appendChild(channelStrip(c));
+  }
+  if (c.waiting) box.appendChild(el("div", `${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from the slot on now, measured once it is over.`, "muted"));
+}
+
 /* ---------- status ---------- */
 async function refresh() {
   const r = await api("api/status");
@@ -257,6 +354,7 @@ async function refresh() {
   $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
   schedule(s);
   spectrogram(s);
+  channel(s);
 
   if (s.slot) {
     const t = s.slot.tone;

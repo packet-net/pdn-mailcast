@@ -41,6 +41,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.DirectoryHeard += directory => Slots.OnDirectory(directory.Mode);
         Intake.ScheduleHeard += OnScheduleHeard;
         Hooks = new SlotHooks(() => Config, time, log);
+        ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place);
         if (config.Rig is not null)
         {
             Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks);
@@ -49,6 +50,34 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The config's <c>hooks</c>, run around each slot listened to.</summary>
     public SlotHooks Hooks { get; }
+
+    /// <summary>The radio path from GB7RDG, measured after each slot from the bursts decoded.</summary>
+    public ChannelWatch ChannelWatch { get; }
+
+    /// <summary>
+    /// Where the receiver is, for naming the hops: the config's <c>locator</c>, or else where the
+    /// web SDR in use says it is; null if neither is known.
+    /// </summary>
+    public GroundPlace? Place
+    {
+        get
+        {
+            var config = Config;
+            if (GroundPlace.FromLocator(config.Locator) is { } set)
+            {
+                return set;
+            }
+            lock (_gate)
+            {
+                return _webSdrPlace is { } p && p.Source == config.Audio ? p.Place : null;
+            }
+        }
+    }
+
+    private (string Source, GroundPlace Place)? _webSdrPlace;
+
+    /// <summary>The slot a burst heard now belongs to: the slot tracker's, or now if it has none.</summary>
+    private DateTimeOffset SlotNow() => Slots.Last is { } slot ? slot.Scheduled ?? slot.Started : _time.GetUtcNow();
 
     /// <summary>Whether the retuner runs the hooks, in step with its own work: it is retuning the radio the audio comes from.</summary>
     internal bool RetunerRunsHooks => Retuner is not null && AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa;
@@ -284,6 +313,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         await pipeline.StartAsync(cancellation).ConfigureAwait(false);
         await pipeline.Finished.WaitAsync(cancellation).ConfigureAwait(false);
         await pipeline.DisposeAsync().ConfigureAwait(false);
+        ChannelWatch.SlotOver();
+        await ChannelWatch.IdleAsync().WaitAsync(cancellation).ConfigureAwait(false);
         await Intake.DrainAsync(cancellation).ConfigureAwait(false);
         _log($"decode: {Intake.FramesHeard} frames heard, {Intake.Pending().Count} bulletins to deliver");
         return await Delivery.DeliverPendingAsync(cancellation).ConfigureAwait(false);
@@ -398,6 +429,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
                 refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
+                _ = NotePlaceAsync(pipeline, config.Audio, token);
                 await pipeline.Finished.WaitAsync(token).ConfigureAwait(false);
                 why = pipeline.EndReason ?? "the audio stopped";
             }
@@ -425,6 +457,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                     _pipeline = null;
                 }
                 await pipeline.DisposeAsync().ConfigureAwait(false);
+                ChannelWatch.SlotOver();
             }
 
             if (pipeline.LeftStuck)
@@ -526,8 +559,29 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
     }
 
+    /// <summary>Keeps where the web SDR says it is, once it has said, while the audio setting is the same.</summary>
+    private async Task NotePlaceAsync(AudioPipeline pipeline, string audio, CancellationToken cancellation)
+    {
+        if (pipeline.Source.Kind != AudioSourceKind.UberSdr)
+        {
+            return;
+        }
+        for (int i = 0; i < 30 && pipeline.WebSdrPlace is null && !cancellation.IsCancellationRequested; i++)
+        {
+            await DelayAsync(TimeSpan.FromSeconds(1), cancellation).ConfigureAwait(false);
+        }
+        if (pipeline.WebSdrPlace is { } place)
+        {
+            lock (_gate)
+            {
+                _webSdrPlace = (audio, place);
+            }
+        }
+    }
+
     private void Attach(AudioPipeline pipeline)
     {
+        pipeline.BurstCaptured += burst => ChannelWatch.Offer(burst, SlotNow());
         // On the audio thread, while the modem is still locked to the burst the frame came on.
         pipeline.Channel.FrameReceived += (_, frame) => Intake.Offer(frame, pipeline.FrameWaveform);
         pipeline.Tone.ToneMeasured += Slots.OnTone;
@@ -544,6 +598,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             await Retuner.DisposeAsync().ConfigureAwait(false);
         }
         await Intake.DisposeAsync().ConfigureAwait(false);
+        await ChannelWatch.DisposeAsync().ConfigureAwait(false);
         Hooks.Dispose();
     }
 

@@ -75,6 +75,11 @@ public sealed class AudioPipeline : IAsyncDisposable
             _log("audio: this pdn-soundmodem does not say which MS110D waveform it locked to, so the page cannot show the speed");
         }
         Burst = new BurstWatch(time);
+        Capture = new BurstCapture(time, burst => BurstCaptured?.Invoke(burst));
+        if (_receiver is not null)
+        {
+            Capture.Attach(_receiver);
+        }
         Channel.FrameReceived += (_, _) => Burst.OnFrame(LockedWaveform);
         Tone = new ToneDetector(OnAir.SampleRate);
         Channel.AddReceiveTap(Tone.Process);
@@ -82,6 +87,18 @@ public sealed class AudioPipeline : IAsyncDisposable
 
     /// <summary>The bursts heard, by the waveform the modem's autobaud locked to: for the speed tile.</summary>
     public BurstWatch Burst { get; }
+
+    /// <summary>Keeps each decoded burst's audio for the channel measurement.</summary>
+    internal BurstCapture Capture { get; }
+
+    /// <summary>Raised on the audio thread with each decoded burst and its audio, for the channel measurement.</summary>
+    public event Action<CapturedBurst>? BurstCaptured;
+
+    /// <summary>
+    /// Where the web SDR says it is, from its <c>/api/description</c> (its GPS position or
+    /// locator), once it has answered; null for other sources, or one that does not say.
+    /// </summary>
+    public GroundPlace? WebSdrPlace { get; private set; }
 
     /// <summary>
     /// The waveform number the MS110D receiver is locked to now, or null between bursts (or if it
@@ -198,6 +215,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 };
                 _input = web;
                 _webSdr = web;
+                _ = FindWebSdrPlaceAsync(endpoint, cancellation);
                 WebSdrDescription = web.ReceiverDescription is { Length: > 0 } about ? Ascii.Clean(about) : null;
                 _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(DialHz + OnAir.CentreAudioHz)} MHz"
                     + (WebSdrDescription is { } said ? $" ({said})" : ""));
@@ -293,9 +311,55 @@ public sealed class AudioPipeline : IAsyncDisposable
         {
             Channel.NoteCardClipping(samples);
         }
+        Capture.Write(samples);
         Channel.ProcessReceive(samples);
         ReleaseStuckLock(samples.Length);
         Burst.AfterBlock(LockedWaveform);
+        Capture.AfterBlock();
+    }
+
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    /// <summary>Asks the web SDR where it is, for naming the hops; quietly nothing if it will not say.</summary>
+    private async Task FindWebSdrPlaceAsync(UberSdrEndpoint endpoint, CancellationToken cancellation)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{endpoint.HttpBase}/api/description");
+            request.Headers.TryAddWithoutValidation("User-Agent", $"pdn-mailcast-receiver/{ReceiverHost.Version}");
+            using var response = await Http.SendAsync(request, cancellation).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            WebSdrPlace = PlaceInDescription(await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false));
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or OperationCanceledException or InvalidOperationException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// The place in an UberSDR's <c>/api/description</c>: its <c>receiver.gps</c> latitude and
+    /// longitude, or failing those its locator. Null if it gives neither, or will not parse.
+    /// </summary>
+    internal static GroundPlace? PlaceInDescription(string? json)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(json) || System.Text.Json.Nodes.JsonNode.Parse(json)?["receiver"]?["gps"] is not System.Text.Json.Nodes.JsonObject gps)
+            {
+                return null;
+            }
+            string? locator = gps["maidenhead"]?.GetValue<string>() is { Length: > 0 } m ? Ascii.Clean(m) : null;
+            double? lat = gps["lat"]?.GetValue<double>(), lon = gps["lon"]?.GetValue<double>();
+            if (lat is { } la && lon is { } lo && Math.Abs(la) <= 90 && Math.Abs(lo) <= 180 && (la != 0 || lo != 0))
+            {
+                return new GroundPlace(la, lo, locator ?? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{la:F2},{lo:F2}"));
+            }
+            return GroundPlace.FromLocator(locator);
+        }
+        catch (Exception e) when (e is System.Text.Json.JsonException or InvalidOperationException or FormatException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -358,6 +422,9 @@ public sealed class AudioPipeline : IAsyncDisposable
             _stop.Dispose();
         }
     }
+
+    /// <summary>Audio at <paramref name="rate"/> converted to the pipeline's 48 kHz, as a recording is: for tests.</summary>
+    internal static float[] ToPipelineRate(float[] samples, int rate) => WavInput.ToPipelineRate(samples, rate, "audio");
 
     /// <summary>A recording as an audio input, converted to 48 kHz, read as fast as it will go.</summary>
     private sealed class WavInput : IAudioInput

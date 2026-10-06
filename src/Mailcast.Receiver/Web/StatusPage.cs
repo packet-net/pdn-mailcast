@@ -698,6 +698,8 @@ public sealed class StatusPage : IAsyncDisposable
             schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
             burst = BurstView(_host.Pipeline?.Burst.Shown),
+            // The radio path from GB7RDG, measured after each slot from the bursts decoded.
+            channel = ChannelTile.View(_host.ChannelWatch, slot, _host.Time.GetUtcNow()),
             slot = slot is null ? null : new
             {
                 started = slot.Started,
