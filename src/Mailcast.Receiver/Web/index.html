@@ -324,11 +324,12 @@ function channel(s) {
   if (c.enough && c.profile) {
     box.appendChild(channelProfile(c));
     const rows = [];
-    if (c.delaySpreadMs !== null) rows.push(["Delay spread", `${c.delaySpreadMs} ms`]);
+    if (c.delaySpreadMs !== null) rows.push(["Delay spread", `${c.delaySpreadMs} ms (echoes smear each symbol by about ${c.delaySpreadMs.toFixed(1)} ms)`]);
+    if (c.dopplerSpreadHz !== null) rows.push(["Doppler spread", `${c.dopplerSpreadHz} Hz (the moving layer blurs the frequency by about ${c.dopplerSpreadHz.toFixed(1)} Hz)`]);
     if (c.fadeDb !== null) rows.push(["Fading", `${c.fadeDb} dB below its middle level, a tenth of the time`]);
     if (c.coherenceS !== null) rows.push(["Steady for", c.coherenceAtLeast ? `${c.coherenceS} s or more` : `about ${c.coherenceS} s`]);
     rows.push(["Measured from", `${c.measurements} burst${c.measurements === 1 ? "" : "s"}${c.snrDb !== null ? `, signal to noise ${c.snrDb} dB` : ""}`]);
-    rows.push(["Path", c.distanceKm !== null ? `${c.distanceKm} km from GB7RDG (IO91lk) to ${esc(c.locator)}` : `set "locator" in receiver.json to name the hops`]);
+    if (c.distanceKm !== null) rows.push(["Path", `${c.distanceKm} km from GB7RDG (IO91lk) to ${esc(c.locator)}`]);
     const dl = document.createElement("dl");
     dl.style.marginTop = "8px";
     dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
@@ -343,6 +344,7 @@ function channel(s) {
     box.appendChild(channelStrip(c));
   }
   if (c.waiting) box.appendChild(el("div", `${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from the slot on now, measured once it is over.`, "muted"));
+  if (c.tooLong) box.appendChild(el("div", `${c.tooLong} burst${c.tooLong === 1 ? " was" : "s were"} too long to keep, so left out.`, "muted"));
 }
 
 /* ---------- status ---------- */

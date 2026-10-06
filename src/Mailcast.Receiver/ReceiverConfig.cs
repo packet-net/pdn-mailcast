@@ -204,13 +204,6 @@ public sealed record ReceiverConfig
     public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast";
 
     /// <summary>
-    /// Where the receiver is, as a 4 or 6 character Maidenhead locator, so the Channel tile can
-    /// say which hops it hears. Null (the default) uses where a web SDR says it is; a sound
-    /// card's receiver needs it set for the hops to be named.
-    /// </summary>
-    public string? Locator { get; init; }
-
-    /// <summary>
     /// The radio's rigctld, for a radio shared with packet: the receiver tunes it to
     /// <see cref="DialKHz"/> for each slot and puts it back afterwards. Null (the default) leaves
     /// the radio alone.
@@ -406,10 +399,6 @@ public sealed record ReceiverConfig
         if (string.IsNullOrWhiteSpace(StateDirectory))
         {
             throw new ConfigException("\"stateDirectory\" is empty");
-        }
-        if (Locator is not null && GroundPlace.FromLocator(Locator) is null)
-        {
-            throw new ConfigException($"\"locator\" '{Locator}' is not a 4 or 6 character Maidenhead locator such as IO91lk; leave it out to use where a web SDR says it is");
         }
         Rig?.Validate();
         Bpq?.Validate();

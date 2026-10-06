@@ -56,6 +56,8 @@ internal static class ChannelTile
             // Bursts heard in the slot on now, measured once it is over.
             waiting = watch.Waiting,
             measuring = watch.Measuring,
+            // Bursts left out since the receiver started, too long for the audio it keeps.
+            tooLong = watch.TooLong,
             history = history.Select(h => new
             {
                 slot = h.Slot,

@@ -81,6 +81,7 @@ public sealed class AudioPipeline : IAsyncDisposable
             Capture.Attach(_receiver);
         }
         Channel.FrameReceived += (_, _) => Burst.OnFrame(LockedWaveform);
+        Channel.FrameReceived += (_, _) => Capture.OnFrame();
         Tone = new ToneDetector(OnAir.SampleRate);
         Channel.AddReceiveTap(Tone.Process);
     }
@@ -93,12 +94,6 @@ public sealed class AudioPipeline : IAsyncDisposable
 
     /// <summary>Raised on the audio thread with each decoded burst and its audio, for the channel measurement.</summary>
     public event Action<CapturedBurst>? BurstCaptured;
-
-    /// <summary>
-    /// Where the web SDR says it is, from its <c>/api/description</c> (its GPS position or
-    /// locator), once it has answered; null for other sources, or one that does not say.
-    /// </summary>
-    public GroundPlace? WebSdrPlace { get; private set; }
 
     /// <summary>
     /// The waveform number the MS110D receiver is locked to now, or null between bursts (or if it
@@ -215,7 +210,6 @@ public sealed class AudioPipeline : IAsyncDisposable
                 };
                 _input = web;
                 _webSdr = web;
-                _ = FindWebSdrPlaceAsync(endpoint, cancellation);
                 WebSdrDescription = web.ReceiverDescription is { Length: > 0 } about ? Ascii.Clean(about) : null;
                 _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(DialHz + OnAir.CentreAudioHz)} MHz"
                     + (WebSdrDescription is { } said ? $" ({said})" : ""));
@@ -320,8 +314,8 @@ public sealed class AudioPipeline : IAsyncDisposable
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
 
-    /// <summary>Asks the web SDR where it is, for naming the hops; quietly nothing if it will not say.</summary>
-    private async Task FindWebSdrPlaceAsync(UberSdrEndpoint endpoint, CancellationToken cancellation)
+    /// <summary>Asks a web SDR where it is, for naming the hops; null if it will not say.</summary>
+    internal static async Task<GroundPlace?> FetchWebSdrPlaceAsync(UberSdrEndpoint endpoint, CancellationToken cancellation)
     {
         try
         {
@@ -329,10 +323,11 @@ public sealed class AudioPipeline : IAsyncDisposable
             request.Headers.TryAddWithoutValidation("User-Agent", $"pdn-mailcast-receiver/{ReceiverHost.Version}");
             using var response = await Http.SendAsync(request, cancellation).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
-            WebSdrPlace = PlaceInDescription(await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false));
+            return PlaceInDescription(await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false));
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or OperationCanceledException or InvalidOperationException)
         {
+            return null;
         }
     }
 

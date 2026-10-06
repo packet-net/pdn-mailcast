@@ -63,7 +63,7 @@ public sealed record ChannelReport
     /// <summary>How long the strongest path keeps half its correlation, seconds.</summary>
     public double? CoherenceS { get; init; }
 
-    /// <summary>The F layer's virtual height from the one and two hop modes, km; null without both, or without the receiver's place.</summary>
+    /// <summary>The F layer's virtual height from the one and two hop modes, km; null without both. Without the receiver's place it is worked out for <see cref="NominalKm"/>, which changes it little.</summary>
     public double? VirtualHeightKm { get; init; }
 
     /// <summary>Signal to noise in 3 kHz, dB.</summary>
@@ -92,6 +92,13 @@ public sealed record ChannelReport
 
     /// <summary>The picture in words, for the page and the log.</summary>
     public string Words { get; init; } = "";
+
+    /// <summary>
+    /// The ground distance assumed for the height when the receiver's place is not known: a
+    /// typical UK path. The height barely depends on it: 1.93 ms between 1F and 2F is 289 km
+    /// straight overhead and 307 km at 300 km.
+    /// </summary>
+    public const double NominalKm = 150;
 
     /// <summary>What the page says when there is too little to measure.</summary>
     public const string TooLittle = "Not enough decoded to measure.";
@@ -148,7 +155,7 @@ public sealed record ChannelReport
             new()
             {
                 DelayMs = 0,
-                PowerDb = Round(ChannelMaths.Median(pictures.Select(p => p.Modes[0].PowerDb)), 1),
+                PowerDb = Power(ChannelMaths.Median(pictures.Select(p => p.Modes[0].PowerDb))),
                 DopplerShiftHz = Rounded(ChannelMaths.Median(pictures.Select(p => (p.Modes[0].CentroidHz - p.Modes.MaxBy(m => m.PowerDb)!.CentroidHz) ?? double.NaN)), 2),
                 DopplerSpreadHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.Modes[0].SpreadHz ?? double.NaN)), 2),
                 SeenIn = n,
@@ -158,20 +165,22 @@ public sealed record ChannelReport
         {
             modes.Add(new ChannelMode
             {
-                DelayMs = Round(ChannelMaths.Median(c.Select(x => x.Delay)), 2),
-                PowerDb = Round(ChannelMaths.Median(c.Select(x => x.Power)), 1),
+                DelayMs = Rounded(ChannelMaths.Median(c.Select(x => x.Delay)), 2) ?? 0,
+                PowerDb = Power(ChannelMaths.Median(c.Select(x => x.Power))),
                 DopplerShiftHz = Rounded(ChannelMaths.Median(c.Select(x => x.Shift ?? double.NaN)), 2),
                 DopplerSpreadHz = Rounded(ChannelMaths.Median(c.Select(x => x.Spread ?? double.NaN)), 2),
                 SeenIn = c.Count,
             });
         }
         double? height = null;
+        // Naming the hops needs the distance; the height hardly does, so without the place it is
+        // still given, from the paths as they would be named on a typical UK path.
+        var (labels, h) = PathGeometry.Label(place is null ? NominalKm : PathGeometry.DistanceKm(place, PathGeometry.Gb7rdg), modes.Select(m => m.DelayMs).ToArray());
         if (place is not null)
         {
-            var (labels, h) = PathGeometry.Label(PathGeometry.DistanceKm(place, PathGeometry.Gb7rdg), modes.Select(m => m.DelayMs).ToArray());
             modes = [.. modes.Select((m, i) => m with { Label = labels[i] })];
-            height = h is { } v ? Math.Round(v) : null;
         }
+        height = h is { } km && double.IsFinite(km) ? Math.Round(km) : null;
 
         // The profile, averaged in power across the measurements.
         var first = pictures[0];
@@ -180,30 +189,32 @@ public sealed record ChannelReport
         for (int i = 0; i < len; i++)
         {
             var v = pictures.Select(p => p.Profile[i]).Where(d => !double.IsNaN(d)).ToArray();
-            profile[i] = v.Length == 0 || v.Average() <= 0 ? null : Math.Round(10 * Math.Log10(v.Average()), 1);
+            profile[i] = v.Length == 0 || !(v.Average() > 0) ? null : Rounded(10 * Math.Log10(v.Average()), 1);
         }
 
         report = report with
         {
             Enough = true,
             Modes = modes,
-            DelaySpreadMs = Round(ChannelMaths.Median(pictures.Select(p => p.DelaySpreadMs)), 2),
+            DelaySpreadMs = Rounded(ChannelMaths.Median(pictures.Select(p => p.DelaySpreadMs)), 2),
             DopplerSpreadHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.DopplerSpreadHz ?? double.NaN)), 2),
-            FadeDb = Round(ChannelMaths.Median(pictures.Select(p => p.FadeDb)), 1),
+            FadeDb = Rounded(ChannelMaths.Median(pictures.Select(p => p.FadeDb)), 1),
             CoherenceS = Rounded(ChannelMaths.Median(pictures.Select(p => p.CoherenceS ?? double.NaN)), 1),
             VirtualHeightKm = height,
             SnrDb = Rounded(ChannelMaths.Median(pictures.Select(p => p.SnrDb)), 1),
             OffsetHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.OffsetHz ?? double.NaN)), 2),
             ProfileDb = profile,
-            ProfileStartMs = Math.Round(first.ProfileStartMs, 4),
-            ProfileStepMs = Math.Round(first.ProfileStepMs, 6),
+            ProfileStartMs = Rounded(first.ProfileStartMs, 4) ?? 0,
+            ProfileStepMs = Rounded(first.ProfileStepMs, 6) ?? 0,
         };
         return report with { Words = Describe(report) };
     }
 
-    private static double Round(double v, int digits) => Math.Round(v, digits);
+    /// <summary>Rounded, or null for NaN or infinity: neither may reach the JSON status, which cannot carry them.</summary>
+    private static double? Rounded(double v, int digits) => double.IsFinite(v) ? Math.Round(v, digits) : null;
 
-    private static double? Rounded(double v, int digits) => double.IsNaN(v) ? null : Math.Round(v, digits);
+    /// <summary>A mode's power in dB, finite: a mode too weak to say is 99 dB down.</summary>
+    private static double Power(double db) => Rounded(Math.Max(db, -99), 1) ?? -99;
 
     /// <summary>
     /// The picture in a few plain sentences: "2 paths: 1 hop, and 2 hops 1.9 ms later, 17 dB

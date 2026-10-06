@@ -6,6 +6,7 @@ using Mailcast.Receiver.Web;
 using Microsoft.Extensions.Time.Testing;
 using Packet.SoundModem.Audio;
 using Packet.SoundModem.Ms110d;
+using Packet.SoundModem.Waterfall;
 
 namespace Mailcast.Receiver.Tests;
 
@@ -386,10 +387,18 @@ public class ChannelTests
         string file = Path.Combine(dir.Path, ChannelWatch.FileName);
         var log = new List<string>();
         var measured = new TaskCompletionSource<ChannelReport>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var waiting = new SemaphoreSlim(0);
+        var bothKept = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using (var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, file, () => Wessex) { Rest = false })
         {
-            watch.QuietWaiting += () => waiting.Release();
+            // The timer that counts is the one set once both bursts are kept: one set after the
+            // first alone is put off again by the second.
+            watch.QuietWaiting += kept =>
+            {
+                if (kept == 2)
+                {
+                    bothKept.TrySetResult();
+                }
+            };
             watch.Measured += r => measured.TrySetResult(r);
             watch.Offer(Captured(1, time.GetUtcNow()), Noon);
             watch.Offer(Captured(2, time.GetUtcNow()), Noon);
@@ -397,7 +406,7 @@ public class ChannelTests
             Assert.Null(watch.Latest);
 
             // Nothing is measured while the slot may still be on.
-            Assert.True(await waiting.WaitAsync(TimeSpan.FromSeconds(10)));
+            await bothKept.Task.WaitAsync(TimeSpan.FromSeconds(10));
             time.Advance(ChannelWatch.Quiet - TimeSpan.FromSeconds(1));
             await Task.Delay(50);
             Assert.False(measured.Task.IsCompleted);
@@ -438,58 +447,154 @@ public class ChannelTests
         await watch.IdleAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Equal([Noon, Noon.AddHours(1)], reports.Select(r => r.Slot));
-        // No place known: the paths are not named, and no height is given.
+        // No place known: the paths are not named, but the height is given, for a typical UK path.
         Assert.All(reports[1].Modes, m => Assert.Null(m.Label));
-        Assert.Null(reports[1].VirtualHeightKm);
+        Assert.InRange(reports[1].VirtualHeightKm!.Value, 270, 310);
         Assert.StartsWith("2 paths: the second 1.9 ms after the first, 16 dB weaker.", reports[1].Words, StringComparison.Ordinal);
         Assert.Equal(2, watch.History.Count);
     }
+
+    private static ReceiverConfig Config(string dir, string audio = "wav:/nonexistent.wav") => new()
+    {
+        Audio = audio,
+        StateDirectory = dir,
+        Bbs = new BbsSettings { Port = 8011, Login = "Q0CAST", Password = "secret" },
+    };
 
     [Fact]
     public async Task Status_HasTheChannel()
     {
         using var dir = new TempDirectory();
-        var config = new ReceiverConfig
-        {
-            Audio = "wav:/nonexistent.wav",
-            StateDirectory = dir.Path,
-            Locator = "IO80qr",
-            Bbs = new BbsSettings { Port = 8011, Login = "Q0CAST", Password = "secret" },
-        };
-        await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
+        var time = new FakeTimeProvider(Noon.AddMinutes(5));
+        await using var host = new ReceiverHost(Config(dir.Path), time, _ => { });
+        host.ChannelWatch.Rest = false;
         var page = new StatusPage(host, null, _ => { });
         var before = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine).GetProperty("channel");
         Assert.Equal(JsonValueKind.Null, before.GetProperty("slot").ValueKind);
         Assert.Equal(ChannelTile.Nothing, before.GetProperty("words").GetString());
 
-        // The page shows the last day, by the real clock here.
-        var now = DateTimeOffset.UtcNow;
-        var slot = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, TimeSpan.Zero);
-        host.ChannelWatch.Offer(Captured(5, now), slot);
+        host.ChannelWatch.Offer(Captured(5, time.GetUtcNow()), Noon);
         host.ChannelWatch.SlotOver();
         await host.ChannelWatch.IdleAsync().WaitAsync(TimeSpan.FromSeconds(60));
 
         var channel = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine).GetProperty("channel");
         Assert.Equal("bursts", channel.GetProperty("basis").GetString());
         Assert.True(channel.GetProperty("enough").GetBoolean());
+        Assert.Equal(Noon, channel.GetProperty("slot").GetDateTimeOffset());
         var modes = channel.GetProperty("modes").EnumerateArray().ToList();
-        Assert.Equal(["1F", "2F"], modes.Select(m => m.GetProperty("label").GetString()));
+        // A recording: where the receiver is is not known, so the paths are not named, but the
+        // height is still worked out, for a typical UK path.
+        Assert.All(modes, m => Assert.Equal(JsonValueKind.Null, m.GetProperty("label").ValueKind));
         Assert.Equal(1.9, modes[1].GetProperty("delayMs").GetDouble(), 0.05);
-        Assert.Equal(slot, channel.GetProperty("slot").GetDateTimeOffset());
+        Assert.Equal(JsonValueKind.Null, channel.GetProperty("distanceKm").ValueKind);
         foreach (string field in (string[])["delaySpreadMs", "dopplerSpreadHz", "fadeDb", "coherenceS", "virtualHeightKm"])
         {
             Assert.Equal(JsonValueKind.Number, channel.GetProperty(field).ValueKind);
         }
+        Assert.Contains("Reflection about", channel.GetProperty("words").GetString(), StringComparison.Ordinal);
         Assert.Single(channel.GetProperty("history").EnumerateArray());
         Assert.True(channel.GetProperty("profile").GetProperty("db").GetArrayLength() > 50);
+        Assert.Equal(0, channel.GetProperty("tooLong").GetInt32());
     }
 
     [Fact]
-    public void Locator_IsChecked()
+    public void Status_NeverCarriesNanOrInfinity()
     {
-        var config = new ReceiverConfig { Bbs = new BbsSettings { Password = "x" }, Locator = "nowhere" };
-        Assert.Contains("\"locator\"", Assert.Throws<ConfigException>(config.Validate).Message, StringComparison.Ordinal);
-        (config with { Locator = "IO80qr" }).Validate();
+        // System.Text.Json refuses NaN and infinity, which would take the whole status down.
+        var odd = new PathPicture
+        {
+            Basis = "bursts",
+            Modes = [new PictureMode(0, 0, double.NaN, double.PositiveInfinity), new PictureMode(1.9, double.NegativeInfinity, null, double.NaN)],
+            PathsMs = [0, 1.9],
+            PathsDb = [0, double.NegativeInfinity],
+            DelaySpreadMs = double.NaN,
+            DopplerSpreadHz = double.PositiveInfinity,
+            OffsetHz = double.NaN,
+            FadeDb = double.PositiveInfinity,
+            CoherenceS = double.NaN,
+            SnrDb = double.NegativeInfinity,
+            FloorDb = double.NaN,
+            GoodSnapshots = 200,
+            Profile = [double.NaN, double.PositiveInfinity, 0, 1, double.NegativeInfinity],
+            ProfileStartMs = double.NaN,
+            ProfileStepMs = 0.1,
+        };
+        var report = ChannelReport.Summarise(Noon, Noon, [odd, odd], 2, Wessex);
+        string json = JsonSerializer.Serialize(report, ReceiverConfig.JsonLine);
+        Assert.DoesNotContain("NaN", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Infinity", json, StringComparison.Ordinal);
+        Assert.Equal(-99, report.Modes[1].PowerDb);
+        Assert.Null(report.DelaySpreadMs);
+        Assert.Null(report.FadeDb);
+    }
+
+    [Fact]
+    public void ChannelSlot_OnlyWithinASlot()
+    {
+        using var dir = new TempDirectory();
+        var host = new ReceiverHost(Config(dir.Path, "ubersdr:wessex.zapto.org"), new FakeTimeProvider(Noon), _ => { });
+        (DateTimeOffset, DateTimeOffset)? recording = null;
+        Assert.Equal(Noon, host.ChannelSlot(Noon.AddMinutes(4), ref recording));
+        // A burst between slots is someone else's, or a lock on noise: not filed under any slot.
+        Assert.Null(host.ChannelSlot(Noon.AddMinutes(40), ref recording));
+        Assert.Equal(Noon.AddHours(1), host.ChannelSlot(Noon.AddHours(1).AddMinutes(1), ref recording));
+        // At night there is no slot at all.
+        Assert.Null(host.ChannelSlot(Noon.AddHours(10).AddMinutes(2), ref recording));
+
+        // A recording has no slots: each run of bursts is one.
+        host.Slots.Schedule = null;
+        Assert.Equal(Noon, host.ChannelSlot(Noon, ref recording));
+        Assert.Equal(Noon, host.ChannelSlot(Noon.AddMinutes(3), ref recording));
+        Assert.Equal(Noon.AddHours(2), host.ChannelSlot(Noon.AddHours(2), ref recording));
+    }
+
+    [Fact]
+    public async Task Capture_OnlyBurstsAFrameWasReadFrom()
+    {
+        var pipeline = AudioPipeline.ForInput(new NoInput(), _ => { }, new FakeTimeProvider(Noon), watch: false);
+        var kept = new List<CapturedBurst>();
+        pipeline.BurstCaptured += kept.Add;
+        var tx = new Ms110dTxSettings { WaveformNumber = 4 };
+
+        // A burst that decodes but carries no frame: noise the modem locked to, or another station.
+        var random = new byte[3000];
+        new Random(5).NextBytes(random);
+        for (int i = 0; i < random.Length; i++)
+        {
+            random[i] &= 1;
+        }
+        Feed(pipeline, new float[Rate]);
+        Feed(pipeline, AudioPipeline.ToPipelineRate(new Ms110dModulator(tx).Modulate(random), Ms110dModulator.NativeRate));
+        Feed(pipeline, new float[3 * Rate]);
+        Assert.Empty(kept);
+
+        // One with a frame in it is kept.
+        var payload = new byte[120];
+        new Random(6).NextBytes(payload);
+        var modem = new Ms110dModem(Rate, _ => { }, tx);
+        Feed(pipeline, modem.Modulate(Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, payload), 0));
+        Feed(pipeline, new float[3 * Rate]);
+        Assert.Single(kept);
+        await pipeline.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Decode_DeliversFirst_AndLeavesTheStateDirectoryAlone()
+    {
+        using var dir = new TempDirectory();
+        var (samples, rate) = WavFile.ReadMono(Path.Combine(AppContext.BaseDirectory, "Channel", "wessex-burst.wav"));
+        string wav = Path.Combine(dir.Path, "slot.wav");
+        WavFile.WriteMono(wav, [.. new float[8 * rate], .. samples, .. new float[8 * rate]], rate);
+        var log = new List<string>();
+        await using var host = new ReceiverHost(Config(dir.Path, "wav:" + wav), new FakeTimeProvider(Noon), line => { lock (log) { log.Add(line); } });
+
+        await host.DecodeOnceAsync(wav, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(120));
+
+        int decoded = log.FindIndex(l => l.StartsWith("decode:", StringComparison.Ordinal));
+        int measured = log.FindIndex(l => l.StartsWith("channel: the", StringComparison.Ordinal));
+        Assert.True(decoded >= 0 && measured > decoded, string.Join("\n", log));
+        Assert.Contains("the second 1.9 ms after the first", log[measured], StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(dir.Path, ChannelWatch.FileName)));
     }
 
     [Fact]

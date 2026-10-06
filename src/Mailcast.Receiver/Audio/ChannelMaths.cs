@@ -439,10 +439,10 @@ internal static class ChannelMaths
         return x;
     }
 
-    /// <summary>The median of some values (the mean of the middle two for an even count); NaN for none.</summary>
+    /// <summary>The median of the finite values given (the mean of the middle two for an even count); NaN for none.</summary>
     public static double Median(IEnumerable<double> values)
     {
-        var v = values.Where(d => !double.IsNaN(d)).OrderBy(d => d).ToArray();
+        var v = values.Where(double.IsFinite).OrderBy(d => d).ToArray();
         if (v.Length == 0)
         {
             return double.NaN;

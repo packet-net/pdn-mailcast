@@ -67,11 +67,22 @@ public sealed class ChannelWatch : IAsyncDisposable
         _loop = RunAsync(_stop.Token);
     }
 
-    /// <summary>Rest after each burst as long as it took, to stay under half a core. Tests turn it off.</summary>
-    internal bool Rest { get; init; } = true;
+    /// <summary>Rest after each burst as long as it took, to stay under half a core. Off for --decode and tests.</summary>
+    internal bool Rest { get; set; } = true;
 
-    /// <summary>For tests: raised each time the loop has set its quiet timer on the clock.</summary>
-    internal event Action? QuietWaiting;
+    /// <summary>Whether the results are written to the state directory. Off for --decode, which must not touch a running service's.</summary>
+    internal bool Persist { get; set; } = true;
+
+    /// <summary>For tests: raised each time the loop has set its quiet timer on the clock, with the bursts kept for the slot.</summary>
+    internal event Action<int>? QuietWaiting;
+
+    /// <summary>Bursts left out since the receiver started because they were too long for the audio kept.</summary>
+    public int TooLong => Volatile.Read(ref _tooLong);
+
+    private int _tooLong;
+
+    /// <summary>A burst was too long to keep: counted for the page.</summary>
+    public void NoteTooLong() => Interlocked.Increment(ref _tooLong);
 
     /// <summary>Raised on the worker after each slot is measured.</summary>
     public event Action<ChannelReport>? Measured;
@@ -113,7 +124,7 @@ public sealed class ChannelWatch : IAsyncDisposable
     {
         lock (_gate)
         {
-            return _waiting == 0 && _measuring == 0 ? Task.CompletedTask : _idle.Task;
+            return _broken || (_waiting == 0 && _measuring == 0) ? Task.CompletedTask : _idle.Task;
         }
     }
 
@@ -137,7 +148,7 @@ public sealed class ChannelWatch : IAsyncDisposable
                 {
                     using var quietStop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
                     var quiet = Task.Delay(Quiet, _time, quietStop.Token);
-                    QuietWaiting?.Invoke();
+                    QuietWaiting?.Invoke(_batch.Count);
                     if (await Task.WhenAny(ready, quiet).ConfigureAwait(false) == quiet)
                     {
                         await MeasureBatchAsync().ConfigureAwait(false);
@@ -170,7 +181,22 @@ public sealed class ChannelWatch : IAsyncDisposable
         catch (OperationCanceledException)
         {
         }
+        catch (Exception e)
+        {
+            // Never expected; but whatever stopped the watch must not leave anyone waiting on it.
+            _log($"channel: the measurement stopped: {Ascii.Clean(e.Message)}");
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _broken = true;
+                _idle.TrySetResult();
+            }
+        }
     }
+
+    private bool _broken;
 
     private void Keep(Offered offered)
     {
@@ -205,7 +231,7 @@ public sealed class ChannelWatch : IAsyncDisposable
         try
         {
             // A thread of its own: the measurement is a few seconds of arithmetic.
-            var report = await Task.Factory.StartNew(() => Measure(slot, bursts, offered), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).ConfigureAwait(false);
+            var report = await Task.Factory.StartNew(() => Measure(slot, bursts, offered, _stop.Token), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).ConfigureAwait(false);
             Remember(report);
             _log(string.Create(CultureInfo.InvariantCulture,
                 $"channel: the {Hhmm(report.Slot)} slot, from {report.Measurements} of {report.Kept} bursts, measured in {report.ComputeSeconds:F1} s: {report.Words}"));
@@ -240,7 +266,7 @@ public sealed class ChannelWatch : IAsyncDisposable
     private static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm 'UTC'", CultureInfo.InvariantCulture);
 
     /// <summary>Measures a slot's bursts, one at a time, and sums them up. On the worker thread.</summary>
-    private ChannelReport Measure(DateTimeOffset slot, CapturedBurst[] bursts, int offered)
+    private ChannelReport Measure(DateTimeOffset slot, CapturedBurst[] bursts, int offered, CancellationToken cancellation)
     {
         // A slot measured before that went on (a quiet spell inside it): its pictures so far
         // are added to, not replaced.
@@ -249,17 +275,26 @@ public sealed class ChannelWatch : IAsyncDisposable
         double busy = 0;
         foreach (var burst in bursts)
         {
+            cancellation.ThrowIfCancellationRequested();
             var one = Stopwatch.StartNew();
-            var series = BurstChannel.Measure(burst.Samples(), burst.EndSample, burst.Lock, burst.PayloadBits);
-            if (series is not null && ChannelAnalysis.Analyse(series) is { } picture)
+            try
             {
-                pictures.Add(picture);
+                var series = BurstChannel.Measure(burst.Samples(), burst.EndSample, burst.Lock, burst.PayloadBits);
+                if (series is not null && ChannelAnalysis.Analyse(series) is { } picture)
+                {
+                    pictures.Add(picture);
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // One burst that will not measure is left out; the rest still count.
+                _log($"channel: could not measure a burst of the {Hhmm(slot)} slot: {Ascii.Clean(e.Message)}");
             }
             one.Stop();
             busy += one.Elapsed.TotalSeconds;
-            if (Rest)
+            if (Rest && cancellation.WaitHandle.WaitOne(one.Elapsed))
             {
-                Thread.Sleep(one.Elapsed);
+                cancellation.ThrowIfCancellationRequested();
             }
         }
         _earlierSlot = slot;
@@ -307,7 +342,7 @@ public sealed class ChannelWatch : IAsyncDisposable
 
     private void Save(List<ChannelReport> history)
     {
-        if (_path is null)
+        if (_path is null || !Persist)
         {
             return;
         }

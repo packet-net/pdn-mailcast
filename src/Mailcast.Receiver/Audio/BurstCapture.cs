@@ -53,6 +53,7 @@ public sealed class BurstCapture
     private readonly Action<CapturedBurst> _sink;
     private readonly List<Pending> _pending = [];
     private long _written;
+    private int _frames;
     private Ms110dLockInfo? _lastLock;
     private Ms110dDemodulator? _receiver;
 
@@ -63,8 +64,8 @@ public sealed class BurstCapture
         _sink = sink;
     }
 
-    /// <summary>Bursts too long for the audio kept, so not measured.</summary>
-    public int TooLong { get; private set; }
+    /// <summary>Raised on the audio thread, with its length in seconds, for a burst too long for the audio kept, so not measured.</summary>
+    public event Action<double>? TooLong;
 
     /// <summary>Follows <paramref name="receiver"/>'s bursts. On the audio thread, before any audio.</summary>
     public void Attach(Ms110dDemodulator receiver)
@@ -73,6 +74,9 @@ public sealed class BurstCapture
         receiver.BlockDecoded += _ => _lastLock = receiver.Lock ?? _lastLock;
         receiver.BurstCompleted += OnBurst;
     }
+
+    /// <summary>A frame was delivered: the burst it came in is GB7RDG's, not noise or another station's.</summary>
+    public void OnFrame() => _frames++;
 
     /// <summary>Each block of audio, before the modem hears it.</summary>
     public void Write(ReadOnlySpan<float> samples)
@@ -97,14 +101,15 @@ public sealed class BurstCapture
             long from = p.From;
             if (from < _written - _ring.Length || from < 0)
             {
-                TooLong++;
+                TooLong?.Invoke((p.End - from) / (double)Rate);
                 continue;
             }
+            // At most two runs of the ring: to its end, then from its start.
             var audio = new Half[_written - from];
-            for (long k = from; k < _written; k++)
-            {
-                audio[k - from] = _ring[k % _ring.Length];
-            }
+            int start = (int)(from % _ring.Length);
+            int first = Math.Min(audio.Length, _ring.Length - start);
+            Array.Copy(_ring, start, audio, 0, first);
+            Array.Copy(_ring, 0, audio, first, audio.Length - first);
             _sink(new CapturedBurst(audio, (int)(p.End - from), p.Lock, p.Bits, p.Heard, from));
         }
     }
@@ -112,8 +117,12 @@ public sealed class BurstCapture
     private void OnBurst(Ms110dBurst burst)
     {
         var locked = _receiver?.Lock ?? _lastLock;
+        int frames = _frames;
         _lastLock = null;
-        if (locked is not { WaveformNumber: >= 1 } || burst.Blocks == 0 || burst.PayloadBits.Length == 0)
+        _frames = 0;
+        // Only a burst a frame was read from: anything else is a lock on noise, or another
+        // MS110D station, and copying its audio here would be wasted on the audio thread.
+        if (frames == 0 || locked is not { WaveformNumber: >= 1 } || burst.Blocks == 0 || burst.PayloadBits.Length == 0)
         {
             return;
         }
