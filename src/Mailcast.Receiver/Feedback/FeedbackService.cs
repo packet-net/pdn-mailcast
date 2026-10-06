@@ -87,6 +87,9 @@ public sealed record SentReport
     /// <summary>When it is offered again, if it will be.</summary>
     public DateTimeOffset? RetryAt { get; init; }
 
+    /// <summary>When it has been offered to the BBS, oldest first.</summary>
+    public IReadOnlyList<DateTimeOffset> Offers { get; init; } = [];
+
     /// <summary>Whether the BBS has answered for good.</summary>
     public bool Final => Answer is FeedbackAnswer.Accepted or FeedbackAnswer.Refused;
 }
@@ -98,8 +101,9 @@ public sealed record SentReport
 /// </summary>
 /// <remarks>
 /// <para>After a restart, the most recent day that was missed is sent, once; any older are let go.
-/// A report the BBS deferred, or a session that failed, is offered again every
-/// <see cref="Retry"/> until the BBS answers or the next day's report is due. A refused one is not
+/// A report the BBS deferred, or a session that failed, is offered again after each of
+/// <see cref="Retries"/> in turn (the last repeating), at most <see cref="MostOffersPerDay"/>
+/// times a UTC day, until the BBS answers or the next day's report is due. A refused one is not
 /// offered again.</para>
 /// </remarks>
 public sealed class FeedbackService
@@ -107,8 +111,11 @@ public sealed class FeedbackService
     /// <summary>How long after the day's last daylight slot the report goes.</summary>
     public static readonly TimeSpan AfterLastSlot = TimeSpan.FromMinutes(30);
 
-    /// <summary>How long after a deferral or a failure the report is offered again.</summary>
-    public static readonly TimeSpan Retry = TimeSpan.FromMinutes(10);
+    /// <summary>The waits before offering a report again after successive deferrals or failures; the last repeats.</summary>
+    public static readonly IReadOnlyList<TimeSpan> Retries = [TimeSpan.FromHours(1), TimeSpan.FromHours(2), TimeSpan.FromHours(4)];
+
+    /// <summary>The most times a report is offered to the BBS in one UTC day.</summary>
+    public const int MostOffersPerDay = 6;
 
     /// <summary>How often the clock is looked at.</summary>
     public static readonly TimeSpan Tick = TimeSpan.FromSeconds(60);
@@ -274,6 +281,7 @@ public sealed class FeedbackService
                 + $"{AfterLastSlot.TotalMinutes:F0} minutes after the last daylight slot"
                 + (Next(now) is { } next ? $"; the next at {next:yyyy-MM-dd HH:mm} UTC" : ""));
         }
+        ForgetTheFuture(now);
         NoteSlots(now);
 
         SentReport? send;
@@ -284,6 +292,30 @@ public sealed class FeedbackService
         if (send is not null)
         {
             await SendAsync(send, cancellation).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Lets go of anything recorded for a day later than today, which only a clock that was
+    /// wrong (a Pi that started on a stale or a future time) can have left: kept, it would stop
+    /// today's report going.
+    /// </summary>
+    private void ForgetTheFuture(DateTimeOffset now)
+    {
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        lock (_gate)
+        {
+            bool changed = _state.Days.RemoveAll(d => d.Day > today) > 0;
+            if (_state.Last is { } last && last.Day > today)
+            {
+                _log($"feedback: the last report on record is for {last.Day:yyyy-MM-dd}, after today ({today:yyyy-MM-dd}); the clock must have been wrong, so it is let go");
+                _state.Last = null;
+                changed = true;
+            }
+            if (changed)
+            {
+                Save();
+            }
         }
     }
 
@@ -384,7 +416,7 @@ public sealed class FeedbackService
                 Day = day,
                 Title = report.Title,
                 Body = report.Body,
-                Bid = Bid(settings.From, day),
+                Bid = Bid(settings.From, ReceiverId(), day),
                 Answer = FeedbackAnswer.Pending,
             };
             Save();
@@ -412,9 +444,25 @@ public sealed class FeedbackService
         return new DailyReport(settings.From, record.Day, header, slots);
     }
 
-    /// <summary>The report's BID: the callsign and the date, G4ABC_61006, unique to the listener and the day and at most 12 characters.</summary>
-    internal static string Bid(string callsign, DateOnly day) =>
-        string.Create(CultureInfo.InvariantCulture, $"{callsign}_{day.Year % 10}{day:MMdd}");
+    /// <summary>
+    /// The report's BID (MID), at most 12 characters: the year's last digit and the day of the
+    /// year, this receiver's own two characters, and the callsign, as 6279K7G4ABC. Unique to the
+    /// day, and to the receiver even when two share a callsign.
+    /// </summary>
+    internal static string Bid(string callsign, string receiverId, DateOnly day) =>
+        string.Create(CultureInfo.InvariantCulture, $"{day.Year % 10}{day.DayOfYear:000}{receiverId}{callsign}");
+
+    /// <summary>This receiver's two characters for the BID, made at random once and kept in <see cref="FileName"/>.</summary>
+    private string ReceiverId()
+    {
+        if (_state.ReceiverId is not { Length: 2 } id || !id.All(char.IsAsciiLetterOrDigit))
+        {
+            const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            id = string.Concat(System.Security.Cryptography.RandomNumberGenerator.GetItems<char>(Alphabet, 2));
+            _state.ReceiverId = id;
+        }
+        return id;
+    }
 
     private async Task SendAsync(SentReport report, CancellationToken cancellation)
     {
@@ -441,15 +489,17 @@ public sealed class FeedbackService
             failure = "the session failed: " + Ascii.Clean(e.Message);
         }
 
+        var offers = report.Offers.Append(now).ToList();
+        var retryAt = RetryTime(offers);
         var answered = outcome.Verdict switch
         {
             DeliveryVerdict.Accepted => report with { Answer = FeedbackAnswer.Accepted, Detail = null, RetryAt = null },
             DeliveryVerdict.AlreadyHad => report with { Answer = FeedbackAnswer.Accepted, Detail = "the BBS already had it", RetryAt = null },
             DeliveryVerdict.Refused => report with { Answer = FeedbackAnswer.Refused, Detail = outcome.Detail, RetryAt = null },
-            DeliveryVerdict.Deferred => report with { Answer = FeedbackAnswer.Deferred, Detail = null, RetryAt = now + Retry },
-            _ => report with { Answer = FeedbackAnswer.Failed, Detail = failure ?? outcome.Detail ?? DeliveryService.Describe(outcome.Verdict), RetryAt = now + Retry },
+            DeliveryVerdict.Deferred => report with { Answer = FeedbackAnswer.Deferred, Detail = null, RetryAt = retryAt },
+            _ => report with { Answer = FeedbackAnswer.Failed, Detail = failure ?? outcome.Detail ?? DeliveryService.Describe(outcome.Verdict), RetryAt = retryAt },
         };
-        answered = answered with { SentAt = now };
+        answered = answered with { SentAt = now, Offers = offers };
         lock (_gate)
         {
             // Only if it is still the one in hand: never put back an older day's.
@@ -461,6 +511,27 @@ public sealed class FeedbackService
         }
         int bytes = Bulletin.TextEncoding.GetByteCount(report.Body);
         _log($"feedback: the report for {report.Day:yyyy-MM-dd} ({Ascii.Clean(report.Title)}, {bytes} bytes) was {Describe(answered)}");
+    }
+
+    /// <summary>
+    /// When to offer a report again after <paramref name="offers"/>: the next of <see cref="Retries"/>
+    /// after the last, and no sooner than the next UTC day once <see cref="MostOffersPerDay"/> have
+    /// been made today.
+    /// </summary>
+    internal static DateTimeOffset RetryTime(IReadOnlyList<DateTimeOffset> offers)
+    {
+        var last = offers[^1];
+        var at = last + Retries[Math.Min(offers.Count - 1, Retries.Count - 1)];
+        var day = DateOnly.FromDateTime(last.UtcDateTime);
+        if (offers.Count(o => DateOnly.FromDateTime(o.UtcDateTime) == day) >= MostOffersPerDay)
+        {
+            var tomorrow = new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            if (at < tomorrow)
+            {
+                at = tomorrow;
+            }
+        }
+        return at;
     }
 
     /// <summary>The answer in words, for the log and the page.</summary>
@@ -494,7 +565,7 @@ public sealed class FeedbackService
         _ => 'U',
     };
 
-    /// <summary>The record for <paramref name="day"/>, made if need be; records more than two days old are let go.</summary>
+    /// <summary>The record for <paramref name="day"/>, made if need be; records more than two days old, or more than one ahead, are let go.</summary>
     private DayRecord Day(DateOnly day)
     {
         if (_state.Days.Find(d => d.Day == day) is { } found)
@@ -504,7 +575,8 @@ public sealed class FeedbackService
         var record = new DayRecord { Day = day };
         _state.Days.Add(record);
         _state.Days.Sort((a, b) => a.Day.CompareTo(b.Day));
-        _state.Days.RemoveAll(d => d.Day < day.AddDays(-2));
+        // Two days back is all a report needs; a day ahead of this one is a wrong clock's.
+        _state.Days.RemoveAll(d => d.Day < day.AddDays(-2) || d.Day > day.AddDays(1));
         return record;
     }
 
@@ -549,6 +621,8 @@ public sealed class FeedbackService
         public List<DayRecord> Days { get; set; } = [];
 
         public SentReport? Last { get; set; }
+
+        public string? ReceiverId { get; set; }
     }
 
     /// <summary>One UTC day's slots and counts.</summary>

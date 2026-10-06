@@ -108,7 +108,8 @@ public class FeedbackTests
 
         await rig.AtAsync(service, ReportAt);
         var mail = Assert.Single(rig.Bbs.Sent);
-        Assert.Equal(('P', "G4ABC", "M0LTE", "GB7RDG.#42.GBR.EURO", "G4ABC_61006"), (mail.Type, mail.From, mail.To, mail.At, mail.Bid));
+        Assert.Equal(('P', "G4ABC", "M0LTE", "GB7RDG.#42.GBR.EURO"), (mail.Type, mail.From, mail.To, mail.At));
+        Assert.Matches("^6279[A-Z0-9]{2}G4ABC$", mail.Bid);
         Assert.Equal("MCR G4ABC 2026-10-06", mail.Title);
         Assert.Empty(mail.RoutingLines);
         var report = DailyReport.Parse(mail.Title, mail.Body);
@@ -215,7 +216,7 @@ public class FeedbackTests
     }
 
     [Fact]
-    public async Task DeferredOrFailed_IsOfferedAgainAfterTenMinutes_WithTheSameBid()
+    public async Task DeferredOrFailed_IsOfferedAgainLater_WithTheSameBid()
     {
         using var dir = new TempDirectory();
         var rig = new Rig(dir.Path);
@@ -226,22 +227,88 @@ public class FeedbackTests
 
         await rig.AtAsync(service, ReportAt);
         Assert.Equal(FeedbackAnswer.Deferred, service.Last!.Answer);
-        Assert.Equal(ReportAt + FeedbackService.Retry, service.Next(rig.Time.GetUtcNow()));
-        await rig.AtAsync(service, ReportAt.AddMinutes(9));
+        Assert.Equal(ReportAt.AddHours(1), service.Next(rig.Time.GetUtcNow()));
+        await rig.AtAsync(service, ReportAt.AddMinutes(59));
         Assert.Single(rig.Bbs.Sent);
 
-        await rig.AtAsync(service, ReportAt.AddMinutes(10));
+        await rig.AtAsync(service, ReportAt.AddHours(1));
         Assert.Equal(FeedbackAnswer.Failed, service.Last!.Answer);
         Assert.Contains("no answer from", service.Last.Detail, StringComparison.Ordinal);
+        Assert.Equal(ReportAt.AddHours(3), service.Last.RetryAt);
 
         // A restart in between changes nothing: it is still owed, and goes when due.
         var restarted = rig.Start();
-        await rig.AtAsync(restarted, ReportAt.AddMinutes(20));
+        await rig.AtAsync(restarted, ReportAt.AddHours(2));
+        Assert.Equal(2, rig.Bbs.Sent.Count);
+        await rig.AtAsync(restarted, ReportAt.AddHours(3));
         Assert.Equal(FeedbackAnswer.Accepted, restarted.Last!.Answer);
         Assert.Equal(3, rig.Bbs.Sent.Count);
         Assert.Single(rig.Bbs.Sent.Select(b => b.Bid).Distinct());
-        await rig.AtAsync(restarted, ReportAt.AddMinutes(40));
+        await rig.AtAsync(restarted, ReportAt.AddHours(5));
         Assert.Equal(3, rig.Bbs.Sent.Count);
+    }
+
+    [Fact]
+    public void Retries_WaitLongerEachTime_AndAtMostSixADay()
+    {
+        var t = new DateTimeOffset(2026, 10, 6, 0, 30, 0, TimeSpan.Zero);
+        Assert.Equal(t.AddHours(1), FeedbackService.RetryTime([t]));
+        Assert.Equal(t.AddHours(3), FeedbackService.RetryTime([t, t.AddHours(1)]));
+        Assert.Equal(t.AddHours(7), FeedbackService.RetryTime([t, t.AddHours(1), t.AddHours(3)]));
+        Assert.Equal(t.AddHours(11), FeedbackService.RetryTime([t, t.AddHours(1), t.AddHours(3), t.AddHours(7)]));
+
+        // Six offers in a day (a restart can bring the next one forward): no more until tomorrow.
+        var six = Enumerable.Range(0, 6).Select(i => t.AddHours(i * 3)).ToList();
+        Assert.Equal(new DateTimeOffset(2026, 10, 7, 0, 0, 0, TimeSpan.Zero), FeedbackService.RetryTime(six));
+        var late = Enumerable.Range(0, 6).Select(i => t.AddHours(20).AddMinutes(i * 30)).ToList();
+        Assert.Equal(late[^1].AddHours(4), FeedbackService.RetryTime(late));
+    }
+
+    [Fact]
+    public async Task ClockPutBack_ADayRecordedInTheFuture_IsLetGo()
+    {
+        using var dir = new TempDirectory();
+        var ahead = new Rig(dir.Path);
+        var service = ahead.Start();
+        await ahead.ListenAsync(service, Day, only: 1);
+        await ahead.AtAsync(service, ReportAt);
+        Assert.Single(ahead.Bbs.Sent);
+
+        // The clock was a day fast; put right, the day before's report still goes.
+        var right = new Rig(dir.Path);
+        var restarted = right.Start();
+        await right.ListenAsync(restarted, Day.AddDays(-1), only: 2);
+        await right.AtAsync(restarted, FeedbackService.ReportTime(Schedule, Day.AddDays(-1))!.Value);
+
+        var mail = Assert.Single(right.Bbs.Sent);
+        Assert.Equal(Day.AddDays(-1), DailyReport.Parse(mail.Title, mail.Body).Day);
+        Assert.Equal(2, DailyReport.Parse(mail.Title, mail.Body).Slots.Count);
+        Assert.Contains(right.Log, l => l.Contains("the clock must have been wrong", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("ubersdr:wessex.zapto.org", "wessex.zapto.org")]
+    [InlineData("ubersdr:https://Wessex.Zapto.org:443", "wessex.zapto.org")]
+    [InlineData("ubersdr:192.168.1.20:8073", "sdr")]
+    [InlineData("ubersdr:localhost:8073", "sdr")]
+    [InlineData("ubersdr:shack-sdr:8073", "sdr")]
+    [InlineData("ubersdr:sdr.local", "sdr")]
+    [InlineData("ubersdr:sdr.lan:8073", "sdr")]
+    [InlineData("plughw:CARD=Device,DEV=0", "sc")]
+    public void Audio_WebSdrIsNamedOnlyWhenItIsAPublicName(string audio, string expected)
+    {
+        Assert.Equal(expected, ReportAudio.For(AudioSource.Parse(audio)));
+    }
+
+    [Theory]
+    [InlineData("10.0.0.5")]
+    [InlineData("[::1]")]
+    [InlineData("fe80::1")]
+    [InlineData("box.home.arpa")]
+    [InlineData("rx.internal")]
+    public void Audio_PrivateHosts_AreJustSdr(string host)
+    {
+        Assert.Equal(ReportAudio.PrivateSdr, ReportAudio.WebSdr(host));
     }
 
     [Fact]
@@ -345,10 +412,27 @@ public class FeedbackTests
     }
 
     [Fact]
-    public void Bid_IsUniqueToTheListenerAndTheDay_AndFitsFbb()
+    public void Bid_IsUniqueToTheListenerTheReceiverAndTheDay_AndFitsFbb()
     {
-        Assert.Equal("G4ABC_61006", FeedbackService.Bid("G4ABC", Day));
-        Assert.Equal("2E0ABC_61231", FeedbackService.Bid("2E0ABC", new DateOnly(2026, 12, 31)));
-        Assert.True(FeedbackService.Bid("2E0ABC", Day).Length <= BbsClient.MaxBidLength);
+        Assert.Equal("6279K7G4ABC", FeedbackService.Bid("G4ABC", "K7", Day));
+        Assert.Equal("6365X02E0ABC", FeedbackService.Bid("2E0ABC", "X0", new DateOnly(2026, 12, 31)));
+        Assert.True(FeedbackService.Bid("2E0ABC", "X0", new DateOnly(2026, 12, 31)).Length <= BbsClient.MaxBidLength);
+    }
+
+    [Fact]
+    public async Task Bid_ReceiversOwnPart_IsKeptAcrossRestarts()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 1);
+        await rig.AtAsync(service, ReportAt);
+        var restarted = rig.Start();
+        await rig.ListenAsync(restarted, Day.AddDays(1), only: 1);
+        await rig.AtAsync(restarted, FeedbackService.ReportTime(Schedule, Day.AddDays(1))!.Value);
+
+        Assert.Equal(2, rig.Bbs.Sent.Count);
+        Assert.Equal(rig.Bbs.Sent[0].Bid[4..6], rig.Bbs.Sent[1].Bid[4..6]);
+        Assert.Equal("6280", rig.Bbs.Sent[1].Bid[..4]);
     }
 }

@@ -176,4 +176,39 @@ public class DailyReportTests
         Assert.Null(Maidenhead.Format(91, 0));
         Assert.Null(Maidenhead.Format(0, -181));
     }
+
+    [Fact]
+    public void Parse_LinesFromALaterVersion_KeepWhatThisReads()
+    {
+        string body = "MCR1 0.9.0 IO91lk sc 1/1 0 header-extra\r\n"
+            + "09 W4 10 12 +0.1 IG\r\n"
+            + "10 W4 11 12 +0.1 IG -\r\n"
+            + "11 W4 12 12 +0.1 IG - - - - - - later-field\r\n"
+            + "12 W4 13 12 +0.1 IG 2 1.9/-17 0.35 0.21 287 b later-field another\r\n";
+
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", body);
+
+        Assert.Equal(4, read.Slots.Count);
+        Assert.All(read.Slots.Take(3), slot => Assert.Null(slot.Channel));
+        Assert.Equal([10, 11, 12, 13], read.Slots.Select(slot => slot.Frames));
+        Assert.Equal(new ReportChannel(2, 1.9, -17, 0.35, 0.21, 287, 'b'), read.Slots[3].Channel);
+        // Written back in this version's own form, which an older reader takes too.
+        Assert.Equal("MCR1 0.9.0 IO91lk sc 1/1 0\r\n09 W4 10 12 +0.1 IG\r\n10 W4 11 12 +0.1 IG\r\n11 W4 12 12 +0.1 IG\r\n12 W4 13 12 +0.1 IG 2 1.9/-17 0.35 0.21 287 b\r\n", read.Body);
+    }
+
+    [Fact]
+    public void Numbers_NeverNegativeZero_AndNotFiniteIsNotKnown()
+    {
+        var header = new ReportHeader("0.6.0", null, "sc", 0, 0, new Dictionary<string, int>());
+        var report = new DailyReport("G4ABC", Day, header,
+        [
+            new ReportSlot(new TimeOnly(9, 0), "W4", 3, -0.3, -0.04, [], new ReportChannel(2, 1.94, -0.4, -0.001, double.NaN, double.PositiveInfinity, 'b')),
+            new ReportSlot(new TimeOnly(10, 0), "W4", 3, double.NaN, double.NegativeInfinity, [], new ReportChannel(2, double.NaN, -3, 0.1, 0.1, 280, 'b')),
+        ]);
+
+        var lines = report.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("09 W4 3 0 +0.0 - 2 1.9/0 0 - - b", lines[1]);
+        Assert.Equal("10 W4 3 - - - 2 - 0.1 0.1 280 b", lines[2]);
+        Assert.Equal(report.Body, DailyReport.Parse(report.Title, report.Body).Body);
+    }
 }

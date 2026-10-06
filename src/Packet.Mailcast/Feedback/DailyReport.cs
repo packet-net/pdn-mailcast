@@ -65,7 +65,9 @@ public sealed record ReportSlot(
 /// tone offset (Hz), verdicts (joined by <c>+</c>), then, only with a channel measurement, the
 /// modes, the 2F delay/power (ms/dB), delay spread (ms), Doppler spread (Hz), virtual height (km)
 /// and basis. A reader ignores fields after the sixth on the header line and after the twelfth on
-/// a slot line, so format 1 can grow at the ends of its lines.</para>
+/// a slot line, and takes <c>-</c> as the seventh to mean no channel measurement whatever follows,
+/// so format 1 can grow at the ends of its lines: a later field on a line with no measurement
+/// comes after six <c>-</c>.</para>
 /// </remarks>
 public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHeader Header, IReadOnlyList<ReportSlot> Slots)
 {
@@ -166,18 +168,18 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         line.Append(s.Start.Minute == 0 ? s.Start.ToString("HH", c) : s.Start.ToString("HHmm", c));
         line.Append(' ').Append(Token(s.Waveform));
         line.Append(' ').Append(s.Frames.ToString(c));
-        line.Append(' ').Append(s.SnrDb is { } snr ? Math.Round(snr).ToString("0", c) : Missing);
-        line.Append(' ').Append(s.OffsetHz is { } offset ? (Math.Round(offset, 1) is var o && o != 0 ? o : 0).ToString("+0.0;-0.0;+0.0", c) : Missing);
+        line.Append(' ').Append(Number(s.SnrDb, 0, "0"));
+        line.Append(' ').Append(Number(s.OffsetHz, 1, "+0.0;-0.0;+0.0"));
         line.Append(' ').Append(s.Verdicts.Count == 0 ? Missing : string.Join('+', s.Verdicts));
         if (s.Channel is { } ch)
         {
             line.Append(' ').Append(ch.Modes.ToString(c));
-            line.Append(' ').Append(ch.TwoFDelayMs is { } d
-                ? Math.Round(d, 1).ToString("0.0", c) + "/" + (ch.TwoFPowerDb is { } p ? Math.Round(p).ToString("0", c) : Missing)
+            line.Append(' ').Append(Number(ch.TwoFDelayMs, 1, "0.0") is var d && d != Missing
+                ? d + "/" + Number(ch.TwoFPowerDb, 0, "0")
                 : Missing);
-            line.Append(' ').Append(Number(ch.DelaySpreadMs, "0.##"));
-            line.Append(' ').Append(Number(ch.DopplerSpreadHz, "0.##"));
-            line.Append(' ').Append(Number(ch.VirtualHeightKm, "0"));
+            line.Append(' ').Append(Number(ch.DelaySpreadMs, 2, "0.##"));
+            line.Append(' ').Append(Number(ch.DopplerSpreadHz, 2, "0.##"));
+            line.Append(' ').Append(Number(ch.VirtualHeightKm, 0, "0"));
             line.Append(' ').Append(char.IsAsciiLetterLower(ch.Basis) ? ch.Basis : '-');
         }
         return line.ToString();
@@ -250,8 +252,14 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             throw new FormatException($"\"{f[2]}\" is not a frame count.");
         }
         ReportChannel? channel = null;
-        if (f.Length >= 12)
+        // Field 7 is the channel's mode count, or "-" for no channel; anything after the
+        // fields this reads is a later version's, and is skipped.
+        if (f.Length > 6 && f[6] != Missing)
         {
+            if (f.Length < 12)
+            {
+                throw new FormatException($"The slot line \"{line}\" has a channel measurement cut short: {f.Length} fields, not 12.");
+            }
             if (!TryInt(f[6], out int modes))
             {
                 throw new FormatException($"\"{f[6]}\" is not a mode count.");
@@ -273,10 +281,6 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             }
             channel = new ReportChannel(modes, delay, power, Double(f[8]), Double(f[9]), Double(f[10]), f[11][0]);
         }
-        else if (f.Length != 6)
-        {
-            throw new FormatException($"The slot line \"{line}\" has {f.Length} fields: 6 without a channel measurement, 12 with.");
-        }
         return new ReportSlot(start, Value(f[1]), frames, Double(f[3]), Double(f[4]),
             f[5] == Missing ? [] : f[5].Split('+'), channel);
     }
@@ -291,8 +295,16 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
 
     private static string? Value(string s) => s == Missing ? null : s;
 
-    private static string Number(double? value, string format) =>
-        value is { } v ? v.ToString(format, CultureInfo.InvariantCulture) : Missing;
+    /// <summary>A number rounded to <paramref name="digits"/>: <c>-</c> for none or one that is not finite, and never <c>-0</c>.</summary>
+    private static string Number(double? value, int digits, string format)
+    {
+        if (value is not { } v || !double.IsFinite(v))
+        {
+            return Missing;
+        }
+        double rounded = Math.Round(v, digits);
+        return (rounded == 0 ? 0 : rounded).ToString(format, CultureInfo.InvariantCulture);
+    }
 
     /// <summary>A value as one field: printable ASCII with no spaces, or <c>-</c> for none.</summary>
     private static string Token(string? value)

@@ -134,8 +134,8 @@ You can help by sending M0LTE a short report each day of what your receiver hear
 - `callsign` is yours, with no SSID, and the report comes from it. It has to look like a callsign, or the receiver won't start.
 - The report goes to `M0LTE@GB7RDG.#42.GBR.EURO` as a personal message, through your own BBS, in the same session the bulletins use. Your BBS sends it on like any other personal mail, so it needs a route towards GB7RDG; most UK BBSes have one.
 - It goes about 30 minutes after the day's last daylight slot (17:30 UTC in early October), once a day at most. If the receiver was off at that time, it sends that day's report when it next starts, once.
-- If your BBS asks for it later, or can't be reached, the receiver tries again every 10 minutes. If your BBS refuses it, it isn't sent again; the status page shows what was said.
-- It is small, under 600 bytes on a normal day, and plain text. The status page shows the last one as sent, what the BBS said, and when the next goes. The receiver keeps its notes for it in `feedback.json` in the state directory.
+- If your BBS asks for it later, or can't be reached, the receiver tries again after 1 hour, then 2, then every 4 hours, at most 6 times a day, until the next day's report is due. If your BBS refuses it, it isn't sent again; the status page shows what was said.
+- It is small and plain text: about 500 bytes for a 9-slot autumn day, and about 760 for a 14-slot midsummer one. The status page shows the last one as sent, what the BBS said, and when the next goes. The receiver keeps its notes for it in `feedback.json` in the state directory.
 
 ### The daily report's format
 
@@ -161,7 +161,7 @@ Fields are separated by one space, and `-` means not known. The first line is th
 1. `MCR1`: format 1.
 2. The receiver's version.
 3. The web SDR's 6 character locator, from the position it reports, or `-` for a sound card.
-4. Where the audio came from: `sc` for a sound card, or the web SDR's address.
+4. Where the audio came from: `sc` for a sound card, or the web SDR's name, such as `wessex.zapto.org`. A web SDR on your own network (an IP address, `localhost`, or a name like `sdr.local` or `sdr.lan`) is just `sdr`, so the report never carries your addresses.
 5. Bulletins rebuilt / delivered to the BBS that day.
 6. Errors: `0`, or how many, a colon, and how many of each kind: `BBS` (a session with the BBS failed), `AUD` (the audio failed or was lost), `RIG` (a problem retuning the radio), `HOOK` (a hook command failed).
 
@@ -183,7 +183,7 @@ When the slot's channel was measured, six more follow:
 11. The virtual height, km. Without the web SDR's position it is worked out for a 150 km path.
 12. What it was measured from: `b` the bursts, `p` a probe.
 
-A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, so the format can grow there without a new number. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
+A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
 
 ## The receiver's login on your BBS
 

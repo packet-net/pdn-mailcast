@@ -68,7 +68,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             PskReporter = () => Intake.PskReporter,
             Channel = slot => ChannelSummary.From(ChannelWatch.History.LastOrDefault(r => r.Slot == slot)),
             Locator = () => ChannelSummary.Locator(Place),
-            Audio = () => AudioSource.Parse(Config.Audio) is { Kind: AudioSourceKind.UberSdr } web ? WebSdrHost(web) : "sc",
+            Audio = () => ReportAudio.For(AudioSource.Parse(Config.Audio)),
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
         Delivery.SessionFinished += report =>

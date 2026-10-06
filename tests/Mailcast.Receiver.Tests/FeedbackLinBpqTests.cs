@@ -28,7 +28,7 @@ public class FeedbackLinBpqTests(ITestOutputHelper output)
             new ReportSlot(new TimeOnly(10, 0), "W4", 212, 18, 1.2, ["IG"], new ReportChannel(2, 1.9, -17, 0.35, 0.21, 290, 'b')),
             new ReportSlot(new TimeOnly(11, 0), null, 0, null, null, []),
         ]);
-        string bid = FeedbackService.Bid("G4ABC", day);
+        string bid = FeedbackService.Bid("G4ABC", "T1", day);
         var mail = new Bulletin('P', "G4ABC", FeedbackSettings.To, FeedbackSettings.At, bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()), [], report.Body);
 
