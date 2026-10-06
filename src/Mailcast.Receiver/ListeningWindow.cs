@@ -73,8 +73,8 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
 }
 
 /// <summary>
-/// When a web SDR is listened to: a few of the day's slots, spread evenly, each from a little
-/// before its start to a little after, so as to stay inside a public receiver's daily allowance.
+/// When a web SDR is listened to: some or all of the day's slots, each from a little before its
+/// start to a little after, so as to stay inside a public receiver's daily allowance.
 /// </summary>
 public static class ListeningWindow
 {
@@ -82,21 +82,26 @@ public static class ListeningWindow
     /// The <paramref name="perDay"/> slots a web SDR listens to, spread evenly through the day
     /// starting with the anchor (8 of 24 hourly slots from 00:00 is every 3 hours from 00:00),
     /// sorted by time of day. Every slot, if there are no more than <paramref name="perDay"/>.
+    /// Null, the default, is as many as fit in the allowance (<see cref="ReceiverConfig.MostWebSdrSlotsPerDay"/>):
+    /// with no daylight rule there is no morning or evening to prefer, so they are spread evenly too.
     /// </summary>
-    public static IReadOnlyList<TimeOnly> WebSdrSlots(SlotSchedule schedule, int perDay)
+    public static IReadOnlyList<TimeOnly> WebSdrSlots(SlotSchedule schedule, int? perDay)
     {
+        ArgumentNullException.ThrowIfNull(schedule);
         var all = schedule.FromAnchor;
-        int n = Math.Clamp(perDay, 1, all.Count);
+        int n = Math.Clamp(perDay ?? ReceiverConfig.MostWebSdrSlotsPerDay, 1, all.Count);
         return [.. Enumerable.Range(0, n).Select(i => all[i * all.Count / n]).Order()];
     }
 
     /// <summary>
-    /// The slots a web SDR listens to on a UTC day: <paramref name="perDay"/> of the day's slots,
-    /// spread evenly. Without a daylight rule they are <see cref="WebSdrSlots"/>, the same every
-    /// day; with one they are spread over that day's daylight slots, starting with its first.
-    /// Every slot of the day, if there are no more than <paramref name="perDay"/>.
+    /// The slots a web SDR listens to on a UTC day. Without a daylight rule they are
+    /// <see cref="WebSdrSlots"/>, the same every day. With one, and <paramref name="perDay"/> null
+    /// (the default), they are every daylight slot that fits in the allowance, and if there are more
+    /// than that (around midsummer), the latest ones; with <paramref name="perDay"/> set, that many,
+    /// spread evenly over the day's daylight slots, starting with its first. Every slot of the day,
+    /// if there are no more than that.
     /// </summary>
-    public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(SlotSchedule schedule, int perDay, DateOnly day)
+    public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(SlotSchedule schedule, int? perDay, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         if (schedule.Daylight is null)
@@ -108,7 +113,15 @@ public static class ListeningWindow
         {
             return [];
         }
-        int n = Math.Clamp(perDay, 1, active.Count);
+        if (perDay is null)
+        {
+            // When there are more daylight slots than the allowance covers, the earliest morning
+            // ones are left out, not the late afternoon ones: late afternoon is often the best time
+            // for 40 m to reach stations near GB7RDG, and an early morning slot hears little.
+            int fit = Math.Min(ReceiverConfig.MostWebSdrSlotsPerDay, active.Count);
+            return [.. active.Skip(active.Count - fit)];
+        }
+        int n = Math.Clamp(perDay.Value, 1, active.Count);
         return [.. Enumerable.Range(0, n).Select(i => active[i * active.Count / n])];
     }
 
@@ -117,7 +130,7 @@ public static class ListeningWindow
     /// <see cref="ReceiverConfig.WebSdrBefore"/> before one of <see cref="WebSdrSlotsOn"/> to
     /// <see cref="ReceiverConfig.WebSdrAfter"/> after it.
     /// </summary>
-    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot) Next(DateTimeOffset now, SlotSchedule schedule, int perDay)
+    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot) Next(DateTimeOffset now, SlotSchedule schedule, int? perDay)
     {
         var utc = now.ToUniversalTime();
         var today = DateOnly.FromDateTime(utc.UtcDateTime);
@@ -207,7 +220,7 @@ public static class ListeningWindow
     /// <see cref="Describe(SlotSchedule, IReadOnlyList{TimeOnly})"/> without a daylight rule, and
     /// with one, which of that day's daylight slots.
     /// </summary>
-    public static string Describe(SlotSchedule schedule, int perDay, DateOnly day)
+    public static string Describe(SlotSchedule schedule, int? perDay, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         if (schedule.Daylight is null)

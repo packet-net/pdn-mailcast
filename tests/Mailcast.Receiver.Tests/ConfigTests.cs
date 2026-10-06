@@ -16,7 +16,7 @@ public class ConfigTests
         Assert.Equal(7052.0, config.DialKHz);
         Assert.Equal("00:00", config.SlotUtc);
         Assert.Equal(60, config.EveryMinutes);
-        Assert.Equal(8, config.WebSdrSlotsPerDay);
+        Assert.Null(config.WebSdrSlotsPerDay);
         Assert.False(config.SlotUtcWithoutEveryMinutes);
         Assert.Equal(new ArchiveSettings { Days = 30, MaxMegabytes = 50 }, config.Archive);
     }
@@ -58,7 +58,7 @@ public class ConfigTests
         var config = ReceiverConfig.Load(path);
 
         Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg), config.Schedule);
-        Assert.Equal(8, config.WebSdrSlots.Count);
+        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, config.WebSdrSlots.Count);
         Assert.False(config.SlotUtcWithoutEveryMinutes);
     }
 
@@ -87,6 +87,25 @@ public class ConfigTests
         config.Save(path);
         Assert.Contains("\"everyMinutes\": 60", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.Equal(config with { SlotUtcWithoutEveryMinutes = false }, ReceiverConfig.Load(path));
+    }
+
+    [Fact]
+    public void WebSdrSlotsPerDay_LeftOut_StaysLeftOutWhenSaved_AndGivenIsKept()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, "{}");
+
+        var config = ReceiverConfig.Load(path);
+        config.Save(path);
+
+        Assert.Null(config.WebSdrSlotsPerDay);
+        Assert.DoesNotContain("webSdrSlotsPerDay", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Null(ReceiverConfig.Load(path).WebSdrSlotsPerDay);
+
+        File.WriteAllText(path, """{ "webSdrSlotsPerDay": 8 }""");
+        ReceiverConfig.Load(path).Save(path);
+        Assert.Equal(8, ReceiverConfig.Load(path).WebSdrSlotsPerDay);
     }
 
     [Fact]

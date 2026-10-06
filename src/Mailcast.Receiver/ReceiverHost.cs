@@ -167,6 +167,24 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     private AudioCondition _audio = new("starting", AudioPhase.Starting);
 
+    /// <summary>
+    /// What the web SDR said about itself when it was last opened (its callsign, name and
+    /// location), kept between slots while the audio setting is the same; null before it has
+    /// been opened, or if it would not say.
+    /// </summary>
+    public string? WebSdrAbout
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _webSdrAbout is { } about && about.Source == _config.Audio ? about.Words : null;
+            }
+        }
+    }
+
+    private (string Source, string Words)? _webSdrAbout;
+
     /// <summary>For tests: raised each time <see cref="Audio"/> changes.</summary>
     internal event Action<AudioCondition>? AudioChanged;
 
@@ -331,7 +349,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 if (opens > _time.GetUtcNow())
                 {
-                    Audio = new($"the web SDR is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
+                    Audio = new($"the web SDR {WebSdrHost(source)} is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
                     if (AudioState != closedSaid)
                     {
                         // Said once per wait, not at every look at the clock.
@@ -367,6 +385,13 @@ public sealed class ReceiverHost : IAsyncDisposable
                 PipelineCreated?.Invoke(pipeline);
                 Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
                 await pipeline.StartAsync(token).ConfigureAwait(false);
+                if (pipeline.WebSdrDescription is { } about)
+                {
+                    lock (_gate)
+                    {
+                        _webSdrAbout = (config.Audio, about);
+                    }
+                }
                 Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
                 refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
@@ -518,6 +543,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         await Intake.DisposeAsync().ConfigureAwait(false);
         Hooks.Dispose();
     }
+
+    /// <summary>A web SDR's address as an operator writes it, such as wessex.zapto.org; for a sound card or recording, its setting.</summary>
+    internal static string WebSdrHost(AudioSource source) =>
+        source.Kind == AudioSourceKind.UberSdr ? Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target).ToString() : source.ToString();
 
     /// <summary>Always delivers through the client for the configuration in force.</summary>
     private sealed class SwitchableSession(ReceiverHost host) : IBbsSession

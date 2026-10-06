@@ -47,8 +47,9 @@ public class WebSdrWindowTests
         public Rig(DateTimeOffset start, Func<ReceiverConfig, ReceiverConfig>? configure = null)
         {
             Clock = new SteppableClock(start);
-            // Every slot, as before daylight hours; the daylight tests below set their own.
-            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Daylight = null };
+            // Every slot, as before daylight hours, and 8 of them a day, every third hour, as
+            // the clock tests expect; the daylight tests below set their own.
+            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Daylight = null, WebSdrSlotsPerDay = 8 };
             config = configure?.Invoke(config) ?? config;
             Host = new ReceiverHost(config, Clock, line => Log.Enqueue(line));
             Host.ClockWaiting += () => Waits.Writer.TryWrite(true);
@@ -57,12 +58,15 @@ public class WebSdrWindowTests
             {
                 var input = new QuietInput();
                 Inputs.Writer.TryWrite(input);
-                return AudioPipeline.ForInput(input, _ => { }, Clock, source, watch: false);
+                return AudioPipeline.ForInput(input, _ => { }, Clock, source, watch: false, webSdrDescription: About);
             };
             _run = Host.RunAsync(_stop.Token);
         }
 
         public TempDirectory Dir { get; } = new();
+
+        /// <summary>What the web SDR says about itself once opened.</summary>
+        public string? About { get; set; } = "M0ABC, Wessex SDR, Salisbury";
 
         public SteppableClock Clock { get; }
 
@@ -239,15 +243,40 @@ public class WebSdrWindowTests
     }
 
     [Fact]
-    public async Task Daylight_ListensToEightOfTheDaysDaylightSlots_AndWaitsForTheMorningsFirst()
+    public async Task Daylight_Explicit8_ListensToEightOfTheDaysDaylightSlots_AsBefore_AndWaitsForTheMorningsFirst()
     {
         // 06:00 on 5 October: the first daylight slot is 09:00, so the window opens at 08:58.
+        // The Rig sets webSdrSlotsPerDay to 8.
         await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Packet.Mailcast.DaylightSettings() });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 08:58 UTC, ready for the 09:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
         Assert.Contains(rig.Log, l => l.Contains("on 2026-10-05 the web SDR listens to 8 of the 9 daylight slots, at 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00 and 16:00 UTC", StringComparison.Ordinal));
         Assert.Contains(rig.Log, l => l.Contains("every hour on the hour, in daylight: from 120 minutes after sunrise to 30 minutes before sunset at IO91lk", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    // 5 October: all 9 daylight slots, the 17:00 one too.
+    [InlineData("2026-10-05T06:00:00Z", "closed until 08:58 UTC, ready for the 09:00 UTC slot",
+        "on 2026-10-05 the web SDR listens to all 9 daylight slots, at 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 and 17:00 UTC")]
+    [InlineData("2026-10-05T16:30:00Z", "closed until 16:58 UTC, ready for the 17:00 UTC slot",
+        "on 2026-10-05 the web SDR listens to all 9 daylight slots")]
+    // Midwinter: all 5.
+    [InlineData("2026-12-21T06:00:00Z", "closed until 10:58 UTC, ready for the 11:00 UTC slot",
+        "on 2026-12-21 the web SDR listens to all 5 daylight slots, at 11:00, 12:00, 13:00, 14:00 and 15:00 UTC")]
+    // Midsummer: 12 of the 14, leaving out 06:00 and 07:00, so the morning starts at 08:00.
+    [InlineData("2026-06-21T05:00:00Z", "closed until 07:58 UTC, ready for the 08:00 UTC slot",
+        "on 2026-06-21 the web SDR listens to 12 of the 14 daylight slots, at 08:00, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00 and 19:00 UTC")]
+    [InlineData("2026-06-21T18:30:00Z", "closed until 18:58 UTC, ready for the 19:00 UTC slot",
+        "on 2026-06-21 the web SDR listens to 12 of the 14 daylight slots")]
+    public async Task Daylight_Default_ListensToEveryDaylightSlotThatFits(string now, string state, string logged)
+    {
+        await using var rig = new Rig(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture),
+            c => c with { Daylight = new Packet.Mailcast.DaylightSettings(), WebSdrSlotsPerDay = null });
+        await rig.Waits.Reader.ReadAsync();
+
+        Assert.Contains(state, rig.Host.AudioState, StringComparison.Ordinal);
+        Assert.Contains(rig.Log, l => l.Contains(logged, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -277,6 +306,11 @@ public class WebSdrWindowTests
         Assert.Equal(new DateTimeOffset(2026, 10, 5, 8, 58, 0, TimeSpan.Zero), reopens);
         Assert.Equal(new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero), forSlot);
         Assert.Equal(JsonValueKindNull, closed.GetProperty("problem").ValueKind);
+        Assert.Contains("the web SDR wessex.zapto.org is closed until 08:58 UTC", closed.GetProperty("state").GetString(), StringComparison.Ordinal);
+        var sdr = closed.GetProperty("webSdr");
+        Assert.Equal("wessex.zapto.org", sdr.GetProperty("host").GetString());
+        Assert.Equal("https://wessex.zapto.org/", sdr.GetProperty("url").GetString());
+        Assert.Equal(JsonValueKindNull, sdr.GetProperty("about").ValueKind); // not opened yet
 
         // The clock reaches the opening: the audio is live and the page may ask for the spectrogram.
         rig.Clock.Step = reopens - rig.Clock.GetUtcNow();
@@ -286,6 +320,26 @@ public class WebSdrWindowTests
         Assert.True(open.GetProperty("live").GetBoolean());
         Assert.Equal("listening", open.GetProperty("phase").GetString());
         Assert.Equal(JsonValueKindNull, open.GetProperty("reopens").ValueKind);
+        Assert.Equal("M0ABC, Wessex SDR, Salisbury", open.GetProperty("webSdr").GetProperty("about").GetString());
+
+        // Closed again after the slot, it still says which web SDR it is.
+        rig.Clock.Step += TimeSpan.FromMinutes(20);
+        rig.Clock.Advance(ReceiverHost.ClockCheck);
+        await rig.AudioAsync(AudioPhase.Closed);
+        var after = rig.StatusAudio();
+        Assert.Equal("wessex.zapto.org", after.GetProperty("webSdr").GetProperty("host").GetString());
+        Assert.Equal("M0ABC, Wessex SDR, Salisbury", after.GetProperty("webSdr").GetProperty("about").GetString());
+    }
+
+    [Fact]
+    public async Task Status_WebSdrOnAnotherPort_SaysItsAddressAsWritten_AndASoundCardHasNone()
+    {
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 8, 30, 0, TimeSpan.Zero), c => c with { Audio = "ubersdr:sdr.example.org:8073" });
+        await rig.AudioAsync(AudioPhase.Closed);
+        Assert.Equal("sdr.example.org:8073", rig.StatusAudio().GetProperty("webSdr").GetProperty("host").GetString());
+        Assert.Contains("the web SDR sdr.example.org:8073 is closed", rig.Host.AudioState, StringComparison.Ordinal);
+
+        Assert.Null(Mailcast.Receiver.Web.StatusPage.WebSdrView("plughw:CARD=Device,DEV=0", null));
     }
 
     private const System.Text.Json.JsonValueKind JsonValueKindNull = System.Text.Json.JsonValueKind.Null;
@@ -333,7 +387,9 @@ public class WebSdrWindowTests
         Assert.DoesNotContain("setTimeout(connect", html, StringComparison.Ordinal);
         Assert.DoesNotContain("\nconnect();", html, StringComparison.Ordinal);
         Assert.Contains("if (s.audio.live && !ws) connect();", html, StringComparison.Ordinal);
-        Assert.Contains("The web SDR is closed between slots. The spectrogram comes back at", html, StringComparison.Ordinal);
+        Assert.Contains("The web SDR ${sdr(s)} is closed between slots. The spectrogram comes back at", html, StringComparison.Ordinal);
+        Assert.Contains("The web SDR ${esc(sdr(s))} is tuned for it", html, StringComparison.Ordinal);
+        Assert.Contains("${w.about ? ` (${esc(w.about)})` : \"\"}", html, StringComparison.Ordinal);
         Assert.Contains("No audio from the sound card", html, StringComparison.Ordinal);
         Assert.Contains("id=\"specNotice\"", html, StringComparison.Ordinal);
     }

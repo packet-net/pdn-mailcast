@@ -36,10 +36,10 @@
   "everyMinutes": 60,
   "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
 
-  // A public web SDR allows each address about 3 hours a day, so it only listens to this many
-  // of each day's daylight slots, spread evenly, from 2 minutes before each to 12 after.
-  // 12 is the most.
-  "webSdrSlotsPerDay": 8,
+  // A public web SDR allows each address about 3 hours a day. Each slot takes 14 minutes, from
+  // 2 minutes before it to 12 after, so up to 12 slots a day fit. It listens to every daylight
+  // slot that fits, which is all of them for most of the year; near midsummer it leaves out the
+  // earliest morning ones. To listen to fewer, add "webSdrSlotsPerDay", from 1 to 12.
 
   // The receiver keeps its own copy of each bulletin once your BBS has answered for it, to
   // read on the status page or send to the BBS again: for "days", and "maxMegabytes" in all,

@@ -202,6 +202,8 @@ const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null, levelSeen = false;
 const whose = s => s && s.audio.kind === "recording" ? "the recording's" : "the web SDR's";
+/* Which web SDR, by its address from the config, such as wessex.zapto.org. */
+const sdr = s => s.audio.webSdr ? s.audio.webSdr.host : "";
 
 /* Asks the receiver and never throws. A refusal that is not JSON (403, 421) and a receiver
    that does not answer at all come back as a sentence in .error for the page to show. A 401
@@ -321,22 +323,22 @@ const at = t => `${day(t)}${utc(t)} (${local(t)} your time)`;
 function schedule(s) {
   const c = s.schedule, a = s.audio, web = c.webSdr;
   const kind = a.source.startsWith("ubersdr:") ? "web" : a.source.startsWith("wav:") ? "wav" : "radio";
-  const tuning = kind === "web" ? `The web SDR is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
+  const tuning = kind === "web" ? `The web SDR ${esc(sdr(s))} is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
     : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
     <dt>Slots</dt><dd>${esc(c.words)}${c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
     <dt>Today</dt><dd>${c.today.length ? `${c.daylight ? "in daylight, " : ""}${c.today.join(", ")} UTC` : "no slots today"}</dd>
     <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
   if (web) {
-    const all = web.slotsPerDay === c.slotsPerDay;
-    rows += `<dt>Web SDR</dt><dd>${web.openNow ? `listening now, to the ${utc(web.slot)} slot`
-      : `the next slot it listens to is ${at(web.slot)}`}.
+    const all = web.slotsPerDay === c.slotsPerDay, w = a.webSdr || {};
+    rows += `<dt>Web SDR</dt><dd>${w.url ? `<a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.host)}</a>` : esc(w.host)}${w.about ? ` (${esc(w.about)})` : ""}:
+      ${web.openNow ? `listening now, to the ${utc(web.slot)} slot` : `the next slot it listens to is ${at(web.slot)}`}.
       ${all ? "It listens to every slot today." : `It listens to ${web.slotsPerDay} of today's ${c.slotsPerDay} slots (${web.times.join(", ")} UTC)
       to stay inside its allowance of about 3 hours a day.`}</dd>`;
   }
   $("when").innerHTML = rows;
   $("slotShape").textContent = `Each slot starts with a ${c.toneSeconds} second tone, ${s.markers.centreHz} Hz in your audio, then a few minutes of short data bursts.`;
-  if (!s.slot) $("slot").textContent = `Nothing heard yet. ${web && !web.openNow ? `The web SDR listens next at ${utc(web.slot)}.` : `The next slot is at ${utc(c.next)}.`}`;
+  if (!s.slot) $("slot").textContent = `Nothing heard yet. ${web && !web.openNow ? `The web SDR ${sdr(s)} listens next at ${utc(web.slot)}.` : `The next slot is at ${utc(c.next)}.`}`;
 
   const tips = [
     web ? `Wait for the next slot the web SDR listens to, at ${utc(web.slot)}, and watch the spectrogram.`
@@ -346,7 +348,7 @@ function schedule(s) {
   ];
   if (c.daylight) tips.splice(1, 0, `GB7RDG sends only in daylight, ${esc(c.daylight.words)}, because 40 m does not reach UK stations at night. Today that is ${c.today.length ? c.today.join(", ") + " UTC" : "no slots at all"}.`);
   if (kind === "radio") tips.push(`Check the radio is on USB at ${mhz(a.dialKHz)} MHz with a receive filter at least 3 kHz wide, and that the level meter moves.`);
-  if (web) tips.push("If this web SDR never hears it, try another UberSDR receiver in the settings below.");
+  if (web) tips.push(`If ${esc(sdr(s))} never hears it, try another UberSDR receiver in the settings below.`);
   tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
   $("help").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
 }
@@ -523,7 +525,7 @@ function audioNote(s) {
   const again = a.retryAt ? ` The receiver tries again at ${new Date(a.retryAt).toISOString().slice(11, 19)} UTC.` : " The receiver keeps trying.";
   switch (a.phase) {
     case "closed":
-      return `The web SDR is closed between slots. The spectrogram comes back at ${utc(a.reopens)}, ready for the ${hhmm(a.forSlot)} slot.`;
+      return `The web SDR ${sdr(s)} is closed between slots. The spectrogram comes back at ${utc(a.reopens)}, ready for the ${hhmm(a.forSlot)} slot.`;
     case "failed":
       return a.kind === "soundCard" ? `No audio from the sound card: ${a.problem}.${again} Check the radio is on and its USB lead is in, and the audio setting below.`
         : a.kind === "webSdr" ? `No audio from the web SDR: ${a.problem}.${again}`
@@ -531,7 +533,7 @@ function audioNote(s) {
     case "ended":
       return "The recording has played to its end.";
     case "opening":
-      return a.kind === "webSdr" ? "Opening the web SDR..." : a.kind === "soundCard" ? "Opening the sound card..." : "Opening the recording...";
+      return a.kind === "webSdr" ? `Opening the web SDR ${sdr(s)}...` : a.kind === "soundCard" ? "Opening the sound card..." : "Opening the recording...";
     default:
       return "Waiting for audio...";
   }

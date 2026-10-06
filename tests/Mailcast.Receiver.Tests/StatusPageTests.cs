@@ -133,7 +133,7 @@ public class StatusPageTests
     [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
     public void Schedule_GivesTheNextSlot_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
     {
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Daylight = null };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Daylight = null, WebSdrSlotsPerDay = 8 };
 
         var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
 
@@ -185,8 +185,9 @@ public class StatusPageTests
         var web = schedule.GetProperty("webSdr");
         Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
         Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
-        // 8 of the 9, spread from the first: all but 17:00.
-        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"], web.GetProperty("times").EnumerateArray().Select(e => e.GetString()));
+        // Every one of the 9, 17:00 too: they all fit in the allowance.
+        Assert.Equal(9, web.GetProperty("slotsPerDay").GetInt32());
+        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"], web.GetProperty("times").EnumerateArray().Select(e => e.GetString()));
     }
 
     [Fact]

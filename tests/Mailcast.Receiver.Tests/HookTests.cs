@@ -150,6 +150,7 @@ public sealed class HookTests
             Audio = audio,
             StateDirectory = dir.Path,
             Daylight = null,
+            WebSdrSlotsPerDay = 8, // every third hour, as the tests below expect
             Rig = rig ? new Retune.RigSettings { DedicatedRadio = true } : null,
         }, new FakeTimeProvider(At(9, 20)), _ => { });
 
@@ -222,6 +223,7 @@ public sealed class HookTests
                 Audio = audio,
                 StateDirectory = dir,
                 Daylight = null,
+                WebSdrSlotsPerDay = 8, // every third hour, as the tests below expect
                 EveryMinutes = everyMinutes,
                 Hooks = new HooksSettings
                 {

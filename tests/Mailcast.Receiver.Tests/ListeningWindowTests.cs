@@ -94,6 +94,52 @@ public class ListeningWindowTests
         Assert.True((ReceiverConfig.MostWebSdrSlotsPerDay + 1) * (ReceiverConfig.WebSdrBefore + ReceiverConfig.WebSdrAfter) > TimeSpan.FromHours(3));
     }
 
+    private static readonly SlotSchedule Daylight = new(new TimeOnly(0, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg);
+
+    private static string[] Hhmm(IEnumerable<DateTimeOffset> times) => [.. times.Select(t => t.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture))];
+
+    [Theory]
+    // Every daylight slot fits for most of the year: 9 in October, 5 in midwinter.
+    [InlineData("2026-10-05", 9, new[] { "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00" })]
+    [InlineData("2026-12-21", 5, new[] { "11:00", "12:00", "13:00", "14:00", "15:00" })]
+    // Midsummer has 14, more than the 12 that fit: the two earliest morning ones are left out.
+    [InlineData("2026-06-21", 14, new[] { "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00" })]
+    public void WebSdr_Default_IsEveryDaylightSlotThatFits_LeavingOutTheEarliest(string date, int daylightSlots, string[] listened)
+    {
+        var day = DateOnly.Parse(date, CultureInfo.InvariantCulture);
+
+        Assert.Equal(daylightSlots, Daylight.ActiveOn(day).Count);
+        Assert.Equal(listened, Hhmm(ListeningWindow.WebSdrSlotsOn(Daylight, null, day)));
+        Assert.True(listened.Length * ReceiverConfig.WebSdrMinutesPerSlot <= ReceiverConfig.WebSdrAllowanceMinutes);
+    }
+
+    [Fact]
+    public void WebSdr_Default_NeverHasMoreThanFitAllYear()
+    {
+        var first = new DateOnly(2026, 1, 1);
+        for (var day = first; day < first.AddYears(1); day = day.AddDays(1))
+        {
+            var active = Daylight.ActiveOn(day);
+            var listened = ListeningWindow.WebSdrSlotsOn(Daylight, null, day);
+            Assert.Equal(Math.Min(active.Count, ReceiverConfig.MostWebSdrSlotsPerDay), listened.Count);
+            Assert.Equal(active[^1], listened[^1]);
+        }
+    }
+
+    [Fact]
+    public void WebSdr_Explicit_IsSpreadEvenlyAsBefore()
+    {
+        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"], Hhmm(ListeningWindow.WebSdrSlotsOn(Daylight, 8, new DateOnly(2026, 10, 5))));
+        Assert.Equal(["06:00", "07:00", "09:00", "11:00", "13:00", "14:00", "16:00", "18:00"], Hhmm(ListeningWindow.WebSdrSlotsOn(Daylight, 8, new DateOnly(2026, 6, 21))));
+        Assert.Equal(["11:00", "12:00", "13:00", "14:00", "15:00"], Hhmm(ListeningWindow.WebSdrSlotsOn(Daylight, 8, new DateOnly(2026, 12, 21))));
+    }
+
+    [Fact]
+    public void WebSdr_DefaultWithoutDaylight_IsTwelveSpreadEvenly()
+    {
+        Assert.Equal(["00:00", "02:00", "04:00", "06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"], Hhmm(ListeningWindow.WebSdrSlots(Hourly, null)));
+    }
+
     [Fact]
     public void Describe_SaysWhichSlots()
     {

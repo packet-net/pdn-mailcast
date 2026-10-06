@@ -145,12 +145,15 @@ public sealed record ReceiverConfig
     public const int ShortestEveryMinutes = 15;
 
     /// <summary>
-    /// How many slots a day a web SDR is listened to, spread evenly through the day (8 of 24
-    /// hourly slots is every 3 hours). Public UberSDR receivers allow each address about three
-    /// hours a day, and each slot listened to takes <see cref="WebSdrMinutesPerSlot"/>, so
-    /// <see cref="MostWebSdrSlotsPerDay"/> is the most. A sound card listens to every slot.
+    /// How many slots a day a web SDR is listened to. Public UberSDR receivers allow each address
+    /// about three hours a day, and each slot listened to takes <see cref="WebSdrMinutesPerSlot"/>,
+    /// so <see cref="MostWebSdrSlotsPerDay"/> is the most. Null, the default, listens to every
+    /// daylight slot that fits, which is every one of them for most of the year; set, it listens
+    /// to that many, spread evenly (8 of 24 hourly slots is every 3 hours). See
+    /// <see cref="ListeningWindow.WebSdrSlotsOn"/>. A sound card listens to every slot.
     /// </summary>
-    public int WebSdrSlotsPerDay { get; init; } = 8;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? WebSdrSlotsPerDay { get; init; }
 
     /// <summary>How long before a slot a web SDR is opened.</summary>
     public static readonly TimeSpan WebSdrBefore = TimeSpan.FromMinutes(2);
@@ -352,7 +355,7 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException($"\"daylight\": {daylightProblem}; GB7RDG's is {{ \"locator\": \"IO91lk\", \"afterSunriseMinutes\": 120, \"beforeSunsetMinutes\": 30 }}");
         }
-        if (WebSdrSlotsPerDay < 1 || WebSdrSlotsPerDay > MostWebSdrSlotsPerDay)
+        if (WebSdrSlotsPerDay is { } perDay && (perDay < 1 || perDay > MostWebSdrSlotsPerDay))
         {
             throw new ConfigException(
                 $"\"webSdrSlotsPerDay\" {WebSdrSlotsPerDay} must be from 1 to {MostWebSdrSlotsPerDay}: each slot keeps a web SDR open {WebSdrMinutesPerSlot} minutes, "
