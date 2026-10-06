@@ -52,6 +52,7 @@ public class WebSdrWindowTests
             config = configure?.Invoke(config) ?? config;
             Host = new ReceiverHost(config, Clock, line => Log.Enqueue(line));
             Host.ClockWaiting += () => Waits.Writer.TryWrite(true);
+            Host.AudioChanged += condition => Conditions.Writer.TryWrite(condition);
             Host.PipelineFactory = source =>
             {
                 var input = new QuietInput();
@@ -70,6 +71,28 @@ public class WebSdrWindowTests
         public System.Collections.Concurrent.ConcurrentQueue<string> Log { get; } = new();
 
         public System.Threading.Channels.Channel<bool> Waits { get; } = System.Threading.Channels.Channel.CreateUnbounded<bool>();
+
+        public System.Threading.Channels.Channel<AudioCondition> Conditions { get; } = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+
+        /// <summary>Waits until the audio has reached <paramref name="phase"/>.</summary>
+        public async Task<AudioCondition> AudioAsync(AudioPhase phase)
+        {
+            while (true)
+            {
+                var condition = await Conditions.Reader.ReadAsync();
+                if (condition.Phase == phase)
+                {
+                    return condition;
+                }
+            }
+        }
+
+        /// <summary>The audio part of the status page's /api/status, as the page reads it.</summary>
+        public System.Text.Json.JsonElement StatusAudio()
+        {
+            var page = new Mailcast.Receiver.Web.StatusPage(Host, null, _ => { }); // never started, so it holds no port
+            return System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine).GetProperty("audio");
+        }
 
         public System.Threading.Channels.Channel<QuietInput> Inputs { get; } = System.Threading.Channels.Channel.CreateUnbounded<QuietInput>();
 
@@ -235,5 +258,83 @@ public class WebSdrWindowTests
 
         Assert.Contains("closed until 10:58 UTC, ready for the 11:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
         Assert.Contains(rig.Log, l => l.Contains("on 2026-12-22 the web SDR listens to all 5 daylight slots, at 11:00, 12:00, 13:00, 14:00 and 15:00 UTC", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Status_BetweenSlots_SaysWhenTheSpectrogramComesBack_AndThenThatItIsLive()
+    {
+        // 08:30: the web SDR next opens at 08:58, for the 09:00 slot.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 8, 30, 0, TimeSpan.Zero));
+        await rig.AudioAsync(AudioPhase.Closed);
+        await rig.Waits.Reader.ReadAsync();
+
+        var closed = rig.StatusAudio();
+        Assert.False(closed.GetProperty("live").GetBoolean());
+        Assert.Equal("closed", closed.GetProperty("phase").GetString());
+        Assert.Equal("webSdr", closed.GetProperty("kind").GetString());
+        var reopens = closed.GetProperty("reopens").GetDateTimeOffset();
+        var forSlot = closed.GetProperty("forSlot").GetDateTimeOffset();
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 8, 58, 0, TimeSpan.Zero), reopens);
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero), forSlot);
+        Assert.Equal(JsonValueKindNull, closed.GetProperty("problem").ValueKind);
+
+        // The clock reaches the opening: the audio is live and the page may ask for the spectrogram.
+        rig.Clock.Step = reopens - rig.Clock.GetUtcNow();
+        rig.Clock.Advance(ReceiverHost.ClockCheck);
+        await rig.AudioAsync(AudioPhase.Listening);
+        var open = rig.StatusAudio();
+        Assert.True(open.GetProperty("live").GetBoolean());
+        Assert.Equal("listening", open.GetProperty("phase").GetString());
+        Assert.Equal(JsonValueKindNull, open.GetProperty("reopens").ValueKind);
+    }
+
+    private const System.Text.Json.JsonValueKind JsonValueKindNull = System.Text.Json.JsonValueKind.Null;
+
+    [Fact]
+    public async Task Status_SoundCardThatCannotBeOpened_SaysWhyAndWhenItIsTriedAgain()
+    {
+        using var dir = new TempDirectory();
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero));
+        var config = new ReceiverConfig { Audio = "plughw:CARD=NoSuchCard,DEV=0", StateDirectory = dir.Path };
+        await using var host = new ReceiverHost(config, clock, _ => { });
+        var failed = new TaskCompletionSource<AudioCondition>(TaskCreationOptions.RunContinuationsAsynchronously);
+        host.AudioChanged += c =>
+        {
+            if (c.Phase == AudioPhase.Failed)
+            {
+                failed.TrySetResult(c);
+            }
+        };
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        var condition = await failed.Task;
+        var page = new Mailcast.Receiver.Web.StatusPage(host, null, _ => { });
+        var audio = System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine).GetProperty("audio");
+
+        Assert.False(audio.GetProperty("live").GetBoolean());
+        Assert.Equal("failed", audio.GetProperty("phase").GetString());
+        Assert.Equal("soundCard", audio.GetProperty("kind").GetString());
+        Assert.Contains("NoSuchCard", audio.GetProperty("problem").GetString(), StringComparison.Ordinal);
+        Assert.Equal(clock.GetUtcNow() + ReceiverHost.AudioRetry, audio.GetProperty("retryAt").GetDateTimeOffset());
+        Assert.Equal(condition.RetryAt, audio.GetProperty("retryAt").GetDateTimeOffset());
+
+        await stop.CancelAsync();
+        await run;
+    }
+
+    [Fact]
+    public void Page_AsksForTheSpectrogramOnlyWhileTheAudioIsLive_AndExplainsOtherwise()
+    {
+        // The page is a file, not a program this suite can run: these check that its logic is the one described.
+        using var stream = typeof(ReceiverHost).Assembly.GetManifestResourceStream("Mailcast.Receiver.Web.index.html")!;
+        string html = new StreamReader(stream).ReadToEnd();
+
+        Assert.DoesNotContain("setTimeout(connect", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("\nconnect();", html, StringComparison.Ordinal);
+        Assert.Contains("if (s.audio.live && !ws) connect();", html, StringComparison.Ordinal);
+        Assert.Contains("The web SDR is closed between slots. The spectrogram comes back at", html, StringComparison.Ordinal);
+        Assert.Contains("No audio from the sound card", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"specNotice\"", html, StringComparison.Ordinal);
     }
 }

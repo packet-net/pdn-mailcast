@@ -651,6 +651,14 @@ public sealed class StatusPage : IAsyncDisposable
             {
                 source = config.Audio,
                 state = _host.AudioState,
+                // What the spectrogram shows instead while there is no audio: see AudioView.
+                kind = AudioKind(config.Audio),
+                live = _host.Audio.Phase == AudioPhase.Listening,
+                phase = AudioPhaseName(_host.Audio.Phase),
+                reopens = _host.Audio.Reopens,
+                forSlot = _host.Audio.ForSlot,
+                problem = _host.Audio.Problem,
+                retryAt = _host.Audio.RetryAt,
                 dialKHz = config.DialKHz,
                 centreKHz = config.CentreHz / 1000,
             },
@@ -721,6 +729,24 @@ public sealed class StatusPage : IAsyncDisposable
             }),
         };
     }
+
+    /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c> or <c>recording</c>.</summary>
+    internal static string AudioKind(string audio) => AudioSource.Parse(audio).Kind switch
+    {
+        AudioSourceKind.UberSdr => "webSdr",
+        AudioSourceKind.Wav => "recording",
+        _ => "soundCard",
+    };
+
+    internal static string AudioPhaseName(AudioPhase phase) => phase switch
+    {
+        AudioPhase.Closed => "closed",
+        AudioPhase.Opening => "opening",
+        AudioPhase.Listening => "listening",
+        AudioPhase.Failed => "failed",
+        AudioPhase.Ended => "ended",
+        _ => "starting",
+    };
 
     /// <summary>When the slots are, for the page, as the config file gives them.</summary>
     internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
