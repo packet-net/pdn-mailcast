@@ -161,6 +161,15 @@ public sealed class SlotRunner
         return await link.SetHardwareAsync(payload, _settings.SetHardwareWait, _time, either.Token);
     }
 
+    /// <summary>
+    /// Whether a refusal was because of the probe: a 400 (a station that does not understand it
+    /// as asked), or a 409 that names the station's txTest.maxSeconds limit (the tone and the
+    /// probe together are too long). A 409 for anything else, a Stop or a channel that did not
+    /// clear, is not, so it is never answered by keying again.
+    /// </summary>
+    internal static bool RefusedForTheProbe(ToneAnswer answer) =>
+        answer.Status == 400 || (answer.Status == 409 && answer.Message.Contains("txTest.maxSeconds", StringComparison.Ordinal));
+
     /// <summary>How a slot is named in the journal: its start, UTC, to the minute.</summary>
     public static string Name(DateTimeOffset slot) => slot.UtcDateTime.ToString("yyyy-MM-dd HH:mm'Z'", CultureInfo.InvariantCulture);
 
@@ -545,12 +554,11 @@ public sealed class SlotRunner
                 if (busy != true)
                 {
                     ToneAnswer answer = await SendToneAsync(probe, cancellation);
-                    if (answer.Outcome != ToneOutcome.Sent && probe is not null && answer.Status is 400 or 409
-                        && await ChannelBusyAsync(cancellation) != true)
+                    if (answer.Outcome != ToneOutcome.Sent && probe is not null && RefusedForTheProbe(answer))
                     {
-                        // Refused with the probe for a reason other than the channel, most likely a
-                        // tone so long that the two pass the station's txTest.maxSeconds: the tone
-                        // alone, at once, so the probe never costs the slot its tone.
+                        // Refused because of the probe itself: the tone alone, at once, so the probe
+                        // never costs the slot its tone. Any other refusal (a Stop, a channel that
+                        // did not clear) is answered as it always was, and Stop still wins.
                         Say($"the station would not send the tone with the channel probe ({answer.Message}); asking for the tone alone");
                         probe = null;
                         answer = await SendToneAsync(null, cancellation);
@@ -558,6 +566,10 @@ public sealed class SlotRunner
                     if (answer.Outcome == ToneOutcome.Sent)
                     {
                         _toneSent = true;
+                        if (probe is not null && answer.KnowsProbe && answer.ProbeComplete == true && answer.ProbeId is string id)
+                        {
+                            _probeId = id;
+                        }
                         Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {S.ToneHz:0} Hz{(probe is null ? "" : ProbeLine(answer))}");
                         if (_abort is null && S.PauseAfterTone > TimeSpan.Zero)
                         {
@@ -605,8 +617,9 @@ public sealed class SlotRunner
             }
         }
 
+
         /// <summary>What became of the probe that was asked for with a tone that went out, for the tone's journal line.</summary>
-        private string ProbeLine(ToneAnswer answer)
+        private static string ProbeLine(ToneAnswer answer)
         {
             if (!answer.KnowsProbe)
             {
@@ -614,7 +627,6 @@ public sealed class SlotRunner
             }
             if (answer.ProbeComplete == true && answer.ProbeId is string id)
             {
-                _probeId = id;
                 return $", then the channel probe ({id}, {ChannelProbe.Airtime.TotalSeconds:0} s more)";
             }
             return answer.ProbeComplete == false

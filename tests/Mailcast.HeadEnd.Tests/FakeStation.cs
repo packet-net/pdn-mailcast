@@ -88,6 +88,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>The station's <c>txTest.maxSeconds</c>: a tone with a probe that would pass it is refused (409), a tone alone is cut to it.</summary>
     public double MaxSeconds { get; set; } = 30;
 
+    /// <summary>A station that does not understand the probe as asked: a tone request with one is answered 400 and nothing is sent.</summary>
+    public bool RejectsProbe { get; set; }
+
+    /// <summary>The next tone request is answered as a Stop on the station page answers it: 409, nothing sent.</summary>
+    public bool StopNextTone { get; set; }
+
+    /// <summary>The next tone request is answered 409 as a channel that did not clear in time, at once, while the flag reads clear.</summary>
+    public bool NextToneChannelNotClear { get; set; }
+
     /// <summary>Every tone request, with the probe it asked for.</summary>
     public List<(DateTimeOffset At, double Seconds, ProbeRequest? Probe)> ToneRequests { get; } = [];
 
@@ -168,6 +177,23 @@ public sealed class FakeStation : IStationApi, IKissConnector
         }
         bool withProbe = probe is not null && KnowsProbe;
         double probeSeconds = ChannelProbe.Airtime.TotalSeconds;
+        if (StopNextTone)
+        {
+            StopNextTone = false;
+            await Task.Yield();
+            return new ToneAnswer(ToneOutcome.Refused, "HTTP 409: stopped before it reached the air, so nothing was transmitted") { Status = 409, KnowsProbe = KnowsProbe };
+        }
+        if (NextToneChannelNotClear)
+        {
+            NextToneChannelNotClear = false;
+            await Task.Yield();
+            return new ToneAnswer(ToneOutcome.Refused, "HTTP 409: the channel did not clear within 60 s, so the test was withdrawn and nothing was transmitted") { Status = 409, KnowsProbe = KnowsProbe };
+        }
+        if (withProbe && RejectsProbe)
+        {
+            await Task.Yield();
+            return new ToneAnswer(ToneOutcome.Failed, "HTTP 400: unknown probe kind \"zc255\"") { Status = 400 };
+        }
         if (withProbe && seconds + probeSeconds > MaxSeconds)
         {
             await Task.Yield();
