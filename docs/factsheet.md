@@ -86,3 +86,5 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | RaptorQ | M0LTE.RaptorQ on nuget.org, checked byte for byte against the Rust `raptorq` crate | AGPL-3.0-only |
 | FBB forwarding | Packet.Fbb on nuget.org, from github.com/packet-net/pdn-fbb, shared with pdn-bbs | AGPL-3.0-or-later |
 | Modem, transmit lease, rig control | github.com/packet-net/pdn-soundmodem | AGPL-3.0-or-later, with some files GPL-3.0 (see its LICENSING.md) |
+
+Using a fountain code to make a one-way link work was Perry M0PYL's idea.
