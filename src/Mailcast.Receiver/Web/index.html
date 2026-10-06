@@ -79,6 +79,12 @@
   </section>
 
   <section>
+    <h2>Speed</h2>
+    <div id="speed" class="muted">Not heard yet.</div>
+    <p class="muted">GB7RDG takes turns: 1200 bps one slot, 600 bps the next. The receiver reads either.</p>
+  </section>
+
+  <section>
     <h2>Your BBS</h2>
     <dl id="bbs"></dl>
   </section>
@@ -104,7 +110,7 @@
     <h2 style="margin-top:14px">Input level</h2>
     <div class="meter"><div class="band" id="band"></div><div class="peak" id="peak"></div></div>
     <div class="muted" id="levelText">Peaks between -18 and -9 dBFS are best.</div>
-    <p class="muted">Check the level while a slot is on. Between slots there is only band noise, so a lower reading then is normal.</p>
+    <p class="muted" id="levelNote">Check the level while a slot is on. Between slots there is only band noise, so a lower reading then is normal.</p>
   </section>
 
   <section class="wide">
@@ -194,7 +200,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
-let status = null;
+let status = null, levelSeen = false;
+const whose = s => s && s.audio.kind === "recording" ? "the recording's" : "the web SDR's";
 
 /* Asks the receiver and never throws. A refusal that is not JSON (403, 421) and a receiver
    that does not answer at all come back as a sentence in .error for the page to show. A 401
@@ -242,6 +249,8 @@ async function refresh() {
          <dt>Frames heard</dt><dd>${s.slot.framesHeard}${s.slot.lastFrame ? ", last at " + new Date(s.slot.lastFrame).toLocaleTimeString() : ""}</dd></dl>`;
   }
 
+  speed(s);
+
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
     ${s.bbs.lastFailure ? `<dt>Problem</dt><dd class="bad">${esc(s.bbs.lastFailure)}</dd>` : `<dt>Last session</dt><dd class="good">fine</dd>`}
@@ -275,9 +284,34 @@ async function refresh() {
         <td class="${d.verdict === "accepted" ? "good" : d.verdict === "refused" ? "bad" : ""}">${esc(d.said)}${d.detail ? `<div class="muted">${esc(d.detail)}</div>` : ""}</td></tr>`).join("")}</table>`;
   }
 
-  const lvl = s.level;
+  const lvl = s.level, target = lvl.advice === "target";
+  $("band").hidden = !target;
+  $("levelNote").hidden = !target;
+  if (!levelSeen) $("levelText").textContent = target ? `Peaks between ${lvl.lowDbFs} and ${lvl.highDbFs} dBFS are best.`
+    : `The level is ${whose(s)} own. Any level is fine short of clipping.`;
   $("band").style.left = pct(lvl.lowDbFs) + "%";
   $("band").style.width = (pct(lvl.highDbFs) - pct(lvl.lowDbFs)) + "%";
+}
+/* the speed the frames are coming at, by the modem's autobaud */
+function speed(s) {
+  const b = s.burst, slot = s.slot, heard = slot ? slot.heard : [];
+  if (!b && !heard.length) { $("speed").className = "muted"; $("speed").textContent = "Not heard yet."; return; }
+  let html = "";
+  if (b) {
+    html += `<div class="big">${esc(b.words)}</div>
+      <div class="muted">${b.live ? "Hearing a burst at this speed now."
+        : `Last burst at ${new Date(b.ended).toLocaleTimeString()}, ${b.frames} frame${b.frames === 1 ? "" : "s"}.`}</div>`;
+  }
+  if (heard.length) {
+    html += `<dl style="margin-top:10px"><dt>Last slot</dt><dd>${heard.map(h => `${esc(h.words)}, ${h.frames} frame${h.frames === 1 ? "" : "s"}`).join("<br>")}</dd>`;
+    if (slot.listedWaveform) {
+      const same = slot.listedWaveform === slot.waveform;
+      html += `<dt>GB7RDG says</dt><dd class="${same ? "" : "warn"}">${esc(slot.listedWords)}${same ? ", which agrees" : ", which does not agree"}</dd>`;
+    }
+    html += "</dl>";
+  }
+  $("speed").className = "";
+  $("speed").innerHTML = html;
 }
 /* when and where to listen */
 const utc = t => new Date(t).toISOString().slice(11, 16) + " UTC";
@@ -517,14 +551,20 @@ let levelTimer = null;
 function level(msg) {
   const peak = $("peak");
   peak.style.width = pct(msg.peak) + "%";
-  peak.classList.toggle("hot", !!msg.clip || msg.peak > -6);
   const lo = status ? status.level.lowDbFs : -18, hi = status ? status.level.highDbFs : -9;
+  /* A sound card's level is yours to set, so it is judged against the target. A web SDR's (or a
+     recording's) is not, and the modem copes with any level short of clipping, so only that is said. */
+  const target = !status || status.level.advice === "target";
+  levelSeen = true;
+  peak.classList.toggle("hot", !!msg.clip || (target && msg.peak > -6));
   $("levelText").innerHTML = `Peak ${msg.peak.toFixed(1)} dBFS. `
-    + (msg.clip ? '<span class="bad">Clipping: turn the audio down.</span>'
+    + (!target ? (msg.clip ? '<span class="bad">Clipping: frames may be lost.</span>'
+        : `This is ${whose(status)} own level. The modem copes with it unless it clips.`)
+      : (msg.clip ? '<span class="bad">Clipping: turn the audio down.</span>'
       : msg.peak > hi ? '<span class="warn">A little hot.</span>'
       : msg.peak < lo ? '<span class="warn">A little quiet.</span>'
       : '<span class="good">Good.</span>')
-    + ` Peaks between ${lo} and ${hi} dBFS are best.`;
+    + ` Peaks between ${lo} and ${hi} dBFS are best.`);
   clearTimeout(levelTimer);
   levelTimer = setTimeout(() => { $("levelText").textContent = "No audio level is coming in."; peak.style.width = "0"; }, 3000);
 }

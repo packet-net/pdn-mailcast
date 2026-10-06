@@ -57,6 +57,7 @@ public sealed class AudioPipeline : IAsyncDisposable
     private int _locksReleased;
     private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _threadDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Ms110dDemodulator? _receiver;
 
     private AudioPipeline(AudioSource source, double dialHz, Action<string> log, TimeProvider time)
     {
@@ -66,10 +67,31 @@ public sealed class AudioPipeline : IAsyncDisposable
         _time = time;
         Channel = new SoundModemChannel(OnAir.SampleRate);
         Channel.ReceiveOnlyReason = "pdn-mailcast's receiver never transmits";
-        Channel.AddModem(0, sink => new Ms110dModem(OnAir.SampleRate, sink));
+        Ms110dModem? modem = null;
+        Channel.AddModem(0, sink => modem = new Ms110dModem(OnAir.SampleRate, sink));
+        _receiver = BurstWatch.ReceiverOf(modem!);
+        if (_receiver is null)
+        {
+            _log("audio: this pdn-soundmodem does not say which MS110D waveform it locked to, so the page cannot show the speed");
+        }
+        Burst = new BurstWatch(time);
+        Channel.FrameReceived += (_, _) => Burst.OnFrame(LockedWaveform);
         Tone = new ToneDetector(OnAir.SampleRate);
         Channel.AddReceiveTap(Tone.Process);
     }
+
+    /// <summary>The bursts heard, by the waveform the modem's autobaud locked to: for the speed tile.</summary>
+    public BurstWatch Burst { get; }
+
+    /// <summary>
+    /// The waveform number the MS110D receiver is locked to now, or null between bursts (or if it
+    /// cannot say). Read on the audio thread while a frame is being delivered, it is the waveform
+    /// that frame came on: the lock is only dropped after the burst's last frame.
+    /// </summary>
+    internal int? LockedWaveform => _receiver?.Lock is { WaveformNumber: >= 0 and int wn } ? wn : null;
+
+    /// <summary>The waveform the frame being delivered now came on, by name; see <see cref="LockedWaveform"/>.</summary>
+    public string? FrameWaveform => LockedWaveform is { } wn ? Waveform.Name(wn) : null;
 
     /// <summary>The channel; its <see cref="SoundModemChannel.FrameReceived"/> carries every decoded frame.</summary>
     public SoundModemChannel Channel { get; }
@@ -265,6 +287,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         }
         Channel.ProcessReceive(samples);
         ReleaseStuckLock(samples.Length);
+        Burst.AfterBlock(LockedWaveform);
     }
 
     /// <summary>

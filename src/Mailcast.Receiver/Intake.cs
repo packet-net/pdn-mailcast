@@ -19,7 +19,7 @@ public sealed class Intake : IAsyncDisposable
     private readonly object _gate = new();
     // Bounded: frames come a few a minute, so a full queue means the store has stopped, and
     // memory should not be what finds that out. Frames are dropped, and counted, rather than waited for.
-    private readonly Channel<ReadOnlyMemory<byte>> _queue;
+    private readonly Channel<(ReadOnlyMemory<byte> Payload, string? Waveform)> _queue;
     private readonly object _settledGate = new();
     private TaskCompletionSource _settledChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private long _offered;
@@ -48,7 +48,7 @@ public sealed class Intake : IAsyncDisposable
         _log = log;
         // With DropWrite a write to a full queue still says it succeeded; this is the only place
         // a dropped frame shows.
-        _queue = Channel.CreateBounded<ReadOnlyMemory<byte>>(
+        _queue = Channel.CreateBounded<(ReadOnlyMemory<byte> Payload, string? Waveform)>(
             new BoundedChannelOptions(queueLength) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite },
             _ => Dropped());
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
@@ -89,8 +89,11 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>A bulletin has been rebuilt and is waiting in the outbox.</summary>
     public event Action<Bulletin>? BulletinCompleted;
 
-    /// <summary>A broadcast frame was heard (raised on the worker).</summary>
-    public event Action? FrameHeard;
+    /// <summary>A broadcast frame was heard, with the waveform it came on if the modem said (raised on the worker).</summary>
+    public event Action<string?>? FrameHeard;
+
+    /// <summary>A directory was rebuilt (raised on the worker, after <see cref="FrameHeard"/> for the frame that completed it).</summary>
+    public event Action<BroadcastDirectory>? DirectoryHeard;
 
     /// <summary>Broadcast frames heard since start.</summary>
     public long FramesHeard => Interlocked.Read(ref _framesHeard);
@@ -102,10 +105,10 @@ public sealed class Intake : IAsyncDisposable
     public long FramesStored => Interlocked.Read(ref _framesStored);
 
     /// <summary>
-    /// Offers a decoded AX.25 frame. Anything that is not a broadcast frame is ignored. Safe to
-    /// call from any thread; returns at once.
+    /// Offers a decoded AX.25 frame, heard on <paramref name="waveform"/> (null if not known).
+    /// Anything that is not a broadcast frame is ignored. Safe to call from any thread; returns at once.
     /// </summary>
-    public bool Offer(byte[] ax25Frame)
+    public bool Offer(byte[] ax25Frame, string? waveform = null)
     {
         if (!BroadcastFrame.TryGetPayload(ax25Frame, out var payload))
         {
@@ -113,7 +116,7 @@ public sealed class Intake : IAsyncDisposable
         }
         Interlocked.Increment(ref _framesHeard);
         Interlocked.Increment(ref _offered);
-        if (!_queue.Writer.TryWrite(payload))
+        if (!_queue.Writer.TryWrite((payload, waveform)))
         {
             Settle(); // only after DisposeAsync
         }
@@ -309,11 +312,11 @@ public sealed class Intake : IAsyncDisposable
 
     private async Task RunAsync()
     {
-        await foreach (var payload in _queue.Reader.ReadAllAsync().ConfigureAwait(false))
+        await foreach (var (payload, waveform) in _queue.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             try
             {
-                Accept(payload);
+                Accept(payload, waveform);
             }
             finally
             {
@@ -322,7 +325,7 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
-    private void Accept(ReadOnlyMemory<byte> payload)
+    private void Accept(ReadOnlyMemory<byte> payload, string? waveform)
     {
         AcceptResult result;
         MailParts? parts = null;
@@ -355,7 +358,7 @@ public sealed class Intake : IAsyncDisposable
 
         try
         {
-            FrameHeard?.Invoke();
+            FrameHeard?.Invoke(waveform);
             Report(result);
         }
         catch (Exception e)
@@ -379,7 +382,9 @@ public sealed class Intake : IAsyncDisposable
                 break;
             case FrameOutcome.CompletedDirectory when result.Directory is { } directory:
                 Interlocked.Increment(ref _framesStored);
-                _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation");
+                _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation"
+                    + (directory.Mode is { } mode ? $", sent on {Waveform.Words(mode)}" : ""));
+                DirectoryHeard?.Invoke(directory);
                 SlotTimetable? changed = null;
                 lock (_gate)
                 {

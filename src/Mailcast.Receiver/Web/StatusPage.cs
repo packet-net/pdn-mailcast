@@ -688,13 +688,20 @@ public sealed class StatusPage : IAsyncDisposable
                 toneLive = liveTone is not null,
             },
             schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
-            level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs },
+            level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
+            burst = BurstView(_host.Pipeline?.Burst.Shown),
             slot = slot is null ? null : new
             {
                 started = slot.Started,
                 scheduled = slot.Scheduled,
                 framesHeard = slot.FramesHeard,
                 lastFrame = slot.LastFrame,
+                waveform = slot.Waveform,
+                frameCounts = slot.FrameCounts,
+                // The same, most first and in words, for the page.
+                heard = slot.FrameCounts.OrderByDescending(c => c.Value).Select(c => new { waveform = c.Key, words = Waveform.Words(c.Key), frames = c.Value }),
+                listedWaveform = slot.ListedWaveform,
+                listedWords = slot.ListedWaveform is { } listed ? Waveform.Words(listed) : null,
                 tone = slot.Tone is not { } tone ? null : new
                 {
                     frequencyHz = Math.Round(tone.FrequencyHz, 1),
@@ -729,6 +736,28 @@ public sealed class StatusPage : IAsyncDisposable
             }),
         };
     }
+
+    /// <summary>
+    /// The burst for the speed tile: the waveform the modem's autobaud locked to, its rate, and
+    /// whether the modem is on it now (else it is the last burst any frames came from).
+    /// </summary>
+    internal static object? BurstView(HeardBurst? burst) => burst is null ? null : new
+    {
+        waveform = burst.Waveform,
+        bps = Waveform.Bps(burst.Waveform),
+        words = Waveform.Words(burst.Waveform),
+        live = burst.Live,
+        frames = burst.Frames,
+        started = burst.Started,
+        ended = burst.Ended,
+    };
+
+    /// <summary>
+    /// How the page judges the input level: <c>target</c> for a sound card, whose level you set,
+    /// so it says when peaks are outside -18 to -9 dBFS; <c>clippingOnly</c> for a web SDR or a
+    /// recording, whose level is not yours to set and which the modem copes with unless it clips.
+    /// </summary>
+    internal static string LevelAdvice(string audio) => AudioSource.Parse(audio).Kind == AudioSourceKind.Alsa ? "target" : "clippingOnly";
 
     /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c> or <c>recording</c>.</summary>
     internal static string AudioKind(string audio) => AudioSource.Parse(audio).Kind switch

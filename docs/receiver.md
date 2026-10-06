@@ -177,15 +177,18 @@ http://127.0.0.1:8130/ shows:
 
 - when to listen: the frequency, the slots and today's slot times, whether they come from GB7RDG's directory or your config, the next slot, and for a web SDR which of today's slots it listens to and the next of them;
 - the last slot: how far off frequency the tone was, its signal-to-noise ratio, and how many frames were heard;
+- the speed: GB7RDG takes turns on 1200 bps (MS110D WN4) and 600 bps (WN3), and the modem reads either. The tile shows the burst being heard now, or else the last one frames came from, then how many frames of the last slot came at each speed, and the speed GB7RDG's directory gave for the slot when one was rebuilt in it. The speed is what the modem itself locked to at the start of each burst. Before anything is heard it says "Not heard yet.";
 - your BBS: where bulletins go, how many are waiting, and any problem reaching it;
 - a live spectrogram from 0 to 4 kHz, with the signal's edges, its centre at 1800 Hz and the tone marked, so you can see whether the signal sits where it should in your passband; pdn-soundmodem's full waterfall is a link away. While there is no audio it says why instead: between a web SDR's slots it says when the spectrogram comes back, and for a sound card that can't be opened it gives the reason and when the receiver tries again;
-- the input level, with the same target as pdn-soundmodem: peaks between -18 and -9 dBFS;
+- the input level. For a sound card it has the same target as pdn-soundmodem: peaks between -18 and -9 dBFS. For a web SDR (or a recording) the level isn't yours to set and the modem copes with any level short of clipping, so it only warns about clipping;
 - what to try if nothing is heard;
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the mail this receiver holds (see [Mail](#mail));
 - the settings: audio, the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
 
 On this machine only, the page answers to `localhost` and nothing else.
+
+Scripts can read the same from `GET /api/status`. For the speed: `slot.waveform` is the waveform most of the last slot's frames came on (`ms110d-wn4`), or `mixed` if two tie; `slot.frameCounts` has the frames on each; `slot.listedWaveform` is the directory's, if one was rebuilt in that slot; and `burst` is the burst now (`live: true`) or the last one frames came from, with its `waveform` and `bps`, or null before any.
 
 ### On your network
 
@@ -223,7 +226,7 @@ On disk they are in the state directory: waiting ones in `store/outbox/`, archiv
 
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), each bulletin as it completes, what the BBS said about it, and each one sent again from the page. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, what the BBS said about it, and each one sent again from the page. The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 

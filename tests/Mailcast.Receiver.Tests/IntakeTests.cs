@@ -54,7 +54,7 @@ public class IntakeTests
         Assert.True(frames.Count >= 8);
         using var entered = new SemaphoreSlim(0);
         using var release = new ManualResetEventSlim();
-        intake.FrameHeard += () =>
+        intake.FrameHeard += _ =>
         {
             entered.Release();
             release.Wait();
