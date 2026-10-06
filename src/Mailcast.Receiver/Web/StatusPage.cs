@@ -372,7 +372,7 @@ public sealed class StatusPage : IAsyncDisposable
     /// is refused for a while) as JSON. <paramref name="session"/> is the session let in on, if any.
     /// </summary>
     /// <remarks>
-    /// Every current browser sends <c>Sec-Fetch-Mode</c> and no script does unless told to. A
+    /// What counts as a browser is <see cref="IsBrowser(string?, string?, string?)"/>. A
     /// browser's HTTP Basic is ignored, never counted as a wrong password: one that remembers a
     /// Basic login from before the sign-in page would otherwise never see that page, could not sign
     /// out, and after a change of password would lock its own address out with its old password
@@ -435,7 +435,21 @@ public sealed class StatusPage : IAsyncDisposable
 
     private const string SignInFirst = "Sign in first: this page needs its password.";
 
-    private static bool IsBrowser(HttpListenerRequest request) => request.Headers["Sec-Fetch-Mode"] is not null;
+    private static bool IsBrowser(HttpListenerRequest request) =>
+        IsBrowser(request.Headers["Sec-Fetch-Mode"], request.Headers["User-Agent"], request.Headers["Accept"]);
+
+    /// <summary>
+    /// Whether a request comes from a browser rather than a script, from its
+    /// <c>Sec-Fetch-Mode</c>, <c>User-Agent</c> and <c>Accept</c> headers. A browser sends
+    /// <c>Sec-Fetch-Mode</c> only to HTTPS and to localhost, never to this page on a plain-HTTP
+    /// network address, which is where the sign-in page matters most; but every browser's user
+    /// agent starts <c>Mozilla/</c>, and its pages ask for <c>text/html</c>. curl, wget and
+    /// python-requests send none of these, so a script is answered as before.
+    /// </summary>
+    internal static bool IsBrowser(string? secFetchMode, string? userAgent, string? accept) =>
+        secFetchMode is not null
+        || (userAgent?.StartsWith("Mozilla/", StringComparison.Ordinal) ?? false)
+        || (accept?.Contains("text/html", StringComparison.OrdinalIgnoreCase) ?? false);
 
     /// <summary>Waits <see cref="FailureDelay"/> before a wrong password is answered.</summary>
     private Task PauseAsync() =>
