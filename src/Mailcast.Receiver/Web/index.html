@@ -199,6 +199,10 @@
         <input id="dial" readonly>
       </label>
       <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal is centred 1800 Hz above it.</div>
+      <label>Accept frames from
+        <input id="sources" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="muted" id="sourcesNote">The callsigns the mailcast is sent from, separated by commas: <code>"sources"</code> in receiver.json. Any SSID is accepted.</div>
       <div class="row">
         <label>BBS host <input id="host"></label>
         <label>Port <input id="port" type="number" min="1" max="65535"></label>
@@ -754,6 +758,9 @@ async function loadSettings() {
   $("dial").value = `${mhz(settings.dialKHz)} MHz (signal centre ${mhz(settings.dialKHz + 1.8)} MHz)`;
   $("alsaOption").textContent = `Sound card on my radio (USB, dial ${mhz(settings.dialKHz)} MHz)`;
   $("cards").innerHTML = settings.soundCards.map(c => `<option value="${esc(c)}">`).join("");
+  $("sources").value = settings.sources.join(", ");
+  $("sourcesNote").innerHTML = 'The callsigns the mailcast is sent from, separated by commas: <code>"sources"</code> in receiver.json. Any SSID is accepted.'
+    + (settings.sourcesSet ? "" : " Your config file leaves it out, so these are the default.");
   $("type").value = settings.bbs.type;
   $("host").value = settings.bbs.host;
   $("port").value = settings.bbs.port;
@@ -786,6 +793,9 @@ $("settings").addEventListener("submit", async e => {
     login: $("login").value, password: $("password").value, command: $("command").value,
     pagePassword: $("pagePassword").value, currentPagePassword: $("currentPagePassword").value,
   };
+  /* Only when changed, so saving other settings leaves a config without "sources" following the default. */
+  const sources = $("sources").value.split(/[\s,]+/).filter(Boolean);
+  if (sources.join(", ") !== settings.sources.join(", ")) form.sources = sources;
   const r = await api("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
   $("saved").innerHTML = r.ok ? '<span class="good">Saved. The receiver is using the new settings.</span>' : `<span class="bad">${esc(r.error)}</span>`;
   $("password").value = "";

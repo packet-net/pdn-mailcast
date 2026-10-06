@@ -73,7 +73,7 @@ public class HeardScheduleTests
         var dapps = TransferObject.ForContent((byte)ObjectKind.DappsMessage, "a DAPPS message"u8.ToArray(), [], false, ZstdDictionary.Gb7rdg1Id, Compression.Default);
         for (uint esi = 0; esi < 10; esi++)
         {
-            intake.Offer(Packet.SoundModem.Waterfall.Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, dapps.Frame(esi).ToBytes()));
+            intake.Offer(Packet.SoundModem.Waterfall.Ax25UiFrame.Build(Samples.Source, OnAir.Destination, dapps.Frame(esi).ToBytes()));
         }
         await intake.DrainAsync(CancellationToken.None);
         Assert.Empty(intake.Pending());

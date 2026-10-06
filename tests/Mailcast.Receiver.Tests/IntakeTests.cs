@@ -39,9 +39,9 @@ public class IntakeTests
         var payload = Samples.Frames([Samples.Bulletin(1)])[0].AsSpan(16).ToArray();
 
         Assert.False(intake.Offer(Ax25UiFrame.Build("G4ABC", OnAir.Destination, payload)));
-        Assert.False(intake.Offer(Ax25UiFrame.Build(OnAir.Source, "ID", payload)));
+        Assert.False(intake.Offer(Ax25UiFrame.Build(Samples.Source, "ID", payload)));
         Assert.False(intake.Offer([1, 2, 3]));
-        Assert.True(intake.Offer(Ax25UiFrame.Build(OnAir.Source + "-3", OnAir.Destination, payload)));
+        Assert.True(intake.Offer(Ax25UiFrame.Build(Samples.Source + "-3", OnAir.Destination, payload)));
         Assert.Equal(1, intake.FramesHeard);
     }
 

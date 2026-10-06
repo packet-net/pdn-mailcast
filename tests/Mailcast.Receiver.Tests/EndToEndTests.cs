@@ -49,7 +49,7 @@ public class EndToEndTests(ITestOutputHelper output)
             plan.Frames.Select((f, i) => (f, i)).First(x => x.f.ObjectId == plan.Objects[0].Transfer.ObjectId).i,
             plan.Frames.Select((f, i) => (f, i)).Last(x => x.f.ObjectId == largest.Transfer.ObjectId).i,
         };
-        var frames = plan.Frames.Select(f => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, f.ToBytes())).ToList();
+        var frames = plan.Frames.Select(f => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, f.ToBytes())).ToList();
         string wav = Path.Combine(dir.Path, "slot.wav");
         SlotRecording.Write(wav, frames, faded, snrDb: 12, toneOffsetHz: 2.5, seed: 2026);
         output.WriteLine($"{frames.Count} frames, {faded.Count} lost to the fade, recording {new FileInfo(wav).Length / 1_000_000.0:F1} MB");

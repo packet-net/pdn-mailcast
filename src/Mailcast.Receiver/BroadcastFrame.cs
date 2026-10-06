@@ -3,19 +3,24 @@ using System.Text;
 namespace Mailcast.Receiver;
 
 /// <summary>
-/// Picks the broadcast out of everything the modem decodes: AX.25 UI frames from
-/// <see cref="OnAir.Source"/> to <see cref="OnAir.Destination"/>, any SSID on either, with no
-/// layer 3 protocol. Anything else on the channel is somebody else's traffic.
+/// Picks the broadcast out of everything the modem decodes: AX.25 UI frames from one of the
+/// config's <see cref="ReceiverConfig.AcceptedSources"/> to <see cref="OnAir.Destination"/>, any
+/// SSID on either, with no layer 3 protocol. Anything else on the channel is somebody else's traffic.
 /// </summary>
 internal static class BroadcastFrame
 {
     private const byte UiControl = 0x03;
     private const byte NoLayer3 = 0xF0;
 
-    /// <summary>The information field of a broadcast frame, or false for any other frame.</summary>
-    public static bool TryGetPayload(byte[] frame, out ReadOnlyMemory<byte> payload)
+    /// <summary>
+    /// The information field of a broadcast frame from one of <paramref name="sources"/>, or false
+    /// for any other frame. <paramref name="otherSource"/> is the source's base callsign when the
+    /// frame looks like the broadcast but comes from a callsign not in the list, and null otherwise.
+    /// </summary>
+    public static bool TryGetPayload(byte[] frame, CallsignList sources, out ReadOnlyMemory<byte> payload, out string? otherSource)
     {
         payload = default;
+        otherSource = null;
         if (!TryReadAddresses(frame, out string destination, out string source, out int afterAddresses))
         {
             return false;
@@ -24,8 +29,13 @@ internal static class BroadcastFrame
         {
             return false;
         }
-        if (BaseCall(source) != OnAir.Source || BaseCall(destination) != OnAir.Destination)
+        if (BaseCall(destination) != OnAir.Destination)
         {
+            return false;
+        }
+        if (!sources.Contains(BaseCall(source)))
+        {
+            otherSource = BaseCall(source);
             return false;
         }
         payload = frame.AsMemory(afterAddresses + 2);

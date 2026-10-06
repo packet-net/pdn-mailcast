@@ -33,6 +33,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             ArchiveRetention = TimeSpan.FromDays(config.Archive.Days),
             ArchiveMaxBytes = config.Archive.MaxMegabytes * 1024L * 1024,
         });
+        Intake.Sources = config.AcceptedSources;
         Ledger = new DeliveryLedger(config.StateDirectory);
         Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Schedule);
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
@@ -250,6 +251,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         _log(ScheduleFromDirectory
             ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's)"
             : $"slots: GB7RDG's slots are {Schedule.Describe()}");
+        _log(SourcesLine(Config));
         if (Config.SlotUtcWithoutEveryMinutes)
         {
             _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
@@ -347,6 +349,11 @@ public sealed class ReceiverHost : IAsyncDisposable
         return delivered;
     }
 
+    /// <summary>The start-up line saying which callsigns frames are accepted from, and whether that is the default for a file without "sources".</summary>
+    internal static string SourcesLine(ReceiverConfig config) => config.Sources is null
+        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default; add \"sources\" to choose"
+        : $"config: frames are accepted from {config.Sources}, as \"sources\" says";
+
     /// <summary>The longest --decode waits for the channel measurement once the mail is delivered.</summary>
     internal static readonly TimeSpan DecodeMeasureWait = TimeSpan.FromMinutes(2);
 
@@ -365,13 +372,14 @@ public sealed class ReceiverHost : IAsyncDisposable
                 || _config.Daylight != config.Daylight
                 || _config.DialKHz != config.DialKHz;
             _config = config;
+            Intake.Sources = config.AcceptedSources;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
             if (audioChanged)
             {
                 restart = _audioRestart;
             }
         }
-        _log($"config: now listening on {config.Audio}, delivering to {DescribeBbs(config.Bbs)}");
+        _log($"config: now listening on {config.Audio}, delivering to {DescribeBbs(config.Bbs)}, accepting frames from {config.AcceptedSources}");
         restart?.Cancel();
         Delivery.Nudge();
     }

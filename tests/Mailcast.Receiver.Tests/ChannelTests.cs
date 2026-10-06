@@ -572,7 +572,7 @@ public class ChannelTests
         var payload = new byte[120];
         new Random(6).NextBytes(payload);
         var modem = new Ms110dModem(Rate, _ => { }, tx);
-        Feed(pipeline, modem.Modulate(Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, payload), 0));
+        Feed(pipeline, modem.Modulate(Ax25UiFrame.Build(Samples.Source, OnAir.Destination, payload), 0));
         Feed(pipeline, new float[3 * Rate]);
         Assert.Single(kept);
         await pipeline.DisposeAsync();

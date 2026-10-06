@@ -124,14 +124,36 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>Broadcast frames that added a piece the store did not have.</summary>
     public long FramesStored => Interlocked.Read(ref _framesStored);
 
+    private volatile CallsignList _sources = ReceiverConfig.DefaultSources;
+
+    /// <summary>
+    /// The callsigns broadcast frames are accepted from: the config's
+    /// <see cref="ReceiverConfig.AcceptedSources"/>, set by the host. Safe to change while frames arrive.
+    /// </summary>
+    public CallsignList Sources
+    {
+        get => _sources;
+        set => _sources = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    // Callsigns already logged as sending the broadcast's frames without being accepted: one line
+    // each, and no more than a few, so a busy channel cannot fill the journal.
+    private readonly HashSet<string> _otherSourcesLogged = new(StringComparer.Ordinal);
+    private const int MostOtherSourcesLogged = 16;
+
     /// <summary>
     /// Offers a decoded AX.25 frame, heard on <paramref name="waveform"/> (null if not known).
     /// Anything that is not a broadcast frame is ignored. Safe to call from any thread; returns at once.
     /// </summary>
     public bool Offer(byte[] ax25Frame, string? waveform = null)
     {
-        if (!BroadcastFrame.TryGetPayload(ax25Frame, out var payload))
+        var sources = _sources;
+        if (!BroadcastFrame.TryGetPayload(ax25Frame, sources, out var payload, out string? otherSource))
         {
+            if (otherSource is not null)
+            {
+                NoteOtherSource(otherSource, sources);
+            }
             return false;
         }
         Interlocked.Increment(ref _framesHeard);
@@ -163,6 +185,18 @@ public sealed class Intake : IAsyncDisposable
             }
             await changed.WaitAsync(cancellation).ConfigureAwait(false);
         }
+    }
+
+    private void NoteOtherSource(string call, CallsignList sources)
+    {
+        lock (_otherSourcesLogged)
+        {
+            if (_otherSourcesLogged.Count >= MostOtherSourcesLogged || !_otherSourcesLogged.Add(call))
+            {
+                return;
+            }
+        }
+        _log($"intake: a frame to {OnAir.Destination} from {call} was ignored: not from an accepted source ({sources}); \"sources\" in the config file sets them");
     }
 
     private void Dropped()

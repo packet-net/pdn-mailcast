@@ -27,7 +27,7 @@ public class PskReporterTests
         }
     }
 
-    private static byte[] Ax25(MailcastFrame frame) => Ax25UiFrame.Build(OnAir.Source, OnAir.Destination, frame.ToBytes());
+    private static byte[] Ax25(MailcastFrame frame) => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, frame.ToBytes());
 
     [Fact]
     public async Task TheReading_IsLoggedOnceAndKept_ButNeverWaitsForTheBbs()
