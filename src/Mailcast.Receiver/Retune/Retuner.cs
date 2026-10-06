@@ -443,10 +443,21 @@ public sealed class Retuner : IAsyncDisposable
             if (_hooks is { Configured: true } hooks)
             {
                 SetState(RetuneStage.Idle, $"running the \"before\" command for the {Hhmm(slot)} UTC slot");
-                if (!await hooks.BeforeAsync(slot, this, "; so the radio is not retuned and LinBPQ is not held off for that slot, as whatever it was to stop may still be transmitting", cancellation).ConfigureAwait(false))
+                var start = await hooks.BeforeAsync(slot, this, "; so the radio is not retuned and LinBPQ is not held off for that slot, as whatever it was to stop may still be transmitting", cancellation).ConfigureAwait(false);
+                if (start != BeforeOutcome.Ok)
                 {
-                    NoteProblem($"the \"before\" command failed, so the radio was not retuned for the {Hhmm(slot)} UTC slot");
-                    SetState(RetuneStage.Idle, $"not retuning for the {Hhmm(slot)} UTC slot: the \"before\" command failed; \"after\" runs at {Hhmm(closes)} UTC");
+                    if (start == BeforeOutcome.Busy)
+                    {
+                        // A web SDR's window from before the audio source changed: its "after"
+                        // has not run, so neither does this slot's "before".
+                        Warn($"retune: not retuning for the {Hhmm(slot)} UTC slot: the hooks are still running for a window from before the audio source changed");
+                    }
+                    NoteProblem(start == BeforeOutcome.Busy
+                        ? $"the hooks were still running for another window, so the radio was not retuned for the {Hhmm(slot)} UTC slot"
+                        : $"the \"before\" command failed, so the radio was not retuned for the {Hhmm(slot)} UTC slot");
+                    SetState(RetuneStage.Idle, start == BeforeOutcome.Busy
+                        ? $"not retuning for the {Hhmm(slot)} UTC slot: the hooks are still running for another window"
+                        : $"not retuning for the {Hhmm(slot)} UTC slot: the \"before\" command failed; \"after\" runs at {Hhmm(closes)} UTC");
                     while (_time.GetUtcNow() < closes)
                     {
                         await WaitAsync(Shorter(closes - _time.GetUtcNow(), Check), cancellation).ConfigureAwait(false);

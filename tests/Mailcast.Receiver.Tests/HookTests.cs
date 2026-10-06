@@ -13,12 +13,12 @@ internal static class HookScript
 {
     /// <summary>
     /// A script that appends "HOOK SLOT DIAL CENTRE BEFORE_OK" (BEFORE_OK "none" when not given)
-    /// to <paramref name="record"/>, then exits with <paramref name="exit"/>.
+    /// to <paramref name="record"/>, runs <paramref name="then"/>, then exits with <paramref name="exit"/>.
     /// </summary>
-    public static HookCommand Write(string dir, string name, string record, int exit = 0, int timeoutSeconds = 60)
+    public static HookCommand Write(string dir, string name, string record, int exit = 0, int timeoutSeconds = 60, string then = "")
     {
         string path = Path.Combine(dir, name);
-        File.WriteAllText(path, $"#!/bin/sh\necho \"$MAILCAST_HOOK $MAILCAST_SLOT_UTC $MAILCAST_DIAL_KHZ $MAILCAST_CENTRE_KHZ ${{MAILCAST_BEFORE_OK-none}}\" >> '{record}'\nexit {exit}\n");
+        File.WriteAllText(path, $"#!/bin/sh\necho \"$MAILCAST_HOOK $MAILCAST_SLOT_UTC $MAILCAST_DIAL_KHZ $MAILCAST_CENTRE_KHZ ${{MAILCAST_BEFORE_OK-none}}\" >> '{record}'\n{then}\nexit {exit}\n");
         File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return new HookCommand { Command = path, TimeoutSeconds = timeoutSeconds };
     }
@@ -66,7 +66,7 @@ public sealed class HookTests
 
         Assert.Equal(script.Command, config.Hooks!.Before!.Command);
         Assert.Equal(["stop", "ardopcf"], config.Hooks.Before.Args);
-        Assert.Equal(TimeSpan.FromSeconds(45), config.Hooks.Before.Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(45), config.Hooks.Before.TimeLimit);
         Assert.Empty(config.Hooks.After!.Args);
         Assert.Equal(HookCommand.DefaultTimeoutSeconds, config.Hooks.After.TimeoutSeconds);
 
@@ -94,6 +94,7 @@ public sealed class HookTests
     [InlineData("""{ "command": "SCRIPT", "timeoutSeconds": 0 }""", "\"timeoutSeconds\" 0 must be from 1 to 300")]
     [InlineData("""{ "command": "SCRIPT", "timeoutSeconds": 301 }""", "\"timeoutSeconds\" 301 must be from 1 to 300")]
     [InlineData("""{ "command": "SCRIPT", "timeoutSeconds": "soon" }""", "(at $.hooks.before.timeoutSeconds)")]
+    [InlineData("""{ "command": "SCRIPT", "timeout": 30 }""", "\"timeout\" is not a setting of a hook (at $.hooks.before")]
     public void Config_AHookThatCannotWork_IsRefusedSayingWhy(string before, string expected)
     {
         using var dir = new TempDirectory();
@@ -113,7 +114,32 @@ public sealed class HookTests
 
         var e = Refused($$"""{ "hooks": { "after": { "command": "{{script.Command}}" } } }""");
 
-        Assert.Equal($"\"hooks\".\"after\": \"command\" {script.Command} is not executable: make it so with chmod +x {script.Command}", e.Message);
+        Assert.StartsWith($"\"hooks\".\"after\": \"command\" {script.Command} is not executable by the user {Environment.UserName}, which runs it: make it so, with chmod +x", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Config_AHookExecutableOnlyByOthers_IsRefused()
+    {
+        if (Environment.UserName == "root")
+        {
+            // root may execute anything with any execute bit, so this cannot be shown as root.
+            return;
+        }
+        using var dir = new TempDirectory();
+        var script = HookScript.Write(dir.Path, "start-ardop", Path.Combine(dir.Path, "runs"));
+        File.SetUnixFileMode(script.Command, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+
+        var e = Refused($$"""{ "hooks": { "after": { "command": "{{script.Command}}" } } }""");
+
+        Assert.Contains("is not executable by the user", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Config_AnUnknownHook_IsRefusedSayingWhatThereIs()
+    {
+        var e = Refused("""{ "hooks": { "befor": { "command": "/bin/true" } } }""");
+
+        Assert.Contains("\"befor\" is not a setting of \"hooks\": it has \"before\" and \"after\"", e.Message, StringComparison.Ordinal);
     }
 
     // ---- windows ----
@@ -181,7 +207,7 @@ public sealed class HookTests
         private Task? _run;
         private TimeSpan? _pending;
 
-        public Loop(DateTimeOffset start, string audio = "plughw:CARD=Device,DEV=0", int beforeExit = 0, string? dir = null, int everyMinutes = 60, bool withBefore = true)
+        public Loop(DateTimeOffset start, string audio = "plughw:CARD=Device,DEV=0", int beforeExit = 0, string? dir = null, int everyMinutes = 60, bool withBefore = true, int afterExit = 0, string afterThen = "")
         {
             if (dir is null)
             {
@@ -200,7 +226,7 @@ public sealed class HookTests
                 Hooks = new HooksSettings
                 {
                     Before = withBefore ? HookScript.Write(dir, "before.sh", Record, beforeExit) : null,
-                    After = HookScript.Write(dir, "after.sh", Record),
+                    After = HookScript.Write(dir, "after.sh", Record, afterExit, then: afterThen),
                 },
             };
             Config.Validate();
@@ -401,6 +427,31 @@ public sealed class HookTests
         Assert.Equal(2, again.Runs.Length);
         await again.RunTo(At(13, 12));
         Assert.Equal(["before 2026-10-05T13:00:00Z 7052.0 7053.8 none", "after 2026-10-05T13:00:00Z 7052.0 7053.8 1"], again.Runs[2..]);
+    }
+
+    [Theory]
+    [InlineData(1, "")]
+    [InlineData(0, "kill -TERM $$")]
+    public async Task AfterFailsOrIsKilled_TheNoteStays_SoTheNextStartRunsItAgain(int exit, string then)
+    {
+        using var dir = new TempDirectory();
+        await using (var first = new Loop(At(11, 56, 30), dir: dir.Path, afterExit: exit, afterThen: then))
+        {
+            first.Start();
+            await first.RunTo(At(12, 12));
+            Assert.Equal("after 2026-10-05T12:00:00Z 7052.0 7053.8 1", first.Runs[^1]);
+            Assert.True(File.Exists(first.Host.Hooks.NotePath));
+            Assert.Contains(first.Log, l => l.StartsWith("hooks: WARNING - \"after\" for the 12:00 UTC slot exited with", StringComparison.Ordinal)
+                && l.Contains("so it is run again when the receiver next starts", StringComparison.Ordinal));
+        }
+
+        await using var again = new Loop(At(12, 20), dir: dir.Path);
+        again.Start();
+        await again.NextWait();
+
+        Assert.Equal(3, again.Runs.Length);
+        Assert.Equal("after 2026-10-05T12:00:00Z 7052.0 7053.8 1", again.Runs[^1]);
+        Assert.False(File.Exists(again.Host.Hooks.NotePath));
     }
 
     [Fact]

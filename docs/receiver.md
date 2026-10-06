@@ -92,15 +92,16 @@ If your radio is shared with something else, Ardopcf say, the receiver can run a
 }
 ```
 
-- `command` is the full path of a program or script, and it must be executable. It is run directly, not through a shell, so each of `args` reaches it exactly as written. Either hook can be left out.
-- `timeoutSeconds` (30 unless set, 1 to 300): a command still running after this is stopped, along with anything it started.
+- `command` is the full path of a program or script, and the receiver's user must be able to run it. It is run directly, not through a shell, so each of `args` reaches it exactly as written. Either hook can be left out, and any other setting in a hook (a misspelt `timeout`, say) stops the receiver starting, with a message saying so.
+- `timeoutSeconds` (30 unless set, 1 to 300): a command still running after this is stopped, along with what it started. A program that detaches itself into the background can escape this, so have your script wait for what it starts.
 - "before" starts `timeoutSeconds` ahead of the listening window, so it is done by the time the window opens: 2 minutes before each slot a web SDR listens to, or before every slot for a sound card. "after" runs when the window closes, 12 minutes after the slot starts. With `rig`, "before" is done before LinBPQ is held off and the radio retuned, and "after" runs once the radio is back and LinBPQ is released.
 - If "before" fails (it exits with anything but 0, runs out of time or can't be started), the log says so, and with `rig` the receiver doesn't retune the radio or hold LinBPQ off for that slot, since whatever it was meant to stop may still be transmitting. A web SDR, or a radio already on 7.052 MHz, still listens.
-- "after" always runs once "before" has started, even if the slot went wrong or the receiver is stopping. If the receiver stops during a window, it runs "after" when it starts again and leaves the rest of that slot alone; meanwhile it keeps `hooks.json` in the state directory.
+- "after" always runs once "before" has started, even if the slot went wrong or the receiver is stopping. If the receiver stops during a window, it runs "after" when it next starts, and leaves the rest of that slot alone. An "after" that doesn't finish with exit 0 (it failed, or was killed as the receiver stopped) is run again at the next start, unless a later slot's has worked since. Meanwhile the receiver keeps `hooks.json` in the state directory.
+- If the receiver is stopping and couldn't put the radio back (with `rig`), "after" still runs, so what it starts may find the radio still on 7.052 MHz. The log says loudly when the radio couldn't be put back.
 - Each command is told about the slot in environment variables: `MAILCAST_HOOK` (`before` or `after`), `MAILCAST_SLOT_UTC` (such as `2026-10-05T12:00:00Z`), `MAILCAST_DIAL_KHZ` (`7052.0`), `MAILCAST_CENTRE_KHZ` (`7053.8`), and for "after" `MAILCAST_BEFORE_OK` (`1` if "before" worked, `0` if not).
 - What a command prints goes to the log, on lines starting `hooks:`.
 
-The commands run as the receiver's own user, `pdn-mailcast`, with the same protections as the receiver: they can't use `sudo`, can't see `/home`, and can only write in `/var/lib/pdn-mailcast`. So keep scripts somewhere like `/usr/local/bin`. This one stops or starts Ardopcf on another machine over ssh:
+The commands run as the receiver's own user, `pdn-mailcast`, with the same protections as the receiver: they can't use `sudo`, can't see `/home`, and can only write in `/var/lib/pdn-mailcast`, `/etc/pdn-mailcast` and a `/tmp` of their own that nothing else sees. So keep scripts somewhere like `/usr/local/bin`. This one stops or starts Ardopcf on another machine over ssh:
 
 ```sh
 #!/bin/sh
@@ -113,7 +114,8 @@ On the shack PC, let that user run those two commands without a password, with a
 The receiver's user needs an ssh key of its own (yours is in `/home`, which it can't see). Make one and copy it across, which also records the shack PC's host key:
 
 ```
-sudo -u pdn-mailcast mkdir -p -m 700 /var/lib/pdn-mailcast/.ssh
+sudo install -d -m 750 -o pdn-mailcast -g pdn-mailcast /var/lib/pdn-mailcast
+sudo install -d -m 700 -o pdn-mailcast -g pdn-mailcast /var/lib/pdn-mailcast/.ssh
 sudo -u pdn-mailcast ssh-keygen -t ed25519 -N "" -f /var/lib/pdn-mailcast/.ssh/id_ed25519
 sudo -u pdn-mailcast ssh-copy-id -i /var/lib/pdn-mailcast/.ssh/id_ed25519 ardop@shack-pc
 ```

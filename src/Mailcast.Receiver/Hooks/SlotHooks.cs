@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Mailcast.Receiver.Retune;
 using Packet.Mailcast;
 
@@ -8,8 +9,10 @@ namespace Mailcast.Receiver.Hooks;
 /// <summary>
 /// The config's <c>hooks</c>: a program run before each slot the receiver listens to, and one
 /// run after it, for a station that shares its radio with something else (stopping Ardopcf on
-/// another machine over ssh, say, and starting it again afterwards). Either may be left out.
+/// another machine over ssh, say, and starting it again afterwards). Either may be left out;
+/// any other key is refused.
 /// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record HooksSettings
 {
     /// <summary>Run before each slot's window, so that it has finished by the time the window opens.</summary>
@@ -29,6 +32,23 @@ public sealed record HooksSettings
             throw new ConfigException($"\"hooks\".\"after\": {after}");
         }
     }
+}
+
+/// <summary>How a window's start went: whether whatever "before" was to stop is stopped.</summary>
+public enum BeforeOutcome
+{
+    /// <summary>"before" worked, or there is none.</summary>
+    Ok,
+
+    /// <summary>"before" failed: what it was to stop may still be running.</summary>
+    Failed,
+
+    /// <summary>
+    /// Nothing was run: an earlier window, someone else's (the retuner's, before the audio
+    /// source was changed, say), has not had its "after" yet. Only its owner runs that, once it
+    /// has put its radio back.
+    /// </summary>
+    Busy,
 }
 
 /// <summary>A slot's listening window, which the hooks run around.</summary>
@@ -104,7 +124,7 @@ public sealed class SlotHooks : IDisposable
     public bool Configured => Settings is { } s && (s.Before is not null || s.After is not null);
 
     /// <summary>How much earlier than the window's opening "before" is started: its timeout, so it is done by then.</summary>
-    public TimeSpan BeforeLead => Settings?.Before?.Timeout ?? TimeSpan.Zero;
+    public TimeSpan BeforeLead => Settings?.Before?.TimeLimit ?? TimeSpan.Zero;
 
     /// <summary>The slot the note from last time was for, if there was one: that slot is not run again.</summary>
     public DateTimeOffset? RecoveredSlot { get; private set; }
@@ -168,16 +188,17 @@ public sealed class SlotHooks : IDisposable
 
     /// <summary>
     /// Runs "before" for <paramref name="slot"/>, having written the note first, and returns
-    /// whether it worked; true when there is no "before". Its failure is logged once, with
-    /// <paramref name="consequence"/> on the end. From then on "after" is owed, to
-    /// <paramref name="owner"/>. If one is owed already, "before" is not run again: that window
-    /// runs on, now <paramref name="owner"/>'s, and this returns how its "before" went.
+    /// whether it worked; <see cref="BeforeOutcome.Ok"/> when there is no "before". Its failure is
+    /// logged once, with <paramref name="consequence"/> on the end. From then on "after" is owed,
+    /// to <paramref name="owner"/> alone. If <paramref name="owner"/>'s own window is still open,
+    /// "before" is not run again and this says how it went; if anyone else's is (or one from last
+    /// time), nothing is run and this returns <see cref="BeforeOutcome.Busy"/>.
     /// </summary>
-    public async Task<bool> BeforeAsync(DateTimeOffset slot, object owner, string consequence, CancellationToken cancellation)
+    public async Task<BeforeOutcome> BeforeAsync(DateTimeOffset slot, object owner, string consequence, CancellationToken cancellation)
     {
         if (!Configured)
         {
-            return true;
+            return BeforeOutcome.Ok;
         }
         await _running.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
@@ -186,8 +207,8 @@ public sealed class SlotHooks : IDisposable
             {
                 if (_owed is { } owed)
                 {
-                    _owed = owed with { Owner = owner };
-                    return owed.BeforeOk;
+                    return owed.Owner != owner ? BeforeOutcome.Busy
+                        : owed.BeforeOk ? BeforeOutcome.Ok : BeforeOutcome.Failed;
                 }
             }
             var config = _config();
@@ -208,7 +229,7 @@ public sealed class SlotHooks : IDisposable
                 _owed = new Owed(slot, owner, ok);
             }
             WriteNote(new Note(slot, slot, ok, _time.GetUtcNow()));
-            return ok;
+            return ok ? BeforeOutcome.Ok : BeforeOutcome.Failed;
         }
         finally
         {
@@ -248,8 +269,10 @@ public sealed class SlotHooks : IDisposable
     /// <summary>
     /// Runs "after", if it is owed to <paramref name="owner"/> (or to nobody, with
     /// <paramref name="unowned"/>; a null <paramref name="owner"/> runs it whoever it is owed
-    /// to), then removes the note. It runs to its end or its timeout,
-    /// whatever else is stopping. <paramref name="why"/> is said in the log line.
+    /// to). It runs to its end or its timeout, whatever else is stopping. The note is removed only
+    /// if it exited with 0: otherwise (it failed, timed out or was killed, by systemd stopping the
+    /// receiver, say) the note stays, so the next start-up runs it again. <paramref name="why"/>
+    /// is said in the log line.
     /// </summary>
     public async Task AfterAsync(object? owner, bool unowned, string why = "")
     {
@@ -266,18 +289,25 @@ public sealed class SlotHooks : IDisposable
                 owed = o;
             }
             var config = _config();
+            bool done = true;
             if (config.Hooks?.After is { } after)
             {
                 string which = owed.Slot == default ? "a slot" : $"the {Hhmm(owed.Slot)} UTC slot";
                 _log($"hooks: running \"after\" for {which}{why}: {after.Describe()}");
                 var result = await Runner.RunAsync(after, Environment(SlotHookEnvironment.AfterName, owed.Slot, config, owed.BeforeOk), "hooks: after", CancellationToken.None).ConfigureAwait(false);
-                _log(result.Ok ? $"hooks: \"after\" {result.Describe()}" : $"hooks: WARNING - \"after\" for {which} {result.Describe()}");
+                done = result.Ok;
+                _log(done
+                    ? $"hooks: \"after\" {result.Describe()}"
+                    : $"hooks: WARNING - \"after\" for {which} {result.Describe()}; keeping {_file}, so it is run again when the receiver next starts");
             }
             lock (_gate)
             {
                 _owed = null;
             }
-            DeleteNote();
+            if (done)
+            {
+                DeleteNote();
+            }
         }
         finally
         {
@@ -324,7 +354,13 @@ public sealed class SlotHooks : IDisposable
                     continue;
                 }
 
-                await BeforeAsync(window.Slot, _loop, "; listening anyway", cancellation).ConfigureAwait(false);
+                if (await BeforeAsync(window.Slot, _loop, "; listening anyway", cancellation).ConfigureAwait(false) == BeforeOutcome.Busy)
+                {
+                    // The retuner's window from before the audio source changed: it runs that
+                    // "after" itself, once its radio is back.
+                    await WaitAsync(Check, cancellation).ConfigureAwait(false);
+                    continue;
+                }
                 var closes = window.Closes;
                 var last = window.Slot;
                 while (true)

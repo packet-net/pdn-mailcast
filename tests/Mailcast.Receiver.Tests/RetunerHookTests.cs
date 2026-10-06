@@ -99,6 +99,38 @@ public sealed partial class RetunerTests
     }
 
     [Fact]
+    public async Task Hooks_TheRetunersWindow_NoOneElseRunsAfter_UntilTheRigIsBackAndLinBpqReleased()
+    {
+        using var scripts = new TempDirectory();
+        string record = Path.Combine(scripts.Path, "runs");
+        await using var s = new Station(At(11, 57, 30), hooks: Scripts(scripts.Path, record));
+        s.Start();
+        await s.StepUntil(() => s.Retuner.Stage == RetuneStage.Tuned, "tuned for 12:00");
+        await s.RunTo(At(12, 5));
+
+        // The audio is changed to a web SDR on the page mid-slot: the hooks loop now has a
+        // window of its own, but the retuner still has the rig on 7.052 MHz and LinBPQ held off.
+        var webSdrWindows = new object();
+        Assert.Equal(BeforeOutcome.Busy, await s.Hooks!.BeforeAsync(At(12, 0), webSdrWindows, "", CancellationToken.None));
+        Assert.False(s.Hooks.AfterOwedTo(webSdrWindows, unowned: true));
+        await s.Hooks.AfterAsync(webSdrWindows, unowned: true);
+        using var stopLoop = new CancellationTokenSource();
+        var loop = s.Hooks.RunAsync(() => false, at => ListeningWindow.Next(at, s.Config.Schedule, 8) is var (o, c, slot) ? new HookWindow(o, c, slot) : null, stopLoop.Token);
+        Assert.Single(HookScript.Runs(record));
+        Assert.Equal(BulletinDialHz, s.Rig.DialHz);
+
+        // Only the retuner runs "after", once it has put the rig back and let LinBPQ go.
+        await s.RunTo(At(12, 13));
+        await stopLoop.CancelAsync();
+        await loop;
+        Assert.Equal(["before 2026-10-05T12:00:00Z 7052.0 7053.8 none", "after 2026-10-05T12:00:00Z 7052.0 7053.8 1"], HookScript.Runs(record));
+        int restored = s.Index($"rig: F {PacketDialHz}");
+        int on = s.Index("bpq: XMITOFF 2 0");
+        int after = s.IndexStarting("hooks: running \"after\"");
+        Assert.True(restored >= 0 && restored < on && on < after, string.Join(" | ", s.Events));
+    }
+
+    [Fact]
     public async Task Hooks_RestartedMidSlot_AfterRunsOnceTheRigIsBack_AndThatSlotIsLeftAlone()
     {
         await using var rig = new FakeRigctld(PacketDialHz, "USB", 2400);

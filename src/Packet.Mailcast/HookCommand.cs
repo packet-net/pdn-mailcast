@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 
 namespace Packet.Mailcast;
@@ -7,8 +8,10 @@ namespace Packet.Mailcast;
 /// A program a receiver runs around a slot: <see cref="Command"/>, an absolute path run directly
 /// (never through a shell), with <see cref="Args"/>, stopped if it takes longer than
 /// <see cref="TimeoutSeconds"/>. A config file gives it as
-/// <c>{ "command": "/path/script", "args": ["..."], "timeoutSeconds": 30 }</c>.
+/// <c>{ "command": "/path/script", "args": ["..."], "timeoutSeconds": 30 }</c>; any other key
+/// in it is refused, so a misspelt one is not silently ignored.
 /// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record HookCommand
 {
     /// <summary>The timeout when none is given.</summary>
@@ -29,14 +32,17 @@ public sealed record HookCommand
     /// <summary>How long it may run, in seconds, before it and everything it started are killed.</summary>
     public int TimeoutSeconds { get; init; } = DefaultTimeoutSeconds;
 
-    /// <summary><see cref="TimeoutSeconds"/> as a time span.</summary>
+    /// <summary>
+    /// <see cref="TimeoutSeconds"/> as a time span. Not called Timeout: in a config file a
+    /// misspelt "timeout" would match it, and be ignored rather than refused.
+    /// </summary>
     [JsonIgnore]
-    public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds);
+    public TimeSpan TimeLimit => TimeSpan.FromSeconds(TimeoutSeconds);
 
     /// <summary>
     /// Why this cannot be run, as a sentence naming the setting (<c>"command"</c>, <c>"args"</c>
     /// or <c>"timeoutSeconds"</c>), or null when it can: the command must be an absolute path to
-    /// an existing executable file, the arguments strings, the timeout from
+    /// an existing file this process's user may execute, the arguments strings, the timeout from
     /// <see cref="ShortestTimeoutSeconds"/> to <see cref="LongestTimeoutSeconds"/>.
     /// </summary>
     public string? Problem()
@@ -57,13 +63,11 @@ public sealed record HookCommand
         {
             return $"\"command\" {Command} does not exist (or cannot be seen by this user)";
         }
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindows() && NativeMethods.Access(Command, NativeMethods.ExecuteOk) != 0)
         {
-            const UnixFileMode anyExecute = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
-            if ((File.GetUnixFileMode(Command) & anyExecute) == 0)
-            {
-                return $"\"command\" {Command} is not executable: make it so with chmod +x {Command}";
-            }
+            // Asked of the system for this process's own user, so an execute bit for some other
+            // user or group does not pass.
+            return $"\"command\" {Command} is not executable by the user {Environment.UserName}, which runs it: make it so, with chmod +x {Command} if it is that user's, or chmod a+x {Command}";
         }
         if (Args is null)
         {
@@ -83,6 +87,15 @@ public sealed record HookCommand
                 $"\"timeoutSeconds\" {TimeoutSeconds} must be from {ShortestTimeoutSeconds} to {LongestTimeoutSeconds}; {DefaultTimeoutSeconds} if left out");
         }
         return null;
+    }
+
+    private static class NativeMethods
+    {
+        /// <summary>access(2)'s X_OK.</summary>
+        public const int ExecuteOk = 1;
+
+        [DllImport("libc", EntryPoint = "access", SetLastError = true)]
+        public static extern int Access([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int mode);
     }
 
     /// <summary>The command line, for the log: the path, then each argument, quoted where it has a space.</summary>

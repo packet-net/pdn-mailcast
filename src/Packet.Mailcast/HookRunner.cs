@@ -96,7 +96,7 @@ public sealed class HookRunner
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(environment);
-        var timeout = command.Timeout;
+        var timeout = command.TimeLimit;
         var start = new ProcessStartInfo(command.Command)
         {
             UseShellExecute = false,
