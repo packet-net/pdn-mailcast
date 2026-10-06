@@ -269,12 +269,12 @@ public class IonosphereTests
     {
         // As in every release before the reading: a new outcome only ever goes at the end.
         Assert.Equal(
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
             new[]
             {
                 FrameOutcome.NotAFrame, FrameOutcome.AlreadyComplete, FrameOutcome.UnknownDictionary, FrameOutcome.Duplicate,
                 FrameOutcome.Stored, FrameOutcome.CompletedBulletin, FrameOutcome.CompletedDirectory, FrameOutcome.CompletedUnhandled,
-                FrameOutcome.CompletedUnknown, FrameOutcome.Rejected, FrameOutcome.CompletedIonosphere,
+                FrameOutcome.CompletedUnknown, FrameOutcome.Rejected, FrameOutcome.CompletedIonosphere, FrameOutcome.CompletedPskReporter,
             }.Select(o => (int)o));
     }
 
@@ -391,7 +391,7 @@ public class IonosphereTests
         Assert.Equal(6.05, store.Ionosphere!.FoF2); // the older sounding does not replace the newer
         // A source this version does not know: ignored quietly, marked done, the reading kept.
         byte[] other = [.. IonoRecord.Encode(Sample()).AsSpan(1, IonoRecord.CommonLength)];
-        other[1] = 3;
+        other[1] = 9;
         var spots = TransferObject.ForRecord((byte)ObjectKind.Propagation, other);
         Assert.Equal(FrameOutcome.CompletedUnknown, store.Accept(spots.Frame(0).ToBytes()).Outcome);
         Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(spots.Frame(1).ToBytes()).Outcome);

@@ -232,7 +232,9 @@ public static partial class Program
         var ionoSettings = config.Ionosphere.ToSettings();
         using var ionosonde = new IonosondeMonitor(ionoSettings, IonosondeMonitor.UserAgentFor(Version, config.Callsign), time, journal.Write);
         Func<IonoReading>? reading = ionoSettings.Stations.Count == 0 ? null : () => ionosonde.Current;
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading);
+        var pskReporter = config.PskReporter.Enabled ? new PskReporterMonitor(config.Callsign, time, journal.Write, host: config.PskReporter.Host, port: config.PskReporter.Port) : null;
+        Func<PskReading>? spots = pskReporter is null ? null : () => pskReporter.Current;
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -259,10 +261,13 @@ public static partial class Program
             ? $"flex: reading PA temperature and reference from {config.Flex.Host}, stopping at {config.Flex.PaTemperatureLimitC:0.#} C"
             : "flex: not configured, so no PA temperature watch and no reference check");
 
-        var status = new StatusStore(config.StateDirectory, time) { Ionosphere = reading };
+        var status = new StatusStore(config.StateDirectory, time) { Ionosphere = reading, PskReporter = spots, PskReporterFeed = pskReporter is null ? null : () => pskReporter.Feed };
         journal.Write(reading is null
             ? "ionosonde: off (\"ionosphere\".\"stations\" is empty)"
             : string.Create(CultureInfo.InvariantCulture, $"ionosonde: observe only, from {string.Join(", ", ionoSettings.Stations)} by GIRO then PROPquest, at most every {IonosondeMonitor.PollEvery.TotalMinutes:0} min near a slot; open at {ionoSettings.OpenMhz:0.###} MHz, reliable at {ionoSettings.ReliableFactor:0.###} of the MUF, stale after {ionoSettings.StaleAfter.TotalMinutes:0} min"));
+        journal.Write(pskReporter is null
+            ? "pskreporter: off (\"pskReporter\".\"enabled\" is false)"
+            : string.Create(CultureInfo.InvariantCulture, $"pskreporter: observe only, live spots from {config.PskReporter.Host}:{config.PskReporter.Port} near a slot, 40 and 80 m FT8/FT4/WSPR with both ends in the UK or Ireland, judged over the last {PskEvaluator.Window.TotalMinutes:0} min; 40 m sent"));
         journal.Write(config.Slot.EveryMinutes == 1440
             ? $"schedule: a slot every day at {config.Slot.TimeUtc}Z"
             : $"schedule: a slot every {config.Slot.EveryMinutes} min, counted from {config.Slot.TimeUtc}Z");
@@ -292,8 +297,10 @@ public static partial class Program
         }
         // In the background and observe only: a slot never waits for it.
         Task ionosondeLoop = reading is null ? Task.CompletedTask : Task.Run(() => ionosonde.RunAsync(t => WantReading(schedule, t), stop.Token));
+        Task pskReporterLoop = pskReporter is null ? Task.CompletedTask : Task.Run(() => pskReporter.RunAsync(t => WantReading(schedule, t), stop.Token));
         await service.RunAsync(stop.Token);
         await ionosondeLoop;
+        await pskReporterLoop;
         fbbIntake?.Dispose();
         journal.Write("pdn-mailcast-headend stopped");
         return 0;

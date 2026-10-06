@@ -40,6 +40,10 @@ public enum IonoSource : byte
     /// <summary>PROPquest.</summary>
     [JsonStringEnumMemberName("propquest")]
     PropQuest = 2,
+
+    /// <summary>Not an ionosonde: live PSK Reporter spots, the source of a <see cref="PskReading"/>.</summary>
+    [JsonStringEnumMemberName("pskreporter")]
+    PskReporter = 3,
 }
 
 /// <summary>How the MUFs at 100, 500 and 1000 km were found.</summary>

@@ -56,6 +56,7 @@ public sealed class Intake : IAsyncDisposable
             (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)), PublishMailOnChange = false });
         _heardSchedule = _store.HeardSchedule;
         _ionosphere = _store.Ionosphere;
+        _pskReporter = _store.PskReporter;
         _time = (options ?? new ReceiverStoreOptions()).Time;
         _progress = (_store.Directory, _store.Progress());
         _worker = Task.Run(RunAsync);
@@ -70,6 +71,14 @@ public sealed class Intake : IAsyncDisposable
     /// restarts; null until one has been heard. Its age is as sent: see <see cref="IonoReading.AsOf"/>.
     /// </summary>
     public IonoReading? Ionosphere => _ionosphere;
+
+    private volatile PskReading? _pskReporter;
+
+    /// <summary>
+    /// The newest PSK Reporter reading heard from the head end (content type 4, source 3), kept
+    /// across restarts; null until one has been heard. Its age is as sent: see <see cref="PskReading.AsOf"/>.
+    /// </summary>
+    public PskReading? PskReporter => _pskReporter;
     private volatile Tuple<BroadcastDirectory?, IReadOnlyList<ObjectProgress>> _progressHeld = Tuple.Create<BroadcastDirectory?, IReadOnlyList<ObjectProgress>>(null, []);
 
     /// <summary>The published progress: a reference swapped whole, so a reader never sees half of one.</summary>
@@ -419,6 +428,16 @@ public sealed class Intake : IAsyncDisposable
                 }
                 DateTimeOffset now = _time.GetUtcNow();
                 _log(Ascii.Clean(reading.AsOf(now, IonoSettings.DefaultStaleAfter).Describe(now)));
+                break;
+            case FrameOutcome.CompletedPskReporter when result.PskReporter is { } spots:
+                // Once per object, so once a slot at most. Never for the BBS.
+                Interlocked.Increment(ref _framesStored);
+                lock (_gate)
+                {
+                    _pskReporter = _store.PskReporter;
+                }
+                DateTimeOffset at = _time.GetUtcNow();
+                _log(Ascii.Clean(spots.AsOf(at, PskEvaluator.StaleAfter).Describe(at)));
                 break;
             case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
                 // Once per object: it is marked done, so its later frames are not rebuilt again.

@@ -342,14 +342,34 @@ public sealed class HeadEndService(
             // Observe only: the reading is in the plan already, and nothing here depends on it.
             journal.Write(line);
         }
+        if (PskReporterLine(plan, time.GetUtcNow()) is { } spots)
+        {
+            // Observe only, the same.
+            journal.Write(spots);
+        }
         SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform);
-        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames };
+        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
         status.SetBulletinsHeld(store.Count);
         SlotsToday today = status.SlotsToday;
         journal.Write($"slots today ({today.Date:yyyy-MM-dd}): {today.Slots}, {today.Completed} completed, {today.Aborted} cut short, {today.Skipped} skipped");
         return report;
+    }
+
+    /// <summary>The slot's one journal line on the PSK Reporter reading, and whether it went in the slot; null when the head end takes none.</summary>
+    public static string? PskReporterLine(SlotPlan plan, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.PskReporter is not { } reading)
+        {
+            return null;
+        }
+        return reading.JournalLine(now) + "; " + (plan.PskReporterFrames > 0
+            ? $"sent in {plan.PskReporterFrames} frames"
+            : !reading.HasObservation ? "nothing to send"
+            : plan.Frames.Count == 0 ? "not sent: this slot sends nothing"
+            : "not sent: no room in this slot");
     }
 
     /// <summary>The slot's one journal line on the ionosonde reading, and whether it went in the slot; null when the head end takes none.</summary>

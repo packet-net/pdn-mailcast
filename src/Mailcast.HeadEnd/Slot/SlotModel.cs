@@ -186,4 +186,10 @@ public sealed record SlotReport
 
     /// <summary>How many of the planned frames carried the reading (content type 4).</summary>
     public int IonosphereFrames { get; init; }
+
+    /// <summary>The PSK Reporter reading as the slot was planned; null when the head end takes none. Observe only.</summary>
+    public Packet.Mailcast.Propagation.PskReading? PskReporter { get; init; }
+
+    /// <summary>How many of the planned frames carried it (content type 4, source 3).</summary>
+    public int PskReporterFrames { get; init; }
 }

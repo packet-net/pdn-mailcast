@@ -101,6 +101,7 @@
   <section>
     <h2>Ionosphere</h2>
     <div id="iono" class="muted">No reading heard yet. GB7RDG sends one in each slot.</div>
+    <div id="pskr"></div>
   </section>
 
   <section>
@@ -272,6 +273,7 @@ async function refresh() {
 
   speed(s);
   iono(s);
+  pskr(s);
   update(s);
 
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
@@ -351,6 +353,16 @@ function iono(s) {
     <div>${esc(i.words)}</div>
     ${i.distanceWords ? `<div class="muted">${esc(i.distanceWords)}.</div>` : ""}
     <div class="muted">From the ionosonde reading GB7RDG sends in each slot. A guide only: it does not change what is sent.</div>`;
+}
+/* beside it, the head end's reading of live PSK Reporter spots between UK and Irish stations */
+function pskr(s) {
+  const p = s.pskReporter;
+  if (!p) return;
+  const tone = { GOOD: "good", MARGINAL: "warn", POOR: "bad" }[p.state] || "muted";
+  $("pskr").innerHTML = `<div class="big ${tone}" style="margin-top:.8em">${esc(p.headline)}</div>
+    <div>${esc(p.words)}</div>
+    ${p.distanceWords ? `<div class="muted">40 m: ${esc(p.distanceWords)}.</div>` : ""}
+    <div class="muted">From GB7RDG's reading of live PSK Reporter spots between UK and Irish stations, sent in each slot. A guide only.</div>`;
 }
 /* the speed the frames are coming at, by the modem's autobaud */
 function speed(s) {
