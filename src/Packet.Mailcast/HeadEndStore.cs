@@ -20,7 +20,9 @@ namespace Packet.Mailcast;
 /// </code>
 /// <para>
 /// A state without FirstSlot but with pieces sent comes from a daily head end before slots had
-/// times, and counts as first carried at midnight UTC on its FirstSeen day.
+/// times. Under the shares rule it counts as first carried at midnight UTC on its FirstSeen day;
+/// under the budget rule it has no first slot yet, so it is back in rotation from its NextEsi and
+/// its next slot is its first.
 /// </para>
 /// <para>And one file per directory object sent, <c>directories/OBJECTID.txt</c>, with its Day and
 /// NextEsi, so a later plan with the same directory object does not repeat its pieces.</para>
@@ -135,7 +137,7 @@ public sealed class HeadEndStore
     /// <summary>
     /// The bulletins in rotation in the slot starting at <paramref name="slot"/>: those not yet
     /// carried, and those still in their carrying slots. Pass them to
-    /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?)"/>.
+    /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?)"/>.
     /// </summary>
     public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot) =>
         _entries.Values
@@ -310,7 +312,7 @@ public sealed class HeadEndStore
             uint nextEsi = uint.Parse(fields["NextEsi"], CultureInfo.InvariantCulture);
             DateTimeOffset? firstSlot = fields.TryGetValue("FirstSlot", out var slotText)
                 ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
-                : nextEsi > 0 ? BroadcastScheduler.Midnight(firstSeen) : null;
+                : nextEsi > 0 && _options.Budget is null ? BroadcastScheduler.Midnight(firstSeen) : null;
             var carried = new CarriedBulletin(
                 fields["Bid"],
                 fields["Title"],

@@ -1,0 +1,8 @@
+Bid: 19936_VE2PKT
+Title: Latest solar radio flux report
+Size: 2393
+FirstSeen: 2026-10-05
+Object: b9c68a40742a4df0
+Dictionary: 1
+Oti: 000000024a0000f001000104
+NextEsi: 5

@@ -79,6 +79,7 @@ public sealed record HeadEndConfig
     {
         Callsign = Callsign,
         Destination = Destination,
+        Mode = Station.Mode,
         SubChannel = Station.SubChannel,
         LeaseLength = TimeSpan.FromSeconds(Station.LeaseSeconds),
         MaxCarrierWait = TimeSpan.FromSeconds(Station.MaxCarrierWaitSeconds),
@@ -97,6 +98,51 @@ public sealed record HeadEndConfig
         PaTemperatureLimitC = Flex.PaTemperatureLimitC,
         WhenFlexUnreachable = Flex.WhenUnreachable,
     };
+
+    /// <summary>
+    /// How bulletins are carried: <see cref="ScheduleConfig.Rule"/> when given; otherwise the
+    /// shares rule for a daily station or a configuration that sets its keys, and the budget rule
+    /// for any other.
+    /// </summary>
+    public ScheduleRule Rule => Schedule.Rule
+        ?? (Slot.EveryMinutes == MinutesPerDay || Schedule.UsesShareKeys ? ScheduleRule.Shares : ScheduleRule.Budget);
+
+    /// <summary>
+    /// What the budget rule fills each slot to, tone and idents included, when it starts on time:
+    /// <see cref="FillLimitAfter"/> with no lateness.
+    /// </summary>
+    public TimeSpan FillLimit => FillLimitAfter(TimeSpan.Zero);
+
+    /// <summary>
+    /// What the budget rule fills a slot to when it starts <paramref name="late"/> after its time
+    /// (a catch-up or a retry): <c>schedule.budgetMinutes</c> (<c>slot.maxMinutes</c> if left out),
+    /// but never more than <c>slot.maxMinutes</c> less the lateness and <see cref="Margin"/>, so a
+    /// slot that waits its longest for a clear channel still ends before the hard stop, which counts
+    /// from the slot's own time. Zero or less fills nothing.
+    /// </summary>
+    public TimeSpan FillLimitAfter(TimeSpan late)
+    {
+        TimeSpan budget = TimeSpan.FromMinutes(Schedule.BudgetMinutes ?? Slot.Max);
+        TimeSpan most = TimeSpan.FromMinutes(Slot.Max) - (late > TimeSpan.Zero ? late : TimeSpan.Zero) - Margin;
+        return budget < most ? budget : most;
+    }
+
+    /// <summary>
+    /// Time kept back from the hard stop: <c>schedule.marginSeconds</c>, or left out the longest the
+    /// slot waits for a clear channel before its tone (<c>slot.channelWaitSeconds</c>; none without a
+    /// tone), and always the room the runner's hard-stop check needs for the last burst: the modem's
+    /// gather and one carrier wait (<c>station.maxCarrierWaitSeconds</c>).
+    /// </summary>
+    public TimeSpan Margin =>
+        TimeSpan.FromSeconds(Schedule.MarginSeconds ?? (Slot.Tone > 0 ? Slot.ChannelWaitSeconds : 0))
+        + SlotAirtime.Gather + TimeSpan.FromSeconds(Station.MaxCarrierWaitSeconds);
+
+    /// <summary>The waveforms the slots take in turn: <c>schedule.modes</c>, or the broadcast modem's own mode alone.</summary>
+    public IReadOnlyList<string> Modes => Schedule.Modes ?? [Station.Mode];
+
+    /// <summary>Which waveform each slot uses. With <c>schedule.modes</c> set, each slot switches the modem to its own.</summary>
+    public Waveforms ToWaveforms(Func<string, IAirtime> measure) =>
+        new(Modes, Schedule.Modes is not null, ToSlotTimetable(), measure);
 
     /// <summary>
     /// The scheduler's options. A daily station's defaults are the core's; any shorter interval
@@ -140,6 +186,15 @@ public sealed record HeadEndConfig
             SymbolSize = Schedule.SymbolSize ?? defaults.SymbolSize,
             MaxBulletinSize = Intake.MaxBulletinBytes,
             Timetable = TimetableIfValid(),
+            Budget = Rule == ScheduleRule.Budget
+                ? new BudgetRule
+                {
+                    SlotCap = Schedule.SlotCap ?? 0.6,
+                    SpreadSlots = Schedule.SpreadSlots ?? 3,
+                    RetireCoverage = Schedule.RetireCoverage ?? 6.0,
+                    RetireAfter = TimeSpan.FromHours(Schedule.RetireHours is > 0 and < 100_000 ? Schedule.RetireHours.Value : 36),
+                }
+                : null,
         };
     }
 
@@ -324,6 +379,70 @@ public sealed record HeadEndConfig
 
     private void ValidateSchedule(List<string> problems, bool everyFine)
     {
+        if (Schedule.Rule == ScheduleRule.Budget && Schedule.UsesShareKeys)
+        {
+            problems.Add("\"schedule\": \"rule\" is \"budget\", which fills each slot to its airtime budget; \"slotShares\", \"slotOffsets\", \"carryOverSlots\" and the daily keys belong to the \"shares\" rule");
+            return;
+        }
+        if (Rule == ScheduleRule.Shares && Schedule.UsesBudgetKeys)
+        {
+            problems.Add("\"schedule\": \"budgetMinutes\", \"slotCap\", \"spreadSlots\", \"retireCoverage\", \"retireHours\" and \"marginSeconds\" belong to the \"budget\" rule; set \"rule\": \"budget\" to use them");
+            return;
+        }
+        if (Schedule.BudgetMinutes is { } budgetMinutes && !(budgetMinutes > 0 && budgetMinutes <= 180))
+        {
+            problems.Add("\"schedule\".\"budgetMinutes\" must be above 0 and at most 180");
+            return;
+        }
+        if (Schedule.MarginSeconds is { } margin && !(margin >= 0 && margin < 10_800))
+        {
+            problems.Add("\"schedule\".\"marginSeconds\" must be 0 or more");
+            return;
+        }
+        if (Schedule.SlotCap is { } cap && !(cap > 0 && cap <= 100))
+        {
+            problems.Add("\"schedule\".\"slotCap\" must be above 0 (a multiple of a bulletin's K)");
+            return;
+        }
+        if (Schedule.SpreadSlots is < 1 or > 100)
+        {
+            problems.Add("\"schedule\".\"spreadSlots\" must be 1 to 100");
+            return;
+        }
+        if (Schedule.RetireCoverage is { } coverage && !(coverage > 0 && coverage <= 1000))
+        {
+            problems.Add("\"schedule\".\"retireCoverage\" must be above 0 (a multiple of a bulletin's K)");
+            return;
+        }
+        if (Schedule.RetireHours is { } hours && !(hours > 0 && hours < 100_000))
+        {
+            problems.Add("\"schedule\".\"retireHours\" must be above 0");
+            return;
+        }
+        if (Rule == ScheduleRule.Budget && Slot.Max is > 0 and <= 180 && FillLimit <= TimeSpan.Zero)
+        {
+            problems.Add(string.Create(CultureInfo.InvariantCulture,
+                $"\"schedule\": nothing would fit in a slot: \"slot\".\"maxMinutes\" {Slot.Max} less the {Margin.TotalSeconds:0} s margin (\"schedule\".\"marginSeconds\", or \"slot\".\"channelWaitSeconds\" if left out) leaves no time"));
+            return;
+        }
+        if (Schedule.Modes is { } modes)
+        {
+            if (modes.Count == 0)
+            {
+                problems.Add("\"schedule\".\"modes\" must list at least one mode, or be left out");
+                return;
+            }
+            if (modes.FirstOrDefault(m => Waveforms.SetHardwarePayload(m) is null) is { } bad)
+            {
+                problems.Add($"\"schedule\".\"modes\": '{bad}' is not an MS110D waveform the modem can switch to (ms110d-wn0 to ms110d-wn8, or ms110d-wn13)");
+                return;
+            }
+            if (Waveforms.SetHardwarePayload(Station.Mode) is null)
+            {
+                problems.Add($"\"schedule\".\"modes\" needs an MS110D broadcast modem, and \"station\".\"mode\" is '{Station.Mode}'");
+                return;
+            }
+        }
         if (Schedule.UsesDailyKeys)
         {
             if (Schedule.SlotShares is not null || Schedule.SlotOffsets is not null || Schedule.CarryOverSlots is not null)
@@ -534,6 +653,46 @@ public sealed record ScheduleConfig
     [JsonIgnore]
     public bool UsesDailyKeys => DaysCarried is not null || TotalOverhead is not null || DayShares is not null;
 
+    /// <summary>Whether any key of the shares rule is set, the daily station's old keys included.</summary>
+    [JsonIgnore]
+    public bool UsesShareKeys => SlotShares is not null || SlotOffsets is not null || CarryOverSlots is not null || UsesDailyKeys;
+
+    /// <summary>Whether any key of the budget rule is set.</summary>
+    [JsonIgnore]
+    public bool UsesBudgetKeys => BudgetMinutes is not null || SlotCap is not null || SpreadSlots is not null || RetireCoverage is not null || RetireHours is not null || MarginSeconds is not null;
+
+    /// <summary>
+    /// How bulletins are carried: <c>budget</c> fills each slot to its airtime budget, <c>shares</c>
+    /// sends fixed shares in fixed slots. Left out, <c>shares</c> for a daily station or when its keys
+    /// are set, and <c>budget</c> otherwise.
+    /// </summary>
+    public ScheduleRule? Rule { get; init; }
+
+    /// <summary>The budget rule's airtime budget for a slot, tone and idents included. Left out, <c>slot.maxMinutes</c>.</summary>
+    public double? BudgetMinutes { get; init; }
+
+    /// <summary>Time kept back from <c>slot.maxMinutes</c>. Left out, <c>slot.channelWaitSeconds</c> (none without a tone).</summary>
+    public double? MarginSeconds { get; init; }
+
+    /// <summary>The most of one bulletin a slot carries, as a multiple of its K. Left out, 0.6.</summary>
+    public double? SlotCap { get; init; }
+
+    /// <summary>Each slot first gives every bulletin in rotation enough that any this many slots rebuild it. Left out, 3.</summary>
+    public int? SpreadSlots { get; init; }
+
+    /// <summary>A bulletin retires once this many K of it have been sent. Left out, 6.</summary>
+    public double? RetireCoverage { get; init; }
+
+    /// <summary>A bulletin retires this many hours after its first slot. Left out, 36.</summary>
+    public double? RetireHours { get; init; }
+
+    /// <summary>
+    /// The waveforms the slots take in turn, as pdn-soundmodem names them (<c>ms110d-wn4</c>,
+    /// <c>ms110d-wn3</c>). Each slot switches the broadcast modem to its own with KISS SETHW. Left
+    /// out, every slot goes on <c>station.mode</c> and the modem is left as it is.
+    /// </summary>
+    public IReadOnlyList<string>? Modes { get; init; }
+
     public int? DirectoryEvery { get; init; }
 
     public int? RememberDays { get; init; }
@@ -609,6 +768,16 @@ public sealed record StatusConfig
     public string Bind { get; init; } = "127.0.0.1";
 
     public int Port { get; init; } = 8216;
+}
+
+/// <summary>How the head end carries bulletins from slot to slot.</summary>
+public enum ScheduleRule
+{
+    /// <summary>Fill each slot to its airtime budget, the least covered bulletins first.</summary>
+    Budget,
+
+    /// <summary>Fixed shares of each bulletin in fixed slots after its first, as before the budget rule.</summary>
+    Shares,
 }
 
 /// <summary>Fixed parts of the slot that the configuration is checked against.</summary>

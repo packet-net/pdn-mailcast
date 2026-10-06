@@ -37,6 +37,12 @@ public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Siz
 /// to carry it.
 /// </para>
 /// <para>
+/// The first entry's line may also name the waveform the slot went out on,
+/// <c>mode=ms110d-wn3</c>, so that a recording or a receiver's log says which slot used which
+/// waveform. Receivers decode any MS110D waveform by itself, so it is for the record only, and
+/// earlier readers ignore it like any field after the title.
+/// </para>
+/// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
 /// different contents never share an ID, even on the same day.
 /// </para>
@@ -47,11 +53,16 @@ public sealed class BroadcastDirectory
     public const string VersionLine = "MAILCAST DIRECTORY 1";
 
     /// <summary>Creates a directory.</summary>
-    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null)
+    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null, string? mode = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
+        if (mode is not null && (mode.Length == 0 || mode.Any(c => c is <= ' ' or > '~')))
+        {
+            throw new ArgumentException($"The mode '{mode}' cannot be serialised.", nameof(mode));
+        }
         Date = date;
         Schedule = schedule;
+        Mode = mode;
         Entries = entries.Select(e => e with { Title = e.Title.Replace('\t', ' ') }).ToArray();
         foreach (var e in Entries)
         {
@@ -70,6 +81,12 @@ public sealed class BroadcastDirectory
     /// receiver should take as the slots, in place of its own settings.
     /// </summary>
     public SlotTimetable? Schedule { get; }
+
+    /// <summary>
+    /// The waveform the slot went out on, as pdn-soundmodem names it (<c>ms110d-wn4</c>), when the
+    /// head end said and there is an entry to carry it; null otherwise.
+    /// </summary>
+    public string? Mode { get; }
 
     /// <summary>The objects in rotation.</summary>
     public IReadOnlyList<DirectoryEntry> Entries { get; }
@@ -94,6 +111,10 @@ public sealed class BroadcastDirectory
                     text.Append('\t').Append(field);
                 }
             }
+            if (i == 0 && Mode is { } mode)
+            {
+                text.Append("\tmode=").Append(mode);
+            }
             text.Append('\n');
         }
         return Bulletin.TextEncoding.GetBytes(text.ToString());
@@ -117,6 +138,7 @@ public sealed class BroadcastDirectory
         }
         var entries = new List<DirectoryEntry>();
         SlotTimetable? schedule = null;
+        string? mode = null;
         foreach (var line in lines[2..^1])
         {
             var parts = line.Split('\t');
@@ -141,11 +163,12 @@ public sealed class BroadcastDirectory
             if (entries.Count == 1 && parts.Length > 5)
             {
                 schedule = SlotTimetable.FromFields(parts[5..]);
+                mode = parts[5..].FirstOrDefault(f => f.StartsWith("mode=", StringComparison.Ordinal) && f.Length > 5)?[5..];
             }
         }
         try
         {
-            return new BroadcastDirectory(date, entries, schedule);
+            return new BroadcastDirectory(date, entries, schedule, mode);
         }
         catch (ArgumentException e)
         {

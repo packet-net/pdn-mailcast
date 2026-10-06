@@ -147,22 +147,24 @@ public static partial class Program
                 }
             }
             var store = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
-            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions);
+            SlotSettings settings = config.ToSlotSettings();
+            Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
+            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter);
 
             SlotPlan plan = planner.Plan(slot);
-            SlotSettings settings = config.ToSlotSettings();
-            var airtime = LinearAirtime.Measure(config.Station.Mode);
+            SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
+            var airtime = (LinearAirtime)waveform.Airtime;
             var runner = new SlotRunner(settings, new NullStation(), new NullKiss(), null, airtime, journal, TimeProvider.System);
-            var bursts = runner.BurstSizes(plan.Frames);
+            var bursts = runner.BurstSizes(plan.Frames, airtime);
             journal.Write(string.Create(CultureInfo.InvariantCulture,
-                $"airtime on {config.Station.Mode}: {airtime.PerBurst.TotalSeconds:0.00} s a burst, {airtime.Burst([1003]).TotalSeconds - airtime.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)"));
+                $"airtime on {waveform.Mode}: {airtime.PerBurst.TotalSeconds:0.00} s a burst, {airtime.Burst([1003]).TotalSeconds - airtime.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)"));
             journal.Write(string.Create(CultureInfo.InvariantCulture,
-                $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {config.Station.Mode}, about {runner.Airtime(plan.Frames, bursts).TotalMinutes:0.0} min on the air"));
+                $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {waveform.Mode}, about {runner.Airtime(plan.Frames, bursts, airtime).TotalMinutes:0.0} min of bursts, {runner.Model(airtime).Slot([.. plan.Frames.Select(f => runner.Ax25(f).Length)], bursts).TotalMinutes:0.0} min on the air with the tone and idents{(scheduleOptions.Budget is null ? "" : string.Create(CultureInfo.InvariantCulture, $" (filled to {config.FillLimit.TotalMinutes:0.0})"))}"));
 
             if (options.GetValueOrDefault("--wav") is string wavPath)
             {
                 int rate = int.Parse(options.GetValueOrDefault("--rate") ?? "48000", CultureInfo.InvariantCulture);
-                var summary = new WavRenderer(settings, config.Station.Mode, rate)
+                var summary = new WavRenderer(settings, waveform.Mode, rate)
                     .Render(plan.Frames, wavPath, slot);
                 journal.Write(string.Create(CultureInfo.InvariantCulture,
                     $"wav: {wavPath}, {summary.Length.TotalMinutes:0.0} min at {rate} Hz: tone {(summary.Tone ? "yes" : "no")}, {summary.Frames} frames, one per burst (the published pdn-soundmodem cannot pack them yet), {summary.Idents} CW idents"));
@@ -222,8 +224,10 @@ public static partial class Program
             });
 
         ScheduleOptions scheduleOptions = config.ToScheduleOptions();
+        SlotSettings settings = config.ToSlotSettings();
+        Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions);
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -240,7 +244,6 @@ public static partial class Program
             journal.Write($"intake: FBB forwarding from {fbb.Host}:{fbb.Port} as {fbb.PartnerCallsign}, every {fbb.PollMinutes:0.#} min");
         }
 
-        SlotSettings settings = config.ToSlotSettings();
         IAirtime airtime = LinearAirtime.Measure(config.Station.Mode);
         using var api = new StationApiClient(new Uri(config.Station.ApiUrl), config.Station.ApiKey, settings.RenewEvery);
         var kiss = new KissTcpConnector(config.Station.KissHost, config.Station.KissPort, config.Station.KissPortNibble);
@@ -255,6 +258,7 @@ public static partial class Program
         journal.Write(config.Slot.EveryMinutes == 1440
             ? $"schedule: a slot every day at {config.Slot.TimeUtc}Z"
             : $"schedule: a slot every {config.Slot.EveryMinutes} min, counted from {config.Slot.TimeUtc}Z");
+        journal.Write(Describe(config, scheduleOptions, waveforms));
         using var service = new HeadEndService(
             config.ToSlotSchedule(), TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
             planner, store, intakes, runner, status, journal, time);
@@ -272,10 +276,30 @@ public static partial class Program
             }
         }
 
+        if (Waveforms.SetHardwarePayload(config.Station.Mode) is not null)
+        {
+            // A slot cut off by a crash or a stop may have left the modem on another waveform, and
+            // "modes" may since have been taken out of the configuration: put it back whatever it says.
+            await runner.PutWaveformBackAsync(stop.Token);
+        }
         await service.RunAsync(stop.Token);
         fbbIntake?.Dispose();
         journal.Write("pdn-mailcast-headend stopped");
         return 0;
+    }
+
+    /// <summary>One journal line on how bulletins are carried and on which waveforms.</summary>
+    internal static string Describe(HeadEndConfig config, ScheduleOptions options, Waveforms waveforms)
+    {
+        string modes = waveforms.Modes.Count == 1
+            ? $"every slot on {waveforms.Modes[0]}{(waveforms.SetOnModem ? " (set on the modem each slot)" : "")}"
+            : $"slots take turns on {string.Join(", ", waveforms.Modes)} (set on the modem each slot)";
+        if (options.Budget is not { } rule)
+        {
+            return $"carrying: fixed shares {string.Join(", ", options.SlotShares.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture)))} K in slots {string.Join(", ", options.SlotOffsets)} after the first; {modes}";
+        }
+        return string.Create(CultureInfo.InvariantCulture,
+            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, retired after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h; {modes}");
     }
 
     private static async Task<int> RunNowAsync(HeadEndConfig config)

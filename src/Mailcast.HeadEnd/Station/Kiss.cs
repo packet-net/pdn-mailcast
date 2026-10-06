@@ -18,6 +18,9 @@ public static class Kiss
     /// <summary>A data frame.</summary>
     public const byte DataCommand = 0x00;
 
+    /// <summary>KISS SETHW: hardware-specific settings, on pdn-soundmodem's MS110D modem the transmit waveform.</summary>
+    public const byte SetHardwareCommand = 0x06;
+
     /// <summary>
     /// An ACKMODE data frame: two id octets then the data. pdn-soundmodem sends the two id octets
     /// back, alone, under the same command once the frame's audio has been handed to the sound card.

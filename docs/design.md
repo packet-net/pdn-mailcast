@@ -64,6 +64,16 @@ With only 5 daylight slots in December, the hourly plan's five carryings would n
 
 The head end's directory says when its slots are and what its daylight rule is, so a receiver that has heard it follows the head end even if its own settings differ.
 
+### Filling each slot
+
+The fixed shares left most slots short and some empty: on 2026-10-06 the 09:00 slot carried only the two bulletins that came in overnight, and at 10:00 nothing was due, so nothing went out, not even the directory. Twenty older bulletins sat unsent, because an older head end had not recorded their first slot.
+
+So the head end now fills every slot to an airtime budget instead (the default for hourly slots). Each slot sends fresh pieces of every bulletin in rotation, the least covered first, spread so that a few slots rebuild each one, until it retires after 6 times its pieces or 36 hours. The stranded bulletins rejoin from where they stopped. A slot is filled to a little under 8 minutes, so even after the longest wait for a clear channel it ends inside the 10 minute hard stop, and a slot that starts late is filled less, so it ends when an on-time one would. In a simulated October day of about 20 bulletins that is 9 slots of 7.4 to 7.8 minutes. The old fixed shares are still there, as `"rule": "shares"`. [headend.md](headend.md) has the details.
+
+### A waveform per slot
+
+To compare 1200 and 600 bps on real mail, slots can take turns between waveforms, WN4 and WN3 say. The head end switches pdn-soundmodem's modem before each slot and back afterwards. Receivers need do nothing, since every mailcast receiver reads the waveform from each burst (autobaud). A WN3 slot carries about half as much. The slot report, the journal and the directory say which waveform each slot used.
+
 ## Each slot
 
 1. The head end listens first. If the channel is busy, it waits, up to a limit.
@@ -71,7 +81,7 @@ The head end's directory says when its slots are and what its daylight rule is, 
 3. 10 seconds of steady tone at the centre frequency (30 for a daily station), then a CW ident.
 4. Bursts of up to 18 seconds, each with its own MS110D preamble, so a receiver that tunes in late or loses sync in a fade picks up at the next burst.
 5. A CW ident at least every 10 minutes and at the end.
-6. The lease is released and normal packet service resumes. An hourly slot never runs past 10 minutes from its start; anything left goes in the next one.
+6. The lease is released and normal packet service resumes. Nothing keys past 10 minutes from the slot's time, closing ident included: before each burst the head end allows for the longest it could wait for the channel, and stops if that would run over. Anything left goes in the next slot.
 
 ### Frequency
 
@@ -158,7 +168,7 @@ A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`
 
 ### The directory
 
-A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs, titles and content types. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. From v0.3.0 there are such fields, each `key=value`: every line has `type=1` (its content type; a line without one is a bulletin), and the first line also has the head end's slots, `slots=00:00/60` (the first slot's time and the minutes between slots), and its daylight rule, `daylight=IO91lk/120/30` (locator, minutes after sunrise, minutes before sunset). Receivers before v0.3.0 read the same entries and ignore the rest, so the version line stays `MAILCAST DIRECTORY 1`. A directory with no entries has nowhere to carry the slots, and a receiver keeps the last ones it heard. It goes out in every slot. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
+A small directory object also goes out repeatedly: the objects in rotation, with their object IDs, dictionaries, sizes, BIDs, titles and content types. It is text: a version line, the date, then one tab-separated line per object, and readers ignore fields after the title. From v0.3.0 there are such fields, each `key=value`: every line has `type=1` (its content type; a line without one is a bulletin), and the first line also has the head end's slots, `slots=00:00/60` (the first slot's time and the minutes between slots), and its daylight rule, `daylight=IO91lk/120/30` (locator, minutes after sunrise, minutes before sunset). Receivers before v0.3.0 read the same entries and ignore the rest, so the version line stays `MAILCAST DIRECTORY 1`. A directory with no entries has nowhere to carry the slots, and a receiver keeps the last ones it heard. The first line may also name the slot's waveform, `mode=ms110d-wn4`, for the record. It goes out in every slot that keys. A slot with no bulletin pieces to send keys nothing, not even the directory; under the budget rule that only happens when nothing is in rotation. Its ID comes from its content like any other object, so two slots can never mix two versions, and two slots with the same rotation on one day send the same object with fresh pieces. A receiver can then show "heard of 34, complete 30", and skip pieces of bulletins it has already rebuilt.
 
 A receiver forgets which objects it has rebuilt after 14 days, and drops a partial object 14 days after its last new piece. The BBS's BID check remains the real duplicate filter.
 

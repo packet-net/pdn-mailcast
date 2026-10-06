@@ -16,6 +16,13 @@ public interface IKissLink : IAsyncDisposable
 
     /// <summary>Queues one AX.25 frame for transmission as ACKMODE data with this id.</summary>
     Task SendAsync(ushort id, ReadOnlyMemory<byte> ax25, CancellationToken cancellation);
+
+    /// <summary>
+    /// Sends a KISS SETHW frame (command 6) and waits up to <paramref name="wait"/> for the modem to
+    /// echo it back, which pdn-soundmodem does once it has applied it. False when no echo came: the
+    /// modem refused it (pdn-soundmodem journals why) or does not know it.
+    /// </summary>
+    Task<bool> SetHardwareAsync(ReadOnlyMemory<byte> payload, TimeSpan wait, TimeProvider time, CancellationToken cancellation);
 }
 
 /// <summary>Opens a <see cref="IKissLink"/>.</summary>
@@ -55,6 +62,7 @@ public sealed class KissTcpLink : IKissLink
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _reader;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly Channel<byte[]> _setHardware = Channel.CreateUnbounded<byte[]>();
 
     internal KissTcpLink(TcpClient client, int portNibble)
     {
@@ -83,6 +91,48 @@ public sealed class KissTcpLink : IKissLink
         }
     }
 
+    /// <inheritdoc />
+    public async Task<bool> SetHardwareAsync(ReadOnlyMemory<byte> payload, TimeSpan wait, TimeProvider time, CancellationToken cancellation)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+        while (_setHardware.Reader.TryRead(out _))
+        {
+            // An echo left from before is not the answer to this one.
+        }
+        byte[] frame = Kiss.Encode(_portNibble, Kiss.SetHardwareCommand, payload.Span);
+        await _writeGate.WaitAsync(cancellation).ConfigureAwait(false);
+        try
+        {
+            await _stream.WriteAsync(frame, cancellation).ConfigureAwait(false);
+            await _stream.FlushAsync(cancellation).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+        using var timeout = new CancellationTokenSource(wait, time);
+        using var either = CancellationTokenSource.CreateLinkedTokenSource(cancellation, timeout.Token);
+        try
+        {
+            while (true)
+            {
+                byte[] echo = await _setHardware.Reader.ReadAsync(either.Token).ConfigureAwait(false);
+                if (echo.AsSpan().SequenceEqual(payload.Span))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (ChannelClosedException)
+        {
+            return false;
+        }
+    }
+
     private async Task ReadLoopAsync()
     {
         var decoder = new KissDecoder();
@@ -98,11 +148,15 @@ public sealed class KissTcpLink : IKissLink
                 }
                 foreach (var frame in decoder.Feed(buffer.AsSpan(0, n)))
                 {
-                    // An acknowledgement is the id alone; anything else on the port (received
-                    // frames, SETHW echoes) is not ours to read.
+                    // An acknowledgement is the id alone, and a SETHW echo confirms a waveform
+                    // change; anything else on the port (received frames) is not ours to read.
                     if (frame.Command == Kiss.AckModeCommand && frame.Payload.Length == 2)
                     {
                         _acks.Writer.TryWrite((ushort)(frame.Payload[0] | (frame.Payload[1] << 8)));
+                    }
+                    else if (frame.Command == Kiss.SetHardwareCommand)
+                    {
+                        _setHardware.Writer.TryWrite(frame.Payload);
                     }
                 }
             }
@@ -114,6 +168,7 @@ public sealed class KissTcpLink : IKissLink
         finally
         {
             _acks.Writer.TryComplete();
+            _setHardware.Writer.TryComplete();
         }
     }
 

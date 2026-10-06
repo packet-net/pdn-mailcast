@@ -64,12 +64,21 @@ public sealed class RotationStore
         }
     }
 
-    /// <summary>Plans a slot from the bulletins in rotation.</summary>
-    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options)
+    /// <summary>Plans a slot from the bulletins in rotation, filling it to <paramref name="budget"/> under the budget rule.</summary>
+    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, SlotBudget? budget = null, string? mode = null)
     {
         lock (_gate)
         {
-            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi);
+            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode);
+        }
+    }
+
+    /// <summary>The bulletins in rotation in a slot, with their next ESIs and first slots.</summary>
+    public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot)
+    {
+        lock (_gate)
+        {
+            return _store.InRotation(slot);
         }
     }
 

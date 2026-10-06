@@ -18,6 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Three bulletins exactly as head end 0.3.0 left them in GB7RDG's store on 2026-10-06. -->
+    <None Include="Gb7rdgStore\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Packet.Mailcast\Packet.Mailcast.csproj" />
   </ItemGroup>
 

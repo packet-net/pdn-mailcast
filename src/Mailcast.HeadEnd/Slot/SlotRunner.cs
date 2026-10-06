@@ -74,59 +74,30 @@ public sealed class SlotRunner
     /// <summary>
     /// How the frames split into bursts: as many as fit in <see cref="SlotSettings.MaxBurst"/>
     /// less two seconds, or <see cref="SlotSettings.FramesPerBurst"/> when set. At least one each.
+    /// On <paramref name="airtime"/>, the slot's waveform, or the configured one when null.
     /// </summary>
-    public IReadOnlyList<int> BurstSizes(IReadOnlyList<SlotFrame> frames)
+    public IReadOnlyList<int> BurstSizes(IReadOnlyList<SlotFrame> frames, IAirtime? airtime = null)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        var sizes = new List<int>();
-        TimeSpan target = _settings.MaxBurst - TimeSpan.FromSeconds(2);
-        int next = 0;
-        while (next < frames.Count)
-        {
-            int count = 0;
-            var lengths = new List<int>();
-            while (next + count < frames.Count)
-            {
-                if (_settings.FramesPerBurst is int fixedCount)
-                {
-                    if (count == fixedCount)
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    lengths.Add(Ax25(frames[next + count]).Length);
-                    if (count > 0 && _airtime.Burst(lengths) > target)
-                    {
-                        break;
-                    }
-                }
-                count++;
-            }
-            sizes.Add(count);
-            next += count;
-        }
-        return sizes;
+        return Model(airtime).BurstSizes(Lengths(frames));
     }
 
     /// <summary>
     /// The frames' airtime in bursts of <paramref name="sizes"/> (from <see cref="BurstSizes"/>
     /// when null): the bursts alone, without the tone, the idents or the gaps between bursts.
     /// </summary>
-    public TimeSpan Airtime(IReadOnlyList<SlotFrame> frames, IReadOnlyList<int>? sizes = null)
+    public TimeSpan Airtime(IReadOnlyList<SlotFrame> frames, IReadOnlyList<int>? sizes = null, IAirtime? airtime = null)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        sizes ??= BurstSizes(frames);
-        TimeSpan total = TimeSpan.Zero;
-        int next = 0;
-        foreach (int n in sizes)
-        {
-            total += _airtime.Burst([.. frames.Skip(next).Take(n).Select(f => Ax25(f).Length)]);
-            next += n;
-        }
-        return total;
+        var lengths = Lengths(frames);
+        var model = Model(airtime);
+        return model.Bursts(lengths, sizes ?? model.BurstSizes(lengths));
     }
+
+    /// <summary>The whole-slot airtime model on <paramref name="airtime"/>, or the configured waveform's.</summary>
+    public SlotAirtime Model(IAirtime? airtime = null) => new(_settings, airtime ?? _airtime);
+
+    private int[] Lengths(IReadOnlyList<SlotFrame> frames) => [.. frames.Select(f => Ax25(f).Length)];
 
     /// <summary>Runs the slot. Never throws for anything the station or the radio does.</summary>
     /// <param name="slot">The slot's start, which names it in the journal and the report.</param>
@@ -138,11 +109,51 @@ public sealed class SlotRunner
     /// records them as it goes, so a crash mid-slot never repeats one.
     /// </param>
     /// <param name="requestedBy">Who asked for a one-off slot, or null for a scheduled one.</param>
-    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null)
+    /// <param name="waveform">
+    /// The waveform the slot goes out on, which the modem is switched to first when it says so;
+    /// null for the configured one, left as it is.
+    /// </param>
+    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null, SlotWaveform? waveform = null)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        using var run = new Run(this, slot, frames, bulletinsInRotation, queued, requestedBy);
+        using var run = new Run(this, slot, frames, bulletinsInRotation, queued, requestedBy, waveform);
         return await run.ExecuteAsync(cancellation);
+    }
+
+    /// <summary>
+    /// Puts the broadcast modem on the configured waveform (<see cref="SlotSettings.Mode"/>) with
+    /// KISS SETHW, as the head end does when it starts, so a slot cut off by a crash or a stop
+    /// never leaves another waveform set. Never throws; false when the modem did not confirm.
+    /// </summary>
+    public async Task<bool> PutWaveformBackAsync(CancellationToken cancellation)
+    {
+        if (Waveforms.SetHardwarePayload(_settings.Mode) is not { } payload)
+        {
+            return false;
+        }
+        try
+        {
+            bool back = await SetOnFreshLinkAsync(payload, cancellation);
+            _journal.Write(back
+                ? $"station: broadcast modem set to {_settings.Mode}"
+                : $"station: WARNING - the broadcast modem did not confirm {_settings.Mode} (no SETHW echo); each slot sets its own waveform anyway");
+            return back;
+        }
+        catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException
+            || (e is OperationCanceledException && !cancellation.IsCancellationRequested))
+        {
+            _journal.Write($"station: could not set the broadcast modem to {_settings.Mode} ({e.Message}); each slot sets its own waveform anyway");
+            return false;
+        }
+    }
+
+    /// <summary>Sends SETHW on a KISS connection of its own and waits for the echo, at most 30 s in all.</summary>
+    private async Task<bool> SetOnFreshLinkAsync(byte[] payload, CancellationToken cancellation)
+    {
+        using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30), _time);
+        using var either = CancellationTokenSource.CreateLinkedTokenSource(cancellation, limit.Token);
+        await using IKissLink link = await _kiss.ConnectAsync(either.Token);
+        return await link.SetHardwareAsync(payload, _settings.SetHardwareWait, _time, either.Token);
     }
 
     /// <summary>How a slot is named in the journal: its start, UTC, to the minute.</summary>
@@ -155,10 +166,15 @@ public sealed class SlotRunner
     private static string Degrees(double c) => c.ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>One slot's state.</summary>
-    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, Action<int>? onQueued, string? requestedBy) : IDisposable
+    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, Action<int>? onQueued, string? requestedBy, SlotWaveform? waveform) : IDisposable
     {
+        private readonly IAirtime _airtime = waveform?.Airtime ?? owner._airtime;
+        private readonly string _mode = waveform?.Mode ?? owner._settings.Mode;
+        private TimeSpan? _estimate;
+        private bool _waveformSet;
+        private DateTimeOffset _deadline;
         /// <summary>How long the modem may gather the first frame of a burst before contending.</summary>
-        private static readonly TimeSpan Gather = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan Gather = SlotAirtime.Gather;
 
         private readonly SemaphoreSlim _leaseGate = new(1, 1);
         private readonly CancellationTokenSource _aborted = new();
@@ -195,6 +211,9 @@ public sealed class SlotRunner
         public async Task<SlotReport> ExecuteAsync(CancellationToken cancellation)
         {
             _start = Now;
+            // The hard stop counts from the slot's own start, so a late slot (a catch-up or a retry)
+            // ends when an on-time one would, while a web SDR receiver is still listening.
+            _deadline = (slot < _start ? slot : _start) + S.MaxSlotLength;
             if (requestedBy is not null)
             {
                 Say($"a one-off slot, asked for by {requestedBy}");
@@ -203,9 +222,11 @@ public sealed class SlotRunner
             {
                 return Finish(SlotOutcome.Skipped, "nothing to send");
             }
-            var sizes = owner.BurstSizes(frames);
-            TimeSpan estimate = owner.Airtime(frames, sizes);
-            Say($"starting at {Clock(_start)}Z, {frames.Count} frames for {bulletins} bulletins in {sizes.Count} bursts, about {Minutes(estimate)} min on the air");
+            var model = owner.Model(_airtime);
+            var lengths = owner.Lengths(frames);
+            var sizes = model.BurstSizes(lengths);
+            _estimate = model.Slot(lengths, sizes);
+            Say($"starting at {Clock(_start)}Z, {frames.Count} frames for {bulletins} bulletins in {sizes.Count} bursts on {_mode}, about {Minutes(_estimate.Value)} min on the air with the tone and idents");
 
             if (S.RequireClockSync)
             {
@@ -238,56 +259,121 @@ public sealed class SlotRunner
 
             await using (link)
             {
-                DateTimeOffset asked = Now;
-                LeaseAnswer first = await AskForLeaseAsync(cancellation);
-                if (!first.Held)
-                {
-                    return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", retryable: true);
-                }
-                _leaseTaken = true;
-                LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
-                Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames go anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel");
-
-                using var slot = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-                Task renewing = RenewLoopAsync(slot.Token);
-                Task watching = owner._flex is { Connected: true } ? PaLoopAsync(slot.Token) : Task.CompletedTask;
-                SlotOutcome? skipped = null;
-                string? skipReason = null;
                 try
                 {
-                    (skipped, skipReason) = await ToneAsync(cancellation);
-                    if (skipped is null && _abort is null)
+                    if (waveform?.SetHardware is { } payload)
                     {
-                        await BurstsAsync(link, sizes, cancellation);
+                        // Counted as set before it is written: once written, the modem may have
+                        // applied it whatever answer comes back, so every way out puts it back.
+                        _waveformSet = true;
+                        bool set;
+                        try
+                        {
+                            set = await link.SetHardwareAsync(payload, S.SetHardwareWait, owner._time, cancellation);
+                        }
+                        catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException)
+                        {
+                            return Finish(SlotOutcome.Skipped, $"cannot switch the modem to {_mode}: {e.Message}", retryable: true);
+                        }
+                        if (!set)
+                        {
+                            return Finish(SlotOutcome.Skipped, $"the modem did not confirm the change to {_mode} within {S.SetHardwareWait.TotalSeconds:0} s (no SETHW echo; pdn-soundmodem's journal says why), so nothing was sent", retryable: true);
+                        }
+                        Say($"modem switched to {_mode}");
                     }
-                }
-                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-                {
-                    Abort("the head end is stopping");
+
+                    DateTimeOffset asked = Now;
+                    LeaseAnswer first = await AskForLeaseAsync(cancellation);
+                    if (!first.Held)
+                    {
+                        return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", retryable: true);
+                    }
+                    _leaseTaken = true;
+                    LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
+                    Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames go anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel");
+
+                    using var slot = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+                    Task renewing = RenewLoopAsync(slot.Token);
+                    Task watching = owner._flex is { Connected: true } ? PaLoopAsync(slot.Token) : Task.CompletedTask;
+                    SlotOutcome? skipped = null;
+                    string? skipReason = null;
+                    try
+                    {
+                        (skipped, skipReason) = await ToneAsync(cancellation);
+                        if (skipped is null && _abort is null)
+                        {
+                            await BurstsAsync(link, sizes, cancellation);
+                        }
+                    }
+                    catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                    {
+                        Abort("the head end is stopping");
+                    }
+                    finally
+                    {
+                        // In line rather than CancelAsync, which finishes on another thread: the slot's own
+                        // loops stop before anything else runs, on virtual time too.
+                        slot.Cancel();
+                        await Quietly(renewing);
+                        await Quietly(watching);
+                        if (_dropping is not null)
+                        {
+                            await _dropping;
+                        }
+                        await ReleaseAsync();
+                    }
+
+                    if (skipped is not null)
+                    {
+                        return Finish(skipped.Value, skipReason);
+                    }
                 }
                 finally
                 {
-                    // In line rather than CancelAsync, which finishes on another thread: the slot's own
-                    // loops stop before anything else runs, on virtual time too.
-                    slot.Cancel();
-                    await Quietly(renewing);
-                    await Quietly(watching);
-                    if (_dropping is not null)
-                    {
-                        await _dropping;
-                    }
-                    await ReleaseAsync();
-                }
-
-                if (skipped is not null)
-                {
-                    return Finish(skipped.Value, skipReason);
+                    await PutWaveformBackAsync(link);
                 }
             }
 
             return _sent == frames.Count && _abort is null
                 ? Finish(SlotOutcome.Completed, null)
                 : Finish(SlotOutcome.Aborted, _abort ?? "stopped early");
+        }
+
+        /// <summary>
+        /// Puts the modem back on the configured waveform once the slot has switched it to another,
+        /// after the release, so nothing of ours is still to be rendered and the modem never stays on
+        /// a slot's waveform outside the slot. Bounded, and never throws.
+        /// </summary>
+        private async Task PutWaveformBackAsync(IKissLink link)
+        {
+            if (!_waveformSet || _mode == S.Mode || Waveforms.SetHardwarePayload(S.Mode) is not { } payload)
+            {
+                return;
+            }
+            bool back = false;
+            try
+            {
+                using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(30), owner._time);
+                back = await link.SetHardwareAsync(payload, S.SetHardwareWait, owner._time, bounded.Token);
+            }
+            catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
+            {
+                // The slot's connection failed; a new one below.
+            }
+            if (!back)
+            {
+                try
+                {
+                    back = await owner.SetOnFreshLinkAsync(payload, CancellationToken.None);
+                }
+                catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
+                {
+                    back = false;
+                }
+            }
+            Say(back
+                ? $"modem put back on {S.Mode}"
+                : $"WARNING - could not put the modem back on {S.Mode}; it may stay on {_mode} until the next slot or the head end's next start");
         }
 
         private async Task<string?> ReadFlexAsync(CancellationToken cancellation)
@@ -508,9 +594,12 @@ public sealed class SlotRunner
                     return;
                 }
                 var batch = frames.Skip(next).Take(count).Select(owner.Ax25).ToList();
-                TimeSpan airtime = owner._airtime.Burst([.. batch.Select(b => b.Length)]);
+                TimeSpan airtime = _airtime.Burst([.. batch.Select(b => b.Length)]);
 
-                if (Now + airtime > _start + S.MaxSlotLength)
+                // The latest this burst and the closing ident after it could end: gathered, a carrier
+                // wait the station cuts off, its airtime and the station's own delay, then the ident.
+                // Nothing keys past the hard stop, however busy the channel.
+                if (Now + Gather + S.MaxCarrierWait + airtime + SlotAirtime.BurstDelay + SlotAirtime.ClosingIdent > _deadline)
                 {
                     Abort($"the {S.MaxSlotLength.TotalMinutes:0} min maximum slot length would be passed by the next burst");
                     return;
@@ -717,15 +806,17 @@ public sealed class SlotRunner
                 LeaseRenewals = _renewals,
                 RequestedBy = requestedBy,
                 Retryable = retryable,
+                Mode = _mode,
+                EstimatedSeconds = _estimate is { } e ? Math.Round(e.TotalSeconds, 1) : null,
             };
             string pa = _paMax is double max ? $"{Degrees(max)} C" : "not read";
             switch (outcome)
             {
                 case SlotOutcome.Completed:
-                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts, {bulletins} bulletins in rotation, tone {(_toneSent ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
+                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {bulletins} bulletins in rotation, tone {(_toneSent ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
                     break;
                 case SlotOutcome.Aborted:
-                    Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");
+                    Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode} ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");
                     break;
                 default:
                     Say($"skipped: {reason}. {(_toneSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry of this one" : "")}");

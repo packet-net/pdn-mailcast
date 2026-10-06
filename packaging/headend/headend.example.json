@@ -7,13 +7,23 @@
   "stateDirectory": "/var/lib/pdn-mailcast-headend",
 
   // Frame size: the bytes of bulletin per frame, 64 to 940 in steps of 4. Smaller frames survive
-  // fades and other stations better; docs/headend.md says more. How each bulletin is carried
-  // ("slotShares", "slotOffsets", "extraSymbols", "carryOverSlots") is left to the defaults for
-  // the slot interval: for hourly in daylight, 1.2 times its pieces in the first slot after it
-  // arrives and 0.4 times again 5 hours later, or in the next daylight slot if that is dark.
-  // Without "daylight", the first slot and again 5, 10, 17 and 25 hours later.
+  // fades and other stations better; docs/headend.md says more.
+  // How bulletins are carried: "budget" (the default for any slot interval but a day) fills each
+  // slot to "budgetMinutes" on the air, tone and idents included, but always leaves the
+  // clear-channel wait ("marginSeconds", or "channelWaitSeconds" if left out) and a carrier wait before
+  // "slot"."maxMinutes". Each slot sends fresh pieces of every bulletin in rotation, the least
+  // covered first, at most "slotCap" times a bulletin's pieces in one slot; a bulletin retires
+  // after "retireCoverage" times its pieces in all, or "retireHours" after its first slot.
+  // "shares" is the earlier rule, with "slotShares", "slotOffsets", "extraSymbols" and
+  // "carryOverSlots". "modes" lists waveforms the slots take in turn, such as
+  // ["ms110d-wn4", "ms110d-wn3"]; left out, every slot goes on "station"."mode".
   "schedule": {
-    "symbolSize": 240
+    "symbolSize": 240,
+    "rule": "budget",
+    "budgetMinutes": 10,
+    "slotCap": 0.6,
+    "retireCoverage": 6,
+    "retireHours": 36
   },
 
   // A slot at "timeUtc" and then every "everyMinutes" (dividing a day, at least 15). Left out,
