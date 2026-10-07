@@ -181,7 +181,7 @@ When the slot's channel was measured, six more follow:
 9. The delay spread, ms.
 10. The Doppler spread, Hz.
 11. The virtual height, km. Without the web SDR's position it is worked out for a 150 km path.
-12. What it was measured from: `b` the bursts, `p` a probe.
+12. What it was measured from: `b` the bursts, `p` the probe after the tone, whichever measured the slot better.
 
 A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
 
@@ -277,19 +277,25 @@ To know when there is a new version, the receiver reads packet-net's apt package
 
 ### The Channel tile
 
-Once a slot is over, the receiver works out what the path from GB7RDG was like, from the data bursts it decoded. Every burst it decodes can be made again exactly, so each one is a known signal to measure the path with, about 20 times a second. It needs no extra airtime and works down to about 1 dB signal to noise. Only the bursts it decoded count: a slot it could not read says "Not enough decoded to measure."
+Once a slot is over, the receiver works out what the path from GB7RDG was like, two ways.
+
+- From the channel probe: 1.5 s after the tone, GB7RDG sends 6.5 s of a known test signal made for measuring paths. The receiver finds it from where the tone ended, and reads every path's delay to a few microseconds and its Doppler, down to about -15 dB signal to noise, well below anything it can decode.
+- From the data bursts it decoded: each one can be made again exactly, so it is a known signal too, about 20 times a second. This works down to about 1 dB.
+
+When it has both, it shows the one that sees further below the strongest path, with the other beside it. A slot with neither says "Not enough decoded to measure."
 
 The tile says it in a line, such as "Last slot (16:00 UTC): 2 paths: 1 hop, and 2 hops 1.9 ms later, 17 dB weaker. Reflection about 290 km up. Doppler spread 0.2 Hz: steady (good for 1200 bps)." Below that:
 
 - the delay profile: how much signal arrived how long after the first path, with each path marked. One hop off the F layer is 1F, two hops 2F, and so on; 1E (the E layer) is only considered more than 300 km from Reading. Naming the hops needs to know where your receiver is, which a web SDR says; with a sound card the paths are shown without names. The height comes from the time between the first two hops, and hardly depends on the distance, so it is given either way;
 - the delay spread (how much the echoes smear each symbol), the Doppler spread (how much the moving layer blurs the frequency), how deep the fades went (how far the signal fell below its middle level a tenth of the time), and how long the signal stays steady;
+- what it was measured from, with the other measurement's summary when there were both;
 - a strip of the last 24 hours, one column per hourly slot, with a dot for each path at its delay, darker for stronger.
 
 Doppler spread under 0.5 Hz is steady and good for 1200 bps; up to 1 Hz, 1200 bps should still cope; beyond that, 600 bps copes better. It is a guide, and it changes nothing about what is sent.
 
-The measuring runs on a thread of its own after the slot, never alongside the decoding, and rests between bursts so it uses at most half of one core. On a Raspberry Pi 4 a slot of 7 bursts takes about 5 seconds of one core. It only keeps bursts it read frames from, heard within 15 minutes of a slot's start: at most 12 of them (and 4 minutes of audio, about 25 MB) per slot until then. A burst longer than the 75 s of audio it keeps is left out, and the log and tile say so. The results for the last day are kept in `channel.json` in the state directory. `--decode` measures too, after delivering, and only logs the result.
+The measuring runs on a thread of its own after the slot, never alongside the decoding, and rests between bursts so it uses at most half of one core. On a Raspberry Pi 4 a slot of 7 bursts takes about 5 seconds of one core, and the probe about 2 seconds more. It keeps 13 s of audio from each tone's end for the probe (about 1.25 MB), and only bursts it read frames from, heard within 15 minutes of a slot's start: at most 12 of them (and 4 minutes of audio, about 25 MB) per slot until then. A burst longer than the 75 s of audio it keeps is left out, and the log and tile say so. The results for the last day are kept in `channel.json` in the state directory. `--decode` measures too, after delivering, and only logs the result.
 
-In `GET /api/status`, `channel` has the last slot: `slot`, `basis` (`bursts`), `enough`, `modes` (each with `label`, `delayMs` after the first, `powerDb` against the strongest, `dopplerShiftHz`, `dopplerSpreadHz` and `seenIn`), `delaySpreadMs`, `dopplerSpreadHz`, `fadeDb`, `coherenceS`, `virtualHeightKm`, `snrDb`, `offsetHz`, `distanceKm` (null when the receiver's position is not known), `words`, `tooLong` (bursts left out since start), the `profile` (`startMs`, `stepMs`, `db`), and `history`, the last day's slots. Before anything has been measured, `slot` is null.
+In `GET /api/status`, `channel` has the last slot: `slot`, `basis` (`probe` or `bursts`), `enough`, `modes` (each with `label`, `delayMs` after the first, `powerDb` against the strongest, `dopplerShiftHz`, `dopplerSpreadHz` and `seenIn`), `delaySpreadMs`, `dopplerSpreadHz`, `fadeDb`, `coherenceS`, `virtualHeightKm`, `snrDb`, `offsetHz`, `distanceKm` (null when the receiver's position is not known), `floorDb` (how far below the strongest path the profile reaches), `words`, `other` (the same slot measured the other way, with `basis`, `enough`, `modes`, `delaySpreadMs`, `dopplerSpreadHz`, `virtualHeightKm`, `snrDb`, `offsetHz`, `floorDb`, `measurements`, `kept` and `words`; null without both), `tooLong` (bursts left out since start), the `profile` (`startMs`, `stepMs`, `db`), and `history`, the last day's slots, each with its `basis`. Before anything has been measured, `slot` is null.
 
 ## Mail
 

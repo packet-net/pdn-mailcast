@@ -7,7 +7,14 @@ namespace Mailcast.Receiver;
 /// <param name="OffsetHz">How far that is from where it should be (<see cref="OnAir.CentreAudioHz"/>); on USB, positive means the signal is high.</param>
 /// <param name="SnrDb">Tone power over the noise in 3 kHz, the bandwidth MS110D's figures are quoted in.</param>
 /// <param name="Duration">How long the tone lasted.</param>
-public sealed record ToneReport(double FrequencyHz, double OffsetHz, double SnrDb, TimeSpan Duration);
+public sealed record ToneReport(double FrequencyHz, double OffsetHz, double SnrDb, TimeSpan Duration)
+{
+    /// <summary>
+    /// Where the tone's last block ended, in samples of the detector's input since it started: the
+    /// tone itself ended within about a block (1.02 s) of it. The channel probe follows 1.5 s later.
+    /// </summary>
+    public long EndSample { get; init; }
+}
 
 /// <summary>
 /// Finds the steady tone that opens each slot and measures its frequency and signal-to-noise
@@ -72,6 +79,8 @@ public sealed class ToneDetector
     private readonly double[] _power = new double[Size / 2];
     private readonly double[] _noise;
     private int _filled;
+    private readonly int _factor;
+    private long _decimatedCount;
 
     // The run in progress.
     private int _runBlocks;
@@ -87,7 +96,8 @@ public sealed class ToneDetector
             throw new ArgumentException($"The sample rate must be a multiple of {Rate}.", nameof(sampleRate));
         }
         _expectedHz = expectedHz;
-        _decimator = new Decimator(sampleRate, sampleRate / Rate);
+        _factor = sampleRate / Rate;
+        _decimator = new Decimator(sampleRate, _factor);
         _decimated = new float[_decimator.MaxOutput(sampleRate)];
         for (int i = 0; i < Size; i++)
         {
@@ -113,6 +123,7 @@ public sealed class ToneDetector
             for (int i = 0; i < produced; i++)
             {
                 _block[_filled++] = _decimated[i];
+                _decimatedCount++;
                 if (_filled == Size)
                 {
                     _filled = 0;
@@ -200,7 +211,9 @@ public sealed class ToneDetector
                 double frequency = _runFrequencySum / _runBlocks;
                 double noiseIn3k = _runNoiseSum / _runBlocks * (NoiseBandwidthHz / BinHz);
                 double snr = 10 * Math.Log10(Math.Max(_runSignalSum / _runBlocks, double.Epsilon) / noiseIn3k);
-                ToneMeasured?.Invoke(new ToneReport(frequency, frequency - _expectedHz, snr, duration));
+                // The run ended with the block before this one.
+                long end = (_decimatedCount - Size) * _factor;
+                ToneMeasured?.Invoke(new ToneReport(frequency, frequency - _expectedHz, snr, duration) { EndSample = end });
             }
         }
         _runBlocks = 0;

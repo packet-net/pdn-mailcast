@@ -23,6 +23,32 @@ public sealed record CapturedBurst(Half[] Audio, int EndSample, Ms110dLockInfo L
     }
 }
 
+/// <summary>The audio after a slot's tone, kept for measuring the channel probe that follows it.</summary>
+/// <param name="Audio">The 48 kHz audio, as half-precision floats: about 13 s, 1.25 MB.</param>
+/// <param name="Tone">The tone it follows.</param>
+/// <param name="ToneEndSeconds">Where the tone detector put the tone's end, seconds into <paramref name="Audio"/>.</param>
+/// <param name="Heard">When it was kept.</param>
+/// <param name="FirstSample">Which sample of the audio since the pipeline started <paramref name="Audio"/> begins at.</param>
+public sealed record CapturedProbe(Half[] Audio, ToneReport Tone, double ToneEndSeconds, DateTimeOffset Heard, long FirstSample)
+{
+    /// <summary>Audio kept before where the tone detector put the tone's end, seconds.</summary>
+    public const double BeforeSeconds = 1;
+
+    /// <summary>Audio kept after it, seconds: the gap, the probe, and the search either side of where it should be.</summary>
+    public const double AfterSeconds = 12;
+
+    /// <summary>The audio as floats, for the measurement.</summary>
+    internal float[] Samples()
+    {
+        var x = new float[Audio.Length];
+        for (int i = 0; i < x.Length; i++)
+        {
+            x[i] = (float)Audio[i];
+        }
+        return x;
+    }
+}
+
 /// <summary>
 /// Keeps the last minute or so of audio, and hands each decoded burst on with its audio, for the
 /// channel measurement. Runs on the audio thread and does nothing there but copy: the
@@ -52,6 +78,7 @@ public sealed class BurstCapture
     private readonly TimeProvider _time;
     private readonly Action<CapturedBurst> _sink;
     private readonly List<Pending> _pending = [];
+    private readonly List<(long From, long Until, Action<Half[], long> Sink)> _windows = [];
     private long _written;
     private int _frames;
     private Ms110dLockInfo? _lastLock;
@@ -87,9 +114,44 @@ public sealed class BurstCapture
         }
     }
 
+    /// <summary>The samples written so far, which is where the next block will start.</summary>
+    public long Written => _written;
+
+    /// <summary>
+    /// Hands <paramref name="sink"/> the audio from sample <paramref name="from"/> to
+    /// <paramref name="until"/> once it is all in, on the audio thread: for the channel probe after
+    /// a slot's tone. Whatever has already left the ring is left out of the start.
+    /// </summary>
+    public void Keep(long from, long until, Action<Half[], long> sink) => _windows.Add((from, until, sink));
+
+    /// <summary>The audio has ended (a recording played through): hands on what there is of any window still being filled.</summary>
+    public void Flush()
+    {
+        foreach (var (from, _, sink) in _windows)
+        {
+            long start = Math.Max(Math.Max(from, 0), _written - _ring.Length);
+            if (start < _written)
+            {
+                sink(Copy(start, _written), start);
+            }
+        }
+        _windows.Clear();
+    }
+
     /// <summary>After each block: hands on any burst whose audio is all in now.</summary>
     public void AfterBlock()
     {
+        for (int i = _windows.Count - 1; i >= 0; i--)
+        {
+            var (from, until, sink) = _windows[i];
+            if (_written < until)
+            {
+                continue;
+            }
+            _windows.RemoveAt(i);
+            from = Math.Max(Math.Max(from, 0), _written - _ring.Length);
+            sink(Copy(from, until), from);
+        }
         for (int i = _pending.Count - 1; i >= 0; i--)
         {
             var p = _pending[i];
@@ -104,14 +166,20 @@ public sealed class BurstCapture
                 TooLong?.Invoke((p.End - from) / (double)Rate);
                 continue;
             }
-            // At most two runs of the ring: to its end, then from its start.
-            var audio = new Half[_written - from];
-            int start = (int)(from % _ring.Length);
-            int first = Math.Min(audio.Length, _ring.Length - start);
-            Array.Copy(_ring, start, audio, 0, first);
-            Array.Copy(_ring, 0, audio, first, audio.Length - first);
-            _sink(new CapturedBurst(audio, (int)(p.End - from), p.Lock, p.Bits, p.Heard, from));
+            _sink(new CapturedBurst(Copy(from, _written), (int)(p.End - from), p.Lock, p.Bits, p.Heard, from));
         }
+    }
+
+    /// <summary>The ring's samples from <paramref name="from"/> up to <paramref name="until"/>, all still in it.</summary>
+    private Half[] Copy(long from, long until)
+    {
+        // At most two runs of the ring: to its end, then from its start.
+        var audio = new Half[until - from];
+        int start = (int)(from % _ring.Length);
+        int first = Math.Min(audio.Length, _ring.Length - start);
+        Array.Copy(_ring, start, audio, 0, first);
+        Array.Copy(_ring, 0, audio, first, audio.Length - first);
+        return audio;
     }
 
     private void OnBurst(Ms110dBurst burst)

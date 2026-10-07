@@ -18,7 +18,8 @@ internal static class SlotRecording
     /// <param name="snrDb">Signal power over noise in 3 kHz, during the bursts.</param>
     /// <param name="toneOffsetHz">How far the whole signal is off frequency.</param>
     /// <param name="seed">The noise's seed.</param>
-    public static void Write(string path, IReadOnlyList<byte[]> frames, ISet<int> faded, double snrDb, double toneOffsetHz, int seed)
+    /// <param name="probe">Whether the channel probe follows the tone, 1.5 s after it, as the head end has sent it since it asked for one.</param>
+    public static void Write(string path, IReadOnlyList<byte[]> frames, ISet<int> faded, double snrDb, double toneOffsetHz, int seed, bool probe = false)
     {
         var modem = new Ms110dModem(Rate, _ => { }, new Ms110dTxSettings { WaveformNumber = 4 });
         var bursts = frames.Select(f => modem.Modulate(f, 0)).ToList();
@@ -33,6 +34,12 @@ internal static class SlotRecording
         for (int i = 0; i < 10 * Rate; i++)
         {
             audio.Add((float)(toneAmplitude * Math.Sin(2 * Math.PI * toneHz * i / Rate)));
+        }
+        if (probe)
+        {
+            // pdn-soundmodem's own render, peaking where the tone does.
+            Silence(1.5);
+            audio.AddRange(Shift(Packet.SoundModem.Audio.ProbeSignal.Render(Packet.SoundModem.Audio.ProbeSignal.Zc255, OnAir.CentreAudioHz, Math.Min(1, toneAmplitude), Rate), toneOffsetHz));
         }
         Silence(2);
         for (int f = 0; f < bursts.Count; f++)
