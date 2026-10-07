@@ -17,14 +17,14 @@ namespace Mailcast.Receiver;
 /// <see cref="Quiet"/>, or when the audio stops (<see cref="SlotOver"/>). The measurement runs
 /// on a thread of its own, one burst at a time, resting as long again after each so it never
 /// takes more than half of one core.</para>
-/// <para>The probe's audio (about 11 s after each tone, <see cref="OfferProbe"/>) is kept the same
+/// <para>The probe's audio (13 s from 1 s before each tone's end, <see cref="OfferProbe"/>) is kept the same
 /// way and measured with the slot's bursts, by <see cref="ProbeChannel"/>, into the same analysis
 /// with <c>basis: "probe"</c>. The slot's report is the better of the two (see
 /// <see cref="ChannelReport.Best"/>), with the other beside it, so a path too weak to decode is
 /// still measured from the probe.</para>
 /// <para>Memory is bounded: at most <see cref="MostBursts"/> bursts and
 /// <see cref="MostSeconds"/> seconds of audio are kept for a slot, and <see cref="MostProbes"/>
-/// probes of about 1 MB each, as half-precision floats (about 100 kB a second).</para>
+/// probes of about 1.25 MB each, as half-precision floats (about 100 kB a second).</para>
 /// </remarks>
 public sealed class ChannelWatch : IAsyncDisposable
 {

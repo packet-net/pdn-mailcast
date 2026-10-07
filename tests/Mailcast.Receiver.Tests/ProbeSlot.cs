@@ -24,8 +24,11 @@ internal static class ProbeSlot
     /// signal is <paramref name="offsetHz"/> off frequency as a mistuned radio would put it.
     /// <paramref name="extra"/> is more audio added as it is, <paramref name="extraAfterToneSeconds"/>
     /// after the tone ends: the first burst, as an older head end sends it 8 s after the tone.
+    /// <paramref name="periodsSent"/> cuts the probe short after that many periods (a Stop at the
+    /// station), and <paramref name="silentPeriods"/> drops some in the middle (a lost stretch of a
+    /// web SDR's audio).
     /// </summary>
-    public static Made Make(Path[] paths, double snrDb, int seed, double offsetHz = 0, bool probe = true, double leadSeconds = 3, double tailSeconds = 3, float[]? extra = null, double extraAfterToneSeconds = 8)
+    public static Made Make(Path[] paths, double snrDb, int seed, double offsetHz = 0, bool probe = true, double leadSeconds = 3, double tailSeconds = 3, float[]? extra = null, double extraAfterToneSeconds = 8, double periodsSent = 61, (int From, int To)? silentPeriods = null)
     {
         var rng = new Random(seed);
         var descriptor = ProbeSignal.Zc255;
@@ -41,7 +44,14 @@ internal static class ProbeSlot
         var spectrum = new Complex[m];
         if (probe)
         {
-            Array.Copy(envelope, spectrum, envelope.Length);
+            int first = descriptor.FirstPeriodSample(Rate);
+            int perPeriod = (int)Math.Round(descriptor.PeriodSeconds * Rate);
+            for (int i = 0; i < envelope.Length; i++)
+            {
+                double period = (i - first) / (double)perPeriod;
+                bool cut = period >= periodsSent || (silentPeriods is var (a, b) && period >= a && period < b);
+                spectrum[i] = cut ? Complex.Zero : envelope[i];
+            }
             ChannelMaths.Fft(spectrum, false);
         }
         double total = paths.Sum(p => Math.Pow(10, p.PowerDb / 10));
@@ -86,8 +96,8 @@ internal static class ProbeSlot
                 power += v * v;
             }
         }
-        // With no probe, the noise is set as though there were one.
-        power = probe ? power / envelope.Length : 0.5 * 0.5;
+        // With no probe, the noise is set as though there were one; with a probe cut short, as for the whole of it.
+        power = probe && periodsSent >= 61 && silentPeriods is null ? power / envelope.Length : probe ? FullPower(paths, envelope) : 0.5 * 0.5;
         if (extra is not null)
         {
             int at = toneStart + toneLength + (int)(extraAfterToneSeconds * Rate);
@@ -106,9 +116,12 @@ internal static class ProbeSlot
         return new Made(audio, (toneStart + toneLength) / (double)Rate, probeStart / (double)Rate);
     }
 
+    /// <summary>The whole probe's power through unit-power paths: its envelope's mean power over two.</summary>
+    private static double FullPower(Path[] paths, Complex[] envelope) => envelope.Average(e => e.Real * e.Real + e.Imaginary * e.Imaginary) / 2;
+
     /// <summary>
     /// The audio the receiver keeps after the tone, as <see cref="CapturedProbe"/> has it: from 1 s
-    /// before where the tone detector put the tone's end to 10 s after, with that end
+    /// before where the tone detector put the tone's end to 12 s after, with that end
     /// <paramref name="endErrorSeconds"/> off the truth.
     /// </summary>
     public static (float[] Audio, double ToneEndSeconds) Kept(Made made, double endErrorSeconds = 0)

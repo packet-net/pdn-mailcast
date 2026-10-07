@@ -180,7 +180,8 @@ public class ProbeTests(ITestOutputHelper output)
         Assert.NotNull(found);
         // The run begins after the probe's first (cyclic prefix) period and its first whole window.
         double probeAt = made.ProbeStartSeconds - (made.ToneEndSeconds + error - CapturedProbe.BeforeSeconds);
-        Assert.InRange(found.StartSeconds - probeAt, 0, 0.25);
+        // The first window used may overlap the probe's start by a little, never by more than its ramp and part of a period.
+        Assert.InRange(found.StartSeconds - probeAt, -0.05, 0.25);
         var (picture, _) = ProbeChannel.Analyse(audio, end, OnAir.CentreAudioHz)!.Value;
         Assert.Equal(2, picture.Modes.Count);
         Assert.Equal(1.2, picture.Modes[1].DelayMs, 0.01);
@@ -217,6 +218,113 @@ public class ProbeTests(ITestOutputHelper output)
     {
         Assert.Null(ProbeChannel.Measure(new float[3 * Rate], 1.0, OnAir.CentreAudioHz));
         Assert.Null(ProbeChannel.Measure([], 0, OnAir.CentreAudioHz));
+    }
+
+    private static readonly P[] Fading2F = [new P(1.0, 0, SpreadHz: 0.2), new P(2.9, -6, SpreadHz: 0.2)];
+
+    private static readonly P[] Steady2F = [new P(1.0, 0), new P(2.9, -6)];
+
+    /// <summary>The whole probe through <paramref name="paths"/> at 5 dB, and the same channel and noise with the probe cut as given.</summary>
+    private static (PathPicture Whole, PathPicture? Cut) WholeAndCut(P[] paths, int seed, double periodsSent = 61, (int, int)? silent = null)
+    {
+        PathPicture? Picture(ProbeSlot.Made made)
+        {
+            var (audio, end) = ProbeSlot.Kept(made, 0.3);
+            return ProbeChannel.Analyse(audio, end, OnAir.CentreAudioHz)?.Picture;
+        }
+        var whole = Picture(ProbeSlot.Make(paths, 5, seed));
+        var cut = Picture(ProbeSlot.Make(paths, 5, seed, periodsSent: periodsSent, silentPeriods: silent));
+        return (whole!, cut);
+    }
+
+    [Theory]
+    [InlineData(45)]
+    [InlineData(35)]
+    [InlineData(40.5)]
+    public void AProbeCutShort_IsMeasuredOnWhatWasSent_NotTheSilenceAfter(double periods)
+    {
+        // A Stop at the station while the probe is on the air: the rest of the run is silence,
+        // which must not count as the channel fading away.
+        for (int seed = 0; seed < 3; seed++)
+        {
+            var (whole, cut) = WholeAndCut(Fading2F, 10 + seed, periodsSent: periods);
+            Assert.NotNull(cut);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"{periods} periods, seed {seed}: {cut.GoodSnapshots} good, fade {cut.FadeDb:F1} dB (whole {whole.FadeDb:F1}), spread {cut.DopplerSpreadHz:F2} Hz (whole {whole.DopplerSpreadHz:F2})"));
+            // Never more than was sent; a few fewer where a fade at the cut took the last windows with it.
+            Assert.InRange(cut.GoodSnapshots, (int)Math.Floor(periods) - 8, (int)Math.Floor(periods));
+            Assert.Equal(2, cut.Modes.Count);
+            Assert.InRange(cut.FadeDb, 0, 5);
+            Assert.InRange(cut.DopplerSpreadHz!.Value, 0, 0.45);
+            Assert.Equal(1.9, cut.Modes[1].DelayMs, 0.02);
+
+            // On a steady channel the truth is exact: the 2F path 6 dB down, no fades, no spread.
+            var (_, steady) = WholeAndCut(Steady2F, 10 + seed, periodsSent: periods);
+            Assert.NotNull(steady);
+            Assert.InRange(steady.Modes[1].PowerDb, -6 - 1, -6 + 1);
+            Assert.InRange(steady.FadeDb, 0, 1.5);
+            Assert.InRange(steady.DopplerSpreadHz!.Value, 0, 0.15);
+        }
+    }
+
+    [Fact]
+    public void AProbeCutTooShort_IsNotMeasured()
+    {
+        // 25 periods leaves fewer than the analysis needs (30): given up, not measured on silence.
+        for (int seed = 0; seed < 3; seed++)
+        {
+            Assert.Null(WholeAndCut(Fading2F, 20 + seed, periodsSent: 25).Cut);
+            Assert.Null(WholeAndCut(Steady2F, 20 + seed, periodsSent: 25).Cut);
+        }
+    }
+
+    [Fact]
+    public void ALostStretchInTheMiddle_IsLeftOut()
+    {
+        // Ten periods of a web SDR's audio lost: those windows are left out, the rest measured.
+        for (int seed = 0; seed < 3; seed++)
+        {
+            var (_, cut) = WholeAndCut(Steady2F, 30 + seed, silent: (25, 35));
+            Assert.NotNull(cut);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"seed {seed}: {cut.GoodSnapshots} good, fade {cut.FadeDb:F1} dB, spread {cut.DopplerSpreadHz:F2} Hz, 2F {cut.Modes[^1].PowerDb:F1} dB, {cut.Modes.Count} modes"));
+            Assert.InRange(cut.GoodSnapshots, 44, 49);
+            Assert.InRange(cut.FadeDb, 0, 1.5);
+            Assert.Equal(2, cut.Modes.Count);
+            Assert.InRange(cut.Modes[1].PowerDb, -6 - 1, -6 + 1);
+        }
+    }
+
+    [Theory]
+    [InlineData(2900)]
+    [InlineData(1850)]
+    public void ACarrierInTheBand_IsCutOut(double hz)
+    {
+        // A birdie as strong as the probe, in the flat middle or the roll-off near the band's edge.
+        var made = ProbeSlot.Make([new P(1.0, 0)], 10, seed: 41);
+        var audio = made.Audio;
+        for (int i = 0; i < audio.Length; i++)
+        {
+            audio[i] += (float)(0.1 * Math.Sqrt(2) * Math.Sin(2 * Math.PI * hz * i / Rate));
+        }
+        var (kept, end) = ProbeSlot.Kept(made with { Audio = audio });
+        var (picture, _) = ProbeChannel.Analyse(kept, end, OnAir.CentreAudioHz)!.Value;
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{hz} Hz: {picture.Modes.Count} modes ({string.Join(", ", picture.Modes.Select(m => $"{m.DelayMs:F2} ms {m.PowerDb:F1} dB"))}), spread {picture.DopplerSpreadHz:F2} Hz, SNR {picture.SnrDb:F1} dB"));
+        // Without the cut it reads as a spread of about 1.2 Hz and strong false paths; what is
+        // left of it is at most a trace more than 20 dB down.
+        Assert.InRange(picture.DopplerSpreadHz!.Value, 0, 0.15);
+        Assert.All(picture.Modes.Skip(1), m => Assert.True(m.PowerDb < -20, $"a mode at {m.DelayMs:F2} ms, {m.PowerDb:F1} dB"));
+    }
+
+    [Fact]
+    public void Present_KeepsFades_ButNotSilenceAtTheEnds()
+    {
+        double[] score = [.. Enumerable.Repeat(400.0, 30), 60, .. Enumerable.Repeat(400.0, 10), 250, 5, 2, -3, 1];
+        var present = ProbeChannel.Present(score, 10);
+        // A fade in the middle stays in.
+        Assert.All(present.Take(41), Assert.True);
+        // The window straddling the cut goes with the silence after it.
+        Assert.All(present.Skip(41), Assert.False);
     }
 
     [Theory]

@@ -149,18 +149,20 @@ internal static class ProbeChannel
         var c = new Complex[to - from + 1][];
         var p = new double[c.Length][];
         var pn = new double[c.Length][];
-        var buffer = new Complex[L];
+        // One set of working buffers for every window, so a Pi's collector is not kept busy.
+        var work = reference.Dft.Work();
+        var x = new Complex[L];
         var scratchBins = new double[reference.InBand.Length];
         for (int k = from; k <= to; k++)
         {
-            Array.Copy(bb, k * L, buffer, 0, L);
-            var x = reference.Dft.Forward(buffer);
-            Excise(x, reference.InBand, scratchBins);
+            reference.Dft.Forward(bb.AsSpan(k * L, L), x, work);
+            Excise(x, reference.InBand, reference.InBandWeight, scratchBins);
             for (int i = 0; i < L; i++)
             {
                 x[i] *= reference.Conjugate[i];
             }
-            var corr = reference.Dft.Inverse(x);
+            var corr = new Complex[L];
+            reference.Dft.Inverse(x, corr, work);
             var power = new double[L];
             for (int i = 0; i < L; i++)
             {
@@ -204,7 +206,45 @@ internal static class ProbeChannel
         {
             return null;
         }
-        // The probe is in every window; a burst of interference (the CW ident's keying) is in a few.
+        // Whether the probe is in each window, from its own correlation: the excess over that
+        // window's floor where the paths are, in units of the floor.
+        // Weighted by the run's own profile there, so what counts is power where the paths are,
+        // not interference spread over every delay (a carrier's leftovers, the tone's tail).
+        int regionBefore = (int)Math.Round((SearchBefore + 0.1e-3) * Rate), regionAfter = (int)Math.Round(6.5e-3 * Rate);
+        int region = regionBefore + regionAfter + 1;
+        // Each window's power over its floor as a mean (noise's power is exponential, its median ln 2 of its mean), less one.
+        double Excess(int j, int i) => (pn[bestRun + 1 + j - from][Wrap(bestLag + i, L)] * Math.Log(2)) - 1;
+        var shape = new double[region];
+        for (int i = 0; i < region; i++)
+        {
+            double mean = 0;
+            for (int j = 0; j < Windows; j++)
+            {
+                mean += Excess(j, i - regionBefore);
+            }
+            shape[i] = Math.Max(mean / Windows, 0);
+        }
+        double shapeSum = shape.Sum();
+        if (!(shapeSum > 0))
+        {
+            return null;
+        }
+        for (int i = 0; i < region; i++)
+        {
+            shape[i] /= shapeSum;
+        }
+        var score = new double[Windows];
+        for (int j = 0; j < Windows; j++)
+        {
+            for (int i = 0; i < region; i++)
+            {
+                score[j] += shape[i] * Excess(j, i - regionBefore);
+            }
+        }
+        // Noise gives each lag's excess a standard deviation of one, so the score one of sqrt(sum w^2).
+        var present = Present(score, Math.Sqrt(shape.Sum(w => w * w)));
+
+        // A burst of interference (the CW ident's keying) shows in a few windows only.
         int showing = 0;
         for (int k = bestRun + 1; k <= bestRun + Windows; k++)
         {
@@ -220,16 +260,22 @@ internal static class ProbeChannel
             }
         }
         double share = showing / (double)Windows;
-        if (peakDb < FoundDb || share < FoundShare)
+        int presentCount = present.Count(x => x);
+        if (peakDb < FoundDb || share < FoundShare || presentCount < ChannelAnalysis.FewestSnapshots)
         {
+            // Not there, or too little of it: a probe cut short (a Stop at the station) gives up
+            // here rather than counting its silence as a channel that faded away.
             return null;
         }
 
-        // The averaged profile of the run, for the signal to noise.
+        // The averaged profile of the windows with the probe in them, for the signal to noise.
         var pdp = new double[L];
-        for (int k = bestRun + 1; k <= bestRun + Windows; k++)
+        for (int j = 0; j < Windows; j++)
         {
-            Add(pdp, p[k - from], 1.0 / Windows);
+            if (present[j])
+            {
+                Add(pdp, p[bestRun + 1 + j - from], 1.0 / presentCount);
+            }
         }
         Array.Copy(pdp, scratch, L);
         double floor = ChannelMaths.Median(scratch);
@@ -244,11 +290,15 @@ internal static class ProbeChannel
 
         // The estimates around the strongest arrival, one per window, and a window spoilt by a
         // crash (far more power than the rest) left out.
-        var estimates = new Complex[Windows][];
-        var windowPower = new double[Windows];
-        for (int j = 0; j < Windows; j++)
+        // Only the span the probe was in: a cut-short probe's silence after it is no part of the
+        // record, so the Doppler spectrum and the fades are worked out over what was sent.
+        int firstIn = Array.IndexOf(present, true), lastIn = Array.LastIndexOf(present, true);
+        int span = lastIn - firstIn + 1;
+        var estimates = new Complex[span][];
+        var windowPower = new double[span];
+        for (int j = 0; j < span; j++)
         {
-            int k = bestRun + 1 + j;
+            int k = bestRun + 1 + firstIn + j;
             var row = new Complex[before + after + 1];
             for (int i = 0; i < row.Length; i++)
             {
@@ -262,8 +312,12 @@ internal static class ProbeChannel
             }
             windowPower[j] = e;
         }
-        double typical = ChannelMaths.Median([.. windowPower]);
-        var good = windowPower.Select(e => e <= 6 * typical).ToArray();
+        double typical = ChannelMaths.Median([.. windowPower.Where((_, j) => present[firstIn + j])]);
+        var good = windowPower.Select((e, j) => present[firstIn + j] && e <= 6 * typical).ToArray();
+        if (good.Count(g => g) < ChannelAnalysis.FewestSnapshots)
+        {
+            return null;
+        }
         return new ProbeMeasurement(
             new ChannelSnapshots
             {
@@ -285,7 +339,7 @@ internal static class ProbeChannel
             },
             peakDb,
             share,
-            (bestRun + 1) * L / (double)Rate,
+            (bestRun + 1 + firstIn) * L / (double)Rate,
             (((bestRun + 1) * L) + bestLag) / (double)Rate);
     }
 
@@ -372,7 +426,8 @@ internal static class ProbeChannel
         // Too faint to tell from a stronger mode's echo: left out, with its paths.
         double strongest = found.Max(x => x.Power);
         found = [.. found.Where(x => x.Power - strongest >= WeakestModeDb)];
-        paths = [.. found.SelectMany(x => x.Members).Order().Select(i => paths[i])];
+        var modeOf = found.SelectMany((x, m) => x.Members.Select(i => (Path: i, Mode: m))).OrderBy(x => x.Path).ToList();
+        paths = [.. modeOf.Select(x => paths[x.Path])];
         earliest = paths[0].At;
         var modes = found.Select(x => x.From with { DelayMs = (x.Delay - earliest) * 1000, PowerDb = x.Power - strongest }).ToList();
         double topPath = paths.Max(x => x.Db);
@@ -385,6 +440,7 @@ internal static class ProbeChannel
             Modes = modes,
             PathsMs = [.. paths.Select(x => (x.At - earliest) * 1000)],
             PathsDb = [.. paths.Select(x => x.Db - topPath)],
+            PathModes = [.. modeOf.Select(x => x.Mode)],
             DelaySpreadMs = rms * 1000,
             FirstPathSeconds = earliest - first.LagZeroSeconds,
         };
@@ -423,28 +479,122 @@ internal static class ProbeChannel
     }
 
     /// <summary>
-    /// Takes out a window's narrowband interference before it is correlated: every bin of the
-    /// probe's band holding more than <see cref="ExciseRatio"/> times the band's median power is
-    /// zeroed. The probe fills its band evenly, so it loses nothing; a carrier (the tone's tail,
-    /// the CW ident, a birdie) would otherwise correlate with the Zadoff-Chu sequence, a chirp, as
-    /// a sharp path at the delay where the chirp passes its frequency.
+    /// Which windows of the run the probe is in, from each window's <paramref name="score"/> (the
+    /// correlation's excess over its own floor where the paths are, weighted by the run's own
+    /// profile, with noise's standard deviation <paramref name="sigma"/>). A window is absent
+    /// when, over it and two either side, the score is no more than noise gives
+    /// (<see cref="AbsentSigmas"/> standard deviations). At either end of the run the probe may
+    /// also be cut short, by a Stop at the station, or the run may overhang it: windows there
+    /// under half the run's typical score are absent, and so is the one beside them, which
+    /// straddles the cut. Fades in the middle stay in.
     /// </summary>
-    private static void Excise(Complex[] x, int[] inBand, double[] power)
+    internal static bool[] Present(double[] score, double sigma)
+    {
+        int n = score.Length;
+        // Absent where noise alone would give as much, judged over five windows at a time so a
+        // weak probe is not lost to its own noise.
+        var smooth = new double[n];
+        for (int j = 0; j < n; j++)
+        {
+            int a = Math.Max(0, j - 2), b = Math.Min(n - 1, j + 2);
+            double sum = 0;
+            for (int i = a; i <= b; i++)
+            {
+                sum += score[i];
+            }
+            smooth[j] = sum / (b - a + 1);
+        }
+        var present = smooth.Select(v => v > AbsentSigmas * sigma / Math.Sqrt(5)).ToArray();
+        double typical = ChannelMaths.Median([.. score.Where((_, j) => present[j])]);
+        if (!double.IsFinite(typical))
+        {
+            return present;
+        }
+        // In the middle, window by window too: a stretch of audio lost (a web SDR's dropout) is
+        // left out to its edges, though a fade is kept.
+        for (int j = 0; j < n; j++)
+        {
+            if (score[j] < Math.Max(0.1 * typical, sigma))
+            {
+                present[j] = false;
+            }
+        }
+        // At the ends, window by window: a cut-short probe leaves windows with little or nothing
+        // in them, and the one beside them straddles the cut, so it goes too.
+        double empty = Math.Max(0.5 * typical, 2 * sigma);
+        void Trim(int start, int step)
+        {
+            int j = start;
+            bool cut = false;
+            for (; j >= 0 && j < n && score[j] < empty; j += step)
+            {
+                present[j] = false;
+                cut = true;
+            }
+            if (cut && j >= 0 && j < n)
+            {
+                present[j] = false;
+            }
+        }
+        Trim(0, 1);
+        Trim(n - 1, -1);
+        return present;
+    }
+
+    /// <summary>A window's score must pass this many of noise's standard deviations for the probe to count as in it.</summary>
+    private const double AbsentSigmas = 4;
+
+    /// <summary>
+    /// Takes out a window's narrowband interference before it is correlated: every bin of the
+    /// probe's band, its power weighted by the probe's own spectrum there, holding more than
+    /// <see cref="ExciseRatio"/> times the band's median is zeroed. The probe fills its band to
+    /// its spectrum's shape, so it loses nothing; a carrier (the tone's tail, the CW ident, a
+    /// birdie, in the flat middle or the roll-off) would otherwise correlate with the Zadoff-Chu
+    /// sequence, a chirp, as a sharp path at the delay where the chirp passes its frequency.
+    /// </summary>
+    private static void Excise(Complex[] x, int[] inBand, double[] weight, double[] power)
     {
         for (int i = 0; i < inBand.Length; i++)
         {
-            power[i] = ChannelMaths.Norm(x[inBand[i]]);
+            power[i] = ChannelMaths.Norm(x[inBand[i]]) / weight[i];
         }
         double median = ChannelMaths.Median(power);
-        double limit = median * ExciseRatio;
-        foreach (int k in inBand)
+        double limit = median * ExciseRatio, spill = median * SpillRatio;
+        var cut = new bool[inBand.Length];
+        for (int i = 0; i < inBand.Length; i++)
         {
-            if (ChannelMaths.Norm(x[k]) > limit)
+            if (power[i] > limit)
             {
-                x[k] = Complex.Zero;
+                // A carrier between bins spills into its neighbours: those standing clear of the
+                // probe go with it, and no more, so the notch stays as narrow as it can.
+                cut[i] = true;
+                for (int d = 1; d <= SpillBins; d++)
+                {
+                    if (i - d >= 0 && power[i - d] > spill)
+                    {
+                        cut[i - d] = true;
+                    }
+                    if (i + d < inBand.Length && power[i + d] > spill)
+                    {
+                        cut[i + d] = true;
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < inBand.Length; i++)
+        {
+            if (cut[i])
+            {
+                x[inBand[i]] = Complex.Zero;
             }
         }
     }
+
+    /// <summary>How far either side of an interfering bin its spill is looked for.</summary>
+    private const int SpillBins = 3;
+
+    /// <summary>A neighbour of an interfering bin goes with it if it holds this many times the band's median.</summary>
+    private const double SpillRatio = 2;
 
     /// <summary>A bin this many times the band's median power is interference: 10 dB, well clear of a fading probe's own unevenness.</summary>
     private const double ExciseRatio = 10;
@@ -473,7 +623,7 @@ internal static class ProbeChannel
     }
 
     /// <summary>One period of the probe at 9600 Hz, its transform, and the figures the measurement needs.</summary>
-    private sealed record Reference(Bluestein Dft, Complex[] Conjugate, double Energy, double PulseEnergy, double GainDb, Func<double, double> Pulse, int[] InBand);
+    private sealed record Reference(Bluestein Dft, Complex[] Conjugate, double Energy, double PulseEnergy, double GainDb, Func<double, double> Pulse, int[] InBand, double[] InBandWeight);
 
     private static Reference BuildReference()
     {
@@ -529,10 +679,14 @@ internal static class ProbeChannel
         }
         // The correlation's gain over the noise in 3 kHz: a period of samples at 9600 Hz against 3 kHz.
         double gain = 10 * Math.Log10(L * 3000.0 / Rate);
-        // The bins the probe's band covers (its spectrum is flat there, falling away past 1200 Hz).
+        // The bins the probe's band covers, with its spectrum's shape there against its flat
+        // middle (floored at a tenth, so the edges' noise is not taken for a carrier).
         double binHz = Rate / (double)L;
-        int[] inBand = [.. Enumerable.Range(0, L).Where(k => Math.Abs((k <= L / 2 ? k : k - L) * binHz) <= probe.ChipRate * (1 - probe.RollOff) / 2)];
-        return new Reference(dft, conjugate, energy, pulse, gain, Pulse, inBand);
+        double flat = transform.Max(ChannelMaths.Norm);
+        int Signed(int k) => k <= L / 2 ? k : k - L;
+        int[] inBand = [.. Enumerable.Range(0, L).Where(k => Math.Abs(Signed(k) * binHz) <= probe.HalfBandwidthHz).OrderBy(Signed)];
+        double[] weight = [.. inBand.Select(k => Math.Max(ChannelMaths.Norm(transform[k]) / flat, 0.1))];
+        return new Reference(dft, conjugate, energy, pulse, gain, Pulse, inBand, weight);
     }
 
     /// <summary>A DFT of any length, by Bluestein's chirp z-transform over the power-of-two FFT.</summary>
@@ -567,43 +721,59 @@ internal static class ProbeChannel
             ChannelMaths.Fft(_filter, false);
         }
 
+        /// <summary>A working buffer for <see cref="Forward(ReadOnlySpan{Complex}, Span{Complex}, Complex[])"/>; one per thread.</summary>
+        public Complex[] Work() => new Complex[_m];
+
         /// <summary>The forward transform, X[k] = sum x[n] exp(-j 2 pi n k / N), as a new array.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public Complex[] Forward(Complex[] x)
         {
-            var a = new Complex[_m];
+            var y = new Complex[_n];
+            Forward(x, y, Work());
+            return y;
+        }
+
+        /// <summary>The forward transform into <paramref name="y"/>, with <paramref name="work"/> from <see cref="Work"/>. <paramref name="x"/> and <paramref name="y"/> may be the same.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        public void Forward(ReadOnlySpan<Complex> x, Span<Complex> y, Complex[] work)
+        {
+            var a = work;
             for (int k = 0; k < _n; k++)
             {
                 a[k] = x[k] * _chirp[k];
             }
+            Array.Clear(a, _n, _m - _n);
             ChannelMaths.Fft(a, false);
             for (int i = 0; i < _m; i++)
             {
                 a[i] *= _filter[i];
             }
             ChannelMaths.Fft(a, true);
-            var y = new Complex[_n];
             for (int k = 0; k < _n; k++)
             {
                 y[k] = a[k] * _chirp[k];
             }
-            return y;
         }
 
         /// <summary>The inverse, scaled by 1/N, as a new array.</summary>
         public Complex[] Inverse(Complex[] x)
         {
-            var conj = new Complex[_n];
+            var y = new Complex[_n];
+            Inverse(x, y, Work());
+            return y;
+        }
+
+        /// <summary>The inverse, scaled by 1/N, into <paramref name="y"/>; <paramref name="x"/> is left conjugated.</summary>
+        public void Inverse(Complex[] x, Span<Complex> y, Complex[] work)
+        {
             for (int k = 0; k < _n; k++)
             {
-                conj[k] = Complex.Conjugate(x[k]);
+                x[k] = Complex.Conjugate(x[k]);
             }
-            var y = Forward(conj);
+            Forward(x, y, work);
             for (int k = 0; k < _n; k++)
             {
                 y[k] = Complex.Conjugate(y[k]) / _n;
             }
-            return y;
         }
     }
 }
