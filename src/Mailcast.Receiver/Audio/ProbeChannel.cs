@@ -65,6 +65,13 @@ internal static class ProbeChannel
     /// </summary>
     public const double ModeGap = 0.4e-3;
 
+    /// <summary>
+    /// The shortest unbroken run of periods a Doppler spread is given for: 40, 4.25 s, whose own
+    /// spectral width (about 0.14 Hz, which is taken out) leaves a spread of 0.1 Hz still to be
+    /// told from none. After a longer gap in the audio the spread is not given, only the shift.
+    /// </summary>
+    public const int FewestDopplerPeriods = 40;
+
     /// <summary>Windows used: the 60 whole ones inside 61 periods, less one each side.</summary>
     public const int Windows = 58;
 
@@ -149,6 +156,7 @@ internal static class ProbeChannel
         var c = new Complex[to - from + 1][];
         var p = new double[c.Length][];
         var pn = new double[c.Length][];
+        var cuts = new List<int>[c.Length];
         // One set of working buffers for every window, so a Pi's collector is not kept busy.
         var work = reference.Dft.Work();
         var x = new Complex[L];
@@ -156,7 +164,9 @@ internal static class ProbeChannel
         for (int k = from; k <= to; k++)
         {
             reference.Dft.Forward(bb.AsSpan(k * L, L), x, work);
-            Excise(x, reference.InBand, reference.InBandWeight, scratchBins);
+            var removed = new List<int>();
+            Excise(x, reference.InBand, reference.InBandWeight, scratchBins, removed);
+            cuts[k - from] = removed;
             for (int i = 0; i < L; i++)
             {
                 x[i] *= reference.Conjugate[i];
@@ -318,6 +328,24 @@ internal static class ProbeChannel
         {
             return null;
         }
+        // The pulse as these windows measured it: with any bins the carrier cut took out, in the
+        // share of windows it took them from, so the notch is not fitted as extra paths.
+        var keep = new double[L];
+        Array.Fill(keep, 1.0);
+        int goodCount = good.Count(g => g);
+        bool notched = false;
+        for (int j = 0; j < span; j++)
+        {
+            if (good[j])
+            {
+                foreach (int bin in cuts[bestRun + 1 + firstIn + j - from])
+                {
+                    keep[bin] -= 1.0 / goodCount;
+                    notched = true;
+                }
+            }
+        }
+        var pulse = notched ? PulseOf(reference.Transform, keep) : reference.Pulse;
         return new ProbeMeasurement(
             new ChannelSnapshots
             {
@@ -332,7 +360,9 @@ internal static class ProbeChannel
                 SnrDb = snr,
                 OffsetHz = toneHz - OnAir.CentreAudioHz,
                 DelayPerHzSeconds = DelayPerHz,
-                Pulse = reference.Pulse,
+                Pulse = pulse,
+                ContiguousDoppler = true,
+                FewestDopplerSnapshots = FewestDopplerPeriods,
                 FinerDelays = true,
                 SearchBeforeSeconds = SearchBefore,
                 FloorMarginDb = FloorMargin,
@@ -511,10 +541,11 @@ internal static class ProbeChannel
             return present;
         }
         // In the middle, window by window too: a stretch of audio lost (a web SDR's dropout) is
-        // left out to its edges, though a fade is kept.
+        // left out to its edges. A fade is kept, however deep, so long as the probe is still
+        // clear of the noise in it.
         for (int j = 0; j < n; j++)
         {
-            if (score[j] < Math.Max(0.1 * typical, sigma))
+            if (score[j] < AbsentSigmas * sigma)
             {
                 present[j] = false;
             }
@@ -552,7 +583,7 @@ internal static class ProbeChannel
     /// birdie, in the flat middle or the roll-off) would otherwise correlate with the Zadoff-Chu
     /// sequence, a chirp, as a sharp path at the delay where the chirp passes its frequency.
     /// </summary>
-    private static void Excise(Complex[] x, int[] inBand, double[] weight, double[] power)
+    private static void Excise(Complex[] x, int[] inBand, double[] weight, double[] power, List<int> removed)
     {
         for (int i = 0; i < inBand.Length; i++)
         {
@@ -586,6 +617,7 @@ internal static class ProbeChannel
             if (cut[i])
             {
                 x[inBand[i]] = Complex.Zero;
+                removed.Add(inBand[i]);
             }
         }
     }
@@ -623,7 +655,7 @@ internal static class ProbeChannel
     }
 
     /// <summary>One period of the probe at 9600 Hz, its transform, and the figures the measurement needs.</summary>
-    private sealed record Reference(Bluestein Dft, Complex[] Conjugate, double Energy, double PulseEnergy, double GainDb, Func<double, double> Pulse, int[] InBand, double[] InBandWeight);
+    private sealed record Reference(Complex[] Transform, Bluestein Dft, Complex[] Conjugate, double Energy, double PulseEnergy, double GainDb, Func<double, double> Pulse, int[] InBand, double[] InBandWeight);
 
     private static Reference BuildReference()
     {
@@ -647,34 +679,12 @@ internal static class ProbeChannel
         // autocorrelation, worked out finely (about 0.8 us apart) from its power spectrum. It is
         // the raised cosine but for the pulse's truncation, which the fit would otherwise take for
         // weak paths beside a strong one.
-        const int Fine = 1 << 17;
-        var spectrum = new Complex[Fine];
-        for (int k = 0; k < L; k++)
-        {
-            int signed = k <= L / 2 ? k : k - L;
-            spectrum[((signed % Fine) + Fine) % Fine] = ChannelMaths.Norm(transform[k]);
-        }
-        ChannelMaths.Fft(spectrum, true);
-        var table = new double[Fine];
-        double zero = spectrum[0].Real;
-        for (int i = 0; i < Fine; i++)
-        {
-            table[i] = spectrum[i].Real / zero;
-        }
-        double perSecond = Fine / (L / (double)Rate);
-        double Pulse(double seconds)
-        {
-            double at = seconds * perSecond;
-            double floorAt = Math.Floor(at);
-            int i = (int)(((long)floorAt % Fine + Fine) % Fine);
-            double frac = at - floorAt;
-            return (table[i] * (1 - frac)) + (table[(i + 1) % Fine] * frac);
-        }
+        var pulseAt = PulseOf(transform, null);
         // A unit path's response summed in power over its lags, to turn the profile's area into path power.
         double pulse = 0;
         for (int m = -L / 2; m < L / 2; m++)
         {
-            double v = Pulse(m / (double)Rate);
+            double v = pulseAt(m / (double)Rate);
             pulse += v * v;
         }
         // The correlation's gain over the noise in 3 kHz: a period of samples at 9600 Hz against 3 kHz.
@@ -686,7 +696,47 @@ internal static class ProbeChannel
         int Signed(int k) => k <= L / 2 ? k : k - L;
         int[] inBand = [.. Enumerable.Range(0, L).Where(k => Math.Abs(Signed(k) * binHz) <= probe.HalfBandwidthHz).OrderBy(Signed)];
         double[] weight = [.. inBand.Select(k => Math.Max(ChannelMaths.Norm(transform[k]) / flat, 0.1))];
-        return new Reference(dft, conjugate, energy, pulse, gain, Pulse, inBand, weight);
+        return new Reference(transform, dft, conjugate, energy, pulse, gain, pulseAt, inBand, weight);
+    }
+
+    /// <summary>
+    /// What one path looks like after the correlation, against its delay in seconds: the period's
+    /// circular autocorrelation, from its power spectrum <paramref name="transform"/> with each
+    /// bin weighted by <paramref name="keep"/> (the share of windows that kept it after the
+    /// carrier cut; all of it when null), worked out finely (about 0.8 us apart). It is the raised
+    /// cosine but for the pulse's truncation and any notch the cut made, which the fit would
+    /// otherwise take for weak paths beside a strong one. Peak 1 with nothing cut.
+    /// </summary>
+    private static Func<double, double> PulseOf(Complex[] transform, double[]? keep)
+    {
+        int L = transform.Length;
+        const int Fine = 1 << 17;
+        var spectrum = new Complex[Fine];
+        double whole = 0;
+        for (int k = 0; k < L; k++)
+        {
+            int signed = k <= L / 2 ? k : k - L;
+            double power = ChannelMaths.Norm(transform[k]);
+            whole += power;
+            spectrum[((signed % Fine) + Fine) % Fine] = power * (keep?[k] ?? 1);
+        }
+        ChannelMaths.Fft(spectrum, true);
+        var table = new double[Fine];
+        // Against the uncut pulse's peak: the inverse FFT scales by 1/Fine.
+        double zero = whole / Fine;
+        for (int i = 0; i < Fine; i++)
+        {
+            table[i] = spectrum[i].Real / zero;
+        }
+        double perSecond = Fine / (L / (double)Rate);
+        return seconds =>
+        {
+            double at = seconds * perSecond;
+            double floorAt = Math.Floor(at);
+            int i = (int)(((long)floorAt % Fine + Fine) % Fine);
+            double frac = at - floorAt;
+            return (table[i] * (1 - frac)) + (table[(i + 1) % Fine] * frac);
+        };
     }
 
     /// <summary>A DFT of any length, by Bluestein's chirp z-transform over the power-of-two FFT.</summary>

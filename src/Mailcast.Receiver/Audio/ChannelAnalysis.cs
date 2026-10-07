@@ -200,11 +200,16 @@ internal static class ChannelAnalysis
         double pmax = groups.Max(g => g.Sum(i => pw[i]));
         var modes = new List<PictureMode>();
         var allSpectrum = new double[DopplerFft];
-        double windowSigma = 1 / (Math.Sqrt(3) * nseg * dt);
+        // The Doppler spectra over every snapshot, or for estimates with gaps that matter (the
+        // probe's, after a lost stretch of audio) over the longest unbroken run of good ones: a
+        // gap in the series would smear a steady path's spectrum into a spread it does not have.
+        var (dopplerFrom, dopplerCount) = s.ContiguousDoppler ? LongestRun(s.Good) : (0, nseg);
+        bool spreadKnown = !s.ContiguousDoppler || dopplerCount >= s.FewestDopplerSnapshots;
+        double windowSigma = 1 / (Math.Sqrt(3) * dopplerCount * dt);
         var spectra = new double[tau.Length][];
         for (int i = 0; i < tau.Length; i++)
         {
-            spectra[i] = DopplerSpectrum(full, i, s.Good);
+            spectra[i] = DopplerSpectrum(full, i, s.Good, dopplerFrom, dopplerCount);
             for (int f = 0; f < DopplerFft; f++)
             {
                 allSpectrum[f] += spectra[i][f];
@@ -222,6 +227,11 @@ internal static class ChannelAnalysis
                 }
             }
             moments[m] = Moments(spectrum, dt, windowSigma);
+            if (!spreadKnown)
+            {
+                // Too short a run for the resolution a spread is given to: the shift only.
+                moments[m] = (moments[m].Centroid, null);
+            }
             // A signal whose delay and Doppler are coupled (the probe's): each mode's paths moved
             // back by its own shift, so two modes with different Doppler keep their true spacing.
             if (s.DelayPerHzSeconds != 0 && moments[m].Centroid is double modeShift)
@@ -245,6 +255,7 @@ internal static class ChannelAnalysis
         double mu = tau.Zip(pw).Sum(t => t.First * t.Second) / total;
         double rms = Math.Sqrt(tau.Zip(pw).Sum(t => t.Second * (t.First - mu) * (t.First - mu)) / total);
         var (allCentroid, allSpread) = Moments(allSpectrum, dt, windowSigma);
+        allSpread = spreadKnown ? allSpread : null;
 
         int strongest = Array.IndexOf(pw, pw.Max());
         double? coherence = CoherenceSeconds(full, strongest, s.Good, dt);
@@ -303,14 +314,13 @@ internal static class ChannelAnalysis
 
     /// <summary>Hann-windowed periodogram of one path's gain over the snapshots, bad ones zeroed, centred on 0 Hz (numpy's fftshift order).</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private static double[] DopplerSpectrum(Complex[][] gains, int path, bool[] good)
+    private static double[] DopplerSpectrum(Complex[][] gains, int path, bool[] good, int from, int n)
     {
-        int n = gains.Length;
         var x = new Complex[DopplerFft];
         for (int j = 0; j < Math.Min(n, DopplerFft); j++)
         {
             double w = n > 1 ? 0.5 - (0.5 * Math.Cos(2 * Math.PI * j / (n - 1))) : 1;
-            x[j] = good[j] ? gains[j][path] * w : Complex.Zero;
+            x[j] = good[from + j] ? gains[from + j][path] * w : Complex.Zero;
         }
         ChannelMaths.Fft(x, false);
         var p = new double[DopplerFft];
@@ -321,6 +331,50 @@ internal static class ChannelAnalysis
         }
         return p;
     }
+
+    /// <summary>
+    /// The longest run of good snapshots, bridging gaps of up to <see cref="BridgedGap"/> (a fade
+    /// or a crash, which are zeroed and do no harm): where it starts, and how many.
+    /// </summary>
+    private static (int From, int Count) LongestRun(bool[] good)
+    {
+        int bestFrom = 0, best = 0;
+        int j = 0;
+        while (j < good.Length)
+        {
+            if (!good[j])
+            {
+                j++;
+                continue;
+            }
+            int start = j, end = j;
+            while (end < good.Length)
+            {
+                int next = end + 1;
+                while (next < good.Length && !good[next] && next - end <= BridgedGap)
+                {
+                    next++;
+                }
+                if (next < good.Length && good[next] && next - end <= BridgedGap + 1)
+                {
+                    end = next;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            if (end - start + 1 > best)
+            {
+                (bestFrom, best) = (start, end - start + 1);
+            }
+            j = end + 1;
+        }
+        return (bestFrom, best);
+    }
+
+    /// <summary>The longest gap of bad snapshots a Doppler run is carried across.</summary>
+    private const int BridgedGap = 2;
 
     /// <summary>The frequency of bin <paramref name="k"/> of a centred spectrum, in Hz.</summary>
     private static double BinHz(int k, double dt) => (k - (DopplerFft / 2)) / (DopplerFft * dt);

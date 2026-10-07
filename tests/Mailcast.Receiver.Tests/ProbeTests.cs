@@ -250,12 +250,20 @@ public class ProbeTests(ITestOutputHelper output)
             var (whole, cut) = WholeAndCut(Fading2F, 10 + seed, periodsSent: periods);
             Assert.NotNull(cut);
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"{periods} periods, seed {seed}: {cut.GoodSnapshots} good, fade {cut.FadeDb:F1} dB (whole {whole.FadeDb:F1}), spread {cut.DopplerSpreadHz:F2} Hz (whole {whole.DopplerSpreadHz:F2})"));
+                $"{periods} periods, seed {seed}: {cut.GoodSnapshots} good, fade {cut.FadeDb:F1} dB (whole {whole.FadeDb:F1}), spread {cut.DopplerSpreadHz?.ToString("F2", CultureInfo.InvariantCulture) ?? "-"} Hz (whole {whole.DopplerSpreadHz:F2})"));
             // Never more than was sent; a few fewer where a fade at the cut took the last windows with it.
             Assert.InRange(cut.GoodSnapshots, (int)Math.Floor(periods) - 8, (int)Math.Floor(periods));
             Assert.Equal(2, cut.Modes.Count);
             Assert.InRange(cut.FadeDb, 0, 5);
-            Assert.InRange(cut.DopplerSpreadHz!.Value, 0, 0.45);
+            // A spread only from a long enough run; never one the silence made.
+            if (cut.GoodSnapshots >= ProbeChannel.FewestDopplerPeriods)
+            {
+                Assert.InRange(cut.DopplerSpreadHz!.Value, 0, 0.45);
+            }
+            else
+            {
+                Assert.Null(cut.DopplerSpreadHz);
+            }
             Assert.Equal(1.9, cut.Modes[1].DelayMs, 0.02);
 
             // On a steady channel the truth is exact: the 2F path 6 dB down, no fades, no spread.
@@ -263,7 +271,8 @@ public class ProbeTests(ITestOutputHelper output)
             Assert.NotNull(steady);
             Assert.InRange(steady.Modes[1].PowerDb, -6 - 1, -6 + 1);
             Assert.InRange(steady.FadeDb, 0, 1.5);
-            Assert.InRange(steady.DopplerSpreadHz!.Value, 0, 0.15);
+            Assert.InRange(steady.DopplerSpreadHz ?? 0, 0, 0.15);
+            Assert.Equal(steady.GoodSnapshots >= ProbeChannel.FewestDopplerPeriods, steady.DopplerSpreadHz is not null);
         }
     }
 
@@ -292,12 +301,25 @@ public class ProbeTests(ITestOutputHelper output)
             Assert.InRange(cut.FadeDb, 0, 1.5);
             Assert.Equal(2, cut.Modes.Count);
             Assert.InRange(cut.Modes[1].PowerDb, -6 - 1, -6 + 1);
+            // Neither side of the gap is long enough to tell a spread of 0.1 Hz from none: no
+            // spread is given, rather than the gap's own smear of 0.7 Hz.
+            Assert.Null(cut.DopplerSpreadHz);
+            Assert.All(cut.Modes, m => Assert.Null(m.SpreadHz));
+            Assert.All(cut.Modes, m => Assert.InRange(m.CentroidHz!.Value, -0.1, 0.1));
+
+            // A gap near the end leaves a run long enough, and the steady path reads as steady.
+            var (_, late) = WholeAndCut(Steady2F, 30 + seed, silent: (48, 53));
+            Assert.NotNull(late);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  late gap: {late.GoodSnapshots} good, spread {late.DopplerSpreadHz:F2} Hz"));
+            Assert.InRange(late.DopplerSpreadHz!.Value, 0, 0.15);
         }
     }
 
     [Theory]
     [InlineData(2900)]
     [InlineData(1850)]
+    [InlineData(1500)]
+    [InlineData(2300)]
     public void ACarrierInTheBand_IsCutOut(double hz)
     {
         // A birdie as strong as the probe, in the flat middle or the roll-off near the band's edge.
@@ -310,10 +332,32 @@ public class ProbeTests(ITestOutputHelper output)
         var (kept, end) = ProbeSlot.Kept(made with { Audio = audio });
         var (picture, _) = ProbeChannel.Analyse(kept, end, OnAir.CentreAudioHz)!.Value;
         output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{hz} Hz: {picture.Modes.Count} modes ({string.Join(", ", picture.Modes.Select(m => $"{m.DelayMs:F2} ms {m.PowerDb:F1} dB"))}), spread {picture.DopplerSpreadHz:F2} Hz, SNR {picture.SnrDb:F1} dB"));
-        // Without the cut it reads as a spread of about 1.2 Hz and strong false paths; what is
-        // left of it is at most a trace more than 20 dB down.
+        // Without the cut it reads as a spread of about 1.2 Hz and strong false paths; with it,
+        // and the pulse fitted with the notch the cut left, there is one steady path and nothing else.
         Assert.InRange(picture.DopplerSpreadHz!.Value, 0, 0.15);
-        Assert.All(picture.Modes.Skip(1), m => Assert.True(m.PowerDb < -20, $"a mode at {m.DelayMs:F2} ms, {m.PowerDb:F1} dB"));
+        Assert.Single(picture.Modes);
+        Assert.Single(picture.PathsMs);
+    }
+
+    [Fact]
+    public void ACarrierOnATwoPathChannel_MakesNoPathOfItsOwn()
+    {
+        // As above, on a path with a weaker second hop: both found, nothing more.
+        foreach (double hz in (double[])[1850, 2900])
+        {
+            var made = ProbeSlot.Make(Steady2F, 10, seed: 42);
+            var audio = made.Audio;
+            for (int i = 0; i < audio.Length; i++)
+            {
+                audio[i] += (float)(0.1 * Math.Sqrt(2) * Math.Sin(2 * Math.PI * hz * i / Rate));
+            }
+            var (kept, end) = ProbeSlot.Kept(made with { Audio = audio });
+            var (picture, _) = ProbeChannel.Analyse(kept, end, OnAir.CentreAudioHz)!.Value;
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{hz} Hz: {string.Join(", ", picture.Modes.Select(m => $"{m.DelayMs:F2} ms {m.PowerDb:F1} dB"))}"));
+            Assert.Equal(2, picture.Modes.Count);
+            Assert.Equal(1.9, picture.Modes[1].DelayMs, 0.01);
+            Assert.InRange(picture.Modes[1].PowerDb, -7, -5);
+        }
     }
 
     [Fact]

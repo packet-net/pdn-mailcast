@@ -65,6 +65,16 @@ internal sealed class ChannelSnapshots
     /// <summary>A path is kept if its power is this far above the profile's floor, in dB.</summary>
     public double FloorMarginDb { get; init; } = ChannelAnalysis.FloorMarginDb;
 
+    /// <summary>
+    /// Whether the Doppler spectra are taken over the longest unbroken run of good snapshots
+    /// rather than all of them with the bad ones zeroed: for estimates whose gaps are long
+    /// stretches (the probe's, after lost audio), which would otherwise read as a spread.
+    /// </summary>
+    public bool ContiguousDoppler { get; init; }
+
+    /// <summary>With <see cref="ContiguousDoppler"/>, the shortest run a Doppler spread is given for; a shorter one gives the shift only.</summary>
+    public int FewestDopplerSnapshots { get; init; }
+
     /// <summary>Paths closer than this are one mode, in seconds.</summary>
     public double ModeGapSeconds { get; init; } = ChannelAnalysis.ModeGapSeconds;
 
