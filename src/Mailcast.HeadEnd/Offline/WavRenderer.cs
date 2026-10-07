@@ -6,11 +6,12 @@ using Packet.SoundModem.Modems;
 namespace Mailcast.HeadEnd.Offline;
 
 /// <summary>What a render produced.</summary>
-public sealed record WavSummary(TimeSpan Length, int Frames, int Bursts, int Idents, bool Tone);
+public sealed record WavSummary(TimeSpan Length, int Frames, int Bursts, int Idents, bool Tone, bool Probe = false);
 
 /// <summary>
 /// Renders a whole slot to a WAV file with pdn-soundmodem's own modem, as the station would send
-/// it: the calibration tone, the CW ident as the station's identifier schedules it, and the frames.
+/// it: the calibration tone and the channel probe after it, the CW ident as the station's identifier
+/// schedules it, and the frames.
 /// </summary>
 /// <remarks>
 /// The published pdn-soundmodem package (0.83.0) cannot pack frames into one burst yet (that is
@@ -63,9 +64,18 @@ public sealed class WavRenderer
 
         Silence(1);
         bool tone = _settings.ToneLength > TimeSpan.Zero;
+        bool probe = false;
         if (tone)
         {
             Write(new TestTone([_settings.ToneHz], 0.5, _sampleRate, _settings.ToneLength.TotalSeconds).Render());
+            // The probe follows in the same keyup, peaking where the tone does, as the station sends it;
+            // left out at a rate too low to hold its band, where the station would refuse it too.
+            probe = ProbeSignal.BandProblem(ChannelProbe.Descriptor, _settings.ToneHz, _sampleRate) is null;
+            if (probe)
+            {
+                Silence(ChannelProbe.Gap.TotalSeconds);
+                Write(ProbeSignal.Render(ChannelProbe.Descriptor, _settings.ToneHz, 0.5, _sampleRate));
+            }
             identifier.NoteTransmission();
             IdentIfDue();
             Silence(Math.Max(0, _settings.PauseAfterTone.TotalSeconds - 3));
@@ -78,7 +88,7 @@ public sealed class WavRenderer
             Silence(_settings.BurstGap.TotalSeconds);
         }
         Silence(2);
-        return new WavSummary(TimeSpan.FromSeconds(clock.Samples / (double)_sampleRate), frames.Count, frames.Count, idents, tone);
+        return new WavSummary(TimeSpan.FromSeconds(clock.Samples / (double)_sampleRate), frames.Count, frames.Count, idents, tone, probe);
     }
 
     /// <summary>A clock that is wherever the render has got to.</summary>

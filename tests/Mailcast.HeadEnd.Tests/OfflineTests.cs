@@ -31,6 +31,7 @@ public class OfflineTests
         var settings = new SlotSettings { ToneLength = TimeSpan.FromSeconds(3), PauseAfterTone = TimeSpan.FromSeconds(4) };
         var summary = new WavRenderer(settings, "ms110d-wn4", 48000).Render(plan.Frames, wav, new DateTimeOffset(day.ToDateTime(new TimeOnly(12, 0), DateTimeKind.Utc)));
         Assert.True(summary.Tone);
+        Assert.True(summary.Probe);
         Assert.Equal(plan.Frames.Count, summary.Frames);
         Assert.True(summary.Idents >= 1);
 

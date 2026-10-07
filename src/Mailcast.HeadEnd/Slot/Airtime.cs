@@ -55,7 +55,7 @@ public sealed class LinearAirtime(TimeSpan perBurst, TimeSpan perFrame, double s
 
 /// <summary>
 /// A whole slot's time on the air, as the planner budgets it: the start (the Flex, the KISS port
-/// and the lease), the calibration tone and the pause after it, the bursts as the runner packs
+/// and the lease), the calibration tone, the channel probe after it and the pause, the bursts as the runner packs
 /// them, each with the station's own delay, the gaps between them, and the closing ident.
 /// </summary>
 /// <remarks>
@@ -64,7 +64,9 @@ public sealed class LinearAirtime(TimeSpan perBurst, TimeSpan perFrame, double s
 /// of 2026-10-05 16:00 (41 frames, 7 bursts, a 30 s tone) 161.5 s. Of that, about 3 s went
 /// before the tone, the tone took about 1 s more than its length, and each burst about 2.5 s
 /// more than the modem's own airtime for it (gathering, keying and the acknowledgement). The
-/// station's closing ident takes about 8 s after the release.
+/// station's closing ident takes about 8 s after the release. The channel probe adds its gap and
+/// its length to the tone's keyup (<see cref="ChannelProbe.Airtime"/>, about 8 s), counted whether
+/// or not the station turns out to send it.
 /// </remarks>
 public sealed class SlotAirtime(SlotSettings settings, IAirtime airtime)
 {
@@ -158,7 +160,7 @@ public sealed class SlotAirtime(SlotSettings settings, IAirtime airtime)
         {
             return TimeSpan.Zero;
         }
-        TimeSpan tone = _settings.ToneLength > TimeSpan.Zero ? _settings.ToneLength + ToneDelay + _settings.PauseAfterTone : TimeSpan.Zero;
+        TimeSpan tone = _settings.ToneLength > TimeSpan.Zero ? _settings.ToneLength + ChannelProbe.Airtime + ToneDelay + _settings.PauseAfterTone : TimeSpan.Zero;
         return StartDelay + tone + Bursts(lengths, sizes) + (BurstDelay * sizes.Count) + (_settings.BurstGap * (sizes.Count - 1)) + ClosingIdent;
     }
 

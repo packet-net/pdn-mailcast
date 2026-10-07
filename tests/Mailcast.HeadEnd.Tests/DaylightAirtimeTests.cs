@@ -77,7 +77,7 @@ public class DaylightAirtimeTests(ITestOutputHelper output)
             // As a real slot: bursts until the next would run past the hard stop.
             var frames = plan.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
             var bursts = runner.BurstSizes(frames);
-            TimeSpan onAir = settings.ToneLength + settings.PauseAfterTone;
+            TimeSpan onAir = settings.ToneLength + ChannelProbe.Airtime + settings.PauseAfterTone;
             int sent = 0;
             foreach (int size in bursts)
             {

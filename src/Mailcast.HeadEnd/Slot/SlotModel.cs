@@ -72,7 +72,7 @@ public sealed record SlotSettings
     /// <summary>What to do if it never clears.</summary>
     public BusyPolicy WhenStillBusy { get; init; } = BusyPolicy.Go;
 
-    /// <summary>The calibration tone's length; zero sends none.</summary>
+    /// <summary>The calibration tone's length; zero sends none, and no channel probe either.</summary>
     public TimeSpan ToneLength { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>The calibration tone's audio frequency: the signal centre.</summary>
@@ -160,6 +160,12 @@ public sealed record SlotReport
     public int BulletinsInRotation { get; init; }
 
     public bool ToneSent { get; init; }
+
+    /// <summary>True when the channel probe followed the tone, all of it.</summary>
+    public bool ProbeSent { get; init; }
+
+    /// <summary>The probe's id as the station named it (<c>zc255-2400-rrc015-v1</c>); null when none went out whole.</summary>
+    public string? ProbeId { get; init; }
 
     public string Reference { get; init; } = "not read";
 

@@ -1,6 +1,7 @@
 using Xunit.Abstractions;
 using Mailcast.HeadEnd.Flex;
 using Mailcast.HeadEnd.Slot;
+using Mailcast.HeadEnd.Station;
 
 namespace Mailcast.HeadEnd.Tests;
 
@@ -275,6 +276,186 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Empty(rig.Station.Frames);
         Assert.Single(rig.Station.Releases);
         Assert.Equal(0, report.FramesQueued);
+    }
+
+    private static readonly SlotSettings TenSecondTone = new() { SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), ToneHz = 4050 };
+
+    [Fact]
+    public void Run_FollowsTheToneWithTheChannelProbe_InOneKeyup_AndReportsIt()
+    {
+        var rig = new Rig(TenSecondTone);
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.True(report.ToneSent);
+        Assert.True(report.ProbeSent);
+        Assert.Equal("zc255-2400-rrc015-v1", report.ProbeId);
+
+        // One request, the probe on the tone's own audio frequency, 1.5 s after it.
+        var request = Assert.Single(rig.Station.ToneRequests);
+        Assert.Equal(new ProbeRequest("zc255", 1.5, 4050), request.Probe);
+        var keyup = rig.Station.Keyups[0];
+        Assert.Equal("tone 4050 Hz and probe zc255 at 4050 Hz", keyup.What);
+        // To the millisecond, the fake clock's resolution.
+        Assert.InRange((keyup.End - keyup.Start - TimeSpan.FromSeconds(10) - ChannelProbe.Airtime).Duration().TotalMilliseconds, 0, 1);
+        Assert.InRange(ChannelProbe.Airtime.TotalSeconds, 8.0, 8.01);
+
+        // The pause for the ident is counted from the end of the probe.
+        Assert.True(rig.Station.Frames[0].At >= keyup.End + TenSecondTone.PauseAfterTone);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("calibration tone sent, 10 s at 4050 Hz, then the channel probe (zc255-2400-rrc015-v1, 8 s more)", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("tone sent, probe sent", StringComparison.Ordinal));
+        AssertNothingKeyedOutsideTheLease(rig.Station);
+    }
+
+    [Fact]
+    public void Run_AtAStationTooOldForTheProbe_SendsTheToneAlone_AndCarriesOn()
+    {
+        var rig = new Rig(TenSecondTone);
+        rig.Station.KnowsProbe = false;
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(5, report.FramesSent);
+        Assert.True(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Null(report.ProbeId);
+        Assert.Single(rig.Station.ToneRequests);
+        Assert.Equal("tone 4050 Hz", rig.Station.Keyups[0].What);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("without the channel probe: the station does not know it", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("tone sent, probe not sent", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_WithAProbeCutShort_LogsIt_AndCarriesOn()
+    {
+        var rig = new Rig(TenSecondTone);
+        rig.Station.CutsProbeShort = true;
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(5, report.FramesSent);
+        Assert.True(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Null(report.ProbeId);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("the channel probe after it was cut short or kept off the air", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_WhenToneAndProbeTogetherPassTheStationsLimit_SendsTheToneAlone()
+    {
+        // The default 30 s tone and pdn-soundmodem's default txTest.maxSeconds of 30: the pair is
+        // refused at once, and the tone alone goes straight after it.
+        var rig = new Rig();
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.True(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Equal(2, rig.Station.ToneRequests.Count);
+        Assert.NotNull(rig.Station.ToneRequests[0].Probe);
+        Assert.Null(rig.Station.ToneRequests[1].Probe);
+        Assert.Equal(rig.Station.ToneRequests[0].At, rig.Station.ToneRequests[1].At);
+        var keyup = rig.Station.Keyups[0];
+        Assert.Equal("tone 1800 Hz", keyup.What);
+        Assert.Equal(TimeSpan.FromSeconds(30), keyup.End - keyup.Start);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("would not send the tone with the channel probe", StringComparison.Ordinal) && l.Contains("txTest.maxSeconds", StringComparison.Ordinal));
+
+        // With the limit raised, both go.
+        var raised = new Rig();
+        raised.Station.MaxSeconds = 40;
+        var both = raised.Run(5);
+        Assert.True(both.ProbeSent);
+        Assert.Single(raised.Station.ToneRequests);
+    }
+
+    [Fact]
+    public void Run_AtAStationThatRejectsTheProbe_SendsTheToneAlone()
+    {
+        var rig = new Rig(TenSecondTone);
+        rig.Station.RejectsProbe = true;
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.True(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Equal(2, rig.Station.ToneRequests.Count);
+        Assert.NotNull(rig.Station.ToneRequests[0].Probe);
+        Assert.Null(rig.Station.ToneRequests[1].Probe);
+        Assert.Equal("tone 4050 Hz", rig.Station.Keyups[0].What);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("would not send the tone with the channel probe (HTTP 400", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_AToneStoppedAtTheStation_IsNotAskedForAgain()
+    {
+        // The operator presses Stop while the tone waits for the channel: the station answers 409
+        // and nothing more is keyed for the tone. Stop wins; the frames still go.
+        var rig = new Rig(TenSecondTone);
+        rig.Station.StopNextTone = true;
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.False(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Single(rig.Station.ToneRequests);
+        Assert.DoesNotContain(rig.Station.Keyups, k => k.What.StartsWith("tone", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("asking for the tone alone", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("the station did not send the tone (HTTP 409: stopped before it reached the air", StringComparison.Ordinal));
+        Assert.Equal(5, report.FramesSent);
+    }
+
+    [Fact]
+    public void Run_AToneTheChannelKeptOff_IsNotAskedForAloneAtOnce()
+    {
+        // A 409 for a channel that did not clear is not the probe's fault: no tone-alone retry.
+        // With the flag clear afterwards the slot carries on without the tone, as before the probe.
+        var rig = new Rig(TenSecondTone);
+        rig.Station.NextToneChannelNotClear = true;
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.False(report.ToneSent);
+        Assert.Single(rig.Station.ToneRequests);
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("asking for the tone alone", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("did not send the tone (HTTP 409: the channel did not clear", StringComparison.Ordinal));
+
+        // And with the channel busy, the head end waits and asks again, still with the probe.
+        var busy = new Rig(TenSecondTone);
+        busy.Station.FirstBusyReadMisses = true;
+        var waited = busy.Run(5, () => busy.Station.KeyOtherTraffic(TimeSpan.FromSeconds(90)));
+        Assert.True(waited.ToneSent);
+        Assert.True(waited.ProbeSent);
+        Assert.Equal(2, busy.Station.ToneRequests.Count);
+        Assert.All(busy.Station.ToneRequests, r => Assert.NotNull(r.Probe));
+    }
+
+    [Theory]
+    [InlineData(400, "HTTP 400: unknown probe kind", true)]
+    [InlineData(409, "HTTP 409: a 38.0 s test is over this station's 30 s limit (txTest.maxSeconds), so nothing was transmitted", true)]
+    [InlineData(409, "HTTP 409: stopped before it reached the air, so nothing was transmitted", false)]
+    [InlineData(409, "HTTP 409: the channel did not clear within 60 s, so the test was withdrawn and nothing was transmitted", false)]
+    [InlineData(404, "HTTP 404: no transmitter test here", false)]
+    [InlineData(500, "HTTP 500: the card went away", false)]
+    public void OnlyARefusalOfTheProbeItself_FallsBackToTheToneAlone(int status, string message, bool expected)
+    {
+        var answer = new Station.ToneAnswer(status == 500 || status == 400 ? Station.ToneOutcome.Failed : Station.ToneOutcome.Refused, message) { Status = status };
+        Assert.Equal(expected, SlotRunner.RefusedForTheProbe(answer));
+    }
+
+    [Fact]
+    public void Run_WaitsForABusyChannel_ThenSendsTheToneAndTheProbe()
+    {
+        var rig = new Rig(TenSecondTone);
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromSeconds(70);
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.True(report.ProbeSent);
+        Assert.All(rig.Station.ToneRequests, r => Assert.NotNull(r.Probe));
+        Assert.True(rig.Station.Keyups[0].Start >= Noon + TimeSpan.FromSeconds(70));
+    }
+
+    [Fact]
+    public void Run_WithNoTone_AsksForNoProbe()
+    {
+        var rig = new Rig(new SlotSettings { SubChannel = 4, ToneLength = TimeSpan.Zero });
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.False(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Empty(rig.Station.ToneRequests);
     }
 
     [Fact]
