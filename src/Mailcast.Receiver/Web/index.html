@@ -335,7 +335,14 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
       <label>USB dial
         <input id="dial" readonly>
       </label>
-      <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal is centred 1800 Hz above it.</div>
+      <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal itself always stays on 7.0538 MHz.</div>
+      <label id="filterLabel" hidden>Your radio's receive filter
+        <select id="filter">
+          <option value="7052">SDR, data mode or 2.7 kHz and wider</option>
+          <option value="7052.3">2.4 kHz or narrower</option>
+        </select>
+      </label>
+      <div class="muted" id="filterNote" hidden></div>
       <label>Accept frames from
         <input id="sources" autocomplete="off" spellcheck="false">
       </label>
@@ -1154,8 +1161,9 @@ async function loadSettings() {
   const kind = a.startsWith("ubersdr:") ? "ubersdr" : a.startsWith("wav:") ? "wav" : "alsa";
   $("audioKind").value = kind;
   $("audioWhere").value = a;
-  $("dial").value = `${mhz(settings.dialKHz)} MHz (signal centre ${mhz(settings.dialKHz + 1.8)} MHz)`;
+  $("dial").value = `${mhz(settings.dialKHz)} MHz (signal centre 7.0538 MHz)`;
   $("alsaOption").textContent = `Sound card on my radio (USB, dial ${mhz(settings.dialKHz)} MHz)`;
+  updateFilter(kind);
   $("cards").innerHTML = settings.soundCards.map(c => `<option value="${esc(c)}">`).join("");
   $("sources").value = settings.sources.join(", ");
   $("sourcesNote").innerHTML = 'The callsigns the mailcast is sent from, separated by commas: <code>"sources"</code> in receiver.json. Any SSID is accepted.'
@@ -1174,6 +1182,19 @@ async function loadSettings() {
     ? "The password for this page. Leave it empty to keep the one you have. Changing it signs out every other browser."
     : "This page has no password, so it only answers on this machine. Setting one means it asks for it here too.";
 }
+const FILTER_WHY = {
+  "7052": "The usual dial; nothing to change for an SDR, a data mode or a filter 2.7 kHz wide or more.",
+  "7052.3": "A 2.4 kHz or narrower filter cuts into the signal on a weak, fading path; this dial clears more of it.",
+};
+function updateFilter(kind) {
+  const isAlsa = kind === "alsa";
+  $("filterLabel").hidden = !isAlsa;
+  $("filterNote").hidden = !isAlsa;
+  if (!isAlsa) return;
+  if (settings) $("filter").value = Math.abs(settings.dialKHz - 7052.3) < 0.01 ? "7052.3" : "7052";
+  $("filterNote").textContent = `Set your radio's dial to ${mhz(Number($("filter").value))} MHz USB. ${FILTER_WHY[$("filter").value]}`;
+}
+$("filter").addEventListener("change", () => updateFilter("alsa"));
 $("signOut").addEventListener("click", async e => {
   e.preventDefault();
   await api("logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -1184,6 +1205,7 @@ $("audioKind").addEventListener("change", () => {
   if (k === "ubersdr" && !v.value.startsWith("ubersdr:")) v.value = "ubersdr:wessex.zapto.org";
   if (k === "wav" && !v.value.startsWith("wav:")) v.value = "wav:/path/to/recording.wav";
   if (k === "alsa" && (v.value.startsWith("ubersdr:") || v.value.startsWith("wav:"))) v.value = settings && settings.soundCards[0] || "plughw:CARD=Device,DEV=0";
+  updateFilter(k);
 });
 $("testBbs").addEventListener("click", async () => {
   $("testBbs").disabled = true;
@@ -1205,6 +1227,7 @@ $("settings").addEventListener("submit", async e => {
     login: $("login").value, password: $("password").value, command: $("command").value,
     pagePassword: $("pagePassword").value, currentPagePassword: $("currentPagePassword").value,
   };
+  if ($("audioKind").value === "alsa") form.dialKHz = Number($("filter").value);
   /* Only when changed, so saving other settings leaves a config without "sources" following the default. */
   const sources = $("sources").value.split(/[\s,]+/).filter(Boolean);
   if (sources.join(", ") !== settings.sources.join(", ")) form.sources = sources;

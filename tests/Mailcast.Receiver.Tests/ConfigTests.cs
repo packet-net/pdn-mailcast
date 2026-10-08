@@ -140,6 +140,40 @@ public class ConfigTests
         Assert.Equal(7052.0, config.DialKHz);
         Assert.Equal(7_052_000, config.DialHz);
         Assert.Equal(7_053_800, config.CentreHz);
+        Assert.Equal(1800, config.AudioCentreHz);
+    }
+
+    [Fact]
+    public void Dial_Explicit7052_StillWorks_WithTheSameAudioCentre()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "dialKHz": 7052 }""");
+
+        var config = ReceiverConfig.Load(path);
+
+        Assert.Equal(7052.0, config.DialKHz);
+        Assert.Equal(7_053_800, config.CentreHz);
+        Assert.Equal(1800, config.AudioCentreHz);
+    }
+
+    [Fact]
+    public void Dial_7052_3_IsTheNarrowFilterAlternative_WithTheSameFixedCentre()
+    {
+        // issue: a sound card behind a 2.4 kHz or narrower rig filter does better on 7052.3 (the
+        // filter study in mailcast-test/filter-study-2026-10-08: G4WNC kept 30 of 36 frames
+        // through a 2.1 kHz DSP filter on 7052.3, against 16 of 36 on 7052). The transmitter
+        // itself never moves, so the true centre (CentreHz) is the same at either dial; only
+        // where it falls in the receiver's own audio (AudioCentreHz) changes.
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "dialKHz": 7052.3 }""");
+
+        var config = ReceiverConfig.Load(path);
+
+        Assert.Equal(7052.3, config.DialKHz);
+        Assert.Equal(7_053_800, config.CentreHz);
+        Assert.Equal(1500, config.AudioCentreHz, 3);
     }
 
     [Fact]
@@ -151,7 +185,9 @@ public class ConfigTests
 
         var config = ReceiverConfig.Load(path);
         Assert.Equal(7049.7, config.DialKHz);
-        Assert.Equal(7_051_500, config.CentreHz, 3);
+        // The signal's true centre never depends on the dial: the transmitter does not move.
+        Assert.Equal(7_053_800, config.CentreHz);
+        Assert.Equal(4100, config.AudioCentreHz, 3);
 
         config.Save(path);
         Assert.Contains("\"dialKHz\": 7049.7", File.ReadAllText(path), StringComparison.Ordinal);

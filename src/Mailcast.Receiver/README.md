@@ -50,6 +50,13 @@ Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appe
 
 Set your radio to USB on **7.052 MHz** (the signal is centred on 7.0538 MHz), with its receive audio into a sound card. It then hears every slot, not just some. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
 
+If your radio's receive filter is 2.4 kHz or narrower, move the dial instead, either on the status page's settings or by setting `"dialKHz"` yourself:
+
+| Your radio's receive filter | Dial | Why |
+|---|---|---|
+| SDR, data mode or 2.7 kHz and wider | 7.052 MHz | The usual dial; nothing to change. |
+| 2.4 kHz or narrower | 7.0523 MHz | A narrow filter cuts into the signal on a weak, fading path; this dial clears more of it. |
+
 ## Linux FBB
 
 Instead of step 2: add a telnet port in `port.sys`, add user **Q0CAST** (`EU Q0CAST`) with the **B** and **M** flags and a password, and don't add it to `forward.sys`. In the receiver's config set `"type": "fbb"` and FBB's telnet port. (Not tested yet.)

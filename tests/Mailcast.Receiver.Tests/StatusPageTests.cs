@@ -444,8 +444,10 @@ public class StatusPageTests
 
         var status = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
         Assert.Equal(7053.5, status.GetProperty("audio").GetProperty("dialKHz").GetDouble());
-        Assert.Equal(7055.3, status.GetProperty("audio").GetProperty("centreKHz").GetDouble(), 6);
-        Assert.Equal(1800, status.GetProperty("markers").GetProperty("centreHz").GetDouble());
+        // The signal's true centre never moves with the dial: the transmitter does not.
+        Assert.Equal(7053.8, status.GetProperty("audio").GetProperty("centreKHz").GetDouble(), 6);
+        // ...but where it falls in this receiver's own audio does: 300 Hz at this (unusual) dial.
+        Assert.Equal(300, status.GetProperty("markers").GetProperty("centreHz").GetDouble(), 3);
 
         var settings = JsonSerializer.SerializeToElement(StatusPage.SettingsView(host.Config), ReceiverConfig.JsonLine);
         Assert.Equal(7053.5, settings.GetProperty("dialKHz").GetDouble());
@@ -453,6 +455,10 @@ public class StatusPageTests
         // The form has no dial: saving the other settings keeps the one in the file.
         var saved = StatusPage.Apply(host.Config, new StatusPage.SettingsForm("ubersdr:wessex.zapto.org", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS"));
         Assert.Equal(7053.5, saved.DialKHz);
+
+        // A sound card's receive filter choice on the settings page writes the dial directly.
+        var narrowed = StatusPage.Apply(host.Config, new StatusPage.SettingsForm("plughw:CARD=Device,DEV=0", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS", DialKHz: 7052.3));
+        Assert.Equal(7052.3, narrowed.DialKHz);
     }
 
     [Fact]

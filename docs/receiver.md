@@ -29,7 +29,12 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 ```
 
 - `audio`: `ubersdr:wessex.zapto.org` for the web SDR, an ALSA device such as `plughw:CARD=Device,DEV=0` for your radio's sound card, or `wav:/path/to/file.wav` to decode a recording.
-- `dialKHz`: the USB dial in kHz, normally `7052.0` (7.052 MHz), which is also what you get if you leave it out. The web SDR is tuned there, and a radio on a sound card should be set there. The signal is centred 1800 Hz above the dial, on 7.0538 MHz. Only change it if the signal moves; anything from 1800 to 30000 kHz is accepted.
+- `dialKHz`: the USB dial in kHz, normally `7052.0` (7.052 MHz), which is also what you get if you leave it out. The web SDR is tuned there, and a radio on a sound card should be set there. The signal itself never moves: it stays on 7.0538 MHz, which sits 1800 Hz above the usual dial. A sound card behind a narrow rig filter can use `7052.3` instead, which puts the signal at 1500 Hz, clear of more of the filter's edges; see the table below. You can also change it on the status page for a sound card. Anything from 1800 to 30000 kHz is accepted.
+
+  | Your radio's receive filter | Dial | Why |
+  |---|---|---|
+  | SDR, data mode or 2.7 kHz and wider | 7.052 MHz (`dialKHz: 7052`) | The usual dial; nothing to change. |
+  | 2.4 kHz or narrower | 7.0523 MHz (`dialKHz: 7052.3`) | A narrow filter cuts into GB7RDG's signal on a weak, fading path; moving the dial clears more of it. A web SDR gains nothing from this, so it always stays on 7.052. |
 - `sources`: the callsigns the broadcast is accepted from. GB7RDG sends it today, and it may move to M0LTE, so the default is `["GB7RDG", "M0LTE"]`. Each is a callsign of 1 to 6 letters and digits; any SSID is accepted, so `M0LTE` also takes `M0LTE-1`, and one written with an SSID counts as the callsign without it. Frames from anyone else are ignored, and the log names the first few such callsigns once each. A config file from before this setting has no `sources`; the receiver uses the default and says so in the log, so it keeps hearing the broadcast. An empty list is refused. You can also change it on the status page.
 - `bbs`: where your BBS is and how the receiver logs in. See below.
 - `web`: the status page. It only answers on this machine unless you set `lan` to true, and then it needs a `password`, which you enter on the page's sign-in page. See [On your network](#on-your-network).
@@ -272,7 +277,7 @@ http://127.0.0.1:8130/ shows:
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the mail this receiver holds (see [Mail](#mail));
 - the daily report, if you have turned it on: the last one as sent, what your BBS said, and when the next goes (see [Sending a daily report](#sending-a-daily-report));
-- the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you. A **Test BBS login** button tries the login shown without exchanging any mail (see [Testing the login](#testing-the-login)).
+- the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too; for a sound card it also offers the receive filter choice above, which writes `dialKHz`. For a web SDR or a recording it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you. A **Test BBS login** button tries the login shown without exchanging any mail (see [Testing the login](#testing-the-login)).
 
 On this machine only, the page answers to `localhost` and nothing else.
 

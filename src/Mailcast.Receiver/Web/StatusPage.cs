@@ -130,7 +130,7 @@ public sealed class StatusPage : IAsyncDisposable
             LinesPerSecond = 10,
             InputLevelMeter = true,
             Title = "pdn-mailcast receiver",
-            DeclaredBands = [new DeclaredBand(0, "mailcast", OnAir.CentreAudioHz, 2 * OnAir.HalfWidthHz)],
+            DeclaredBands = [new DeclaredBand(0, "mailcast", OnAir.AudioCentreHz(pipeline.DialHz), 2 * OnAir.HalfWidthHz)],
             Log = line => _log("web: " + Ascii.Clean(line)),
         });
         waterfall.Start();
@@ -715,9 +715,9 @@ public sealed class StatusPage : IAsyncDisposable
             },
             markers = new
             {
-                centreHz = OnAir.CentreAudioHz,
-                lowHz = OnAir.CentreAudioHz - OnAir.HalfWidthHz,
-                highHz = OnAir.CentreAudioHz + OnAir.HalfWidthHz,
+                centreHz = config.AudioCentreHz,
+                lowHz = config.AudioCentreHz - OnAir.HalfWidthHz,
+                highHz = config.AudioCentreHz + OnAir.HalfWidthHz,
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },
@@ -1057,10 +1057,13 @@ public sealed class StatusPage : IAsyncDisposable
     /// The form's answer. An empty password keeps the one already set; so does an empty
     /// <paramref name="PagePassword"/>, the page's own, which needs <paramref name="CurrentPagePassword"/>
     /// to change once there is one. A null <paramref name="Sources"/> keeps the callsigns accepted as they are,
-    /// and a null <paramref name="Feedback"/> the daily report as it is.
+    /// and a null <paramref name="Feedback"/> the daily report as it is. A null <paramref name="DialKHz"/>
+    /// keeps the dial as it is too: the settings page only sends one for a sound card, from the
+    /// receive filter choice (<c>7052</c> or <c>7052.3</c>); a web SDR source keeps the usual 7.052.
     /// </summary>
     internal sealed record SettingsForm(string Audio, string Type, string Host, int Port, string Login, string? Password, string Command,
-        string? PagePassword = null, string? CurrentPagePassword = null, IReadOnlyList<string?>? Sources = null, FeedbackForm? Feedback = null);
+        string? PagePassword = null, string? CurrentPagePassword = null, IReadOnlyList<string?>? Sources = null, FeedbackForm? Feedback = null,
+        double? DialKHz = null);
 
     /// <summary>
     /// The daily report's part of the settings form: on or off, and the callsign it is sent from.
@@ -1114,6 +1117,7 @@ public sealed class StatusPage : IAsyncDisposable
         var next = current with
         {
             Audio = form.Audio.Trim(),
+            DialKHz = form.DialKHz ?? current.DialKHz,
             Bbs = current.Bbs with
             {
                 Type = kind,

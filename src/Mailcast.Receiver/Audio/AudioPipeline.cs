@@ -82,7 +82,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         }
         Channel.FrameReceived += (_, _) => Burst.OnFrame(LockedWaveform);
         Channel.FrameReceived += (_, _) => Capture.OnFrame();
-        Tone = new ToneDetector(OnAir.SampleRate);
+        Tone = new ToneDetector(OnAir.SampleRate, OnAir.AudioCentreHz(dialHz));
         Channel.AddReceiveTap(Tone.Process);
         // The channel probe follows the tone: its audio is kept from the same ring once it is all in.
         Tone.ToneMeasured += tone =>
@@ -222,7 +222,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 _input = web;
                 _webSdr = web;
                 WebSdrDescription = web.ReceiverDescription is { Length: > 0 } about ? Ascii.Clean(about) : null;
-                _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(DialHz + OnAir.CentreAudioHz)} MHz"
+                _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(OnAir.TransmitHz)} MHz"
                     + (WebSdrDescription is { } said ? $" ({said})" : ""));
                 break;
 

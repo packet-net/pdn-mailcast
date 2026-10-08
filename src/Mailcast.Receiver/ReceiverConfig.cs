@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Mailcast.Receiver.Feedback;
@@ -115,9 +116,19 @@ public sealed record ReceiverConfig
     [JsonIgnore]
     public double DialHz => DialKHz * 1000;
 
-    /// <summary>The signal's centre in Hz: the dial plus <see cref="OnAir.CentreAudioHz"/>.</summary>
+    /// <summary>The signal's true centre in Hz: always <see cref="OnAir.TransmitHz"/>; the dial does not move it.</summary>
     [JsonIgnore]
-    public double CentreHz => DialHz + OnAir.CentreAudioHz;
+    [SuppressMessage("Performance", "CA1822", Justification = "An instance property, so it reads beside DialKHz and AudioCentreHz; it is constant only because the transmitter never moves.")]
+    public double CentreHz => OnAir.TransmitHz;
+
+    /// <summary>
+    /// Where <see cref="CentreHz"/> falls in this receiver's own audio, Hz above zero: 1800 Hz at
+    /// the usual 7.052 MHz dial, or 1500 Hz at 7.0523 MHz, the alternative for a sound card behind
+    /// a rig filter 2.4 kHz or narrower (see docs/receiver.md). What the tone detector, the
+    /// spectrogram's marks and the channel probe look for.
+    /// </summary>
+    [JsonIgnore]
+    public double AudioCentreHz => OnAir.AudioCentreHz(DialHz);
 
     /// <summary>
     /// The callsigns accepted when the file has no <c>"sources"</c>, as files from before the

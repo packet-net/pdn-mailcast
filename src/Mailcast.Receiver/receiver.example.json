@@ -6,7 +6,8 @@
   "audio": "ubersdr:wessex.zapto.org",
 
   // The USB dial in kHz. The web SDR is tuned here, and your radio should be too if you use
-  // a sound card. The signal is centred 1800 Hz above it, on 7.0538 MHz.
+  // a sound card. The signal itself always stays on 7.0538 MHz. A sound card behind a rig
+  // filter 2.4 kHz or narrower does better on 7052.3; see docs/receiver.md.
   "dialKHz": 7052.0,
 
   // The callsigns the broadcast is accepted from, any SSID. GB7RDG sends it today, and it may
