@@ -68,7 +68,9 @@ internal static class ProbeChannel
     /// <summary>
     /// The shortest unbroken run of periods a Doppler spread is given for: 40, 4.25 s, whose own
     /// spectral width (about 0.14 Hz, which is taken out) leaves a spread of 0.1 Hz still to be
-    /// told from none. After a longer gap in the audio the spread is not given, only the shift.
+    /// told from none. A fade does not break the run, however deep; a stretch where the probe was
+    /// not there does (<see cref="Present"/>), and when no run is left long enough the spread is
+    /// not given, only the shift.
     /// </summary>
     public const int FewestDopplerPeriods = 40;
 
@@ -130,19 +132,16 @@ internal static class ProbeChannel
     /// tone detector put the tone's end, seconds into the audio, and <paramref name="toneHz"/>
     /// its measured frequency. Null when no probe was found.
     /// </summary>
+    public static ProbeMeasurement? Measure(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz) =>
+        Measure(ChannelMaths.ToBaseband(audio), toneEndSeconds, toneHz);
+
+    /// <summary>As <see cref="Measure(ReadOnlySpan{float}, double, double)"/>, from the audio already at baseband (<see cref="ChannelMaths.ToBaseband"/>), which is left as it is.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public static ProbeMeasurement? Measure(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz)
+    private static ProbeMeasurement? Measure(Complex[] baseband, double toneEndSeconds, double toneHz)
     {
         var reference = Ref.Value;
         int L = Period;
-        var bb = ChannelMaths.ToBaseband(audio);
-        // On the tone's own frequency: the probe goes out on it.
-        double w = -2 * Math.PI * (toneHz - OnAir.CentreAudioHz) / Rate;
-        for (int n = 0; n < bb.Length; n++)
-        {
-            bb[n] *= Complex.FromPolarCoordinates(1, w * n);
-        }
-        int count = bb.Length / L;
+        int count = baseband.Length / L;
         double expected = (toneEndSeconds + GapSeconds) * Rate;
         // Runs whose first whole window could be the probe's: windows from first + 1 to first + Windows.
         int lowest = Math.Max(0, (int)Math.Floor((expected - (SearchEarlierSeconds * Rate)) / L));
@@ -152,39 +151,60 @@ internal static class ProbeChannel
             return null;
         }
         int from = lowest + 1, to = highest + Windows;
-        // Each window's correlation, as power, and the correlations kept for the run chosen.
-        var c = new Complex[to - from + 1][];
-        var p = new double[c.Length][];
-        var pn = new double[c.Length][];
-        var cuts = new List<int>[c.Length];
-        // One set of working buffers for every window, so a Pi's collector is not kept busy.
-        var work = reference.Dft.Work();
-        var x = new Complex[L];
+        int windows = to - from + 1;
+        // The arrays are the thread's own, kept from one measurement to the next so a Pi's
+        // collector is not kept busy; nothing returned refers to them.
+        var ws = Workspace.For(baseband.Length, windows, L, reference.Dft);
+        var bb = ws.Mixed;
+        // On the tone's own frequency: the probe goes out on it.
+        double w = -2 * Math.PI * (toneHz - OnAir.CentreAudioHz) / Rate;
+        for (int n = 0; n < baseband.Length; n++)
+        {
+            bb[n] = baseband[n] * Complex.FromPolarCoordinates(1, w * n);
+        }
+        // Each window's correlation, and its power against the window's own floor, so a run is
+        // chosen by where the probe is and not by where the noise happens to be quieter.
+        var c = ws.Correlation;
+        var pn = ws.Normalised;
+        var floors = new double[windows];
+        var bandPower = new double[windows];
+        var cuts = new int[windows][];
+        var removed = new List<int>();
+        var x = ws.Bins;
         var scratchBins = new double[reference.InBand.Length];
+        var scratch = new double[L];
         for (int k = from; k <= to; k++)
         {
-            reference.Dft.Forward(bb.AsSpan(k * L, L), x, work);
-            var removed = new List<int>();
+            reference.Dft.Forward(bb.AsSpan(k * L, L), x, ws.Work);
+            removed.Clear();
             Excise(x, reference.InBand, reference.InBandWeight, scratchBins, removed);
-            cuts[k - from] = removed;
+            cuts[k - from] = removed.Count == 0 ? [] : [.. removed];
+            // What was received in the probe's band, carriers taken out: a probe gone leaves the
+            // noise alone there, or silence, where one faded leaves it over the noise.
+            double received = 0;
+            foreach (int bin in reference.InBand)
+            {
+                received += ChannelMaths.Norm(x[bin]);
+            }
+            bandPower[k - from] = received;
             for (int i = 0; i < L; i++)
             {
                 x[i] *= reference.Conjugate[i];
             }
-            var corr = new Complex[L];
-            reference.Dft.Inverse(x, corr, work);
-            var power = new double[L];
+            var corr = c[k - from];
+            reference.Dft.Inverse(x, corr, ws.Work);
+            var norm = pn[k - from];
             for (int i = 0; i < L; i++)
             {
                 corr[i] /= reference.Energy;
-                power[i] = ChannelMaths.Norm(corr[i]);
+                norm[i] = ChannelMaths.Norm(corr[i]);
             }
-            c[k - from] = corr;
-            p[k - from] = power;
-            // Each window against its own floor, so a run is chosen by where the probe is and not
-            // by where the noise happens to be quieter.
-            double floorHere = Math.Max(ChannelMaths.Median(power), double.Epsilon);
-            pn[k - from] = [.. power.Select(v => v / floorHere)];
+            double floorHere = Math.Max(MedianOf(norm, scratch), double.Epsilon);
+            floors[k - from] = floorHere;
+            for (int i = 0; i < L; i++)
+            {
+                norm[i] /= floorHere;
+            }
         }
         // The run whose summed profile, each window against its own floor, stands highest over its median.
         var sum = new double[L];
@@ -194,7 +214,6 @@ internal static class ProbeChannel
         }
         double bestRatio = 0;
         int bestRun = -1, bestLag = 0;
-        var scratch = new double[L];
         for (int run = lowest; run <= highest; run++)
         {
             if (run > lowest)
@@ -203,8 +222,7 @@ internal static class ProbeChannel
                 Add(sum, pn[run + Windows - from], 1);
             }
             int peak = ArgMax(sum);
-            Array.Copy(sum, scratch, L);
-            double median = ChannelMaths.Median(scratch);
+            double median = MedianOf(sum, scratch);
             double ratio = median > 0 ? sum[peak] / median : 0;
             if (ratio > bestRatio)
             {
@@ -216,6 +234,9 @@ internal static class ProbeChannel
         {
             return null;
         }
+        // The run's windows among all of them, and the rest, outside it.
+        int runStart = bestRun + 1 - from;
+        bool Outside(int i) => i < runStart || i >= runStart + Windows;
         // Whether the probe is in each window, from its own correlation: the excess over that
         // window's floor where the paths are, in units of the floor.
         // Weighted by the run's own profile there, so what counts is power where the paths are,
@@ -223,14 +244,14 @@ internal static class ProbeChannel
         int regionBefore = (int)Math.Round((SearchBefore + 0.1e-3) * Rate), regionAfter = (int)Math.Round(6.5e-3 * Rate);
         int region = regionBefore + regionAfter + 1;
         // Each window's power over its floor as a mean (noise's power is exponential, its median ln 2 of its mean), less one.
-        double Excess(int j, int i) => (pn[bestRun + 1 + j - from][Wrap(bestLag + i, L)] * Math.Log(2)) - 1;
+        double Excess(int index, int i) => (pn[index][Wrap(bestLag + i, L)] * Math.Log(2)) - 1;
         var shape = new double[region];
         for (int i = 0; i < region; i++)
         {
             double mean = 0;
             for (int j = 0; j < Windows; j++)
             {
-                mean += Excess(j, i - regionBefore);
+                mean += Excess(runStart + j, i - regionBefore);
             }
             shape[i] = Math.Max(mean / Windows, 0);
         }
@@ -243,28 +264,44 @@ internal static class ProbeChannel
         {
             shape[i] /= shapeSum;
         }
-        var score = new double[Windows];
-        for (int j = 0; j < Windows; j++)
+        // Scored over every window, not just the run's, so a stretch without the probe is seen
+        // to run on past the run's end (a Stop) or not.
+        var score = new double[windows];
+        for (int j = 0; j < windows; j++)
         {
             for (int i = 0; i < region; i++)
             {
                 score[j] += shape[i] * Excess(j, i - regionBefore);
             }
         }
-        // Noise gives each lag's excess a standard deviation of one, so the score one of sqrt(sum w^2).
-        var present = Present(score, Math.Sqrt(shape.Sum(w => w * w)));
+        // The noise in the probe's band, from the windows outside the run (the gap before the
+        // probe, the time after it), the quieter of them: those after it may hold the bursts.
+        var outside = Enumerable.Range(0, windows).Where(Outside).Select(i => bandPower[i]).Order().ToArray();
+        double noise = outside.Length >= 4 ? outside[outside.Length / 4] : double.NaN;
+        // How much noise alone moves the score: neighbouring lags are not independent, so it is
+        // more than the weights alone say. Measured on the windows outside the run with only
+        // noise in them, and never taken as less than the weights say.
+        double sigma = Math.Sqrt(shape.Sum(v => v * v));
+        double[] quietScores = [.. Enumerable.Range(0, windows).Where(i => Outside(i) && bandPower[i] <= QuietRatio * noise).Select(i => score[i])];
+        if (quietScores.Length >= 8)
+        {
+            double middle = ChannelMaths.Median(quietScores);
+            sigma = Math.Max(sigma, 1.4826 * ChannelMaths.Median([.. quietScores.Select(v => Math.Abs(v - middle))]));
+        }
+        var present = Present(score, sigma, bandPower, noise, runStart, Windows);
 
         // A burst of interference (the CW ident's keying) shows in a few windows only.
         int showing = 0;
-        for (int k = bestRun + 1; k <= bestRun + Windows; k++)
+        for (int j = runStart; j < runStart + Windows; j++)
         {
-            var window = p[k - from];
+            // Against the window's own floor, which pn is already over.
+            var window = pn[j];
             double near = 0;
             for (int i = -3; i <= 3; i++)
             {
                 near = Math.Max(near, window[Wrap(bestLag + i, L)]);
             }
-            if (near > ShowingRatio * ChannelMaths.Median(window))
+            if (near > ShowingRatio)
             {
                 showing++;
             }
@@ -284,11 +321,10 @@ internal static class ProbeChannel
         {
             if (present[j])
             {
-                Add(pdp, p[bestRun + 1 + j - from], 1.0 / presentCount);
+                Add(pdp, pn[runStart + j], floors[runStart + j] / presentCount);
             }
         }
-        Array.Copy(pdp, scratch, L);
-        double floor = ChannelMaths.Median(scratch);
+        double floor = MedianOf(pdp, scratch);
         int before = (int)Math.Round(BeforeSeconds * Rate), after = (int)Math.Round(AfterSeconds * Rate);
         double paths = 0;
         for (int i = -(int)Math.Round((SearchBefore + 0.1e-3) * Rate); i <= (int)Math.Round(6.5e-3 * Rate); i++)
@@ -324,6 +360,8 @@ internal static class ProbeChannel
         }
         double typical = ChannelMaths.Median([.. windowPower.Where((_, j) => present[firstIn + j])]);
         var good = windowPower.Select((e, j) => present[firstIn + j] && e <= 6 * typical).ToArray();
+        // The probe gone, as against a window spoilt by a crash: a gap the Doppler run is never carried across.
+        var missing = Enumerable.Range(0, span).Select(j => !present[firstIn + j]).ToArray();
         if (good.Count(g => g) < ChannelAnalysis.FewestSnapshots)
         {
             return null;
@@ -354,6 +392,7 @@ internal static class ProbeChannel
                 LagStepSeconds = 1.0 / Rate,
                 Estimates = estimates,
                 Good = good,
+                Missing = missing,
                 SnapshotSeconds = L / (double)Rate,
                 SymbolRate = Probe.ChipRate,
                 RollOff = Probe.RollOff,
@@ -385,7 +424,9 @@ internal static class ProbeChannel
     /// </summary>
     public static (PathPicture Picture, ProbeMeasurement Measurement)? Analyse(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz)
     {
-        if (Measure(audio, toneEndSeconds, toneHz) is not { } first || ChannelAnalysis.Analyse(first.Snapshots) is not { } rough)
+        // At baseband once, and mixed again on each mode's own frequency from there.
+        var baseband = ChannelMaths.ToBaseband(audio);
+        if (Measure(baseband, toneEndSeconds, toneHz) is not { } first || ChannelAnalysis.Analyse(first.Snapshots) is not { } rough)
         {
             return null;
         }
@@ -413,7 +454,7 @@ internal static class ProbeChannel
             double shift = mode.CentroidHz is double c && Math.Abs(c) <= 4 && Math.Abs(c) >= 0.01 ? Math.Round(c, 3) : 0;
             if (!passes.TryGetValue(shift, out var pass))
             {
-                pass = Measure(audio, toneEndSeconds, toneHz + shift) is { } again && ChannelAnalysis.Analyse(again.Snapshots) is { } picture ? (again, picture) : null;
+                pass = Measure(baseband, toneEndSeconds, toneHz + shift) is { } again && ChannelAnalysis.Analyse(again.Snapshots) is { } picture ? (again, picture) : null;
                 passes[shift] = pass;
             }
             own[m] = pass ?? (first, rough);
@@ -509,68 +550,124 @@ internal static class ProbeChannel
     }
 
     /// <summary>
-    /// Which windows of the run the probe is in, from each window's <paramref name="score"/> (the
-    /// correlation's excess over its own floor where the paths are, weighted by the run's own
-    /// profile, with noise's standard deviation <paramref name="sigma"/>). A window is absent
-    /// when, over it and two either side, the score is no more than noise gives
-    /// (<see cref="AbsentSigmas"/> standard deviations). At either end of the run the probe may
-    /// also be cut short, by a Stop at the station, or the run may overhang it: windows there
-    /// under half the run's typical score are absent, and so is the one beside them, which
-    /// straddles the cut. Fades in the middle stay in.
+    /// Which windows of the run (<paramref name="runLength"/> of them from <paramref name="runStart"/>
+    /// among all the windows given) the probe is in. A fade is the channel and stays in, however
+    /// deep; only a probe that is not there at all is left out: one cut short by a Stop at the
+    /// station, a stretch of audio lost, or the noise beyond the probe where the run overhangs it.
     /// </summary>
-    internal static bool[] Present(double[] score, double sigma)
+    /// <remarks>
+    /// <para>A window is empty when what it received in the probe's band (<paramref name="power"/>)
+    /// is down at the <paramref name="noise"/> measured outside the probe, or below it, and its
+    /// correlation <paramref name="score"/> (the excess over its floor where the paths are,
+    /// weighted by the run's profile, noise's standard deviation <paramref name="sigma"/>) is no
+    /// more than noise alone gives. One loud with something else is not empty: the probe may be
+    /// under it. A window is never left out for being weaker than the rest.</para>
+    /// <para>A stretch of empty windows is the probe gone when it runs on past either end of the
+    /// run (the probe stopped, or had not begun); when it is silent, well under the noise (lost
+    /// audio, which a fade, leaving the noise, cannot be); or when it is two windows or more and
+    /// the probe stands at full strength (<see cref="FullSigmas"/>) within two windows of it on
+    /// both sides: so sudden a drop is a gap, where a fade comes and goes over a few windows. A
+    /// probe too weak to stand that clear can fade into the noise just as it would drop out, and
+    /// a stretch inside the run is then kept as a fade.</para>
+    /// <para>The window either side of a gap straddles its edge and goes too, after any next to it
+    /// with only a trace of the probe (<see cref="FaintShare"/>: a later path carries it a little
+    /// way past the edge). Without a measure of the noise (too few windows outside the run), only
+    /// the correlation says.</para>
+    /// </remarks>
+    internal static bool[] Present(double[] score, double sigma, double[] power, double noise, int runStart, int runLength)
     {
         int n = score.Length;
-        // Absent where noise alone would give as much, judged over five windows at a time so a
-        // weak probe is not lost to its own noise.
-        var smooth = new double[n];
+        bool known = double.IsFinite(noise) && noise >= 0;
+        bool Quiet(int j) => !known || power[j] <= QuietRatio * noise;
+        var empty = new bool[n];
         for (int j = 0; j < n; j++)
         {
-            int a = Math.Max(0, j - 2), b = Math.Min(n - 1, j + 2);
-            double sum = 0;
-            for (int i = a; i <= b; i++)
-            {
-                sum += score[i];
-            }
-            smooth[j] = sum / (b - a + 1);
+            empty[j] = score[j] < AbsentSigmas * sigma && Quiet(j);
         }
-        var present = smooth.Select(v => v > AbsentSigmas * sigma / Math.Sqrt(5)).ToArray();
-        double typical = ChannelMaths.Median([.. score.Where((_, j) => present[j])]);
-        if (!double.IsFinite(typical))
+        // The run's typical window where the probe is in it.
+        double typical = ChannelMaths.Median(Enumerable.Range(runStart, runLength).Where(j => !empty[j]).Select(j => score[j]));
+        // Noise now and then scores a little over the test in one window of many: a lone window
+        // between two empty ones with no more than twice it, and well under the probe's typical
+        // window (so never a weak probe's own), is empty with them.
+        double lonely = double.IsFinite(typical) ? Math.Min(2 * AbsentSigmas * sigma, LoneShare * typical) : 0;
+        var lone = new bool[n];
+        for (int j = 1; j < n - 1; j++)
         {
-            return present;
+            lone[j] = !empty[j] && empty[j - 1] && empty[j + 1] && score[j] < lonely && Quiet(j);
         }
-        // In the middle, window by window too: a stretch of audio lost (a web SDR's dropout) is
-        // left out to its edges. A fade is kept, however deep, so long as the probe is still
-        // clear of the noise in it.
-        for (int j = 0; j < n; j++)
+        bool Empty(int j) => empty[j] || lone[j];
+        // A trace of the probe: 20 dB or more under the run's typical window.
+        double faint = double.IsFinite(typical) ? Math.Max(AbsentSigmas * sigma, FaintShare * typical) : AbsentSigmas * sigma;
+        bool Faint(int j) => score[j] < faint && Quiet(j);
+        bool Full(int j) => j >= 0 && j < n && score[j] >= FullSigmas * sigma;
+        var absent = new bool[n];
+        for (int j = 0; j < n;)
         {
-            if (score[j] < AbsentSigmas * sigma)
+            if (!Empty(j))
             {
-                present[j] = false;
+                j++;
+                continue;
             }
+            int start = j;
+            double received = 0;
+            for (; j < n && Empty(j); j++)
+            {
+                received += power[j];
+            }
+            bool past = start == 0 || start < runStart || j == n || j > runStart + runLength;
+            bool silent = known && received / (j - start) <= SilentRatio * noise;
+            bool sudden = j - start >= 2
+                && (Full(start - 1) || Full(start - 2))
+                && (Full(j) || Full(j + 1));
+            if (!(past || silent || sudden))
+            {
+                continue;
+            }
+            int lo = start, hi = j;
+            while (lo > 0 && Faint(lo - 1))
+            {
+                lo--;
+            }
+            while (hi < n && Faint(hi))
+            {
+                hi++;
+            }
+            for (int i = Math.Max(0, lo - 1); i <= Math.Min(n - 1, hi); i++)
+            {
+                absent[i] = true;
+            }
+            j = Math.Max(j, hi);
         }
-        // At the ends, window by window: a cut-short probe leaves windows with little or nothing
-        // in them, and the one beside them straddles the cut, so it goes too.
-        double empty = Math.Max(0.5 * typical, 2 * sigma);
-        void Trim(int start, int step)
+        var present = new bool[runLength];
+        for (int j = 0; j < runLength; j++)
         {
-            int j = start;
-            bool cut = false;
-            for (; j >= 0 && j < n && score[j] < empty; j += step)
-            {
-                present[j] = false;
-                cut = true;
-            }
-            if (cut && j >= 0 && j < n)
-            {
-                present[j] = false;
-            }
+            present[j] = !absent[runStart + j];
         }
-        Trim(0, 1);
-        Trim(n - 1, -1);
         return present;
     }
+
+    /// <summary>
+    /// A window whose power in the probe's band is no more than this times the noise measured
+    /// outside the probe is down at the noise: +1.8 dB, room for the noise's own unevenness from
+    /// one window to the next and for a receiver's AGC.
+    /// </summary>
+    private const double QuietRatio = 1.5;
+
+    /// <summary>A window next to a gap with this share of the run's typical correlation or less (-20 dB) holds only a trace of the probe, and goes with the gap.</summary>
+    private const double FaintShare = 0.01;
+
+    /// <summary>A lone window scoring a little over the empty test is noise only under this share of the run's typical window (-10 dB).</summary>
+    private const double LoneShare = 0.1;
+
+    /// <summary>A stretch this far under the noise (-3 dB) is silence: lost audio, which a fade, leaving the noise, cannot be.</summary>
+    private const double SilentRatio = 0.5;
+
+    /// <summary>
+    /// The probe at full strength beside a gap: this many of noise's standard deviations, 14 dB
+    /// over what empties a window. A probe heard at about -4 dB or more stands so clear; under
+    /// that its fades and its gaps look alike.
+    /// </summary>
+    private const double FullSigmas = 100;
 
     /// <summary>A window's score must pass this many of noise's standard deviations for the probe to count as in it.</summary>
     private const double AbsentSigmas = 4;
@@ -632,6 +729,16 @@ internal static class ProbeChannel
     private const double ExciseRatio = 10;
 
     private static int Wrap(int i, int n) => ((i % n) + n) % n;
+
+    /// <summary>The median of <paramref name="values"/>, as <see cref="ChannelMaths.Median"/> has it for finite ones, sorted in <paramref name="scratch"/> rather than in new arrays.</summary>
+    private static double MedianOf(double[] values, double[] scratch)
+    {
+        var v = scratch.AsSpan(0, values.Length);
+        values.CopyTo(v);
+        v.Sort();
+        int n = v.Length;
+        return n % 2 == 1 ? v[n / 2] : (v[(n / 2) - 1] + v[n / 2]) / 2;
+    }
 
     private static void Add(double[] into, double[] what, double scale)
     {
@@ -737,6 +844,50 @@ internal static class ProbeChannel
             double frac = at - floorAt;
             return (table[i] * (1 - frac)) + (table[(i + 1) % Fine] * frac);
         };
+    }
+
+    /// <summary>
+    /// A thread's working arrays for <see cref="Measure(Complex[], double, double)"/>, kept from
+    /// one call to the next: the audio mixed on the frequency measured at, and each window's
+    /// correlation and its power over its floor, some 5 MB in all, made once rather than for
+    /// every pass. Nothing a measurement returns refers to them.
+    /// </summary>
+    private sealed class Workspace
+    {
+        [ThreadStatic]
+        private static Workspace? _mine;
+
+        public Complex[] Mixed { get; private set; } = [];
+
+        public Complex[][] Correlation { get; private set; } = [];
+
+        public double[][] Normalised { get; private set; } = [];
+
+        public Complex[] Bins { get; private set; } = [];
+
+        public Complex[] Work { get; private set; } = [];
+
+        public static Workspace For(int samples, int windows, int length, Bluestein dft)
+        {
+            var ws = _mine ??= new Workspace();
+            if (ws.Mixed.Length < samples)
+            {
+                ws.Mixed = new Complex[samples];
+            }
+            if (ws.Bins.Length != length)
+            {
+                ws.Bins = new Complex[length];
+                ws.Work = dft.Work();
+                ws.Correlation = [];
+                ws.Normalised = [];
+            }
+            if (ws.Correlation.Length < windows)
+            {
+                ws.Correlation = [.. Enumerable.Range(0, windows).Select(_ => new Complex[length])];
+                ws.Normalised = [.. Enumerable.Range(0, windows).Select(_ => new double[length])];
+            }
+            return ws;
+        }
     }
 
     /// <summary>A DFT of any length, by Bluestein's chirp z-transform over the power-of-two FFT.</summary>

@@ -279,7 +279,7 @@ To know when there is a new version, the receiver reads packet-net's apt package
 
 Once a slot is over, the receiver works out what the path from GB7RDG was like, two ways.
 
-- From the channel probe: 1.5 s after the tone, GB7RDG sends 6.5 s of a known test signal made for measuring paths. The receiver finds it from where the tone ended, and reads every path's delay to a few microseconds and its Doppler, down to about -15 dB signal to noise, well below anything it can decode.
+- From the channel probe: 1.5 s after the tone, GB7RDG sends 6.5 s of a known test signal made for measuring paths. The receiver finds it from where the tone ended, and reads every path's delay to a few microseconds and its Doppler, down to about -15 dB signal to noise, well below anything it can decode. Its fades are part of the path and count, however deep; if the probe is cut short or the audio drops out, it measures what was heard.
 - From the data bursts it decoded: each one can be made again exactly, so it is a known signal too, about 20 times a second. This works down to about 1 dB.
 
 When it has both, it shows the one that sees further below the strongest path, with the other beside it. A slot with neither says "Not enough decoded to measure."

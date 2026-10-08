@@ -94,7 +94,9 @@ public class ProbeTests(ITestOutputHelper output)
         Assert.All(trials, t => Assert.Equal(2, t.Modes));
         Assert.True(Quantile(trials.Select(t => Math.Abs(t.FirstErrorUs)), 0.5) < 6);
         Assert.True(Quantile(trials.Select(t => Math.Abs(t.SeparationErrorUs)), 0.5) < 6);
-        Assert.All(trials, t => Assert.InRange(Math.Abs(t.SeparationErrorUs), 0, 15));
+        // Every window of a fading probe is measured, the deepest fades too, and at -3 dB their
+        // noise can take a trial out to about 20 us.
+        Assert.All(trials, t => Assert.InRange(Math.Abs(t.SeparationErrorUs), 0, 20));
         Assert.All(trials, t => Assert.InRange(Math.Abs(t.ShiftErrorHz), 0, 0.3));
     }
 
@@ -279,11 +281,15 @@ public class ProbeTests(ITestOutputHelper output)
     [Fact]
     public void AProbeCutTooShort_IsNotMeasured()
     {
-        // 25 periods leaves fewer than the analysis needs (30): given up, not measured on silence.
-        for (int seed = 0; seed < 3; seed++)
+        // 30 periods or fewer leaves fewer windows than the analysis needs (30): given up, not
+        // measured on silence.
+        foreach (double periods in (double[])[30, 25])
         {
-            Assert.Null(WholeAndCut(Fading2F, 20 + seed, periodsSent: 25).Cut);
-            Assert.Null(WholeAndCut(Steady2F, 20 + seed, periodsSent: 25).Cut);
+            for (int seed = 0; seed < 3; seed++)
+            {
+                Assert.Null(WholeAndCut(Fading2F, 20 + seed, periodsSent: periods).Cut);
+                Assert.Null(WholeAndCut(Steady2F, 20 + seed, periodsSent: periods).Cut);
+            }
         }
     }
 
@@ -361,14 +367,106 @@ public class ProbeTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Present_KeepsFades_ButNotSilenceAtTheEnds()
+    public void Present_KeepsFades_ButNotSilence()
     {
-        double[] score = [.. Enumerable.Repeat(400.0, 30), 60, .. Enumerable.Repeat(400.0, 10), 250, 5, 2, -3, 1];
-        var present = ProbeChannel.Present(score, 10);
-        // A fade in the middle stays in.
+        // Noise alone puts 1.0 in the band, the probe 4.0. The gap before the probe, two windows
+        // of probe before the run, the run, and the time after a Stop. A fade, down at the noise
+        // for a window but still showing in the correlation, stays; the silence after the Stop
+        // does not, nor does the window straddling the cut.
+        double[] power = [1.0, 1.0, 1.0, 4.0, 4.0, .. Enumerable.Repeat(4.0, 27), 2.5, 1.6, 1.2, 1.5, 2.2, .. Enumerable.Repeat(4.0, 9), 2.5, 1.0, 1.0, 0.9, 1.0, 1.0];
+        double[] score = [0, 2, -1, 400, 400, .. Enumerable.Repeat(400.0, 27), 150, 60, 45, 50, 120, .. Enumerable.Repeat(400.0, 9), 250, 5, 2, -3, 1, 0];
+        var present = ProbeChannel.Present(score, 10, power, 1.0, 5, 47);
         Assert.All(present.Take(41), Assert.True);
-        // The window straddling the cut goes with the silence after it.
         Assert.All(present.Skip(41), Assert.False);
+
+        // However weak against the rest, a fade at the very end of the run stays.
+        double[] fadePower = [1.0, 1.0, 4.0, 4.0, .. Enumerable.Repeat(4.0, 40), 2.0, 1.6, 1.7, 2.5, 4.0, 1.0, 1.0];
+        double[] fadeScore = [0, 1, 400, 400, .. Enumerable.Repeat(400.0, 40), 60, 45, 50, 90, 300, 2, -1];
+        Assert.All(ProbeChannel.Present(fadeScore, 10, fadePower, 1.0, 4, 44), Assert.True);
+
+        // A stretch lost in the middle, the probe at full strength either side, goes, with the
+        // windows either side of it, which straddle its edges.
+        double[] gapPower = [.. Enumerable.Repeat(4.0, 20), 1.0, 1.0, 1.0, .. Enumerable.Repeat(4.0, 20)];
+        double[] gapScore = [.. Enumerable.Repeat(2000.0, 20), 1, -2, 3, .. Enumerable.Repeat(2000.0, 20)];
+        var gap = ProbeChannel.Present(gapScore, 10, gapPower, 1.0, 0, 43);
+        Assert.Equal(Enumerable.Range(0, 43).Select(j => j < 19 || j > 23), gap);
+
+        // One window into the noise and straight out again is a fast fade, not a gap.
+        double[] nullScore = [.. Enumerable.Repeat(2000.0, 20), 2, .. Enumerable.Repeat(2000.0, 20)];
+        double[] nullPower = [.. Enumerable.Repeat(4.0, 20), 1.1, .. Enumerable.Repeat(4.0, 20)];
+        Assert.All(ProbeChannel.Present(nullScore, 10, nullPower, 1.0, 0, 41), Assert.True);
+
+        // A probe too weak to stand clear of the noise: a fade and a gap look alike, so a stretch
+        // inside the run with no correlation in it is kept as a fade, unless it is silence.
+        double[] weakPower = [.. Enumerable.Repeat(1.05, 43)];
+        double[] weakScore = [.. Enumerable.Repeat(30.0, 20), 1, -2, 3, .. Enumerable.Repeat(30.0, 20)];
+        Assert.All(ProbeChannel.Present(weakScore, 2, weakPower, 1.0, 0, 43), Assert.True);
+        double[] silentPower = [.. Enumerable.Repeat(1.05, 20), 0.0, 0.0, 0.0, .. Enumerable.Repeat(1.05, 20)];
+        Assert.Equal(Enumerable.Range(0, 43).Select(j => j < 19 || j > 23), ProbeChannel.Present(weakScore, 2, silentPower, 1.0, 0, 43));
+    }
+
+    [Theory]
+    [InlineData(5, 0.2)]
+    [InlineData(5, 1.0)]
+    [InlineData(-12, 0.5)]
+    public void AFadingFullProbe_KeepsItsWindows_ItsFadesAndItsSpread(double snr, double spread)
+    {
+        // A whole probe on one fading path: every window is the probe, faded or not. The same
+        // channel at 40 dB (the same fading; only the noise differs) is the truth for the fades.
+        for (int seed = 0; seed < 4; seed++)
+        {
+            PathPicture Picture(double at)
+            {
+                var made = ProbeSlot.Make([new P(1.0, 0, SpreadHz: spread)], at, seed: 60 + seed);
+                var (audio, end) = ProbeSlot.Kept(made, 0.3);
+                return ProbeChannel.Analyse(audio, end, OnAir.CentreAudioHz)!.Value.Picture;
+            }
+            var picture = Picture(snr);
+            var clean = Picture(40);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"{snr} dB, {spread} Hz, seed {seed}: {picture.GoodSnapshots} good of {picture.Seconds / 0.10625:F0}, fade {picture.FadeDb:F1} dB (clean {clean.FadeDb:F1}, {clean.GoodSnapshots} good), spread {picture.DopplerSpreadHz?.ToString("F2", CultureInfo.InvariantCulture) ?? "-"} Hz (clean {clean.DopplerSpreadHz:F2})"));
+            // Every window, faded or not. Only where the run, chosen on the strongest stretch of a
+            // fading probe, overhangs its end by a window does that window go, with the one
+            // straddling the end; the same happens with no noise at all.
+            Assert.InRange(picture.GoodSnapshots, ProbeChannel.Windows - 2, ProbeChannel.Windows);
+            if (snr > 0)
+            {
+                // The fades as deep as with no noise, less what the noise fills in.
+                Assert.InRange(picture.FadeDb, 0.7 * clean.FadeDb, clean.FadeDb + 1);
+            }
+            Assert.NotNull(picture.DopplerSpreadHz);
+            Assert.InRange(picture.DopplerSpreadHz.Value, spread / 2.5, spread * 2);
+        }
+    }
+
+    [Fact]
+    public void AShortDropout_IsNotBridged()
+    {
+        // Three periods lost: never carried across, which would read the gap as spread. Near the
+        // end the longer side still gives a spread, and it reads as the whole probe's; in the
+        // middle neither side is long enough for one.
+        for (int seed = 0; seed < 3; seed++)
+        {
+            var (whole, late) = WholeAndCut(Fading2F, 70 + seed, silent: (45, 48));
+            Assert.NotNull(late);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"fading, 45-48, seed {seed}: {late.GoodSnapshots} good, spread {late.DopplerSpreadHz?.ToString("F2", CultureInfo.InvariantCulture) ?? "-"} Hz (whole {whole.DopplerSpreadHz:F2}), fade {late.FadeDb:F1} dB (whole {whole.FadeDb:F1})"));
+            Assert.InRange(late.GoodSnapshots, 52, 55);
+            Assert.NotNull(late.DopplerSpreadHz);
+            Assert.InRange(late.DopplerSpreadHz.Value, whole.DopplerSpreadHz!.Value - 0.1, whole.DopplerSpreadHz.Value + 0.1);
+
+            var (_, steady) = WholeAndCut(Steady2F, 70 + seed, silent: (45, 48));
+            Assert.NotNull(steady);
+            Assert.InRange(steady.DopplerSpreadHz!.Value, 0, 0.15);
+            Assert.InRange(steady.FadeDb, 0, 1.5);
+
+            var (_, middle) = WholeAndCut(Steady2F, 70 + seed, silent: (28, 31));
+            Assert.NotNull(middle);
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"steady, 28-31, seed {seed}: {middle.GoodSnapshots} good, spread {middle.DopplerSpreadHz?.ToString("F2", CultureInfo.InvariantCulture) ?? "-"} Hz"));
+            Assert.InRange(middle.GoodSnapshots, 52, 55);
+            Assert.Null(middle.DopplerSpreadHz);
+            Assert.InRange(middle.FadeDb, 0, 1.5);
+        }
     }
 
     [Theory]

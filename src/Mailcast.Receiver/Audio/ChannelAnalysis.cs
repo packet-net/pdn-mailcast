@@ -203,7 +203,7 @@ internal static class ChannelAnalysis
         // The Doppler spectra over every snapshot, or for estimates with gaps that matter (the
         // probe's, after a lost stretch of audio) over the longest unbroken run of good ones: a
         // gap in the series would smear a steady path's spectrum into a spread it does not have.
-        var (dopplerFrom, dopplerCount) = s.ContiguousDoppler ? LongestRun(s.Good) : (0, nseg);
+        var (dopplerFrom, dopplerCount) = s.ContiguousDoppler ? LongestRun(s.Good, s.Missing) : (0, nseg);
         bool spreadKnown = !s.ContiguousDoppler || dopplerCount >= s.FewestDopplerSnapshots;
         double windowSigma = 1 / (Math.Sqrt(3) * dopplerCount * dt);
         var spectra = new double[tau.Length][];
@@ -333,11 +333,13 @@ internal static class ChannelAnalysis
     }
 
     /// <summary>
-    /// The longest run of good snapshots, bridging gaps of up to <see cref="BridgedGap"/> (a fade
-    /// or a crash, which are zeroed and do no harm): where it starts, and how many.
+    /// The longest run of good snapshots, bridging gaps of up to <see cref="BridgedGap"/> unfit
+    /// ones (a crash, zeroed, which does no harm) but never one where the signal was
+    /// <paramref name="missing"/>: where it starts, and how many.
     /// </summary>
-    private static (int From, int Count) LongestRun(bool[] good)
+    private static (int From, int Count) LongestRun(bool[] good, bool[]? missing)
     {
+        bool Gap(int j) => missing is not null && j < missing.Length && missing[j];
         int bestFrom = 0, best = 0;
         int j = 0;
         while (j < good.Length)
@@ -351,7 +353,7 @@ internal static class ChannelAnalysis
             while (end < good.Length)
             {
                 int next = end + 1;
-                while (next < good.Length && !good[next] && next - end <= BridgedGap)
+                while (next < good.Length && !good[next] && !Gap(next) && next - end <= BridgedGap)
                 {
                     next++;
                 }

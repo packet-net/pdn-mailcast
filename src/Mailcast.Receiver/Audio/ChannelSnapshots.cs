@@ -72,6 +72,13 @@ internal sealed class ChannelSnapshots
     /// </summary>
     public bool ContiguousDoppler { get; init; }
 
+    /// <summary>
+    /// With <see cref="ContiguousDoppler"/>, the snapshots where the signal was not there at all
+    /// (a stretch of audio lost), as against ones merely unfit (a crash): the run is never
+    /// carried across these. Null for none.
+    /// </summary>
+    public bool[]? Missing { get; init; }
+
     /// <summary>With <see cref="ContiguousDoppler"/>, the shortest run a Doppler spread is given for; a shorter one gives the shift only.</summary>
     public int FewestDopplerSnapshots { get; init; }
 
