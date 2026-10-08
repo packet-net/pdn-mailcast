@@ -100,7 +100,7 @@
 </div>
 <div id="optIn" hidden>
   <div id="optInAsk">
-    <p><strong>Help the experiment:</strong> send M0LTE a short daily report of what this receiver heard. It goes as one small packet mail through your own BBS, about 500 bytes a day. Nothing else is sent.</p>
+    <p><strong>Help the experiment:</strong> post a short daily report of what this receiver heard as a public bulletin on GB7RDG (MCAST). It goes as one small message through your own BBS, about 500 bytes a day. Nothing else is sent.</p>
     <form id="optInForm">
       <label><input type="checkbox" id="optInBox"> Send a daily report</label>
       <label>Your callsign <input id="optInCall" maxlength="6" autocomplete="off" spellcheck="false" placeholder="G4ABC"></label>
@@ -495,13 +495,13 @@ $("updateCopy").addEventListener("click", async () => {
   setTimeout(() => { $("updateCopy").textContent = "Copy"; }, 3000);
 });
 
-/* the daily report to M0LTE, when "feedback" is on in the config */
+/* the daily report, a public bulletin to MCAST, when "feedback" is on in the config */
 function feedback(s) {
   const f = s.feedback;
   $("feedbackBox").hidden = !(f && f.enabled);
   if (!f || !f.enabled) return;
   const tone = { accepted: "good", refused: "bad" }[f.answer] || "";
-  $("feedback").innerHTML = `<dt>Goes to</dt><dd>${esc(f.to)}, through your BBS, every day half an hour after the last slot</dd>
+  $("feedback").innerHTML = `<dt>Goes to</dt><dd>${esc(f.to)}, a public bulletin, through your BBS, every day half an hour after the last slot</dd>
     ${f.lastSent ? `<dt>Last sent</dt><dd>${when(f.lastSent)}</dd>` : ""}
     ${f.lastAnswer ? `<dt>The BBS said</dt><dd class="${tone}">${esc(f.lastAnswer)}</dd>` : ""}
     ${f.next ? `<dt>Next</dt><dd>${when(f.next)}</dd>` : ""}`;
@@ -517,7 +517,7 @@ function optIn(s) {
   $("optIn").classList.toggle("on", on);
   $("optInAsk").hidden = on;
   $("optInOn").hidden = !on;
-  if (on) $("optInLine").textContent = `Daily report to M0LTE: on${f.next ? `, next at ${day(f.next)}${utc(f.next)}` : ""}.`;
+  if (on) $("optInLine").textContent = `Daily report, a public bulletin on GB7RDG (MCAST): on${f.next ? `, next at ${day(f.next)}${utc(f.next)}` : ""}.`;
   const call = $("optInCall");
   if (settings && !call.value && document.activeElement !== call && settings.feedback.callsign) call.value = settings.feedback.callsign;
   $("optInSave").disabled = !$("optInBox").checked;

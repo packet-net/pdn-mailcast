@@ -244,8 +244,8 @@ public sealed record ReceiverConfig
     public HooksSettings? Hooks { get; init; }
 
     /// <summary>
-    /// A short daily report of what this receiver heard, sent as a personal mail through the BBS
-    /// to the broadcast's author. Null (the default) or not enabled sends nothing.
+    /// A short daily report of what this receiver heard, sent through the BBS as a public
+    /// bulletin to MCAST at GB7RDG. Null (the default) or not enabled sends nothing.
     /// </summary>
     public FeedbackSettings? Feedback { get; init; }
 

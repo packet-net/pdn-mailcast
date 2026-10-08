@@ -10,7 +10,11 @@ namespace Mailcast.HeadEnd.Intake;
 /// session state machine: the head end calls the BBS, logs in, says it has nothing to send, and
 /// takes what the BBS proposes. Bulletins up to the size cap are accepted; bulletins over the cap
 /// or already held are answered <c>-</c>; personal mail and NTS traffic, which should never be
-/// routed here, are answered <c>=</c> (later) so the BBS keeps them, with a warning.
+/// routed here, are answered <c>=</c> (later) so the BBS keeps them, with a warning. A listener's
+/// daily report is never taken: a bulletin to MCAST is answered <c>-</c>, and one that turns out
+/// to be a report once its title and body arrive is not kept (see <see cref="IntakePolicy.DailyReportRefusal"/>).
+/// Either way the BBS counts it handed over and does not offer it again, and the journal says so
+/// once for each BID.
 /// </summary>
 /// <remarks>
 /// <para>The head end always calls, on its own timer and just before each slot, so the BBS needs
@@ -28,6 +32,10 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     private readonly TimeProvider _time;
     private readonly Func<CancellationToken, Task<Stream>> _connect;
     private readonly SemaphoreSlim _one = new(1, 1);
+    private readonly HashSet<string> _reportsSaid = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The most report BIDs remembered for saying once; past it the record starts again.</summary>
+    private const int MostReportsRemembered = 10_000;
 
     public FbbIntake(FbbIntakeConfig config, RotationStore store, IntakePolicy policy, IJournal journal, TimeProvider time, Func<CancellationToken, Task<Stream>>? connect = null)
     {
@@ -167,6 +175,13 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             _journal.Write($"intake: WARNING - the BBS offered {fa.Bid} (type {fa.MessageType}, to {fa.To}@{fa.AtBbs}) to the mailcast partner; answered \"later\" so the BBS keeps it. Only bulletins should be routed here: check the partner's TO, AT and personal HR routes, then send the message on by hand");
             return FsAnswer.Defer;
         }
+        if (IntakePolicy.DailyReportRefusal(fa.To) is { } report)
+        {
+            // "-": the BBS counts it handed over and does not offer it again.
+            counts.Refused++;
+            RefusedReport(fa, report);
+            return FsAnswer.AlreadyHave;
+        }
         string? why = _policy.Refusal(fa.MessageType, fa.Bid, fa.Size)
             ?? (_store.Holds(fa.Bid) ? "its BID is already held" : null);
         if (why is null)
@@ -185,6 +200,13 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             return;
         }
         string text = Encoding.Latin1.GetString(delivered.Body.Span);
+        if (IntakePolicy.DailyReportRefusal(fa.To, delivered.Title, text) is { } report)
+        {
+            // Taken, so the BBS does not offer it again, but never kept, so never sent.
+            counts.Refused++;
+            RefusedReport(fa, report);
+            return;
+        }
         long seconds = _time.GetUtcNow().ToUnixTimeSeconds();
         Bulletin bulletin;
         try
@@ -210,6 +232,19 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
                 counts.Refused++;
                 _journal.Write($"intake: {bulletin.Bid} is over the size cap once serialised; not kept");
                 break;
+        }
+    }
+
+    /// <summary>Says once for each BID that a daily report was refused.</summary>
+    private void RefusedReport(FaProposal fa, string why)
+    {
+        if (_reportsSaid.Count >= MostReportsRemembered)
+        {
+            _reportsSaid.Clear();
+        }
+        if (_reportsSaid.Add(fa.Bid))
+        {
+            _journal.Write($"intake: refused {fa.Bid} from {fa.From} to {fa.To}@{fa.AtBbs}: {why}");
         }
     }
 

@@ -8,13 +8,13 @@ namespace Mailcast.Receiver.Tests;
 
 /// <summary>
 /// The daily report into a real LinBPQ in docker, as the receiver's login sends it: taken as a
-/// personal message to M0LTE at GB7RDG, readable back as a report, and not taken twice.
+/// public bulletin to MCAST at GB7RDG, listed to MCAST, readable back as a report, and not taken twice.
 /// </summary>
 [Trait("Category", "Docker")]
 public class FeedbackLinBpqTests(ITestOutputHelper output)
 {
     [Fact]
-    public async Task DailyReport_LinBpqTakesItAsPersonalMail_Once()
+    public async Task DailyReport_LinBpqTakesItAsABulletinToMcast_Once()
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         var cancellation = deadline.Token;
@@ -29,7 +29,7 @@ public class FeedbackLinBpqTests(ITestOutputHelper output)
             new ReportSlot(new TimeOnly(11, 0), null, 0, null, null, []),
         ]);
         string bid = FeedbackService.Bid("G4ABC", "T1", day);
-        var mail = new Bulletin('P', "G4ABC", FeedbackSettings.To, FeedbackSettings.At, bid, report.Title,
+        var mail = new Bulletin(FeedbackSettings.Type, "G4ABC", FeedbackSettings.To, FeedbackSettings.At, bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()), [], report.Body);
 
         var first = await client.DeliverAsync([mail], cancellation);
@@ -43,13 +43,24 @@ public class FeedbackLinBpqTests(ITestOutputHelper output)
             output.WriteLine(text);
         }
         var (line, message) = Assert.Single(messages);
-        Assert.Contains("M0LTE", line, StringComparison.Ordinal);
+        Assert.Contains("MCAST", line, StringComparison.Ordinal);
         Assert.Contains("@GB7RDG", line, StringComparison.Ordinal);
-        Assert.Contains("Type/Status: P", message, StringComparison.Ordinal);
+        Assert.Matches(@"^\s*\d+\s+\d\d-\w+\s+B", line);
+        Assert.Contains("Type/Status: B", message, StringComparison.Ordinal);
         Assert.Contains("From: G4ABC\n", message, StringComparison.Ordinal);
-        Assert.Contains("To: M0LTE\n", message, StringComparison.Ordinal);
+        Assert.Contains("To: MCAST\n", message, StringComparison.Ordinal);
         Assert.Contains("Bid: " + bid + "\n", message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Title: " + report.Title + "\n", message, StringComparison.Ordinal);
+
+        // The whole @ field, which LinBPQ lists only up to its first dot, as kept in its message database.
+        var holding = await bpq.FilesHoldingAsync("GB7RDG.#42.GBR.EURO", cancellation);
+        output.WriteLine("@GB7RDG.#42.GBR.EURO is kept in: " + string.Join(", ", holding));
+        Assert.Contains(holding, f => f.EndsWith("DIRMES.SYS", StringComparison.OrdinalIgnoreCase));
+
+        // Anyone on the BBS finds it by its addressee.
+        string listed = await bpq.ListAsync("L> MCAST", cancellation);
+        output.WriteLine(listed);
+        Assert.Contains(line, listed, StringComparison.Ordinal);
 
         // As a sysop or a tool reads it back from the BBS, routing lines and all: the same report.
         var read = DailyReport.Parse(report.Title, message);

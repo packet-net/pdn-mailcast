@@ -108,7 +108,7 @@ public class FeedbackTests
 
         await rig.AtAsync(service, ReportAt);
         var mail = Assert.Single(rig.Bbs.Sent);
-        Assert.Equal(('P', "G4ABC", "M0LTE", "GB7RDG.#42.GBR.EURO"), (mail.Type, mail.From, mail.To, mail.At));
+        Assert.Equal(('B', "G4ABC", "MCAST", "GB7RDG.#42.GBR.EURO"), (mail.Type, mail.From, mail.To, mail.At));
         Assert.Matches("^6279[A-Z0-9]{2}G4ABC$", mail.Bid);
         Assert.Equal("MCR G4ABC 2026-10-06", mail.Title);
         Assert.Empty(mail.RoutingLines);
@@ -268,6 +268,44 @@ public class FeedbackTests
         var again = rig.Bbs.Sent[1];
         Assert.Equal(("G4ABC", rig.Bbs.Sent[0].Bid, "MCR G4ABC 2026-10-06"), (again.From, again.Bid, again.Title));
         Assert.Equal(FeedbackAnswer.Accepted, restarted.Last!.Answer);
+    }
+
+    [Fact]
+    public async Task Upgrade_AReportWaitingAsAPersonalMail_GoesAsTheBulletin()
+    {
+        // feedback.json as v0.8.1 left it: the report for 6 October deferred by the BBS when it
+        // was a personal mail to M0LTE, to be offered again at 18:30. Nothing in it says P or
+        // M0LTE: the message is made afresh at each offer.
+        using var dir = new TempDirectory();
+        const string Body = "MCR1 0.8.1 IO91lk sc 0/0 0\r\n09 W4 150 16 +1.2 IG\r\n";
+        File.WriteAllText(Path.Combine(dir.Path, FeedbackService.FileName), $$"""
+            {
+              "days": [],
+              "last": {
+                "day": "2026-10-06",
+                "title": "MCR G4ABC 2026-10-06",
+                "body": "{{Body.Replace("\r\n", "\\r\\n", StringComparison.Ordinal)}}",
+                "bid": "6279K7G4ABC",
+                "from": "G4ABC",
+                "sentAt": "2026-10-06T17:30:00+00:00",
+                "answer": "deferred",
+                "retryAt": "2026-10-06T18:30:00+00:00",
+                "offers": ["2026-10-06T17:30:00+00:00"]
+              },
+              "receiverId": "K7"
+            }
+            """);
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        Assert.Equal(FeedbackAnswer.Deferred, service.Last!.Answer);
+
+        await rig.AtAsync(service, new DateTimeOffset(2026, 10, 6, 18, 30, 0, TimeSpan.Zero));
+
+        var mail = Assert.Single(rig.Bbs.Sent);
+        Assert.Equal(('B', "G4ABC", "MCAST", "GB7RDG.#42.GBR.EURO"), (mail.Type, mail.From, mail.To, mail.At));
+        Assert.Equal(("6279K7G4ABC", "MCR G4ABC 2026-10-06", Body), (mail.Bid, mail.Title, mail.Body));
+        Assert.Equal(FeedbackAnswer.Accepted, service.Last!.Answer);
+        Assert.Equal(2, service.Last.Offers.Count);
     }
 
     [Fact]

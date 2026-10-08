@@ -191,6 +191,8 @@ Q0HEAD is a Q callsign, which is never issued, so it cannot clash with a station
 
 If LinBPQ ever offers the head end a personal message or NTS traffic, the head end answers `=` (later), so LinBPQ keeps it queued rather than counting it delivered, and logs a WARNING naming the BID every time it is offered: the partner's routes need fixing, and the message sending on by hand. Bulletins over the size cap, or with a BID already held, are answered `-`.
 
+Listeners' daily reports are public bulletins on GB7RDG, to `MCAST@GB7RDG.#42.GBR.EURO` (see [receiver.md](receiver.md#sending-a-daily-report)), and the head end never broadcasts one. A bulletin to MCAST is answered `-`, so LinBPQ counts it handed over and doesn't offer it again. A bulletin addressed anywhere else whose title starts `MCR ` and whose body has an `MCR1` header line is taken from LinBPQ, for the same reason, and then dropped. Either way the journal says so once for each BID. The file drop refuses both too.
+
 ### Later, packet.net's BBS
 
 pdn-bbs speaks the same FBB B1F forwarding, and its `fbbTcp` listener (BPQ's FBBPORT equivalent) asks only for the callsign. Add Q0HEAD as a partner there with the same bulletin-only routing, and change the head end's login to `[{ "expect": "Callsign :", "send": "{call}" }]` with pdn-bbs's port. pdn-bbs hands a partner that dials in whatever it holds for it, as LinBPQ does.

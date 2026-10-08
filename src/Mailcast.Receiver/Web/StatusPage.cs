@@ -970,7 +970,7 @@ public sealed class StatusPage : IAsyncDisposable
             lan = config.Web.Lan,
             passwordSet = config.Web.Password.Length > 0,
         },
-        // The daily report to M0LTE: whether it is on, and the callsign it is sent from.
+        // The daily report, a public bulletin to MCAST: whether it is on, and the callsign it is sent from.
         feedback = new
         {
             enabled = config.Feedback?.Enabled ?? false,
@@ -1175,8 +1175,8 @@ public sealed class StatusPage : IAsyncDisposable
         if (wasOn != isOn || (isOn && next.Feedback!.From != current.Feedback!.From))
         {
             _log(isOn
-                ? $"web: the daily report to {FeedbackSettings.To} was turned on from the page, sent from {next.Feedback!.From}"
-                : $"web: the daily report to {FeedbackSettings.To} was turned off from the page");
+                ? $"web: the daily report (a public bulletin to {FeedbackSettings.To}) was turned on from the page, sent from {next.Feedback!.From}"
+                : $"web: the daily report (a public bulletin to {FeedbackSettings.To}) was turned off from the page");
         }
         if (!string.Equals(next.Web.Password, pagePassword, StringComparison.Ordinal))
         {

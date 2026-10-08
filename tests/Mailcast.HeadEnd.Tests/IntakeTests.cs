@@ -193,6 +193,96 @@ public class IntakeTests
         Assert.Equal(bulletin.Title, entry.Title);
     }
 
+    /// <summary>A listener's daily report as it reaches GB7RDG: a bulletin to MCAST at GB7RDG's full address.</summary>
+    private static Bulletin Report(string call, string to = "MCAST", string at = "GB7RDG.#42.GBR.EURO") => Bulletin.FromMessageText('B', call, to, at,
+        $"6279T1{call}", $"MCR {call} 2026-10-06", new DateTimeOffset(2026, 10, 6, 18, 0, 0, TimeSpan.Zero),
+        "R:261006/1800Z 6279T1@GB7XYZ.#42.GBR.EURO BPQ6.0.25\r\n\r\nMCR1 0.8.1 IO91lk wessex.zapto.org 3/3 0\r\n10 W4 212 18 +1.2 IG\r\n");
+
+    [Fact]
+    public async Task Fbb_NeverTakesADailyReport_AndSaysSoOnceForEachBid()
+    {
+        // One to MCAST, refused at the proposal; one addressed anywhere else but shaped like a
+        // report, found once its title and body arrive; and an ordinary bulletin whose title
+        // happens to start "MCR ", which is taken.
+        var toMcast = Report("G4ABC");
+        var lookalike = Report("G4XYZ", to: "ALL", at: "GBR");
+        var ordinary = Bulletin.FromMessageText('B', "G4ABC", "ALL", "GBR", "2001_GB7XYZ", "MCR meeting tonight",
+            new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero), "R:261006/0900Z 2001@GB7XYZ.#42.GBR.EURO BPQ6.0.25\r\n\r\nThe MCR group meets at 8.\r\n");
+
+        using var state = new TempDirectory();
+        var journal = new MemoryJournal();
+        var store = Store(state, journal, cap: 6000);
+        int port = 0;
+        var config = new FbbIntakeConfig
+        {
+            Host = "127.0.0.1",
+            Port = 1,
+            User = "Q0HEAD",
+            Password = "pw",
+            Login = [new("user:", "{user}"), new("password:", "{password}")],
+            SessionTimeoutSeconds = 60,
+        };
+        using var intake = new FbbIntake(config, store, new IntakePolicy(6000), journal, TimeProvider.System, async cancellation =>
+        {
+            var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port, cancellation);
+            return client.GetStream();
+        });
+
+        // Twice, as a BBS that offered them again would: the same answers, and one line each.
+        for (int session = 0; session < 2; session++)
+        {
+            await using var bbs = new FakeBbs([Queued(toMcast), Queued(lookalike), Queued(ordinary)]);
+            port = bbs.Port;
+
+            var result = await intake.CollectAsync(Today, CancellationToken.None);
+            await bbs.DisposeAsync();
+
+            Assert.Null(result.Problem);
+            // "-" for the one to MCAST, so the BBS counts it handed over and does not offer it again.
+            Assert.Equal(FsAnswerKind.AlreadyHave, bbs.Answers[toMcast.Bid]);
+            // Asked for, since nothing in the proposal gives it away, then not kept.
+            Assert.Equal(FsAnswerKind.Accept, bbs.Answers[lookalike.Bid]);
+            Assert.Equal(session == 0 ? FsAnswerKind.Accept : FsAnswerKind.AlreadyHave, bbs.Answers[ordinary.Bid]);
+            Assert.Equal(session == 0 ? 1 : 0, result.Accepted);
+            Assert.Equal(session == 0 ? 2 : 3, result.Refused);
+        }
+
+        Assert.Equal(1, store.Count);
+        Assert.False(store.Holds(toMcast.Bid));
+        Assert.False(store.Holds(lookalike.Bid));
+        Assert.True(store.Holds(ordinary.Bid));
+        var plan = store.Plan(BroadcastScheduler.Midnight(Today).AddHours(12), 1, Compression.Default, new ScheduleOptions());
+        Assert.DoesNotContain(plan.Directory.Entries, e => e.Title.StartsWith("MCR G4", StringComparison.Ordinal));
+
+        var said = Assert.Single(journal.Lines, l => l.Contains(toMcast.Bid, StringComparison.Ordinal));
+        Assert.Contains("refused", said, StringComparison.Ordinal);
+        Assert.Contains("addressed to MCAST", said, StringComparison.Ordinal);
+        said = Assert.Single(journal.Lines, l => l.Contains(lookalike.Bid, StringComparison.Ordinal));
+        Assert.Contains("daily report", said, StringComparison.Ordinal);
+        Assert.All(journal.Lines, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
+    }
+
+    [Fact]
+    public async Task FileDrop_NeverTakesADailyReport()
+    {
+        using var state = new TempDirectory();
+        using var drop = new TempDirectory();
+        var journal = new MemoryJournal();
+        var store = Store(state, journal, cap: 6000);
+        File.WriteAllBytes(Path.Combine(drop.Path, "a.bul"), Report("G4ABC").Serialize());
+        File.WriteAllBytes(Path.Combine(drop.Path, "b.bul"), Report("G4XYZ", to: "ALL", at: "WW").Serialize());
+
+        var intake = new FileDropIntake(drop.Path, store, new IntakePolicy(6000), journal);
+        var result = await intake.CollectAsync(Today, CancellationToken.None);
+
+        Assert.Equal((0, 2), (result.Accepted, result.Refused));
+        Assert.Equal(0, store.Count);
+        Assert.Equal(["a.bul", "b.bul"], Directory.EnumerateFiles(Path.Combine(drop.Path, "rejected")).Select(Path.GetFileName).Order());
+        Assert.Contains(journal.Lines, l => l.Contains("a.bul", StringComparison.Ordinal) && l.Contains("addressed to MCAST", StringComparison.Ordinal));
+        Assert.Contains(journal.Lines, l => l.Contains("b.bul", StringComparison.Ordinal) && l.Contains("daily report", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Fbb_SaysWhyWhenTheBbsCannotBeReached()
     {

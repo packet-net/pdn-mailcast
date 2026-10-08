@@ -47,7 +47,7 @@ public sealed record ReportSlot(
 
 /// <summary>
 /// A listener's daily feedback report: what one receiver heard of GB7RDG's slots in a UTC day,
-/// small enough to go as a packet mail. See docs/receiver.md, "The daily report's format".
+/// small enough to go as a packet bulletin. See docs/receiver.md, "The daily report's format".
 /// </summary>
 /// <remarks>
 /// <para>The title is <c>MCR CALL YYYY-MM-DD</c>. The body is plain ASCII: one header line, then
@@ -76,6 +76,18 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
 
     /// <summary>What the title and the header line start with.</summary>
     public const string Tag = "MCR";
+
+    /// <summary>
+    /// Who the report is addressed to: it goes as a public bulletin, type B, to MCAST, so anyone
+    /// on GB7RDG can list it. Nothing addressed to MCAST is ever taken in for the broadcast.
+    /// </summary>
+    public const string BulletinTo = "MCAST";
+
+    /// <summary>
+    /// The report's @ field: GB7RDG's full hierarchical address, so mail routing carries it to
+    /// GB7RDG and it stays there, rather than a flood area such as WW or GBR.
+    /// </summary>
+    public const string BulletinAt = "GB7RDG.#42.GBR.EURO";
 
     private const string Missing = "-";
 
@@ -320,6 +332,35 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         }
         return token.ToString();
     }
+
+    /// <summary>
+    /// Whether a message looks like a daily report, whoever it is addressed to: a title starting
+    /// <c>MCR </c> and a body with an <c>MCR</c> header line (<c>MCR1</c>, or a later format), as
+    /// a BBS shows it, routing lines and all. The head end refuses such a message, so a report can
+    /// never be put on the air.
+    /// </summary>
+    public static bool LooksLikeReport(string? title, string? body)
+    {
+        if (title is null || body is null || !title.TrimStart().StartsWith(Tag + " ", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        foreach (string line in body.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
+        {
+            if (HeaderPattern().IsMatch(line.Trim()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Whether <paramref name="to"/> is the report's addressee, <see cref="BulletinTo"/>, in any case.</summary>
+    public static bool IsReportAddressee(string? to) =>
+        to is not null && to.Trim().Equals(BulletinTo, StringComparison.OrdinalIgnoreCase);
+
+    [GeneratedRegex(@"^MCR[0-9]+(\s|$)", RegexOptions.IgnoreCase)]
+    private static partial Regex HeaderPattern();
 
     [GeneratedRegex(@"^MCR ([A-Z0-9]+) (\d{4}-\d{2}-\d{2})$")]
     private static partial Regex TitlePattern();

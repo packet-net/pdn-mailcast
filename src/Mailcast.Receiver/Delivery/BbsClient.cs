@@ -165,8 +165,9 @@ public sealed partial class BbsClient : IBbsSession
 
     /// <summary>
     /// Builds the message as a partner sends it: FA B from @at to BID, the routing lines and body
-    /// as text. A message of type P goes as a personal one, FA P from @at to MID: that is how the
-    /// daily report (see <see cref="Feedback.FeedbackService"/>) reaches M0LTE through the BBS.
+    /// as text. The daily report (see <see cref="Feedback.FeedbackService"/>) goes the same way, a
+    /// bulletin to MCAST at GB7RDG's full address. A message of type P would go as a personal
+    /// one, FA P from @at to MID.
     /// </summary>
     internal static FbbOutboundMessage ToOutbound(Bulletin bulletin, string fallbackAt) => new()
     {
