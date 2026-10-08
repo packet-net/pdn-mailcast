@@ -268,6 +268,17 @@ public sealed class DeliveryService
         _ => "not offered",
     };
 
+    /// <summary>A word or two for a narrow status badge; <see cref="Describe"/> gives the full sentence for a tooltip.</summary>
+    internal static string DescribeShort(DeliveryVerdict verdict) => verdict switch
+    {
+        DeliveryVerdict.Accepted => "accepted",
+        DeliveryVerdict.AlreadyHad => "already had",
+        DeliveryVerdict.Refused => "refused",
+        DeliveryVerdict.Deferred => "deferred",
+        DeliveryVerdict.Unconfirmed => "unconfirmed",
+        _ => "not offered",
+    };
+
     private static string Describe(TimeSpan delay) =>
         delay.TotalMinutes >= 1 ? $"{delay.TotalMinutes:F0} min" : $"{delay.TotalSeconds:F0} s";
 }
