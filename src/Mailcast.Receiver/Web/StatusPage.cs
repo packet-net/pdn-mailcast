@@ -243,6 +243,9 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/bbs/test", "POST"):
                     await TestBbsAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/listen-now", "POST"):
+                    await ListenNowAsync(context).ConfigureAwait(false);
+                    break;
                 case (_, "GET") when path.StartsWith(MailBase, StringComparison.Ordinal):
                     await ServeBulletinAsync(context, path[MailBase.Length..]).ConfigureAwait(false);
                     break;
@@ -709,6 +712,8 @@ public sealed class StatusPage : IAsyncDisposable
                 toneLive = liveTone is not null,
             },
             schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
+            // Issue #53: the "Listen now" button, for a web SDR only.
+            listenNow = ListenNowView(_host, config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
             burst = BurstView(_host.Pipeline?.Burst.Shown),
             // The radio path from GB7RDG, measured after each slot from the bursts decoded.
@@ -898,6 +903,30 @@ public sealed class StatusPage : IAsyncDisposable
         }
         var endpoint = Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target);
         return new { host = endpoint.ToString(), url = endpoint.PublicUrl, about };
+    }
+
+    /// <summary>
+    /// Issue #53's "Listen now" tile: null unless the audio is a web SDR. <c>until</c> is set
+    /// while a session it opened is still running, for the page's countdown.
+    /// </summary>
+    internal static object? ListenNowView(ReceiverHost host, ReceiverConfig config, DateTimeOffset now)
+    {
+        if (AudioSource.Parse(config.Audio).Kind != AudioSourceKind.UberSdr)
+        {
+            return null;
+        }
+        var until = host.ListenNow.ActiveUntil(now);
+        var nextOpens = ListeningWindow.Next(now, host.Schedule).Opens;
+        bool alreadyListening = host.Audio.Phase == AudioPhase.Listening && until is null;
+        return new
+        {
+            usesLeft = host.ListenNow.UsesLeft(now),
+            usesMax = ListenNowService.MaxPerDay,
+            minutes = (int)ListenNowService.Duration.TotalMinutes,
+            until,
+            canUse = until is null && host.ListenNow.Problem(now, nextOpens, alreadyListening) is null,
+            problem = until is null ? host.ListenNow.Problem(now, nextOpens, alreadyListening) : null,
+        };
     }
 
     internal static string AudioPhaseName(AudioPhase phase) => phase switch
@@ -1490,6 +1519,30 @@ public sealed class StatusPage : IAsyncDisposable
             said = result.Said,
             detail = result.Detail,
         }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// POST /api/listen-now: issue #53's button. Opens a web SDR for a few minutes between its
+    /// scheduled windows, or says why not (already used up for today, a slot's window is too
+    /// close, or the audio is not a web SDR).
+    /// </summary>
+    private async Task ListenNowAsync(HttpListenerContext context)
+    {
+        var (answered, _) = await ReadBodyAsync(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        var result = _host.RequestListenNow();
+        if (result.Ok)
+        {
+            _log($"web: \"Listen now\" opened from the page ({context.Request.RemoteEndPoint?.Address}), until {result.Until:HH:mm:ss} UTC");
+            await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { ok = true, until = result.Until }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
+        }
+        else
+        {
+            await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { ok = false, error = result.Reason })).ConfigureAwait(false);
+        }
     }
 
     /// <summary>The sound cards ALSA knows, as device names the audio setting takes.</summary>

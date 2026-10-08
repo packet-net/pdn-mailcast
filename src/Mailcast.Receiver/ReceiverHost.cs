@@ -49,7 +49,49 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks);
         }
+        ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
+    }
+
+    /// <summary>
+    /// Issue #53: a web SDR receiver's "Listen now" button, opened for a few minutes between
+    /// its scheduled windows.
+    /// </summary>
+    public ListenNowService ListenNow { get; }
+
+    /// <summary>
+    /// Opens a "Listen now" session, if one is not refused (see <see cref="ListenNowService.Problem"/>):
+    /// only for a web SDR, and never overlapping a slot's own window.
+    /// </summary>
+    public ListenNowService.Result RequestListenNow()
+    {
+        var config = Config;
+        if (AudioSource.Parse(config.Audio).Kind != AudioSourceKind.UberSdr)
+        {
+            return new ListenNowService.Result(false, "Listen now is for a web SDR receiver only.", null);
+        }
+        var now = _time.GetUtcNow();
+        var nextOpens = ListeningWindow.Next(now, Schedule).Opens;
+        var result = ListenNow.Request(now, nextOpens, alreadyListening: Audio.Phase == AudioPhase.Listening);
+        if (result.Ok)
+        {
+            WakeListenNow();
+        }
+        return result;
+    }
+
+    private readonly object _listenNowGate = new();
+    private TaskCompletionSource _listenNowWake = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Wakes a wait for the web SDR to reopen at once, so a granted "Listen now" request does not wait out the clock check.</summary>
+    private void WakeListenNow()
+    {
+        TaskCompletionSource wake;
+        lock (_listenNowGate)
+        {
+            wake = _listenNowWake;
+        }
+        wake.TrySetResult();
     }
 
     /// <summary>The daily report to the broadcast's author, when the config's <c>feedback</c> turns it on.</summary>
@@ -466,6 +508,16 @@ public sealed class ReceiverHost : IAsyncDisposable
                     described = words;
                     _log($"audio: {words}");
                 }
+                // Issue #53: a "Listen now" session granted while the web SDR would otherwise be
+                // closed opens it at once, until the session's own end (never the real window's:
+                // ListenNowService caps it at the window's opening).
+                bool listenNow = false;
+                if (opens > _time.GetUtcNow() && ListenNow.ActiveUntil(_time.GetUtcNow()) is { } until)
+                {
+                    opens = _time.GetUtcNow();
+                    closes = until;
+                    listenNow = true;
+                }
                 if (opens > _time.GetUtcNow())
                 {
                     Audio = new($"the web SDR {WebSdrHost(source)} is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
@@ -477,11 +529,16 @@ public sealed class ReceiverHost : IAsyncDisposable
                     }
                     // At most a minute at a time, then the clock again: a Pi that booted on
                     // fake-hwclock's stale time is put right by NTP partway through the wait,
-                    // and one long timer would sleep straight through the real slot.
+                    // and one long timer would sleep straight through the real slot. A granted
+                    // "Listen now" request also wakes this at once.
                     await ClockDelayAsync(Shorter(opens - _time.GetUtcNow(), ClockCheck), restart.Token).ConfigureAwait(false);
                     continue;
                 }
                 closedSaid = null;
+                if (listenNow)
+                {
+                    _log($"audio: \"Listen now\": opening the web SDR {WebSdrHost(source)} until {closes.UtcDateTime:HH:mm:ss} UTC");
+                }
                 closeAt = new CancellationTokenSource();
                 _ = CloseAtAsync(opens, closes, closeAt, restart.Token);
             }
@@ -607,11 +664,23 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     private async Task ClockDelayAsync(TimeSpan delay, CancellationToken cancellation)
     {
+        Task wake;
+        lock (_listenNowGate)
+        {
+            if (_listenNowWake.Task.IsCompleted)
+            {
+                _listenNowWake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+            wake = _listenNowWake.Task;
+        }
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         try
         {
-            var tick = Task.Delay(delay, _time, cancellation);
+            var tick = Task.Delay(delay, _time, stop.Token);
             ClockWaiting?.Invoke();
-            await tick.ConfigureAwait(false);
+            await Task.WhenAny(tick, wake).ConfigureAwait(false);
+            await stop.CancelAsync().ConfigureAwait(false);
+            cancellation.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException)
         {

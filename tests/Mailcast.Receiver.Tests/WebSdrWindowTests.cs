@@ -390,6 +390,41 @@ public class WebSdrWindowTests
     }
 
     [Fact]
+    public async Task ListenNow_BetweenWindows_OpensAtOnceAndClosesAfterDuration()
+    {
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero));
+        await rig.AudioAsync(AudioPhase.Closed);
+
+        var result = rig.Host.RequestListenNow();
+        Assert.True(result.Ok);
+
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.AudioAsync(AudioPhase.Listening);
+        Assert.False(input.Disposed);
+        Assert.Contains(rig.Log, l => l.Contains("\"Listen now\"", StringComparison.Ordinal));
+
+        rig.Clock.Advance(ListenNowService.Duration);
+        await rig.AudioAsync(AudioPhase.Closed);
+        Assert.True(input.Disposed);
+        // Back to the real schedule afterwards: the next real window, not stuck or skipped.
+        Assert.Contains("closed until 09:58 UTC, ready for the 10:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ListenNow_RefusedWithinFiveMinutesOfTheRealWindow()
+    {
+        // 09:56: the 10:00 slot's window opens at 09:58, under 5 minutes away.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 56, 0, TimeSpan.Zero));
+        await rig.AudioAsync(AudioPhase.Closed);
+
+        var result = rig.Host.RequestListenNow();
+
+        Assert.False(result.Ok);
+        Assert.Contains("wait for that instead", result.Reason, StringComparison.Ordinal);
+        Assert.False(rig.Inputs.Reader.TryPeek(out _));
+    }
+
+    [Fact]
     public void Page_AsksForTheSpectrogramOnlyWhileTheAudioIsLive_AndExplainsOtherwise()
     {
         // The page is a file, not a program this suite can run: these check that its logic is the one described.
