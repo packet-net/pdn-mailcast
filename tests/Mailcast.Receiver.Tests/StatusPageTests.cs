@@ -22,7 +22,8 @@ public class StatusPageTests
     /// got, and pdn-soundmodem's waterfall needs HttpListener, so this asks the system for a
     /// free port and, in the rare case another process takes it first, asks again.
     /// </summary>
-    private static async Task<(ReceiverHost Host, StatusPage Page, HttpClient Http, string Path)> StartAsync(string dir, bool lan = false, string password = "")
+    private static async Task<(ReceiverHost Host, StatusPage Page, HttpClient Http, string Path)> StartAsync(
+        string dir, bool lan = false, string password = "", Func<BbsSettings, Task<BbsLoginTestResult>>? testBbsLogin = null)
     {
         string path = System.IO.Path.Combine(dir, "receiver.json");
         for (int attempt = 0; ; attempt++)
@@ -34,7 +35,7 @@ public class StatusPageTests
             var config = Config(dir, port, lan, password);
             config.Save(path);
             var host = new ReceiverHost(config, TimeProvider.System, _ => { });
-            var page = new StatusPage(host, path, _ => { });
+            var page = new StatusPage(host, path, _ => { }) { TestBbsLogin = testBbsLogin };
             try
             {
                 page.Start();
@@ -389,6 +390,218 @@ public class StatusPageTests
         Assert.Equal(HttpStatusCode.Forbidden, crossSite.StatusCode);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, huge.StatusCode);
         Assert.Equal(before, ReceiverConfig.Load(path));
+    }
+
+    [Fact]
+    public async Task TestBbs_GoodPassword_SaysOkAndNeverReturnsIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs(); // default password "secret", matching Config()'s saved Bbs.Password
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+        string body = await answer.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.DoesNotContain("secret", body, StringComparison.Ordinal);
+        var json = JsonSerializer.Deserialize<JsonElement>(body);
+        Assert.Equal("ok", json.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("detail").ValueKind);
+        // No mail was exchanged.
+        Assert.Empty(bbs.Taken);
+    }
+
+    [Fact]
+    public async Task TestBbs_WrongPassword_SaysSo()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs();
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port, password = "nope" });
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("wrongPassword", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_NotSetUpAsAPartner_SaysSo()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs { NotAPartner = true };
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("notForwardingPartner", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_NothingListening_SaysItCannotReachIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int closedPort = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = closedPort, password = "secret" });
+
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("unreachable", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_IsRateLimited()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs();
+
+        var first = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+        var second = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.NotNull(second.Headers.RetryAfter);
+    }
+
+    [Fact]
+    public async Task TestBbs_FromAnotherSite_IsRefused()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        using var foreign = new HttpRequestMessage(HttpMethod.Post, "api/bbs/test") { Content = JsonContent.Create(new { host = "127.0.0.1", port = 1 }) };
+        foreign.Headers.Add("Origin", "http://evil.example");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(foreign)).StatusCode);
+    }
+
+    [Fact]
+    public async Task TestBbs_OnAPageWithAPassword_NeedsIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path, password: "letmein");
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var without = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = 1 });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, without.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(65536)]
+    [InlineData(70000)]
+    public async Task TestBbs_PortOutOfRange_IsRefusedCleanly_NotLeftToThrow(int port)
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port, password = "secret" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("TCP port", json.GetProperty("error").GetString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("bad\u0000host")]
+    [InlineData("bad\u0001host")]
+    public async Task TestBbs_HostInsane_IsRefusedCleanly(string host)
+    {
+        using var dir = new TempDirectory();
+        var (hostApp, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = hostApp;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host, port = 8011, password = "secret" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+    }
+
+    [Fact]
+    public async Task TestBbs_HostTooLong_IsRefusedCleanly()
+    {
+        using var dir = new TempDirectory();
+        var (hostApp, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = hostApp;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = new string('a', 300), port = 8011, password = "secret" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+    }
+
+    /// <summary>An empty host, like an empty login or command, keeps the one already saved: it is never left empty, so this is not the same path as <see cref="TestBbs_HostInsane_IsRefusedCleanly"/>.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task TestBbs_HostLeftEmpty_KeepsTheSavedOne(string host)
+    {
+        using var dir = new TempDirectory();
+        var (hostApp, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = hostApp;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs(); // the saved host (127.0.0.1) and password (secret) reach it fine
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host, port = bbs.Port, password = "secret" });
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("ok", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_LoginThrowsUnexpectedly_StillAnswersWithNoSecretInIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path, testBbsLogin: _ => throw new InvalidOperationException("boom, with the password s3cr3t in it"));
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = 8011, password = "secret" });
+        string body = await answer.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.DoesNotContain("s3cr3t", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("boom", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", body, StringComparison.Ordinal);
+        var json = JsonSerializer.Deserialize<JsonElement>(body);
+        Assert.Equal("unexpectedReply", json.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("detail").ValueKind);
     }
 
     [Fact]

@@ -48,6 +48,32 @@ public sealed record DeliveryOutcome(string Bid, DeliveryVerdict Verdict, string
 /// <param name="ReverseOffered">Messages the BBS tried to send the receiver, all answered FS =.</param>
 public sealed record SessionReport(bool Graceful, string? Failure, IReadOnlyList<DeliveryOutcome> Outcomes, int ReverseOffered);
 
+/// <summary>What testing a BBS login found.</summary>
+public enum BbsLoginTestOutcome
+{
+    /// <summary>Connected, logged in, and reached the forwarding prompt, as a partner would.</summary>
+    Ok,
+
+    /// <summary>The BBS said the password was wrong.</summary>
+    WrongPassword,
+
+    /// <summary>The login worked, but it is not set up as a BBS forwarding partner.</summary>
+    NotForwardingPartner,
+
+    /// <summary>The BBS could not be reached: it refused the connection, or never answered.</summary>
+    Unreachable,
+
+    /// <summary>Something else happened; <see cref="BbsLoginTestResult.Detail"/> has the BBS's first line.</summary>
+    UnexpectedReply,
+}
+
+/// <summary>
+/// What testing a BBS login found. <see cref="Said"/> is a short, friendly sentence for the
+/// settings page; <see cref="Detail"/> is the BBS's own first line of reply, given only for
+/// <see cref="BbsLoginTestOutcome.UnexpectedReply"/>.
+/// </summary>
+public sealed record BbsLoginTestResult(BbsLoginTestOutcome Outcome, string Said, string? Detail = null);
+
 /// <summary>
 /// One FBB B1F forwarding session into the local BBS, as its calling partner: connect, log in,
 /// propose every bulletin given, transfer those the BBS asks for, and close.
@@ -90,6 +116,179 @@ public sealed partial class BbsClient : IBbsSession
 
     /// <summary>The software version in the receiver's SID.</summary>
     public string Version { get; init; } = "0.1.0";
+
+    /// <summary>How long a login test may take in all: connecting, logging in and reading the reply.</summary>
+    public TimeSpan TestTimeout { get; init; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Tests the configured login: connects, logs in and enters the BBS command (for LinBPQ) or
+    /// answers FBB's prompts, far enough to see whether it reaches the forwarding prompt as a
+    /// partner would. Exchanges no mail, proposes nothing, and never starts the FBB session
+    /// proper; it just closes the connection once it knows, which is as polite as a connection
+    /// that commits to nothing needs to be.
+    /// </summary>
+    public async Task<BbsLoginTestResult> TestLoginAsync(CancellationToken cancellation)
+    {
+        using var whole = new Deadline(TestTimeout, _time, cancellation);
+        using var client = new TcpClient();
+        try
+        {
+            await client.ConnectAsync(_settings.Host, _settings.Port, whole.Token).ConfigureAwait(false);
+        }
+        catch (SocketException e)
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.Unreachable,
+                $"Can't reach {_settings.Host}:{_settings.Port}: {Ascii.Clean(e.Message)}.");
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.Unreachable,
+                $"{_settings.Host}:{_settings.Port} did not answer within {TestTimeout.TotalSeconds:F0} s.");
+        }
+        client.NoDelay = true;
+        using var stream = client.GetStream();
+        try
+        {
+            return _settings.Type == BbsKind.LinBpq
+                ? await TestLinBpqAsync(stream, whole.Token).ConfigureAwait(false)
+                : await TestFbbAsync(stream, whole.Token).ConfigureAwait(false);
+        }
+        catch (IOException e)
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.Unreachable, $"The connection broke: {Ascii.Clean(e.Message)}.");
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.UnexpectedReply, "The BBS did not answer in time.");
+        }
+    }
+
+    /// <summary>LinBPQ's FBBPORT sends no prompts: send all three lines, then read the reply.</summary>
+    private async Task<BbsLoginTestResult> TestLinBpqAsync(NetworkStream stream, CancellationToken cancellation)
+    {
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(_settings.Login + "\r" + _settings.Password + "\r"
+            + (_settings.Command.Length > 0 ? _settings.Command + "\r" : "")), cancellation).ConfigureAwait(false);
+        var (text, closed) = await ReadTestReplyAsync(stream, Settled, cancellation).ConfigureAwait(false);
+        return Classify(text, closed);
+    }
+
+    /// <summary>FBB prompts for both; a leading dot asks for a binary session.</summary>
+    private async Task<BbsLoginTestResult> TestFbbAsync(NetworkStream stream, CancellationToken cancellation)
+    {
+        var (first, closed1) = await ReadTestReplyAsync(stream,
+            t => t.Contains("allsign", StringComparison.OrdinalIgnoreCase) || Settled(t), cancellation).ConfigureAwait(false);
+        if (closed1 || !first.Contains("allsign", StringComparison.OrdinalIgnoreCase))
+        {
+            return Classify(first, closed1);
+        }
+        await stream.WriteAsync(Encoding.Latin1.GetBytes("." + _settings.Login + "\r"), cancellation).ConfigureAwait(false);
+        var (second, closed2) = await ReadTestReplyAsync(stream,
+            t => t.Contains("assword", StringComparison.OrdinalIgnoreCase) || Settled(t), cancellation).ConfigureAwait(false);
+        if (closed2 || !second.Contains("assword", StringComparison.OrdinalIgnoreCase))
+        {
+            return Classify(second, closed2);
+        }
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(_settings.Password + "\r"), cancellation).ConfigureAwait(false);
+        var (text, closed) = await ReadTestReplyAsync(stream, Settled, cancellation).ConfigureAwait(false);
+        return Classify(text, closed);
+    }
+
+    /// <summary>Reads until <paramref name="stop"/> says the reply is settled, or the connection closes or the deadline passes.</summary>
+    private static async Task<(string Text, bool Closed)> ReadTestReplyAsync(NetworkStream stream, Func<string, bool> stop, CancellationToken cancellation)
+    {
+        var seen = new List<byte>();
+        var buffer = new byte[1024];
+        while (true)
+        {
+            string text = Encoding.Latin1.GetString([.. seen]);
+            if (stop(text))
+            {
+                return (text, false);
+            }
+            int read;
+            try
+            {
+                read = await stream.ReadAsync(buffer, cancellation).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return (text, false);
+            }
+            if (read == 0)
+            {
+                return (text, true);
+            }
+            seen.AddRange(buffer.AsSpan(0, read).ToArray());
+        }
+    }
+
+    /// <summary>The phrases a BBS refuses a login with: LinBPQ's FBBPORT re-sends its prompts; FBB says one of these.</summary>
+    private static readonly string[] FbbLoginRefusals = ["Invalid callsign", "Unregistered callsign", "Callsign error", "Password error", "Bad password"];
+
+    private static bool RefusalFound(string text) =>
+        text.Contains("user:", StringComparison.OrdinalIgnoreCase)
+        || text.Contains("password:", StringComparison.OrdinalIgnoreCase)
+        || FbbLoginRefusals.Any(r => text.Contains(r, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The reply has said enough to classify: a refusal, an unknown command, or a prompt at the end.</summary>
+    private static bool Settled(string text) =>
+        RefusalFound(text) || text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase) || text.TrimEnd().EndsWith('>');
+
+    /// <summary>
+    /// What a login test's reply means. <see cref="PromptCall"/> matching means the BBS sent its
+    /// own forwarding prompt ("de CALL>"), exactly as it does to a real forwarding partner; a bare
+    /// prompt with no "de CALL" means the login worked but is not a BBS user set up to forward,
+    /// such as LinBPQ asking a brand new login to register a name.
+    /// </summary>
+    private BbsLoginTestResult Classify(string text, bool closed)
+    {
+        if (RefusalFound(text))
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.WrongPassword, "That password is not right.");
+        }
+        if (text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.UnexpectedReply,
+                $"The BBS did not know the command \"{_settings.Command}\".", FirstLine(text));
+        }
+        if (PromptCall().IsMatch(text))
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.Ok, "OK, logged in as a forwarding partner.");
+        }
+        if (text.TrimEnd().EndsWith('>'))
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.NotForwardingPartner,
+                $"\"{_settings.Login}\" logged in, but it is not set up as a BBS forwarding partner.");
+        }
+        string? line = FirstLine(text);
+        return new BbsLoginTestResult(BbsLoginTestOutcome.UnexpectedReply,
+            line is null
+                ? (closed ? "The BBS closed the connection without answering." : "The BBS did not answer in time.")
+                : "The BBS said something unexpected.",
+            line);
+    }
+
+    /// <summary>
+    /// The first line of <paramref name="text"/>, cleaned of anything not printable and with the
+    /// password tested redacted, or null for nothing. The password is taken out before this ever
+    /// reaches a log or a reply: whether a BBS ever echoes back what it was sent is not something
+    /// to rely on, FBB's included.
+    /// </summary>
+    private string? FirstLine(string text)
+    {
+        string trimmed = text.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+        int end = trimmed.IndexOfAny(['\r', '\n']);
+        string line = Ascii.Clean(Redact(end < 0 ? trimmed : trimmed[..end])).Trim();
+        return line.Length == 0 ? null : line;
+    }
+
+    /// <summary>Replaces every occurrence of the password tested with asterisks.</summary>
+    private string Redact(string text) =>
+        _settings.Password.Length == 0 ? text : text.Replace(_settings.Password, "***", StringComparison.Ordinal);
 
     /// <summary>Offers <paramref name="bulletins"/> to the BBS in one session.</summary>
     public async Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)

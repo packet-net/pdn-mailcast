@@ -40,7 +40,11 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>How soon one bulletin can be sent to the BBS again after the last time.</summary>
     public static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
 
+    /// <summary>How soon the BBS login can be tested again after the last time.</summary>
+    public static readonly TimeSpan BbsTestCooldown = TimeSpan.FromSeconds(10);
+
     private readonly Dictionary<ulong, DateTimeOffset> _resentAt = [];
+    private DateTimeOffset? _lastBbsTestAt;
 
     private readonly SessionStore _sessions;
     private readonly Dictionary<HttpListenerContext, string?> _sockets = [];
@@ -89,6 +93,9 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>How the wait for a wrong password is done, for a test to hold it; null waits on the host's clock.</summary>
     internal Func<TimeSpan, Task>? Pause { get; init; }
+
+    /// <summary>How "Test BBS login" actually tries the login, for a test to make it throw; null uses a real <see cref="BbsClient"/>.</summary>
+    internal Func<BbsSettings, Task<BbsLoginTestResult>>? TestBbsLogin { get; init; }
 
     /// <summary>The check for a newer version, whose finding the page shows; null shows none.</summary>
     public UpdateCheck? Updates { get; init; }
@@ -232,6 +239,9 @@ public sealed class StatusPage : IAsyncDisposable
                     break;
                 case ("/api/mail/resend", "POST"):
                     await ResendAsync(context).ConfigureAwait(false);
+                    break;
+                case ("/api/bbs/test", "POST"):
+                    await TestBbsAsync(context).ConfigureAwait(false);
                     break;
                 case (_, "GET") when path.StartsWith(MailBase, StringComparison.Ordinal):
                     await ServeBulletinAsync(context, path[MailBase.Length..]).ConfigureAwait(false);
@@ -1367,6 +1377,119 @@ public sealed class StatusPage : IAsyncDisposable
                 await RespondAsync(context, 404, "application/json", JsonSerializer.Serialize(new { error = "No such bulletin in the archive." })).ConfigureAwait(false);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The "Test BBS login" form: the host, port, login, password and command to try. Any field
+    /// left out, or an empty password, uses the one already saved, so the button can test a
+    /// login that has not been saved yet, or the one already on the page.
+    /// </summary>
+    internal sealed record TestBbsForm(string? Type, string? Host, int? Port, string? Login, string? Password, string? Command);
+
+    /// <summary>
+    /// POST /api/bbs/test: tries the host, port, login, password and command given (or, for any
+    /// left out, the ones already saved), the same way <see cref="BbsClient.TestLoginAsync"/>
+    /// does, and says in plain words how far it got. Exchanges no mail, and never logs or returns
+    /// the password. Rate-limited to one try every <see cref="BbsTestCooldown"/>, the same CSRF
+    /// and sign-in checks as every other setting, because this opens a real connection out from
+    /// the receiver on whatever is asked.
+    /// </summary>
+    private async Task TestBbsAsync(HttpListenerContext context)
+    {
+        var now = _host.Time.GetUtcNow();
+        TimeSpan? wait = null;
+        lock (_gate)
+        {
+            if (_lastBbsTestAt is { } last && now - last < BbsTestCooldown)
+            {
+                wait = BbsTestCooldown - (now - last);
+            }
+            else
+            {
+                _lastBbsTestAt = now;
+            }
+        }
+        if (wait is { } left)
+        {
+            context.Response.Headers["Retry-After"] = RetryAfter(left);
+            await RespondAsync(context, 429, "application/json",
+                JsonSerializer.Serialize(new { error = $"Only one login test at a time. Try again in {Math.Ceiling(left.TotalSeconds)} s." })).ConfigureAwait(false);
+            return;
+        }
+
+        var (answered, form) = await ReadJsonAsync<TestBbsForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        if (form is null)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "That was not a login to test." })).ConfigureAwait(false);
+            return;
+        }
+
+        var current = _host.Config.Bbs;
+        var kind = current.Type;
+        if (form.Type is { Length: > 0 } type && !Enum.TryParse(type, ignoreCase: true, out kind))
+        {
+            await RespondAsync(context, 400, "application/json",
+                JsonSerializer.Serialize(new { error = $"\"{Ascii.Clean(type)}\" is not a kind of BBS this receiver knows; use linBpq or fbb" })).ConfigureAwait(false);
+            return;
+        }
+        string host = string.IsNullOrWhiteSpace(form.Host) ? current.Host : form.Host.Trim();
+        int port = form.Port ?? current.Port;
+        string login = string.IsNullOrWhiteSpace(form.Login) ? current.Login : form.Login.Trim();
+        string password = string.IsNullOrEmpty(form.Password) ? current.Password : form.Password;
+        string command = string.IsNullOrWhiteSpace(form.Command) ? current.Command : form.Command.Trim();
+        // The same bounds as a saved config (ReceiverConfig.Validate): a host that is not empty
+        // and not absurd, and a port that is an actual TCP port. Without this, a port such as
+        // 70000 reaches TcpClient.ConnectAsync, which throws rather than refusing cleanly, and
+        // the request never answers.
+        if (string.IsNullOrWhiteSpace(host) || host.Length > 255 || host.Any(char.IsControl))
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Give a host to test, such as 127.0.0.1." })).ConfigureAwait(false);
+            return;
+        }
+        if (port is < 1 or > 65535)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = $"\"{port}\" is not a TCP port; it must be from 1 to 65535." })).ConfigureAwait(false);
+            return;
+        }
+        if (password.Length == 0)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Enter the password to test." })).ConfigureAwait(false);
+            return;
+        }
+
+        var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = login.ToUpperInvariant(), Password = password, Command = command };
+        BbsLoginTestResult result;
+        try
+        {
+            result = TestBbsLogin is { } hook
+                ? await hook(settings).ConfigureAwait(false)
+                : await new BbsClient(settings, _host.Time, _ => { }).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // Whatever this is, the page still gets an answer rather than a hung request; never
+            // the password, and the type name only, not the exception's own message, which could
+            // quote back something given to it.
+            _log($"web: testing the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)} failed unexpectedly ({e.GetType().Name})");
+            await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
+            {
+                outcome = BbsLoginTestOutcome.UnexpectedReply,
+                said = "Something went wrong testing the login.",
+                detail = (string?)null,
+            }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
+            return;
+        }
+        _log($"web: tested the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)}: {Ascii.Clean(result.Said)}");
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
+        {
+            outcome = result.Outcome,
+            said = result.Said,
+            detail = result.Detail,
+        }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 
     /// <summary>The sound cards ALSA knows, as device names the audio setting takes.</summary>
