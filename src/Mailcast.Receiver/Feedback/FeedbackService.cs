@@ -75,6 +75,13 @@ public sealed record SentReport
     /// <summary>Its BID (MID).</summary>
     public string Bid { get; init; } = "";
 
+    /// <summary>
+    /// The callsign it is from, as when it was made: kept, so that one offered again goes from the
+    /// same callsign as its title and BID even if the setting has changed since. Null in a
+    /// feedback.json from before this was kept.
+    /// </summary>
+    public string? From { get; init; }
+
     /// <summary>When it was last offered to the BBS.</summary>
     public DateTimeOffset? SentAt { get; init; }
 
@@ -228,12 +235,29 @@ public sealed class FeedbackService
             {
                 continue;
             }
-            if (ReportTime(schedule, day) is { } at && at > now)
+            if (ReportTime(schedule, day) is { } at && at > now && CanReport(day, now))
             {
                 return at;
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Whether there can be a report for <paramref name="day"/>: a slot of it has been noted, or
+    /// one it listens to is still to come. Not so for today when the report was turned on after
+    /// its last slot, so the next is tomorrow's.
+    /// </summary>
+    private bool CanReport(DateOnly day, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (_state.Days.Exists(d => d.Day == day && d.Slots.Count > 0))
+            {
+                return true;
+            }
+        }
+        return _sources.Listened(day).Any(slot => slot + Window > now);
     }
 
     /// <summary>When a day's report goes: <see cref="AfterLastSlot"/> after its last slot; null with no slot.</summary>
@@ -269,6 +293,12 @@ public sealed class FeedbackService
     /// <summary>One look at the clock: note the slot in progress, and send a report that is due.</summary>
     internal async Task TickAsync(CancellationToken cancellation)
     {
+        if (!Enabled && _said)
+        {
+            // Turned off from the status page, or by a config put in force without a restart.
+            _said = false;
+            _log("feedback: off. No daily report is sent");
+        }
         if (!Enabled || _sources.Schedule() is not { } schedule || _sources.Settings() is not { } settings)
         {
             return;
@@ -417,6 +447,7 @@ public sealed class FeedbackService
                 Title = report.Title,
                 Body = report.Body,
                 Bid = Bid(settings.From, ReceiverId(), day),
+                From = settings.From,
                 Answer = FeedbackAnswer.Pending,
             };
             Save();
@@ -467,8 +498,8 @@ public sealed class FeedbackService
     private async Task SendAsync(SentReport report, CancellationToken cancellation)
     {
         var now = _time.GetUtcNow();
-        var settings = _sources.Settings();
-        string from = settings?.From ?? "";
+        // The callsign it was made with, which its title and BID name, not the setting now.
+        string from = report.From is { Length: > 0 } made ? made : _sources.Settings()?.From ?? "";
         var mail = new Bulletin('P', from, FeedbackSettings.To, FeedbackSettings.At, report.Bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds()), [], report.Body);
         DeliveryOutcome outcome;

@@ -71,6 +71,19 @@
   #channel svg { width: 100%; height: auto; display: block; margin-top: 8px; }
   #channel svg text { font: 11px system-ui, sans-serif; fill: var(--soft); }
   #channel .head { font-weight: 600; }
+  /* the daily report opt-in, near the top: a panel while it is off, one line once it is on */
+  #optIn { margin: 10px 24px 0; padding: 12px 16px; background: #edf7f0; border: 1px solid #b5dbc1; border-radius: 10px; }
+  #optIn[hidden], #optIn [hidden] { display: none; }
+  #optIn p { margin: 0 0 8px; }
+  #optIn strong { font-size: 16px; }
+  #optInForm { display: flex; gap: 10px 16px; align-items: center; flex-wrap: wrap; }
+  #optInForm label { display: flex; gap: 6px; align-items: center; font-size: 15px; color: var(--ink); }
+  #optInForm input[type=checkbox] { width: 18px; height: 18px; margin: 0; }
+  #optInCall { width: 8em; text-transform: uppercase; }
+  #optIn details { margin-top: 8px; font-size: 14px; }
+  #optIn details pre { margin: 6px 0; padding: 8px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; overflow: auto; }
+  #optIn.on { padding: 8px 16px; }
 </style>
 </head>
 <body>
@@ -84,6 +97,29 @@
   <p id="updateWhat"></p>
   <div class="cmd"><pre id="updateCmd"></pre><button type="button" class="plain" id="updateCopy">Copy</button></div>
   <p class="muted">Best done between slots: in daylight, after :13 and before :58 past the hour. At night, any time.</p>
+</div>
+<div id="optIn" hidden>
+  <div id="optInAsk">
+    <p><strong>Help the experiment:</strong> send M0LTE a short daily report of what this receiver heard. It goes as one small packet mail through your own BBS, about 500 bytes a day. Nothing else is sent.</p>
+    <form id="optInForm">
+      <label><input type="checkbox" id="optInBox"> Send a daily report</label>
+      <label>Your callsign <input id="optInCall" maxlength="6" autocomplete="off" spellcheck="false" placeholder="G4ABC"></label>
+      <button type="submit" id="optInSave" disabled>Save</button>
+      <span id="optInSaid"></span>
+    </form>
+    <details>
+      <summary>What's in it</summary>
+      <p>Your callsign and the date, the receiver's version, the web SDR it listens through and its locator (or just "sc" for a sound card), and for each slot it listened to: the speed, the frames heard, the tone's signal to noise and offset, and the radio path as measured. For example:</p>
+      <pre>MCR G4ABC 2026-10-06
+
+MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
+09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b
+10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b
+17 - 0 3 +0.8 IP</pre>
+      <p><a href="https://github.com/packet-net/pdn-mailcast/blob/main/docs/receiver.md#sending-a-daily-report" target="_blank" rel="noopener">Every field explained</a></p>
+    </details>
+  </div>
+  <div id="optInOn" hidden><span id="optInLine"></span> <a href="#" id="optInOff">Turn off</a> <span id="optInOffSaid"></span></div>
 </div>
 <main>
   <section>
@@ -390,6 +426,7 @@ async function refresh() {
   pskr(s);
   update(s);
   feedback(s);
+  optIn(s);
 
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
@@ -471,6 +508,51 @@ function feedback(s) {
   $("feedbackText").hidden = !f.text;
   if (f.text && $("feedbackText").textContent !== f.text) $("feedbackText").textContent = f.text;
 }
+/* The daily report's opt-in near the top. Off, it is a panel asking, shown only when there is a
+   BBS to send through; on, one line saying so, with a link to turn it off. Either way the change
+   is saved through the settings, with the rest of them as they are, and is in force at once. */
+function optIn(s) {
+  const f = s.feedback, on = !!(f && f.enabled);
+  $("optIn").hidden = !on && !s.bbs.reachable;
+  $("optIn").classList.toggle("on", on);
+  $("optInAsk").hidden = on;
+  $("optInOn").hidden = !on;
+  if (on) $("optInLine").textContent = `Daily report to M0LTE: on${f.next ? `, next at ${day(f.next)}${utc(f.next)}` : ""}.`;
+  const call = $("optInCall");
+  if (settings && !call.value && document.activeElement !== call && settings.feedback.callsign) call.value = settings.feedback.callsign;
+  $("optInSave").disabled = !$("optInBox").checked;
+}
+async function saveFeedback(enabled, callsign) {
+  /* Everything else as it is saved now, read again just before: a change made since this page
+     loaded (in another browser, or the config file) is not put back. An empty password keeps the
+     BBS's, and "sources" left out keeps the callsigns accepted. */
+  const now = await api("api/settings");
+  if (!now.ok) return { ok: false, error: `Cannot load the settings: ${now.error}` };
+  const c = now.body, b = c.bbs;
+  const form = { audio: c.audio, type: b.type, host: b.host, port: b.port, login: b.login, password: "", command: b.command,
+    feedback: { enabled, callsign } };
+  const r = await api("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+  if (r.ok) { await loadSettings(); refresh(); }
+  return r;
+}
+$("optInBox").addEventListener("change", () => { $("optInSave").disabled = !$("optInBox").checked; });
+$("optInForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!$("optInBox").checked) return;
+  const call = $("optInCall").value.trim().toUpperCase();
+  $("optInSaid").textContent = "";
+  const r = await saveFeedback(true, call);
+  /* Saved, the panel gives way to the line saying it is on. */
+  $("optInSaid").className = "bad";
+  $("optInSaid").textContent = r.ok ? "" : r.error;
+  if (r.ok) $("optInBox").checked = false;
+});
+$("optInOff").addEventListener("click", async e => {
+  e.preventDefault();
+  $("optInOffSaid").textContent = "";
+  const r = await saveFeedback(false, "");
+  if (!r.ok) { $("optInOffSaid").className = "bad"; $("optInOffSaid").textContent = r.error; }
+});
 /* the head end's ionosonde reading: is 40 m open from Reading, and how far out */
 function iono(s) {
   const i = s.iono;

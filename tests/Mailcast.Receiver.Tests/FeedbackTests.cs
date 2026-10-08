@@ -249,6 +249,28 @@ public class FeedbackTests
     }
 
     [Fact]
+    public async Task Retry_AfterTheCallsignChanged_GoesFromTheCallsignItWasMadeWith()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        rig.Bbs.Answers.Enqueue(DeliveryVerdict.Deferred);
+        await rig.ListenAsync(service, Day, only: 1);
+        await rig.AtAsync(service, ReportAt);
+        Assert.Equal(FeedbackAnswer.Deferred, service.Last!.Answer);
+
+        // Changed on the status page while it waits; across a restart too.
+        rig.Settings = new FeedbackSettings { Enabled = true, Callsign = "M0XYZ" };
+        var restarted = rig.Start();
+        await rig.AtAsync(restarted, ReportAt.AddHours(1));
+
+        Assert.Equal(2, rig.Bbs.Sent.Count);
+        var again = rig.Bbs.Sent[1];
+        Assert.Equal(("G4ABC", rig.Bbs.Sent[0].Bid, "MCR G4ABC 2026-10-06"), (again.From, again.Bid, again.Title));
+        Assert.Equal(FeedbackAnswer.Accepted, restarted.Last!.Answer);
+    }
+
+    [Fact]
     public void Retries_WaitLongerEachTime_AndAtMostSixADay()
     {
         var t = new DateTimeOffset(2026, 10, 6, 0, 30, 0, TimeSpan.Zero);
@@ -344,6 +366,44 @@ public class FeedbackTests
         await using var page = new StatusPage(host, null, _ => { });
         var status = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
         Assert.False(status.GetProperty("feedback").GetProperty("enabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Report_StartsAndStopsWithTheSetting()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path) { Settings = new FeedbackSettings { Enabled = false, Callsign = "G4ABC" } };
+        var service = rig.Start();
+
+        // Off: nothing noted.
+        await rig.ListenAsync(service, Day);
+        Assert.Empty(rig.Log);
+
+        // Turned on after the day's last slot but before its report, as from the status page:
+        // there is nothing to report for today, so the next is tomorrow's.
+        var tomorrow = Day.AddDays(1);
+        rig.Settings = new FeedbackSettings { Enabled = true, Callsign = "G4ABC" };
+        await rig.AtAsync(service, Slots[^1].AddMinutes(20));
+        Assert.Equal(FeedbackService.ReportTime(Schedule, tomorrow), service.Next(rig.Time.GetUtcNow()));
+        Assert.Contains(rig.Log, l => l.StartsWith("feedback: on.", StringComparison.Ordinal));
+        Assert.True(JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("enabled").GetBoolean());
+        await rig.AtAsync(service, ReportAt);
+        Assert.Empty(rig.Bbs.Sent);
+
+        await rig.ListenAsync(service, tomorrow);
+        await rig.AtAsync(service, FeedbackService.ReportTime(Schedule, tomorrow)!.Value);
+        var mail = Assert.Single(rig.Bbs.Sent);
+        Assert.Equal(tomorrow, DailyReport.Parse(mail.Title, mail.Body).Day);
+
+        // Turned off again: said once, and the next day's does not go.
+        var after = tomorrow.AddDays(1);
+        rig.Settings = new FeedbackSettings { Enabled = false, Callsign = "G4ABC" };
+        await rig.ListenAsync(service, after);
+        await rig.AtAsync(service, FeedbackService.ReportTime(Schedule, after)!.Value.AddMinutes(5));
+        Assert.Single(rig.Bbs.Sent);
+        Assert.Single(rig.Log, l => l.StartsWith("feedback: off", StringComparison.Ordinal));
+        Assert.Null(service.Next(rig.Time.GetUtcNow()));
+        Assert.False(JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("enabled").GetBoolean());
     }
 
     [Theory]

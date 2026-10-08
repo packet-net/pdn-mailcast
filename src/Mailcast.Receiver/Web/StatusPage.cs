@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Mailcast.Receiver.Delivery;
+using Mailcast.Receiver.Feedback;
 using Mailcast.Receiver.Updates;
 using Packet.Mailcast.Propagation;
 using Packet.SoundModem.Audio;
@@ -676,6 +677,8 @@ public sealed class StatusPage : IAsyncDisposable
                 lastFailure = _host.Delivery.LastFailure,
                 nextAttempt = _host.Delivery.NextAttempt,
                 waiting = _host.Intake.Mail().Waiting, // from memory: this page is asked every few seconds
+                // Whether there is a BBS to send through, for the daily report's opt-in.
+                reachable = BbsReachable(_host.Ledger.Recent, _host.Feedback.Last, _host.Delivery.LastFailure),
             },
             retune = _host.Retuner is not { } retuner ? null : new
             {
@@ -750,6 +753,17 @@ public sealed class StatusPage : IAsyncDisposable
             }),
         };
     }
+
+    /// <summary>
+    /// Whether the receiver has a BBS to send through, as far as it knows: the BBS has answered
+    /// for a bulletin or a daily report, or no session with it has failed yet. False for a
+    /// receiver whose BBS has never been reached, such as one set up to listen only, with
+    /// nothing at the BBS's address; the page offers the daily report only when this is true.
+    /// </summary>
+    internal static bool BbsReachable(IReadOnlyList<DeliveryRecord> recent, SentReport? report, string? lastFailure) =>
+        lastFailure is null
+        || recent.Any(r => r.Verdict is DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Deferred or DeliveryVerdict.Refused or DeliveryVerdict.Unconfirmed)
+        || report?.Answer is FeedbackAnswer.Accepted or FeedbackAnswer.Refused or FeedbackAnswer.Deferred;
 
     /// <summary>
     /// The ionosonde tile: the head end's newest reading, aged by this receiver's clock and
@@ -956,16 +970,52 @@ public sealed class StatusPage : IAsyncDisposable
             lan = config.Web.Lan,
             passwordSet = config.Web.Password.Length > 0,
         },
+        // The daily report to M0LTE: whether it is on, and the callsign it is sent from.
+        feedback = new
+        {
+            enabled = config.Feedback?.Enabled ?? false,
+            callsign = config.Feedback?.Callsign,
+        },
         soundCards = SoundCards(),
     };
 
     /// <summary>
     /// The form's answer. An empty password keeps the one already set; so does an empty
     /// <paramref name="PagePassword"/>, the page's own, which needs <paramref name="CurrentPagePassword"/>
-    /// to change once there is one. A null <paramref name="Sources"/> keeps the callsigns accepted as they are.
+    /// to change once there is one. A null <paramref name="Sources"/> keeps the callsigns accepted as they are,
+    /// and a null <paramref name="Feedback"/> the daily report as it is.
     /// </summary>
     internal sealed record SettingsForm(string Audio, string Type, string Host, int Port, string Login, string? Password, string Command,
-        string? PagePassword = null, string? CurrentPagePassword = null, IReadOnlyList<string?>? Sources = null);
+        string? PagePassword = null, string? CurrentPagePassword = null, IReadOnlyList<string?>? Sources = null, FeedbackForm? Feedback = null);
+
+    /// <summary>
+    /// The daily report's part of the settings form: on or off, and the callsign it is sent from.
+    /// Turned off with no callsign, the one already set is kept, for when it is turned on again.
+    /// </summary>
+    internal sealed record FeedbackForm(bool Enabled, string? Callsign);
+
+    /// <summary>The daily report's settings after <paramref name="form"/>; throws <see cref="ConfigException"/> for a callsign it cannot be sent from.</summary>
+    internal static FeedbackSettings? ApplyFeedback(FeedbackSettings? current, FeedbackForm? form)
+    {
+        if (form is null)
+        {
+            return current;
+        }
+        string callsign = (form.Callsign ?? "").Trim().ToUpperInvariant();
+        if (form.Enabled && callsign.Length == 0)
+        {
+            throw new ConfigException("Enter your callsign: the daily report is sent from it.");
+        }
+        if (form.Enabled && !FeedbackSettings.IsPlausibleCallsign(callsign))
+        {
+            throw new ConfigException($"\"{Ascii.Clean(callsign)}\" does not look like a callsign. Give your own, such as G4ABC, with no SSID or \"/\".");
+        }
+        if (!form.Enabled && callsign.Length == 0)
+        {
+            callsign = current?.Callsign ?? "";
+        }
+        return new FeedbackSettings { Enabled = form.Enabled, Callsign = callsign.Length == 0 ? null : callsign };
+    }
 
     /// <summary>Applies a settings form to <paramref name="current"/>; throws <see cref="ConfigException"/> for one that cannot work.</summary>
     internal static ReceiverConfig Apply(ReceiverConfig current, SettingsForm form)
@@ -1002,6 +1052,7 @@ public sealed class StatusPage : IAsyncDisposable
             // The caller has checked CurrentPagePassword: it needs the sign-in throttle.
             Web = string.IsNullOrEmpty(form.PagePassword) ? current.Web : current.Web with { Password = form.PagePassword },
             Sources = form.Sources is null ? current.Sources : CallsignList.Parse(form.Sources),
+            Feedback = ApplyFeedback(current.Feedback, form.Feedback),
         };
         next.Validate();
         return next;
@@ -1120,6 +1171,13 @@ public sealed class StatusPage : IAsyncDisposable
             }
         }
         _host.Reconfigure(next);
+        bool wasOn = current.Feedback?.Enabled ?? false, isOn = next.Feedback?.Enabled ?? false;
+        if (wasOn != isOn || (isOn && next.Feedback!.From != current.Feedback!.From))
+        {
+            _log(isOn
+                ? $"web: the daily report to {FeedbackSettings.To} was turned on from the page, sent from {next.Feedback!.From}"
+                : $"web: the daily report to {FeedbackSettings.To} was turned off from the page");
+        }
         if (!string.Equals(next.Web.Password, pagePassword, StringComparison.Ordinal))
         {
             _sessions.NoticePasswordChange(); // signs every browser out
