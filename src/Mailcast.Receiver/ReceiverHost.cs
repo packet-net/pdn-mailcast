@@ -83,7 +83,11 @@ public sealed class ReceiverHost : IAsyncDisposable
     private readonly object _listenNowGate = new();
     private TaskCompletionSource _listenNowWake = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    /// <summary>Wakes a wait for the web SDR to reopen at once, so a granted "Listen now" request does not wait out the clock check.</summary>
+    /// <summary>
+    /// Wakes a wait on "Listen now" state at once, rather than it waiting out the clock check: a
+    /// granted request while closed opens the web SDR right away, and (issue #57) a schedule
+    /// change while a session is open re-checks its close against it right away too.
+    /// </summary>
     private void WakeListenNow()
     {
         TaskCompletionSource wake;
@@ -233,6 +237,9 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Slots.Schedule = schedule;
         }
+        // Issue #57: a "Listen now" session re-checks its close against the new schedule at
+        // once, rather than waiting for its next clock check.
+        WakeListenNow();
     }
 
     /// <summary>This program's version, for the SID and the log.</summary>
@@ -512,7 +519,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // closed opens it at once, until the session's own end (never the real window's:
                 // ListenNowService caps it at the window's opening).
                 bool listenNow = false;
-                if (opens > _time.GetUtcNow() && ListenNow.ActiveUntil(_time.GetUtcNow()) is { } until)
+                if (opens > _time.GetUtcNow() && ListenNow.ActiveUntil(_time.GetUtcNow(), opens) is { } until)
                 {
                     opens = _time.GetUtcNow();
                     closes = until;
@@ -540,7 +547,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                     _log($"audio: \"Listen now\": opening the web SDR {WebSdrHost(source)} until {closes.UtcDateTime:HH:mm:ss} UTC");
                 }
                 closeAt = new CancellationTokenSource();
-                _ = CloseAtAsync(opens, closes, closeAt, restart.Token);
+                // Issue #57: a "Listen now" session's close is re-checked against the schedule
+                // every time, not just at grant, so a window GB7RDG's directory moves earlier
+                // mid-session is still never overlapped.
+                Func<DateTimeOffset, DateTimeOffset>? recomputeCloses = !listenNow ? null
+                    : now => ListenNow.ActiveUntil(now, ListeningWindow.Next(now, Schedule).Opens) ?? now;
+                _ = CloseAtAsync(opens, closes, recomputeCloses, closeAt, restart.Token);
             }
 
             using var window = closeAt;
@@ -633,17 +645,40 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// Cancels <paramref name="close"/> once the clock reads <paramref name="closes"/>, or is put
-    /// back before <paramref name="opens"/>, looking at it every minute.
+    /// back before <paramref name="opens"/>, looking at it every minute. <paramref name="recomputeCloses"/>,
+    /// for a "Listen now" session (issue #57), is asked for a fresh <paramref name="closes"/>
+    /// each time, and wakes this at once if the schedule changes mid-session, so the session
+    /// never overlaps a window that has since moved earlier.
     /// </summary>
-    private async Task CloseAtAsync(DateTimeOffset opens, DateTimeOffset closes, CancellationTokenSource close, CancellationToken cancellation)
+    private async Task CloseAtAsync(DateTimeOffset opens, DateTimeOffset closes, Func<DateTimeOffset, DateTimeOffset>? recomputeCloses, CancellationTokenSource close, CancellationToken cancellation)
     {
         try
         {
             while (_time.GetUtcNow() >= opens && _time.GetUtcNow() < closes)
             {
-                var tick = Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation);
+                if (recomputeCloses is null)
+                {
+                    var tick = Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation);
+                    ClockWaiting?.Invoke();
+                    await tick.ConfigureAwait(false);
+                    continue;
+                }
+                closes = recomputeCloses(_time.GetUtcNow());
+                Task wake;
+                lock (_listenNowGate)
+                {
+                    if (_listenNowWake.Task.IsCompleted)
+                    {
+                        _listenNowWake = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    }
+                    wake = _listenNowWake.Task;
+                }
+                using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+                var listenTick = Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, stop.Token);
                 ClockWaiting?.Invoke();
-                await tick.ConfigureAwait(false);
+                await Task.WhenAny(listenTick, wake).ConfigureAwait(false);
+                await stop.CancelAsync().ConfigureAwait(false);
+                cancellation.ThrowIfCancellationRequested();
             }
             await close.CancelAsync().ConfigureAwait(false);
         }

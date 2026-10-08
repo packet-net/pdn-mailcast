@@ -66,20 +66,35 @@ public sealed class ListenNowService
     private int UsedToday(DateTimeOffset now) => _usage.Day == DateOnly.FromDateTime(now.UtcDateTime) ? _usage.Count : 0;
 
     /// <summary>
-    /// The session open now, if any: null once <see cref="Duration"/> (or less, if a slot window
-    /// was closer) has passed.
+    /// The session open now, if any: null once <see cref="Duration"/> has passed, or (issue #57)
+    /// at once if <paramref name="nextWindowOpens"/> has moved to now or the past, or is now
+    /// sooner than the session's own end, since a slot's window must never be overlapped however
+    /// it came to be sooner than it looked when the session was granted (GB7RDG's directory,
+    /// heard mid-session, can move it).
     /// </summary>
-    public DateTimeOffset? ActiveUntil(DateTimeOffset now)
+    public DateTimeOffset? ActiveUntil(DateTimeOffset now, DateTimeOffset nextWindowOpens)
     {
         lock (_gate)
         {
-            if (_until is { } until && until > now)
-            {
-                return until;
-            }
+            return EffectiveUntil(now, nextWindowOpens);
+        }
+    }
+
+    /// <summary>Under <see cref="_gate"/>: the session's current end, capped fresh against <paramref name="nextWindowOpens"/> every time; null once it is over.</summary>
+    private DateTimeOffset? EffectiveUntil(DateTimeOffset now, DateTimeOffset nextWindowOpens)
+    {
+        if (_until is not { } until || until <= now)
+        {
             _until = null;
             return null;
         }
+        var capped = until < nextWindowOpens ? until : nextWindowOpens;
+        if (capped <= now)
+        {
+            _until = null;
+            return null;
+        }
+        return capped;
     }
 
     /// <summary>
@@ -90,7 +105,7 @@ public sealed class ListenNowService
     {
         lock (_gate)
         {
-            if (_until is { } until && until > now)
+            if (EffectiveUntil(now, nextWindowOpens) is not null)
             {
                 return null; // a session is already open
             }
@@ -119,7 +134,7 @@ public sealed class ListenNowService
     {
         lock (_gate)
         {
-            if (_until is { } active && active > now)
+            if (EffectiveUntil(now, nextWindowOpens) is { } active)
             {
                 return new Result(true, null, active);
             }

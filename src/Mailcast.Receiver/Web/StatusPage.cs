@@ -915,8 +915,8 @@ public sealed class StatusPage : IAsyncDisposable
         {
             return null;
         }
-        var until = host.ListenNow.ActiveUntil(now);
         var nextOpens = ListeningWindow.Next(now, host.Schedule).Opens;
+        var until = host.ListenNow.ActiveUntil(now, nextOpens);
         bool alreadyListening = host.Audio.Phase == AudioPhase.Listening && until is null;
         return new
         {

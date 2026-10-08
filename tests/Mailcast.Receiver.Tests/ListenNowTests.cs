@@ -18,7 +18,7 @@ public class ListenNowTests
         Assert.True(result.Ok);
         Assert.Null(result.Reason);
         Assert.Equal(Noon + ListenNowService.Duration, result.Until);
-        Assert.Equal(Noon + ListenNowService.Duration, service.ActiveUntil(Noon));
+        Assert.Equal(Noon + ListenNowService.Duration, service.ActiveUntil(Noon, Noon + TimeSpan.FromHours(1)));
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class ListenNowTests
 
         Assert.False(result.Ok);
         Assert.Contains("wait for that instead", result.Reason, StringComparison.Ordinal);
-        Assert.Null(service.ActiveUntil(Noon));
+        Assert.Null(service.ActiveUntil(Noon, Noon + TimeSpan.FromMinutes(4)));
     }
 
     [Fact]
@@ -109,13 +109,36 @@ public class ListenNowTests
     {
         var time = new FakeTimeProvider(Noon);
         var service = new ListenNowService(time, null);
-        service.Request(Noon, Noon + TimeSpan.FromHours(1), alreadyListening: false);
+        var farWindow = Noon + TimeSpan.FromHours(1);
+        service.Request(Noon, farWindow, alreadyListening: false);
 
         time.Advance(ListenNowService.Duration - TimeSpan.FromSeconds(1));
-        Assert.NotNull(service.ActiveUntil(time.GetUtcNow()));
+        Assert.NotNull(service.ActiveUntil(time.GetUtcNow(), farWindow));
 
         time.Advance(TimeSpan.FromSeconds(2));
-        Assert.Null(service.ActiveUntil(time.GetUtcNow()));
+        Assert.Null(service.ActiveUntil(time.GetUtcNow(), farWindow));
+    }
+
+    [Fact]
+    public void ActiveUntil_RecomputesTheCapAgainstAFreshWindow_EndingAtOnceIfItHasMovedCloser()
+    {
+        // Issue #57: GB7RDG's directory, heard mid-session, can move a slot's window earlier
+        // than it looked when the session was granted. ActiveUntil must still never say a time
+        // past that window's opening, however it is asked afterwards.
+        var time = new FakeTimeProvider(Noon);
+        var service = new ListenNowService(time, null);
+        var farWindow = Noon + TimeSpan.FromHours(1);
+        var result = service.Request(Noon, farWindow, alreadyListening: false);
+        Assert.Equal(Noon + ListenNowService.Duration, result.Until);
+
+        time.Advance(TimeSpan.FromSeconds(10));
+        // The window moves to a minute from now: still open, but capped sooner than granted.
+        var closerWindow = time.GetUtcNow() + TimeSpan.FromMinutes(1);
+        Assert.Equal(closerWindow, service.ActiveUntil(time.GetUtcNow(), closerWindow));
+
+        // The window moves to right now (or the past): the session is over at once.
+        Assert.Null(service.ActiveUntil(time.GetUtcNow(), time.GetUtcNow()));
+        Assert.Null(service.ActiveUntil(time.GetUtcNow(), time.GetUtcNow() - TimeSpan.FromSeconds(1)));
     }
 
     [Fact]
