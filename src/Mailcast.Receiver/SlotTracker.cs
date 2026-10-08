@@ -30,6 +30,12 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
     /// </summary>
     public bool ProbeCaptured { get; init; }
 
+    /// <summary>Issue #49: whether this slot's ionosonde reading has been received.</summary>
+    public bool IonosphereHeard { get; init; }
+
+    /// <summary>Issue #49: whether this slot's PSK Reporter reading has been received.</summary>
+    public bool PskReporterHeard { get; init; }
+
     /// <summary>The waveform most of the slot's frames came on, <c>mixed</c> if two or more tie for most, or null if none is known.</summary>
     public string? Waveform
     {
@@ -211,6 +217,30 @@ public sealed class SlotTracker
             if (_current is not null)
             {
                 _current = _current with { ProbeCaptured = true };
+            }
+        }
+    }
+
+    /// <summary>Issue #49: this slot's ionosonde reading was received.</summary>
+    public void OnIonosphereHeard()
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { IonosphereHeard = true };
+            }
+        }
+    }
+
+    /// <summary>Issue #49: this slot's PSK Reporter reading was received.</summary>
+    public void OnPskReporterHeard()
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { PskReporterHeard = true };
             }
         }
     }

@@ -112,8 +112,18 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>A broadcast frame was heard, with the waveform it came on if the modem said (raised on the worker).</summary>
     public event Action<string?>? FrameHeard;
 
-    /// <summary>A directory was rebuilt (raised on the worker, after <see cref="FrameHeard"/> for the frame that completed it).</summary>
+    /// <summary>
+    /// A directory was rebuilt (raised on the worker, after <see cref="FrameHeard"/> for the
+    /// frame that completed it), or (issue #49) a repeat of the directory already held arrived:
+    /// either way, this means the directory is known for the slot now on.
+    /// </summary>
     public event Action<BroadcastDirectory>? DirectoryHeard;
+
+    /// <summary>Issue #49: the ionosonde reading for the slot now on was received.</summary>
+    public event Action<IonoReading>? IonosphereHeard;
+
+    /// <summary>Issue #49: the PSK Reporter reading for the slot now on was received.</summary>
+    public event Action<PskReading>? PskReporterHeard;
 
     /// <summary>Broadcast frames heard since start.</summary>
     public long FramesHeard => Interlocked.Read(ref _framesHeard);
@@ -453,6 +463,12 @@ public sealed class Intake : IAsyncDisposable
                     ScheduleHeard?.Invoke(changed);
                 }
                 break;
+            case FrameOutcome.AlreadyComplete when result.Directory is { } repeat:
+                // Issue #49: a repeat of the directory already held (the other waveform resends
+                // it every other slot, or this is the first one heard again after a restart):
+                // the slot now on still gets to know the directory from it.
+                DirectoryHeard?.Invoke(repeat);
+                break;
             case FrameOutcome.CompletedIonosphere when result.Ionosphere is { } reading:
                 // Once per object, so once a slot at most. Never for the BBS.
                 Interlocked.Increment(ref _framesStored);
@@ -462,6 +478,7 @@ public sealed class Intake : IAsyncDisposable
                 }
                 DateTimeOffset now = _time.GetUtcNow();
                 _log(Ascii.Clean(reading.AsOf(now, IonoSettings.DefaultStaleAfter).Describe(now)));
+                IonosphereHeard?.Invoke(reading);
                 break;
             case FrameOutcome.CompletedPskReporter when result.PskReporter is { } spots:
                 // Once per object, so once a slot at most. Never for the BBS.
@@ -472,6 +489,7 @@ public sealed class Intake : IAsyncDisposable
                 }
                 DateTimeOffset at = _time.GetUtcNow();
                 _log(Ascii.Clean(spots.AsOf(at, PskEvaluator.StaleAfter).Describe(at)));
+                PskReporterHeard?.Invoke(spots);
                 break;
             case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
                 // Once per object: it is marked done, so its later frames are not rebuilt again.

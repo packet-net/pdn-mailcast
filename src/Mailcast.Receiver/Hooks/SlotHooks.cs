@@ -333,7 +333,9 @@ public sealed class SlotHooks : IDisposable
     /// Runs the hooks around each window <paramref name="windowAt"/> gives (the window in
     /// progress at a time, or else the next; null for none), until <paramref name="cancellation"/>
     /// is cancelled, while <paramref name="retunerRuns"/> says the retuner is not running them
-    /// itself. "after" still owed when it is cancelled is left for <see cref="FinishAsync"/>.
+    /// itself. "after" still owed when it is cancelled is left for <see cref="FinishAsync"/>. If a
+    /// web SDR's window ends early (issue #49), <paramref name="windowAt"/> says so (an earlier
+    /// <c>Closes</c> for the same slot) and "after" runs then, not at the window's usual close.
     /// </summary>
     public async Task RunAsync(Func<bool> retunerRuns, Func<DateTimeOffset, HookWindow?> windowAt, CancellationToken cancellation)
     {
@@ -372,16 +374,27 @@ public sealed class SlotHooks : IDisposable
                     await WaitAsync(Check, cancellation).ConfigureAwait(false);
                     continue;
                 }
+                var opens = window.Opens;
                 var closes = window.Closes;
                 var last = window.Slot;
                 while (true)
                 {
                     now = _time.GetUtcNow();
+                    // Issue #49: a web SDR's window may have ended early; windowAt reflects that
+                    // at once, so "after" does not wait for its usual close either.
+                    if (!retunerRuns() && windowAt(opens) is { } live && live.Slot == last && live.Closes < closes)
+                    {
+                        closes = live.Closes;
+                    }
                     if (now >= closes)
                     {
                         // A following window whose "before" would start before this one closes keeps it open.
-                        if (!retunerRuns() && Next(windowAt, closes, null) is { } following && following.Opens - BeforeLead <= closes)
+                        // Issue #49: once this window has shrunk (ended early), windowAt(closes) can
+                        // still resolve to this same slot (its real, unshrunk close is later still);
+                        // following.Slot != last keeps that from extending into itself forever.
+                        if (!retunerRuns() && Next(windowAt, closes, null) is { } following && following.Slot != last && following.Opens - BeforeLead <= closes)
                         {
+                            opens = following.Opens;
                             closes = following.Closes;
                             last = following.Slot;
                             Extend(last);

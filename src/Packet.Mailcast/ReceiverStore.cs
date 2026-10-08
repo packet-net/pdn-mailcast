@@ -331,6 +331,11 @@ public sealed class ReceiverStore
                 File.Delete(directoryFile);
             }
         }
+        var directoryIdFile = Path.Combine(root, DirectoryIdFile);
+        if (Directory is not null && File.Exists(directoryIdFile) && ObjectId.TryParse(File.ReadAllText(directoryIdFile).Trim(), out ulong savedId))
+        {
+            _directoryObjectId = savedId;
+        }
 
         foreach (var dir in System.IO.Directory.EnumerateDirectories(_objects).Order(StringComparer.Ordinal).ToList())
         {
@@ -355,6 +360,17 @@ public sealed class ReceiverStore
 
     /// <summary>The newest directory heard, if any.</summary>
     public BroadcastDirectory? Directory { get; private set; }
+
+    /// <summary>
+    /// The object ID of <see cref="Directory"/>, kept in <see cref="DirectoryIdFile"/> across
+    /// restarts. Used so a repeat of the same directory (<see cref="FrameOutcome.AlreadyComplete"/>,
+    /// as the other waveform resends it every other slot, or after a restart) is still
+    /// recognised as "this slot heard the directory".
+    /// </summary>
+    private ulong? _directoryObjectId;
+
+    /// <summary>Where <see cref="Directory"/>'s object ID is kept, under the store's folder.</summary>
+    public const string DirectoryIdFile = "directory-id.txt";
 
     /// <summary>Where the newest ionosonde reading is kept, as the object that carried it, under the store's folder.</summary>
     public const string IonosphereFile = "ionosphere.bin";
@@ -403,7 +419,10 @@ public sealed class ReceiverStore
         }
         if (_done.ContainsKey(frame.ObjectId))
         {
-            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId);
+            // A repeat of the directory already held: still worth telling the caller which, so a
+            // slot that only ever resends the known directory (WN3/WN4 taking turns, or after a
+            // restart) is not treated as one where the directory was never heard.
+            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: frame.ObjectId == _directoryObjectId ? Directory : null);
         }
         if (!_compression.Knows(frame.DictionaryId))
         {
@@ -845,7 +864,9 @@ public sealed class ReceiverStore
             if (Directory is null || directory.Date >= Directory.Date)
             {
                 DurableFile.WriteAtomically(Path.Combine(_root, "directory.txt"), content, flush: _options.FlushToDisk);
+                DurableFile.WriteAtomically(Path.Combine(_root, DirectoryIdFile), Bulletin.TextEncoding.GetBytes(ObjectId.Format(instance.ObjectId)), flush: _options.FlushToDisk);
                 Directory = directory;
+                _directoryObjectId = instance.ObjectId;
             }
             if (directory.Schedule is { } schedule && (HeardScheduleDate is null || directory.Date >= HeardScheduleDate))
             {

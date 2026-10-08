@@ -1,4 +1,6 @@
+using System.Runtime.Versioning;
 using M0LTE.Radio.Audio;
+using Mailcast.Receiver.Hooks;
 using Microsoft.Extensions.Time.Testing;
 using Packet.Mailcast;
 
@@ -54,6 +56,7 @@ public class WebSdrWindowTests
             config = configure?.Invoke(config) ?? config;
             Host = new ReceiverHost(config, Clock, line => Log.Enqueue(line));
             Host.ClockWaiting += () => Waits.Writer.TryWrite(true);
+            Host.Hooks.Waiting += d => HookWaits.Writer.TryWrite(d);
             Host.AudioChanged += condition => Conditions.Writer.TryWrite(condition);
             Host.PipelineFactory = source =>
             {
@@ -76,6 +79,9 @@ public class WebSdrWindowTests
         public System.Collections.Concurrent.ConcurrentQueue<string> Log { get; } = new();
 
         public System.Threading.Channels.Channel<bool> Waits { get; } = System.Threading.Channels.Channel.CreateUnbounded<bool>();
+
+        /// <summary>Each delay the hooks loop has set a timer on the clock for, as it sets it.</summary>
+        public System.Threading.Channels.Channel<TimeSpan> HookWaits { get; } = System.Threading.Channels.Channel.CreateUnbounded<TimeSpan>();
 
         public System.Threading.Channels.Channel<AudioCondition> Conditions { get; } = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
 
@@ -484,8 +490,16 @@ public class WebSdrWindowTests
 
         Assert.True(input.Disposed);
         Assert.Contains(rig.Log, l => l.Contains("ending the 12:00 UTC slot's window early", StringComparison.Ordinal));
+        // The early-end line says why; the "outside the listening window" one would be
+        // misleading here, since by the clock the window was still open.
+        Assert.DoesNotContain(rig.Log, l => l.Contains("the clock is outside the slot's listening window", StringComparison.Ordinal));
         // Closed well ahead of the usual 12:12 end, ready for the next slot it listens to.
         Assert.Contains("closed until 13:58 UTC, ready for the 14:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+
+        // The status page says why too.
+        var page = new Mailcast.Receiver.Web.StatusPage(rig.Host, null, _ => { });
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        Assert.Contains("the directory and everything in rotation are heard", json.GetProperty("slot").GetProperty("endedEarly").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -510,6 +524,54 @@ public class WebSdrWindowTests
         // Still the usual window: closed at 12:12, not sooner.
         Assert.False(input.Disposed);
         Assert.DoesNotContain(rig.Log, l => l.Contains("ending the 12:00 UTC slot's window early", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task EarlyEnd_WebSdrWithHooks_RunsAfterSoonerThanTheUsualClose()
+    {
+        using var scripts = new TempDirectory();
+        string record = Path.Combine(scripts.Path, "runs");
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero), c => c with
+        {
+            Hooks = new HooksSettings
+            {
+                Before = HookScript.Write(scripts.Path, "before.sh", record),
+                After = HookScript.Write(scripts.Path, "after.sh", record),
+            },
+        });
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        // "before" started well ahead of 11:58, so it is already done.
+        await rig.HookWaits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Contains(HookScript.Runs(record), l => l.StartsWith("before ", StringComparison.Ordinal));
+
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            rig.Host.Intake.Offer(frame);
+        }
+        await rig.Host.Intake.DrainAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        rig.Host.Slots.OnProbeCaptured();
+
+        for (int i = 0; i < 6 && !input.Disposed; i++)
+        {
+            rig.Clock.Advance(ReceiverHost.EarlyEndPoll);
+            await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.True(input.Disposed);
+        Assert.DoesNotContain(HookScript.Runs(record), l => l.StartsWith("after ", StringComparison.Ordinal));
+
+        // The hooks loop polls at most every SlotHooks.Check: well under the ~11 minutes still
+        // left to the slot's usual 12:12 close, it notices the window ended early and runs
+        // "after" then, not at the usual close.
+        for (int i = 0; i < 15 && !HookScript.Runs(record).Any(l => l.StartsWith("after ", StringComparison.Ordinal)); i++)
+        {
+            rig.Clock.Advance(SlotHooks.Check);
+            await rig.HookWaits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.Contains(HookScript.Runs(record), l => l.StartsWith("after ", StringComparison.Ordinal));
+        Assert.True(rig.Clock.GetUtcNow() < new DateTimeOffset(2026, 10, 5, 12, 12, 0, TimeSpan.Zero),
+            $"\"after\" should have run well before the usual 12:12 close; it is now {rig.Clock.GetUtcNow():HH:mm:ss}");
     }
 
     [Fact]
