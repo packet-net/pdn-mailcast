@@ -132,6 +132,10 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
     <h2>Hearing GB7RDG</h2>
     <dl id="when"></dl>
     <p class="muted" id="slotShape">Each slot starts with a 10 second tone, then a few minutes of short data bursts.</p>
+    <p id="listenNow" hidden>
+      <button id="listenNowBtn" class="plain" type="button">Listen now</button>
+      <span id="listenNowStatus" class="muted"></span>
+    </p>
   </section>
 
   <section>
@@ -623,6 +627,7 @@ function schedule(s) {
   }
   $("when").innerHTML = rows;
   $("slotShape").textContent = `Each slot starts with a ${c.toneSeconds} second tone, ${s.markers.centreHz} Hz in your audio, then a few minutes of short data bursts.`;
+  listenNow(s);
   if (!s.slot) $("slot").textContent = `Nothing heard yet. ${web && !web.openNow ? `The web SDR ${sdr(s)} listens next at ${utc(web.slot)}.` : `The next slot is at ${utc(c.next)}.`}`;
 
   const tips = [
@@ -637,6 +642,31 @@ function schedule(s) {
   tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
   $("help").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
 }
+
+/* issue #53: the "Listen now" button, for a web SDR only; counts down while a session is open */
+function listenNow(s) {
+  const ln = s.listenNow;
+  $("listenNow").hidden = !ln;
+  if (!ln) return;
+  if (ln.until) {
+    const left = Math.max(0, Math.round((new Date(ln.until) - Date.now()) / 1000));
+    $("listenNowStatus").className = "good";
+    $("listenNowStatus").textContent = `Listening now - closes in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}.`;
+    $("listenNowBtn").disabled = true;
+  } else {
+    $("listenNowStatus").className = "muted";
+    $("listenNowStatus").textContent = ln.canUse
+      ? `See the spectrogram now, for ${ln.minutes} minutes (${ln.usesLeft} of ${ln.usesMax} left today).`
+      : (ln.problem || "Not available right now.");
+    $("listenNowBtn").disabled = !ln.canUse;
+  }
+}
+$("listenNowBtn").addEventListener("click", async () => {
+  $("listenNowBtn").disabled = true;
+  const r = await api("api/listen-now", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  if (!r.ok) { $("listenNowStatus").className = "bad"; $("listenNowStatus").textContent = r.error; }
+  refresh();
+});
 
 const pct = db => Math.max(0, Math.min(100, (db + 60) / 60 * 100));
 setInterval(refresh, 3000);

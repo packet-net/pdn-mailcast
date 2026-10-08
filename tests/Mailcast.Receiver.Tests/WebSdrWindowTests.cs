@@ -1,5 +1,6 @@
 using M0LTE.Radio.Audio;
 using Microsoft.Extensions.Time.Testing;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver.Tests;
 
@@ -387,6 +388,72 @@ public class WebSdrWindowTests
 
         await stop.CancelAsync();
         await run;
+    }
+
+    [Fact]
+    public async Task ListenNow_BetweenWindows_OpensAtOnceAndClosesAfterDuration()
+    {
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero));
+        await rig.AudioAsync(AudioPhase.Closed);
+
+        var result = rig.Host.RequestListenNow();
+        Assert.True(result.Ok);
+
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.AudioAsync(AudioPhase.Listening);
+        Assert.False(input.Disposed);
+        Assert.Contains(rig.Log, l => l.Contains("\"Listen now\"", StringComparison.Ordinal));
+
+        rig.Clock.Advance(ListenNowService.Duration);
+        await rig.AudioAsync(AudioPhase.Closed);
+        Assert.True(input.Disposed);
+        // Back to the real schedule afterwards: the next real window, not stuck or skipped.
+        Assert.Contains("closed until 09:58 UTC, ready for the 10:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ListenNow_RefusedWithinFiveMinutesOfTheRealWindow()
+    {
+        // 09:56: the 10:00 slot's window opens at 09:58, under 5 minutes away.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 56, 0, TimeSpan.Zero));
+        await rig.AudioAsync(AudioPhase.Closed);
+
+        var result = rig.Host.RequestListenNow();
+
+        Assert.False(result.Ok);
+        Assert.Contains("wait for that instead", result.Reason, StringComparison.Ordinal);
+        Assert.False(rig.Inputs.Reader.TryPeek(out _));
+    }
+
+    [Fact]
+    public async Task ListenNow_CutShortAtOnce_IfTheScheduleMovesAWindowCloserMidSession()
+    {
+        // At 09:20 the next hourly slot is 09:58's, far enough away to grant a session that
+        // would otherwise run to about 09:23.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero));
+        await rig.AudioAsync(AudioPhase.Closed);
+        var result = rig.Host.RequestListenNow();
+        Assert.True(result.Ok);
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.AudioAsync(AudioPhase.Listening);
+        Assert.False(input.Disposed);
+
+        // GB7RDG's directory, heard mid-session, moves the slots to :21 past the hour: the
+        // 09:21 slot's window (opens 09:19) is already due.
+        var heard = new SlotTimetable(new TimeOnly(9, 21), 60, null);
+        var options = ScheduleOptions.Hourly with { Timetable = heard };
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)], options, new DateTimeOffset(2026, 10, 5, 9, 21, 0, TimeSpan.Zero)))
+        {
+            rig.Host.Intake.Offer(frame);
+        }
+        await rig.Host.Intake.DrainAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Cut short at once, well before the ~3 minutes the session was granted for.
+        for (int i = 0; i < 100 && !input.Disposed; i++)
+        {
+            await Task.Delay(20);
+        }
+        Assert.True(input.Disposed);
     }
 
     [Fact]
