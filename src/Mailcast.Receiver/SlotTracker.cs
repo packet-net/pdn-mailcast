@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
 
@@ -16,6 +17,26 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
 
     /// <summary>The waveform GB7RDG's directory said this slot went out on, if a directory completed in it.</summary>
     public string? ListedWaveform { get; init; }
+
+    /// <summary>
+    /// Issue #49: the directory recognised while this slot was tracked (newly completed, or a
+    /// repeat of one already known from a recent slot: the two waveforms taking turns give the
+    /// same rotation different object IDs), so the receiver knows what is in that day's
+    /// rotation. Null until one is recognised.
+    /// </summary>
+    public BroadcastDirectory? HeardDirectory { get; init; }
+
+    /// <summary>
+    /// Issue #49: whether the probe audio after this slot's tone (used for the channel
+    /// measurement when no burst decodes) has been captured.
+    /// </summary>
+    public bool ProbeCaptured { get; init; }
+
+    /// <summary>Issue #49: whether this slot's ionosonde reading has been received.</summary>
+    public bool IonosphereHeard { get; init; }
+
+    /// <summary>Issue #49: whether this slot's PSK Reporter reading has been received.</summary>
+    public bool PskReporterHeard { get; init; }
 
     /// <summary>The waveform most of the slot's frames came on, <c>mixed</c> if two or more tie for most, or null if none is known.</summary>
     public string? Waveform
@@ -176,20 +197,55 @@ public sealed class SlotTracker
     }
 
     /// <summary>
-    /// A directory was rebuilt, naming the waveform the slot went out on (<paramref name="mode"/>,
-    /// null from a head end that does not say): kept beside the slot's frames as a cross-check.
+    /// A directory was recognised for the slot now on, naming the waveform it went out on in
+    /// <see cref="SlotSummary.ListedWaveform"/> (null from a head end that does not say, which
+    /// leaves whatever was already there): kept beside the slot's frames as a cross-check, and
+    /// (issue #49) as the exact rotation list the early-end check judges completeness against.
     /// </summary>
-    public void OnDirectory(string? mode)
+    public void OnDirectory(BroadcastDirectory directory)
     {
-        if (mode is null)
-        {
-            return;
-        }
+        ArgumentNullException.ThrowIfNull(directory);
         lock (_gate)
         {
             if (_current is not null)
             {
-                _current = _current with { ListedWaveform = mode };
+                _current = _current with { HeardDirectory = directory, ListedWaveform = directory.Mode ?? _current.ListedWaveform };
+            }
+        }
+    }
+
+    /// <summary>Issue #49: the probe audio after the slot's tone has been captured.</summary>
+    public void OnProbeCaptured()
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { ProbeCaptured = true };
+            }
+        }
+    }
+
+    /// <summary>Issue #49: this slot's ionosonde reading was received.</summary>
+    public void OnIonosphereHeard()
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { IonosphereHeard = true };
+            }
+        }
+    }
+
+    /// <summary>Issue #49: this slot's PSK Reporter reading was received.</summary>
+    public void OnPskReporterHeard()
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { PskReporterHeard = true };
             }
         }
     }

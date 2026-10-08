@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver.Tests;
 
@@ -7,6 +8,9 @@ public class SlotTrackerTests
     private static readonly SlotSchedule Hourly = new(new TimeOnly(0, 0), 60);
 
     private static DateTimeOffset At(int hour, int minute, int second = 0) => new(2026, 10, 5, hour, minute, second, TimeSpan.Zero);
+
+    /// <summary>A directory naming <paramref name="mode"/> as the waveform the slot went out on (null for a head end that does not say).</summary>
+    private static BroadcastDirectory Directory(string? mode = null) => new(DateOnly.FromDateTime(DateTime.UtcNow), [], mode: mode);
 
     private static ToneReport Tone(double seconds = 10) => new(1801, 1, 12, TimeSpan.FromSeconds(seconds));
 
@@ -155,6 +159,59 @@ public class SlotTrackerTests
         Assert.Equal(1, slots.Last!.FramesHeard);
         Assert.Null(slots.Last.Tone);
         Assert.Null(slots.Last.Scheduled);
+    }
+
+    [Fact]
+    public void OnDirectory_SetsHeardDirectory_EvenWithoutAWaveform()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        var directory = Directory();
+
+        slots.OnDirectory(directory);
+
+        Assert.Same(directory, slots.Last!.HeardDirectory);
+        Assert.Null(slots.Last.ListedWaveform);
+    }
+
+    [Fact]
+    public void OnDirectory_WithAWaveform_SetsBothAndKeepsTheWaveformOnANextCallWithout()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        var second = Directory();
+
+        slots.OnDirectory(Directory("ms110d-wn4"));
+        slots.OnDirectory(second);
+
+        Assert.Same(second, slots.Last!.HeardDirectory);
+        Assert.Equal("ms110d-wn4", slots.Last.ListedWaveform);
+    }
+
+    [Fact]
+    public void OnDirectory_WithNoSlotTrackedYet_DoesNothing()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+
+        slots.OnDirectory(Directory("ms110d-wn4"));
+
+        Assert.Null(slots.Last);
+    }
+
+    [Fact]
+    public void OnProbeCaptured_SetsTheFlagOnTheSlotInProgress()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        Assert.False(slots.Last!.ProbeCaptured);
+
+        slots.OnProbeCaptured();
+
+        Assert.True(slots.Last!.ProbeCaptured);
     }
 
     [Fact]

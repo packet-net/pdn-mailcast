@@ -81,6 +81,8 @@ public sealed class Retuner : IAsyncDisposable
     private readonly RigTuning _tuning;
     private readonly BpqNodeSettings? _bpq;
     private readonly SlotHooks? _hooks;
+    /// <summary>Issue #49: given the slot's start, says why its window can end now, or null to keep going.</summary>
+    private readonly Func<DateTimeOffset, string?>? _earlyEnd;
     private readonly string _file;
     private readonly string _rigRestoreFile;
     private readonly object _gate = new();
@@ -106,13 +108,13 @@ public sealed class Retuner : IAsyncDisposable
     /// <paramref name="onRadio"/> says the audio comes from the radio. <paramref name="hooks"/>,
     /// if given, are run around each slot it retunes for.
     /// </summary>
-    public Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null)
-        : this(config, schedule, onRadio, time, log, time, hooks)
+    public Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+        : this(config, schedule, onRadio, time, log, time, hooks, earlyEnd)
     {
     }
 
     /// <summary>As the public one, with rig control on a clock of its own, so a test can step its polls by themselves.</summary>
-    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null)
+    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         var rig = config.Rig ?? throw new ArgumentException("the config has no \"rig\"", nameof(config));
@@ -121,6 +123,7 @@ public sealed class Retuner : IAsyncDisposable
         _schedule = schedule;
         _onRadio = onRadio;
         _hooks = hooks;
+        _earlyEnd = earlyEnd;
         _bpq = config.Bpq;
         _owedPort = _bpq?.HfPort ?? 0;
         _tuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
@@ -532,6 +535,14 @@ public sealed class Retuner : IAsyncDisposable
                         {
                             break;
                         }
+                    }
+                    // Issue #49: give the rig back and release LinBPQ sooner, once the slot is
+                    // done with. Only checked while tuned (never during "before"/"after" or the
+                    // restore that follows: those are outside this loop).
+                    if (_earlyEnd?.Invoke(slot) is { } earlyWhy)
+                    {
+                        _log($"retune: ending the {Hhmm(slot)} UTC slot early: {earlyWhy}");
+                        break;
                     }
                     await WaitAsync(Shorter(closes - _time.GetUtcNow(), WindowPoll), cancellation, wakeable: true).ConfigureAwait(false);
                     if (_time.GetUtcNow() >= closes)

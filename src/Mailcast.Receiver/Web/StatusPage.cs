@@ -737,6 +737,8 @@ public sealed class StatusPage : IAsyncDisposable
                     snrDb = Math.Round(tone.SnrDb, 1),
                     seconds = Math.Round(tone.Duration.TotalSeconds),
                 },
+                // Issue #49: why its window ended early, for this slot only; null otherwise.
+                endedEarly = _host.LastEarlyEnd is { } early && early.Slot == slot.Scheduled ? early.Reason : null,
             },
             framesHeard = _host.Intake.FramesHeard,
             iono = IonoView(_host.Intake.Ionosphere, _host.Time.GetUtcNow()),
