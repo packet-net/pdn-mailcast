@@ -84,6 +84,45 @@
   #optIn details pre { margin: 6px 0; padding: 8px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px;
     font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; overflow: auto; }
   #optIn.on { padding: 8px 16px; }
+  /* A short, coloured status word with the full sentence as a tooltip (title="..."): used for
+     the BBS and Answer columns, which otherwise hold a whole sentence in a narrow cell. */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: #e9edf1; color: var(--ink); }
+  .badge.good { background: #e3f3e8; color: var(--good); }
+  .badge.warn { background: #fbeedd; color: var(--warn); }
+  .badge.bad { background: #fbe4e1; color: var(--bad); }
+  .badge.muted { background: #e9edf1; color: var(--soft); }
+
+  /* Phones, portrait and landscape (issue #59): one column of tiles, no sideways scrolling,
+     tables as labelled cards instead of cramped grids, and controls big enough to tap. A grid
+     item's content can force its track wider than the viewport unless the item itself is
+     allowed to shrink, hence min-width: 0 on section. */
+  section { min-width: 0; }
+  @media (max-width: 900px) {
+    header { padding: 14px 16px 6px; }
+    #signOut { position: static; display: inline-block; margin-top: 8px; }
+    main { grid-template-columns: 1fr; padding: 10px 14px 28px; gap: 12px; }
+    section { padding: 12px 14px; }
+    #update, #optIn { margin-left: 14px; margin-right: 14px; }
+    .row { grid-template-columns: 1fr; }
+    input, select { width: 100%; }
+    button { min-height: 44px; padding: 10px 16px; }
+    .pager button { min-height: 40px; }
+    #updateCopy { min-height: 40px; }
+    #optInForm input[type=checkbox] { width: 22px; height: 22px; }
+    #optInForm label { min-height: 44px; }
+
+    /* Bulletins, deliveries and mail: each row becomes a card, each cell a labelled line,
+       instead of a table too wide for the tile. */
+    main table { display: block; width: 100%; border: 0; }
+    main table tr:has(th) { display: none; }
+    main table tbody, main table tr { display: block; width: 100%; }
+    main table tr { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; }
+    main table td { display: grid; grid-template-columns: 76px 1fr; gap: 8px; align-items: start;
+      border-bottom: 0; padding: 4px 0; white-space: normal; }
+    main table td.num { white-space: normal; }
+    main table td:not([data-label]) { grid-template-columns: 1fr; }
+    main table td[data-label]::before { content: attr(data-label); color: var(--soft); font-size: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -283,6 +322,13 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 "use strict";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+/* A short status word or two, coloured, with the full sentence as a tooltip: keeps a narrow BBS
+   or Answer column from wrapping into a tall stack of single words on a phone. */
+const badgeClass = short => ["accepted", "complete"].includes(short) ? "good"
+  : short === "refused" ? "bad"
+  : ["already had", "deferred", "unconfirmed", "waiting"].includes(short) ? "warn"
+  : "muted";
+const badge = (short, full) => `<span class="badge ${badgeClass(short)}"${full && full !== short ? ` title="${esc(full)}"` : ""}>${esc(short)}</span>`;
 const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null, levelSeen = false;
@@ -456,18 +502,18 @@ async function refresh() {
     $("bulletins").className = "";
     $("bulletins").innerHTML = `<p class="muted">List of ${esc(s.directory.date)}: ${s.bulletins.length} bulletins, ${done} complete here.</p>
       <table><tr><th>BID</th><th>Title</th><th>Pieces</th><th>BBS</th></tr>
-      ${s.bulletins.map(b => `<tr><td class="num">${esc(b.bid)}</td><td>${esc(b.title)}</td>
-        <td>${b.complete ? '<span class="good">complete</span>'
+      ${s.bulletins.map(b => `<tr><td class="num" data-label="BID">${esc(b.bid)}</td><td data-label="Title">${esc(b.title)}</td>
+        <td data-label="Pieces">${b.complete ? '<span class="good">complete</span>'
           : b.needed ? `<div class="bar" title="${b.received} of ${b.needed}"><span style="width:${Math.min(100, 100 * b.received / b.needed)}%"></span></div>`
           : '<span class="muted">none yet</span>'}</td>
-        <td>${esc(b.delivery ?? (b.complete ? "waiting" : ""))}</td></tr>`).join("")}</table>`;
+        <td data-label="BBS">${b.delivery ? badge(b.deliveryShort, b.delivery) : (b.complete ? badge("waiting", "waiting for the BBS") : "")}</td></tr>`).join("")}</table>`;
   }
 
   if (s.deliveries.length) {
     $("deliveries").className = "";
     $("deliveries").innerHTML = `<table><tr><th>When</th><th>BID</th><th>Title</th><th>Answer</th></tr>
-      ${s.deliveries.map(d => `<tr><td class="num">${when(d.time)}</td><td class="num">${esc(d.bid)}</td><td>${esc(d.title)}</td>
-        <td class="${d.verdict === "accepted" ? "good" : d.verdict === "refused" ? "bad" : ""}">${esc(d.said)}${d.detail ? `<div class="muted">${esc(d.detail)}</div>` : ""}</td></tr>`).join("")}</table>`;
+      ${s.deliveries.map(d => `<tr><td class="num" data-label="When">${when(d.time)}</td><td class="num" data-label="BID">${esc(d.bid)}</td><td data-label="Title">${esc(d.title)}</td>
+        <td data-label="Answer">${badge(d.saidShort, d.said)}${d.detail ? `<div class="muted">${esc(d.detail)}</div>` : ""}</td></tr>`).join("")}</table>`;
   }
 
   const lvl = s.level, target = lvl.advice === "target";
@@ -684,12 +730,25 @@ function el(tag, text, cls) {
   if (cls) e.className = cls;
   return e;
 }
+/* A <td> with a "data-label" for the mobile card layout (see the stylesheet): the label is
+   shown by CSS ahead of the value once the table stacks into cards on a narrow screen. */
+function td(text, cls, label) {
+  const e = el("td", text, cls);
+  if (label) e.dataset.label = label;
+  return e;
+}
+function badgeEl(short, full, cls) {
+  const e = el("span", short, "badge " + cls);
+  if (full && full !== short) e.title = full;
+  return e;
+}
 function mailRow(m) {
   const tr = el("tr", null, "pick" + (viewing === m.id ? " open" : ""));
   tr.dataset.id = m.id;
-  tr.append(el("td", m.bid, "num"), el("td", m.from), el("td", m.to), el("td", m.at), el("td", m.title),
-    el("td", when(m.date), "num"), el("td", size(m.size), "num"));
-  const st = el("td", m.status, m.waiting ? "warn" : m.verdict === "refused" ? "bad" : "good");
+  tr.append(td(m.bid, "num", "BID"), td(m.from, null, "From"), td(m.to, null, "To"), td(m.at, null, "@"), td(m.title, null, "Title"),
+    td(when(m.date), "num", "Date"), td(size(m.size), "num", "Size"));
+  const st = td(null, null, "Status");
+  st.append(badgeEl(m.statusShort || m.status, m.status, m.waiting ? "warn" : m.verdict === "refused" ? "bad" : "good"));
   if (m.waiting && m.lastAttempt) st.append(el("div", `last try ${when(m.lastAttempt)}`, "muted"));
   if (m.waiting && m.nextAttempt) st.append(el("div", `next try ${when(m.nextAttempt)}`, "muted"));
   if (m.detail) st.append(el("div", m.detail, "muted"));

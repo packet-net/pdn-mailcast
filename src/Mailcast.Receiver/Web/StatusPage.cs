@@ -757,6 +757,7 @@ public sealed class StatusPage : IAsyncDisposable
                     received = p.Received,
                     needed = p.Needed,
                     delivery = delivered is null ? null : DeliveryService.Describe(delivered.Verdict),
+                    deliveryShort = delivered is null ? null : DeliveryService.DescribeShort(delivered.Verdict),
                 };
             }),
             deliveries = _host.Ledger.Recent.Take(40).Select(r => new
@@ -766,6 +767,7 @@ public sealed class StatusPage : IAsyncDisposable
                 title = r.Title,
                 verdict = r.Verdict,
                 said = DeliveryService.Describe(r.Verdict),
+                saidShort = DeliveryService.DescribeShort(r.Verdict),
                 detail = r.Detail,
             }),
         };
@@ -1257,7 +1259,7 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>One bulletin for the list: what it is, where it is, and what the BBS has said.</summary>
     private object MailView(Packet.Mailcast.MailEntry m)
     {
-        string status;
+        string status, statusShort;
         DeliveryRecord? last = null;
         if (m.Waiting)
         {
@@ -1267,6 +1269,7 @@ public sealed class StatusPage : IAsyncDisposable
             status = last is not null ? "waiting: " + DeliveryService.Describe(last.Verdict)
                 : _host.Delivery.LastFailure is { } failure ? "waiting: " + failure
                 : "waiting for the BBS";
+            statusShort = "waiting";
         }
         else
         {
@@ -1275,6 +1278,12 @@ public sealed class StatusPage : IAsyncDisposable
                 Packet.Mailcast.BbsVerdict.Accepted => "accepted by the BBS",
                 Packet.Mailcast.BbsVerdict.AlreadyHad => "the BBS already had it",
                 _ => "refused by the BBS",
+            };
+            statusShort = m.Verdict switch
+            {
+                Packet.Mailcast.BbsVerdict.Accepted => "accepted",
+                Packet.Mailcast.BbsVerdict.AlreadyHad => "already had",
+                _ => "refused",
             };
         }
         return new
@@ -1290,6 +1299,7 @@ public sealed class StatusPage : IAsyncDisposable
             size = m.Size,
             time = m.Time,
             status,
+            statusShort,
             verdict = m.Verdict,
             detail = m.Detail ?? last?.Detail,
             lastAttempt = last?.Time,
