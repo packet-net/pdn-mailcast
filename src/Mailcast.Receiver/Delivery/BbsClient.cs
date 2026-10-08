@@ -268,8 +268,13 @@ public sealed partial class BbsClient : IBbsSession
             line);
     }
 
-    /// <summary>The first line of <paramref name="text"/>, cleaned of anything not printable, or null for nothing.</summary>
-    private static string? FirstLine(string text)
+    /// <summary>
+    /// The first line of <paramref name="text"/>, cleaned of anything not printable and with the
+    /// password tested redacted, or null for nothing. The password is taken out before this ever
+    /// reaches a log or a reply: whether a BBS ever echoes back what it was sent is not something
+    /// to rely on, FBB's included.
+    /// </summary>
+    private string? FirstLine(string text)
     {
         string trimmed = text.Trim();
         if (trimmed.Length == 0)
@@ -277,9 +282,13 @@ public sealed partial class BbsClient : IBbsSession
             return null;
         }
         int end = trimmed.IndexOfAny(['\r', '\n']);
-        string line = Ascii.Clean(end < 0 ? trimmed : trimmed[..end]).Trim();
+        string line = Ascii.Clean(Redact(end < 0 ? trimmed : trimmed[..end])).Trim();
         return line.Length == 0 ? null : line;
     }
+
+    /// <summary>Replaces every occurrence of the password tested with asterisks.</summary>
+    private string Redact(string text) =>
+        _settings.Password.Length == 0 ? text : text.Replace(_settings.Password, "***", StringComparison.Ordinal);
 
     /// <summary>Offers <paramref name="bulletins"/> to the BBS in one session.</summary>
     public async Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)

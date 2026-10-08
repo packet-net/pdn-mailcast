@@ -222,6 +222,23 @@ public class BbsClientTests
         Assert.Equal("Something has gone wrong here", result.Detail);
     }
 
+    /// <summary>
+    /// Whether a real BBS ever echoes the password back isn't verified for every kind, so the
+    /// password tested is taken out of anything that reaches the reply, not assumed never to appear.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_BbsEchoesThePasswordBack_IsRedactedFromTheReply()
+    {
+        await using var bbs = new FakeBbs { Garbled = "you said secret, which is wrong\r\nmore after it" };
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.UnexpectedReply, result.Outcome);
+        Assert.NotNull(result.Detail);
+        Assert.DoesNotContain("secret", result.Detail, StringComparison.Ordinal);
+        Assert.Contains("***", result.Detail, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task TestLogin_NothingListening_SaysItCannotReachIt()
     {

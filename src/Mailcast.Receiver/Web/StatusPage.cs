@@ -94,6 +94,9 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>How the wait for a wrong password is done, for a test to hold it; null waits on the host's clock.</summary>
     internal Func<TimeSpan, Task>? Pause { get; init; }
 
+    /// <summary>How "Test BBS login" actually tries the login, for a test to make it throw; null uses a real <see cref="BbsClient"/>.</summary>
+    internal Func<BbsSettings, Task<BbsLoginTestResult>>? TestBbsLogin { get; init; }
+
     /// <summary>The check for a newer version, whose finding the page shows; null shows none.</summary>
     public UpdateCheck? Updates { get; init; }
 
@@ -1434,10 +1437,24 @@ public sealed class StatusPage : IAsyncDisposable
             return;
         }
         string host = string.IsNullOrWhiteSpace(form.Host) ? current.Host : form.Host.Trim();
-        int port = form.Port is > 0 ? form.Port.Value : current.Port;
+        int port = form.Port ?? current.Port;
         string login = string.IsNullOrWhiteSpace(form.Login) ? current.Login : form.Login.Trim();
         string password = string.IsNullOrEmpty(form.Password) ? current.Password : form.Password;
         string command = string.IsNullOrWhiteSpace(form.Command) ? current.Command : form.Command.Trim();
+        // The same bounds as a saved config (ReceiverConfig.Validate): a host that is not empty
+        // and not absurd, and a port that is an actual TCP port. Without this, a port such as
+        // 70000 reaches TcpClient.ConnectAsync, which throws rather than refusing cleanly, and
+        // the request never answers.
+        if (string.IsNullOrWhiteSpace(host) || host.Length > 255 || host.Any(char.IsControl))
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Give a host to test, such as 127.0.0.1." })).ConfigureAwait(false);
+            return;
+        }
+        if (port is < 1 or > 65535)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = $"\"{port}\" is not a TCP port; it must be from 1 to 65535." })).ConfigureAwait(false);
+            return;
+        }
         if (password.Length == 0)
         {
             await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Enter the password to test." })).ConfigureAwait(false);
@@ -1445,7 +1462,27 @@ public sealed class StatusPage : IAsyncDisposable
         }
 
         var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = login.ToUpperInvariant(), Password = password, Command = command };
-        var result = await new BbsClient(settings, _host.Time, _ => { }).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
+        BbsLoginTestResult result;
+        try
+        {
+            result = TestBbsLogin is { } hook
+                ? await hook(settings).ConfigureAwait(false)
+                : await new BbsClient(settings, _host.Time, _ => { }).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // Whatever this is, the page still gets an answer rather than a hung request; never
+            // the password, and the type name only, not the exception's own message, which could
+            // quote back something given to it.
+            _log($"web: testing the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)} failed unexpectedly ({e.GetType().Name})");
+            await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
+            {
+                outcome = BbsLoginTestOutcome.UnexpectedReply,
+                said = "Something went wrong testing the login.",
+                detail = (string?)null,
+            }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
+            return;
+        }
         _log($"web: tested the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)}: {Ascii.Clean(result.Said)}");
         await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
         {
