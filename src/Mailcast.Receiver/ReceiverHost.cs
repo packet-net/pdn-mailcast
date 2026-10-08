@@ -41,7 +41,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
-        Intake.DirectoryHeard += directory => Slots.OnDirectory(directory.Mode);
+        Intake.DirectoryHeard += Slots.OnDirectory;
         Intake.IonosphereHeard += _ => Slots.OnIonosphereHeard();
         Intake.PskReporterHeard += _ => Slots.OnPskReporterHeard();
         Intake.ScheduleHeard += OnScheduleHeard;
@@ -213,19 +213,22 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             return null;
         }
-        if (!slot.DirectoryHeard)
+        if (slot.HeardDirectory is not { } heardDirectory)
         {
             // The receiver does not yet know what is in today's rotation.
             return null;
         }
-        var (directory, progress) = Intake.Progress();
-        if (directory is null || progress.Any(p => !p.Complete))
+        // Judged against the specific directory heard this slot, not whichever is newest
+        // overall: the two waveforms taking turns give the same rotation different object IDs
+        // (the mode they went out on is part of the object), so a slot's own resend may not be
+        // the "latest" the store has seen.
+        if (heardDirectory.Entries.Any(e => !Intake.IsComplete(e.ObjectId)))
         {
-            // A bulletin, or the directory itself, is not complete yet.
+            // A bulletin in it is not complete yet.
             return null;
         }
         // The ionosonde and PSK Reporter readings are new objects each slot, never listed in the
-        // directory, so Progress() above says nothing about them. Wait for each to be heard this
+        // directory, so the check above says nothing about them. Wait for each to be heard this
         // slot, unless this receiver has never heard that kind at all: then the head end, or this
         // broadcast, may simply not send it, and there is no other way to tell "the plan has none".
         if (!slot.IonosphereHeard && Intake.Ionosphere is not null)

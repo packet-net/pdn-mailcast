@@ -63,6 +63,22 @@ internal static class Samples
         var plan = BroadcastScheduler.Plan(bulletins.Select(b => new BroadcastBulletin(b, DateOnly.FromDateTime(slot.UtcDateTime), slot)), slot, seed, Compression.Default, options);
         return [.. plan.Frames.Select(f => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, f.ToBytes()))];
     }
+
+    /// <summary>
+    /// As the other overload, with the directory naming <paramref name="mode"/> as the waveform
+    /// the slot went out on: GB7RDG takes turns on WN4 and WN3, so the same rotation, resent on
+    /// the other one, is a different object (the mode is part of what is compressed and hashed).
+    /// </summary>
+    public static IReadOnlyList<byte[]> Frames(IEnumerable<Bulletin> bulletins, ScheduleOptions options, DateTimeOffset slot, string mode, int seed = 1)
+    {
+        var carried = bulletins.Select(b =>
+        {
+            var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, options.SymbolSize, options.Alignment);
+            return new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, DateOnly.FromDateTime(slot.UtcDateTime), transfer, 0, slot);
+        }).ToList();
+        var plan = BroadcastScheduler.Plan(carried, slot, seed, Compression.Default, options, mode: mode);
+        return [.. plan.Frames.Select(f => Ax25UiFrame.Build(Samples.Source, OnAir.Destination, f.ToBytes()))];
+    }
 }
 
 /// <summary>A scratch directory removed when the test ends.</summary>

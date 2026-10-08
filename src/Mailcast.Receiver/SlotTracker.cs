@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
 
@@ -18,11 +19,12 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
     public string? ListedWaveform { get; init; }
 
     /// <summary>
-    /// Issue #49: whether a directory completed while this slot was tracked, so the receiver
-    /// knows what is in that day's rotation. Set even when the directory does not say its
-    /// waveform (so <see cref="ListedWaveform"/> stays null).
+    /// Issue #49: the directory recognised while this slot was tracked (newly completed, or a
+    /// repeat of one already known from a recent slot: the two waveforms taking turns give the
+    /// same rotation different object IDs), so the receiver knows what is in that day's
+    /// rotation. Null until one is recognised.
     /// </summary>
-    public bool DirectoryHeard { get; init; }
+    public BroadcastDirectory? HeardDirectory { get; init; }
 
     /// <summary>
     /// Issue #49: whether the probe audio after this slot's tone (used for the channel
@@ -195,16 +197,19 @@ public sealed class SlotTracker
     }
 
     /// <summary>
-    /// A directory was rebuilt, naming the waveform the slot went out on (<paramref name="mode"/>,
-    /// null from a head end that does not say): kept beside the slot's frames as a cross-check.
+    /// A directory was recognised for the slot now on, naming the waveform it went out on in
+    /// <see cref="SlotSummary.ListedWaveform"/> (null from a head end that does not say, which
+    /// leaves whatever was already there): kept beside the slot's frames as a cross-check, and
+    /// (issue #49) as the exact rotation list the early-end check judges completeness against.
     /// </summary>
-    public void OnDirectory(string? mode)
+    public void OnDirectory(BroadcastDirectory directory)
     {
+        ArgumentNullException.ThrowIfNull(directory);
         lock (_gate)
         {
             if (_current is not null)
             {
-                _current = _current with { DirectoryHeard = true, ListedWaveform = mode ?? _current.ListedWaveform };
+                _current = _current with { HeardDirectory = directory, ListedWaveform = directory.Mode ?? _current.ListedWaveform };
             }
         }
     }

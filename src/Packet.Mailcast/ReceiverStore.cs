@@ -331,11 +331,7 @@ public sealed class ReceiverStore
                 File.Delete(directoryFile);
             }
         }
-        var directoryIdFile = Path.Combine(root, DirectoryIdFile);
-        if (Directory is not null && File.Exists(directoryIdFile) && ObjectId.TryParse(File.ReadAllText(directoryIdFile).Trim(), out ulong savedId))
-        {
-            _directoryObjectId = savedId;
-        }
+        LoadKnownDirectories();
 
         foreach (var dir in System.IO.Directory.EnumerateDirectories(_objects).Order(StringComparer.Ordinal).ToList())
         {
@@ -362,15 +358,21 @@ public sealed class ReceiverStore
     public BroadcastDirectory? Directory { get; private set; }
 
     /// <summary>
-    /// The object ID of <see cref="Directory"/>, kept in <see cref="DirectoryIdFile"/> across
-    /// restarts. Used so a repeat of the same directory (<see cref="FrameOutcome.AlreadyComplete"/>,
-    /// as the other waveform resends it every other slot, or after a restart) is still
-    /// recognised as "this slot heard the directory".
+    /// Every directory recognised in the last <see cref="KnownDirectoriesRetention"/>, by its own
+    /// object ID, kept in <see cref="KnownDirectoriesFolder"/> across restarts. The two waveforms
+    /// take turns resending the same day's rotation, and the mode each went out on is part of the
+    /// object, so the same rotation has a different ID on each: without remembering more than
+    /// just the newest, a repeat on the other waveform (<see cref="FrameOutcome.AlreadyComplete"/>)
+    /// would not be recognised as "this slot heard the directory", and after three or more slots
+    /// the oldest would never be recognised again at all.
     /// </summary>
-    private ulong? _directoryObjectId;
+    private readonly Dictionary<ulong, (BroadcastDirectory Directory, DateTimeOffset HeardAt)> _knownDirectories = [];
 
-    /// <summary>Where <see cref="Directory"/>'s object ID is kept, under the store's folder.</summary>
-    public const string DirectoryIdFile = "directory-id.txt";
+    /// <summary>Where each known directory (see <see cref="_knownDirectories"/>) is kept, one file per object ID in hex, under the store's folder.</summary>
+    public const string KnownDirectoriesFolder = "directories";
+
+    /// <summary>How long a directory is remembered by its object ID.</summary>
+    public static readonly TimeSpan KnownDirectoriesRetention = TimeSpan.FromHours(48);
 
     /// <summary>Where the newest ionosonde reading is kept, as the object that carried it, under the store's folder.</summary>
     public const string IonosphereFile = "ionosphere.bin";
@@ -405,6 +407,88 @@ public sealed class ReceiverStore
     /// <summary>Whether an object has been rebuilt (within <see cref="ReceiverStoreOptions.DoneRetention"/>).</summary>
     public bool IsComplete(ulong objectId) => _done.ContainsKey(objectId);
 
+    /// <summary>Reads every directory still within <see cref="KnownDirectoriesRetention"/> from <see cref="KnownDirectoriesFolder"/>.</summary>
+    private void LoadKnownDirectories()
+    {
+        string dir = Path.Combine(_root, KnownDirectoriesFolder);
+        if (!System.IO.Directory.Exists(dir))
+        {
+            return;
+        }
+        var now = _options.Time.GetUtcNow();
+        foreach (string file in System.IO.Directory.EnumerateFiles(dir))
+        {
+            DateTimeOffset heardAt;
+            try
+            {
+                heardAt = File.GetLastWriteTimeUtc(file);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+            if (now - heardAt > KnownDirectoriesRetention)
+            {
+                TryDelete(file);
+                continue;
+            }
+            if (!ObjectId.TryParse(Path.GetFileNameWithoutExtension(file), out ulong id))
+            {
+                continue;
+            }
+            try
+            {
+                _knownDirectories[id] = (BroadcastDirectory.Parse(File.ReadAllBytes(file)), heardAt);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
+            {
+                Log($"{file} unreadable, removed: {e.Message}");
+                TryDelete(file);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Keeps <paramref name="directory"/> under its own object ID, so a later repeat of it
+    /// (<see cref="FrameOutcome.AlreadyComplete"/>, as the other waveform resends it, or after a
+    /// restart) is still recognised.
+    /// </summary>
+    private void RememberDirectory(ulong objectId, BroadcastDirectory directory)
+    {
+        var now = _options.Time.GetUtcNow();
+        _knownDirectories[objectId] = (directory, now);
+        try
+        {
+            System.IO.Directory.CreateDirectory(Path.Combine(_root, KnownDirectoriesFolder));
+            DurableFile.WriteAtomically(Path.Combine(_root, KnownDirectoriesFolder, ObjectId.Format(objectId) + ".txt"), directory.Serialize(), now, _options.FlushToDisk);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log($"cannot remember the directory {ObjectId.Format(objectId)}: {e.Message}");
+        }
+    }
+
+    /// <summary>Forgets directories heard more than <see cref="KnownDirectoriesRetention"/> ago.</summary>
+    private void PruneKnownDirectories(DateTimeOffset now)
+    {
+        foreach (var id in _knownDirectories.Where(kv => now - kv.Value.HeardAt > KnownDirectoriesRetention).Select(kv => kv.Key).ToList())
+        {
+            _knownDirectories.Remove(id);
+            TryDelete(Path.Combine(_root, KnownDirectoriesFolder, ObjectId.Format(id) + ".txt"));
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     /// <summary>Offers one received frame payload (an AX.25 UI frame's information field).</summary>
     public AcceptResult Accept(ReadOnlySpan<byte> payload)
     {
@@ -419,10 +503,12 @@ public sealed class ReceiverStore
         }
         if (_done.ContainsKey(frame.ObjectId))
         {
-            // A repeat of the directory already held: still worth telling the caller which, so a
-            // slot that only ever resends the known directory (WN3/WN4 taking turns, or after a
-            // restart) is not treated as one where the directory was never heard.
-            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: frame.ObjectId == _directoryObjectId ? Directory : null);
+            // A repeat of a directory already held: still worth telling the caller which, so a
+            // slot that only ever resends one already known (WN3/WN4 taking turns give the same
+            // rotation a different ID each, or this is the first repeat since a restart) is not
+            // treated as one where the directory was never heard.
+            _knownDirectories.TryGetValue(frame.ObjectId, out var known);
+            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: known.Directory);
         }
         if (!_compression.Knows(frame.DictionaryId))
         {
@@ -705,6 +791,7 @@ public sealed class ReceiverStore
                 _done.Remove(id);
             }
         }
+        PruneKnownDirectories(now);
         foreach (var instance in _instances.Values.ToList())
         {
             if (now - instance.LastPiece > _options.PartialRetention)
@@ -864,10 +951,9 @@ public sealed class ReceiverStore
             if (Directory is null || directory.Date >= Directory.Date)
             {
                 DurableFile.WriteAtomically(Path.Combine(_root, "directory.txt"), content, flush: _options.FlushToDisk);
-                DurableFile.WriteAtomically(Path.Combine(_root, DirectoryIdFile), Bulletin.TextEncoding.GetBytes(ObjectId.Format(instance.ObjectId)), flush: _options.FlushToDisk);
                 Directory = directory;
-                _directoryObjectId = instance.ObjectId;
             }
+            RememberDirectory(instance.ObjectId, directory);
             if (directory.Schedule is { } schedule && (HeardScheduleDate is null || directory.Date >= HeardScheduleDate))
             {
                 if (schedule != HeardSchedule || directory.Date != HeardScheduleDate)

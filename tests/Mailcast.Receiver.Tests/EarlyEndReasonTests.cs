@@ -301,4 +301,95 @@ public class EarlyEndReasonTests
         Assert.True(f.Host.Slots.Last!.PskReporterHeard);
         Assert.NotNull(f.Host.EarlyEndReason(SlotStart));
     }
+
+    [Fact]
+    public async Task AlternatingWn4AndWn3Directories_AcrossThreeSlots_TheRepeatOnTheThirdStillCountsAsHeard()
+    {
+        // GB7RDG takes turns on WN4 and WN3: the same rotation, resent on the other waveform, is
+        // a different object (the mode it went out on is part of what is hashed), so remembering
+        // only the newest would forget the one before as soon as the other took its place.
+        await using var f = new Fixture(SlotStart.AddSeconds(2));
+        var bulletin = Samples.Bulletin(1);
+
+        // 12:00, WN4.
+        foreach (var frame in Samples.Frames([bulletin], ScheduleOptions.Hourly, SlotStart, "ms110d-wn4"))
+        {
+            await f.HearAsync(frame);
+        }
+        f.Host.Slots.OnProbeCaptured();
+        f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+        Assert.NotNull(f.Host.EarlyEndReason(SlotStart));
+
+        // 13:00, WN3: a fresh object, so a fresh "CompletedDirectory", not a repeat.
+        var slot2 = SlotStart.AddHours(1);
+        f.Time.SetUtcNow(slot2.AddSeconds(2));
+        foreach (var frame in Samples.Frames([bulletin], ScheduleOptions.Hourly, slot2, "ms110d-wn3"))
+        {
+            await f.HearAsync(frame);
+        }
+        f.Host.Slots.OnProbeCaptured();
+        f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+        Assert.NotNull(f.Host.EarlyEndReason(slot2));
+
+        // 14:00: the head end resends the exact WN4-encoded directory from 12:00 (same object,
+        // same ID, byte for byte) again. Only remembering the newest (WN3's, from 13:00) would
+        // mean this is not recognised, and the bug: EarlyEndReason never fires for this slot.
+        var slot3 = SlotStart.AddHours(2);
+        f.Time.SetUtcNow(slot3.AddSeconds(2));
+        var wn4Repeat = Samples.Frames([bulletin], ScheduleOptions.Hourly, SlotStart, "ms110d-wn4");
+        await f.HearAsync(wn4Repeat[0]); // the directory; AlreadyComplete this time
+        f.Host.Slots.OnProbeCaptured();
+        f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+
+        Assert.NotNull(f.Host.EarlyEndReason(slot3));
+    }
+
+    [Fact]
+    public async Task DirectoryKnownFromBeforeARestart_AResendOnTheOtherWaveform_StillCountsAsHeard()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(SlotStart.AddSeconds(2));
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        var bulletin = Samples.Bulletin(1);
+        var wn4 = Samples.Frames([bulletin], ScheduleOptions.Hourly, SlotStart, "ms110d-wn4");
+
+        await using (var first = new ReceiverHost(config, time, _ => { }))
+        {
+            foreach (var frame in wn4)
+            {
+                first.Intake.Offer(frame);
+            }
+            await first.Intake.DrainAsync(CancellationToken.None);
+        }
+
+        // A new receiver (a restart), a slot later: the head end sends the rotation on WN3, a
+        // fresh object this receiver has never seen. Remembering the WN4 directory only in
+        // memory (lost across the restart) would still let this complete normally; the point of
+        // this test is the next slot's WN4 repeat, below.
+        var slot2 = SlotStart.AddHours(1);
+        time.SetUtcNow(slot2.AddSeconds(2));
+        var wn3 = Samples.Frames([bulletin], ScheduleOptions.Hourly, slot2, "ms110d-wn3");
+        await using var second = new ReceiverHost(config, time, _ => { });
+        foreach (var frame in wn3)
+        {
+            second.Intake.Offer(frame);
+        }
+        await second.Intake.DrainAsync(CancellationToken.None);
+        second.Slots.OnProbeCaptured();
+        time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+        Assert.NotNull(second.EarlyEndReason(slot2));
+
+        // 14:00: GB7RDG resends the WN4 directory from before the restart. Without persisting
+        // known directories across restarts (not just the single newest in memory), this would
+        // never be recognised, since this process never saw it complete.
+        var slot3 = SlotStart.AddHours(2);
+        time.SetUtcNow(slot3.AddSeconds(2));
+        await using var third = new ReceiverHost(config, time, _ => { });
+        third.Intake.Offer(wn4[0]); // the directory from before the restart; AlreadyComplete
+        await third.Intake.DrainAsync(CancellationToken.None);
+        third.Slots.OnProbeCaptured();
+        time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+
+        Assert.NotNull(third.EarlyEndReason(slot3));
+    }
 }

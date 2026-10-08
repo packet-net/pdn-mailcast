@@ -367,6 +367,15 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
+    /// <summary>Issue #49: whether the object <paramref name="objectId"/> names has been rebuilt (within the store's normal retention).</summary>
+    public bool IsComplete(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.IsComplete(objectId);
+        }
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {

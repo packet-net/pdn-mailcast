@@ -2,6 +2,7 @@ using System.Text.Json;
 using M0LTE.Radio.Audio;
 using Mailcast.Receiver.Web;
 using Microsoft.Extensions.Time.Testing;
+using Packet.Mailcast;
 using Packet.SoundModem.Ms110d;
 using Packet.SoundModem.Waterfall;
 
@@ -18,6 +19,9 @@ public class SpeedTests
     private const string Wn4 = "ms110d-wn4";
     private const string Wn3 = "ms110d-wn3";
     private static readonly SlotSchedule Hourly = new(new TimeOnly(0, 0), 60);
+
+    /// <summary>A directory naming <paramref name="mode"/> as the waveform the slot went out on (null for a head end that does not say).</summary>
+    private static BroadcastDirectory Directory(string? mode) => new(DateOnly.FromDateTime(DateTime.UtcNow), [], mode: mode);
 
     private static DateTimeOffset At(int hour, int minute, int second = 0) => new(2026, 10, 6, hour, minute, second, TimeSpan.Zero);
 
@@ -112,13 +116,13 @@ public class SpeedTests
         var time = new FakeTimeProvider(At(12, 0, 10));
         var slots = new SlotTracker(time, _ => { }, Hourly);
 
-        slots.OnDirectory(Wn4); // nothing heard yet: nothing to put it on
+        slots.OnDirectory(Directory(Wn4)); // nothing heard yet: nothing to put it on
         Assert.Null(slots.Last);
 
         slots.OnFrame(Wn4);
-        slots.OnDirectory(null); // a head end that does not say
+        slots.OnDirectory(Directory(null)); // a head end that does not say
         Assert.Null(slots.Last!.ListedWaveform);
-        slots.OnDirectory(Wn4);
+        slots.OnDirectory(Directory(Wn4));
         time.Advance(TimeSpan.FromSeconds(15));
         slots.OnTone(new ToneReport(1800, 0, 12, TimeSpan.FromSeconds(10)));
 
@@ -225,7 +229,7 @@ public class SpeedTests
         host.Slots.OnFrame(Wn4);
         host.Slots.OnFrame(Wn4);
         host.Slots.OnFrame(Wn3);
-        host.Slots.OnDirectory(Wn4);
+        host.Slots.OnDirectory(Directory(Wn4));
 
         var slot = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine).GetProperty("slot");
         Assert.Equal(Wn4, slot.GetProperty("waveform").GetString());
