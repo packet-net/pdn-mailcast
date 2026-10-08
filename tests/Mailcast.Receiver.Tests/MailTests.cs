@@ -168,6 +168,39 @@ public class MailTests
     }
 
     [Fact]
+    public async Task MailAndStatus_ShowWhenEachBulletinCompleted_AndWhenTheBbsHadIt()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(61), Samples.Bulletin(62));
+        time.Advance(TimeSpan.FromMinutes(5));
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "61_GB7RDG"
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred)), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+
+        var items = (await MailAsync(http)).ToDictionary(i => i.GetProperty("bid").GetString()!);
+        var delivered = items["61_GB7RDG"];
+        Assert.Equal(Start, delivered.GetProperty("completed").GetDateTimeOffset());
+        Assert.Equal(Start + TimeSpan.FromMinutes(5), delivered.GetProperty("delivered").GetDateTimeOffset());
+        var waiting = items["62_GB7RDG"];
+        Assert.Equal(Start, waiting.GetProperty("completed").GetDateTimeOffset());
+        Assert.Equal(JsonValueKind.Null, waiting.GetProperty("delivered").ValueKind);
+
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        var bulletins = status.GetProperty("bulletins").EnumerateArray().ToDictionary(b => b.GetProperty("bid").GetString()!);
+        Assert.Equal(Start, bulletins["61_GB7RDG"].GetProperty("completedAt").GetDateTimeOffset());
+        Assert.Equal(Start + TimeSpan.FromMinutes(5), bulletins["61_GB7RDG"].GetProperty("deliveredAt").GetDateTimeOffset());
+        Assert.Equal("accepted", bulletins["61_GB7RDG"].GetProperty("deliveredVerdict").GetString());
+        Assert.Equal(Start, bulletins["62_GB7RDG"].GetProperty("completedAt").GetDateTimeOffset());
+        Assert.Equal(JsonValueKind.Null, bulletins["62_GB7RDG"].GetProperty("deliveredAt").ValueKind); // deferred is not delivered
+    }
+
+    [Fact]
     public async Task HostileBulletin_IsServedAsPlainTextOnly_AndNeverAsMarkup()
     {
         using var dir = new TempDirectory();

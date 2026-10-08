@@ -506,7 +506,9 @@ async function refresh() {
         <td data-label="Pieces">${b.complete ? '<span class="good">complete</span>'
           : b.needed ? `<div class="bar" title="${b.received} of ${b.needed}"><span style="width:${Math.min(100, 100 * b.received / b.needed)}%"></span></div>`
           : '<span class="muted">none yet</span>'}</td>
-        <td data-label="BBS">${b.delivery ? badge(b.deliveryShort, b.delivery) : (b.complete ? badge("waiting", "waiting for the BBS") : "")}</td></tr>`).join("")}</table>`;
+        <td data-label="BBS"><div>${b.delivery ? badge(b.deliveryShort, b.delivery) : (b.complete ? badge("waiting", "waiting for the BBS") : "")}
+          ${b.completedAt ? `<div class="muted bulletin-time">completed ${when(b.completedAt)}</div>` : ""}
+          ${b.deliveredAt ? `<div class="muted bulletin-time">${b.deliveredVerdict === "refused" ? "refused by BBS" : "delivered to BBS"} ${when(b.deliveredAt)}</div>` : ""}</div></td></tr>`).join("")}</table>`;
   }
 
   if (s.deliveries.length) {
@@ -747,13 +749,16 @@ function mailRow(m) {
   tr.dataset.id = m.id;
   tr.append(td(m.bid, "num", "BID"), td(m.from, null, "From"), td(m.to, null, "To"), td(m.at, null, "@"), td(m.title, null, "Title"),
     td(when(m.date), "num", "Date"), td(size(m.size), "num", "Size"));
-  const st = td(null, null, "Status");
+  const st = el("div"); // one block, so on a phone it all sits in the value column of the card
   st.append(badgeEl(m.statusShort || m.status, m.status, m.waiting ? "warn" : m.verdict === "refused" ? "bad" : "good"));
   if (m.waiting && m.lastAttempt) st.append(el("div", `last try ${when(m.lastAttempt)}`, "muted"));
   if (m.waiting && m.nextAttempt) st.append(el("div", `next try ${when(m.nextAttempt)}`, "muted"));
   if (m.detail) st.append(el("div", m.detail, "muted"));
-  st.append(el("div", `${m.waiting ? "in the outbox since" : "answered"} ${when(m.time)}`, "muted"));
-  tr.append(st);
+  if (m.completed) st.append(el("div", `completed ${when(m.completed)}`, "muted bulletin-time"));
+  if (!m.waiting) st.append(el("div", `${m.verdict === "refused" ? "refused by BBS" : "delivered to BBS"} ${when(m.delivered)}`, "muted bulletin-time"));
+  const cell = td(null, null, "Status");
+  cell.append(st);
+  tr.append(cell);
   return tr;
 }
 async function refreshMail() {

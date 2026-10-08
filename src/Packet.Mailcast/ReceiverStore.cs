@@ -597,7 +597,7 @@ public sealed class ReceiverStore
                 {
                     try
                     {
-                        _archive.Add(id, held.Serialized, held.Bulletin, verdict, detail); // on disk before the outbox file goes
+                        _archive.Add(id, held.Serialized, held.Bulletin, verdict, detail, held.Written); // on disk before the outbox file goes
                     }
                     catch (Exception e) when ((e is IOException or UnauthorizedAccessException) && verdict == BbsVerdict.Refused)
                     {
@@ -1210,7 +1210,7 @@ public sealed class ReceiverStore
         }
 
         static MailEntry Entry((ulong Id, byte[] Serialized, Bulletin Bulletin, DateTimeOffset Written) o) =>
-            MailEntry.Of(o.Id, o.Bulletin, o.Serialized.Length, o.Written, null, null);
+            MailEntry.Of(o.Id, o.Bulletin, o.Serialized.Length, o.Written, null, null, o.Written);
     }
 
     private static string OutboxName(ulong objectId) => ObjectId.Format(objectId) + ".bulletin";
