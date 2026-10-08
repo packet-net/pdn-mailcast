@@ -181,7 +181,7 @@ The head end is a forwarding partner that calls LinBPQ, logs in on its FBBPORT a
 
 2. In the mail configuration, add a user **Q0HEAD** and tick **BBS**.
 
-3. On Q0HEAD's forwarding page, tick **Allow Blocked**, **Allow Compressed** and **Use B1 Protocol**. Set **HR** (flood bulletin routes) to `WW` and **BBS HA** to `Q0HEAD.#42.GBR.EURO`, so it gets the same flood bulletins as any partner in the UK: @WW, @EURO and @GBR all reach it. Leave **TO**, **AT** and the personal HR routes empty, so personal mail is never queued for it. It does not need to be enabled for forwarding, and needs no connect script.
+3. On Q0HEAD's forwarding page, tick **FBB Blocked** (forward in FBB's binary blocks, not line-by-line text), **Allow Binary** (LinBPQ's label for allowing compressed forwarding, which blocked forwarding also needs) and **Use B1 Protocol** (the simpler of FBB's two binary protocols). Set **Hierarchical Routes (Flood Bulls)** (the HRB box) to `WW` and **BBS HA** to `Q0HEAD.#42.GBR.EURO`, so it gets the same flood bulletins as any partner in the UK: @WW, @EURO and @GBR all reach it. Leave **TO**, **AT** and **HR (Personals and Directed Bulls)** (the HRP box) empty, so personal mail is never queued for it. It does not need to be enabled for forwarding, and needs no connect script. Click **Update** to save.
 
 4. Put the password in the head end's `intake.fbb.password`, with `"port": 8011`.
 

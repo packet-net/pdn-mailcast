@@ -432,7 +432,7 @@ public sealed partial class BbsClient : IBbsSession
             {
                 return $"the BBS offered {Ascii.Clean(sid.Raw)}, which is not compressed FBB forwarding. "
                     + (owner._settings.Type == BbsKind.LinBpq
-                        ? $"In LinBPQ's mail configuration, make {owner._settings.Login} a BBS user and tick Allow Blocked, Allow Compressed and Use B1 on its forwarding page"
+                        ? $"In LinBPQ's mail configuration, make {owner._settings.Login} a BBS user and tick FBB Blocked, Allow Binary and Use B1 Protocol on its forwarding page"
                         : $"In FBB, give {owner._settings.Login} the BBS flag");
             }
             return "protocol error: " + Ascii.Clean(errorLine);
