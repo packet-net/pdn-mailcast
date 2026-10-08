@@ -121,7 +121,7 @@
 
   <section>
     <h2>Channel</h2>
-    <div id="channel" class="muted">Measured after each slot, from the bursts this receiver decodes. Nothing measured yet.</div>
+    <div id="channel" class="muted">Measured after each slot, from the probe after the tone and the bursts this receiver decodes. Nothing measured yet.</div>
   </section>
 
   <section class="wide">
@@ -269,7 +269,7 @@ async function api(url, options) {
   return { ok: false, status: answer.status, body, text, error: why };
 }
 
-/* ---------- channel: the radio path from GB7RDG, measured from the bursts decoded ---------- */
+/* ---------- channel: the radio path from GB7RDG, measured from the probe and the bursts decoded ---------- */
 const svgNs = "http://www.w3.org/2000/svg";
 function svgEl(tag, attrs, title) {
   const e = document.createElementNS(svgNs, tag);
@@ -315,7 +315,7 @@ function channelStrip(c) {
     const t = Math.floor(new Date(h.slot).getTime() / hour) * hour;
     if (t < start) continue;
     svg.appendChild(svgEl("rect", { x: x(t) - cw / 2 + 1, y: T, width: cw - 2, height: H - T - B, rx: 2, fill: h.enough ? "var(--paper)" : "var(--line)" },
-      `${utc(h.slot)}: ${h.words}`));
+      `${utc(h.slot)}${h.basis === "probe" ? " (from the probe)" : ""}: ${h.words}`));
     for (const m of h.modes) {
       const shade = Math.max(0.15, 1 + m.powerDb / 25);
       svg.appendChild(svgEl("circle", { cx: x(t), cy: y(m.delayMs), r: 3.5, fill: "var(--accent)", "fill-opacity": shade.toFixed(2) },
@@ -341,7 +341,9 @@ function channel(s) {
     if (c.dopplerSpreadHz !== null) rows.push(["Doppler spread", `${c.dopplerSpreadHz} Hz (the moving layer blurs the frequency by about ${c.dopplerSpreadHz.toFixed(1)} Hz)`]);
     if (c.fadeDb !== null) rows.push(["Fading", `${c.fadeDb} dB below its middle level, a tenth of the time`]);
     if (c.coherenceS !== null) rows.push(["Steady for", c.coherenceAtLeast ? `${c.coherenceS} s or more` : `about ${c.coherenceS} s`]);
-    rows.push(["Measured from", `${c.measurements} burst${c.measurements === 1 ? "" : "s"}${c.snrDb !== null ? `, signal to noise ${c.snrDb} dB` : ""}`]);
+    const from = m => m.basis === "probe" ? "the probe after the tone" : `${m.measurements} burst${m.measurements === 1 ? "" : "s"}`;
+    rows.push(["Measured from", `${from(c)}${c.snrDb !== null ? `, signal to noise ${c.snrDb} dB` : ""}`]);
+    if (c.other) rows.push([c.other.basis === "probe" ? "From the probe" : "From the bursts", `${esc(c.other.words)}${c.other.enough && c.other.snrDb !== null ? ` (signal to noise ${c.other.snrDb} dB)` : ""}`]);
     if (c.distanceKm !== null) rows.push(["Path", `${c.distanceKm} km from GB7RDG (IO91lk) to ${esc(c.locator)}`]);
     const dl = document.createElement("dl");
     dl.style.marginTop = "8px";
@@ -352,7 +354,7 @@ function channel(s) {
     const cap = document.createElement("div");
     cap.className = "muted";
     cap.style.marginTop = "10px";
-    cap.textContent = "Last 24 hours, by hour (UTC): each dot a path, at its delay; darker is stronger. Grey: too little decoded.";
+    cap.textContent = "Last 24 hours, by hour (UTC): each dot a path, at its delay; darker is stronger. Grey: too little heard.";
     box.appendChild(cap);
     box.appendChild(channelStrip(c));
   }

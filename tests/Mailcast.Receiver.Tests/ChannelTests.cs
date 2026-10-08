@@ -101,7 +101,7 @@ public class ChannelTests
     }
 
     /// <summary>A unit-power Rayleigh fading gain with a Gaussian Doppler spectrum, made at 100 Hz and interpolated; 1 for no spread.</summary>
-    private static Func<int, Complex> Fading(int samples, double spread2s, Random rng)
+    internal static Func<int, Complex> Fading(int samples, double spread2s, Random rng)
     {
         if (spread2s <= 0)
         {
@@ -373,7 +373,7 @@ public class ChannelTests
         Assert.Equal(ChannelReport.TooLittle, ChannelReport.Summarise(Noon, Noon, [], 3, Wessex).Words);
     }
 
-    private static CapturedBurst Captured(int seed, DateTimeOffset heard)
+    internal static CapturedBurst Captured(int seed, DateTimeOffset heard)
     {
         var (audio, end, bits) = Synthesise(4000, seed, [new SynthPath(0, 0), new SynthPath(1.9, -16)], snrDb: 15);
         return new CapturedBurst([.. audio.Select(s => (Half)s)], end, Wn4, bits, heard, 0);

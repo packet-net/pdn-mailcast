@@ -25,8 +25,9 @@ public sealed record ChannelMode
 }
 
 /// <summary>
-/// The radio path from GB7RDG over one slot, as measured passively from the bursts decoded (or,
-/// later, from a sounding probe: <see cref="Basis"/> says which).
+/// The radio path from GB7RDG over one slot, as measured from the bursts decoded or from the
+/// sounding probe after the tone: <see cref="Basis"/> says which, and <see cref="Other"/> holds
+/// the other measurement when there were both.
 /// </summary>
 public sealed record ChannelReport
 {
@@ -36,14 +37,20 @@ public sealed record ChannelReport
     /// <summary>When it was measured.</summary>
     public DateTimeOffset Measured { get; init; }
 
-    /// <summary>What it was measured from: <c>bursts</c>.</summary>
+    /// <summary>What it was measured from: <c>bursts</c>, or <c>probe</c> for the sounding probe after the tone.</summary>
     public string Basis { get; init; } = "bursts";
 
-    /// <summary>The measurements (bursts) it is made from.</summary>
+    /// <summary>The measurements (bursts, or probes) it is made from.</summary>
     public int Measurements { get; init; }
 
-    /// <summary>The bursts kept for it, measurable or not.</summary>
+    /// <summary>The bursts (or probes) kept for it, measurable or not.</summary>
     public int Kept { get; init; }
+
+    /// <summary>The same slot measured the other way, when it was measured both ways; this report is the better of the two (<see cref="Best"/>).</summary>
+    public ChannelReport? Other { get; init; }
+
+    /// <summary>The averaged delay profile's floor against its peak, dB: how far below the strongest mode a weaker one can still be seen.</summary>
+    public double? FloorDb { get; init; }
 
     /// <summary>Whether there was enough to say anything.</summary>
     public bool Enough { get; init; }
@@ -100,29 +107,53 @@ public sealed record ChannelReport
     /// </summary>
     public const double NominalKm = 150;
 
+    /// <summary>What the page says of a probe found but too weak or too spoilt to measure.</summary>
+    public const string TooWeakProbe = "The probe was too weak to measure.";
+
     /// <summary>What the page says when there is too little to measure.</summary>
     public const string TooLittle = "Not enough decoded to measure.";
+
+    /// <summary>
+    /// The slot's report from its two measurements: the probe's when the bursts' says too little,
+    /// or when both say enough and the probe's profile reaches deeper (a lower floor, so weaker
+    /// modes are seen); otherwise the bursts'. The other is kept beside it. A probe that was not
+    /// found (an older head end, or nothing heard) leaves the bursts' report as it was.
+    /// </summary>
+    internal static ChannelReport Best(ChannelReport bursts, ChannelReport? probe)
+    {
+        if (probe is not { Measurements: > 0 })
+        {
+            return bursts;
+        }
+        bool probeBetter = probe.Enough && (!bursts.Enough || (probe.FloorDb ?? 0) < (bursts.FloorDb ?? 0));
+        return probeBetter
+            ? probe with { Other = bursts.Kept > 0 ? bursts : null }
+            : bursts with { Other = probe };
+    }
 
     /// <summary>
     /// The slot's picture from its measurements, as summarize.py makes it: each measurement's
     /// modes against its first, clustered across measurements, kept if seen in enough of them,
     /// and medians of the rest.
     /// </summary>
-    internal static ChannelReport Summarise(DateTimeOffset slot, DateTimeOffset measured, IReadOnlyList<PathPicture> pictures, int kept, GroundPlace? place)
+    internal static ChannelReport Summarise(DateTimeOffset slot, DateTimeOffset measured, IReadOnlyList<PathPicture> pictures, int kept, GroundPlace? place, string? basis = null)
     {
+        basis ??= pictures.Count > 0 ? pictures[0].Basis : "bursts";
         var report = new ChannelReport
         {
             Slot = slot,
             Measured = measured,
-            Basis = pictures.Count > 0 ? pictures[0].Basis : "bursts",
+            Basis = basis,
             Measurements = pictures.Count,
             Kept = kept,
             Locator = place?.Locator,
             DistanceKm = place is null ? null : Math.Round(PathGeometry.DistanceKm(place, PathGeometry.Gb7rdg)),
         };
-        if (pictures.Count == 0 || pictures.Sum(p => p.GoodSnapshots) < 2 * ChannelAnalysis.FewestSnapshots)
+        // One probe is a measurement in itself; bursts are short, so it takes a few.
+        int fewest = basis == ProbeChannel.Basis ? ChannelAnalysis.FewestSnapshots : 2 * ChannelAnalysis.FewestSnapshots;
+        if (pictures.Count == 0 || pictures.Sum(p => p.GoodSnapshots) < fewest)
         {
-            return report with { Words = TooLittle };
+            return report with { Words = basis == ProbeChannel.Basis ? TooWeakProbe : TooLittle };
         }
         int n = pictures.Count;
         // Later modes against each measurement's first, with their power and spread, and their
@@ -203,6 +234,7 @@ public sealed record ChannelReport
             VirtualHeightKm = height,
             SnrDb = Rounded(ChannelMaths.Median(pictures.Select(p => p.SnrDb)), 1),
             OffsetHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.OffsetHz ?? double.NaN)), 2),
+            FloorDb = Rounded(ChannelMaths.Median(pictures.Select(p => p.FloorDb)), 1),
             ProfileDb = profile,
             ProfileStartMs = Rounded(first.ProfileStartMs, 4) ?? 0,
             ProfileStepMs = Rounded(first.ProfileStepMs, 6) ?? 0,

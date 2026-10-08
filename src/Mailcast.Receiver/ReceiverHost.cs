@@ -679,6 +679,13 @@ public sealed class ReceiverHost : IAsyncDisposable
                 ChannelWatch.Offer(burst, slot);
             }
         };
+        pipeline.ProbeCaptured += probe =>
+        {
+            if (ChannelSlot(probe.Heard, ref recording) is { } slot)
+            {
+                ChannelWatch.OfferProbe(probe, slot);
+            }
+        };
         pipeline.Capture.TooLong += seconds =>
         {
             ChannelWatch.NoteTooLong();

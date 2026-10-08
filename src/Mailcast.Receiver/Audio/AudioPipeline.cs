@@ -84,6 +84,14 @@ public sealed class AudioPipeline : IAsyncDisposable
         Channel.FrameReceived += (_, _) => Capture.OnFrame();
         Tone = new ToneDetector(OnAir.SampleRate);
         Channel.AddReceiveTap(Tone.Process);
+        // The channel probe follows the tone: its audio is kept from the same ring once it is all in.
+        Tone.ToneMeasured += tone =>
+        {
+            long from = tone.EndSample - (long)(CapturedProbe.BeforeSeconds * OnAir.SampleRate);
+            long until = tone.EndSample + (long)(CapturedProbe.AfterSeconds * OnAir.SampleRate);
+            Capture.Keep(from, until, (audio, first) => ProbeCaptured?.Invoke(
+                new CapturedProbe(audio, tone, (tone.EndSample - first) / (double)OnAir.SampleRate, _time.GetUtcNow(), first)));
+        };
     }
 
     /// <summary>The bursts heard, by the waveform the modem's autobaud locked to: for the speed tile.</summary>
@@ -94,6 +102,9 @@ public sealed class AudioPipeline : IAsyncDisposable
 
     /// <summary>Raised on the audio thread with each decoded burst and its audio, for the channel measurement.</summary>
     public event Action<CapturedBurst>? BurstCaptured;
+
+    /// <summary>Raised on the audio thread with the audio after each tone, where the channel probe should be.</summary>
+    public event Action<CapturedProbe>? ProbeCaptured;
 
     /// <summary>
     /// The waveform number the MS110D receiver is locked to now, or null between bursts (or if it
@@ -277,6 +288,8 @@ public sealed class AudioPipeline : IAsyncDisposable
                     if (_input is WavInput)
                     {
                         EndReason = "the recording has been played through";
+                        // A probe right at the end of a recording is measured on what there is of it.
+                        Capture.Flush();
                         break;
                     }
                     continue;

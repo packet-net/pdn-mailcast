@@ -7,7 +7,7 @@ namespace Mailcast.Receiver.Web;
 internal static class ChannelTile
 {
     /// <summary>What the tile says before anything has been measured.</summary>
-    public const string Nothing = "Measured after each slot, from the bursts this receiver decodes. Nothing measured yet.";
+    public const string Nothing = "Measured after each slot, from the probe after the tone and the bursts this receiver decodes. Nothing measured yet.";
 
     /// <summary>
     /// The tile's object. <paramref name="lastSlot"/> is the slot the receiver last heard: if it
@@ -52,7 +52,33 @@ internal static class ChannelTile
             measurements = latest?.Measurements ?? 0,
             kept = latest?.Kept ?? 0,
             words = latest?.Words ?? Nothing,
+            floorDb = latest?.FloorDb,
             profile = latest is { Enough: true } r ? new { startMs = r.ProfileStartMs, stepMs = r.ProfileStepMs, db = r.ProfileDb } : null,
+            // The same slot measured the other way (the bursts when this is the probe's, or the
+            // probe when this is the bursts'), when it was measured both ways.
+            other = latest?.Other is { } o ? new
+            {
+                basis = o.Basis,
+                enough = o.Enough,
+                modes = o.Modes.Select(m => new
+                {
+                    label = m.Label,
+                    delayMs = m.DelayMs,
+                    powerDb = m.PowerDb,
+                    dopplerShiftHz = m.DopplerShiftHz,
+                    dopplerSpreadHz = m.DopplerSpreadHz,
+                    seenIn = m.SeenIn,
+                }),
+                delaySpreadMs = o.DelaySpreadMs,
+                dopplerSpreadHz = o.DopplerSpreadHz,
+                virtualHeightKm = o.VirtualHeightKm,
+                snrDb = o.SnrDb,
+                offsetHz = o.OffsetHz,
+                floorDb = o.FloorDb,
+                measurements = o.Measurements,
+                kept = o.Kept,
+                words = o.Words,
+            } : null,
             // Bursts heard in the slot on now, measured once it is over.
             waiting = watch.Waiting,
             measuring = watch.Measuring,
@@ -61,6 +87,7 @@ internal static class ChannelTile
             history = history.Select(h => new
             {
                 slot = h.Slot,
+                basis = h.Basis,
                 enough = h.Enough,
                 modes = h.Modes.Select(m => new { label = m.Label, delayMs = m.DelayMs, powerDb = m.PowerDb }),
                 delaySpreadMs = h.DelaySpreadMs,

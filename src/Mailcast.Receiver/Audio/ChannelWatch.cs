@@ -6,8 +6,9 @@ using System.Threading.Channels;
 namespace Mailcast.Receiver;
 
 /// <summary>
-/// Measures the radio path from GB7RDG after each slot, from the bursts the receiver decoded,
-/// and keeps a day of the results for the status page's Channel tile.
+/// Measures the radio path from GB7RDG after each slot, from the channel probe after the tone and
+/// from the bursts the receiver decoded, and keeps a day of the results for the status page's
+/// Channel tile.
 /// </summary>
 /// <remarks>
 /// <para>Bursts arrive from the audio thread (<see cref="Offer"/>) with the slot they belong to,
@@ -16,11 +17,14 @@ namespace Mailcast.Receiver;
 /// <see cref="Quiet"/>, or when the audio stops (<see cref="SlotOver"/>). The measurement runs
 /// on a thread of its own, one burst at a time, resting as long again after each so it never
 /// takes more than half of one core.</para>
+/// <para>The probe's audio (13 s from 1 s before each tone's end, <see cref="OfferProbe"/>) is kept the same
+/// way and measured with the slot's bursts, by <see cref="ProbeChannel"/>, into the same analysis
+/// with <c>basis: "probe"</c>. The slot's report is the better of the two (see
+/// <see cref="ChannelReport.Best"/>), with the other beside it, so a path too weak to decode is
+/// still measured from the probe.</para>
 /// <para>Memory is bounded: at most <see cref="MostBursts"/> bursts and
-/// <see cref="MostSeconds"/> seconds of audio are kept for a slot, as half-precision floats
-/// (about 100 kB a second).</para>
-/// <para>A sounding probe, later, will hand its own <see cref="PathPicture"/>s in to the same
-/// summary, so the tile and the API stay the same with <c>basis: "probe"</c>.</para>
+/// <see cref="MostSeconds"/> seconds of audio are kept for a slot, and <see cref="MostProbes"/>
+/// probes of about 1.25 MB each, as half-precision floats (about 100 kB a second).</para>
 /// </remarks>
 public sealed class ChannelWatch : IAsyncDisposable
 {
@@ -35,6 +39,9 @@ public sealed class ChannelWatch : IAsyncDisposable
 
     /// <summary>The most seconds of audio kept for one slot.</summary>
     public const double MostSeconds = 240;
+
+    /// <summary>The most probes kept for one slot: there is one after each tone.</summary>
+    public const int MostProbes = 2;
 
     /// <summary>The file in the state directory the results are kept in.</summary>
     public const string FileName = "channel.json";
@@ -116,6 +123,13 @@ public sealed class ChannelWatch : IAsyncDisposable
         _inbox.Writer.TryWrite(new Offered(burst, slot));
     }
 
+    /// <summary>The audio after a tone, from the audio thread, and the slot it was heard in.</summary>
+    public void OfferProbe(CapturedProbe probe, DateTimeOffset slot)
+    {
+        Interlocked.Increment(ref _waiting);
+        _inbox.Writer.TryWrite(new OfferedProbe(probe, slot));
+    }
+
     /// <summary>The audio has stopped: measure what is kept now.</summary>
     public void SlotOver() => _inbox.Writer.TryWrite(Flush.Instance);
 
@@ -131,6 +145,7 @@ public sealed class ChannelWatch : IAsyncDisposable
     private static TaskCompletionSource NewIdle() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly List<CapturedBurst> _batch = [];
+    private readonly List<CapturedProbe> _probes = [];
     private DateTimeOffset? _batchSlot;
     private double _batchSeconds;
     private int _batchOffered;
@@ -170,6 +185,14 @@ public sealed class ChannelWatch : IAsyncDisposable
                             await MeasureBatchAsync().ConfigureAwait(false);
                         }
                         Keep(offered);
+                    }
+                    else if (message is OfferedProbe probe)
+                    {
+                        if (_batchSlot is { } slot && slot != probe.Slot)
+                        {
+                            await MeasureBatchAsync().ConfigureAwait(false);
+                        }
+                        KeepProbe(probe);
                     }
                     else
                     {
@@ -214,6 +237,19 @@ public sealed class ChannelWatch : IAsyncDisposable
         }
     }
 
+    private void KeepProbe(OfferedProbe offered)
+    {
+        _batchSlot = offered.Slot;
+        if (_probes.Count < MostProbes)
+        {
+            _probes.Add(offered.Probe);
+        }
+        else
+        {
+            Interlocked.Decrement(ref _waiting);
+        }
+    }
+
     private async Task MeasureBatchAsync()
     {
         if (_batchSlot is not { } slot)
@@ -222,8 +258,10 @@ public sealed class ChannelWatch : IAsyncDisposable
             return;
         }
         var bursts = _batch.ToArray();
+        var probes = _probes.ToArray();
         int offered = _batchOffered;
         _batch.Clear();
+        _probes.Clear();
         _batchSlot = null;
         _batchSeconds = 0;
         _batchOffered = 0;
@@ -231,11 +269,14 @@ public sealed class ChannelWatch : IAsyncDisposable
         try
         {
             // A thread of its own: the measurement is a few seconds of arithmetic.
-            var report = await Task.Factory.StartNew(() => Measure(slot, bursts, offered, _stop.Token), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).ConfigureAwait(false);
-            Remember(report);
-            _log(string.Create(CultureInfo.InvariantCulture,
-                $"channel: the {Hhmm(report.Slot)} slot, from {report.Measurements} of {report.Kept} bursts, measured in {report.ComputeSeconds:F1} s: {report.Words}"));
-            Measured?.Invoke(report);
+            var report = await Task.Factory.StartNew(() => Measure(slot, bursts, probes, offered, _stop.Token), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).ConfigureAwait(false);
+            // A tone heard with no probe after it and no bursts: nothing to say, as before the probe.
+            if (report is not null)
+            {
+                Remember(report);
+                _log(LogLine(report));
+                Measured?.Invoke(report);
+            }
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -244,7 +285,7 @@ public sealed class ChannelWatch : IAsyncDisposable
         }
         finally
         {
-            Interlocked.Add(ref _waiting, -bursts.Length);
+            Interlocked.Add(ref _waiting, -bursts.Length - probes.Length);
             Volatile.Write(ref _measuring, 0);
             SignalIdle();
         }
@@ -254,7 +295,7 @@ public sealed class ChannelWatch : IAsyncDisposable
     {
         lock (_gate)
         {
-            if (_waiting == 0 && _batch.Count == 0)
+            if (_waiting == 0 && _batch.Count == 0 && _probes.Count == 0)
             {
                 var done = _idle;
                 _idle = NewIdle();
@@ -265,14 +306,56 @@ public sealed class ChannelWatch : IAsyncDisposable
 
     private static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm 'UTC'", CultureInfo.InvariantCulture);
 
-    /// <summary>Measures a slot's bursts, one at a time, and sums them up. On the worker thread.</summary>
-    private ChannelReport Measure(DateTimeOffset slot, CapturedBurst[] bursts, int offered, CancellationToken cancellation)
+    /// <summary>The journal's line for a slot measured: what from, how long it took, and the picture.</summary>
+    internal static string LogLine(ChannelReport report)
+    {
+        var bursts = report.Basis == ProbeChannel.Basis ? report.Other : report;
+        var probe = report.Basis == ProbeChannel.Basis ? report : report.Other;
+        string from = bursts is null ? "" : $"{bursts.Measurements} of {bursts.Kept} bursts";
+        if (probe is not null)
+        {
+            from = from.Length == 0 ? "the probe" : $"the probe and {from}";
+        }
+        string text = string.Create(CultureInfo.InvariantCulture,
+            $"channel: the {Hhmm(report.Slot)} slot, from {(from.Length == 0 ? "0 of 0 bursts" : from)}, measured in {report.ComputeSeconds:F1} s: {report.Words}");
+        if (report.Other is { Enough: true } other)
+        {
+            text += $" From the {(other.Basis == ProbeChannel.Basis ? "probe" : "bursts")}: {other.Words}";
+        }
+        return text;
+    }
+
+    /// <summary>Measures a slot's probes and bursts, one at a time, and sums them up. On the worker thread.</summary>
+    private ChannelReport? Measure(DateTimeOffset slot, CapturedBurst[] bursts, CapturedProbe[] probes, int offered, CancellationToken cancellation)
     {
         // A slot measured before that went on (a quiet spell inside it): its pictures so far
         // are added to, not replaced.
         var pictures = _earlierSlot == slot ? new List<PathPicture>(_earlier) : [];
         int kept = (_earlierSlot == slot ? _earlierKept : 0) + offered;
+        int probesKept = (_earlierSlot == slot ? _earlierProbes : 0) + probes.Length;
         double busy = 0;
+        foreach (var probe in probes)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var one = Stopwatch.StartNew();
+            try
+            {
+                if (ProbeChannel.Analyse(probe.Samples(), probe.ToneEndSeconds, probe.Tone.FrequencyHz) is { } found)
+                {
+                    pictures.Add(found.Picture);
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                _log($"channel: could not measure the probe of the {Hhmm(slot)} slot: {Ascii.Clean(e.Message)}");
+            }
+            one.Stop();
+            busy += one.Elapsed.TotalSeconds;
+            if (Rest && cancellation.WaitHandle.WaitOne(one.Elapsed))
+            {
+                cancellation.ThrowIfCancellationRequested();
+            }
+        }
         foreach (var burst in bursts)
         {
             cancellation.ThrowIfCancellationRequested();
@@ -300,13 +383,22 @@ public sealed class ChannelWatch : IAsyncDisposable
         _earlierSlot = slot;
         _earlier = pictures;
         _earlierKept = kept;
-        var report = ChannelReport.Summarise(slot, _time.GetUtcNow(), pictures, kept, _place());
-        return report with { ComputeSeconds = Math.Round(busy, 2) };
+        _earlierProbes = probesKept;
+        var now = _time.GetUtcNow();
+        var place = _place();
+        var fromBursts = ChannelReport.Summarise(slot, now, [.. pictures.Where(p => p.Basis != ProbeChannel.Basis)], kept, place);
+        var fromProbe = probesKept == 0 ? null : ChannelReport.Summarise(slot, now, [.. pictures.Where(p => p.Basis == ProbeChannel.Basis)], probesKept, place, ProbeChannel.Basis);
+        if (kept == 0 && fromProbe is not { Measurements: > 0 })
+        {
+            return null;
+        }
+        return ChannelReport.Best(fromBursts, fromProbe) with { ComputeSeconds = Math.Round(busy, 2) };
     }
 
     private DateTimeOffset? _earlierSlot;
     private List<PathPicture> _earlier = [];
     private int _earlierKept;
+    private int _earlierProbes;
 
     private void Remember(ChannelReport report)
     {
@@ -368,6 +460,8 @@ public sealed class ChannelWatch : IAsyncDisposable
     }
 
     private sealed record Offered(CapturedBurst Burst, DateTimeOffset Slot);
+
+    private sealed record OfferedProbe(CapturedProbe Probe, DateTimeOffset Slot);
 
     private sealed class Flush
     {

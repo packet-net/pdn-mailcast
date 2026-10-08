@@ -19,8 +19,14 @@ internal sealed record PathPicture
     /// <summary>The modes, earliest first.</summary>
     public required IReadOnlyList<PictureMode> Modes { get; init; }
 
+    /// <summary>The first path's delay on the estimates' own delays (<see cref="ChannelSnapshots.Lag"/>), in seconds.</summary>
+    public double FirstPathSeconds { get; init; }
+
     /// <summary>The discrete paths fitted, in ms after the first.</summary>
     public required IReadOnlyList<double> PathsMs { get; init; }
+
+    /// <summary>Which of <see cref="Modes"/> each path belongs to.</summary>
+    public IReadOnlyList<int> PathModes { get; init; } = [];
 
     /// <summary>Their powers against the strongest path, in dB.</summary>
     public required IReadOnlyList<double> PathsDb { get; init; }
@@ -72,11 +78,14 @@ internal sealed record PathPicture
 /// </summary>
 internal static class ChannelAnalysis
 {
-    /// <summary>A path is kept if its power is this far above the profile's floor.</summary>
-    private const double FloorMarginDb = 6.0;
+    /// <summary>A path is kept if its power is this far above the profile's floor, unless the estimates say otherwise (<see cref="ChannelSnapshots.FloorMarginDb"/>).</summary>
+    public const double FloorMarginDb = 6.0;
 
-    /// <summary>Paths closer than this are one mode.</summary>
-    private const double ModeGapSeconds = 0.6e-3;
+    /// <summary>How far before the profile's peak paths are looked for, unless the estimates say otherwise (<see cref="ChannelSnapshots.SearchBeforeSeconds"/>).</summary>
+    public const double SearchBeforeSeconds = 1.5e-3;
+
+    /// <summary>Paths closer than this are one mode, unless the estimates say otherwise (<see cref="ChannelSnapshots.ModeGapSeconds"/>).</summary>
+    public const double ModeGapSeconds = 0.6e-3;
 
     /// <summary>The most paths fitted.</summary>
     private const int MostPaths = 4;
@@ -88,6 +97,9 @@ internal static class ChannelAnalysis
     private const double Separation = 0.15e-3;
 
     private const int DopplerFft = 4096;
+
+    /// <summary>The most Doppler a delay is corrected for: the probe's snapshots cover 4.7 Hz either way.</summary>
+    private const double MostCoupledHz = 5;
 
     /// <summary>The fewest usable snapshots worth analysing: about 2 s of WN4.</summary>
     public const int FewestSnapshots = 30;
@@ -134,7 +146,7 @@ internal static class ChannelAnalysis
         for (int l = 0; l < nlag; l++)
         {
             double lag = s.Lag(l);
-            if (lag < peakLag - 1.6e-3 || lag > peakLag + 6.5e-3)
+            if (lag < peakLag - s.SearchBeforeSeconds - 0.1e-3 || lag > peakLag + 6.5e-3)
             {
                 floorSum += pdp[l];
                 floorCount++;
@@ -143,14 +155,14 @@ internal static class ChannelAnalysis
         double floor = floorCount > 0 ? floorSum / floorCount : double.NaN;
 
         var model = new PathModel(s);
-        double spanLo = peakLag - 1.5e-3, spanHi = Math.Min(peakLag + 6.0e-3, s.Lag(nlag - 1) - 0.5e-3);
+        double spanLo = peakLag - s.SearchBeforeSeconds, spanHi = Math.Min(peakLag + 6.0e-3, s.Lag(nlag - 1) - 0.5e-3);
         var fits = model.Search(spanLo, spanHi);
         (double[] Taus, double[] Powers)? kept = null;
         foreach (var taus in fits)
         {
             var gains = model.Gains(taus, goodOnly: true);
             var p = MeanPower(gains, taus.Length);
-            if (kept is null || p.Min() > floor * Math.Pow(10, FloorMarginDb / 10))
+            if (kept is null || p.Min() > floor * Math.Pow(10, s.FloorMarginDb / 10))
             {
                 kept = (taus, p);
             }
@@ -158,6 +170,12 @@ internal static class ChannelAnalysis
             {
                 break;
             }
+        }
+        if (s.FinerDelays)
+        {
+            // Below the search's 5 us lattice, for a measurement that is good for it (the probe's).
+            var finer = model.Refine(kept!.Value.Taus);
+            kept = (finer, MeanPower(model.Gains(finer, goodOnly: true), finer.Length));
         }
         var order = Enumerable.Range(0, kept!.Value.Taus.Length).OrderBy(i => kept.Value.Taus[i]).ToArray();
         double[] tau = [.. order.Select(i => kept.Value.Taus[i])];
@@ -170,7 +188,7 @@ internal static class ChannelAnalysis
         var groups = new List<List<int>>();
         for (int i = 0; i < tau.Length; i++)
         {
-            if (groups.Count > 0 && tau[i] - tau[groups[^1][^1]] < ModeGapSeconds)
+            if (groups.Count > 0 && tau[i] - tau[groups[^1][^1]] < s.ModeGapSeconds)
             {
                 groups[^1].Add(i);
             }
@@ -180,38 +198,64 @@ internal static class ChannelAnalysis
             }
         }
         double pmax = groups.Max(g => g.Sum(i => pw[i]));
-        double first = tau[0];
         var modes = new List<PictureMode>();
         var allSpectrum = new double[DopplerFft];
-        double windowSigma = 1 / (Math.Sqrt(3) * nseg * dt);
+        // The Doppler spectra over every snapshot, or for estimates with gaps that matter (the
+        // probe's, after a lost stretch of audio) over the longest unbroken run of good ones: a
+        // gap in the series would smear a steady path's spectrum into a spread it does not have.
+        var (dopplerFrom, dopplerCount) = s.ContiguousDoppler ? LongestRun(s.Good, s.Missing) : (0, nseg);
+        bool spreadKnown = !s.ContiguousDoppler || dopplerCount >= s.FewestDopplerSnapshots;
+        double windowSigma = 1 / (Math.Sqrt(3) * dopplerCount * dt);
         var spectra = new double[tau.Length][];
         for (int i = 0; i < tau.Length; i++)
         {
-            spectra[i] = DopplerSpectrum(full, i, s.Good);
+            spectra[i] = DopplerSpectrum(full, i, s.Good, dopplerFrom, dopplerCount);
             for (int f = 0; f < DopplerFft; f++)
             {
                 allSpectrum[f] += spectra[i][f];
             }
         }
-        foreach (var g in groups)
+        var moments = new (double? Centroid, double? Spread)[groups.Count];
+        for (int m = 0; m < groups.Count; m++)
         {
-            double power = g.Sum(i => pw[i]);
-            double delay = g.Sum(i => tau[i] * pw[i]) / power;
             var spectrum = new double[DopplerFft];
-            foreach (int i in g)
+            foreach (int i in groups[m])
             {
                 for (int f = 0; f < DopplerFft; f++)
                 {
                     spectrum[f] += spectra[i][f];
                 }
             }
-            var (centroid, spread) = Moments(spectrum, dt, windowSigma);
-            modes.Add(new PictureMode((delay - first) * 1e3, 10 * Math.Log10(power / pmax), centroid, spread));
+            moments[m] = Moments(spectrum, dt, windowSigma);
+            if (!spreadKnown)
+            {
+                // Too short a run for the resolution a spread is given to: the shift only.
+                moments[m] = (moments[m].Centroid, null);
+            }
+            // A signal whose delay and Doppler are coupled (the probe's): each mode's paths moved
+            // back by its own shift, so two modes with different Doppler keep their true spacing.
+            if (s.DelayPerHzSeconds != 0 && moments[m].Centroid is double modeShift)
+            {
+                double back = s.DelayPerHzSeconds * Math.Clamp(modeShift, -MostCoupledHz, MostCoupledHz);
+                foreach (int i in groups[m])
+                {
+                    tau[i] += back;
+                }
+            }
+        }
+        double first = tau[0];
+        for (int m = 0; m < groups.Count; m++)
+        {
+            var g = groups[m];
+            double power = g.Sum(i => pw[i]);
+            double delay = g.Sum(i => tau[i] * pw[i]) / power;
+            modes.Add(new PictureMode((delay - first) * 1e3, 10 * Math.Log10(power / pmax), moments[m].Centroid, moments[m].Spread));
         }
         double total = pw.Sum();
         double mu = tau.Zip(pw).Sum(t => t.First * t.Second) / total;
         double rms = Math.Sqrt(tau.Zip(pw).Sum(t => t.Second * (t.First - mu) * (t.First - mu)) / total);
         var (allCentroid, allSpread) = Moments(allSpectrum, dt, windowSigma);
+        allSpread = spreadKnown ? allSpread : null;
 
         int strongest = Array.IndexOf(pw, pw.Max());
         double? coherence = CoherenceSeconds(full, strongest, s.Good, dt);
@@ -231,6 +275,8 @@ internal static class ChannelAnalysis
         {
             Basis = s.Basis,
             Modes = modes,
+            FirstPathSeconds = first,
+            PathModes = [.. Enumerable.Range(0, tau.Length).Select(i => groups.FindIndex(g => g.Contains(i)))],
             PathsMs = [.. tau.Select(t => (t - first) * 1e3)],
             PathsDb = [.. pw.Select(p => 10 * Math.Log10(p / pw.Max()))],
             DelaySpreadMs = rms * 1e3,
@@ -268,14 +314,13 @@ internal static class ChannelAnalysis
 
     /// <summary>Hann-windowed periodogram of one path's gain over the snapshots, bad ones zeroed, centred on 0 Hz (numpy's fftshift order).</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private static double[] DopplerSpectrum(Complex[][] gains, int path, bool[] good)
+    private static double[] DopplerSpectrum(Complex[][] gains, int path, bool[] good, int from, int n)
     {
-        int n = gains.Length;
         var x = new Complex[DopplerFft];
         for (int j = 0; j < Math.Min(n, DopplerFft); j++)
         {
             double w = n > 1 ? 0.5 - (0.5 * Math.Cos(2 * Math.PI * j / (n - 1))) : 1;
-            x[j] = good[j] ? gains[j][path] * w : Complex.Zero;
+            x[j] = good[from + j] ? gains[from + j][path] * w : Complex.Zero;
         }
         ChannelMaths.Fft(x, false);
         var p = new double[DopplerFft];
@@ -286,6 +331,52 @@ internal static class ChannelAnalysis
         }
         return p;
     }
+
+    /// <summary>
+    /// The longest run of good snapshots, bridging gaps of up to <see cref="BridgedGap"/> unfit
+    /// ones (a crash, zeroed, which does no harm) but never one where the signal was
+    /// <paramref name="missing"/>: where it starts, and how many.
+    /// </summary>
+    private static (int From, int Count) LongestRun(bool[] good, bool[]? missing)
+    {
+        bool Gap(int j) => missing is not null && j < missing.Length && missing[j];
+        int bestFrom = 0, best = 0;
+        int j = 0;
+        while (j < good.Length)
+        {
+            if (!good[j])
+            {
+                j++;
+                continue;
+            }
+            int start = j, end = j;
+            while (end < good.Length)
+            {
+                int next = end + 1;
+                while (next < good.Length && !good[next] && !Gap(next) && next - end <= BridgedGap)
+                {
+                    next++;
+                }
+                if (next < good.Length && good[next] && next - end <= BridgedGap + 1)
+                {
+                    end = next;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            if (end - start + 1 > best)
+            {
+                (bestFrom, best) = (start, end - start + 1);
+            }
+            j = end + 1;
+        }
+        return (bestFrom, best);
+    }
+
+    /// <summary>The longest gap of bad snapshots a Doppler run is carried across.</summary>
+    private const int BridgedGap = 2;
 
     /// <summary>The frequency of bin <paramref name="k"/> of a centred spectrum, in Hz.</summary>
     private static double BinHz(int k, double dt) => (k - (DopplerFft / 2)) / (DopplerFft * dt);
@@ -508,7 +599,7 @@ internal static class ChannelAnalysis
             var r = new double[_nlag];
             for (int l = 0; l < _nlag; l++)
             {
-                r[l] = ChannelMaths.RaisedCosine(_s.Lag(l) - t, _s.SymbolRate, _s.RollOff);
+                r[l] = _s.PulseAt(_s.Lag(l) - t);
             }
             var qr = new double[_nlag];
             for (int a = 0; a < _nlag; a++)
@@ -522,6 +613,75 @@ internal static class ChannelAnalysis
 
         private double Delay(long k) => _latticeOrigin + (k * Grid / 2);
 
+        /// <summary>What is left over with paths at <paramref name="taus"/>, anywhere, against the total.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        private double CostAt(double[] taus)
+        {
+            int n = taus.Length;
+            var rows = new (double[] R, double[] Qr)[n];
+            for (int i = 0; i < n; i++)
+            {
+                var r = new double[_nlag];
+                for (int l = 0; l < _nlag; l++)
+                {
+                    r[l] = _s.PulseAt(_s.Lag(l) - taus[i]);
+                }
+                var qr = new double[_nlag];
+                for (int a = 0; a < _nlag; a++)
+                {
+                    qr[a] = Dot(_qRe.AsSpan(a * _nlag, _nlag), r);
+                }
+                rows[i] = (r, qr);
+            }
+            return CostOf(rows);
+        }
+
+        /// <summary>
+        /// The delays moved off the lattice to where they fit best, each in turn within half a
+        /// lattice step either way by golden section, twice round.
+        /// </summary>
+        public double[] Refine(double[] taus)
+        {
+            var t = (double[])taus.Clone();
+            double g = (Math.Sqrt(5) - 1) / 2;
+            for (int round = 0; round < 2; round++)
+            {
+                for (int i = 0; i < t.Length; i++)
+                {
+                    double a = t[i] - (Grid / 2), b = t[i] + (Grid / 2);
+                    double Try(double at)
+                    {
+                        var trial = (double[])t.Clone();
+                        trial[i] = at;
+                        return CostAt(trial);
+                    }
+                    double c = b - (g * (b - a)), d = a + (g * (b - a));
+                    double fc = Try(c), fd = Try(d);
+                    for (int k = 0; k < 16; k++)
+                    {
+                        if (fc < fd)
+                        {
+                            (b, d, fd) = (d, c, fc);
+                            c = b - (g * (b - a));
+                            fc = Try(c);
+                        }
+                        else
+                        {
+                            (a, c, fc) = (c, d, fd);
+                            d = a + (g * (b - a));
+                            fd = Try(d);
+                        }
+                    }
+                    double best = (a + b) / 2;
+                    if (Try(best) < Try(t[i]))
+                    {
+                        t[i] = best;
+                    }
+                }
+            }
+            return t;
+        }
+
         /// <summary>What is left over with paths at lattice points <paramref name="ks"/>, against the total.</summary>
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private double Cost(ReadOnlySpan<long> ks)
@@ -532,6 +692,14 @@ internal static class ChannelAnalysis
             {
                 rows[i] = At(ks[i]);
             }
+            return CostOf(rows);
+        }
+
+        /// <summary>The cost of paths whose pulses (and Q times them) are <paramref name="rows"/>.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        private double CostOf((double[] R, double[] Qr)[] rows)
+        {
+            int n = rows.Length;
             var g = new double[n * n];
             var mre = new double[n * n];
             for (int a = 0; a < n; a++)
@@ -664,7 +832,7 @@ internal static class ChannelAnalysis
                 r[i] = new double[_nlag];
                 for (int l = 0; l < _nlag; l++)
                 {
-                    r[i][l] = ChannelMaths.RaisedCosine(_s.Lag(l) - taus[i], _s.SymbolRate, _s.RollOff);
+                    r[i][l] = _s.PulseAt(_s.Lag(l) - taus[i]);
                 }
             }
             var g = new double[n * n];
