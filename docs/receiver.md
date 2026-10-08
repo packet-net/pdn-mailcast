@@ -125,7 +125,7 @@ Then try it as that user, `sudo -u pdn-mailcast /usr/local/bin/mailcast-hook sto
 
 ## Sending a daily report
 
-You can help by sending M0LTE a short report each day of what your receiver heard. It is off unless you turn it on:
+You can help the experiment by posting a short report each day of what your receiver heard. It is a public bulletin on GB7RDG, so anyone there can read it. It is off unless you turn it on:
 
 ```json
 "feedback": { "enabled": true, "callsign": "G4ABC" }
@@ -134,7 +134,9 @@ You can help by sending M0LTE a short report each day of what your receiver hear
 Or tick "Send a daily report" near the top of the status page, give your callsign and save: that writes the same to the config and is in force at once, with no restart. "Turn off" there stops it again. The first report covers the slots from when you turned it on.
 
 - `callsign` is yours, with no SSID, and the report comes from it. It has to look like a callsign, or the receiver won't start.
-- The report goes to `M0LTE@GB7RDG.#42.GBR.EURO` as a personal message, through your own BBS, in the same session the bulletins use. Your BBS sends it on like any other personal mail, so it needs a route towards GB7RDG; most UK BBSes have one.
+- The report is public. It goes as a bulletin (type B) to `MCAST@GB7RDG.#42.GBR.EURO`, through your own BBS, in the same session the bulletins use. The full address means mail routing carries it to GB7RDG and it stays there, rather than flooding the country. Anyone on GB7RDG can list the reports with `L> MCAST` and read them, and like any bulletin it can also be read on your own BBS and any it passes through on the way.
+- Your BBS sends it on like any other bulletin addressed to GB7RDG, so it needs a route towards GB7RDG; most UK BBSes have one.
+- GB7RDG's head end never broadcasts a report: it refuses anything addressed to MCAST, and anything that looks like a report.
 - It goes about 30 minutes after the day's last daylight slot (17:30 UTC in early October), once a day at most. If the receiver was off at that time, it sends that day's report when it next starts, once.
 - If your BBS asks for it later, or can't be reached, the receiver tries again after 1 hour, then 2, then every 4 hours, at most 6 times a day, until the next day's report is due. If your BBS refuses it, it isn't sent again; the status page shows what was said.
 - It is small and plain text: about 500 bytes for a 9-slot autumn day, and about 760 for a 14-slot midsummer one. The status page shows the last one as sent, what the BBS said, and when the next goes. The receiver keeps its notes for it in `feedback.json` in the state directory.

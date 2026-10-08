@@ -1,4 +1,5 @@
 using Packet.Mailcast;
+using Packet.Mailcast.Feedback;
 
 namespace Mailcast.HeadEnd.Intake;
 
@@ -38,6 +39,24 @@ public sealed class IntakePolicy(int maxBulletinBytes)
         }
         return string.IsNullOrWhiteSpace(bid) ? "it has no BID" : null;
     }
+
+    /// <summary>
+    /// Why a bulletin is a listener's daily report, which is never broadcast, or null if it is
+    /// not one: addressed to <see cref="DailyReport.BulletinTo"/>, or, once its title and body
+    /// are known, shaped like a report (see <see cref="DailyReport.LooksLikeReport"/>). Listeners
+    /// post their reports as public bulletins on GB7RDG, where LinBPQ could otherwise hand them
+    /// to the head end with the rest.
+    /// </summary>
+    public static string? DailyReportRefusal(string? to, string? title = null, string? body = null)
+    {
+        if (DailyReport.IsReportAddressee(to))
+        {
+            return $"it is addressed to {DailyReport.BulletinTo}, where listeners' daily reports go, and those are never broadcast";
+        }
+        return DailyReport.LooksLikeReport(title, body)
+            ? "it is a listener's daily report (an MCR title and body), and those are never broadcast"
+            : null;
+    }
 }
 
 /// <summary>
@@ -74,7 +93,8 @@ public sealed class FileDropIntake(string directory, RotationStore store, Intake
             {
                 byte[] content = File.ReadAllBytes(path);
                 bulletin = Bulletin.Parse(content);
-                why = policy.Refusal(bulletin.Type, bulletin.Bid, bulletin.MessageText.Length);
+                why = policy.Refusal(bulletin.Type, bulletin.Bid, bulletin.MessageText.Length)
+                    ?? IntakePolicy.DailyReportRefusal(bulletin.To, bulletin.Title, bulletin.MessageText);
             }
             catch (FormatException e)
             {

@@ -211,4 +211,35 @@ public class DailyReportTests
         Assert.Equal("10 W4 3 - - - 2 - 0.1 0.1 280 b", lines[2]);
         Assert.Equal(report.Body, DailyReport.Parse(report.Title, report.Body).Body);
     }
+
+    [Fact]
+    public void LooksLikeReport_KnowsAReport_AsWrittenOrAsABbsShowsIt()
+    {
+        var report = FullDay();
+        Assert.True(DailyReport.LooksLikeReport(report.Title, report.Body));
+        Assert.True(DailyReport.LooksLikeReport(report.Title, "R:261006/1800Z 6279@GB7XYZ.#42.GBR.EURO BPQ6.0.25\r\n\r\n" + report.Body));
+        Assert.True(DailyReport.LooksLikeReport("mcr g4abc 2026-10-06", "mcr1 0.8.1 - sc 0/0 0\n"));
+        // A later format number is still a report.
+        Assert.True(DailyReport.LooksLikeReport(report.Title, "MCR2 0.9.0 - sc 0/0 0\r\n"));
+    }
+
+    [Theory]
+    [InlineData("MCR meeting tonight", "The MCR group meets at 8.\r\n")]
+    [InlineData("Weather", "MCR1 0.8.1 - sc 0/0 0\r\n")]
+    [InlineData("MCRG4ABC 2026-10-06", "MCR1 0.8.1 - sc 0/0 0\r\n")]
+    [InlineData("MCR G4ABC 2026-10-06", "MCR is not a header\r\nMCR1x\r\n")]
+    [InlineData(null, "MCR1 0.8.1 - sc 0/0 0\r\n")]
+    [InlineData("MCR G4ABC 2026-10-06", null)]
+    public void LooksLikeReport_NotForOtherMessages(string? title, string? body) =>
+        Assert.False(DailyReport.LooksLikeReport(title, body));
+
+    [Theory]
+    [InlineData("MCAST", true)]
+    [InlineData("mcast", true)]
+    [InlineData(" MCAST ", true)]
+    [InlineData("ALL", false)]
+    [InlineData("MCASTX", false)]
+    [InlineData(null, false)]
+    public void IsReportAddressee_IsMcastInAnyCase(string? to, bool expected) =>
+        Assert.Equal(expected, DailyReport.IsReportAddressee(to));
 }

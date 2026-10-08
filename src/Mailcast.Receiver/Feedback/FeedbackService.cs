@@ -104,7 +104,8 @@ public sealed record SentReport
 /// <summary>
 /// Sends the daily report: notes what each slot listened to brought, and about
 /// <see cref="AfterLastSlot"/> after the day's last daylight slot sends a <see cref="DailyReport"/>
-/// as a personal mail through the BBS. Once per UTC day at most, kept in <see cref="FileName"/>.
+/// through the BBS as a public bulletin to MCAST at GB7RDG. Once per UTC day at most, kept in
+/// <see cref="FileName"/>.
 /// </summary>
 /// <remarks>
 /// <para>After a restart, the most recent day that was missed is sent, once; any older are let go.
@@ -112,6 +113,9 @@ public sealed record SentReport
 /// <see cref="Retries"/> in turn (the last repeating), at most <see cref="MostOffersPerDay"/>
 /// times a UTC day, until the BBS answers or the next day's report is due. A refused one is not
 /// offered again.</para>
+/// <para>The message is made afresh each time it is offered, from what is kept, so a report
+/// still waiting from a version that sent it as a personal mail to M0LTE goes as the bulletin,
+/// with the same title, body and BID.</para>
 /// </remarks>
 public sealed class FeedbackService
 {
@@ -307,7 +311,7 @@ public sealed class FeedbackService
         if (!_said)
         {
             _said = true;
-            _log($"feedback: on. A daily report from {settings.From} goes to {FeedbackSettings.To}@{FeedbackSettings.At} through the BBS, "
+            _log($"feedback: on. A daily report from {settings.From} goes through the BBS as a public bulletin to {FeedbackSettings.To}@{FeedbackSettings.At}, "
                 + $"{AfterLastSlot.TotalMinutes:F0} minutes after the last daylight slot"
                 + (Next(now) is { } next ? $"; the next at {next:yyyy-MM-dd HH:mm} UTC" : ""));
         }
@@ -500,7 +504,7 @@ public sealed class FeedbackService
         var now = _time.GetUtcNow();
         // The callsign it was made with, which its title and BID name, not the setting now.
         string from = report.From is { Length: > 0 } made ? made : _sources.Settings()?.From ?? "";
-        var mail = new Bulletin('P', from, FeedbackSettings.To, FeedbackSettings.At, report.Bid, report.Title,
+        var mail = new Bulletin(FeedbackSettings.Type, from, FeedbackSettings.To, FeedbackSettings.At, report.Bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds()), [], report.Body);
         DeliveryOutcome outcome;
         string? failure;

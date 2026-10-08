@@ -5,17 +5,20 @@ namespace Mailcast.Receiver.Feedback;
 
 /// <summary>
 /// The config's <c>feedback</c>: a short daily report of what this receiver heard, sent once a
-/// day as a personal mail through the listener's own BBS to the broadcast's author. Off unless
-/// asked for; any other key is refused.
+/// day through the listener's own BBS as a public bulletin to MCAST at GB7RDG, where anyone can
+/// read it. Off unless asked for; any other key is refused.
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed partial record FeedbackSettings
 {
-    /// <summary>Who the report goes to. Fixed: it is the broadcast's author.</summary>
-    public const string To = "M0LTE";
+    /// <summary>The report's type: a bulletin, public on GB7RDG. Fixed.</summary>
+    public const char Type = 'B';
 
-    /// <summary>Where <see cref="To"/> reads his mail, as the @ field.</summary>
-    public const string At = "GB7RDG.#42.GBR.EURO";
+    /// <summary>Who the report is addressed to. Fixed.</summary>
+    public const string To = Packet.Mailcast.Feedback.DailyReport.BulletinTo;
+
+    /// <summary>The report's @ field, GB7RDG's full address, so it is routed to GB7RDG and stays there. Fixed.</summary>
+    public const string At = Packet.Mailcast.Feedback.DailyReport.BulletinAt;
 
     /// <summary>Whether the report is sent.</summary>
     public bool Enabled { get; init; }

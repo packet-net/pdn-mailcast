@@ -52,7 +52,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | | |
 |---|---|
 | Software | pdn-mailcast head end 0.3.0 beside pdn-soundmodem 0.85.0 on the node that drives the Flex |
-| Intake | Forwarding partner Q0HEAD on GB7RDG's LinBPQ (FBB B1F over the FBBPORT, bulletins only, flood routes WW, GBR, EURO); bulletins over 32 KB are refused, and personal mail and NTS are left queued in LinBPQ |
+| Intake | Forwarding partner Q0HEAD on GB7RDG's LinBPQ (FBB B1F over the FBBPORT, bulletins only, flood routes WW, GBR, EURO); bulletins over 32 KB are refused, and personal mail and NTS are left queued in LinBPQ. Listeners' daily reports (to MCAST, or an MCR title with an MCR1 body) are refused and never sent |
 | Coexistence | A transmit lease in pdn-soundmodem holds LinBPQ's packet traffic off for the slot only; frames waiting when the lease ends are dropped, never sent late |
 | Safety | Refuses to key unless the system clock is synchronised; stops the slot if the PA passes 70 C (read-only Flex meter connection); one-off slots by `pdn-mailcast-headend --run-now` |
 
@@ -65,6 +65,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | Delivery | Logs in to the listener's LinBPQ or Linux FBB as forwarding partner Q0CAST and offers each rebuilt bulletin by FBB B1F; the BBS keeps or refuses it by BID like any partner |
 | Durability | Rebuilt bulletins stay in an on-disk outbox until the BBS has answered; partial objects and completed markers expire after 14 days |
 | Mail | The receiver keeps its own copy of every bulletin (30 days or 50 MB unless set), readable on the status page, and any of them can be sent to the BBS again |
+| Daily report | Off unless the listener turns it on: once a day, a public bulletin of about 500 bytes on what the receiver heard, from the listener's callsign to `MCAST@GB7RDG.#42.GBR.EURO` through their own BBS, where anyone on GB7RDG can read it (`L> MCAST`) |
 | Sharing a radio | If the radio is also a LinBPQ packet radio, the receiver turns LinBPQ's transmitter off on that port (`XMITOFF`), tunes the rig to 7.052 MHz by Hamlib rigctld (flrig works through `rigctld -m 4`) from a minute before each slot to 12 minutes after, then puts the rig back and turns the port on again; it gives the rig back at once if it ever sees PTT on |
 | Status | Local web page with level meter, spectrogram, the tone's frequency offset and signal-to-noise, today's slot times and bulletin progress; open on the local network only with a password, behind a sign-in page |
 

@@ -206,8 +206,8 @@ public class StatusPageTests
 
         foreach (string part in new[]
         {
-            "id=\"optIn\"", "Help the experiment:", "about 500 bytes a day. Nothing else is sent.", "Send a daily report", "Your callsign",
-            "Daily report to M0LTE: on", "Turn off", "docs/receiver.md#sending-a-daily-report",
+            "id=\"optIn\"", "Help the experiment:", "as a public bulletin on GB7RDG (MCAST)", "about 500 bytes a day. Nothing else is sent.", "Send a daily report", "Your callsign",
+            "Daily report, a public bulletin on GB7RDG (MCAST): on", "Turn off", "docs/receiver.md#sending-a-daily-report",
         })
         {
             Assert.Contains(part, html, StringComparison.Ordinal);

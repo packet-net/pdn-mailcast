@@ -177,6 +177,49 @@ internal sealed partial class LinBpqContainer : IAsyncDisposable
         return messages;
     }
 
+    /// <summary>
+    /// The files under LinBPQ's /data that hold <paramref name="text"/>, by name relative to it:
+    /// for what the BBS keeps but never shows in full, such as a message's whole @ field, which
+    /// it keeps in its message database (DIRMES.SYS) and lists only up to the first dot.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> FilesHoldingAsync(string text, CancellationToken cancellation)
+    {
+        var copy = Directory.CreateTempSubdirectory("mailcast-linbpq-data-");
+        try
+        {
+            await DockerAsync(cancellation, "cp", $"{Id}:/data/.", copy.FullName);
+            byte[] needle = Encoding.ASCII.GetBytes(text);
+            return [.. Directory.EnumerateFiles(copy.FullName, "*", SearchOption.AllDirectories)
+                // LinBPQ's logLatest files are links to the day's log, which may not be there.
+                .Where(f => new FileInfo(f).LinkTarget is null && File.ReadAllBytes(f).AsSpan().IndexOf(needle) >= 0)
+                .Select(f => Path.GetRelativePath(copy.FullName, f))
+                .Order(StringComparer.Ordinal)];
+        }
+        finally
+        {
+            copy.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>What one of LinBPQ's list commands, such as <c>L&gt; MCAST</c>, shows the sysop.</summary>
+    public async Task<string> ListAsync(string command, CancellationToken cancellation)
+    {
+        using var client = new TcpClient();
+        await client.ConnectAsync("127.0.0.1", TelnetPort, cancellation);
+        var stream = client.GetStream();
+        await ReadUntilAsync(stream, "user:", cancellation);
+        await stream.WriteAsync("sysop\r"u8.ToArray(), cancellation);
+        await ReadUntilAsync(stream, "password:", cancellation);
+        await stream.WriteAsync("sysop\r"u8.ToArray(), cancellation);
+        await ReadUntilAsync(stream, "\r", cancellation);
+        await stream.WriteAsync("BBS\r"u8.ToArray(), cancellation);
+        await ReadUntilAsync(stream, "de GB7TST>", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(command + "\r"), cancellation);
+        string listing = await ReadUntilAsync(stream, "de GB7TST>", cancellation);
+        await stream.WriteAsync("B\r"u8.ToArray(), cancellation);
+        return listing;
+    }
+
     [GeneratedRegex(@"^\s*(\d+)\s+\d\d-.*$", RegexOptions.Multiline)]
     private static partial Regex ListingNumber();
 
