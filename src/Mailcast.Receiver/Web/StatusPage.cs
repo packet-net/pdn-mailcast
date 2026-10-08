@@ -37,6 +37,12 @@ public sealed class StatusPage : IAsyncDisposable
 
     private const string MailBase = "/api/mail/";
 
+    /// <summary>The start of a slot drill-down request, issue #48: <c>/api/slots/{slot}/frames</c>.</summary>
+    private const string SlotsBase = "/api/slots/";
+
+    /// <summary>The end of a slot drill-down request, issue #48.</summary>
+    private const string SlotsFramesSuffix = "/frames";
+
     /// <summary>How soon one bulletin can be sent to the BBS again after the last time.</summary>
     public static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
 
@@ -248,6 +254,9 @@ public sealed class StatusPage : IAsyncDisposable
                     break;
                 case (_, "GET") when path.StartsWith(MailBase, StringComparison.Ordinal):
                     await ServeBulletinAsync(context, path[MailBase.Length..]).ConfigureAwait(false);
+                    break;
+                case (_, "GET") when path.StartsWith(SlotsBase, StringComparison.Ordinal) && path.EndsWith(SlotsFramesSuffix, StringComparison.Ordinal):
+                    await ServeSlotFramesAsync(context, path[SlotsBase.Length..^SlotsFramesSuffix.Length]).ConfigureAwait(false);
                     break;
                 default:
                     await RespondAsync(context, 404, "text/plain", "Not found.\n").ConfigureAwait(false);
@@ -741,6 +750,18 @@ public sealed class StatusPage : IAsyncDisposable
                 endedEarly = _host.LastEarlyEnd is { } early && early.Slot == slot.Scheduled ? early.Reason : null,
             },
             framesHeard = _host.Intake.FramesHeard,
+            // Issue #48: a slim list of the slots "what was heard" can show; the full drill-down
+            // for one of them is GET /api/slots/{slotTicks}/frames, fetched when the page opens
+            // it. slotTicks is the slot's UTC instant in .NET ticks: plain digits, nothing to
+            // URL-escape, and round-trips exactly (milliseconds alone would not: the slot's
+            // identity can carry sub-millisecond precision).
+            heardSlots = _host.FrameHistory.Slots.Reverse().Select(s => new
+            {
+                slot = s.Slot,
+                slotTicks = s.Slot.UtcTicks,
+                bursts = s.Bursts.Count,
+                frames = s.Bursts.Sum(b => b.Pieces.Count),
+            }),
             iono = IonoView(_host.Intake.Ionosphere, _host.Time.GetUtcNow()),
             pskReporter = PskView(_host.Intake.PskReporter, _host.Time.GetUtcNow()),
             // The daily report, when the config's "feedback" turns it on.
@@ -1325,6 +1346,61 @@ public sealed class StatusPage : IAsyncDisposable
         context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
         await RespondAsync(context, 200, "text/plain; charset=utf-8", BulletinText(held.Serialized)).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Issue #48: one slot's drill-down, its bursts and their pieces, from
+    /// <see cref="ReceiverHost.FrameHistory"/>. <paramref name="rawSlot"/> is the slot's identity
+    /// as the page's own JSON gives it in <c>heardSlots</c> (<c>slotTicks</c>): the slot's UTC
+    /// instant in .NET ticks, plain digits, so nothing here needs URL-escaping, and it round-trips
+    /// exactly. 404 for a slot that was never kept, or has since been trimmed.
+    /// </summary>
+    private async Task ServeSlotFramesAsync(HttpListenerContext context, string rawSlot)
+    {
+        if (!long.TryParse(rawSlot, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long ticks))
+        {
+            await RespondAsync(context, 400, "text/plain; charset=utf-8", "Bad slot.\n").ConfigureAwait(false);
+            return;
+        }
+        DateTimeOffset slot;
+        try
+        {
+            slot = new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            await RespondAsync(context, 400, "text/plain; charset=utf-8", "Bad slot.\n").ConfigureAwait(false);
+            return;
+        }
+        var heard = _host.FrameHistory.Slot(slot);
+        if (heard is null)
+        {
+            await RespondAsync(context, 404, "text/plain; charset=utf-8", "That slot is not held (it may have scrolled out of the last few).\n").ConfigureAwait(false);
+            return;
+        }
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(SlotFramesView(heard), ReceiverConfig.JsonLine)).ConfigureAwait(false);
+    }
+
+    /// <summary>Issue #48: one slot's drill-down, for the status page and the API.</summary>
+    internal static object SlotFramesView(HeardSlotPieces slot) => new
+    {
+        slot = slot.Slot,
+        bursts = slot.Bursts.Select(b => new
+        {
+            started = b.Started,
+            waveform = b.Waveform,
+            words = b.Waveform is null ? null : Waveform.Words(b.Waveform),
+            snrDb = b.SnrDb,
+            frames = b.Pieces.Count,
+            pieces = b.Pieces.Select(p => new
+            {
+                heard = p.Heard,
+                esi = p.Esi,
+                status = p.Status,
+                crcGood = p.CrcGood,
+                what = p.What,
+            }),
+        }),
+    };
 
     /// <summary>
     /// BBS mail is octets in no declared character set: read as UTF-8 if it is valid UTF-8, else

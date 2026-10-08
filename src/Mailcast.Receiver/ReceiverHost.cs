@@ -45,8 +45,12 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.IonosphereHeard += _ => Slots.OnIonosphereHeard();
         Intake.PskReporterHeard += _ => Slots.OnPskReporterHeard();
         Intake.ScheduleHeard += OnScheduleHeard;
+        // Issue #48: after Slots.OnFrame above, so the slot this piece belongs to is already
+        // the one Slots.Last knows about.
+        Intake.Piece += OnPieceHandled;
         Hooks = new SlotHooks(() => Config, time, log);
         ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place);
+        ChannelWatch.Measured += FrameHistory.OnChannelMeasured;
         if (config.Rig is not null)
         {
             Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks, EarlyEndReason);
@@ -147,6 +151,27 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The radio path from GB7RDG, measured after each slot from the bursts decoded.</summary>
     public ChannelWatch ChannelWatch { get; }
+
+    /// <summary>
+    /// Issue #48: what the last few slots carried, burst by burst and piece by piece, for the
+    /// status page's "what was heard" section and <c>GET /api/slots/{slot}/frames</c>. In
+    /// memory only; empty again after a restart.
+    /// </summary>
+    public SlotFrameHistory FrameHistory { get; } = new();
+
+    /// <summary>
+    /// Issue #48: records one piece into <see cref="FrameHistory"/>, on the intake worker
+    /// (<see cref="Intake.Piece"/>), never the audio thread. The slot is <see cref="Slots"/>'s
+    /// own identity; the burst is the audio thread's own published snapshot
+    /// (<see cref="BurstWatch.Shown"/>), read here, not measured here.
+    /// </summary>
+    private void OnPieceHandled(PieceHandled piece)
+    {
+        var slot = Slots.Last is { } last ? last.Scheduled ?? last.Started : piece.Heard;
+        var burstStarted = Pipeline?.Burst.Shown?.Started;
+        var directory = Intake.Progress().Directory;
+        FrameHistory.Record(slot, burstStarted, piece.Waveform, HeardPiece.From(piece.Result, piece.Esi, piece.Heard, directory));
+    }
 
     /// <summary>
     /// Where the receiver is, for naming the hops: where the web SDR in use says it is, once it

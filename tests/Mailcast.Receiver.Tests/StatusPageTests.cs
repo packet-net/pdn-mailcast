@@ -81,6 +81,55 @@ public class StatusPageTests
         Assert.Equal(saved, host.Config);
     }
 
+    /// <summary>Issue #48: the status page's slim list of recent slots, and the full drill-down for one of them.</summary>
+    [Fact]
+    public async Task SlotFrames_Api_ReturnsWhatWasHeardForThatSlot()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        var heardSlots = status.GetProperty("heardSlots").EnumerateArray().ToList();
+        var slim = Assert.Single(heardSlots);
+        Assert.True(slim.GetProperty("frames").GetInt32() > 0);
+        long slotTicks = slim.GetProperty("slotTicks").GetInt64();
+
+        var detail = await http.GetFromJsonAsync<JsonElement>($"api/slots/{slotTicks}/frames");
+        var bursts = detail.GetProperty("bursts").EnumerateArray().ToList();
+        Assert.NotEmpty(bursts);
+        var pieces = bursts[0].GetProperty("pieces").EnumerateArray().ToList();
+        Assert.NotEmpty(pieces);
+        Assert.True(pieces[0].TryGetProperty("what", out _));
+        Assert.True(pieces[0].TryGetProperty("status", out _));
+        Assert.True(pieces[0].TryGetProperty("crcGood", out _));
+        Assert.Contains(bursts, b => b.GetProperty("pieces").EnumerateArray()
+            .Any(p => p.GetProperty("status").GetString() == "completedObject"));
+    }
+
+    /// <summary>Issue #48: a slot never heard (or scrolled out of the last few) is a 404, not an error.</summary>
+    [Fact]
+    public async Task SlotFrames_Api_404sForASlotNeverHeard()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.GetAsync($"api/slots/{DateTimeOffset.UtcNow.UtcTicks}/frames");
+
+        Assert.Equal(HttpStatusCode.NotFound, answer.StatusCode);
+    }
+
     private static object FeedbackForm(bool enabled, string? callsign) =>
         new { audio = "wav:/nonexistent.wav", type = "linBpq", host = "127.0.0.1", port = 8011, login = "Q0CAST", password = "", command = "BBS", feedback = new { enabled, callsign } };
 

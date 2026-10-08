@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using Packet.Mailcast;
 using Packet.SoundModem.Waterfall;
 
@@ -72,5 +73,54 @@ public class IntakeTests
         release.Set();
         await intake.DrainAsync(CancellationToken.None);
         Assert.Equal(8, intake.FramesHeard);
+    }
+
+    /// <summary>
+    /// Issue #48: <see cref="Intake.Piece"/> fires on the worker, once per frame, with the
+    /// piece's ESI from the frame itself, the waveform it came on, and the clock's time when the
+    /// worker got to it (<see cref="FakeTimeProvider"/>, never advancing backwards).
+    /// </summary>
+    [Fact]
+    public async Task Piece_FiresOnceEachFrame_WithTheFramesEsiAndTheClocksTime()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero));
+        await using var intake = new Intake(dir.Path, _ => { }, new ReceiverStoreOptions { Time = time });
+        var frames = Samples.Frames([Samples.Bulletin(1)]);
+        var pieces = new List<PieceHandled>();
+        intake.Piece += pieces.Add;
+
+        foreach (var frame in frames)
+        {
+            time.Advance(TimeSpan.FromMilliseconds(1));
+            intake.Offer(frame, "ms110d-wn4");
+        }
+        await intake.DrainAsync(CancellationToken.None);
+
+        Assert.Equal(frames.Count, pieces.Count);
+        Assert.All(pieces, p => Assert.Equal("ms110d-wn4", p.Waveform));
+        Assert.All(pieces, p => Assert.NotNull(p.Esi));
+        Assert.Contains(pieces, p => p.Result.Outcome == FrameOutcome.CompletedBulletin);
+        for (int i = 1; i < pieces.Count; i++)
+        {
+            Assert.True(pieces[i].Heard >= pieces[i - 1].Heard);
+        }
+    }
+
+    /// <summary>Issue #48: a frame too short or malformed to be a mailcast piece still raises <see cref="Intake.Piece"/>, with no ESI.</summary>
+    [Fact]
+    public async Task Piece_ForAFrameThatDoesNotParse_HasNoEsi()
+    {
+        using var dir = new TempDirectory();
+        await using var intake = new Intake(dir.Path, _ => { });
+        PieceHandled? seen = null;
+        intake.Piece += p => seen = p;
+
+        intake.Offer(Ax25UiFrame.Build(Samples.Source, OnAir.Destination, [1, 2, 3]));
+        await intake.DrainAsync(CancellationToken.None);
+
+        Assert.NotNull(seen);
+        Assert.Equal(FrameOutcome.NotAFrame, seen!.Value.Result.Outcome);
+        Assert.Null(seen.Value.Esi);
     }
 }
