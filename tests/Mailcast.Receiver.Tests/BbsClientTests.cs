@@ -174,4 +174,65 @@ public class BbsClientTests
         Assert.Equal(DeliveryVerdict.Deferred, Assert.Single(session.Outcomes).Verdict);
         Assert.Empty(bbs.Taken);
     }
+
+    [Fact]
+    public async Task TestLogin_GoodPassword_ReachesTheForwardingPromptAsAPartnerWould()
+    {
+        await using var bbs = new FakeBbs();
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.Ok, result.Outcome);
+        Assert.Null(result.Detail);
+        Assert.Equal(["Q0CAST", "secret", "BBS"], Assert.Single(bbs.Logins));
+        // No mail was exchanged: it never got the chance to offer or take anything.
+        Assert.Empty(bbs.Taken);
+    }
+
+    [Fact]
+    public async Task TestLogin_WrongPassword_SaysSo()
+    {
+        await using var bbs = new FakeBbs();
+
+        var result = await Client(bbs.Port, password: "wrong").TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
+        Assert.Null(result.Detail);
+    }
+
+    [Fact]
+    public async Task TestLogin_NotSetUpAsAPartner_SaysSo()
+    {
+        await using var bbs = new FakeBbs { NotAPartner = true };
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.NotForwardingPartner, result.Outcome);
+        Assert.Contains("Q0CAST", result.Said, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestLogin_GarbledReply_IsUnexpectedWithItsFirstLine()
+    {
+        await using var bbs = new FakeBbs { Garbled = "Something has gone wrong here\r\nmore detail that is not the first line" };
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.UnexpectedReply, result.Outcome);
+        Assert.Equal("Something has gone wrong here", result.Detail);
+    }
+
+    [Fact]
+    public async Task TestLogin_NothingListening_SaysItCannotReachIt()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+
+        var result = await Client(port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.Unreachable, result.Outcome);
+        Assert.Null(result.Detail);
+    }
 }

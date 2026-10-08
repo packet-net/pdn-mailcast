@@ -40,7 +40,11 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>How soon one bulletin can be sent to the BBS again after the last time.</summary>
     public static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
 
+    /// <summary>How soon the BBS login can be tested again after the last time.</summary>
+    public static readonly TimeSpan BbsTestCooldown = TimeSpan.FromSeconds(10);
+
     private readonly Dictionary<ulong, DateTimeOffset> _resentAt = [];
+    private DateTimeOffset? _lastBbsTestAt;
 
     private readonly SessionStore _sessions;
     private readonly Dictionary<HttpListenerContext, string?> _sockets = [];
@@ -232,6 +236,9 @@ public sealed class StatusPage : IAsyncDisposable
                     break;
                 case ("/api/mail/resend", "POST"):
                     await ResendAsync(context).ConfigureAwait(false);
+                    break;
+                case ("/api/bbs/test", "POST"):
+                    await TestBbsAsync(context).ConfigureAwait(false);
                     break;
                 case (_, "GET") when path.StartsWith(MailBase, StringComparison.Ordinal):
                     await ServeBulletinAsync(context, path[MailBase.Length..]).ConfigureAwait(false);
@@ -1367,6 +1374,85 @@ public sealed class StatusPage : IAsyncDisposable
                 await RespondAsync(context, 404, "application/json", JsonSerializer.Serialize(new { error = "No such bulletin in the archive." })).ConfigureAwait(false);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The "Test BBS login" form: the host, port, login, password and command to try. Any field
+    /// left out, or an empty password, uses the one already saved, so the button can test a
+    /// login that has not been saved yet, or the one already on the page.
+    /// </summary>
+    internal sealed record TestBbsForm(string? Type, string? Host, int? Port, string? Login, string? Password, string? Command);
+
+    /// <summary>
+    /// POST /api/bbs/test: tries the host, port, login, password and command given (or, for any
+    /// left out, the ones already saved), the same way <see cref="BbsClient.TestLoginAsync"/>
+    /// does, and says in plain words how far it got. Exchanges no mail, and never logs or returns
+    /// the password. Rate-limited to one try every <see cref="BbsTestCooldown"/>, the same CSRF
+    /// and sign-in checks as every other setting, because this opens a real connection out from
+    /// the receiver on whatever is asked.
+    /// </summary>
+    private async Task TestBbsAsync(HttpListenerContext context)
+    {
+        var now = _host.Time.GetUtcNow();
+        TimeSpan? wait = null;
+        lock (_gate)
+        {
+            if (_lastBbsTestAt is { } last && now - last < BbsTestCooldown)
+            {
+                wait = BbsTestCooldown - (now - last);
+            }
+            else
+            {
+                _lastBbsTestAt = now;
+            }
+        }
+        if (wait is { } left)
+        {
+            context.Response.Headers["Retry-After"] = RetryAfter(left);
+            await RespondAsync(context, 429, "application/json",
+                JsonSerializer.Serialize(new { error = $"Only one login test at a time. Try again in {Math.Ceiling(left.TotalSeconds)} s." })).ConfigureAwait(false);
+            return;
+        }
+
+        var (answered, form) = await ReadJsonAsync<TestBbsForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        if (form is null)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "That was not a login to test." })).ConfigureAwait(false);
+            return;
+        }
+
+        var current = _host.Config.Bbs;
+        var kind = current.Type;
+        if (form.Type is { Length: > 0 } type && !Enum.TryParse(type, ignoreCase: true, out kind))
+        {
+            await RespondAsync(context, 400, "application/json",
+                JsonSerializer.Serialize(new { error = $"\"{Ascii.Clean(type)}\" is not a kind of BBS this receiver knows; use linBpq or fbb" })).ConfigureAwait(false);
+            return;
+        }
+        string host = string.IsNullOrWhiteSpace(form.Host) ? current.Host : form.Host.Trim();
+        int port = form.Port is > 0 ? form.Port.Value : current.Port;
+        string login = string.IsNullOrWhiteSpace(form.Login) ? current.Login : form.Login.Trim();
+        string password = string.IsNullOrEmpty(form.Password) ? current.Password : form.Password;
+        string command = string.IsNullOrWhiteSpace(form.Command) ? current.Command : form.Command.Trim();
+        if (password.Length == 0)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Enter the password to test." })).ConfigureAwait(false);
+            return;
+        }
+
+        var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = login.ToUpperInvariant(), Password = password, Command = command };
+        var result = await new BbsClient(settings, _host.Time, _ => { }).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
+        _log($"web: tested the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)}: {Ascii.Clean(result.Said)}");
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
+        {
+            outcome = result.Outcome,
+            said = result.Said,
+            detail = result.Detail,
+        }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 
     /// <summary>The sound cards ALSA knows, as device names the audio setting takes.</summary>

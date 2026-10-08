@@ -238,6 +238,18 @@ Not tested yet: this is from FBB 7.0.11's documentation and source.
 
 4. In the receiver's config use `"type": "fbb"`, FBB's host and port, and the password. The receiver logs in as `.Q0CAST`: the dot asks FBB for a binary session, without which FBB would mangle the compressed transfers.
 
+### Testing the login
+
+The settings page's **Test BBS login** button tries the host, port, login and password shown (or typed in but not yet saved), the same way the receiver logs in to send mail, but exchanges no mail: it connects, logs in, enters the BBS command, and stops once it knows how far it got. It says plainly:
+
+- logged in as a forwarding partner: the login works;
+- the password is wrong;
+- the login works but is not set up as a BBS forwarding partner, such as Q0CAST added to the Telnet port but not to the mail configuration's Users;
+- the BBS could not be reached, because the host or port refused the connection or never answered;
+- something else, with the BBS's own first line of reply.
+
+Leave the password field empty to test with the one already saved. The button never saves anything, and the password is never shown back, logged, or sent anywhere other than the BBS you asked it to try.
+
 ## The status page
 
 http://127.0.0.1:8130/ shows:
@@ -255,7 +267,7 @@ http://127.0.0.1:8130/ shows:
 - the bulletins being sent, how many pieces of each have arrived, and what the BBS said about each;
 - the mail this receiver holds (see [Mail](#mail));
 - the daily report, if you have turned it on: the last one as sent, what your BBS said, and when the next goes (see [Sending a daily report](#sending-a-daily-report));
-- the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you.
+- the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too, but it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you. A **Test BBS login** button tries the login shown without exchanging any mail (see [Testing the login](#testing-the-login)).
 
 On this machine only, the page answers to `localhost` and nothing else.
 

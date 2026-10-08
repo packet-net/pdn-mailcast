@@ -392,6 +392,127 @@ public class StatusPageTests
     }
 
     [Fact]
+    public async Task TestBbs_GoodPassword_SaysOkAndNeverReturnsIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs(); // default password "secret", matching Config()'s saved Bbs.Password
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+        string body = await answer.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.DoesNotContain("secret", body, StringComparison.Ordinal);
+        var json = JsonSerializer.Deserialize<JsonElement>(body);
+        Assert.Equal("ok", json.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("detail").ValueKind);
+        // No mail was exchanged.
+        Assert.Empty(bbs.Taken);
+    }
+
+    [Fact]
+    public async Task TestBbs_WrongPassword_SaysSo()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs();
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port, password = "nope" });
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("wrongPassword", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_NotSetUpAsAPartner_SaysSo()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs { NotAPartner = true };
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("notForwardingPartner", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_NothingListening_SaysItCannotReachIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int closedPort = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = closedPort, password = "secret" });
+
+        var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("unreachable", json.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public async Task TestBbs_IsRateLimited()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await using var bbs = new FakeBbs();
+
+        var first = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+        var second = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.NotNull(second.Headers.RetryAfter);
+    }
+
+    [Fact]
+    public async Task TestBbs_FromAnotherSite_IsRefused()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        using var foreign = new HttpRequestMessage(HttpMethod.Post, "api/bbs/test") { Content = JsonContent.Create(new { host = "127.0.0.1", port = 1 }) };
+        foreign.Headers.Add("Origin", "http://evil.example");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(foreign)).StatusCode);
+    }
+
+    [Fact]
+    public async Task TestBbs_OnAPageWithAPassword_NeedsIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path, password: "letmein");
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var without = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = 1 });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, without.StatusCode);
+    }
+
+    [Fact]
     public async Task PageWithAPassword_AsksForIt()
     {
         using var dir = new TempDirectory();

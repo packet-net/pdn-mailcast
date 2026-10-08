@@ -52,6 +52,16 @@ internal sealed class FakeBbs : IAsyncDisposable
     /// <summary>Drop the connection straight after the first transfer, before answering it.</summary>
     public bool HangUpAfterTransfer { get; set; }
 
+    /// <summary>
+    /// Behave as a login that is a working Telnet user but not set up as a BBS forwarding
+    /// partner: after a correct password, answer as LinBPQ does to a brand new login (its own
+    /// SID, then asking for a name) instead of the forwarding banner, and then hang up.
+    /// </summary>
+    public bool NotAPartner { get; set; }
+
+    /// <summary>Answer a correct password with one unrecognisable line, then hang up.</summary>
+    public string? Garbled { get; set; }
+
     private async Task AcceptAsync()
     {
         while (!_stop.IsCancellationRequested)
@@ -101,7 +111,19 @@ internal sealed class FakeBbs : IAsyncDisposable
                     return;
                 }
 
+                if (Garbled is { } garbled)
+                {
+                    await stream.WriteAsync(Encoding.Latin1.GetBytes(garbled), _stop.Token);
+                    return;
+                }
+
                 await stream.WriteAsync(Encoding.Latin1.GetBytes("TST:GB7TST} Connected to BBS\r"), _stop.Token);
+                if (NotAPartner)
+                {
+                    await stream.WriteAsync(Encoding.Latin1.GetBytes("[PDN-0.1.0-M$]\rPlease enter your Name\r>\r"), _stop.Token);
+                    return;
+                }
+
                 var session = new FbbSession(new FbbSessionConfig { Role = FbbRole.Answerer, OwnCallsign = "GB7TST" }, Queued);
                 await ApplyAsync(stream, session, session.Advance(new FbbStart()));
                 if (pending.Count > 0)

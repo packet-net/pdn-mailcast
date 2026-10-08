@@ -260,6 +260,11 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
         <label>Password <input id="password" type="password" autocomplete="new-password"></label>
       </div>
       <div class="row">
+        <button type="button" id="testBbs">Test BBS login</button>
+        <div id="testBbsResult" class="muted"></div>
+      </div>
+      <div class="muted">Tries logging in with the host, port, login and password above (whichever of those you haven't typed over use the saved ones), the same way the receiver does to send mail, but sends and takes none. Leave the password empty to test with the one already saved.</div>
+      <div class="row">
         <label>New page password <input id="pagePassword" type="password" autocomplete="new-password"></label>
         <label id="currentPageLabel">Current page password <input id="currentPagePassword" type="password" autocomplete="current-password"></label>
       </div>
@@ -891,6 +896,19 @@ $("audioKind").addEventListener("change", () => {
   if (k === "ubersdr" && !v.value.startsWith("ubersdr:")) v.value = "ubersdr:wessex.zapto.org";
   if (k === "wav" && !v.value.startsWith("wav:")) v.value = "wav:/path/to/recording.wav";
   if (k === "alsa" && (v.value.startsWith("ubersdr:") || v.value.startsWith("wav:"))) v.value = settings && settings.soundCards[0] || "plughw:CARD=Device,DEV=0";
+});
+$("testBbs").addEventListener("click", async () => {
+  $("testBbs").disabled = true;
+  $("testBbsResult").textContent = "Testing...";
+  const form = {
+    type: $("type").value, host: $("host").value, port: Number($("port").value),
+    login: $("login").value, password: $("password").value, command: $("command").value,
+  };
+  const r = await api("api/bbs/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+  $("testBbs").disabled = false;
+  if (!r.ok) { $("testBbsResult").innerHTML = `<span class="bad">${esc(r.error)}</span>`; return; }
+  const said = r.body.detail ? `${r.body.said} The BBS said: "${r.body.detail}"` : r.body.said;
+  $("testBbsResult").innerHTML = `<span class="${r.body.outcome === "ok" ? "good" : "bad"}">${esc(said)}</span>`;
 });
 $("settings").addEventListener("submit", async e => {
   e.preventDefault();
