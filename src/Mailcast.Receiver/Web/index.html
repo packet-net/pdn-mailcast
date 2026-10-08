@@ -523,11 +523,13 @@ function optIn(s) {
   $("optInSave").disabled = !$("optInBox").checked;
 }
 async function saveFeedback(enabled, callsign) {
-  if (!settings) await loadSettings();
-  if (!settings) return { ok: false, error: "Cannot load the settings." };
-  const b = settings.bbs;
-  /* Everything else as it is saved now: an empty password keeps the BBS's. */
-  const form = { audio: settings.audio, type: b.type, host: b.host, port: b.port, login: b.login, password: "", command: b.command,
+  /* Everything else as it is saved now, read again just before: a change made since this page
+     loaded (in another browser, or the config file) is not put back. An empty password keeps the
+     BBS's, and "sources" left out keeps the callsigns accepted. */
+  const now = await api("api/settings");
+  if (!now.ok) return { ok: false, error: `Cannot load the settings: ${now.error}` };
+  const c = now.body, b = c.bbs;
+  const form = { audio: c.audio, type: b.type, host: b.host, port: b.port, login: b.login, password: "", command: b.command,
     feedback: { enabled, callsign } };
   const r = await api("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
   if (r.ok) { await loadSettings(); refresh(); }

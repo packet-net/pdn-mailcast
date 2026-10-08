@@ -75,6 +75,13 @@ public sealed record SentReport
     /// <summary>Its BID (MID).</summary>
     public string Bid { get; init; } = "";
 
+    /// <summary>
+    /// The callsign it is from, as when it was made: kept, so that one offered again goes from the
+    /// same callsign as its title and BID even if the setting has changed since. Null in a
+    /// feedback.json from before this was kept.
+    /// </summary>
+    public string? From { get; init; }
+
     /// <summary>When it was last offered to the BBS.</summary>
     public DateTimeOffset? SentAt { get; init; }
 
@@ -440,6 +447,7 @@ public sealed class FeedbackService
                 Title = report.Title,
                 Body = report.Body,
                 Bid = Bid(settings.From, ReceiverId(), day),
+                From = settings.From,
                 Answer = FeedbackAnswer.Pending,
             };
             Save();
@@ -490,8 +498,8 @@ public sealed class FeedbackService
     private async Task SendAsync(SentReport report, CancellationToken cancellation)
     {
         var now = _time.GetUtcNow();
-        var settings = _sources.Settings();
-        string from = settings?.From ?? "";
+        // The callsign it was made with, which its title and BID name, not the setting now.
+        string from = report.From is { Length: > 0 } made ? made : _sources.Settings()?.From ?? "";
         var mail = new Bulletin('P', from, FeedbackSettings.To, FeedbackSettings.At, report.Bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds()), [], report.Body);
         DeliveryOutcome outcome;

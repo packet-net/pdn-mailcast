@@ -249,6 +249,28 @@ public class FeedbackTests
     }
 
     [Fact]
+    public async Task Retry_AfterTheCallsignChanged_GoesFromTheCallsignItWasMadeWith()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        rig.Bbs.Answers.Enqueue(DeliveryVerdict.Deferred);
+        await rig.ListenAsync(service, Day, only: 1);
+        await rig.AtAsync(service, ReportAt);
+        Assert.Equal(FeedbackAnswer.Deferred, service.Last!.Answer);
+
+        // Changed on the status page while it waits; across a restart too.
+        rig.Settings = new FeedbackSettings { Enabled = true, Callsign = "M0XYZ" };
+        var restarted = rig.Start();
+        await rig.AtAsync(restarted, ReportAt.AddHours(1));
+
+        Assert.Equal(2, rig.Bbs.Sent.Count);
+        var again = rig.Bbs.Sent[1];
+        Assert.Equal(("G4ABC", rig.Bbs.Sent[0].Bid, "MCR G4ABC 2026-10-06"), (again.From, again.Bid, again.Title));
+        Assert.Equal(FeedbackAnswer.Accepted, restarted.Last!.Answer);
+    }
+
+    [Fact]
     public void Retries_WaitLongerEachTime_AndAtMostSixADay()
     {
         var t = new DateTimeOffset(2026, 10, 6, 0, 30, 0, TimeSpan.Zero);
