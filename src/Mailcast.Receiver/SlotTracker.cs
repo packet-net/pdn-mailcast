@@ -17,6 +17,19 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
     /// <summary>The waveform GB7RDG's directory said this slot went out on, if a directory completed in it.</summary>
     public string? ListedWaveform { get; init; }
 
+    /// <summary>
+    /// Issue #49: whether a directory completed while this slot was tracked, so the receiver
+    /// knows what is in that day's rotation. Set even when the directory does not say its
+    /// waveform (so <see cref="ListedWaveform"/> stays null).
+    /// </summary>
+    public bool DirectoryHeard { get; init; }
+
+    /// <summary>
+    /// Issue #49: whether the probe audio after this slot's tone (used for the channel
+    /// measurement when no burst decodes) has been captured.
+    /// </summary>
+    public bool ProbeCaptured { get; init; }
+
     /// <summary>The waveform most of the slot's frames came on, <c>mixed</c> if two or more tie for most, or null if none is known.</summary>
     public string? Waveform
     {
@@ -181,15 +194,23 @@ public sealed class SlotTracker
     /// </summary>
     public void OnDirectory(string? mode)
     {
-        if (mode is null)
-        {
-            return;
-        }
         lock (_gate)
         {
             if (_current is not null)
             {
-                _current = _current with { ListedWaveform = mode };
+                _current = _current with { DirectoryHeard = true, ListedWaveform = mode ?? _current.ListedWaveform };
+            }
+        }
+    }
+
+    /// <summary>Issue #49: the probe audio after the slot's tone has been captured.</summary>
+    public void OnProbeCaptured()
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = _current with { ProbeCaptured = true };
             }
         }
     }

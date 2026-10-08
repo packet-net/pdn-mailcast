@@ -47,7 +47,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place);
         if (config.Rig is not null)
         {
-            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks);
+            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks, EarlyEndReason);
         }
         ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
@@ -186,6 +186,57 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>Whether the retuner runs the hooks, in step with its own work: it is retuning the radio the audio comes from.</summary>
     internal bool RetunerRunsHooks => Retuner is not null && AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa;
+
+    /// <summary>
+    /// Issue #49: the probe after a slot's tone is captured within about this long of the slot's
+    /// start (the tone, <see cref="OnAir.ToneSeconds"/>, then up to
+    /// <see cref="CapturedProbe.AfterSeconds"/> of audio after it, with a little margin for
+    /// processing). Past it, ending the window early no longer waits for a probe that is not coming.
+    /// </summary>
+    internal static readonly TimeSpan ProbeCaptureWindow = TimeSpan.FromSeconds(OnAir.ToneSeconds + CapturedProbe.AfterSeconds + 5);
+
+    /// <summary>Issue #49: how long since the last frame before a window may end early, in case a burst is still to come.</summary>
+    internal static readonly TimeSpan QuietBeforeEarlyEnd = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Issue #49: why the listening window for the slot starting at <paramref name="slotStart"/>
+    /// can end now, before its usual close; null while it should keep going. Conservative:
+    /// anything unknown or incomplete, or no slot tracked yet matching <paramref name="slotStart"/>,
+    /// keeps it open.
+    /// </summary>
+    internal string? EarlyEndReason(DateTimeOffset slotStart)
+    {
+        var slot = Slots.Last;
+        if (slot is null || slot.Scheduled != slotStart)
+        {
+            return null;
+        }
+        if (!slot.DirectoryHeard)
+        {
+            // The receiver does not yet know what is in today's rotation.
+            return null;
+        }
+        var (directory, progress) = Intake.Progress();
+        if (directory is null || progress.Any(p => !p.Complete))
+        {
+            // A bulletin, a propagation reading, or the directory itself is not complete yet.
+            return null;
+        }
+        var now = _time.GetUtcNow();
+        if (!slot.ProbeCaptured && now - slot.Started < ProbeCaptureWindow)
+        {
+            // The probe used for the channel measurement when no burst decodes may still be coming.
+            return null;
+        }
+        var quiet = now - (slot.LastFrame ?? slot.Started);
+        if (quiet < QuietBeforeEarlyEnd)
+        {
+            // A burst may still be coming; be conservative while the head end may send something new.
+            return null;
+        }
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for {quiet.TotalSeconds:F0} s");
+    }
 
     /// <summary>
     /// The listening window the hooks run around, in progress at <paramref name="at"/> or else
@@ -509,6 +560,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // lengthen and shorten.
                 var schedule = Schedule;
                 var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule);
+                if (slot == EarlyEndFinished)
+                {
+                    // Issue #49: this window was closed early, before its usual end; it is not
+                    // reopened for the rest of it, same as if it had run to its usual close.
+                    (opens, closes, slot) = ListeningWindow.Next(closes, schedule);
+                }
                 string words = ListeningWindow.Describe(schedule, DateOnly.FromDateTime(slot.UtcDateTime));
                 if (words != described)
                 {
@@ -552,7 +609,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // mid-session is still never overlapped.
                 Func<DateTimeOffset, DateTimeOffset>? recomputeCloses = !listenNow ? null
                     : now => ListenNow.ActiveUntil(now, ListeningWindow.Next(now, Schedule).Opens) ?? now;
-                _ = CloseAtAsync(opens, closes, recomputeCloses, closeAt, restart.Token);
+                _ = CloseAtAsync(opens, closes, slot, recomputeCloses, closeAt, restart.Token);
             }
 
             using var window = closeAt;
@@ -643,22 +700,45 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     private static TimeSpan Shorter(TimeSpan a, TimeSpan b) => a < b ? (a < TimeSpan.Zero ? TimeSpan.Zero : a) : b;
 
+    /// <summary>How often a web SDR's open window is checked for ending early (issue #49).</summary>
+    internal static readonly TimeSpan EarlyEndPoll = TimeSpan.FromSeconds(15);
+
+    private DateTimeOffset? _earlyEndFinished;
+
     /// <summary>
-    /// Cancels <paramref name="close"/> once the clock reads <paramref name="closes"/>, or is put
-    /// back before <paramref name="opens"/>, looking at it every minute. <paramref name="recomputeCloses"/>,
-    /// for a "Listen now" session (issue #57), is asked for a fresh <paramref name="closes"/>
-    /// each time, and wakes this at once if the schedule changes mid-session, so the session
-    /// never overlaps a window that has since moved earlier.
+    /// Issue #49: the most recent web SDR slot whose window was closed early, before its usual
+    /// end; it is not reopened for the rest of that window, the same as one that ran to its usual
+    /// close.
     /// </summary>
-    private async Task CloseAtAsync(DateTimeOffset opens, DateTimeOffset closes, Func<DateTimeOffset, DateTimeOffset>? recomputeCloses, CancellationTokenSource close, CancellationToken cancellation)
+    private DateTimeOffset? EarlyEndFinished
+    {
+        get { lock (_gate) { return _earlyEndFinished; } }
+        set { lock (_gate) { _earlyEndFinished = value; } }
+    }
+
+    /// <summary>
+    /// Cancels <paramref name="close"/> once the clock reads <paramref name="closes"/>, it is put
+    /// back before <paramref name="opens"/>, or (issue #49) <paramref name="slot"/>'s window can
+    /// end early; looking at it every minute, or <see cref="EarlyEndPoll"/> if sooner.
+    /// <paramref name="recomputeCloses"/>, for a "Listen now" session (issue #57), is asked for a
+    /// fresh <paramref name="closes"/> each time, and wakes this at once if the schedule changes
+    /// mid-session, so the session never overlaps a window that has since moved earlier.
+    /// </summary>
+    private async Task CloseAtAsync(DateTimeOffset opens, DateTimeOffset closes, DateTimeOffset slot, Func<DateTimeOffset, DateTimeOffset>? recomputeCloses, CancellationTokenSource close, CancellationToken cancellation)
     {
         try
         {
             while (_time.GetUtcNow() >= opens && _time.GetUtcNow() < closes)
             {
+                if (EarlyEndReason(slot) is { } why)
+                {
+                    _log($"audio: ending the {slot.UtcDateTime:HH:mm} UTC slot's window early: {why}");
+                    EarlyEndFinished = slot;
+                    break;
+                }
                 if (recomputeCloses is null)
                 {
-                    var tick = Task.Delay(Shorter(closes - _time.GetUtcNow(), ClockCheck), _time, cancellation);
+                    var tick = Task.Delay(Shorter(Shorter(closes - _time.GetUtcNow(), ClockCheck), EarlyEndPoll), _time, cancellation);
                     ClockWaiting?.Invoke();
                     await tick.ConfigureAwait(false);
                     continue;
@@ -785,6 +865,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         };
         pipeline.ProbeCaptured += probe =>
         {
+            Slots.OnProbeCaptured();
             if (ChannelSlot(probe.Heard, ref recording) is { } slot)
             {
                 ChannelWatch.OfferProbe(probe, slot);

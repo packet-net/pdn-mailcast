@@ -158,6 +158,57 @@ public class SlotTrackerTests
     }
 
     [Fact]
+    public void OnDirectory_SetsDirectoryHeard_EvenWithoutAWaveform()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+
+        slots.OnDirectory(null);
+
+        Assert.True(slots.Last!.DirectoryHeard);
+        Assert.Null(slots.Last.ListedWaveform);
+    }
+
+    [Fact]
+    public void OnDirectory_WithAWaveform_SetsBothAndKeepsTheWaveformOnANextCallWithout()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+
+        slots.OnDirectory("ms110d-wn4");
+        slots.OnDirectory(null);
+
+        Assert.True(slots.Last!.DirectoryHeard);
+        Assert.Equal("ms110d-wn4", slots.Last.ListedWaveform);
+    }
+
+    [Fact]
+    public void OnDirectory_WithNoSlotTrackedYet_DoesNothing()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+
+        slots.OnDirectory("ms110d-wn4");
+
+        Assert.Null(slots.Last);
+    }
+
+    [Fact]
+    public void OnProbeCaptured_SetsTheFlagOnTheSlotInProgress()
+    {
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        Assert.False(slots.Last!.ProbeCaptured);
+
+        slots.OnProbeCaptured();
+
+        Assert.True(slots.Last!.ProbeCaptured);
+    }
+
+    [Fact]
     public void Schedule_LatestAndNearestStart()
     {
         Assert.Equal(At(13, 0), Hourly.LatestStart(At(13, 0)));

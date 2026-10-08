@@ -57,7 +57,8 @@ public sealed partial class RetunerTests
             BpqNodeSettings? bpq = null,
             Func<BpqNodeSettings, BpqNodeSettings>? adjust = null,
             SlotSchedule? schedule = null,
-            HooksSettings? hooks = null)
+            HooksSettings? hooks = null,
+            Func<DateTimeOffset, string?>? earlyEnd = null)
         {
             _ownFakes = rig is null;
             Rig = rig ?? new FakeRigctld(PacketDialHz, "USB", 2400);
@@ -93,7 +94,7 @@ public sealed partial class RetunerTests
                 Log.Enqueue(line);
                 Events.Enqueue(line);
             });
-            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks);
+            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks, earlyEnd);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
             Retuner.Rig.Changed += RigChanges.Enqueue;
         }

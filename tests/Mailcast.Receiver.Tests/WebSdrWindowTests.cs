@@ -457,6 +457,62 @@ public class WebSdrWindowTests
     }
 
     [Fact]
+    public async Task EarlyEnd_WebSdr_ClosesBeforeTheUsualEnd_OnceEverythingIsHeardAndQuiet()
+    {
+        // Open at 12:01, in the 12:00 slot's window (opens 11:58, closes 12:12).
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero));
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        // The directory and its one bulletin are heard, and the probe is captured.
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            rig.Host.Intake.Offer(frame);
+        }
+        await rig.Host.Intake.DrainAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        rig.Host.Slots.OnProbeCaptured();
+        Assert.False(input.Disposed);
+        Assert.NotNull(rig.Host.Intake.Progress().Directory);
+        Assert.All(rig.Host.Intake.Progress().Progress, p => Assert.True(p.Complete));
+
+        // Once it has been quiet for a minute, the window closes well before its usual 12:12.
+        for (int i = 0; i < 6 && !input.Disposed; i++)
+        {
+            rig.Clock.Advance(ReceiverHost.EarlyEndPoll);
+            await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(input.Disposed);
+        Assert.Contains(rig.Log, l => l.Contains("ending the 12:00 UTC slot's window early", StringComparison.Ordinal));
+        // Closed well ahead of the usual 12:12 end, ready for the next slot it listens to.
+        Assert.Contains("closed until 13:58 UTC, ready for the 14:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EarlyEnd_WebSdr_NeverFiresWhileABulletinInTheDirectoryIsStillIncomplete()
+    {
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero));
+        var input = await rig.Inputs.Reader.ReadAsync();
+        await rig.Waits.Reader.ReadAsync();
+
+        // Only the directory frame (always first) and one piece of a bulletin that needs many:
+        // the directory lists a bulletin that is not complete here.
+        var frames = Samples.Frames([Samples.Bulletin(1, bodyLines: 200)]);
+        Assert.True(frames.Count >= 8);
+        rig.Host.Intake.Offer(frames[0]);
+        rig.Host.Intake.Offer(frames[1]);
+        await rig.Host.Intake.DrainAsync(CancellationToken.None);
+        rig.Host.Slots.OnProbeCaptured();
+
+        rig.Clock.Advance(ReceiverHost.QuietBeforeEarlyEnd + ReceiverHost.EarlyEndPoll);
+        await rig.Waits.Reader.ReadAsync();
+
+        // Still the usual window: closed at 12:12, not sooner.
+        Assert.False(input.Disposed);
+        Assert.DoesNotContain(rig.Log, l => l.Contains("ending the 12:00 UTC slot's window early", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Page_AsksForTheSpectrogramOnlyWhileTheAudioIsLive_AndExplainsOtherwise()
     {
         // The page is a file, not a program this suite can run: these check that its logic is the one described.
