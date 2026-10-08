@@ -25,10 +25,10 @@ sudo apt install pdn-mailcast-receiver
    Start LinBPQ again.
 
 2. In LinBPQ's web page, open **Mail Mgmt**:
-   - under **Users**, add **Q0CAST** and tick **BBS**;
-   - on Q0CAST's **Forwarding** page, tick **Allow Blocked**, **Allow Compressed** and **Use B1 Protocol**, and leave everything else empty.
+   - under **Users**, add **Q0CAST** and tick **BBS** (makes it a BBS forwarding partner rather than an ordinary terminal user);
+   - on Q0CAST's **Forwarding** page, tick **FBB Blocked** (forward in FBB's binary blocks, not line-by-line text), **Allow Binary** (LinBPQ's label for allowing compressed forwarding; blocked forwarding needs this too) and **Use B1 Protocol** (the simpler of FBB's two binary protocols). Leave the TO/AT/TIMES/Connect Script boxes, both HR Routes boxes, BBS HA, Enable Forwarding, Request Reverse and everything else unticked and empty: Q0CAST never needs LinBPQ to call it, because the receiver always calls in.
 
-   Save both.
+   Click **Update** on each page to save it.
 
 3. Put the password in the receiver's config:
 

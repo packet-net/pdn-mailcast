@@ -212,9 +212,9 @@ Tested against LinBPQ 6.0.25.41.
 
    The receiver must use the FBBPORT, not the ordinary telnet port, because forwarding is binary. Leave the fourth field (the command run at login) empty: the receiver sends `BBS` itself. Restart LinBPQ.
 
-2. In the mail configuration (the web page's Mail Mgmt, or BPQMail's configuration), add a user **Q0CAST** and tick **BBS**.
+2. In the mail configuration (the web page's Mail Mgmt, or BPQMail's configuration), add a user **Q0CAST** and tick **BBS**, so it's a forwarding partner rather than an ordinary terminal user.
 
-3. On Q0CAST's forwarding page, tick **Allow Blocked**, **Allow Compressed** and **Use B1 Protocol**. Leave the TO, AT and HR boxes empty, so nothing is ever queued for it. It does not need to be enabled for forwarding, because LinBPQ never has to call it.
+3. On Q0CAST's forwarding page, tick **FBB Blocked** (forward in FBB's binary blocks, not line-by-line text), **Allow Binary** (LinBPQ's label for allowing compressed forwarding, which blocked forwarding also needs) and **Use B1 Protocol** (the simpler of FBB's two binary protocols). Leave the TO, AT, TIMES, Connect Script and HR Routes boxes empty, so nothing is ever queued for it, and leave Enable Forwarding, Request Reverse and the rest unticked. It does not need to be enabled for forwarding, because LinBPQ never has to call it. Click **Update** to save.
 
 4. Put the same password in the receiver's config, and `"port": 8011`.
 
