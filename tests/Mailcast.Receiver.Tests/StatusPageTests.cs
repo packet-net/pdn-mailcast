@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
+using Mailcast.Receiver.Delivery;
 using Mailcast.Receiver.Web;
 
 namespace Mailcast.Receiver.Tests;
@@ -77,6 +78,142 @@ public class StatusPageTests
         Assert.Equal("secret", saved.Bbs.Password);
         Assert.Equal("ubersdr:wessex.zapto.org", saved.Audio);
         Assert.Equal(saved, host.Config);
+    }
+
+    private static object FeedbackForm(bool enabled, string? callsign) =>
+        new { audio = "wav:/nonexistent.wav", type = "linBpq", host = "127.0.0.1", port = 8011, login = "Q0CAST", password = "", command = "BBS", feedback = new { enabled, callsign } };
+
+    [Fact]
+    public async Task DailyReport_TurnedOnAndOffFromThePage_IsSavedAndInForceAtOnce()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, path) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        // Off with a BBS: the page offers it.
+        var shown = await http.GetFromJsonAsync<JsonElement>("api/settings");
+        Assert.False(shown.GetProperty("feedback").GetProperty("enabled").GetBoolean());
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.False(status.GetProperty("feedback").GetProperty("enabled").GetBoolean());
+        Assert.True(status.GetProperty("bbs").GetProperty("reachable").GetBoolean());
+
+        // From another site it is refused, like any other change of settings.
+        using var foreign = new HttpRequestMessage(HttpMethod.Post, "api/settings") { Content = JsonContent.Create(FeedbackForm(true, "G4ABC")) };
+        foreign.Headers.Add("Origin", "http://evil.example");
+        Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(foreign)).StatusCode);
+        Assert.Null(ReceiverConfig.Load(path).Feedback);
+
+        var on = await http.PostAsJsonAsync("api/settings", FeedbackForm(true, " g4abc "));
+
+        Assert.Equal(HttpStatusCode.OK, on.StatusCode);
+        Assert.Equal(new Feedback.FeedbackSettings { Enabled = true, Callsign = "G4ABC" }, ReceiverConfig.Load(path).Feedback);
+        Assert.Equal(new Feedback.FeedbackSettings { Enabled = true, Callsign = "G4ABC" }, host.Config.Feedback);
+        // No restart: the report service reads the settings in force.
+        status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.True(status.GetProperty("feedback").GetProperty("enabled").GetBoolean());
+        shown = await http.GetFromJsonAsync<JsonElement>("api/settings");
+        Assert.True(shown.GetProperty("feedback").GetProperty("enabled").GetBoolean());
+        Assert.Equal("G4ABC", shown.GetProperty("feedback").GetProperty("callsign").GetString());
+        // The other settings are as they were.
+        Assert.Equal("secret", ReceiverConfig.Load(path).Bbs.Password);
+
+        // Off in one click: no callsign given, the one set is kept for next time.
+        var off = await http.PostAsJsonAsync("api/settings", FeedbackForm(false, ""));
+
+        Assert.Equal(HttpStatusCode.OK, off.StatusCode);
+        Assert.Equal(new Feedback.FeedbackSettings { Enabled = false, Callsign = "G4ABC" }, ReceiverConfig.Load(path).Feedback);
+        status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.False(status.GetProperty("feedback").GetProperty("enabled").GetBoolean());
+
+        // Saving the other settings without it leaves it as it is.
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("api/settings", Form())).StatusCode);
+        Assert.Equal(new Feedback.FeedbackSettings { Enabled = false, Callsign = "G4ABC" }, ReceiverConfig.Load(path).Feedback);
+    }
+
+    [Theory]
+    [InlineData("", "Enter your callsign")]
+    [InlineData(null, "Enter your callsign")]
+    [InlineData("N0CALL", "does not look like a callsign")]
+    [InlineData("G4ABC/P", "does not look like a callsign")]
+    [InlineData("G4ABC-1", "does not look like a callsign")]
+    [InlineData("G4ABCDE", "does not look like a callsign")]
+    public async Task DailyReport_WithACallsignItCannotGoFrom_IsRefusedWithAReason(string? callsign, string expected)
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, path) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        var before = ReceiverConfig.Load(path);
+
+        var answer = await http.PostAsJsonAsync("api/settings", FeedbackForm(true, callsign));
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+        Assert.Contains(expected, (await answer.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString(), StringComparison.Ordinal);
+        Assert.Equal(before, ReceiverConfig.Load(path));
+        Assert.Null(host.Config.Feedback);
+    }
+
+    [Fact]
+    public async Task DailyReport_OnAPageWithAPassword_NeedsIt()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, path) = await StartAsync(dir.Path, password: "letmein");
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var without = await http.PostAsJsonAsync("api/settings", FeedbackForm(true, "G4ABC"));
+        Assert.Equal(HttpStatusCode.Unauthorized, without.StatusCode);
+        Assert.Null(ReceiverConfig.Load(path).Feedback);
+
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String("any:letmein"u8.ToArray()));
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("api/settings", FeedbackForm(true, "G4ABC"))).StatusCode);
+        Assert.True(ReceiverConfig.Load(path).Feedback!.Enabled);
+    }
+
+    /// <summary>The page offers the daily report only with a BBS to send it through: one that has answered, or not yet failed.</summary>
+    [Fact]
+    public void DailyReport_IsOfferedOnlyWithABbs()
+    {
+        var at = DateTimeOffset.Parse("2026-10-06T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        DeliveryRecord Said(DeliveryVerdict verdict) => new(at, "B1", "Title", verdict, null);
+        const string Refused = "cannot connect to 127.0.0.1:8011: Connection refused";
+
+        // Off with a BBS: nothing has failed, or it has answered before.
+        Assert.True(StatusPage.BbsReachable([], null, null));
+        Assert.True(StatusPage.BbsReachable([Said(DeliveryVerdict.Accepted)], null, Refused));
+        Assert.True(StatusPage.BbsReachable([Said(DeliveryVerdict.Deferred)], null, Refused));
+        Assert.True(StatusPage.BbsReachable([], new Feedback.SentReport { Answer = Feedback.FeedbackAnswer.Accepted }, Refused));
+        // Off without one: it has never answered, and the last session failed.
+        Assert.False(StatusPage.BbsReachable([], null, Refused));
+        Assert.False(StatusPage.BbsReachable([Said(DeliveryVerdict.NotOffered)], null, Refused));
+        Assert.False(StatusPage.BbsReachable([], new Feedback.SentReport { Answer = Feedback.FeedbackAnswer.Failed }, Refused));
+    }
+
+    [Fact]
+    public async Task DailyReport_Panel_IsOnThePage()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        string html = await http.GetStringAsync("/");
+
+        foreach (string part in new[]
+        {
+            "id=\"optIn\"", "Help the experiment:", "about 500 bytes a day. Nothing else is sent.", "Send a daily report", "Your callsign",
+            "Daily report to M0LTE: on", "Turn off", "docs/receiver.md#sending-a-daily-report",
+        })
+        {
+            Assert.Contains(part, html, StringComparison.Ordinal);
+        }
+        // Near the top: before the tiles.
+        Assert.True(html.IndexOf("id=\"optIn\"", StringComparison.Ordinal) < html.IndexOf("<main>", StringComparison.Ordinal));
     }
 
     [Fact]

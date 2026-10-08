@@ -228,12 +228,29 @@ public sealed class FeedbackService
             {
                 continue;
             }
-            if (ReportTime(schedule, day) is { } at && at > now)
+            if (ReportTime(schedule, day) is { } at && at > now && CanReport(day, now))
             {
                 return at;
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Whether there can be a report for <paramref name="day"/>: a slot of it has been noted, or
+    /// one it listens to is still to come. Not so for today when the report was turned on after
+    /// its last slot, so the next is tomorrow's.
+    /// </summary>
+    private bool CanReport(DateOnly day, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (_state.Days.Exists(d => d.Day == day && d.Slots.Count > 0))
+            {
+                return true;
+            }
+        }
+        return _sources.Listened(day).Any(slot => slot + Window > now);
     }
 
     /// <summary>When a day's report goes: <see cref="AfterLastSlot"/> after its last slot; null with no slot.</summary>
@@ -269,6 +286,12 @@ public sealed class FeedbackService
     /// <summary>One look at the clock: note the slot in progress, and send a report that is due.</summary>
     internal async Task TickAsync(CancellationToken cancellation)
     {
+        if (!Enabled && _said)
+        {
+            // Turned off from the status page, or by a config put in force without a restart.
+            _said = false;
+            _log("feedback: off. No daily report is sent");
+        }
         if (!Enabled || _sources.Schedule() is not { } schedule || _sources.Settings() is not { } settings)
         {
             return;
