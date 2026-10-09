@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace Mailcast.Receiver;
 
 /// <summary>One propagation mode in one measurement: a group of paths less than 0.6 ms apart.</summary>
-/// <param name="DelayMs">Its power-weighted delay after the first path, in ms.</param>
+/// <param name="DelayMs">Its power-weighted delay after the strongest mode, in ms; can be negative for a mode that arrived earlier (packet-net/pdn-mailcast#60).</param>
 /// <param name="PowerDb">Its power against the strongest mode's, in dB.</param>
 /// <param name="CentroidHz">The centre of its Doppler spectrum, in Hz, against the lock offset already taken out; null if it had none.</param>
 /// <param name="SpreadHz">Its Doppler spread, two standard deviations, in Hz; null if it could not be measured.</param>
@@ -16,13 +16,18 @@ internal sealed record PathPicture
     /// <summary>What measured it, as <see cref="ChannelSnapshots.Basis"/>.</summary>
     public required string Basis { get; init; }
 
-    /// <summary>The modes, earliest first.</summary>
+    /// <summary>
+    /// The modes, earliest first, named by delay after the strongest one: a mode that arrived
+    /// earlier has a negative delay here (packet-net/pdn-mailcast#60; ChannelReport.Summarise
+    /// is where a sidelobe seen consistently ahead of the strongest path, across a slot's
+    /// measurements, is told apart from one measurement's ordinary noise and left out).
+    /// </summary>
     public required IReadOnlyList<PictureMode> Modes { get; init; }
 
-    /// <summary>The first path's delay on the estimates' own delays (<see cref="ChannelSnapshots.Lag"/>), in seconds.</summary>
+    /// <summary>The strongest path's delay on the estimates' own delays (<see cref="ChannelSnapshots.Lag"/>), in seconds.</summary>
     public double FirstPathSeconds { get; init; }
 
-    /// <summary>The discrete paths fitted, in ms after the first.</summary>
+    /// <summary>The discrete paths fitted, in ms after the strongest path (even one that arrived earlier, so this can be negative).</summary>
     public required IReadOnlyList<double> PathsMs { get; init; }
 
     /// <summary>Which of <see cref="Modes"/> each path belongs to.</summary>
@@ -61,10 +66,10 @@ internal sealed record PathPicture
     /// <summary>Seconds of signal behind it.</summary>
     public double Seconds { get; init; }
 
-    /// <summary>The averaged delay profile, linear power against its peak, from <see cref="ProfileStartMs"/> after the first path in steps of <see cref="ProfileStepMs"/>.</summary>
+    /// <summary>The averaged delay profile, linear power against its peak, from <see cref="ProfileStartMs"/> after the strongest path in steps of <see cref="ProfileStepMs"/>.</summary>
     public required double[] Profile { get; init; }
 
-    /// <summary>Where <see cref="Profile"/> starts, ms after the first path.</summary>
+    /// <summary>Where <see cref="Profile"/> starts, ms after the strongest path.</summary>
     public double ProfileStartMs { get; init; }
 
     /// <summary>The step of <see cref="Profile"/>, in ms.</summary>
@@ -243,7 +248,15 @@ internal static class ChannelAnalysis
                 }
             }
         }
-        double first = tau[0];
+        // The modes are named by their delay after the strongest path, not whichever arrived
+        // first (packet-net/pdn-mailcast#60): over one measurement, a weak path a little ahead
+        // of the real signal is ordinary noise on the fit, not a processing sidelobe, so nothing
+        // is thrown away here (one measurement's modes can come out with the earliest one at a
+        // small negative delay; ChannelReport.Summarise is where a sidelobe seen consistently
+        // across a slot's measurements is told apart from that and left out).
+        int strongest = Array.IndexOf(pw, pw.Max());
+        int strongestGroup = groups.FindIndex(g => g.Contains(strongest));
+        double first = groups[strongestGroup].Sum(i => tau[i] * pw[i]) / groups[strongestGroup].Sum(i => pw[i]);
         for (int m = 0; m < groups.Count; m++)
         {
             var g = groups[m];
@@ -257,7 +270,6 @@ internal static class ChannelAnalysis
         var (allCentroid, allSpread) = Moments(allSpectrum, dt, windowSigma);
         allSpread = spreadKnown ? allSpread : null;
 
-        int strongest = Array.IndexOf(pw, pw.Max());
         double? coherence = CoherenceSeconds(full, strongest, s.Good, dt);
         double fade = FadeDepthDb(s);
 

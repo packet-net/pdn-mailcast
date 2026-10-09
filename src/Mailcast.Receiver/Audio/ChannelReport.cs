@@ -156,16 +156,30 @@ public sealed record ChannelReport
             return report with { Words = basis == ProbeChannel.Basis ? TooWeakProbe : TooLittle };
         }
         int n = pictures.Count;
-        // Later modes against each measurement's first, with their power and spread, and their
-        // Doppler shift against the measurement's strongest mode.
+        // Every mode against each measurement's strongest, with its power and spread, and its
+        // Doppler shift against that same strongest mode (packet-net/pdn-mailcast#60: naming
+        // modes after whichever arrived first, rather than the strongest, let a sidelobe ahead
+        // of the real signal shift every delay and so every hop label).
         var later = new List<(double Delay, double Power, double? Spread, double? Shift)>();
         foreach (var p in pictures)
         {
-            var m1 = p.Modes[0];
-            double? reference = p.Modes.MaxBy(m => m.PowerDb)!.CentroidHz;
-            foreach (var m in p.Modes.Skip(1))
+            int strongest = 0;
+            for (int i = 1; i < p.Modes.Count; i++)
             {
-                later.Add((m.DelayMs - m1.DelayMs, m.PowerDb, m.SpreadHz, m.CentroidHz - reference));
+                if (p.Modes[i].PowerDb > p.Modes[strongest].PowerDb)
+                {
+                    strongest = i;
+                }
+            }
+            var m1 = p.Modes[strongest];
+            for (int i = 0; i < p.Modes.Count; i++)
+            {
+                if (i == strongest)
+                {
+                    continue;
+                }
+                var m = p.Modes[i];
+                later.Add((m.DelayMs - m1.DelayMs, m.PowerDb, m.SpreadHz, m.CentroidHz - m1.CentroidHz));
             }
         }
         var clusters = new List<List<(double Delay, double Power, double? Spread, double? Shift)>>();
@@ -186,13 +200,16 @@ public sealed record ChannelReport
             new()
             {
                 DelayMs = 0,
-                PowerDb = Power(ChannelMaths.Median(pictures.Select(p => p.Modes[0].PowerDb))),
-                DopplerShiftHz = Rounded(ChannelMaths.Median(pictures.Select(p => (p.Modes[0].CentroidHz - p.Modes.MaxBy(m => m.PowerDb)!.CentroidHz) ?? double.NaN)), 2),
-                DopplerSpreadHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.Modes[0].SpreadHz ?? double.NaN)), 2),
+                PowerDb = Power(ChannelMaths.Median(pictures.Select(p => p.Modes.Max(m => m.PowerDb)))),
+                DopplerShiftHz = 0,
+                DopplerSpreadHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.Modes.MaxBy(m => m.PowerDb)!.SpreadHz ?? double.NaN)), 2),
                 SeenIn = n,
             },
         };
-        foreach (var c in clusters.Where(c => c.Count >= need))
+        // A cluster seen consistently ahead of the strongest path (a negative delay) cannot be a
+        // real longer hop, so it is a processing sidelobe, not a mode: left out here rather than
+        // reported with an invented, impossibly early "hop".
+        foreach (var c in clusters.Where(c => c.Count >= need && ChannelMaths.Median(c.Select(x => x.Delay)) >= 0))
         {
             modes.Add(new ChannelMode
             {
