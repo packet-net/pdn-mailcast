@@ -662,6 +662,7 @@ public sealed class StatusPage : IAsyncDisposable
         var config = _host.Config;
         var slot = _host.Slots.Last;
         var (directory, progress) = _host.Intake.Progress();
+        var mail = _host.Intake.Mail();
         double? liveTone = _host.Pipeline?.Tone.LiveFrequencyHz;
         return new
         {
@@ -749,6 +750,9 @@ public sealed class StatusPage : IAsyncDisposable
             bulletins = progress.Select(p =>
             {
                 var delivered = _host.Ledger.Latest(p.Entry.Bid);
+                // Issue #47: the rebuilt time is only known once it is held, waiting or archived.
+                var held = p.Complete ? mail.ById(p.Entry.ObjectId) : null;
+                var final = FinalAnswer(held, delivered);
                 return new
                 {
                     bid = p.Entry.Bid,
@@ -758,6 +762,10 @@ public sealed class StatusPage : IAsyncDisposable
                     needed = p.Needed,
                     delivery = delivered is null ? null : DeliveryService.Describe(delivered.Verdict),
                     deliveryShort = delivered is null ? null : DeliveryService.DescribeShort(delivered.Verdict),
+                    completedAt = held?.Completed,
+                    deliveredAt = final?.At,
+                    deliveredVerdict = final?.Verdict,
+                    deliveredDetail = final?.Detail,
                 };
             }),
             deliveries = _host.Ledger.Recent.Take(40).Select(r => new
@@ -1256,6 +1264,22 @@ public sealed class StatusPage : IAsyncDisposable
         };
     }
 
+    /// <summary>
+    /// The BBS's final answer for a bulletin on the progress list, if it has one: from the archive
+    /// copy, or from the delivery record when no copy is kept. One back in the outbox, sent again,
+    /// has none yet, whatever the BBS said the time before; nor does one only deferred.
+    /// </summary>
+    private static (DateTimeOffset At, Packet.Mailcast.BbsVerdict Verdict, string? Detail)? FinalAnswer(Packet.Mailcast.MailEntry? held, DeliveryRecord? delivered)
+    {
+        if (held is not null)
+        {
+            return held.Waiting || held.Verdict is not { } verdict ? null : (held.Time, verdict, held.Detail);
+        }
+        return delivered is { Verdict: DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Refused }
+            ? (delivered.Time, DeliveryService.Final(delivered.Verdict), delivered.Detail)
+            : null;
+    }
+
     /// <summary>One bulletin for the list: what it is, where it is, and what the BBS has said.</summary>
     private object MailView(Packet.Mailcast.MailEntry m)
     {
@@ -1304,6 +1328,9 @@ public sealed class StatusPage : IAsyncDisposable
             detail = m.Detail ?? last?.Detail,
             lastAttempt = last?.Time,
             nextAttempt = m.Waiting ? _host.Delivery.NextAttempt : null,
+            // Issue #47: when it was rebuilt, and (once archived) when the BBS answered, shown together.
+            completed = m.Completed,
+            delivered = m.Waiting ? (DateTimeOffset?)null : m.Time,
         };
     }
 

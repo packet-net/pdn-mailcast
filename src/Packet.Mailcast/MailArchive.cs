@@ -30,13 +30,18 @@ public enum BbsVerdict
 /// <param name="Time">When it went into the outbox, or, archived, when the BBS answered for it.</param>
 /// <param name="Verdict">What the BBS said, for an archived bulletin.</param>
 /// <param name="Detail">More about the answer, if the BBS gave any.</param>
+/// <param name="Completed">
+/// When the bulletin was rebuilt (went into the outbox), kept alongside <paramref name="Time"/> so
+/// that an archived entry still shows it, not only the BBS's answer time. Null for an archive file
+/// written before this was recorded; it means unknown, not zero.
+/// </param>
 public sealed record MailEntry(
     ulong ObjectId, bool Waiting, char Type, string Bid, string From, string To, string At, string Title,
-    DateTimeOffset Date, int Size, DateTimeOffset Time, BbsVerdict? Verdict, string? Detail)
+    DateTimeOffset Date, int Size, DateTimeOffset Time, BbsVerdict? Verdict, string? Detail, DateTimeOffset? Completed)
 {
-    internal static MailEntry Of(ulong objectId, Bulletin bulletin, int size, DateTimeOffset time, BbsVerdict? verdict, string? detail) =>
+    internal static MailEntry Of(ulong objectId, Bulletin bulletin, int size, DateTimeOffset time, BbsVerdict? verdict, string? detail, DateTimeOffset? completed) =>
         new(objectId, verdict is null, bulletin.Type, bulletin.Bid, bulletin.From, bulletin.To, bulletin.At, bulletin.Title,
-            bulletin.Date, size, time, verdict, detail);
+            bulletin.Date, size, time, verdict, detail, completed);
 }
 
 /// <summary>
@@ -47,6 +52,7 @@ public sealed class MailSnapshot
 {
     private readonly MailEntry[] _newestFirst;
     private readonly Dictionary<ulong, byte[]> _waiting;
+    private readonly Dictionary<ulong, MailEntry> _byId;
 
     /// <summary>Nothing held.</summary>
     public static readonly MailSnapshot Empty = new([], 0, []);
@@ -56,6 +62,7 @@ public sealed class MailSnapshot
         _newestFirst = newestFirst;
         Waiting = waiting;
         _waiting = waitingBytes;
+        _byId = newestFirst.ToDictionary(e => e.ObjectId);
     }
 
     /// <summary>How many bulletins are held in all.</summary>
@@ -82,6 +89,9 @@ public sealed class MailSnapshot
 
     /// <summary>A waiting bulletin as the outbox holds it, if it is waiting.</summary>
     internal byte[]? WaitingBytes(ulong objectId) => _waiting.GetValueOrDefault(objectId);
+
+    /// <summary>The entry for an object, whether waiting or archived, if it is held at all.</summary>
+    public MailEntry? ById(ulong objectId) => _byId.GetValueOrDefault(objectId);
 }
 
 /// <summary>
@@ -95,6 +105,7 @@ public sealed class MailSnapshot
 /// <code>
 /// Mailcast-Archive: 1
 /// Answered: 2026-10-05T12:00:00Z
+/// Completed: 2026-10-05T11:58:00Z  (when it was rebuilt; missing in a file from before this was kept)
 /// Verdict: accepted          (accepted, already-had or refused)
 /// Detail: ...                (only if there is more to say)
 ///
@@ -216,7 +227,7 @@ internal sealed class MailArchive
     /// bulletin the archive has as accepted (sent again, or offered twice after a crash) keeps
     /// accepted: the BBS has it either way, and accepted says more. Throws on a write that fails.
     /// </summary>
-    public void Add(ulong objectId, ReadOnlySpan<byte> serialized, Bulletin bulletin, BbsVerdict verdict, string? detail)
+    public void Add(ulong objectId, ReadOnlySpan<byte> serialized, Bulletin bulletin, BbsVerdict verdict, string? detail, DateTimeOffset completed)
     {
         if (!Enabled)
         {
@@ -228,11 +239,13 @@ internal sealed class MailArchive
             detail = "offered again; the BBS already had it";
         }
         var now = _time.GetUtcNow();
-        now = new DateTimeOffset(now.Ticks - (now.Ticks % TimeSpan.TicksPerSecond), TimeSpan.Zero);
+        now = Rounded(now);
+        completed = Rounded(completed);
         detail = OneLine(detail);
         var header = new StringBuilder()
             .Append(Magic).Append(": 1\n")
             .Append("Answered: ").Append(now.UtcDateTime.ToString(DateFormat, CultureInfo.InvariantCulture)).Append('\n')
+            .Append("Completed: ").Append(completed.UtcDateTime.ToString(DateFormat, CultureInfo.InvariantCulture)).Append('\n')
             .Append("Verdict: ").Append(Token(verdict)).Append('\n');
         if (detail is not null)
         {
@@ -247,9 +260,13 @@ internal sealed class MailArchive
         System.IO.Directory.CreateDirectory(_folder);
         DurableFile.WriteAtomically(PathOf(objectId), content, flush: _flush); // flushes the folder too
         Forget(objectId);
-        Index(MailEntry.Of(objectId, bulletin, serialized.Length, now, verdict, detail), content.Length);
+        Index(MailEntry.Of(objectId, bulletin, serialized.Length, now, verdict, detail, completed), content.Length);
         Prune();
     }
+
+    /// <summary>A time with no finer than one-second precision, which is all the header format carries.</summary>
+    private static DateTimeOffset Rounded(DateTimeOffset time) =>
+        new(time.Ticks - (time.Ticks % TimeSpan.TicksPerSecond), TimeSpan.Zero);
 
     /// <summary>
     /// Reads a held bulletin's file whole: its entry and the bulletin as stored. Safe from any
@@ -371,7 +388,7 @@ internal sealed class MailArchive
         {
             throw new FormatException("no end to the bulletin header in the first " + MaxHeaderBytes / 1024 + " KB");
         }
-        var (time, verdict, detail) = ArchiveFields(Bulletin.TextEncoding.GetString(span[..archiveEnd]));
+        var (time, completed, verdict, detail) = ArchiveFields(Bulletin.TextEncoding.GetString(span[..archiveEnd]));
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (string line in Bulletin.TextEncoding.GetString(span.Slice(bulletinStart, bulletinEnd)).Split('\n'))
         {
@@ -403,7 +420,7 @@ internal sealed class MailArchive
         }
         long size = length - bulletinStart;
         var entry = new MailEntry(objectId, false, type[0], fields["Bid"], fields["From"], fields["To"], fields["At"], fields["Title"],
-            date, (int)Math.Min(size, int.MaxValue), time, verdict, detail);
+            date, (int)Math.Min(size, int.MaxValue), time, verdict, detail, completed);
         return (entry, length);
     }
 
@@ -415,13 +432,17 @@ internal sealed class MailArchive
         {
             throw new FormatException("no end to the archive header");
         }
-        var (time, verdict, detail) = ArchiveFields(Bulletin.TextEncoding.GetString(bytes, 0, split));
+        var (time, completed, verdict, detail) = ArchiveFields(Bulletin.TextEncoding.GetString(bytes, 0, split));
         byte[] serialized = bytes[(split + 2)..];
         var bulletin = Bulletin.Parse(serialized);
-        return (MailEntry.Of(objectId, bulletin, serialized.Length, time, verdict, detail), serialized);
+        return (MailEntry.Of(objectId, bulletin, serialized.Length, time, verdict, detail, completed), serialized);
     }
 
-    private static (DateTimeOffset Time, BbsVerdict Verdict, string? Detail) ArchiveFields(string header)
+    /// <summary>
+    /// Reads the archive header's own fields. <c>Completed</c> is optional: a file written before
+    /// it was recorded, or one with an unparseable value, gives null rather than failing to read.
+    /// </summary>
+    private static (DateTimeOffset Time, DateTimeOffset? Completed, BbsVerdict Verdict, string? Detail) ArchiveFields(string header)
     {
         var fields = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (string line in header.Split('\n'))
@@ -446,7 +467,10 @@ internal sealed class MailArchive
         {
             throw new FormatException("no Verdict");
         }
-        return (time, verdict, fields.GetValueOrDefault("Detail"));
+        DateTimeOffset? completed = fields.TryGetValue("Completed", out var completedText)
+            && DateTimeOffset.TryParseExact(completedText, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var c)
+                ? c : null;
+        return (time, completed, verdict, fields.GetValueOrDefault("Detail"));
     }
 
     private static string Token(BbsVerdict verdict) => verdict switch

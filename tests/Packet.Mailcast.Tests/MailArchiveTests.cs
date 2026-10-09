@@ -46,7 +46,8 @@ public class MailArchiveTests
             Assert.All(mail, m => Assert.False(m.Waiting));
             Assert.Equal([BbsVerdict.Refused, BbsVerdict.AlreadyHad, BbsVerdict.Accepted], mail.Select(m => m.Verdict!.Value));
             Assert.Equal("FS R: no such  category", mail[0].Detail); // one line, whatever the BBS said
-            Assert.Equal(Start + TimeSpan.FromMinutes(2), mail[0].Time);
+            Assert.Equal(Start + TimeSpan.FromMinutes(2), mail[0].Time); // answered
+            Assert.All(mail, m => Assert.Equal(Start, m.Completed)); // all three rebuilt before any answer
             Assert.Equal(refused.Title, mail[0].Title);
             Assert.Equal(refused.Serialize().Length, mail[0].Size);
 
@@ -55,6 +56,37 @@ public class MailArchiveTests
             Assert.Equal(accepted.Serialize(), serialized);
         }
         Assert.Equal(3, Directory.EnumerateFiles(ArchiveFolder(dir), "*.mail").Count());
+    }
+
+    /// <summary>
+    /// A file from before issue #47, with no Completed line at all. It must load without
+    /// throwing, both at start-up (headers only) and when the whole file is read, and give
+    /// Completed as null (unknown) rather than guessing at some other time.
+    /// </summary>
+    [Fact]
+    public void OldArchiveFile_WithoutACompletedLine_LoadsWithCompletedUnknown()
+    {
+        using var dir = new TempDirectory();
+        var time = new ManualTime(Start);
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var bulletin = TestBulletins.Make(90, 1500);
+        ulong id = Rebuild(store, bulletin);
+        store.Acknowledge(bulletin.Bid, BbsVerdict.Accepted);
+        string file = Path.Combine(ArchiveFolder(dir), ObjectId.Format(id) + ".mail");
+        string text = File.ReadAllText(file, System.Text.Encoding.Latin1);
+        Assert.Contains("Completed: ", text, StringComparison.Ordinal); // the current format has one
+        text = System.Text.RegularExpressions.Regex.Replace(text, "Completed: [^\n]*\n", "");
+        File.WriteAllText(file, text, System.Text.Encoding.Latin1); // as a pre-#47 receiver would have written it
+
+        var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+
+        var fromHeader = Assert.Single(reopened.Mail.NewestFirst);
+        Assert.Null(fromHeader.Completed);
+        Assert.Equal(BbsVerdict.Accepted, fromHeader.Verdict);
+        Assert.Equal(Start, fromHeader.Time);
+        var (whole, serialized) = reopened.ReadMail(id)!.Value;
+        Assert.Null(whole.Completed); // reading the file whole agrees with the header-only read
+        Assert.Equal(bulletin.Serialize(), serialized);
     }
 
     [Fact]
