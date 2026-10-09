@@ -285,11 +285,14 @@ public class ChannelTests
         Assert.Equal(3, found!.Superframes);
         var p = ChannelAnalysis.Analyse(series!)!;
 
-        // Python: SNR 16.7 dB, floor -36.7 dB, RMS 0.282 ms, 2F +2.03 ms from the first path, -17.1 dB.
+        // Python: SNR 16.7 dB, floor -36.7 dB, RMS 0.282 ms, 2F +2.03 ms from the first path
+        // found, -17.1 dB. The C# picture (packet-net/pdn-mailcast#60) instead re-references
+        // every mode to the strongest path, which here sits a little later within its own mode
+        // than the single earliest tap Python measured from, hence the slightly smaller gap.
         Assert.Equal(16.7, p.SnrDb, 0.5);
         Assert.Equal(0.28, p.DelaySpreadMs, 0.02);
         Assert.Equal(2, p.Modes.Count);
-        Assert.Equal(2.03, p.Modes[1].DelayMs, 0.05);
+        Assert.Equal(1.93, p.Modes[1].DelayMs, 0.05);
         Assert.Equal(-17.1, p.Modes[1].PowerDb, 1.0);
 
         var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex);
@@ -326,6 +329,10 @@ public class ChannelTests
         double gap = PathGeometry.DelayMs(136, 2, 270) - PathGeometry.DelayMs(136, 1, 270);
         Assert.Equal(270, PathGeometry.HeightFromGap(136, gap)!.Value, 0.01);
         Assert.Null(PathGeometry.HeightFromGap(136, 20));
+        // A gap small enough to imply a height under 200 km is never reported (packet-net/pdn-mailcast#60):
+        // no height is better than an implausible one.
+        double tooSmall = PathGeometry.DelayMs(136, 2, 150) - PathGeometry.DelayMs(136, 1, 150);
+        Assert.Null(PathGeometry.HeightFromGap(136, tooSmall));
     }
 
     [Theory]
@@ -336,10 +343,89 @@ public class ChannelTests
     [InlineData(136, new[] { 0, 2.56, 3.51 }, new[] { "1F", "2F", null })]
     [InlineData(220, new[] { 0, 1.74, 2.44 }, new[] { "1F", "2F", null })]
     [InlineData(136, new[] { 0.0 }, new[] { "1F" })]
+    // CT 150, 534 km, 2026-10-08 11:00 UTC (packet-net/pdn-mailcast#60): a sidelobe at 0.89 ms,
+    // 12 dB too close after 1F to be a real 2F at a plausible F height, is left unlabelled; the
+    // true 2F is the one at 2.08 ms (the bug called the sidelobe "2F" at an implausible 188 km).
+    [InlineData(534, new[] { 0, 0.89, 2.08 }, new[] { "1F", null, "2F" })]
+    // CT 150, 534 km, 2026-10-08 13:00 UTC (packet-net/pdn-mailcast#60): at 534 km a real 2F is
+    // never less than about 1 ms after 1F, so +0.53 ms is too soon to be one and is left
+    // unlabelled (a sidelobe); +1.08 ms does fall where a 2F at a plausible F height would be, so
+    // it is named 2F. The bug paired +0.53 and +1.08 up as "1F" and "2F" instead and from their
+    // 0.55 ms gap invented an implausible 137 km reflection, below the F layer's 200 km floor.
+    [InlineData(534, new[] { 0, 0.53, 1.08 }, new[] { "1F", null, "2F" })]
     public void Labels_NameTheHops(double km, double[] delays, string?[] expected)
     {
         var (labels, _) = PathGeometry.Label(km, delays);
         Assert.Equal(expected, labels);
+    }
+
+    [Fact]
+    public void Labels_NeverInventAHeightOutsideThePlausibleRange()
+    {
+        // The two real CT 150 cases from packet-net/pdn-mailcast#60: both get a height from the
+        // confirmed 1F/2F pair, both inside 200 to 450 km, and neither is the bug's wrong answer.
+        var (elevenUtc, elevenHeight) = PathGeometry.Label(534, [0, 0.89, 2.08]);
+        Assert.Equal(new string?[] { "1F", null, "2F" }, elevenUtc);
+        Assert.InRange(elevenHeight!.Value, 200, 450);
+        Assert.NotEqual(188, elevenHeight.Value);
+
+        var (thirteenUtc, thirteenHeight) = PathGeometry.Label(534, [0, 0.53, 1.08]);
+        Assert.Equal(new string?[] { "1F", null, "2F" }, thirteenUtc);
+        Assert.InRange(thirteenHeight!.Value, 200, 450);
+        Assert.NotEqual(137, thirteenHeight.Value);
+
+        // Nothing fits any plausible F height at all (the gaps are both far too small for 300
+        // km): no hop beyond the first is named, and no height is given, rather than one outside
+        // the plausible range.
+        var (nothingFits, noHeight) = PathGeometry.Label(300, [0, 0.1, 0.2]);
+        Assert.Equal(new string?[] { "1F", null, null }, nothingFits);
+        Assert.Null(noHeight);
+    }
+
+    [Fact]
+    public void OneMeasurement_NamesModesAfterTheStrongestPath_EvenAtANegativeDelay()
+    {
+        // A weak artefact 0.8 ms ahead of the real (and strongest) first path, which is itself
+        // 1.9 ms ahead of a real second hop. Naming modes after whichever arrived first (the
+        // bug in packet-net/pdn-mailcast#60) would have put the real path at +0.8 ms and the
+        // second hop at +2.7 ms, offsetting both from where the profile's power actually peaks.
+        // One measurement cannot yet tell a real, if unusual, early weak path from a processing
+        // sidelobe (ChannelReport.Summarise does, from several measurements), so nothing here is
+        // thrown away: the artefact keeps its place, at a negative delay from the strongest.
+        var paths = new[] { new SynthPath(0, -15), new SynthPath(0.8, 0), new SynthPath(2.7, -16) };
+        var (audio, end, bits) = Synthesise(6000, seed: 7, paths, snrDb: 15);
+        var p = Picture(audio, end, bits);
+
+        Assert.Equal(3, p.Modes.Count);
+        Assert.Equal(-0.8, p.Modes[0].DelayMs, 0.05);
+        Assert.Equal(-15, p.Modes[0].PowerDb, 1.0);
+        Assert.Equal(0, p.Modes[1].DelayMs, 0.03);
+        Assert.Equal(0, p.Modes[1].PowerDb, 0.5);
+        Assert.Equal(1.9, p.Modes[2].DelayMs, 0.05);
+        Assert.Equal(-16, p.Modes[2].PowerDb, 1.0);
+    }
+
+    [Fact]
+    public void SidelobeConsistentlyAheadOfTheStrongestPath_IsLeftOutOfTheReport()
+    {
+        // The same artefact as above, repeated over several measurements: consistently 0.8 ms
+        // ahead of the strongest path, it clusters and would otherwise be named a mode of its
+        // own (an impossible negative-delay "hop"). ChannelReport.Summarise leaves it out.
+        var paths = new[] { new SynthPath(0, -15), new SynthPath(0.8, 0), new SynthPath(2.7, -16) };
+        var pictures = Enumerable.Range(0, 4)
+            .Select(seed =>
+            {
+                var (audio, end, bits) = Synthesise(6000, seed, paths, snrDb: 15);
+                return Picture(audio, end, bits);
+            })
+            .ToList();
+
+        var report = ChannelReport.Summarise(Noon, Noon, pictures, pictures.Count, Wessex);
+        Assert.True(report.Enough);
+        Assert.Equal(2, report.Modes.Count);
+        Assert.Equal(0, report.Modes[0].DelayMs);
+        Assert.Equal(1.9, report.Modes[1].DelayMs, 0.1);
+        Assert.All(report.Modes, m => Assert.True(m.DelayMs >= 0, $"a mode at {m.DelayMs} ms, before the strongest path"));
     }
 
     [Fact]
