@@ -134,7 +134,7 @@ public sealed record ScheduleOptions
     /// day over a little more than a day. A web SDR receiver hears every third slot; two of the
     /// repeats fall in each of the two sets of every third slot that miss the first, so whichever
     /// set it hears, it gets at least 1.4 K. On GB7RDG's volume this is about 3 minutes on the air
-    /// in an average hour.
+    /// in an average hour (a little more with the directory's wider spread, issue #69).
     /// </summary>
     public static ScheduleOptions Hourly { get; } = new()
     {
@@ -159,9 +159,10 @@ public sealed record ScheduleOptions
     /// 1.2 K and two spare symbols in its first slot, enough to rebuild it from that slot alone
     /// with about a fifth of the frames lost, then one repeat of 0.4 K 5 hours later (moved on to
     /// the next daylight slot when that is dark) for a receiver that lost more. On GB7RDG's volume
-    /// that is about 4 minutes on the air in an average daylight slot in December, under 3 in
-    /// October and under 2 in June; the hourly station's five carryings would need more than
-    /// the 10 minute hard stop allows in every December slot.
+    /// that is about 4 minutes on the air in an average daylight slot in December (a little more
+    /// with the directory's wider spread, issue #69), under 4 in October and about 2 in June; the
+    /// hourly station's five carryings would need more than the 10 minute hard stop allows in
+    /// every December slot.
     /// </summary>
     public static ScheduleOptions HourlyDaylight { get; } = Hourly with
     {
@@ -266,6 +267,9 @@ public sealed class SlotBroadcast
 /// that is plain round robin; in general it means a fade takes a little from everyone rather
 /// than all of one small bulletin. The directory's frames go in evenly spaced places, the first
 /// frame of the slot and then at least one in every <see cref="ScheduleOptions.DirectoryEvery"/>.
+/// There are enough of them that a station decoding only a quarter of the slot's frames still
+/// has a good chance of a whole directory from it alone, not just <see cref="ScheduleOptions.DirectoryExtra"/>
+/// above its K (see <see cref="DirectoryFloor"/>, issue #69).
 /// </para>
 /// </remarks>
 public static class BroadcastScheduler
@@ -639,8 +643,54 @@ public static class BroadcastScheduler
 
     private static double Coverage(CarriedBulletin c, int more) => (c.NextEsi + (double)more) / c.Transfer.SourceSymbols;
 
+    /// <summary>
+    /// The frame rate issue #69 designs the directory's redundancy for: a weak station that
+    /// decodes about a quarter of a slot's frames (G7TAJ, reported 2026-10-09).
+    /// </summary>
+    private const double WeakStationFrameRate = 0.25;
+
+    /// <summary>
+    /// How sure <see cref="DirectoryFloor"/> aims to make it that a station at
+    /// <see cref="WeakStationFrameRate"/> gets the whole directory from one slot.
+    /// </summary>
+    private const double WeakStationConfidence = 0.80;
+
+    /// <summary>
+    /// The fewest directory frames so that a station decoding <see cref="WeakStationFrameRate"/>
+    /// of a slot's frames gets at least <paramref name="sourceSymbols"/> of them (so the whole
+    /// directory, its K being small) with at least <see cref="WeakStationConfidence"/> probability:
+    /// the smallest N with P(Binomial(N, <see cref="WeakStationFrameRate"/>) &gt;= sourceSymbols) at
+    /// least <see cref="WeakStationConfidence"/>. Found by counting up N from sourceSymbols, since
+    /// the directory's K is always small (1 or 2 for GB7RDG's usual 14 to 20 bulletins in rotation),
+    /// so this never runs more than a few dozen times.
+    /// </summary>
+    internal static int DirectoryFloor(int sourceSymbols)
+    {
+        for (int n = sourceSymbols; ; n++)
+        {
+            if (BinomialAtLeast(n, sourceSymbols, WeakStationFrameRate) >= WeakStationConfidence)
+            {
+                return n;
+            }
+        }
+    }
+
+    /// <summary>P(X &gt;= k) for X ~ Binomial(n, p), by building up the probability mass function one term at a time.</summary>
+    private static double BinomialAtLeast(int n, int k, double p)
+    {
+        double term = Math.Pow(1 - p, n); // P(X = 0)
+        double below = k > 0 ? term : 0; // P(X < k), built up as P(X = 0) + P(X = 1) + ...
+        for (int i = 1; i < k; i++)
+        {
+            term *= (n - i + 1) / (double)i * p / (1 - p);
+            below += term;
+        }
+        return 1 - below;
+    }
+
     private static int DirectoryFrames(TransferObject directory, int bulletinFrames, ScheduleOptions options) =>
-        Math.Max(directory.SourceSymbols + options.DirectoryExtra, (int)Math.Ceiling(bulletinFrames / (double)(options.DirectoryEvery - 1)));
+        Math.Max(Math.Max(directory.SourceSymbols + options.DirectoryExtra, DirectoryFloor(directory.SourceSymbols)),
+            (int)Math.Ceiling(bulletinFrames / (double)(options.DirectoryEvery - 1)));
 
     /// <summary>
     /// The budget rule's share of the slot for each bulletin, in order: one symbol at a time to the

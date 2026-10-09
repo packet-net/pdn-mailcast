@@ -137,8 +137,8 @@ public class DaylightAirtimeTests(ITestOutputHelper output)
     };
 
     [Theory]
-    [InlineData("2026-12-18", 4.2)]
-    [InlineData("2026-10-02", 3.0)]
+    [InlineData("2026-12-18", 4.5)]
+    [InlineData("2026-10-02", 3.2)]
     [InlineData("2026-06-18", 2.0)]
     public void DaylightDefaults_AverageUnderFourMinutesAnActiveSlot_AndFinishEveryBulletin(string start, double most)
     {

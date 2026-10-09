@@ -39,11 +39,11 @@ public class BudgetSchedulerTests
         int k = fresh.Transfer.SourceSymbols;
         Assert.True(k >= 8);
 
-        // Room for the directory and a few more: all of it goes to the new bulletin.
-        var tight = BroadcastScheduler.Plan([old, half, fresh], Slot, 1, Compression.Default, Options, null, Frames(7));
+        // Room for the directory (its floor, issue #69, comes first) and a few more: the rest goes to the new bulletin.
+        var tight = BroadcastScheduler.Plan([old, half, fresh], Slot, 1, Compression.Default, Options, null, Frames(10));
         var objects = ByBid(tight);
         int directory = tight.Objects[0].Count;
-        Assert.Equal(7 - directory, objects[fresh.Bid].Count);
+        Assert.Equal(10 - directory, objects[fresh.Bid].Count);
         Assert.True(objects[fresh.Bid].Count >= 2);
         Assert.Equal(0, objects[half.Bid].Count);
         Assert.Equal(0, objects[old.Bid].Count);
@@ -173,6 +173,81 @@ public class BudgetSchedulerTests
         Assert.Equal("MAILCAST DIRECTORY 1\n2026-10-06\n0123456789abcdef\t1\t2345\t12345_GB7RDG\tTitle text\ttype=1\tslots=00:00/60\tmode=ms110d-wn4\n", text);
         Assert.Null(BroadcastDirectory.Parse(new BroadcastDirectory(new DateOnly(2026, 10, 6), [entry]).Serialize()).Mode);
         Assert.Throws<ArgumentException>(() => new BroadcastDirectory(new DateOnly(2026, 10, 6), [entry], null, "ms110d wn4"));
+    }
+
+    /// <summary>
+    /// Issue #69: a station decoding only a quarter of a slot's frames should still have a good
+    /// chance (binomial, p = 0.25, at least 80%) of a whole directory from one slot, not just
+    /// <see cref="ScheduleOptions.DirectoryExtra"/> above its K.
+    /// </summary>
+    [Theory]
+    [InlineData(1, 6)] // GB7RDG's usual rotation (14 to 20 bulletins): K is 1, needs 6 frames for 80%.
+    [InlineData(2, 11)] // A big rotation (around 27 bulletins): K is 2, needs 11.
+    [InlineData(3, 16)]
+    [InlineData(4, 21)]
+    public void DirectoryFloor_IsEnoughForAnEightyPercentChanceAtAQuarterDecoded(int k, int expected)
+    {
+        Assert.Equal(expected, BroadcastScheduler.DirectoryFloor(k));
+        double atFloor = Binomial(BroadcastScheduler.DirectoryFloor(k), k, 0.25);
+        Assert.True(atFloor >= 0.80, $"K {k}: {atFloor} at the floor");
+        double oneFewer = Binomial(BroadcastScheduler.DirectoryFloor(k) - 1, k, 0.25);
+        Assert.True(oneFewer < 0.80, $"K {k}: {oneFewer} one frame short of the floor, should already be under 80%");
+    }
+
+    /// <summary>P(X &gt;= k) for X ~ Binomial(n, p), computed independently of <see cref="BroadcastScheduler.DirectoryFloor"/>.</summary>
+    private static double Binomial(int n, int k, double p)
+    {
+        double sum = 0;
+        for (int i = 0; i < k; i++)
+        {
+            double term = 1.0;
+            for (int j = 0; j < i; j++)
+            {
+                term *= (n - j) / (double)(j + 1);
+            }
+            term *= Math.Pow(p, i) * Math.Pow(1 - p, n - i);
+            sum += term;
+        }
+        return 1 - sum;
+    }
+
+    /// <summary>GB7RDG's own symbol size (940, <see cref="Options"/> in this file uses 240 so airtime is a frame count).</summary>
+    private static readonly ScheduleOptions RealisticOptions = ScheduleOptions.HourlyBudget;
+
+    private static CarriedBulletin RealisticHeld(int seed, int size)
+    {
+        var b = TestBulletins.Make(seed, size);
+        var transfer = TransferObject.ForBulletin(b, RealisticOptions.DictionaryId, Compression.Default, RealisticOptions.SymbolSize, RealisticOptions.Alignment);
+        return new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, new DateOnly(2026, 10, 5), transfer, 0, null);
+    }
+
+    [Fact]
+    public void Fill_DirectoryFloor_BeatsK_PlusDirectoryExtra_ForGb7rdgsUsualRotation()
+    {
+        // A realistic GB7RDG directory, 15 bulletins in rotation: its K is small (RaptorQ with a
+        // short, well-compressed object at GB7RDG's own 940-octet symbol size), so the old
+        // K + DirectoryExtra floor (3) left a quarter decoder under 60% for a whole directory;
+        // the new floor (6) gets it above 80%.
+        var bulletins = Enumerable.Range(0, 15).Select(i => RealisticHeld(200 + i, 1000 + (i * 300))).ToList();
+        var plan = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, RealisticOptions, null, Frames(500), "ms110d-wn3");
+        int k = plan.Objects[0].Transfer.SourceSymbols;
+        Assert.Equal(1, k); // confirms the realistic case: K is 1 for a 15-entry directory
+        Assert.Equal(BroadcastScheduler.DirectoryFloor(k), plan.Objects[0].Count);
+        Assert.True(plan.Objects[0].Count > k + RealisticOptions.DirectoryExtra);
+    }
+
+    /// <summary>The directory's extra frames still spread across the whole slot, the first at place 0.</summary>
+    [Fact]
+    public void Fill_DirectoryFloor_StillSpreadsAcrossTheSlot()
+    {
+        var bulletins = Enumerable.Range(0, 15).Select(i => RealisticHeld(300 + i, 1000 + (i * 300))).ToList();
+        var plan = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, RealisticOptions, null, Frames(500), "ms110d-wn3");
+        ulong directoryId = plan.Objects[0].Transfer.ObjectId;
+        var positions = plan.Frames.Select((f, i) => (f, i)).Where(x => x.f.ObjectId == directoryId).Select(x => x.i).ToList();
+        Assert.True(positions.Count >= 6);
+        Assert.Equal(0, positions[0]);
+        var gaps = positions.Zip(positions.Skip(1), (a, b) => b - a);
+        Assert.All(gaps, g => Assert.InRange(g, 1, RealisticOptions.DirectoryEvery));
     }
 
     [Fact]

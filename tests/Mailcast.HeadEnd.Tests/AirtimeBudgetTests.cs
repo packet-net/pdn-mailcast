@@ -84,7 +84,7 @@ public class AirtimeBudgetTests(ITestOutputHelper output)
         double mean = keyed.Sum(k => k.OnAir.TotalMinutes) / 48;
         double worst = keyed.Max(k => k.OnAir.TotalMinutes);
         output.WriteLine($"on the air: {mean:0.00} min in an average hour, {worst:0.00} min in the worst");
-        Assert.InRange(mean, 1.5, 3.3);
+        Assert.InRange(mean, 1.5, 3.5);
         Assert.True(worst < 10, $"the worst hour is {worst:0.0} min, which the 10 minute hard stop would cut");
     }
 }
