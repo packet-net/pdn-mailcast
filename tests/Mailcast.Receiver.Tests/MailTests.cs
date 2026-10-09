@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Packet.Mailcast;
+using Packet.SoundModem.Waterfall;
 using Mailcast.Receiver.Delivery;
 using Mailcast.Receiver.Web;
 using Microsoft.Extensions.Time.Testing;
@@ -20,6 +21,18 @@ public class MailTests
     {
         public Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation) =>
             Task.FromResult(new SessionReport(true, null, [.. bulletins.Select(answer)], 0));
+    }
+
+    /// <summary>
+    /// A part-received object (issue #73's "coming in" row): a bulletin big enough to need more
+    /// than one RaptorQ symbol, heard one piece at a time so it never completes, and named by no
+    /// directory (built directly from the bulletin, not picked out of a planned day's frames).
+    /// </summary>
+    private static byte[] FirstPieceOf(Bulletin bulletin)
+    {
+        var transfer = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Assert.True(transfer.SourceSymbols > 1);
+        return Ax25UiFrame.Build(Samples.Source, OnAir.Destination, transfer.Frame(0).ToBytes());
     }
 
     private static async Task RebuildAsync(Intake intake, params Bulletin[] bulletins)
@@ -168,7 +181,7 @@ public class MailTests
     }
 
     [Fact]
-    public async Task MailAndStatus_ShowWhenEachBulletinCompleted_AndWhenTheBbsHadIt()
+    public async Task Mail_ShowsWhenEachBulletinCompleted_AndItsOwnDeliveryHistory()
     {
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(Start);
@@ -187,17 +200,68 @@ public class MailTests
         var delivered = items["61_GB7RDG"];
         Assert.Equal(Start, delivered.GetProperty("completed").GetDateTimeOffset());
         Assert.Equal(Start + TimeSpan.FromMinutes(5), delivered.GetProperty("delivered").GetDateTimeOffset());
+        // Issue #73: the reader's own delivery history for this BID, not only its final answer.
+        var deliveredAttempt = Assert.Single(delivered.GetProperty("attempts").EnumerateArray());
+        Assert.Equal(Start + TimeSpan.FromMinutes(5), deliveredAttempt.GetProperty("time").GetDateTimeOffset());
+        Assert.Equal("accepted", deliveredAttempt.GetProperty("saidShort").GetString());
+
         var waiting = items["62_GB7RDG"];
         Assert.Equal(Start, waiting.GetProperty("completed").GetDateTimeOffset());
         Assert.Equal(JsonValueKind.Null, waiting.GetProperty("delivered").ValueKind);
+        var deferredAttempt = Assert.Single(waiting.GetProperty("attempts").EnumerateArray());
+        Assert.Equal("deferred", deferredAttempt.GetProperty("saidShort").GetString());
+    }
+
+    /// <summary>
+    /// Issue #73 review: the CT 150 survey script (root@10.45.0.235's
+    /// /usr/local/bin/mailcast-survey) reads <c>bulletins</c> from <c>GET /api/status</c> for its
+    /// bulletins_completed columns, and the receiver's own page used to read <c>deliveries</c>
+    /// from there too. Both stay on that endpoint, in their v0.8.7 shape, even though the page
+    /// itself now gets the same facts from <c>GET /api/mail</c> instead - this pins that the
+    /// fields, and the keys on each of their entries, are still there.
+    /// </summary>
+    [Fact]
+    public async Task Status_KeepsBulletinsAndDeliveriesFields_InTheirOldShape_ForScripts()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(71), Samples.Bulletin(72));
+        time.Advance(TimeSpan.FromMinutes(5));
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "71_GB7RDG"
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred)), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(970, bodyLines: 200))); // a part-received one too
 
         var status = await http.GetFromJsonAsync<JsonElement>("api/status");
-        var bulletins = status.GetProperty("bulletins").EnumerateArray().ToDictionary(b => b.GetProperty("bid").GetString()!);
-        Assert.Equal(Start, bulletins["61_GB7RDG"].GetProperty("completedAt").GetDateTimeOffset());
-        Assert.Equal(Start + TimeSpan.FromMinutes(5), bulletins["61_GB7RDG"].GetProperty("deliveredAt").GetDateTimeOffset());
-        Assert.Equal("accepted", bulletins["61_GB7RDG"].GetProperty("deliveredVerdict").GetString());
-        Assert.Equal(Start, bulletins["62_GB7RDG"].GetProperty("completedAt").GetDateTimeOffset());
-        Assert.Equal(JsonValueKind.Null, bulletins["62_GB7RDG"].GetProperty("deliveredAt").ValueKind); // deferred is not delivered
+
+        var bulletins = status.GetProperty("bulletins").EnumerateArray().ToList();
+        Assert.Equal(3, bulletins.Count); // 71, 72 and the part-received one
+        var delivered = bulletins.Single(b => b.GetProperty("bid").GetString() == "71_GB7RDG");
+        foreach (string key in new[] { "bid", "title", "complete", "received", "needed", "delivery", "deliveryShort", "completedAt", "deliveredAt", "deliveredVerdict", "deliveredDetail" })
+        {
+            Assert.True(delivered.TryGetProperty(key, out _), $"bulletins[].{key} is missing");
+        }
+        Assert.True(delivered.GetProperty("complete").GetBoolean());
+        Assert.Equal("accepted", delivered.GetProperty("deliveryShort").GetString());
+        Assert.Equal(Start, delivered.GetProperty("completedAt").GetDateTimeOffset());
+        Assert.Equal(Start + TimeSpan.FromMinutes(5), delivered.GetProperty("deliveredAt").GetDateTimeOffset());
+        var partial = bulletins.Single(b => b.GetProperty("bid").ValueKind == JsonValueKind.Null);
+        Assert.False(partial.GetProperty("complete").GetBoolean());
+        Assert.Equal(1, partial.GetProperty("received").GetInt32());
+
+        var deliveries = status.GetProperty("deliveries").EnumerateArray().ToList();
+        Assert.NotEmpty(deliveries);
+        foreach (string key in new[] { "time", "bid", "title", "verdict", "said", "saidShort", "detail" })
+        {
+            Assert.True(deliveries[0].TryGetProperty(key, out _), $"deliveries[].{key} is missing");
+        }
+        Assert.Contains(deliveries, d => d.GetProperty("bid").GetString() == "71_GB7RDG" && d.GetProperty("saidShort").GetString() == "accepted");
+        Assert.Contains(deliveries, d => d.GetProperty("bid").GetString() == "72_GB7RDG" && d.GetProperty("saidShort").GetString() == "deferred");
     }
 
     [Fact]
@@ -509,5 +573,133 @@ public class MailTests
         Assert.Equal(HttpStatusCode.TooManyRequests, tooMany.StatusCode);
         Assert.Contains("50 bulletins sent again are already waiting", await tooMany.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         Assert.Equal(ReceiverStore.MaxResentWaiting, host.Intake.Mail().Waiting);
+    }
+
+    /// <summary>
+    /// Issue #73: the combined Bulletins section's data, from the one endpoint - a part-received
+    /// object, a delivered bulletin and a refused one, all at once, with the summary counts the
+    /// page's own heading is built from.
+    /// </summary>
+    [Fact]
+    public async Task Mail_ShowsAPartReceivedAndADeliveredAndARefusedBulletin_WithSummaryCounts()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(1), Samples.Bulletin(2));
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "1_GB7RDG"
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Refused, "FS R: not wanted here")), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(900, bodyLines: 200)));
+
+        var mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
+        Assert.Equal(0, mail.GetProperty("waiting").GetInt32());
+        Assert.Equal(1, mail.GetProperty("delivered").GetInt32());
+        Assert.Equal(1, mail.GetProperty("refused").GetInt32());
+        var partial = Assert.Single(mail.GetProperty("partial").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, partial.GetProperty("bid").ValueKind); // not yet named
+        Assert.Equal(1, partial.GetProperty("received").GetInt32());
+        Assert.True(partial.GetProperty("needed").GetInt32() > 1);
+
+        var items = mail.GetProperty("items").EnumerateArray().ToDictionary(i => i.GetProperty("bid").GetString()!);
+        Assert.Equal("accepted", items["1_GB7RDG"].GetProperty("verdict").GetString());
+        Assert.Equal("refused", items["2_GB7RDG"].GetProperty("verdict").GetString());
+        Assert.Equal("FS R: not wanted here", items["2_GB7RDG"].GetProperty("detail").GetString());
+    }
+
+    /// <summary>
+    /// Issue #73: the part-received list is handed over on the side, not inside the archive's own
+    /// paging, so it reads the same at every offset while the archive page underneath it moves on.
+    /// </summary>
+    [Fact]
+    public async Task Mail_PartialRows_AreTheSameOnEveryPage_WhileArchivePagesMoveOn()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(1), Samples.Bulletin(2));
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(901, bodyLines: 200)));
+
+        var firstPage = await http.GetFromJsonAsync<JsonElement>("api/mail?offset=0&limit=1");
+        var secondPage = await http.GetFromJsonAsync<JsonElement>("api/mail?offset=1&limit=1");
+        Assert.Equal(2, firstPage.GetProperty("total").GetInt32());
+        string firstBid = Assert.Single(firstPage.GetProperty("items").EnumerateArray()).GetProperty("bid").GetString()!;
+        string secondBid = Assert.Single(secondPage.GetProperty("items").EnumerateArray()).GetProperty("bid").GetString()!;
+        Assert.NotEqual(firstBid, secondBid);
+        Assert.Single(firstPage.GetProperty("partial").EnumerateArray());
+        Assert.Single(secondPage.GetProperty("partial").EnumerateArray());
+    }
+
+    /// <summary>
+    /// Issue #73: a bulletin offered more than once (deferred, then accepted on a later session)
+    /// keeps every answer in order in its own "attempts", for the reader to show as its story -
+    /// not only the final verdict the Status column already gives.
+    /// </summary>
+    [Fact]
+    public async Task Mail_AttemptHistory_KeepsEveryAnswerInOrder()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(10));
+        int calls = 0;
+        var bbs = new AnsweringBbs(b => ++calls == 1
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred, "offering it again later")
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted));
+        var service = new DeliveryService(host.Intake, bbs, host.Ledger, time, _ => { });
+
+        Assert.NotNull(await service.DeliverPendingAsync(CancellationToken.None)); // deferred first
+        time.Advance(TimeSpan.FromMinutes(10));
+        Assert.Null(await service.DeliverPendingAsync(CancellationToken.None)); // accepted on the second try
+
+        var item = Assert.Single(await MailAsync(http));
+        Assert.Equal("accepted", item.GetProperty("verdict").GetString());
+        var attempts = item.GetProperty("attempts").EnumerateArray().ToList();
+        Assert.Equal(2, attempts.Count);
+        Assert.Equal("deferred", attempts[0].GetProperty("saidShort").GetString());
+        Assert.Equal(Start, attempts[0].GetProperty("time").GetDateTimeOffset());
+        Assert.Equal("accepted", attempts[1].GetProperty("saidShort").GetString());
+        Assert.Equal(Start + TimeSpan.FromMinutes(10), attempts[1].GetProperty("time").GetDateTimeOffset());
+    }
+
+    /// <summary>
+    /// Issue #73: a BBS the receiver cannot reach at all (no answer, a login refused, and the
+    /// like) is not about any one bulletin, so it stays in the "Your BBS" tile's own data
+    /// (<c>bbs.lastFailure</c>) rather than turning up as any bulletin's delivery history. Using
+    /// <c>host.Delivery</c> itself, pointed (by <see cref="StartAsync"/>'s default config) at a
+    /// BBS port nothing listens on, so the session fails before it offers anything, the same way
+    /// <see cref="StatusPageTests.DailyReport_IsOfferedOnlyWithABbs"/> treats that failure.
+    /// </summary>
+    [Fact]
+    public async Task SessionFailure_IsNotTiedToOneBid_AndStaysInTheBbsTile()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(5));
+
+        string? failure = await host.Delivery.DeliverPendingAsync(CancellationToken.None);
+        Assert.NotNull(failure);
+
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.Equal(failure, status.GetProperty("bbs").GetProperty("lastFailure").GetString());
+        var item = Assert.Single(await MailAsync(http));
+        Assert.True(item.GetProperty("waiting").GetBoolean());
+        Assert.Empty(item.GetProperty("attempts").EnumerateArray());
     }
 }

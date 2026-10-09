@@ -95,6 +95,22 @@ public sealed class DeliveryLedger
     }
 
     /// <summary>
+    /// Issue #73: every answer this session remembers for a BID, oldest first, for the page's
+    /// reader view to show as that bulletin's own delivery history (what the BBS said each time
+    /// it was offered). Bounded by the same <see cref="RecentKept"/> window as <see cref="Recent"/>,
+    /// and, across a restart, by the one line per BID that <c>deliveries.jsonl</c> keeps once
+    /// compacted: a bulletin answered more than once before the last restart shows only its
+    /// newest answer from before that point, same as <see cref="Latest"/> always has.
+    /// </summary>
+    public IReadOnlyList<DeliveryRecord> History(string bid)
+    {
+        lock (_gate)
+        {
+            return [.. _recent.Where(r => string.Equals(r.Bid, bid, StringComparison.OrdinalIgnoreCase))];
+        }
+    }
+
+    /// <summary>
     /// Records the BBS's answer for <paramref name="bulletin"/> and returns the record written. An
     /// FS - for a bulletin whose last transfer was unconfirmed is the BBS confirming it kept that
     /// transfer, so it is recorded as accepted.

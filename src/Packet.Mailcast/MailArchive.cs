@@ -63,6 +63,21 @@ public sealed class MailSnapshot
         Waiting = waiting;
         _waiting = waitingBytes;
         _byId = newestFirst.ToDictionary(e => e.ObjectId);
+        // Issue #73 review: counted once here, when the snapshot is built (a bulletin rebuilt, a
+        // sent-again, or a pruning, not every few seconds the status page polls), so the
+        // combined Bulletins section's summary line (StatusPage.MailList) is O(1) for them
+        // rather than scanning the whole archive on every poll.
+        foreach (var entry in newestFirst)
+        {
+            if (entry.Verdict is BbsVerdict.Accepted or BbsVerdict.AlreadyHad)
+            {
+                Delivered++;
+            }
+            else if (entry.Verdict is BbsVerdict.Refused)
+            {
+                Refused++;
+            }
+        }
     }
 
     /// <summary>How many bulletins are held in all.</summary>
@@ -73,6 +88,12 @@ public sealed class MailSnapshot
 
     /// <summary>How many are archived and not waiting.</summary>
     public int Archived => _newestFirst.Length - Waiting;
+
+    /// <summary>How many archived bulletins the BBS accepted or already had (issue #73).</summary>
+    public int Delivered { get; }
+
+    /// <summary>How many archived bulletins the BBS refused (issue #73).</summary>
+    public int Refused { get; }
 
     /// <summary>Every bulletin held, newest first.</summary>
     public IReadOnlyList<MailEntry> NewestFirst => _newestFirst;
