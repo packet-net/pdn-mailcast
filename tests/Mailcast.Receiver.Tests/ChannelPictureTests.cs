@@ -194,6 +194,21 @@ public class ChannelPictureTests
     }
 
     [Fact]
+    public void Svg_EndLabelsGrowOutward_WhenAShortPathLeavesNoRoomBetweenThem()
+    {
+        // A short path with a tall real layer height: the reflecting layer dominates the
+        // picture's width far more than the ground track does, so the two ends land closer
+        // together than "GB7RDG IO91lk" and the far end's locator are wide. Both labels must then
+        // grow away from each other, not towards each other (where they would collide).
+        var report = Report(136, 293, "IO80qr", Mode("1F", 0, 0), Mode("2F", 1.93, -17.2));
+        string svg = ChannelPicture.Svg(report, "IO80qr", 340, withLabels: true)!;
+        Assert.Contains(">GB7RDG IO91lk</text>", svg, StringComparison.Ordinal);
+        Assert.Contains("font-size=\"11\" text-anchor=\"end\">GB7RDG IO91lk</text>", svg, StringComparison.Ordinal);
+        Assert.Contains("font-size=\"11\">IO80qr</text>", svg, StringComparison.Ordinal);
+        Assert.DoesNotContain("font-size=\"11\" text-anchor=\"end\">IO80qr</text>", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Svg_IsWellFormedAndFinite_AtPhoneAndDesktopWidths()
     {
         var report = Report(534, 354, "IO86ha",

@@ -184,11 +184,20 @@ internal static class ChannelPicture
             var start = ground[0];
             var end = ground[^1];
             double midX = (Sx(start) + Sx(end)) / 2;
+            // Normally GB7RDG's label grows in towards the middle and the other end's grows in
+            // the other way, which reads naturally when the two ends are well apart. On a short
+            // path the reflecting layer's fixed real height can dominate the picture's width far
+            // more than the ground track does, leaving the two ends closer together than their
+            // labels are wide: then both instead grow outward, away from each other.
+            string endLabel = endLocator ?? "receiver";
+            bool roomInward = (Sx(end) - Sx(start)) >= (("GB7RDG IO91lk".Length + endLabel.Length) * 7.0) + 10;
+            string startAttrs = roomInward ? "" : " text-anchor=\"end\"";
+            string endAttrs = roomInward ? " text-anchor=\"end\"" : "";
             sb.Append(CultureInfo.InvariantCulture,
                 $"<circle cx=\"{F(Sx(start))}\" cy=\"{F(Sy(start))}\" r=\"4\" fill=\"var(--bad)\"/>"
-                + $"<text x=\"{F(Sx(start))}\" y=\"{F(Sy(start) + 16)}\" font-size=\"11\">GB7RDG IO91lk</text>"
+                + $"<text x=\"{F(Sx(start))}\" y=\"{F(Sy(start) + 16)}\" font-size=\"11\"{startAttrs}>GB7RDG IO91lk</text>"
                 + $"<circle cx=\"{F(Sx(end))}\" cy=\"{F(Sy(end))}\" r=\"4\" fill=\"var(--ink)\"/>"
-                + $"<text x=\"{F(Sx(end))}\" y=\"{F(Sy(end) + 16)}\" text-anchor=\"end\" font-size=\"11\">{WebUtility.HtmlEncode(endLocator ?? "receiver")}</text>");
+                + $"<text x=\"{F(Sx(end))}\" y=\"{F(Sy(end) + 16)}\" font-size=\"11\"{endAttrs}>{WebUtility.HtmlEncode(endLabel)}</text>");
             bool anyNominal = rays.Any(r => !r.HeightKnown);
             // Kept short, and split onto its own lines, rather than one long line: SVG text does
             // not wrap, so a note this length in one line would run off the picture's width.
