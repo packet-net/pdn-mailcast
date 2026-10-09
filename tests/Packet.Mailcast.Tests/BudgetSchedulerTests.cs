@@ -147,6 +147,29 @@ public class BudgetSchedulerTests
         Assert.Empty(none.Directory.Entries);
     }
 
+    /// <summary>
+    /// Issue #69's bigger directory floor made this reachable: with a big enough rotation, the
+    /// directory alone can be over a tight budget, with no bulletin frames for the fill to give
+    /// up instead (it gives every one up first, since none of them fit either). The directory's
+    /// own frame count must then give way, one at a time, rather than the plan going over budget.
+    /// </summary>
+    [Fact]
+    public void Fill_CapsTheDirectoryItself_WhenEvenItAloneIsOverBudget()
+    {
+        var bulletins = Enumerable.Range(0, 27).Select(i => AtCoverage(400 + i, 1000 + (i * 300), 0)).ToList();
+        var tiny = Frames(5);
+        var plan = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, Options, null, tiny);
+        Assert.Equal(0, plan.BulletinFrames);
+        Assert.True(plan.Objects[0].Count >= 1);
+        Assert.True(tiny.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= tiny.Limit,
+            $"{plan.Frames.Count} frames in a budget of 5, directory alone");
+
+        // A budget too tight even for one frame: still only ever the one, never zero.
+        var impossible = Frames(0);
+        var smallest = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, Options, null, impossible);
+        Assert.Equal(1, smallest.Objects[0].Count);
+    }
+
     [Fact]
     public void Fill_AlwaysSendsTheDirectory_WithTheModeAndTheTimetable()
     {

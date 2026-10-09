@@ -11,10 +11,26 @@ public class HourlyTests
     /// <summary>
     /// Whether a frame survives a simulated loss, by the frame's own identity rather than its
     /// place in the slot: so adding or moving frames elsewhere (a bigger directory, say) never
-    /// changes which of a seed's frames these tests lose.
+    /// changes which of a seed's frames these tests lose. A stable mix (splitmix64), not
+    /// <see cref="HashCode.Combine"/>: that is randomised per process by design, so these tests
+    /// would pass or fail a different sub-case on about three runs in five.
     /// </summary>
-    private static bool Survives(int seed, MailcastFrame frame, double loss) =>
-        (uint)HashCode.Combine(seed, frame.ObjectId, frame.EncodingSymbolId) / (double)uint.MaxValue >= loss;
+    private static bool Survives(int seed, MailcastFrame frame, double loss)
+    {
+        ulong h = SplitMix64((ulong)(uint)seed);
+        h = SplitMix64(h ^ frame.ObjectId);
+        h = SplitMix64(h ^ frame.EncodingSymbolId);
+        return h / (double)ulong.MaxValue >= loss;
+    }
+
+    /// <summary>The fixed point mix from Vigna's splitmix64 (the finaliser also used in xoshiro's seeding).</summary>
+    private static ulong SplitMix64(ulong x)
+    {
+        x += 0x9E3779B97F4A7C15UL;
+        x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9UL;
+        x = (x ^ (x >> 27)) * 0x94D049BB133111EBUL;
+        return x ^ (x >> 31);
+    }
 
     /// <summary>A head end that keeps its state in memory: every slot planned goes out whole.</summary>
     private sealed class Head(ScheduleOptions options)
