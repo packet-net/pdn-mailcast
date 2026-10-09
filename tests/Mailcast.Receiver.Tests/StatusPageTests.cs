@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Mailcast.Receiver.Delivery;
 using Mailcast.Receiver.Web;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Mailcast.Receiver.Tests;
 
@@ -736,5 +737,74 @@ public class StatusPageTests
     public void Origin_MustBeThisPage(string origin, string host, bool same)
     {
         Assert.Equal(same, StatusPage.SameOrigin(origin, host));
+    }
+
+    /// <summary>
+    /// Issue #68: the newest directory heard (<c>Samples.Day</c>, 2026-10-04) is days behind the
+    /// clock, as for a weak station it never stops being heard. The page's own status says so
+    /// plainly, naming the stale date, rather than leaving a caller (or the heading built from
+    /// it) to think the list below is of today.
+    /// </summary>
+    [Fact]
+    public async Task Status_NewestDirectoryHeardIsNotToday_NamesTheStaleDate()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero));
+        var (host, page) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)])) // directory day defaults to Samples.Day, 2026-10-04
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        var status = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        var directory = status.GetProperty("directory");
+        Assert.Equal("2026-10-04", directory.GetProperty("date").GetString());
+        Assert.True(directory.GetProperty("stale").GetBoolean());
+    }
+
+    /// <summary>Issue #68: once the clock catches up to the directory's own date, it is not stale.</summary>
+    [Fact]
+    public async Task Status_NewestDirectoryHeardIsToday_IsNotStale()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
+        var (host, page) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        var status = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        Assert.False(status.GetProperty("directory").GetProperty("stale").GetBoolean());
+    }
+
+    /// <summary>A receiver on a fake clock, its page bound to a free port (see <see cref="StartAsync"/> above for why it may ask twice).</summary>
+    private static async Task<(ReceiverHost Host, StatusPage Page)> StartAsync(string dir, TimeProvider time)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            int port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+            var host = new ReceiverHost(Config(dir, port), time, _ => { });
+            var page = new StatusPage(host, null, _ => { });
+            try
+            {
+                page.Start();
+                return (host, page);
+            }
+            catch (HttpListenerException) when (attempt < 20)
+            {
+                await page.DisposeAsync();
+                await host.DisposeAsync();
+            }
+        }
     }
 }

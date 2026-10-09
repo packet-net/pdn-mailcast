@@ -119,6 +119,23 @@ public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, 
 /// <param name="Needed">Symbols needed at least (K), if any have been received.</param>
 public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Received, int Needed);
 
+/// <summary>
+/// One object the receiver currently holds and worth showing on its own list (issue #68): a
+/// complete bulletin still relevant, or a part-received object, named by a remembered directory
+/// or not. See <see cref="ReceiverStore.HeldBulletins"/>.
+/// </summary>
+/// <param name="ObjectId">The object's ID.</param>
+/// <param name="Bid">
+/// Its BID, from any directory still remembered that names the object, or, once it is complete,
+/// from the bulletin itself; null if neither is known yet (a part-received object no known
+/// directory names).
+/// </param>
+/// <param name="Title">Its title, the same way; null on the same terms as <paramref name="Bid"/>.</param>
+/// <param name="Complete">Whether it has been rebuilt.</param>
+/// <param name="Received">Symbols held, if not complete.</param>
+/// <param name="Needed">Symbols needed at least (K), if any have been received.</param>
+public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed);
+
 /// <summary>Settings for a <see cref="ReceiverStore"/>.</summary>
 public sealed record ReceiverStoreOptions
 {
@@ -764,6 +781,86 @@ public sealed class ReceiverStore
                 : new ObjectProgress(entry, false, held.Symbols.Count, held.Oti.SourceBlockSymbols(0)));
         }
         return result;
+    }
+
+    /// <summary>
+    /// Everything on the receiver's own bulletin list (issue #68): every complete bulletin still
+    /// relevant - named by a directory still remembered (<see cref="KnownDirectoriesRetention"/>),
+    /// or completed within that same window even when no remembered directory names it - and
+    /// every part-received object currently held, named or not, so its progress bar shows whether
+    /// or not the newest directory heard happens to name it. Title and BID come from any
+    /// remembered directory naming the object, or, once it is complete, from the bulletin itself;
+    /// a part-received object no known directory names gets a row with a null title and BID,
+    /// which the page shows as "not yet named".
+    /// </summary>
+    public IReadOnlyList<HeldBulletin> HeldBulletins()
+    {
+        var cutoff = _options.Time.GetUtcNow() - KnownDirectoriesRetention;
+
+        // The newest name for an object, from whichever remembered directory names it.
+        var named = new Dictionary<ulong, (string Bid, string Title, DateTimeOffset HeardAt)>();
+        foreach (var (directory, heardAt) in _knownDirectories.Values)
+        {
+            foreach (var entry in directory.Entries)
+            {
+                if (!named.TryGetValue(entry.ObjectId, out var have) || heardAt > have.HeardAt)
+                {
+                    named[entry.ObjectId] = (entry.Bid, entry.Title, heardAt);
+                }
+            }
+        }
+
+        // The fullest instance of each partial object, found in one pass rather than once per entry.
+        var fullest = new Dictionary<ulong, Instance>();
+        foreach (var instance in _instances.Values)
+        {
+            if (!fullest.TryGetValue(instance.ObjectId, out var best) || instance.Symbols.Count > best.Symbols.Count)
+            {
+                fullest[instance.ObjectId] = instance;
+            }
+        }
+
+        var ids = new HashSet<ulong>(fullest.Keys);
+        foreach (var id in named.Keys)
+        {
+            if (_done.ContainsKey(id))
+            {
+                ids.Add(id);
+            }
+        }
+        foreach (var entry in Mail.NewestFirst)
+        {
+            if ((entry.Completed ?? entry.Time) >= cutoff)
+            {
+                ids.Add(entry.ObjectId);
+            }
+        }
+
+        var result = new List<HeldBulletin>(ids.Count);
+        foreach (var id in ids)
+        {
+            bool complete = _done.ContainsKey(id);
+            (string Bid, string Title, DateTimeOffset HeardAt)? name = named.TryGetValue(id, out var found) ? found : null;
+            string? bid = name?.Bid;
+            string? title = name?.Title;
+            int received = 0, needed = 0;
+            if (!complete && fullest.TryGetValue(id, out var held))
+            {
+                received = held.Symbols.Count;
+                needed = held.Oti.SourceBlockSymbols(0);
+            }
+            if (bid is null && complete && Mail.ById(id) is { } mailEntry)
+            {
+                bid = mailEntry.Bid;
+                title = mailEntry.Title;
+            }
+            result.Add(new HeldBulletin(id, bid, title, complete, received, needed));
+        }
+        return [.. result
+            .OrderBy(r => r.Complete) // part-received first: the most actionable
+            .ThenByDescending(r => r.Received)
+            .ThenBy(r => r.Bid ?? "￿", StringComparer.Ordinal)
+            .ThenBy(r => r.ObjectId)];
     }
 
     /// <summary>

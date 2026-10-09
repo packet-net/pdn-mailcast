@@ -363,6 +363,18 @@ public sealed class Intake : IAsyncDisposable
     /// </summary>
     public (BroadcastDirectory? Directory, IReadOnlyList<ObjectProgress> Progress) Progress() => _progress;
 
+    /// <summary>
+    /// Issue #68: everything on the receiver's own bulletin list, as
+    /// <see cref="ReceiverStore.HeldBulletins"/>, read fresh under the store's lock.
+    /// </summary>
+    public IReadOnlyList<HeldBulletin> HeldBulletins()
+    {
+        lock (_gate)
+        {
+            return _store.HeldBulletins();
+        }
+    }
+
     /// <summary>For tests: how many times the mail list has been rebuilt.</summary>
     internal long MailBuilds => _store.MailBuilds;
 

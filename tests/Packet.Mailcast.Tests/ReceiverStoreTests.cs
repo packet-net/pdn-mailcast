@@ -1,4 +1,5 @@
 using Mailcast.RaptorQ;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Packet.Mailcast.Tests;
 
@@ -437,5 +438,76 @@ public class ReceiverStoreTests
 
         var reopened = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
         Assert.Equal(plan.Directory.Date, reopened.Directory!.Date);
+    }
+
+    /// <summary>
+    /// Issue #68: a directory heard days ago is still the newest one heard (nothing newer has
+    /// come in since) and is still remembered inside <see cref="ReceiverStore.KnownDirectoriesRetention"/>.
+    /// A bulletin completed since, that no directory, old or new, ever named (G7TAJ's IARU
+    /// 08-OCT, completed from its own pieces without the day's directory ever reaching him
+    /// whole), still shows on the held list, named from the bulletin itself.
+    /// </summary>
+    [Fact]
+    public void HeldBulletins_AStaleDirectoryPlusABulletinNoDirectoryNames_ShowsBoth()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var bulletins = TestBulletins.Day(30, 2);
+        var plan = PlanDay(bulletins, Day1);
+        ulong first = Ids.Of(bulletins.OrderBy(b => b.Bid, StringComparer.Ordinal).First());
+        Feed(store, plan.Frames.Where(f => f.ObjectId == Ids.DirectoryOf(plan) || f.ObjectId == first));
+        Assert.NotNull(store.Directory);
+        var namedBid = bulletins.OrderBy(b => b.Bid, StringComparer.Ordinal).First().Bid;
+
+        // Four days pass; nothing newer is heard, so the same directory is still "the newest
+        // heard" and is still within the 48 h retention that keeps it remembered.
+        time.Advance(TimeSpan.FromHours(20));
+
+        // A bulletin no directory, old or new, ever named: rebuilt from its own pieces alone.
+        var orphan = TestBulletins.Make(999, 2000);
+        var obj = TransferObject.ForBulletin(orphan, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        for (uint esi = 0; !store.IsComplete(obj.ObjectId); esi++)
+        {
+            store.Accept(obj.Frame(esi).ToBytes());
+        }
+
+        var held = store.HeldBulletins();
+        var namedRow = Assert.Single(held, h => h.Bid == namedBid);
+        Assert.True(namedRow.Complete);
+        var orphanRow = Assert.Single(held, h => h.ObjectId == obj.ObjectId);
+        Assert.True(orphanRow.Complete);
+        Assert.Equal(orphan.Bid, orphanRow.Bid);
+        Assert.Equal(orphan.Title, orphanRow.Title);
+    }
+
+    /// <summary>
+    /// Issue #68: a part-received object that no known directory names (today's or any other
+    /// remembered one) still gets a row, with its progress bar, so a weak station sees the
+    /// pieces it has of a bulletin it has not heard named yet.
+    /// </summary>
+    [Fact]
+    public void HeldBulletins_APartialObjectNoDirectoryNames_ShowsWithItsBar()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
+        var bulletins = TestBulletins.Day(31, 2);
+        var plan = PlanDay(bulletins, Day1);
+        Feed(store, plan.Frames.Where(f => f.ObjectId == Ids.DirectoryOf(plan)));
+        Assert.NotNull(store.Directory);
+
+        // A big bulletin no directory names, with only its first piece heard: genuinely partial.
+        var partial = TestBulletins.Make(998, 9000);
+        var obj = TransferObject.ForBulletin(partial, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Assert.True(obj.SourceSymbols > 1);
+        store.Accept(obj.Frame(0).ToBytes());
+
+        var row = Assert.Single(store.HeldBulletins(), h => h.ObjectId == obj.ObjectId);
+        Assert.False(row.Complete);
+        Assert.Null(row.Bid);
+        Assert.Null(row.Title);
+        Assert.Equal(1, row.Received);
+        Assert.Equal(obj.Oti.SourceBlockSymbols(0), row.Needed);
+        Assert.True(row.Needed > 1);
     }
 }
