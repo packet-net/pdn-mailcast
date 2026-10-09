@@ -212,6 +212,58 @@ public class MailTests
         Assert.Equal("deferred", deferredAttempt.GetProperty("saidShort").GetString());
     }
 
+    /// <summary>
+    /// Issue #73 review: the CT 150 survey script (root@10.45.0.235's
+    /// /usr/local/bin/mailcast-survey) reads <c>bulletins</c> from <c>GET /api/status</c> for its
+    /// bulletins_completed columns, and the receiver's own page used to read <c>deliveries</c>
+    /// from there too. Both stay on that endpoint, in their v0.8.7 shape, even though the page
+    /// itself now gets the same facts from <c>GET /api/mail</c> instead - this pins that the
+    /// fields, and the keys on each of their entries, are still there.
+    /// </summary>
+    [Fact]
+    public async Task Status_KeepsBulletinsAndDeliveriesFields_InTheirOldShape_ForScripts()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        await RebuildAsync(host.Intake, Samples.Bulletin(71), Samples.Bulletin(72));
+        time.Advance(TimeSpan.FromMinutes(5));
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "71_GB7RDG"
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred)), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(970, bodyLines: 200))); // a part-received one too
+
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+
+        var bulletins = status.GetProperty("bulletins").EnumerateArray().ToList();
+        Assert.Equal(3, bulletins.Count); // 71, 72 and the part-received one
+        var delivered = bulletins.Single(b => b.GetProperty("bid").GetString() == "71_GB7RDG");
+        foreach (string key in new[] { "bid", "title", "complete", "received", "needed", "delivery", "deliveryShort", "completedAt", "deliveredAt", "deliveredVerdict", "deliveredDetail" })
+        {
+            Assert.True(delivered.TryGetProperty(key, out _), $"bulletins[].{key} is missing");
+        }
+        Assert.True(delivered.GetProperty("complete").GetBoolean());
+        Assert.Equal("accepted", delivered.GetProperty("deliveryShort").GetString());
+        Assert.Equal(Start, delivered.GetProperty("completedAt").GetDateTimeOffset());
+        Assert.Equal(Start + TimeSpan.FromMinutes(5), delivered.GetProperty("deliveredAt").GetDateTimeOffset());
+        var partial = bulletins.Single(b => b.GetProperty("bid").ValueKind == JsonValueKind.Null);
+        Assert.False(partial.GetProperty("complete").GetBoolean());
+        Assert.Equal(1, partial.GetProperty("received").GetInt32());
+
+        var deliveries = status.GetProperty("deliveries").EnumerateArray().ToList();
+        Assert.NotEmpty(deliveries);
+        foreach (string key in new[] { "time", "bid", "title", "verdict", "said", "saidShort", "detail" })
+        {
+            Assert.True(deliveries[0].TryGetProperty(key, out _), $"deliveries[].{key} is missing");
+        }
+        Assert.Contains(deliveries, d => d.GetProperty("bid").GetString() == "71_GB7RDG" && d.GetProperty("saidShort").GetString() == "accepted");
+        Assert.Contains(deliveries, d => d.GetProperty("bid").GetString() == "72_GB7RDG" && d.GetProperty("saidShort").GetString() == "deferred");
+    }
+
     [Fact]
     public async Task HostileBulletin_IsServedAsPlainTextOnly_AndNeverAsMarkup()
     {

@@ -677,6 +677,8 @@ public sealed class StatusPage : IAsyncDisposable
         var config = _host.Config;
         var slot = _host.Slots.Last;
         var (directory, _) = _host.Intake.Progress();
+        var held = _host.Intake.HeldBulletins();
+        var mail = _host.Intake.Mail();
         double? liveTone = _host.Pipeline?.Tone.LiveFrequencyHz;
         return new
         {
@@ -774,17 +776,59 @@ public sealed class StatusPage : IAsyncDisposable
             pskReporter = PskView(_host.Intake.PskReporter, _host.Time.GetUtcNow()),
             // The daily report, when the config's "feedback" turns it on.
             feedback = _host.Feedback.View(),
-            // Issue #73: "stale" says the newest directory heard is not today's (UTC), so the
-            // combined Bulletins section can say plainly that its list is old, rather than
-            // letting the held bulletins below (not limited to that one directory) go
-            // unexplained. The bulletins themselves, part-received and complete, are on
-            // GET /api/mail now (MailList): see its "partial" and "items".
+            // Issue #68: "stale" says the newest directory heard is not today's (UTC), so the
+            // page can say plainly that its list is old, rather than letting the bulletins
+            // below (which are not limited to that one directory) go unexplained.
             directory = directory is null ? null : new
             {
                 date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                 entries = directory.Entries.Count,
                 stale = directory.Date != DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime),
             },
+            // Issue #68: every bulletin still relevant, complete or not, whether or not the
+            // newest directory heard happens to name it; see Intake.HeldBulletins. Issue #73
+            // review: kept on this endpoint, unchanged in shape, for scripts that already read it
+            // (such as the CT 150 survey script); the combined Bulletins section on the page
+            // itself now reads the same facts from GET /api/mail instead (its "partial" and
+            // "items"), which is where new work should look.
+            bulletins = held.Select(p =>
+            {
+                var delivered = p.Bid is null ? null : _host.Ledger.Latest(p.Bid);
+                // Issue #47: the rebuilt time is only known once it is held, waiting or archived.
+                var mailEntry = p.Complete ? mail.ById(p.ObjectId) : null;
+                var final = FinalAnswer(mailEntry, delivered);
+                return new
+                {
+                    bid = p.Bid,
+                    title = p.Title,
+                    complete = p.Complete,
+                    received = p.Received,
+                    needed = p.Needed,
+                    delivery = delivered is null ? null : DeliveryService.Describe(delivered.Verdict),
+                    deliveryShort = delivered is null ? null : DeliveryService.DescribeShort(delivered.Verdict),
+                    completedAt = mailEntry?.Completed,
+                    deliveredAt = final?.At,
+                    deliveredVerdict = final?.Verdict,
+                    deliveredDetail = final?.Detail,
+                };
+            }),
+            // Issue #73 review: kept on this endpoint, unchanged in shape, for the same reason as
+            // "bulletins" above. It also remains the only place a delivery record for a bulletin
+            // since pruned from the archive (by archive.days or archive.maxMegabytes) can still be
+            // read: the combined Bulletins section's reader, on GET /api/mail, can only show a
+            // bulletin's attempts while the bulletin itself is still held. In practice the 200
+            // most recent records here age out of relevance before a 30 day archive does, so this
+            // is a narrow gap, not a working fallback list; see docs/receiver.md.
+            deliveries = _host.Ledger.Recent.Take(40).Select(r => new
+            {
+                time = r.Time,
+                bid = r.Bid,
+                title = r.Title,
+                verdict = r.Verdict,
+                said = DeliveryService.Describe(r.Verdict),
+                saidShort = DeliveryService.DescribeShort(r.Verdict),
+                detail = r.Detail,
+            }),
         };
     }
 
@@ -1274,18 +1318,6 @@ public sealed class StatusPage : IAsyncDisposable
         int offset = Math.Max(0, int.TryParse(query["offset"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int o) ? o : 0);
         int limit = int.TryParse(query["limit"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int l) ? Math.Clamp(l, 1, MaxMailPage) : 50;
         var mail = _host.Intake.Mail(); // in memory, newest first, already counted: no files, no lock, no sorting
-        int delivered = 0, refused = 0;
-        foreach (var entry in mail.NewestFirst)
-        {
-            if (entry.Verdict is Packet.Mailcast.BbsVerdict.Accepted or Packet.Mailcast.BbsVerdict.AlreadyHad)
-            {
-                delivered++;
-            }
-            else if (entry.Verdict is Packet.Mailcast.BbsVerdict.Refused)
-            {
-                refused++;
-            }
-        }
         var partial = _host.Intake.HeldBulletins().Where(h => !h.Complete).Select(h => new
         {
             bid = h.Bid,
@@ -1298,14 +1330,31 @@ public sealed class StatusPage : IAsyncDisposable
             total = mail.Count,
             waiting = mail.Waiting,
             archived = mail.Archived,
-            delivered,
-            refused,
+            // Counted once, when the snapshot was built: see MailSnapshot (issue #73 review).
+            delivered = mail.Delivered,
+            refused = mail.Refused,
             partial,
             offset,
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
             items = mail.Page(offset, limit).Select(MailView).ToList(),
         };
+    }
+
+    /// <summary>
+    /// The BBS's final answer for a bulletin on the progress list, if it has one: from the archive
+    /// copy, or from the delivery record when no copy is kept. One back in the outbox, sent again,
+    /// has none yet, whatever the BBS said the time before; nor does one only deferred.
+    /// </summary>
+    private static (DateTimeOffset At, Packet.Mailcast.BbsVerdict Verdict, string? Detail)? FinalAnswer(Packet.Mailcast.MailEntry? held, DeliveryRecord? delivered)
+    {
+        if (held is not null)
+        {
+            return held.Waiting || held.Verdict is not { } verdict ? null : (held.Time, verdict, held.Detail);
+        }
+        return delivered is { Verdict: DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Refused }
+            ? (delivered.Time, DeliveryService.Final(delivered.Verdict), delivered.Detail)
+            : null;
     }
 
     /// <summary>One bulletin for the list: what it is, where it is, what the BBS has said, and
