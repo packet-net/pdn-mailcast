@@ -251,7 +251,7 @@ public sealed class DeliveryService
     }
 
     /// <summary>The archive's name for a final answer.</summary>
-    private static BbsVerdict Final(DeliveryVerdict verdict) => verdict switch
+    internal static BbsVerdict Final(DeliveryVerdict verdict) => verdict switch
     {
         DeliveryVerdict.Accepted => BbsVerdict.Accepted,
         DeliveryVerdict.AlreadyHad => BbsVerdict.AlreadyHad,
