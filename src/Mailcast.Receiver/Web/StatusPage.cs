@@ -676,7 +676,8 @@ public sealed class StatusPage : IAsyncDisposable
     {
         var config = _host.Config;
         var slot = _host.Slots.Last;
-        var (directory, progress) = _host.Intake.Progress();
+        var (directory, _) = _host.Intake.Progress();
+        var held = _host.Intake.HeldBulletins();
         var mail = _host.Intake.Mail();
         double? liveTone = _host.Pipeline?.Tone.LiveFrequencyHz;
         return new
@@ -775,23 +776,33 @@ public sealed class StatusPage : IAsyncDisposable
             pskReporter = PskView(_host.Intake.PskReporter, _host.Time.GetUtcNow()),
             // The daily report, when the config's "feedback" turns it on.
             feedback = _host.Feedback.View(),
-            directory = directory is null ? null : new { date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), entries = directory.Entries.Count },
-            bulletins = progress.Select(p =>
+            // Issue #68: "stale" says the newest directory heard is not today's (UTC), so the
+            // page can say plainly that its list is old, rather than letting the bulletins
+            // below (which are not limited to that one directory) go unexplained.
+            directory = directory is null ? null : new
             {
-                var delivered = _host.Ledger.Latest(p.Entry.Bid);
+                date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                entries = directory.Entries.Count,
+                stale = directory.Date != DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime),
+            },
+            // Issue #68: every bulletin still relevant, complete or not, whether or not the
+            // newest directory heard happens to name it; see Intake.HeldBulletins.
+            bulletins = held.Select(p =>
+            {
+                var delivered = p.Bid is null ? null : _host.Ledger.Latest(p.Bid);
                 // Issue #47: the rebuilt time is only known once it is held, waiting or archived.
-                var held = p.Complete ? mail.ById(p.Entry.ObjectId) : null;
-                var final = FinalAnswer(held, delivered);
+                var mailEntry = p.Complete ? mail.ById(p.ObjectId) : null;
+                var final = FinalAnswer(mailEntry, delivered);
                 return new
                 {
-                    bid = p.Entry.Bid,
-                    title = p.Entry.Title,
+                    bid = p.Bid,
+                    title = p.Title,
                     complete = p.Complete,
                     received = p.Received,
                     needed = p.Needed,
                     delivery = delivered is null ? null : DeliveryService.Describe(delivered.Verdict),
                     deliveryShort = delivered is null ? null : DeliveryService.DescribeShort(delivered.Verdict),
-                    completedAt = held?.Completed,
+                    completedAt = mailEntry?.Completed,
                     deliveredAt = final?.At,
                     deliveredVerdict = final?.Verdict,
                     deliveredDetail = final?.Detail,

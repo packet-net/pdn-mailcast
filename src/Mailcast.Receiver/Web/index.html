@@ -283,7 +283,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 
   <section class="wide">
     <h2>Bulletins</h2>
-    <div id="bulletins" class="muted">No list of bulletins heard yet. It comes round in each slot.</div>
+    <div id="bulletins" class="muted">This receiver holds nothing yet. Bulletins come round in each slot.</div>
   </section>
 
   <section class="wide">
@@ -687,12 +687,20 @@ async function refresh() {
       ${r.problem ? `<dt>Last problem</dt><dd class="bad">${esc(r.problem)} (${when(r.problemAt)})</dd>` : ""}`;
   }
 
-  if (s.directory && s.bulletins.length) {
+  if (s.bulletins.length) {
     const done = s.bulletins.filter(b => b.complete).length;
     $("bulletins").className = "";
-    $("bulletins").innerHTML = `<p class="muted">List of ${esc(s.directory.date)}: ${s.bulletins.length} bulletins, ${done} complete here.</p>
+    // Issue #68: the list is everything this receiver holds, not only the newest directory's
+    // entries, so the heading says plainly when that directory is stale rather than claiming
+    // the list below is "of" a day it has moved past.
+    const heading = !s.directory
+      ? `Holding ${s.bulletins.length} bulletin${s.bulletins.length === 1 ? "" : "s"}, ${done} complete here; no list heard yet.`
+      : s.directory.stale
+      ? `Newest list heard is from ${esc(s.directory.date)}. Holding ${s.bulletins.length} bulletin${s.bulletins.length === 1 ? "" : "s"} here, ${done} complete.`
+      : `List of ${esc(s.directory.date)}: ${s.bulletins.length} bulletins, ${done} complete here.`;
+    $("bulletins").innerHTML = `<p class="muted">${heading}</p>
       <table><tr><th>BID</th><th>Title</th><th>Pieces</th><th>BBS</th></tr>
-      ${s.bulletins.map(b => `<tr><td class="num" data-label="BID">${esc(b.bid)}</td><td data-label="Title">${esc(b.title)}</td>
+      ${s.bulletins.map(b => `<tr><td class="num" data-label="BID">${b.bid ? esc(b.bid) : '<span class="muted">not yet named</span>'}</td><td data-label="Title">${esc(b.title || "")}</td>
         <td data-label="Pieces">${b.complete ? '<span class="good">complete</span>'
           : b.needed ? `<div class="bar" title="${b.received} of ${b.needed}"><span style="width:${Math.min(100, 100 * b.received / b.needed)}%"></span></div>`
           : '<span class="muted">none yet</span>'}</td>

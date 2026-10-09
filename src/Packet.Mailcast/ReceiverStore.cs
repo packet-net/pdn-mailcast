@@ -119,6 +119,23 @@ public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, 
 /// <param name="Needed">Symbols needed at least (K), if any have been received.</param>
 public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Received, int Needed);
 
+/// <summary>
+/// One object the receiver currently holds and worth showing on its own list (issue #68): a
+/// complete bulletin still relevant, or a part-received object, named by a remembered directory
+/// or not. See <see cref="ReceiverStore.HeldBulletins"/>.
+/// </summary>
+/// <param name="ObjectId">The object's ID.</param>
+/// <param name="Bid">
+/// Its BID, from any directory still remembered that names the object, or, once it is complete,
+/// from the bulletin itself; null if neither is known yet (a part-received object no known
+/// directory names).
+/// </param>
+/// <param name="Title">Its title, the same way; null on the same terms as <paramref name="Bid"/>.</param>
+/// <param name="Complete">Whether it has been rebuilt.</param>
+/// <param name="Received">Symbols held, if not complete.</param>
+/// <param name="Needed">Symbols needed at least (K), if any have been received.</param>
+public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed);
+
 /// <summary>Settings for a <see cref="ReceiverStore"/>.</summary>
 public sealed record ReceiverStoreOptions
 {
@@ -506,9 +523,18 @@ public sealed class ReceiverStore
             // A repeat of a directory already held: still worth telling the caller which, so a
             // slot that only ever resends one already known (WN3/WN4 taking turns give the same
             // rotation a different ID each, or this is the first repeat since a restart) is not
-            // treated as one where the directory was never heard.
-            _knownDirectories.TryGetValue(frame.ObjectId, out var known);
-            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: known.Directory);
+            // treated as one where the directory was never heard. Issue #68 review: also
+            // refreshes when it was last heard, so a directory repeated every so often (well
+            // inside KnownDirectoriesRetention each time) keeps being "remembered" for as long
+            // as it keeps being heard, rather than the clock running out 48 h after the one time
+            // it was originally rebuilt.
+            BroadcastDirectory? repeated = null;
+            if (_knownDirectories.TryGetValue(frame.ObjectId, out var known))
+            {
+                repeated = known.Directory;
+                RememberDirectory(frame.ObjectId, known.Directory);
+            }
+            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: repeated);
         }
         if (!_compression.Knows(frame.DictionaryId))
         {
@@ -764,6 +790,105 @@ public sealed class ReceiverStore
                 : new ObjectProgress(entry, false, held.Symbols.Count, held.Oti.SourceBlockSymbols(0)));
         }
         return result;
+    }
+
+    /// <summary>
+    /// Everything on the receiver's own bulletin list (issue #68): every complete bulletin still
+    /// relevant - named by a directory still remembered (<see cref="KnownDirectoriesRetention"/>),
+    /// or completed within that same window even when no remembered directory names it - and
+    /// every part-received object currently held, named or not, so its progress bar shows whether
+    /// or not the newest directory heard happens to name it. Title and BID come from any
+    /// remembered directory naming the object, or, once it is complete, from the bulletin itself;
+    /// a part-received object no known directory names gets a row with a null title and BID,
+    /// which the page shows as "not yet named".
+    /// </summary>
+    public IReadOnlyList<HeldBulletin> HeldBulletins()
+    {
+        var cutoff = _options.Time.GetUtcNow() - KnownDirectoriesRetention;
+
+        // The newest name for an object, from whichever remembered directory names it. Seeded
+        // first from the one directory heard now (Directory itself never ages out: it stays
+        // "the newest heard" until something replaces it, however long that takes), so a
+        // station stuck on one directory for days still gets every title even once that
+        // directory has fallen out of the 48 h cache below (issue #68 review).
+        var named = new Dictionary<ulong, (string Bid, string Title, DateTimeOffset HeardAt)>();
+        if (Directory is { } newest)
+        {
+            foreach (var entry in newest.Entries)
+            {
+                named[entry.ObjectId] = (entry.Bid, entry.Title, DateTimeOffset.MinValue);
+            }
+        }
+        foreach (var (directory, heardAt) in _knownDirectories.Values)
+        {
+            foreach (var entry in directory.Entries)
+            {
+                if (!named.TryGetValue(entry.ObjectId, out var have) || heardAt > have.HeardAt)
+                {
+                    named[entry.ObjectId] = (entry.Bid, entry.Title, heardAt);
+                }
+            }
+        }
+
+        // The fullest instance of each partial object, found in one pass rather than once per entry.
+        var fullest = new Dictionary<ulong, Instance>();
+        foreach (var instance in _instances.Values)
+        {
+            if (!fullest.TryGetValue(instance.ObjectId, out var best) || instance.Symbols.Count > best.Symbols.Count)
+            {
+                fullest[instance.ObjectId] = instance;
+            }
+        }
+
+        var ids = new HashSet<ulong>(fullest.Keys);
+        foreach (var id in named.Keys)
+        {
+            if (_done.ContainsKey(id))
+            {
+                ids.Add(id);
+            }
+        }
+        // Newest answered (or, waiting, newest built) first; an entry's Completed time is never
+        // after its Time (it cannot be answered before it is rebuilt), so once Time itself falls
+        // behind the cutoff nothing further down the list can qualify either.
+        foreach (var entry in Mail.NewestFirst)
+        {
+            if (entry.Time < cutoff)
+            {
+                break;
+            }
+            if ((entry.Completed ?? entry.Time) >= cutoff)
+            {
+                ids.Add(entry.ObjectId);
+            }
+        }
+
+        var result = new List<HeldBulletin>(ids.Count);
+        foreach (var id in ids)
+        {
+            bool complete = _done.ContainsKey(id);
+            (string Bid, string Title, DateTimeOffset HeardAt)? name = named.TryGetValue(id, out var found) ? found : null;
+            string? bid = name?.Bid;
+            string? title = name?.Title;
+            int received = 0, needed = 0;
+            if (!complete && fullest.TryGetValue(id, out var held))
+            {
+                received = held.Symbols.Count;
+                needed = held.Oti.SourceBlockSymbols(0);
+            }
+            if (bid is null && complete && Mail.ById(id) is { } mailEntry)
+            {
+                bid = mailEntry.Bid;
+                title = mailEntry.Title;
+            }
+            result.Add(new HeldBulletin(id, bid, title, complete, received, needed));
+        }
+        return [.. result
+            .OrderBy(r => r.Complete) // part-received first: the most actionable
+            .ThenByDescending(r => r.Received)
+            .ThenBy(r => r.Bid is null) // named rows before ones still "not yet named"
+            .ThenBy(r => r.Bid, StringComparer.Ordinal)
+            .ThenBy(r => r.ObjectId)];
     }
 
     /// <summary>
