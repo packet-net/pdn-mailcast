@@ -410,6 +410,32 @@ function channelProfile(c) {
   }
   return svg;
 }
+/* the day strip of small side views (packet-net/pdn-mailcast#50): the SVG for each slot is built
+   by the receiver itself (ChannelPicture.cs), so its geometry is unit tested there; this just
+   lays the slots out and captions each with its hour and, when there is one, its height. */
+function channelPathStrip(c) {
+  const row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.flexWrap = "wrap";
+  row.style.gap = "4px";
+  for (const h of c.history) {
+    const cell = document.createElement("div");
+    cell.style.flex = "1 1 70px";
+    cell.style.minWidth = "70px";
+    if (h.pathSvg) cell.innerHTML = h.pathSvg;
+    const hour = new Date(h.slot).toISOString().slice(11, 13);
+    const labelled = h.modes.some(m => m.label);
+    const said = !h.enough ? "too little heard"
+      : h.virtualHeightKm !== null ? `${h.virtualHeightKm} km`
+      : labelled ? "height unknown"
+      : h.modes.length <= 1 ? "1 path" : "paths not labelled";
+    cell.appendChild(el("div", `${hour}:00 ${said}`, "muted"));
+    cell.lastChild.style.fontSize = "10px";
+    cell.lastChild.style.textAlign = "center";
+    row.appendChild(cell);
+  }
+  return row;
+}
 /* the last 24 hours: one column per hour, a dot per mode at its delay, darker for stronger */
 function channelStrip(c) {
   const W = 320, H = 74, L = 34, R = 8, T = 6, B = 18, top = 5;
@@ -443,6 +469,20 @@ function channel(s) {
   }
   box.className = "";
   box.innerHTML = `<div><span class="head">Last slot (${utc(c.slot)}):</span> ${esc(c.words)}</div>`;
+  if (c.pathSvg) {
+    const pic = document.createElement("div");
+    pic.style.marginTop = "8px";
+    pic.innerHTML = c.pathSvg;
+    box.appendChild(pic);
+  }
+  if (c.history.some(h => h.pathSvg)) {
+    const cap = document.createElement("div");
+    cap.className = "muted";
+    cap.style.marginTop = "10px";
+    cap.textContent = "Today, slot by slot: a small side view per slot (packet-net/pdn-mailcast#50); dashed when the height could not be measured.";
+    box.appendChild(cap);
+    box.appendChild(channelPathStrip(c));
+  }
   if (c.enough && c.profile) {
     box.appendChild(channelProfile(c));
     const rows = [];

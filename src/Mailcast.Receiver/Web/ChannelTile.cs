@@ -54,6 +54,9 @@ internal static class ChannelTile
             words = latest?.Words ?? Nothing,
             floorDb = latest?.FloorDb,
             profile = latest is { Enough: true } r ? new { startMs = r.ProfileStartMs, stepMs = r.ProfileStepMs, db = r.ProfileDb } : null,
+            // The side view of the path (packet-net/pdn-mailcast#50): null when there is nothing
+            // plausible to draw (the receiver's place is not known, or nothing could be labelled).
+            pathSvg = latest is null ? null : ChannelPicture.Svg(latest, latest.Locator, MainPictureWidthPx, withLabels: true),
             // The same slot measured the other way (the bursts when this is the probe's, or the
             // probe when this is the bursts'), when it was measured both ways.
             other = latest?.Other is { } o ? new
@@ -94,7 +97,16 @@ internal static class ChannelTile
                 dopplerSpreadHz = h.DopplerSpreadHz,
                 virtualHeightKm = h.VirtualHeightKm,
                 words = h.Words,
+                // A small, unlabelled side view for the day strip; null for the same reasons as
+                // the main one above.
+                pathSvg = ChannelPicture.Svg(h, h.Locator, StripPictureWidthPx, withLabels: false),
             }),
         };
     }
+
+    /// <summary>The main side view's width, px (packet-net/pdn-mailcast#50): the SVG's own viewBox scales it to fit, phone or desktop.</summary>
+    private const int MainPictureWidthPx = 340;
+
+    /// <summary>One day strip picture's width, px.</summary>
+    private const int StripPictureWidthPx = 140;
 }
