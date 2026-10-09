@@ -281,16 +281,6 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
     </ul>
   </section>
 
-  <section class="wide">
-    <h2>Bulletins</h2>
-    <div id="bulletins" class="muted">This receiver holds nothing yet. Bulletins come round in each slot.</div>
-  </section>
-
-  <section class="wide">
-    <h2>What the BBS said</h2>
-    <div id="deliveries" class="muted">Nothing delivered yet.</div>
-  </section>
-
   <section class="wide" id="feedbackBox" hidden>
     <h2>Daily report</h2>
     <dl id="feedback"></dl>
@@ -298,9 +288,9 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
   </section>
 
   <section class="wide">
-    <h2>Mail</h2>
-    <p class="muted" id="mailNote">Every bulletin this receiver has rebuilt: those waiting for your BBS, and a copy of each one it has answered for.</p>
-    <div id="mail" class="muted">No bulletins yet.</div>
+    <h2>Bulletins</h2>
+    <p class="muted" id="mailNote">Loading...</p>
+    <div id="mail" class="muted">Loading...</div>
     <div class="pager" id="pager" hidden>
       <button type="button" class="plain" id="newer">Newer</button>
       <span id="mailPage" class="muted"></span>
@@ -687,35 +677,6 @@ async function refresh() {
       ${r.problem ? `<dt>Last problem</dt><dd class="bad">${esc(r.problem)} (${when(r.problemAt)})</dd>` : ""}`;
   }
 
-  if (s.bulletins.length) {
-    const done = s.bulletins.filter(b => b.complete).length;
-    $("bulletins").className = "";
-    // Issue #68: the list is everything this receiver holds, not only the newest directory's
-    // entries, so the heading says plainly when that directory is stale rather than claiming
-    // the list below is "of" a day it has moved past.
-    const heading = !s.directory
-      ? `Holding ${s.bulletins.length} bulletin${s.bulletins.length === 1 ? "" : "s"}, ${done} complete here; no list heard yet.`
-      : s.directory.stale
-      ? `Newest list heard is from ${esc(s.directory.date)}. Holding ${s.bulletins.length} bulletin${s.bulletins.length === 1 ? "" : "s"} here, ${done} complete.`
-      : `List of ${esc(s.directory.date)}: ${s.bulletins.length} bulletins, ${done} complete here.`;
-    $("bulletins").innerHTML = `<p class="muted">${heading}</p>
-      <table><tr><th>BID</th><th>Title</th><th>Pieces</th><th>BBS</th></tr>
-      ${s.bulletins.map(b => `<tr><td class="num" data-label="BID">${b.bid ? esc(b.bid) : '<span class="muted">not yet named</span>'}</td><td data-label="Title">${esc(b.title || "")}</td>
-        <td data-label="Pieces">${b.complete ? '<span class="good">complete</span>'
-          : b.needed ? `<div class="bar" title="${b.received} of ${b.needed}"><span style="width:${Math.min(100, 100 * b.received / b.needed)}%"></span></div>`
-          : '<span class="muted">none yet</span>'}</td>
-        <td data-label="BBS"><div>${b.delivery ? badge(b.deliveryShort, b.delivery) : (b.complete ? badge("waiting", "waiting for the BBS") : "")}
-          ${b.completedAt ? `<div class="muted bulletin-time">completed <time>${esc(when(b.completedAt))}</time></div>` : ""}
-          ${b.deliveredAt ? `<div class="muted bulletin-time">${b.deliveredVerdict === "refused" ? "refused by BBS" : "delivered to BBS"} <time>${esc(when(b.deliveredAt))}</time></div>` : ""}</div></td></tr>`).join("")}</table>`;
-  }
-
-  if (s.deliveries.length) {
-    $("deliveries").className = "";
-    $("deliveries").innerHTML = `<table><tr><th>When</th><th>BID</th><th>Title</th><th>Answer</th></tr>
-      ${s.deliveries.map(d => `<tr><td class="num" data-label="When">${when(d.time)}</td><td class="num" data-label="BID">${esc(d.bid)}</td><td data-label="Title">${esc(d.title)}</td>
-        <td data-label="Answer">${badge(d.saidShort, d.said)}${d.detail ? `<div class="muted">${esc(d.detail)}</div>` : ""}</td></tr>`).join("")}</table>`;
-  }
-
   const lvl = s.level, target = lvl.advice === "target";
   $("band").hidden = !target;
   $("levelNote").hidden = !target;
@@ -958,6 +919,29 @@ function timeLine(label, t) {
   line.append(el("time", when(t)));
   return line;
 }
+/* Issue #73: a part-received object, with its progress bar, in the same table as the complete
+   bulletins below it: not clickable (there is nothing to read or resend yet), and the columns a
+   complete row has no answer for yet show "-" rather than being left looking broken. */
+function partialRow(p) {
+  const tr = el("tr");
+  const bidCell = td(null, "num", "BID");
+  bidCell.append(p.bid ? document.createTextNode(p.bid) : el("span", "not yet named", "muted"));
+  tr.append(bidCell, td("-", null, "From"), td("-", null, "To"), td("-", null, "@"), td(p.title || "", null, "Title"),
+    td("-", "num", "Date"), td("-", "num", "Size"));
+  const cell = td(null, null, "Status");
+  if (p.needed) {
+    const bar = el("div", null, "bar");
+    bar.title = `${p.received} of ${p.needed}`;
+    const fill = el("span");
+    fill.style.width = `${Math.min(100, 100 * p.received / p.needed)}%`;
+    bar.append(fill);
+    cell.append(bar);
+  } else {
+    cell.append(el("span", "none yet", "muted"));
+  }
+  tr.append(cell);
+  return tr;
+}
 function mailRow(m) {
   const tr = el("tr", null, "pick" + (viewing === m.id ? " open" : ""));
   tr.dataset.id = m.id;
@@ -975,20 +959,37 @@ function mailRow(m) {
   tr.append(cell);
   return tr;
 }
+/* Issue #73: the combined Bulletins section's summary line - counts (only the ones worth a
+   word), then the archive limits "Mail" always showed, then, when the newest directory heard is
+   stale (issue #68), a note about that too. "status" is refresh()'s own global, polled on its
+   own schedule, so it may still be null the first time refreshMail() lands first. */
+function mailSummary(m) {
+  const parts = [];
+  if (m.partial.length) parts.push(`${m.partial.length} coming in`);
+  if (m.waiting) parts.push(`${m.waiting} waiting for your BBS`);
+  if (m.delivered) parts.push(`${m.delivered} delivered`);
+  if (m.refused) parts.push(`${m.refused} refused`);
+  let note = (parts.length ? parts.join(", ") : "Nothing held yet.")
+    + ` (each kept ${m.archive.days} days, ${m.archive.maxMegabytes} MB at most). Click one to read it.`;
+  if (status && status.directory && status.directory.stale) note += ` Newest list heard is from ${status.directory.date}.`;
+  return note;
+}
 async function refreshMail() {
   const r = await api(`api/mail?offset=${mailOffset}&limit=${PAGE}`);
   if (!r.ok) { $("mailNote").textContent = r.error; $("mailNote").className = "bad"; return; }
   mail = r.body;
   $("mailNote").className = "muted";
   if (mail.total > 0 && mailOffset >= mail.total) { mailOffset = Math.max(0, mailOffset - PAGE); return refreshMail(); }
-  $("mailNote").textContent = `${mail.waiting} waiting for your BBS, ${mail.archived} kept after the BBS answered `
-    + `(each kept ${mail.archive.days} days, ${mail.archive.maxMegabytes} MB at most). Click one to read it.`;
+  $("mailNote").textContent = mailSummary(mail);
   const box = $("mail");
-  if (!mail.items.length) { box.className = "muted"; box.textContent = "No bulletins yet."; $("pager").hidden = true; return; }
+  // Issue #73: part-received rows always on top of the first page; the paged archive and outbox
+  // (mail.items) follow, on every page, exactly as "Mail" ordered them before.
+  const partial = mailOffset === 0 ? mail.partial : [];
+  if (!mail.items.length && !partial.length) { box.className = "muted"; box.textContent = "Nothing held yet."; $("pager").hidden = true; return; }
   box.className = "";
   const table = el("table"), head = el("tr");
   for (const h of ["BID", "From", "To", "@", "Title", "Date", "Size", "Status"]) head.append(el("th", h));
-  table.append(head, ...mail.items.map(mailRow));
+  table.append(head, ...partial.map(partialRow), ...mail.items.map(mailRow));
   box.replaceChildren(table);
   $("pager").hidden = mail.total <= PAGE;
   $("mailPage").textContent = `${mailOffset + 1} to ${Math.min(mail.total, mailOffset + PAGE)} of ${mail.total}`;
@@ -1011,6 +1012,25 @@ async function view(m) {
   for (const [k, v] of [["BID", m.bid], ["From", m.from], ["To", m.to + (m.at ? "@" + m.at : "")], ["Title", m.title],
     ["Status", m.status + (m.detail ? ": " + m.detail : "")]]) dl.append(el("dt", k), el("dd", v));
   $("viewHead").replaceChildren(dl);
+  if (m.attempts && m.attempts.length) {
+    // Issue #73: what the BBS said each time this BID was offered, oldest first, so a bulletin
+    // deferred or unconfirmed before its final answer still shows that whole story, not only the
+    // final line the Status row above already gives.
+    const hist = el("div", null, "muted");
+    hist.style.marginTop = "8px";
+    hist.append(el("div", "What the BBS said:"));
+    const list = document.createElement("ul");
+    list.style.margin = "4px 0 0";
+    list.style.paddingLeft = "18px";
+    for (const a of m.attempts) {
+      const li = document.createElement("li");
+      li.append(badgeEl(a.saidShort, a.said, badgeClass(a.saidShort)), document.createTextNode(" " + when(a.time)));
+      if (a.detail) li.append(el("span", ` - ${a.detail}`, "muted"));
+      list.append(li);
+    }
+    hist.append(list);
+    $("viewHead").append(hist);
+  }
   $("resend").hidden = m.waiting;
   $("raw").href = `api/mail/${encodeURIComponent(m.id)}`;
   $("viewText").textContent = "Loading...";
