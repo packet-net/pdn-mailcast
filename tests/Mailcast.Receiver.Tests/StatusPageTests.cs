@@ -432,27 +432,35 @@ public class StatusPageTests
     public async Task ConfiguredDial_ReachesTheWebSdrTuningTheStatusAndTheSettings()
     {
         using var dir = new TempDirectory();
-        var config = Config(dir.Path) with { Audio = "ubersdr:wessex.zapto.org", DialKHz = 7053.5 };
+        // An unusual but accepted dial (audio centre 1300 Hz, inside the 1000-2000 Hz this
+        // receiver can use), as a measured or typed dial would be.
+        var config = Config(dir.Path) with { Audio = "ubersdr:wessex.zapto.org", DialKHz = 7052.5 };
         await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
         // Never started, so it holds no port; disposing it would make HttpListener bind one.
         var page = new StatusPage(host, null, _ => { });
 
         await using var pipeline = host.CreatePipeline(AudioSource.Parse(config.Audio), host.Config);
-        Assert.Equal(7_053_500, pipeline.DialHz);
-        Assert.Equal(7_053_500, pipeline.WebSdrTuning.FrequencyHz);
+        Assert.Equal(7_052_500, pipeline.DialHz);
+        Assert.Equal(7_052_500, pipeline.WebSdrTuning.FrequencyHz);
         Assert.Equal("Upper", pipeline.WebSdrTuning.Sideband.ToString());
 
         var status = JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
-        Assert.Equal(7053.5, status.GetProperty("audio").GetProperty("dialKHz").GetDouble());
-        Assert.Equal(7055.3, status.GetProperty("audio").GetProperty("centreKHz").GetDouble(), 6);
-        Assert.Equal(1800, status.GetProperty("markers").GetProperty("centreHz").GetDouble());
+        Assert.Equal(7052.5, status.GetProperty("audio").GetProperty("dialKHz").GetDouble());
+        // The signal's true centre never moves with the dial: the transmitter does not.
+        Assert.Equal(7053.8, status.GetProperty("audio").GetProperty("centreKHz").GetDouble(), 6);
+        // ...but where it falls in this receiver's own audio does: 1300 Hz at this (unusual) dial.
+        Assert.Equal(1300, status.GetProperty("markers").GetProperty("centreHz").GetDouble(), 3);
 
         var settings = JsonSerializer.SerializeToElement(StatusPage.SettingsView(host.Config), ReceiverConfig.JsonLine);
-        Assert.Equal(7053.5, settings.GetProperty("dialKHz").GetDouble());
+        Assert.Equal(7052.5, settings.GetProperty("dialKHz").GetDouble());
 
         // The form has no dial: saving the other settings keeps the one in the file.
         var saved = StatusPage.Apply(host.Config, new StatusPage.SettingsForm("ubersdr:wessex.zapto.org", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS"));
-        Assert.Equal(7053.5, saved.DialKHz);
+        Assert.Equal(7052.5, saved.DialKHz);
+
+        // A sound card's own dial (typed or measured) writes dialKHz directly through the form.
+        var narrowed = StatusPage.Apply(host.Config, new StatusPage.SettingsForm("plughw:CARD=Device,DEV=0", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS", DialKHz: 7052.3));
+        Assert.Equal(7052.3, narrowed.DialKHz);
     }
 
     [Fact]

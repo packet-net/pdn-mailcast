@@ -10,11 +10,34 @@ public static class OnAir
     public const string Destination = "MCAST";
 
     /// <summary>
-    /// Where the centre of the signal and the tone fall in the receiver's audio, the MS110D
-    /// standard's own centre. The receiver's USB dial is a setting
-    /// (<see cref="ReceiverConfig.DialKHz"/>); the signal is always this far above it.
+    /// The waveform name ModemCatalog places the receive modem by: MS110D WN4. Receiving is
+    /// autobaud, so this only names a default; whichever waveform the head end actually sent
+    /// still decodes.
+    /// </summary>
+    public const string Mode = "ms110d-wn4";
+
+    /// <summary>
+    /// GB7RDG's transmitter, fixed: it never moves off 7.0538 MHz, whatever dial a receiver
+    /// uses. See <see cref="ReceiverConfig.DialKHz"/> and <see cref="AudioCentreHz"/>.
+    /// </summary>
+    public const double TransmitHz = 7_053_800;
+
+    /// <summary>
+    /// Where the centre of the signal and the tone fall in a receiver's own audio for its USB
+    /// dial, the MS110D standard's own centre at the usual 7.052 MHz dial: 1800 Hz. A sound card
+    /// behind a rig filter 2.4 kHz or narrower can be set to 7.0523 MHz instead (docs/receiver.md),
+    /// which puts it at 1500 Hz. The receiver's own front end (<see cref="ChannelMaths.ToBaseband"/>)
+    /// always mixes to this fixed 1800 Hz baseband reference regardless of the dial; what moves
+    /// with the dial is <see cref="AudioCentreHz(double)"/>.
     /// </summary>
     public const double CentreAudioHz = 1800;
+
+    /// <summary>
+    /// Where <see cref="TransmitHz"/> falls in a receiver's own audio for USB dial
+    /// <paramref name="dialHz"/>, Hz: <see cref="CentreAudioHz"/> (1800) at the usual 7.052 MHz
+    /// dial, or 1500 Hz at 7.0523 MHz.
+    /// </summary>
+    public static double AudioCentreHz(double dialHz) => TransmitHz - dialHz;
 
     /// <summary>
     /// Half the signal's occupied width: MS110D with the standard's pulse shaping fills about

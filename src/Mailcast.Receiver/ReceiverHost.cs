@@ -49,7 +49,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         // the one Slots.Last knows about.
         Intake.Piece += OnPieceHandled;
         Hooks = new SlotHooks(() => Config, time, log);
-        ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place);
+        ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place) { AudioCentreHz = config.AudioCentreHz };
         ChannelWatch.Measured += FrameHistory.OnChannelMeasured;
         if (config.Rig is not null)
         {
@@ -84,6 +84,53 @@ public sealed class ReceiverHost : IAsyncDisposable
             WakeListenNow();
         }
         return result;
+    }
+
+    /// <summary>How long "Measure my filter" listens to band noise.</summary>
+    public static readonly TimeSpan FilterMeasureDuration = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Listens to <see cref="FilterMeasureDuration"/> of this sound card's own audio and measures
+    /// its receive filter (<see cref="FilterScan.Analyse"/>): only for a sound card, and never
+    /// while a slot's own window is open (nothing should be tuned away from the signal then).
+    /// </summary>
+    public async Task<(RadioFilter? Filter, string? Problem)> MeasureFilterAsync(CancellationToken cancellation)
+    {
+        var pipeline = Pipeline;
+        if (pipeline is null || AudioSource.Parse(Config.Audio).Kind != AudioSourceKind.Alsa)
+        {
+            return (null, "\"Measure my filter\" is for a sound card only.");
+        }
+        var now = _time.GetUtcNow();
+        var window = ListeningWindow.SoundCard(now, Schedule);
+        if (window is { } w && now >= w.Opens && now < w.Closes)
+        {
+            return (null, "A slot's window is open now: wait until it closes and try again.");
+        }
+        var samples = new List<float>();
+        var gate = new object();
+        void OnBlock(ReadOnlySpan<float> block)
+        {
+            lock (gate)
+            {
+                samples.AddRange(block);
+            }
+        }
+        pipeline.SourceBlock += OnBlock;
+        try
+        {
+            await Task.Delay(FilterMeasureDuration, _time, cancellation).ConfigureAwait(false);
+        }
+        finally
+        {
+            pipeline.SourceBlock -= OnBlock;
+        }
+        float[] captured;
+        lock (gate)
+        {
+            captured = samples.ToArray();
+        }
+        return FilterScan.Analyse(captured);
     }
 
     private readonly object _listenNowGate = new();
@@ -590,6 +637,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 || _config.DialKHz != config.DialKHz;
             _config = config;
             Intake.Sources = config.AcceptedSources;
+            ChannelWatch.AudioCentreHz = config.AudioCentreHz;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
             if (audioChanged)
             {

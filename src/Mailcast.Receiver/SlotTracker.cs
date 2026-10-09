@@ -130,7 +130,7 @@ public sealed class SlotTracker
     {
         var began = _time.GetUtcNow() - tone.Duration;
         string measured = string.Create(CultureInfo.InvariantCulture,
-            $"{tone.FrequencyHz:F1} Hz, {tone.OffsetHz:+0.0;-0.0;0.0} Hz from {OnAir.CentreAudioHz:F0} Hz, SNR {tone.SnrDb:F1} dB in 3 kHz, {tone.Duration.TotalSeconds:F0} s");
+            $"{tone.FrequencyHz:F1} Hz, {tone.OffsetHz:+0.0;-0.0;0.0} Hz from {tone.FrequencyHz - tone.OffsetHz:F0} Hz, SNR {tone.SnrDb:F1} dB in 3 kHz, {tone.Duration.TotalSeconds:F0} s");
         lock (_gate)
         {
             DateTimeOffset? slot = null;
