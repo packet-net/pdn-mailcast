@@ -753,13 +753,15 @@ public sealed class StatusPage : IAsyncDisposable
             framesHeard = _host.Intake.FramesHeard,
             // Issue #48: a slim list of the slots "what was heard" can show; the full drill-down
             // for one of them is GET /api/slots/{slotTicks}/frames, fetched when the page opens
-            // it. slotTicks is the slot's UTC instant in .NET ticks: plain digits, nothing to
-            // URL-escape, and round-trips exactly (milliseconds alone would not: the slot's
-            // identity can carry sub-millisecond precision).
+            // it. slotTicks is the slot's UTC instant in .NET ticks, sent as a string of digits:
+            // nothing to URL-escape, and no precision lost. As a JSON number it would be about
+            // 6.4e17, past JavaScript's safe integer range (2^53), and the browser would round it
+            // to a slot that does not exist. Milliseconds would fit but lose the sub-millisecond
+            // part of the slot's identity.
             heardSlots = _host.FrameHistory.Slots.Reverse().Select(s => new
             {
                 slot = s.Slot,
-                slotTicks = s.Slot.UtcTicks,
+                slotTicks = s.Slot.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 bursts = s.Bursts.Count,
                 frames = s.Bursts.Sum(b => b.Pieces.Count),
             }),
@@ -1387,9 +1389,10 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>
     /// Issue #48: one slot's drill-down, its bursts and their pieces, from
     /// <see cref="ReceiverHost.FrameHistory"/>. <paramref name="rawSlot"/> is the slot's identity
-    /// as the page's own JSON gives it in <c>heardSlots</c> (<c>slotTicks</c>): the slot's UTC
-    /// instant in .NET ticks, plain digits, so nothing here needs URL-escaping, and it round-trips
-    /// exactly. 404 for a slot that was never kept, or has since been trimmed.
+    /// as the page's own JSON gives it in <c>heardSlots</c> (<c>slotTicks</c>, a string): the
+    /// slot's UTC instant in .NET ticks, plain digits, so nothing here needs URL-escaping. 400
+    /// for anything that is not a tick count a date can have; 404 for a slot that was never
+    /// kept, or has since been trimmed.
     /// </summary>
     private async Task ServeSlotFramesAsync(HttpListenerContext context, string rawSlot)
     {

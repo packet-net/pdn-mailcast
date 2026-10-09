@@ -472,7 +472,8 @@ function channel(s) {
 }
 
 /* ---------- what was heard: issue #48's per-slot drill-down ---------- */
-/* Which slots the user has opened (slotTicks as strings), so a refresh does not collapse them. */
+/* Which slots the user has opened, so a refresh does not collapse them. slotTicks is a string of
+   digits, never a number: it is past 2^53, so a number would be rounded to a slot that does not exist. */
 const heardOpen = new Set();
 /* The summary list's last rendered shape (slotTicks:frames, joined), so an unchanged poll does nothing. */
 let heardKey = "";
