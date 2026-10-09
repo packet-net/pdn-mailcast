@@ -105,7 +105,11 @@ internal static class ChannelPicture
         var all = ground.Concat(layers.SelectMany(l => l.Points)).Concat(rays.SelectMany(r => r.Points)).ToList();
         double minX = all.Min(p => p.X), maxX = all.Max(p => p.X);
         double minY = all.Min(p => p.Y), maxY = all.Max(p => p.Y);
-        double padTop = withLabels ? 22 : 4, padSide = 8, padBottom = withLabels ? 50 : 14;
+        // Room above the curves for the ray labels, staggered one above another (see below), and
+        // below for the end labels and the scale note (one line more when it also says a height
+        // was not measured).
+        double padTop = withLabels ? 22 + (Math.Max(0, rays.Count - 1) * 15) : 4, padSide = 8;
+        double padBottom = withLabels ? (rays.Any(r => !r.HeightKnown) ? 64 : 50) : 14;
         double scale = (widthPx - (2 * padSide)) / (maxX - minX);
         double height = ((maxY - minY) * scale) + padTop + padBottom;
         double Sx(PicturePoint p) => ((p.X - minX) * scale) + padSide;
@@ -121,8 +125,9 @@ internal static class ChannelPicture
             sb.Append(CultureInfo.InvariantCulture,
                 $"<polyline points=\"{Points(l.Points, Sx, Sy)}\" fill=\"none\" stroke=\"#c9a227\" stroke-width=\"{(withLabels ? 3 : 2)}\" stroke-opacity=\"0.35\"{dash}/>");
         }
-        foreach (var r in rays)
+        for (int i = 0; i < rays.Count; i++)
         {
+            var r = rays[i];
             double strength = Strength(r.Mode.PowerDb);
             double width = Math.Max(1, (withLabels ? 6 : 3) * strength);
             double opacity = Math.Min(1, strength);
@@ -134,10 +139,13 @@ internal static class ChannelPicture
                 + $"stroke-width=\"{F(width)}\" stroke-opacity=\"{F(opacity)}\"{dash}><title>{WebUtility.HtmlEncode(title)}</title></polyline>");
             if (withLabels)
             {
+                // Staggered by which ray it is (not stacked at the same height) so two labels
+                // whose bounce points land close together do not sit on top of each other.
                 var apex = r.Points[1];
+                double labelY = Sy(apex) - 8 - (i * 15);
                 string label = string.Create(CultureInfo.InvariantCulture, $"{r.Mode.Label}: {r.Mode.DelayMs:+0.00;-0.00;0.00} ms, {r.Mode.PowerDb:0} dB");
                 sb.Append(CultureInfo.InvariantCulture,
-                    $"<text x=\"{F(Sx(apex))}\" y=\"{F(Sy(apex) - 8)}\" text-anchor=\"middle\" font-size=\"11\" fill=\"var(--accent)\">{WebUtility.HtmlEncode(label)}</text>");
+                    $"<text x=\"{F(Sx(apex))}\" y=\"{F(labelY)}\" text-anchor=\"middle\" font-size=\"11\" fill=\"var(--accent)\">{WebUtility.HtmlEncode(label)}</text>");
             }
         }
         if (withLabels)
@@ -151,13 +159,17 @@ internal static class ChannelPicture
                 + $"<text x=\"{F(Sx(end))}\" y=\"{F(Sy(end) + 16)}\" text-anchor=\"end\" font-size=\"11\">{WebUtility.HtmlEncode(endLocator ?? "receiver")}</text>");
             double midX = (Sx(start) + Sx(end)) / 2;
             bool anyNominal = rays.Any(r => !r.HeightKnown);
-            string scaleNote = anyNominal
-                ? "The earth's curve and the layer's height are both drawn several times too deep so the bend is easy to see; the ground distance is to scale. The dashed path's height could not be measured, so it is drawn at a nominal 300 km."
-                : "The earth's curve and the layer's height are both drawn several times too deep so the bend is easy to see; the ground distance is to scale.";
+            // Kept short, and split onto its own lines, rather than one long line: SVG text does
+            // not wrap, so a note this length in one line would run off the picture's width.
             sb.Append(CultureInfo.InvariantCulture,
                 $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 30)}\" text-anchor=\"middle\" font-size=\"10\" fill=\"var(--soft)\">{Math.Round(groundKm)} km</text>");
             sb.Append(CultureInfo.InvariantCulture,
-                $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 42)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">{WebUtility.HtmlEncode(scaleNote)}</text>");
+                $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 42)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">Curve &amp; height exaggerated; distance to scale.</text>");
+            if (anyNominal)
+            {
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 54)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">Dashed: height unmeasured, nominal 300 km.</text>");
+            }
         }
         sb.Append("</svg>");
         return sb.ToString();
