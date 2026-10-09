@@ -124,6 +124,17 @@
     main table td:not([data-label]) { grid-template-columns: 1fr; }
     main table td[data-label]::before { content: attr(data-label); color: var(--soft); font-size: 12px; }
   }
+  /* Issue #48: "What was heard" drill-down. Self-contained: no table, so it reads fine narrow. */
+  #heardSlots details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+  #heardSlots summary { cursor: pointer; font-weight: 500; }
+  #heardSlots summary .muted { font-weight: 400; }
+  .heardBurst { border-top: 1px solid var(--line); padding: 8px 0; }
+  .heardBurst:first-child { border-top: none; }
+  .heardBurstHead { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--soft); font-size: 13px; margin-bottom: 4px; }
+  .heardPieces { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; font-size: 13px; }
+  .heardPieces li { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 3px 0; border-bottom: 1px dotted var(--line); }
+  .heardPieces li:last-child { border-bottom: none; }
+  .heardEsi { font-variant-numeric: tabular-nums; color: var(--soft); min-width: 2.5em; }
 </style>
 </head>
 <body>
@@ -202,6 +213,12 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
   <section>
     <h2>Channel</h2>
     <div id="channel" class="muted">Measured after each slot, from the probe after the tone and the bursts this receiver decodes. Nothing measured yet.</div>
+  </section>
+
+  <section class="wide" id="heardBox">
+    <h2>What was heard</h2>
+    <p class="muted">The last few slots, burst by burst: each frame's piece number, whether it was new, already held or completed what it belongs to, and whether its CRC was good. For checking coverage and for debugging. Kept in memory only, not written to disk, so it starts empty again after a restart.</p>
+    <div id="heardSlots" class="muted">Nothing heard yet.</div>
   </section>
 
   <section class="wide">
@@ -454,6 +471,74 @@ function channel(s) {
   if (c.tooLong) box.appendChild(el("div", `${c.tooLong} burst${c.tooLong === 1 ? " was" : "s were"} too long to keep, so left out.`, "muted"));
 }
 
+/* ---------- what was heard: issue #48's per-slot drill-down ---------- */
+/* Which slots the user has opened, so a refresh does not collapse them. slotTicks is a string of
+   digits, never a number: it is past 2^53, so a number would be rounded to a slot that does not exist. */
+const heardOpen = new Set();
+/* The summary list's last rendered shape (slotTicks:frames, joined), so an unchanged poll does nothing. */
+let heardKey = "";
+
+function heard(s) {
+  const list = s.heardSlots || [];
+  const key = list.map(x => `${x.slotTicks}:${x.frames}`).join(",");
+  if (key === heardKey) return;
+  heardKey = key;
+  const box = $("heardSlots");
+  if (!list.length) { box.className = "muted"; box.textContent = "Nothing heard yet."; return; }
+  box.className = "";
+  box.innerHTML = list.map(x => `
+    <details id="heardSlot_${x.slotTicks}">
+      <summary>${when(x.slot)} <span class="muted">, ${x.bursts} burst${x.bursts === 1 ? "" : "s"}, ${x.frames} frame${x.frames === 1 ? "" : "s"}</span></summary>
+      <div class="heardBody muted">Loading...</div>
+    </details>`).join("");
+  for (const x of list) {
+    const row = document.getElementById(`heardSlot_${x.slotTicks}`);
+    if (!row) continue;
+    if (heardOpen.has(String(x.slotTicks))) { row.open = true; loadHeardSlot(x.slotTicks); }
+    row.addEventListener("toggle", () => {
+      if (row.open) { heardOpen.add(String(x.slotTicks)); loadHeardSlot(x.slotTicks); }
+      else heardOpen.delete(String(x.slotTicks));
+    });
+  }
+}
+
+async function loadHeardSlot(slotTicks) {
+  const body = document.querySelector(`#heardSlot_${slotTicks} .heardBody`);
+  if (!body) return;
+  const r = await api(`api/slots/${slotTicks}/frames`);
+  if (!r.ok) { body.className = "muted"; body.textContent = r.error; return; }
+  body.className = "";
+  body.innerHTML = r.body.bursts.length
+    ? r.body.bursts.map(heardBurstHtml).join("")
+    : `<p class="muted">No bursts kept for this slot.</p>`;
+}
+
+function heardBurstHtml(b) {
+  return `<div class="heardBurst">
+    <div class="heardBurstHead">
+      <span>${when(b.started)}</span>
+      <span>${b.words ? esc(b.words) : "waveform not known"}</span>
+      <span>${b.snrDb === null || b.snrDb === undefined ? "SNR not measured yet" : `SNR ${b.snrDb} dB`}</span>
+      <span>${b.frames} frame${b.frames === 1 ? "" : "s"}</span>
+    </div>
+    <ul class="heardPieces">${b.pieces.map(heardPieceHtml).join("")}</ul>
+  </div>`;
+}
+
+const heardStatusWords = {
+  new: "new", alreadyHeld: "already held", completedObject: "completed",
+  rejected: "rejected", notRecognised: "not recognised", unknownDictionary: "unknown dictionary",
+};
+function heardPieceHtml(p) {
+  const cls = p.status === "completedObject" ? "good" : p.status === "rejected" || p.status === "notRecognised" ? "bad" : "";
+  return `<li>
+    <span class="heardEsi">#${p.esi ?? "-"}</span>
+    <span class="${cls}">${esc(heardStatusWords[p.status] || p.status)}</span>
+    <span>${p.crcGood ? "CRC good" : "CRC bad"}</span>
+    <span>${esc(p.what)}</span>
+  </li>`;
+}
+
 /* ---------- status ---------- */
 async function refresh() {
   const r = await api("api/status");
@@ -464,6 +549,7 @@ async function refresh() {
   schedule(s);
   spectrogram(s);
   channel(s);
+  heard(s);
 
   if (s.slot) {
     const t = s.slot.tone;

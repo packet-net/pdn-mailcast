@@ -666,6 +666,7 @@ public class SignInTests
     [InlineData("GET", "api/settings")]
     [InlineData("GET", "api/mail")]
     [InlineData("GET", "api/mail/0000000000000001")]
+    [InlineData("GET", "api/slots/1760011200000/frames")]
     [InlineData("POST", "api/settings")]
     [InlineData("POST", "api/mail/resend")]
     public async Task Api_WithoutASession_Is401AsJson(string method, string url)

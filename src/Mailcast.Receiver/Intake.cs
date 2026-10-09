@@ -5,6 +5,14 @@ using Packet.Mailcast.Propagation;
 namespace Mailcast.Receiver;
 
 /// <summary>
+/// One piece as the intake worker handled it (issue #48): what the store made of it
+/// (<see cref="Result"/>), its piece number from the frame itself, the waveform it came on, and
+/// when the worker got to it. Raised by <see cref="Intake.Piece"/>, on the worker, so recording
+/// it (see <see cref="SlotFrameHistory"/>) costs nothing on the audio thread.
+/// </summary>
+public readonly record struct PieceHandled(AcceptResult Result, uint? Esi, string? Waveform, DateTimeOffset Heard);
+
+/// <summary>
 /// Takes broadcast frames from the modem and keeps them in the <see cref="ReceiverStore"/>,
 /// which persists every piece so bulletins add up across days and restarts.
 /// </summary>
@@ -111,6 +119,12 @@ public sealed class Intake : IAsyncDisposable
 
     /// <summary>A broadcast frame was heard, with the waveform it came on if the modem said (raised on the worker).</summary>
     public event Action<string?>? FrameHeard;
+
+    /// <summary>
+    /// Issue #48: a piece was handled, new or not, whatever became of it, raised on the worker
+    /// right after <see cref="FrameHeard"/>. For the status page's "what was heard" drill-down.
+    /// </summary>
+    public event Action<PieceHandled>? Piece;
 
     /// <summary>
     /// A directory was rebuilt (raised on the worker, after <see cref="FrameHeard"/> for the
@@ -433,6 +447,14 @@ public sealed class Intake : IAsyncDisposable
         {
             FrameHeard?.Invoke(waveform);
             Report(result);
+            if (Piece is { } piece)
+            {
+                // A second, cheap parse, only for the piece number: the store does not hand it
+                // back in the result, and re-parsing here keeps this issue #48 bookkeeping out
+                // of ReceiverStore's own contract. esi stays null (not a mailcast frame) when it failed.
+                uint? esi = MailcastFrame.TryParse(payload.Span, out var frame) ? frame!.EncodingSymbolId : null;
+                piece.Invoke(new PieceHandled(result, esi, waveform, _time.GetUtcNow()));
+            }
         }
         catch (Exception e)
         {

@@ -81,6 +81,91 @@ public class StatusPageTests
         Assert.Equal(saved, host.Config);
     }
 
+    /// <summary>Issue #48: the status page's slim list of recent slots, and the full drill-down for one of them.</summary>
+    [Fact]
+    public async Task SlotFrames_Api_ReturnsWhatWasHeardForThatSlot()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        var heardSlots = status.GetProperty("heardSlots").EnumerateArray().ToList();
+        var slim = Assert.Single(heardSlots);
+        Assert.True(slim.GetProperty("frames").GetInt32() > 0);
+        // A string, not a number: a real slot's ticks (about 6.4e17) are past JavaScript's safe
+        // integer range, so as a number the page would round them to a slot that is not held.
+        var ticksJson = slim.GetProperty("slotTicks");
+        Assert.Equal(JsonValueKind.String, ticksJson.ValueKind);
+        string slotTicks = ticksJson.GetString()!;
+        var held = Assert.Single(host.FrameHistory.Slots).Slot;
+        Assert.Equal(held.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture), slotTicks);
+        Assert.True(held.UtcTicks > (1L << 53)); // real size: the case that broke in the browser
+        // What a browser would have sent had it been a number: a double's nearest value.
+        long rounded = (long)(double)held.UtcTicks;
+        if (rounded != held.UtcTicks)
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"api/slots/{rounded}/frames")).StatusCode);
+        }
+
+        var detail = await http.GetFromJsonAsync<JsonElement>($"api/slots/{slotTicks}/frames");
+        var bursts = detail.GetProperty("bursts").EnumerateArray().ToList();
+        Assert.NotEmpty(bursts);
+        var pieces = bursts[0].GetProperty("pieces").EnumerateArray().ToList();
+        Assert.NotEmpty(pieces);
+        Assert.True(pieces[0].TryGetProperty("what", out _));
+        Assert.True(pieces[0].TryGetProperty("status", out _));
+        Assert.True(pieces[0].TryGetProperty("crcGood", out _));
+        Assert.Contains(bursts, b => b.GetProperty("pieces").EnumerateArray()
+            .Any(p => p.GetProperty("status").GetString() == "completedObject"));
+    }
+
+    /// <summary>Issue #48: anything in the slot's place that is not a tick count a date can have is a 400.</summary>
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("12x4")]
+    [InlineData("1.5")]
+    [InlineData("-1")]
+    [InlineData("-639271010995923120")]
+    [InlineData("3155378976000000000")] // one tick past DateTimeOffset.MaxValue
+    [InlineData("9223372036854775807")] // long.MaxValue
+    [InlineData("99999999999999999999")] // past long
+    public async Task SlotFrames_Api_400sForASlotThatIsNotATickCount(string raw)
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.GetAsync($"api/slots/{raw}/frames");
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+    }
+
+    /// <summary>Issue #48: a slot never heard (or scrolled out of the last few) is a 404, not an error.</summary>
+    [Fact]
+    public async Task SlotFrames_Api_404sForASlotNeverHeard()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.GetAsync($"api/slots/{DateTimeOffset.UtcNow.UtcTicks}/frames");
+
+        Assert.Equal(HttpStatusCode.NotFound, answer.StatusCode);
+    }
+
     private static object FeedbackForm(bool enabled, string? callsign) =>
         new { audio = "wav:/nonexistent.wav", type = "linBpq", host = "127.0.0.1", port = 8011, login = "Q0CAST", password = "", command = "BBS", feedback = new { enabled, callsign } };
 
