@@ -523,9 +523,18 @@ public sealed class ReceiverStore
             // A repeat of a directory already held: still worth telling the caller which, so a
             // slot that only ever resends one already known (WN3/WN4 taking turns give the same
             // rotation a different ID each, or this is the first repeat since a restart) is not
-            // treated as one where the directory was never heard.
-            _knownDirectories.TryGetValue(frame.ObjectId, out var known);
-            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: known.Directory);
+            // treated as one where the directory was never heard. Issue #68 review: also
+            // refreshes when it was last heard, so a directory repeated every so often (well
+            // inside KnownDirectoriesRetention each time) keeps being "remembered" for as long
+            // as it keeps being heard, rather than the clock running out 48 h after the one time
+            // it was originally rebuilt.
+            BroadcastDirectory? repeated = null;
+            if (_knownDirectories.TryGetValue(frame.ObjectId, out var known))
+            {
+                repeated = known.Directory;
+                RememberDirectory(frame.ObjectId, known.Directory);
+            }
+            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: repeated);
         }
         if (!_compression.Knows(frame.DictionaryId))
         {
@@ -797,8 +806,19 @@ public sealed class ReceiverStore
     {
         var cutoff = _options.Time.GetUtcNow() - KnownDirectoriesRetention;
 
-        // The newest name for an object, from whichever remembered directory names it.
+        // The newest name for an object, from whichever remembered directory names it. Seeded
+        // first from the one directory heard now (Directory itself never ages out: it stays
+        // "the newest heard" until something replaces it, however long that takes), so a
+        // station stuck on one directory for days still gets every title even once that
+        // directory has fallen out of the 48 h cache below (issue #68 review).
         var named = new Dictionary<ulong, (string Bid, string Title, DateTimeOffset HeardAt)>();
+        if (Directory is { } newest)
+        {
+            foreach (var entry in newest.Entries)
+            {
+                named[entry.ObjectId] = (entry.Bid, entry.Title, DateTimeOffset.MinValue);
+            }
+        }
         foreach (var (directory, heardAt) in _knownDirectories.Values)
         {
             foreach (var entry in directory.Entries)
@@ -828,8 +848,15 @@ public sealed class ReceiverStore
                 ids.Add(id);
             }
         }
+        // Newest answered (or, waiting, newest built) first; an entry's Completed time is never
+        // after its Time (it cannot be answered before it is rebuilt), so once Time itself falls
+        // behind the cutoff nothing further down the list can qualify either.
         foreach (var entry in Mail.NewestFirst)
         {
+            if (entry.Time < cutoff)
+            {
+                break;
+            }
             if ((entry.Completed ?? entry.Time) >= cutoff)
             {
                 ids.Add(entry.ObjectId);
@@ -859,7 +886,8 @@ public sealed class ReceiverStore
         return [.. result
             .OrderBy(r => r.Complete) // part-received first: the most actionable
             .ThenByDescending(r => r.Received)
-            .ThenBy(r => r.Bid ?? "￿", StringComparer.Ordinal)
+            .ThenBy(r => r.Bid is null) // named rows before ones still "not yet named"
+            .ThenBy(r => r.Bid, StringComparer.Ordinal)
             .ThenBy(r => r.ObjectId)];
     }
 

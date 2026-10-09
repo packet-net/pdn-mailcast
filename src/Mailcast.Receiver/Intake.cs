@@ -365,7 +365,13 @@ public sealed class Intake : IAsyncDisposable
 
     /// <summary>
     /// Issue #68: everything on the receiver's own bulletin list, as
-    /// <see cref="ReceiverStore.HeldBulletins"/>, read fresh under the store's lock.
+    /// <see cref="ReceiverStore.HeldBulletins"/>, read fresh under the store's lock, unlike
+    /// <see cref="Progress"/> and <see cref="Mail"/>, which read a published snapshot instead.
+    /// It needs the lock because it depends on the current time (the 48 h cutoff), not only on
+    /// what changed at the last frame, so a plain published snapshot would go stale between
+    /// frames; but the work it does under the lock is bounded the same way <see cref="Pending"/>
+    /// and <see cref="PartialObjects"/> already are, and this is read only for the status page's
+    /// poll, seconds apart, never per frame, so holding the lock a little longer here is fine.
     /// </summary>
     public IReadOnlyList<HeldBulletin> HeldBulletins()
     {

@@ -510,4 +510,65 @@ public class ReceiverStoreTests
         Assert.Equal(obj.Oti.SourceBlockSymbols(0), row.Needed);
         Assert.True(row.Needed > 1);
     }
+
+    /// <summary>
+    /// Issue #68 review: a station can be stuck on one directory for well over the 48 h
+    /// <see cref="ReceiverStore.KnownDirectoriesRetention"/>, with nothing newer ever heard to
+    /// refresh <c>_knownDirectories</c>. Its entries still get their titles from the persisted
+    /// <see cref="ReceiverStore.Directory"/> field, which never ages out on its own: on the real
+    /// CT 150 store this was checked against (G4WNC, stuck on the 2026-10-07 directory), all 10
+    /// entries lost their names without this fallback.
+    /// </summary>
+    [Fact]
+    public void HeldBulletins_ADirectoryHeardOnceMoreThan48HoursAgo_StillNamesItsEntries()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var bulletins = TestBulletins.Day(41, 3);
+        var plan = PlanDay(bulletins, Day1);
+        Feed(store, plan.Frames); // the directory and every bulletin in it, all rebuilt
+        Assert.NotNull(store.Directory);
+
+        // Heard once, then nothing ever again: no repeat to refresh _knownDirectories, and well
+        // past the 48 h it keeps an entry for.
+        time.Advance(TimeSpan.FromHours(72));
+        store.Expire(); // Accept() would do this anyway at the next frame; forced to be sure
+
+        var held = store.HeldBulletins();
+        Assert.Equal(bulletins.Count, held.Count);
+        foreach (var bulletin in bulletins)
+        {
+            var row = Assert.Single(held, h => h.Bid == bulletin.Bid);
+            Assert.True(row.Complete);
+            Assert.Equal(bulletin.Title, row.Title);
+        }
+    }
+
+    /// <summary>
+    /// Issue #68 review: a directory repeated every so often, each gap well inside the 48 h
+    /// retention, must keep being "remembered" past the point where 48 h have passed since it
+    /// was first (and only) rebuilt - the window means <em>last</em> heard, not first.
+    /// </summary>
+    [Fact]
+    public void Accept_ARepeatOfAKnownDirectory_RefreshesWhenItWasLastHeard()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 0, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var bulletins = TestBulletins.Day(42, 2);
+        var plan = PlanDay(bulletins, Day1);
+        var directoryFrame = plan.Frames.First(f => f.ObjectId == Ids.DirectoryOf(plan));
+        Assert.Equal(FrameOutcome.CompletedDirectory, store.Accept(directoryFrame.ToBytes()).Outcome);
+
+        // Three repeats 20 h apart: 60 h in all, more than the 48 h retention counted from the
+        // original rebuild, but each gap on its own is well inside it.
+        for (int i = 0; i < 3; i++)
+        {
+            time.Advance(TimeSpan.FromHours(20));
+            var repeat = store.Accept(directoryFrame.ToBytes());
+            Assert.Equal(FrameOutcome.AlreadyComplete, repeat.Outcome);
+            Assert.NotNull(repeat.Directory);
+        }
+    }
 }
