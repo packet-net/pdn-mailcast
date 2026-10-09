@@ -130,14 +130,16 @@ internal static class ProbeChannel
     /// Measures the probe in <paramref name="audio"/>, 48 kHz audio from somewhere before the
     /// tone ended to somewhere after the probe. <paramref name="toneEndSeconds"/> is where the
     /// tone detector put the tone's end, seconds into the audio, and <paramref name="toneHz"/>
-    /// its measured frequency. Null when no probe was found.
+    /// its measured frequency. <paramref name="centreHz"/> is where the signal's centre is
+    /// expected in this audio (<see cref="ReceiverConfig.AudioCentreHz"/>); left out, the usual
+    /// 1800 Hz. Null when no probe was found.
     /// </summary>
-    public static ProbeMeasurement? Measure(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz) =>
-        Measure(ChannelMaths.ToBaseband(audio), toneEndSeconds, toneHz);
+    public static ProbeMeasurement? Measure(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz, double centreHz = OnAir.CentreAudioHz) =>
+        Measure(ChannelMaths.ToBaseband(audio, centreHz), toneEndSeconds, toneHz, centreHz);
 
-    /// <summary>As <see cref="Measure(ReadOnlySpan{float}, double, double)"/>, from the audio already at baseband (<see cref="ChannelMaths.ToBaseband"/>), which is left as it is.</summary>
+    /// <summary>As <see cref="Measure(ReadOnlySpan{float}, double, double, double)"/>, from the audio already at baseband (<see cref="ChannelMaths.ToBaseband"/>), which is left as it is.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private static ProbeMeasurement? Measure(Complex[] baseband, double toneEndSeconds, double toneHz)
+    private static ProbeMeasurement? Measure(Complex[] baseband, double toneEndSeconds, double toneHz, double centreHz = OnAir.CentreAudioHz)
     {
         var reference = Ref.Value;
         int L = Period;
@@ -157,7 +159,7 @@ internal static class ProbeChannel
         var ws = Workspace.For(baseband.Length, windows, L, reference.Dft);
         var bb = ws.Mixed;
         // On the tone's own frequency: the probe goes out on it.
-        double w = -2 * Math.PI * (toneHz - OnAir.CentreAudioHz) / Rate;
+        double w = -2 * Math.PI * (toneHz - centreHz) / Rate;
         for (int n = 0; n < baseband.Length; n++)
         {
             bb[n] = baseband[n] * Complex.FromPolarCoordinates(1, w * n);
@@ -397,7 +399,7 @@ internal static class ProbeChannel
                 SymbolRate = Probe.ChipRate,
                 RollOff = Probe.RollOff,
                 SnrDb = snr,
-                OffsetHz = toneHz - OnAir.CentreAudioHz,
+                OffsetHz = toneHz - centreHz,
                 DelayPerHzSeconds = DelayPerHz,
                 Pulse = pulse,
                 ContiguousDoppler = true,
@@ -422,11 +424,11 @@ internal static class ProbeChannel
     /// dropped. What little shift is left (the second pass's own) is taken out with
     /// <see cref="DelayPerHz"/>. Null when no probe was found.
     /// </summary>
-    public static (PathPicture Picture, ProbeMeasurement Measurement)? Analyse(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz)
+    public static (PathPicture Picture, ProbeMeasurement Measurement)? Analyse(ReadOnlySpan<float> audio, double toneEndSeconds, double toneHz, double centreHz = OnAir.CentreAudioHz)
     {
         // At baseband once, and mixed again on each mode's own frequency from there.
-        var baseband = ChannelMaths.ToBaseband(audio);
-        if (Measure(baseband, toneEndSeconds, toneHz) is not { } first || ChannelAnalysis.Analyse(first.Snapshots) is not { } rough)
+        var baseband = ChannelMaths.ToBaseband(audio, centreHz);
+        if (Measure(baseband, toneEndSeconds, toneHz, centreHz) is not { } first || ChannelAnalysis.Analyse(first.Snapshots) is not { } rough)
         {
             return null;
         }
@@ -454,7 +456,7 @@ internal static class ProbeChannel
             double shift = mode.CentroidHz is double c && Math.Abs(c) <= 4 && Math.Abs(c) >= 0.01 ? Math.Round(c, 3) : 0;
             if (!passes.TryGetValue(shift, out var pass))
             {
-                pass = Measure(baseband, toneEndSeconds, toneHz + shift) is { } again && ChannelAnalysis.Analyse(again.Snapshots) is { } picture ? (again, picture) : null;
+                pass = Measure(baseband, toneEndSeconds, toneHz + shift, centreHz) is { } again && ChannelAnalysis.Analyse(again.Snapshots) is { } picture ? (again, picture) : null;
                 passes[shift] = pass;
             }
             own[m] = pass ?? (first, rough);

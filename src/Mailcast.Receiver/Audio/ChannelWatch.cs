@@ -77,6 +77,13 @@ public sealed class ChannelWatch : IAsyncDisposable
     /// <summary>Rest after each burst as long as it took, to stay under half a core. Off for --decode and tests.</summary>
     internal bool Rest { get; set; } = true;
 
+    /// <summary>
+    /// Where the signal's centre is expected in a captured burst's or probe's audio (<see
+    /// cref="ReceiverConfig.AudioCentreHz"/>), for <see cref="BurstChannel"/> and <see
+    /// cref="ProbeChannel"/>: the usual 1800 Hz until the host sets it from the config in force.
+    /// </summary>
+    internal double AudioCentreHz { get; set; } = OnAir.CentreAudioHz;
+
     /// <summary>Whether the results are written to the state directory. Off for --decode, which must not touch a running service's.</summary>
     internal bool Persist { get; set; } = true;
 
@@ -340,7 +347,7 @@ public sealed class ChannelWatch : IAsyncDisposable
             var one = Stopwatch.StartNew();
             try
             {
-                if (ProbeChannel.Analyse(probe.Samples(), probe.ToneEndSeconds, probe.Tone.FrequencyHz) is { } found)
+                if (ProbeChannel.Analyse(probe.Samples(), probe.ToneEndSeconds, probe.Tone.FrequencyHz, AudioCentreHz) is { } found)
                 {
                     pictures.Add(found.Picture);
                 }
@@ -362,7 +369,7 @@ public sealed class ChannelWatch : IAsyncDisposable
             var one = Stopwatch.StartNew();
             try
             {
-                var series = BurstChannel.Measure(burst.Samples(), burst.EndSample, burst.Lock, burst.PayloadBits);
+                var series = BurstChannel.Measure(burst.Samples(), burst.EndSample, burst.Lock, burst.PayloadBits, AudioCentreHz);
                 if (series is not null && ChannelAnalysis.Analyse(series) is { } picture)
                 {
                     pictures.Add(picture);

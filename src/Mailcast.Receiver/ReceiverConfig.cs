@@ -100,11 +100,14 @@ public sealed record ReceiverConfig
     /// <summary>The usual USB dial, in kHz: 7.052 MHz, which puts the signal's centre on 7.0538 MHz.</summary>
     public const double DefaultDialKHz = 7052.0;
 
-    /// <summary>The lowest dial accepted, in kHz: the bottom of 160 m.</summary>
-    public const double LowestDialKHz = 1800;
+    /// <summary>
+    /// The lowest audio centre accepted, Hz: below this a rig's own filter (or its sound card)
+    /// cuts into the signal from below, and pdn-soundmodem's own guard against DC refuses it outright.
+    /// </summary>
+    public const double LowestAudioCentreHz = 1000;
 
-    /// <summary>The highest dial accepted, in kHz: the top of HF.</summary>
-    public const double HighestDialKHz = 30000;
+    /// <summary>The highest audio centre accepted, Hz: above this a typical SSB filter's own roll-off starts cutting in from above.</summary>
+    public const double HighestAudioCentreHz = 2000;
 
     /// <summary>
     /// The USB dial, in kHz. A web SDR is tuned here; a radio on a sound card should be set here.
@@ -414,10 +417,10 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException($"\"daylight\": {daylightProblem}; GB7RDG's is {{ \"locator\": \"IO91lk\", \"afterSunriseMinutes\": 120, \"beforeSunsetMinutes\": 30 }}");
         }
-        if (!(DialKHz >= LowestDialKHz && DialKHz <= HighestDialKHz))
+        if (!(AudioCentreHz >= LowestAudioCentreHz && AudioCentreHz <= HighestAudioCentreHz))
         {
             throw new ConfigException(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                $"\"dialKHz\" {DialKHz} is not a USB dial in kHz between {LowestDialKHz:F0} and {HighestDialKHz:F0}; the usual one is {DefaultDialKHz:F1}"));
+                $"\"dialKHz\" {DialKHz} puts the signal's centre at {AudioCentreHz:F0} Hz in your audio, outside the {LowestAudioCentreHz:F0} to {HighestAudioCentreHz:F0} Hz this receiver can use; the usual dial is {DefaultDialKHz:F1} (1800 Hz)"));
         }
         if (string.IsNullOrWhiteSpace(Bbs.Host))
         {

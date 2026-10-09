@@ -10,6 +10,13 @@ public static class OnAir
     public const string Destination = "MCAST";
 
     /// <summary>
+    /// The waveform name ModemCatalog places the receive modem by: MS110D WN4. Receiving is
+    /// autobaud, so this only names a default; whichever waveform the head end actually sent
+    /// still decodes.
+    /// </summary>
+    public const string Mode = "ms110d-wn4";
+
+    /// <summary>
     /// GB7RDG's transmitter, fixed: it never moves off 7.0538 MHz, whatever dial a receiver
     /// uses. See <see cref="ReceiverConfig.DialKHz"/> and <see cref="AudioCentreHz"/>.
     /// </summary>

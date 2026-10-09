@@ -59,12 +59,24 @@ public sealed class AudioPipeline : IAsyncDisposable
     private readonly TaskCompletionSource _threadDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Ms110dDemodulator? _receiver;
 
+    /// <summary>
+    /// Shifts this dial's audio to the modem's native 1800 Hz before it reaches the channel, so
+    /// the modem itself never has to know the dial moved: null at the usual dial (no shift
+    /// needed). pdn-soundmodem's own band-plan placement (<c>ModemCatalog</c>) cannot do this
+    /// below about 1740 Hz, inside the 1000 to 2000 Hz this receiver otherwise accepts, because
+    /// it guards MS110D's occupied band 350 Hz clear of DC; shifting the audio ourselves, this
+    /// far upstream, means the modem is never asked to run that close to DC at all.
+    /// </summary>
+    private readonly FrequencyShifter? _shift;
+
     private AudioPipeline(AudioSource source, double dialHz, Action<string> log, TimeProvider time)
     {
         _source = source;
         DialHz = dialHz;
         _log = log;
         _time = time;
+        double shiftHz = OnAir.CentreAudioHz - OnAir.AudioCentreHz(dialHz);
+        _shift = Math.Abs(shiftHz) < 0.5 ? null : new FrequencyShifter(OnAir.SampleRate, shiftHz);
         Channel = new SoundModemChannel(OnAir.SampleRate);
         Channel.ReceiveOnlyReason = "pdn-mailcast's receiver never transmits";
         Ms110dModem? modem = null;
@@ -83,7 +95,10 @@ public sealed class AudioPipeline : IAsyncDisposable
         Channel.FrameReceived += (_, _) => Burst.OnFrame(LockedWaveform);
         Channel.FrameReceived += (_, _) => Capture.OnFrame();
         Tone = new ToneDetector(OnAir.SampleRate, OnAir.AudioCentreHz(dialHz));
-        Channel.AddReceiveTap(Tone.Process);
+        // Not Channel.AddReceiveTap: the tone detector reads this dial's own audio (above, at
+        // OnAir.AudioCentreHz(dialHz)), while the channel's modem reads it shifted to the
+        // modem's native 1800 Hz (see _shift and Feed below); one receive tap cannot see two
+        // different versions of the same audio.
         // The channel probe follows the tone: its audio is kept from the same ring once it is all in.
         Tone.ToneMeasured += tone =>
         {
@@ -163,8 +178,8 @@ public sealed class AudioPipeline : IAsyncDisposable
     public int LocksReleased => Volatile.Read(ref _locksReleased);
 
     /// <summary>For tests: a pipeline over an input that is already open, watched as a sound card would be.</summary>
-    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true, TimeSpan? longestBurst = null, string? webSdrDescription = null) =>
-        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), ReceiverConfig.DefaultDialKHz * 1000, log, time)
+    internal static AudioPipeline ForInput(IAudioInput input, Action<string> log, TimeProvider time, AudioSource? source = null, bool watch = true, TimeSpan? longestBurst = null, string? webSdrDescription = null, double? dialHz = null) =>
+        new(source ?? new AudioSource(AudioSourceKind.Alsa, "test"), dialHz ?? ReceiverConfig.DefaultDialKHz * 1000, log, time)
         {
             _input = input,
             WebSdrDescription = webSdrDescription,
@@ -319,7 +334,19 @@ public sealed class AudioPipeline : IAsyncDisposable
             Channel.NoteCardClipping(samples);
         }
         Capture.Write(samples);
-        Channel.ProcessReceive(samples);
+        Tone.Process(samples);
+        if (_shift is null)
+        {
+            Channel.ProcessReceive(samples);
+        }
+        else
+        {
+            // Only the channel (the modem) reads the shifted audio: the tone detector and the
+            // capture above already read this dial's own, at OnAir.AudioCentreHz(DialHz).
+            var shifted = new float[samples.Length];
+            _shift.Process(samples, shifted);
+            Channel.ProcessReceive(shifted);
+        }
         ReleaseStuckLock(samples.Length);
         Burst.AfterBlock(LockedWaveform);
         Capture.AfterBlock();

@@ -181,18 +181,20 @@ public class ConfigTests
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, """{ "dialKHz": 7049.7 }""");
+        // An arbitrary dial inside the accepted range (not one of the two commonly recommended),
+        // as a "measure or type" dial would be.
+        File.WriteAllText(path, """{ "dialKHz": 7052.6 }""");
 
         var config = ReceiverConfig.Load(path);
-        Assert.Equal(7049.7, config.DialKHz);
+        Assert.Equal(7052.6, config.DialKHz);
         // The signal's true centre never depends on the dial: the transmitter does not move.
         Assert.Equal(7_053_800, config.CentreHz);
-        Assert.Equal(4100, config.AudioCentreHz, 3);
+        Assert.Equal(1200, config.AudioCentreHz, 3);
 
         config.Save(path);
-        Assert.Contains("\"dialKHz\": 7049.7", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Contains("\"dialKHz\": 7052.6", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.DoesNotContain("dialHz", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(7049.7, ReceiverConfig.Load(path).DialKHz);
+        Assert.Equal(7052.6, ReceiverConfig.Load(path).DialKHz);
     }
 
     [Fact]
@@ -239,8 +241,8 @@ public class ConfigTests
     [InlineData("""{ "dialKHz": 0 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": -7052 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": 7052000 }""", "dialKHz")]
-    [InlineData("""{ "dialKHz": 1799.9 }""", "dialKHz")]
-    [InlineData("""{ "dialKHz": 30000.1 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": 7051.79 }""", "dialKHz")]
+    [InlineData("""{ "dialKHz": 7052.81 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": "7052" }""", "JSON")]
     public void BadSetting_SaysWhich(string json, string mentioned)
     {

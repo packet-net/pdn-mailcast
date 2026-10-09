@@ -252,6 +252,12 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/listen-now", "POST"):
                     await ListenNowAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/filter/measure", "POST"):
+                    await MeasureFilterAsync(context).ConfigureAwait(false);
+                    break;
+                case ("/api/filter/dial", "POST"):
+                    await FilterDialAsync(context).ConfigureAwait(false);
+                    break;
                 case (_, "GET") when path.StartsWith(MailBase, StringComparison.Ordinal):
                     await ServeBulletinAsync(context, path[MailBase.Length..]).ConfigureAwait(false);
                     break;
@@ -1665,6 +1671,50 @@ public sealed class StatusPage : IAsyncDisposable
         {
             await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { ok = false, error = result.Reason })).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>The answer to a filter measurement or a typed one: the maths, or why not.</summary>
+    private static object FilterView((RadioFilter? Filter, string? Problem) result) => result.Filter is { } f
+        ? new { lowHz = f.LowHz, highHz = f.HighHz, widthHz = f.WidthHz, dialKHz = f.DialKHz, narrow = f.Narrow, problem = (string?)null }
+        : new { lowHz = (double?)null, highHz = (double?)null, widthHz = (double?)null, dialKHz = (double?)null, narrow = (bool?)null, problem = result.Problem };
+
+    /// <summary>
+    /// POST /api/filter/measure: listens to <see cref="ReceiverHost.FilterMeasureDuration"/> of
+    /// this sound card's own audio and measures its receive filter, for the settings page's
+    /// "Measure my filter". A problem, not a filter, if it could not be used or measured.
+    /// </summary>
+    private async Task MeasureFilterAsync(HttpListenerContext context)
+    {
+        var (answered, _) = await ReadBodyAsync(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        var result = await _host.MeasureFilterAsync(CancellationToken.None).ConfigureAwait(false);
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(FilterView(result), ReceiverConfig.JsonLine)).ConfigureAwait(false);
+    }
+
+    /// <summary>The typed-edges form: low and high, Hz.</summary>
+    private sealed record FilterEdgesForm(double LowHz, double HighHz);
+
+    /// <summary>
+    /// POST /api/filter/dial: the dial for a typed low and high edge, the same maths "Measure my
+    /// filter" uses.
+    /// </summary>
+    private static async Task FilterDialAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<FilterEdgesForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        if (form is null)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "That was not a low and high edge." })).ConfigureAwait(false);
+            return;
+        }
+        var result = FilterScan.DialFor(form.LowHz, form.HighHz);
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(FilterView(result), ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 
     /// <summary>The sound cards ALSA knows, as device names the audio setting takes.</summary>

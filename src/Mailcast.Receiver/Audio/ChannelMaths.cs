@@ -101,23 +101,31 @@ internal static class ChannelMaths
     }
 
     /// <summary>
-    /// 48 kHz USB audio to complex baseband at 9600 Hz centred on 1800 Hz: mixed down, low-passed
-    /// (delay compensated) and decimated by 5, as dsp.py's audio48_to_bb. Output sample m is at
-    /// input sample 5m.
+    /// 48 kHz USB audio to complex baseband at 9600 Hz centred on <paramref name="centreHz"/>:
+    /// mixed down, low-passed (delay compensated) and decimated by 5, as dsp.py's audio48_to_bb
+    /// (which assumed the signal's usual 1800 Hz centre; a sound card behind a narrow rig filter
+    /// can be on a dial that puts it somewhere else, from about 1000 to 2000 Hz). Output sample m
+    /// is at input sample 5m.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public static Complex[] ToBaseband(ReadOnlySpan<float> audio)
+    public static Complex[] ToBaseband(ReadOnlySpan<float> audio, double centreHz = OnAir.CentreAudioHz)
     {
         int n = audio.Length;
-        // Mixed by 2 exp(-j 2 pi 1800 t): 1800/48000 is 3/80 of a cycle a sample.
+        // Mixed by 2 exp(-j 2 pi centreHz t), from a table exact for centreHz rounded to the
+        // nearest Hz: its period is the shortest number of samples that is a whole number of
+        // both the mixer's cycles and the sample rate's (80 samples, 3 cycles, at 1800 Hz; 32
+        // samples, 1 cycle, at 1500 Hz), found from their greatest common divisor.
         var re = new float[n + FrontTaps];
         var im = new float[n + FrontTaps];
-        const int Period = 80;
-        Span<float> cos = stackalloc float[Period];
-        Span<float> sin = stackalloc float[Period];
-        for (int i = 0; i < Period; i++)
+        int period = Period(centreHz);
+        long cycles = (long)Math.Round(centreHz) / Gcd((long)Math.Round(centreHz), AudioRate);
+        // Heap, not stackalloc: an unusual centre (not a tidy fraction of 48 kHz) can make the
+        // period thousands of samples long.
+        var cos = new float[period];
+        var sin = new float[period];
+        for (int i = 0; i < period; i++)
         {
-            double phase = 2 * Math.PI * 3 * i / Period;
+            double phase = 2 * Math.PI * cycles * i / period;
             cos[i] = (float)(2 * Math.Cos(phase));
             sin[i] = (float)(-2 * Math.Sin(phase));
         }
@@ -126,7 +134,7 @@ internal static class ChannelMaths
         const int Half = (FrontTaps - 1) / 2;
         for (int i = 0; i < n; i++)
         {
-            int p = i % Period;
+            int p = i % period;
             re[i + Half] = audio[i] * cos[p];
             im[i + Half] = audio[i] * sin[p];
         }
@@ -140,6 +148,30 @@ internal static class ChannelMaths
             bb[m] = new Complex(Dot(h, re.AsSpan(s, FrontTaps)), Dot(h, im.AsSpan(s, FrontTaps)));
         }
         return bb;
+    }
+
+    /// <summary>
+    /// The shortest whole number of samples at <see cref="AudioRate"/> that a mixer at
+    /// <paramref name="centreHz"/> (rounded to the nearest Hz) repeats in: 80 at the usual 1800
+    /// Hz, 32 at 1500 Hz.
+    /// </summary>
+    private static int Period(double centreHz)
+    {
+        long hz = Math.Abs((long)Math.Round(centreHz));
+        long g = Gcd(hz, AudioRate);
+        return g == 0 ? AudioRate : (int)(AudioRate / g);
+    }
+
+    /// <summary>The greatest common divisor of two non-negative integers (Euclid's algorithm).</summary>
+    private static long Gcd(long a, long b)
+    {
+        a = Math.Abs(a);
+        b = Math.Abs(b);
+        while (b != 0)
+        {
+            (a, b) = (b, a % b);
+        }
+        return a;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]

@@ -22,20 +22,25 @@ internal static class BurstChannel
     /// <summary>
     /// Measures one burst. <paramref name="audio"/> is the 48 kHz audio around it, and
     /// <paramref name="endSample"/> the sample in it at which the modem reported the burst over.
-    /// Null if the burst could not be found in its audio.
+    /// <paramref name="centreHz"/> is where the signal's centre is expected in this audio (<see
+    /// cref="ReceiverConfig.AudioCentreHz"/>); left out, the usual 1800 Hz. The modem's own lock
+    /// (<paramref name="locked"/>) only ever reports its offset from its own native frequency,
+    /// whatever <paramref name="centreHz"/> actually is, since a dial away from the modem's
+    /// native 1800 Hz is shifted back to it before the modem ever sees it (<c>ModemCatalog</c>);
+    /// this audio, captured before that shift, is not. Null if the burst could not be found.
     /// </summary>
-    public static ChannelSnapshots? Measure(ReadOnlySpan<float> audio, int endSample, Ms110dLockInfo locked, byte[] payloadBits) =>
-        Measure(audio, endSample, locked, payloadBits, out _);
+    public static ChannelSnapshots? Measure(ReadOnlySpan<float> audio, int endSample, Ms110dLockInfo locked, byte[] payloadBits, double centreHz = OnAir.CentreAudioHz) =>
+        Measure(audio, endSample, locked, payloadBits, out _, centreHz);
 
-    /// <summary>As <see cref="Measure(ReadOnlySpan{float}, int, Ms110dLockInfo, byte[])"/>, saying where the burst was found.</summary>
-    public static ChannelSnapshots? Measure(ReadOnlySpan<float> audio, int endSample, Ms110dLockInfo locked, byte[] payloadBits, out BurstReference.Aligned? found)
+    /// <summary>As <see cref="Measure(ReadOnlySpan{float}, int, Ms110dLockInfo, byte[], double)"/>, saying where the burst was found.</summary>
+    public static ChannelSnapshots? Measure(ReadOnlySpan<float> audio, int endSample, Ms110dLockInfo locked, byte[] payloadBits, out BurstReference.Aligned? found, double centreHz = OnAir.CentreAudioHz)
     {
         found = null;
         if (locked.WaveformNumber < 1 || payloadBits.Length == 0)
         {
             return null;
         }
-        var bb = ChannelMaths.ToBaseband(audio);
+        var bb = ChannelMaths.ToBaseband(audio, centreHz);
         // The modem's lock offset out first, as align.py and analyze.py do.
         double w = -2 * Math.PI * locked.CfoHz / ChannelMaths.Rate;
         for (int n = 0; n < bb.Length; n++)
