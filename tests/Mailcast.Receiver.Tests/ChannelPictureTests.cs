@@ -103,6 +103,31 @@ public class ChannelPictureTests
     }
 
     [Fact]
+    public void Words_AreHopCountsAndPlainStrength_NotNumbersForTheReference()
+    {
+        // The reference (strongest) path just says what it is; a later one adds its delay and
+        // strength in plain words (coordinator review, 2026-10-09).
+        Assert.Equal("1 hop", ChannelPicture.Words(Mode("1F", 0, 0), isReference: true, anyE: false));
+        Assert.Equal("1 hop off the E layer", ChannelPicture.Words(Mode("1E", 0, 0), isReference: true, anyE: true));
+        Assert.Equal("2 hops: 1.8 ms later, 14 dB weaker", ChannelPicture.Words(Mode("2F", 1.8, -14), isReference: false, anyE: false));
+        Assert.Equal("1 hop off the F layer: 0.5 ms later, 3 dB weaker", ChannelPicture.Words(Mode("1F", 0.53, -2.6), isReference: false, anyE: true));
+        Assert.Equal("2 hops: 1.0 ms later, 2 dB stronger", ChannelPicture.Words(Mode("2F", 1.0, 2), isReference: false, anyE: false));
+        Assert.Equal("3 hops: 4.0 ms later, about as strong", ChannelPicture.Words(Mode("3F", 4.0, -0.5), isReference: false, anyE: false));
+    }
+
+    [Fact]
+    public void Svg_RayLabelsDoNotMentionRawNumbers_ForTheReferencePath()
+    {
+        var report = Report(534, 354, "IO86ha", Mode("1F", 0, 0), Mode(null, 0.89, -9.9), Mode("2F", 2.08, -19.6));
+        string svg = ChannelPicture.Svg(report, "IO86ha", 340, withLabels: true)!;
+        Assert.Contains(">1 hop<", svg, StringComparison.Ordinal);
+        Assert.Contains("2 hops: 2.1 ms later,", svg, StringComparison.Ordinal);
+        // Just the tooltip (the <title>, with the exact numbers) mentions 0 ms for the reference
+        // path; the visible label text does not.
+        Assert.DoesNotContain(">0.00 ms<", svg, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Strength_IsFullAtTheStrongest_AndFloorsOutRatherThanGoingNegative()
     {
         Assert.Equal(1, ChannelPicture.Strength(0));

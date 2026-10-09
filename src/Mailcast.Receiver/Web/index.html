@@ -18,6 +18,21 @@
   main { display: grid; gap: 16px; padding: 12px 24px 32px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
   section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
   section.wide { grid-column: 1 / -1; }
+  /* packet-net/pdn-mailcast#50: the Path tile sits across two columns on wide screens, one on
+     phones. "span 2" is only given once two columns actually fit: in a one-column auto-fit grid
+     it would otherwise force a second, narrower implicit column and overflow the page. */
+  @media (min-width: 744px) {
+    section.span2 { grid-column: span 2; }
+  }
+  /* The Channel detail tile's figures, closed by default (phones); opened on wide screens by the
+     syncDetailOpen() script below (a <details> element's own box does not give its content any
+     room unless it is actually open, so CSS alone cannot do this). */
+  #channelDetail[open] > summary { display: none; }
+  #channelDetail:not([open]) > summary { cursor: pointer; color: var(--soft); font-size: 14px; }
+  /* The Today tile: the day strip of side views and the 24 hour dot chart, beside each other
+     when there is room, stacked on phones. */
+  .todayRow { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+  .todayRow > div { flex: 1 1 280px; min-width: 280px; }
   h2 { margin: 0 0 10px; font-size: 16px; }
   .big { font-size: 26px; font-weight: 600; }
   .muted { color: var(--soft); }
@@ -69,9 +84,9 @@
   #updateCmd { flex: 1 1 320px; margin: 0; padding: 7px 10px; background: #fff; border: 1px solid var(--line); border-radius: 6px;
     font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
   #updateCopy { padding: 4px 12px; }
-  #channel svg { width: 100%; height: auto; display: block; margin-top: 8px; }
-  #channel svg text { font: 11px system-ui, sans-serif; fill: var(--soft); }
-  #channel .head { font-weight: 600; }
+  #channelPath svg, #channelDetailBody svg, #channelToday svg { width: 100%; height: auto; display: block; margin-top: 8px; }
+  #channelPath svg text, #channelDetailBody svg text, #channelToday svg text { font: 11px system-ui, sans-serif; fill: var(--soft); }
+  #channelPath .head { font-weight: 600; }
   /* the daily report opt-in, near the top: a panel while it is off, one line once it is on */
   #optIn { margin: 10px 24px 0; padding: 12px 16px; background: #edf7f0; border: 1px solid #b5dbc1; border-radius: 10px; }
   #optIn[hidden], #optIn [hidden] { display: none; }
@@ -210,9 +225,22 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
     <dl id="retune"></dl>
   </section>
 
+  <section class="span2">
+    <h2>Path</h2>
+    <div id="channelPath" class="muted">Measured after each slot, from the probe after the tone and the bursts this receiver decodes. Nothing measured yet.</div>
+  </section>
+
   <section>
-    <h2>Channel</h2>
-    <div id="channel" class="muted">Measured after each slot, from the probe after the tone and the bursts this receiver decodes. Nothing measured yet.</div>
+    <h2>Channel detail</h2>
+    <details id="channelDetail">
+      <summary>Details</summary>
+      <div id="channelDetailBody" class="muted">Nothing measured yet.</div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Today</h2>
+    <div id="channelToday" class="muted">Nothing measured yet.</div>
   </section>
 
   <section class="wide" id="heardBox">
@@ -459,32 +487,38 @@ function channelStrip(c) {
   }
   return svg;
 }
+/* The Channel tile split in three (Tom, 2026-10-09): Path (the picture and the one-line
+   summary), Channel detail (the profile and the figures, closed by default on phones), and
+   Today (the day strip of side views, beside the 24 hour dot chart). */
 function channel(s) {
-  const c = s.channel, box = $("channel");
+  const c = s.channel;
+  const path = $("channelPath"), detail = $("channelDetailBody"), today = $("channelToday");
   if (!c) return;
   if (!c.slot) {
-    box.className = "muted";
-    box.textContent = c.waiting ? `${c.words} ${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from this slot, measured once it is over.` : c.words;
+    path.className = "muted";
+    path.textContent = c.waiting ? `${c.words} ${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from this slot, measured once it is over.` : c.words;
+    detail.className = "muted";
+    detail.textContent = "Nothing measured yet.";
+    today.className = "muted";
+    today.textContent = "Nothing measured yet.";
     return;
   }
-  box.className = "";
-  box.innerHTML = `<div><span class="head">Last slot (${utc(c.slot)}):</span> ${esc(c.words)}</div>`;
+
+  path.className = "";
+  path.innerHTML = `<div><span class="head">Last slot (${utc(c.slot)}):</span> ${esc(c.words)}</div>`;
   if (c.pathSvg) {
     const pic = document.createElement("div");
     pic.style.marginTop = "8px";
     pic.innerHTML = c.pathSvg;
-    box.appendChild(pic);
+    path.appendChild(pic);
   }
-  if (c.history.some(h => h.pathSvg)) {
-    const cap = document.createElement("div");
-    cap.className = "muted";
-    cap.style.marginTop = "10px";
-    cap.textContent = "Today, slot by slot: a small side view per slot (packet-net/pdn-mailcast#50); dashed when the height could not be measured.";
-    box.appendChild(cap);
-    box.appendChild(channelPathStrip(c));
-  }
+  if (c.waiting) path.appendChild(el("div", `${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from the slot on now, measured once it is over.`, "muted"));
+  if (c.tooLong) path.appendChild(el("div", `${c.tooLong} burst${c.tooLong === 1 ? " was" : "s were"} too long to keep, so left out.`, "muted"));
+
+  detail.innerHTML = "";
+  detail.className = "";
   if (c.enough && c.profile) {
-    box.appendChild(channelProfile(c));
+    detail.appendChild(channelProfile(c));
     const rows = [];
     if (c.delaySpreadMs !== null) rows.push(["Delay spread", `${c.delaySpreadMs} ms (echoes smear each symbol by about ${c.delaySpreadMs.toFixed(1)} ms)`]);
     if (c.dopplerSpreadHz !== null) rows.push(["Doppler spread", `${c.dopplerSpreadHz} Hz (the moving layer blurs the frequency by about ${c.dopplerSpreadHz.toFixed(1)} Hz)`]);
@@ -493,22 +527,35 @@ function channel(s) {
     const from = m => m.basis === "probe" ? "the probe after the tone" : `${m.measurements} burst${m.measurements === 1 ? "" : "s"}`;
     rows.push(["Measured from", `${from(c)}${c.snrDb !== null ? `, signal to noise ${c.snrDb} dB` : ""}`]);
     if (c.other) rows.push([c.other.basis === "probe" ? "From the probe" : "From the bursts", `${esc(c.other.words)}${c.other.enough && c.other.snrDb !== null ? ` (signal to noise ${c.other.snrDb} dB)` : ""}`]);
-    if (c.distanceKm !== null) rows.push(["Path", `${c.distanceKm} km from GB7RDG (IO91lk) to ${esc(c.locator)}`]);
     const dl = document.createElement("dl");
     dl.style.marginTop = "8px";
     dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-    box.appendChild(dl);
+    detail.appendChild(dl);
+  } else {
+    detail.className = "muted";
+    detail.textContent = "Nothing measured yet.";
   }
+
+  today.innerHTML = "";
+  today.className = "";
   if (c.history.length) {
-    const cap = document.createElement("div");
-    cap.className = "muted";
-    cap.style.marginTop = "10px";
-    cap.textContent = "Last 24 hours, by hour (UTC): each dot a path, at its delay; darker is stronger. Grey: too little heard.";
-    box.appendChild(cap);
-    box.appendChild(channelStrip(c));
+    const row = document.createElement("div");
+    row.className = "todayRow";
+    if (c.history.some(h => h.pathSvg)) {
+      const col = document.createElement("div");
+      col.appendChild(el("div", "Slot by slot: a small side view per slot; dashed when the height could not be measured.", "muted"));
+      col.appendChild(channelPathStrip(c));
+      row.appendChild(col);
+    }
+    const col2 = document.createElement("div");
+    col2.appendChild(el("div", "Last 24 hours, by hour (UTC): each dot a path, at its delay; darker is stronger. Grey: too little heard.", "muted"));
+    col2.appendChild(channelStrip(c));
+    row.appendChild(col2);
+    today.appendChild(row);
+  } else {
+    today.className = "muted";
+    today.textContent = "Nothing measured yet.";
   }
-  if (c.waiting) box.appendChild(el("div", `${c.waiting} burst${c.waiting === 1 ? "" : "s"} kept from the slot on now, measured once it is over.`, "muted"));
-  if (c.tooLong) box.appendChild(el("div", `${c.tooLong} burst${c.tooLong === 1 ? " was" : "s were"} too long to keep, so left out.`, "muted"));
 }
 
 /* ---------- what was heard: issue #48's per-slot drill-down ---------- */
@@ -846,6 +893,16 @@ $("listenNowBtn").addEventListener("click", async () => {
 const pct = db => Math.max(0, Math.min(100, (db + 60) / 60 * 100));
 setInterval(refresh, 3000);
 refresh();
+
+/* Channel detail starts open on wide screens (there is room) and closed on phones; a <details>
+   element's own box gives its content no room unless it is actually open, so this has to set the
+   attribute itself rather than rely on CSS alone. Not touched again after that, so a visitor's
+   own click (on a phone that is then turned sideways, say) is not fought with. */
+const wideScreen = matchMedia("(min-width: 744px)");
+if (wideScreen.matches) $("channelDetail").open = true;
+let detailTouched = false;
+$("channelDetail").addEventListener("toggle", () => { detailTouched = true; });
+wideScreen.addEventListener("change", e => { if (!detailTouched) $("channelDetail").open = e.matches; });
 
 /* ---------- mail ---------- */
 // Bulletins are whatever came over the air, so nothing from one is ever put in as HTML: every

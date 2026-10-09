@@ -63,6 +63,34 @@ internal static class ChannelPicture
     /// <summary>How far along a mode's hop count is read off its label, "1F", "2E", and so on.</summary>
     internal static int HopsOf(string label) => label[0] - '0';
 
+    /// <summary>A hop count (and the E layer, when it is one) in plain words: "1 hop", "1 hop off the E layer", "2 hops".</summary>
+    internal static string HopWords(string label, bool anyE) => label switch
+    {
+        "1E" => "1 hop off the E layer",
+        "1F" => anyE ? "1 hop off the F layer" : "1 hop",
+        { Length: 2 } l when l[1] == 'F' => $"{l[0]} hops",
+        _ => label,
+    };
+
+    /// <summary>
+    /// A ray's label in plain words: just the hop count for the reference (strongest) path, or
+    /// the hop count with its delay and strength against that reference for any other path, such
+    /// as "2 hops: 1.8 ms later, 14 dB weaker".
+    /// </summary>
+    internal static string Words(ChannelMode mode, bool isReference, bool anyE)
+    {
+        string hop = HopWords(mode.Label!, anyE);
+        if (isReference)
+        {
+            return hop;
+        }
+        double d = mode.PowerDb;
+        string strength = d <= -1 ? string.Create(CultureInfo.InvariantCulture, $"{-d:0} dB weaker")
+            : d >= 1 ? string.Create(CultureInfo.InvariantCulture, $"{d:0} dB stronger")
+            : "about as strong";
+        return string.Create(CultureInfo.InvariantCulture, $"{hop}: {mode.DelayMs:0.0} ms later, {strength}");
+    }
+
     /// <summary>Stroke width and opacity scale with a path's power the same way: full at the strongest, fading out by about -25 dB, never past a small floor.</summary>
     internal static double Strength(double powerDb) => Math.Max(0.15, 1 + (powerDb / 25));
 
@@ -105,16 +133,17 @@ internal static class ChannelPicture
         var all = ground.Concat(layers.SelectMany(l => l.Points)).Concat(rays.SelectMany(r => r.Points)).ToList();
         double minX = all.Min(p => p.X), maxX = all.Max(p => p.X);
         double minY = all.Min(p => p.Y), maxY = all.Max(p => p.Y);
-        // Room above the curves for the ray labels, staggered one above another (see below), and
-        // below for the end labels and the scale note (one line more when it also says a height
-        // was not measured).
-        double padTop = withLabels ? 22 + (Math.Max(0, rays.Count - 1) * 15) : 4, padSide = 8;
+        // Room above the curves for the ray labels, one per line (see below), and below for the
+        // end labels and the scale note (one line more when it also says a height was not
+        // measured).
+        double padTop = withLabels ? 10 + (rays.Count * 13) : 4, padSide = 8;
         double padBottom = withLabels ? (rays.Any(r => !r.HeightKnown) ? 64 : 50) : 14;
         double scale = (widthPx - (2 * padSide)) / (maxX - minX);
         double height = ((maxY - minY) * scale) + padTop + padBottom;
         double Sx(PicturePoint p) => ((p.X - minX) * scale) + padSide;
         double Sy(PicturePoint p) => ((p.Y - minY) * scale) + padTop;
 
+        bool anyE = rays.Any(r => r.Mode.Label!.EndsWith('E'));
         var aria = $"Side view of the path from GB7RDG to {WebUtility.HtmlEncode(endLocator ?? "the receiver")}, {Math.Round(groundKm)} km, over a deliberately curved earth";
         var sb = new StringBuilder();
         sb.Append(CultureInfo.InvariantCulture, $"<svg viewBox=\"0 0 {widthPx} {F(height)}\" role=\"img\" aria-label=\"{aria}\">");
@@ -139,25 +168,27 @@ internal static class ChannelPicture
                 + $"stroke-width=\"{F(width)}\" stroke-opacity=\"{F(opacity)}\"{dash}><title>{WebUtility.HtmlEncode(title)}</title></polyline>");
             if (withLabels)
             {
-                // Staggered by which ray it is (not stacked at the same height) so two labels
-                // whose bounce points land close together do not sit on top of each other.
-                var apex = r.Points[1];
-                double labelY = Sy(apex) - 8 - (i * 15);
-                string label = string.Create(CultureInfo.InvariantCulture, $"{r.Mode.Label}: {r.Mode.DelayMs:+0.00;-0.00;0.00} ms, {r.Mode.PowerDb:0} dB");
+                // A small legend above the curves, one ray per line, left aligned: trying to put
+                // a label beside its own apex instead reads fine for a short one (the reference's
+                // "1 hop"), but a later ray's delay and strength in full words can be too long to
+                // fit next to a bounce point without running off the picture's edge or over
+                // another label, in a side view only a few hundred pixels wide.
+                string label = Words(r.Mode, isReference: i == 0, anyE);
+                double labelY = 12 + (i * 13);
                 sb.Append(CultureInfo.InvariantCulture,
-                    $"<text x=\"{F(Sx(apex))}\" y=\"{F(labelY)}\" text-anchor=\"middle\" font-size=\"11\" fill=\"var(--accent)\">{WebUtility.HtmlEncode(label)}</text>");
+                    $"<text x=\"{F(padSide)}\" y=\"{F(labelY)}\" font-size=\"11\" fill=\"var(--accent)\">{WebUtility.HtmlEncode(label)}</text>");
             }
         }
         if (withLabels)
         {
             var start = ground[0];
             var end = ground[^1];
+            double midX = (Sx(start) + Sx(end)) / 2;
             sb.Append(CultureInfo.InvariantCulture,
                 $"<circle cx=\"{F(Sx(start))}\" cy=\"{F(Sy(start))}\" r=\"4\" fill=\"var(--bad)\"/>"
                 + $"<text x=\"{F(Sx(start))}\" y=\"{F(Sy(start) + 16)}\" font-size=\"11\">GB7RDG IO91lk</text>"
                 + $"<circle cx=\"{F(Sx(end))}\" cy=\"{F(Sy(end))}\" r=\"4\" fill=\"var(--ink)\"/>"
                 + $"<text x=\"{F(Sx(end))}\" y=\"{F(Sy(end) + 16)}\" text-anchor=\"end\" font-size=\"11\">{WebUtility.HtmlEncode(endLocator ?? "receiver")}</text>");
-            double midX = (Sx(start) + Sx(end)) / 2;
             bool anyNominal = rays.Any(r => !r.HeightKnown);
             // Kept short, and split onto its own lines, rather than one long line: SVG text does
             // not wrap, so a note this length in one line would run off the picture's width.
