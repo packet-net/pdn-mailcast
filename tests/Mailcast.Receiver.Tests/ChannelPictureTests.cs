@@ -238,6 +238,56 @@ public class ChannelPictureTests
 
     private static int Count(string haystack, string needle) => (haystack.Length - haystack.Replace(needle, "", StringComparison.Ordinal).Length) / needle.Length;
 
+    // A made-up receiver west-south-west of Ireland: far enough out, and in the right direction
+    // from GB7RDG, that a 2F path's one ground bounce (the midpoint) falls in the Celtic Sea,
+    // inside the Lundy shipping forecast area - the issue's own worked example - and a 3F path's
+    // two (a third and two thirds of the way along) fall in the Bristol Channel and the Celtic
+    // Sea's Fastnet area respectively (packet-net/pdn-mailcast#89).
+    private static readonly GroundPlace FarEnd = new(51.0, -10.5, "far end");
+
+    [Fact]
+    public void Svg_NamesGroundBounces_ForA2FPath_WhenTheReceiversPlaceIsKnown()
+    {
+        double groundKm = PathGeometry.DistanceKm(PathGeometry.Gb7rdg, FarEnd);
+        var report = Report(groundKm, 300, "far end", Mode("1F", 0, 0), Mode("2F", 2, -10));
+        string svg = ChannelPicture.Svg(report, "far end", 340, withLabels: true, FarEnd)!;
+        // Each bounce gets its own line (not joined with commas on one line): SVG text does not
+        // wrap, and a sea name with a shipping forecast area in brackets can run long.
+        Assert.Contains(">Ground bounces:<", svg, StringComparison.Ordinal);
+        Assert.Contains(">Celtic Sea (Lundy)<", svg, StringComparison.Ordinal);
+        // One dot per named bounce, over and above the two end-point circles.
+        Assert.Equal(3, Count(svg, "<circle"));
+    }
+
+    [Fact]
+    public void Svg_NamesBothBounces_ForA3FPath()
+    {
+        double groundKm = PathGeometry.DistanceKm(PathGeometry.Gb7rdg, FarEnd);
+        var report = Report(groundKm, 300, "far end", Mode("1F", 0, 0), Mode("3F", 4, -12));
+        string svg = ChannelPicture.Svg(report, "far end", 340, withLabels: true, FarEnd)!;
+        Assert.Contains(">Ground bounces:<", svg, StringComparison.Ordinal);
+        Assert.Contains(">Bristol Channel<", svg, StringComparison.Ordinal);
+        Assert.Contains(">Celtic Sea (Fastnet)<", svg, StringComparison.Ordinal);
+        Assert.Equal(4, Count(svg, "<circle"));
+    }
+
+    [Fact]
+    public void Svg_HasNoGroundBounceCaption_WithoutTheReceiversPlace_OrForA1FPath()
+    {
+        var report1F = Report(534, 354, "IO86ha", Mode("1F", 0, 0));
+        string svgNoPlace = ChannelPicture.Svg(report1F, "IO86ha", 340, withLabels: true)!;
+        Assert.DoesNotContain("Ground bounces", svgNoPlace, StringComparison.Ordinal);
+
+        var end = GroundPlace.FromLocator("IO86ha")!;
+        string svg1FWithPlace = ChannelPicture.Svg(report1F, "IO86ha", 340, withLabels: true, end)!;
+        Assert.DoesNotContain("Ground bounces", svg1FWithPlace, StringComparison.Ordinal);
+
+        var report2F = Report(534, 354, "IO86ha", Mode("1F", 0, 0), Mode("2F", 2, -10));
+        string strip = ChannelPicture.Svg(report2F, "IO86ha", 140, withLabels: false, end)!;
+        Assert.DoesNotContain("Ground bounces", strip, StringComparison.Ordinal);
+        Assert.DoesNotContain("<circle", strip, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task StatusJson_CarriesThePicture_ForTheSlotAndEachHistoryEntry()
     {

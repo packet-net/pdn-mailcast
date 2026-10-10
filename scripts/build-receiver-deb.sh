@@ -73,6 +73,18 @@ Copyright: packet-net contributors
 License: AGPL-3.0-only
  The receiver bundles pdn-soundmodem (GPL-3.0-or-later) and the .NET runtime (MIT).
  See https://github.com/packet-net/pdn-mailcast/blob/main/LICENSE
+
+Files: usr/lib/pdn-mailcast/pdn-mailcast-receiver (embedded ground bounce data, issue #89)
+Copyright: GeoNames (towns); Flanders Marine Institute (sea names); Met Office (shipping
+ forecast areas, Crown copyright)
+License: CC-BY-4.0 and OGL-UK-3.0
+ Towns: GeoNames, https://www.geonames.org/, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+ Sea names: Flanders Marine Institute (2018). IHO Sea Areas, version 3,
+ https://doi.org/10.14284/323, CC BY 4.0.
+ Shipping forecast areas: Met Office, National Meteorological Library and Archive, Factsheet 8
+ "The Shipping Forecast", Table 1. Crown copyright, Open Government Licence v3.0
+ (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+ Full credits, and how the data was built and simplified: docs/receiver.md.
 EOF
 
 # Library floors, read from the ELF files in the package rather than assumed: the .NET host's

@@ -20,6 +20,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Web\index.html" LogicalName="Mailcast.Receiver.Web.index.html" />
     <EmbeddedResource Include="Web\signin.html" LogicalName="Mailcast.Receiver.Web.signin.html" />
+    <EmbeddedResource Include="Data\towns.txt.gz" LogicalName="Mailcast.Receiver.Data.towns.txt.gz" />
+    <EmbeddedResource Include="Data\sea-areas.txt.gz" LogicalName="Mailcast.Receiver.Data.sea-areas.txt.gz" />
+    <EmbeddedResource Include="Data\shipping-forecast-areas.txt.gz" LogicalName="Mailcast.Receiver.Data.shipping-forecast-areas.txt.gz" />
   </ItemGroup>
 
   <ItemGroup>
