@@ -1,45 +1,36 @@
+using MaidenheadLib;
+
 namespace Packet.Mailcast;
 
-/// <summary>Maidenhead locators (IO91, IO91lk) as latitude and longitude.</summary>
+/// <summary>
+/// Maidenhead locators (IO91, IO91lk) as latitude and longitude, over MaidenheadLib (issue #88;
+/// this package no longer carries its own copy of the conversion).
+/// </summary>
 public static class Maidenhead
 {
     /// <summary>
     /// The centre of a 4 or 6 character locator, in degrees (north and east positive). Letters may
-    /// be either case. Returns false for anything that is not a locator.
+    /// be either case. Returns false for anything that is not a locator, including null. (MaidenheadLib's
+    /// own constructor throws <see cref="NullReferenceException"/> rather than a sensible exception for
+    /// null; null is refused here before it ever reaches that constructor.)
     /// </summary>
     public static bool TryParse(string? locator, out double latitude, out double longitude)
     {
         latitude = 0;
         longitude = 0;
-        if (locator is null || (locator.Length != 4 && locator.Length != 6))
+        if (locator is null)
         {
             return false;
         }
-        string l = locator.ToUpperInvariant();
-        if (l[0] is < 'A' or > 'R' || l[1] is < 'A' or > 'R' || l[2] is < '0' or > '9' || l[3] is < '0' or > '9')
+        try
+        {
+            (latitude, longitude) = new Locator(locator).Centre;
+            return true;
+        }
+        catch (FormatException)
         {
             return false;
         }
-        double lon = -180 + ((l[0] - 'A') * 20) + ((l[2] - '0') * 2);
-        double lat = -90 + ((l[1] - 'A') * 10) + (l[3] - '0');
-        if (l.Length == 6)
-        {
-            if (l[4] is < 'A' or > 'X' || l[5] is < 'A' or > 'X')
-            {
-                return false;
-            }
-            // Subsquares are 5 minutes of longitude by 2.5 of latitude; the centre is half of each in.
-            lon += ((l[4] - 'A') + 0.5) * 5 / 60.0;
-            lat += ((l[5] - 'A') + 0.5) * 2.5 / 60.0;
-        }
-        else
-        {
-            lon += 1;
-            lat += 0.5;
-        }
-        latitude = lat;
-        longitude = lon;
-        return true;
     }
 
     /// <summary>The centre of a locator. Throws <see cref="FormatException"/> for one that is not.</summary>
@@ -58,15 +49,20 @@ public static class Maidenhead
         {
             return null;
         }
-        // The north pole and the antimeridian's east side belong to the last square.
-        double lon = Math.Min(longitude + 180, 359.999999);
-        double lat = Math.Min(latitude + 90, 179.999999);
-        int field1 = (int)(lon / 20), field2 = (int)(lat / 10);
-        int square1 = (int)(lon % 20 / 2), square2 = (int)(lat % 10);
-        int sub1 = (int)(lon % 2 * 12), sub2 = (int)(lat % 1 * 24);
-        return string.Concat(
-            (char)('A' + field1), (char)('A' + field2),
-            (char)('0' + square1), (char)('0' + square2),
-            (char)('a' + sub1), (char)('a' + sub2));
+        // The north pole, and the antimeridian itself, belong to the last square, same as our own
+        // formula used to give them: MaidenheadLib does not clamp either (any longitude at
+        // latitude 90, not just the corner, and likewise any latitude at longitude 180), and
+        // without this it would hand back a locator whose field letter is one past 'R', outside a
+        // real locator's range.
+        double lat = Math.Min(latitude, 89.999999);
+        double lon = Math.Min(longitude, 179.999999);
+        // Precision 0 normally gives exactly the 6 characters we want (field, square, subsquare),
+        // but MaidenheadLib has a bug: when the subsquare comes out "mm" it returns only the first
+        // 4 characters instead (decompiled, it special-cases that one string literally), silently
+        // dropping the subsquare for about 1 in 600 points, e.g. (-85.46, -174.98) gives "AA24" at
+        // precision 0 rather than "AA24mm". Precision 1 does not have that bug (it always gives 8:
+        // field, square, subsquare, then an extra digit pair we do not want), so the 6 characters
+        // we want are the first 6 of the 8 that precision 1 gives, every time.
+        return MaidenheadLocator.LatLngToLocator(lat, lon, 1)[..6];
     }
 }
