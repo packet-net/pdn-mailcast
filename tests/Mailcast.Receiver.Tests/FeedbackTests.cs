@@ -184,10 +184,71 @@ public class FeedbackTests
 
         var mail = Assert.Single(rig.Bbs.Sent);
         var lines = mail.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("MCR1 0.6.0 IO91lk sc 1/1 3:AUD1,BBS2", lines[0]);
+        Assert.Equal("MCR1 0.6.0 IO91lk sc 1/1 3:AUD1,BBS2 0", lines[0]);
         Assert.Equal(3, lines.Length);
         Assert.Equal($"{Slots[1]:HH} - 0 - - -", lines[1]);
         Assert.Equal($"{Slots[2]:HH} - 7 - - IM+PG 2 1.9/-17 0.35 0.21 287 b", lines[2]);
+    }
+
+    /// <summary>
+    /// Issue #86: accepted and already-had are counted apart, so a day like G7TAJ's (three
+    /// already had, nothing newly accepted) reads as such in the header's fifth and new seventh
+    /// fields, rather than already-had being folded into delivered.
+    /// </summary>
+    [Fact]
+    public async Task AcceptedAndAlreadyHad_AreCountedApart_InTheReportsHeader()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 1);
+        service.NoteRebuilt();
+        service.NoteRebuilt();
+        service.NoteRebuilt();
+        service.NoteDelivered(0);
+        service.NoteAlreadyHad(3);
+
+        await rig.AtAsync(service, ReportAt);
+
+        var mail = Assert.Single(rig.Bbs.Sent);
+        var report = DailyReport.Parse(mail.Title, mail.Body);
+        Assert.Equal((3, 0, 3), (report.Header.Rebuilt, report.Header.Delivered, report.Header.AlreadyHad));
+        var lines = mail.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("MCR1 0.6.0 IO91lk sc 3/0 0 3", lines[0]);
+    }
+
+    /// <summary>
+    /// Issue #86: a feedback.json a pre-#86 receiver left, with no "alreadyHad" at all on a
+    /// day's record, loads without failing and starts that count at zero rather than refusing to
+    /// read the file - so upgrading mid-day does not break the day's report.
+    /// </summary>
+    [Fact]
+    public async Task Upgrade_DayRecordWithoutAlreadyHad_LoadsAsZero_AndCountsFromThen()
+    {
+        using var dir = new TempDirectory();
+        File.WriteAllText(Path.Combine(dir.Path, FeedbackService.FileName), """
+            {
+              "days": [
+                {
+                  "day": "2026-10-06",
+                  "rebuilt": 2,
+                  "delivered": 1,
+                  "errors": {}
+                }
+              ],
+              "last": null
+            }
+            """);
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+
+        await rig.ListenAsync(service, Day, only: 1);
+        service.NoteAlreadyHad(2);
+        await rig.AtAsync(service, ReportAt);
+
+        var mail = Assert.Single(rig.Bbs.Sent);
+        var report = DailyReport.Parse(mail.Title, mail.Body);
+        Assert.Equal((2, 1, 2), (report.Header.Rebuilt, report.Header.Delivered, report.Header.AlreadyHad));
     }
 
     [Fact]
@@ -210,7 +271,7 @@ public class FeedbackTests
         Assert.Equal("refused", view.GetProperty("answer").GetString());
         Assert.Equal("refused by the BBS: the BBS answered Reject; it is not sent again", view.GetProperty("lastAnswer").GetString());
         Assert.Equal(ReportAt, view.GetProperty("lastSent").GetDateTimeOffset());
-        Assert.StartsWith("MCR G4ABC 2026-10-06\nMCR1 0.6.0 IO91lk sc 0/0 0\n", view.GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("MCR G4ABC 2026-10-06\nMCR1 0.6.0 IO91lk sc 0/0 0 0\n", view.GetProperty("text").GetString(), StringComparison.Ordinal);
         Assert.Equal(FeedbackService.ReportTime(Schedule, Day.AddDays(1)), view.GetProperty("next").GetDateTimeOffset());
         Assert.Contains(rig.Log, l => l.Contains("was refused by the BBS", StringComparison.Ordinal));
     }

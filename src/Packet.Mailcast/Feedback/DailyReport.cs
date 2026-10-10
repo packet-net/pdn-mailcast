@@ -59,8 +59,12 @@ public sealed record ReportSlot(
 /// 10 W3 0 4 +1.1 IM
 /// </code>
 /// <para>Header: the format (<c>MCR1</c>), the receiver's version, its locator, the audio
-/// (<c>sc</c> for a sound card, or the web SDR's host), bulletins rebuilt/delivered, and the
-/// errors (<c>0</c>, or the count, a colon and each code with its count).</para>
+/// (<c>sc</c> for a sound card, or the web SDR's host), bulletins rebuilt/delivered, the
+/// errors (<c>0</c>, or the count, a colon and each code with its count), and (issue #86) how
+/// many of the day's bulletins the BBS already had, as its own seventh field: <c>-</c> for a
+/// header with no seventh field at all, which means not known rather than zero, since an older
+/// sender folded this into delivered instead of counting it apart. A reader ignores a field
+/// after the seventh too, so the header can grow further still.</para>
 /// <para>Slot: the hour (HHMM if the slot is not on the hour), waveform, frames, tone SNR (dB),
 /// tone offset (Hz), verdicts (joined by <c>+</c>), then, only with a channel measurement, the
 /// modes, the 2F delay/power (ms/dB), delay spread (ms), Doppler spread (Hz), virtual height (km)
@@ -169,8 +173,9 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         string errors = h.Errors.Count == 0 || h.Errors.Values.Sum() == 0
             ? "0"
             : string.Create(CultureInfo.InvariantCulture, $"{h.Errors.Values.Sum()}:{string.Join(',', h.Errors.Where(e => e.Value > 0).OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => string.Create(CultureInfo.InvariantCulture, $"{e.Key}{e.Value}")))}");
+        string alreadyHad = h.AlreadyHad is { } a ? a.ToString(CultureInfo.InvariantCulture) : Missing;
         return string.Create(CultureInfo.InvariantCulture,
-            $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors}");
+            $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors} {alreadyHad}");
     }
 
     private static string SlotLine(ReportSlot s)
@@ -217,8 +222,17 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         {
             throw new FormatException($"\"{f[4]}\" is not bulletins rebuilt/delivered.");
         }
-        return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]));
+        // Field 7 (issue #86): how many the BBS already had, as its own count. Missing
+        // altogether (a header with only six fields, an older sender's) or "-" both mean not
+        // known, not zero: the older format folded this into field 5's delivered instead.
+        int? alreadyHad = f.Length > 6 ? ParseAlreadyHad(f[6]) : null;
+        return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad);
     }
+
+    private static int? ParseAlreadyHad(string field) =>
+        field == Missing ? null
+        : TryInt(field, out int value) ? value
+        : throw new FormatException($"\"{field}\" is not an already-had count.");
 
     private static Dictionary<string, int> ParseErrors(string field)
     {
@@ -390,6 +404,12 @@ public static class ReportErrors
 /// <param name="Locator">The receiver's Maidenhead locator, if it knows it.</param>
 /// <param name="Audio">Where the audio came from: <c>sc</c> for a sound card, or the web SDR's host.</param>
 /// <param name="Rebuilt">Bulletins rebuilt in the day.</param>
-/// <param name="Delivered">Bulletins the BBS accepted in the day.</param>
+/// <param name="Delivered">Bulletins the BBS accepted in the day. Does not include <paramref name="AlreadyHad"/>.</param>
 /// <param name="Errors">How many of each kind of error there were, by code (see <see cref="ReportErrors"/>).</param>
-public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors);
+/// <param name="AlreadyHad">
+/// Bulletins the BBS already had in the day (issue #86), as its own count. Null when read from
+/// a header with no seventh field, or an explicit <c>-</c> there: an older sender's report, from
+/// before this was tracked apart, where it is not known (not necessarily zero) because the old
+/// format folded it into <paramref name="Delivered"/> instead.
+/// </param>
+public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad);

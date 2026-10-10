@@ -183,6 +183,15 @@ public sealed class FeedbackService
         }
     }
 
+    /// <summary>The BBS already had <paramref name="count"/> bulletins (issue #86).</summary>
+    public void NoteAlreadyHad(int count)
+    {
+        if (count > 0)
+        {
+            Count(d => d.AlreadyHad += count);
+        }
+    }
+
     /// <summary>Something went wrong, of the kind <paramref name="code"/> (see <see cref="ReportErrors"/>).</summary>
     public void NoteError(string code) => Count(d => d.Errors[code] = d.Errors.GetValueOrDefault(code) + 1);
 
@@ -475,7 +484,7 @@ public sealed class FeedbackService
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
-            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal));
+            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad);
         return new DailyReport(settings.From, record.Day, header, slots);
     }
 
@@ -670,6 +679,14 @@ public sealed class FeedbackService
         public int Rebuilt { get; set; }
 
         public int Delivered { get; set; }
+
+        /// <summary>
+        /// Bulletins the BBS already had (issue #86). Zero by default, so a feedback.json from
+        /// before this was kept, with no field for it at all, loads with the day's count simply
+        /// unknown-so-far rather than failing: the field fills in as the rest of the day's slots
+        /// are noted and sessions answered, same as any other count would starting mid-day.
+        /// </summary>
+        public int AlreadyHad { get; set; }
 
         public SortedDictionary<string, int> Errors { get; set; } = new(StringComparer.Ordinal);
     }

@@ -24,7 +24,7 @@ public class DailyReportTests
                 new ReportChannel(2, 1.94, -16.6, 0.347, 0.214, 287, 'b')));
         }
         var header = new ReportHeader("0.6.0", "IO91lk", "wessex.zapto.org", 14, 13,
-            new Dictionary<string, int> { [ReportErrors.Bbs] = 2, [ReportErrors.Audio] = 1 });
+            new Dictionary<string, int> { [ReportErrors.Bbs] = 2, [ReportErrors.Audio] = 1 }, 5);
         return new DailyReport("G4ABC", Day, header, slots);
     }
 
@@ -39,7 +39,7 @@ public class DailyReportTests
         Assert.InRange(Encoding.ASCII.GetByteCount(body), 300, 600);
         var lines = body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(10, lines.Length);
-        Assert.Equal("MCR1 0.6.0 IO91lk wessex.zapto.org 14/13 3:AUD1,BBS2", lines[0]);
+        Assert.Equal("MCR1 0.6.0 IO91lk wessex.zapto.org 14/13 3:AUD1,BBS2 5", lines[0]);
         Assert.Equal("08 W4 180 12 -1.3 IG 2 1.9/-17 0.35 0.21 287 b", lines[1]);
         Assert.All(lines.Skip(1), l => Assert.InRange(l.Length, 30, 60));
     }
@@ -52,7 +52,7 @@ public class DailyReportTests
             new TimeOnly(h, 30), "WX", 9999, -12.3, -123.45, ["IU", "PG"],
             new ReportChannel(4, 12.34, -25.4, 1.234, 12.345, 999, 'p'))).ToList();
         var header = new ReportHeader("10.20.30", "IO91lk", "some-long-web-sdr-name.example.org:8073", 999, 999,
-            new Dictionary<string, int> { ["BBS"] = 99, ["AUD"] = 99, ["RIG"] = 99, ["HOOK"] = 99 });
+            new Dictionary<string, int> { ["BBS"] = 99, ["AUD"] = 99, ["RIG"] = 99, ["HOOK"] = 99 }, 999);
         var report = new DailyReport("2E0ABC", Day, header, slots);
 
         var lines = report.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
@@ -83,7 +83,7 @@ public class DailyReportTests
     [Fact]
     public void Parse_SlotsWithLittleHeard_AndNoChannel()
     {
-        var header = new ReportHeader("0.6.0", null, "sc", 0, 0, new Dictionary<string, int>());
+        var header = new ReportHeader("0.6.0", null, "sc", 0, 0, new Dictionary<string, int>(), 0);
         var report = new DailyReport("M0XYZ", Day, header,
         [
             new ReportSlot(new TimeOnly(9, 0), null, 0, null, null, []),
@@ -91,9 +91,10 @@ public class DailyReportTests
             new ReportSlot(new TimeOnly(11, 0), "W3", 40, 8, 0, ["IM"], new ReportChannel(1, null, null, 0.05, 0.4, null, 'b')),
         ]);
 
-        Assert.Equal("MCR1 0.6.0 - sc 0/0 0\r\n09 - 0 - - -\r\n1030 - 0 3 +0.0 IP\r\n11 W3 40 8 +0.0 IM 1 - 0.05 0.4 - b\r\n", report.Body);
+        Assert.Equal("MCR1 0.6.0 - sc 0/0 0 0\r\n09 - 0 - - -\r\n1030 - 0 3 +0.0 IP\r\n11 W3 40 8 +0.0 IM 1 - 0.05 0.4 - b\r\n", report.Body);
         var read = DailyReport.Parse(report.Title, report.Body);
         Assert.Null(read.Header.Locator);
+        Assert.Equal(0, read.Header.AlreadyHad);
         Assert.Empty(read.Header.Errors);
         Assert.Equal(new TimeOnly(10, 30), read.Slots[1].Start);
         Assert.Null(read.Slots[0].Channel);
@@ -113,6 +114,20 @@ public class DailyReportTests
         Assert.Equal("sc", read.Header.Audio);
         Assert.Equal(22, read.Slots[1].Frames);
         Assert.Equal('b', read.Slots[1].Channel!.Basis);
+        // Issue #86: an older sender's header has no seventh field at all, so the already-had
+        // count is not known (it was folded into "delivered" under the old format), not zero.
+        Assert.Null(read.Header.AlreadyHad);
+    }
+
+    [Theory]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0", null)] // no seventh field at all: an older sender's
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 -", null)] // seventh field explicitly "-": still not known
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 0", 0)] // the BBS already had none
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 3", 3)] // G7TAJ's case from issue #86: it already had all three
+    public void Parse_AlreadyHadField_KnownOrNot(string headerLine, int? expected)
+    {
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", headerLine + "\r\n");
+        Assert.Equal(expected, read.Header.AlreadyHad);
     }
 
     [Theory]
@@ -136,7 +151,7 @@ public class DailyReportTests
     {
         // The example in docs/receiver.md, "The daily report's format".
         string body = string.Join("\r\n",
-            "MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1",
+            "MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1 0",
             "09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b",
             "10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b",
             "11 W4 214 18 +1.2 IG 2 1.8/-16 0.31 0.18 279 b",
@@ -180,7 +195,7 @@ public class DailyReportTests
     [Fact]
     public void Parse_LinesFromALaterVersion_KeepWhatThisReads()
     {
-        string body = "MCR1 0.9.0 IO91lk sc 1/1 0 header-extra\r\n"
+        string body = "MCR1 0.9.0 IO91lk sc 1/1 0 2 header-extra\r\n"
             + "09 W4 10 12 +0.1 IG\r\n"
             + "10 W4 11 12 +0.1 IG -\r\n"
             + "11 W4 12 12 +0.1 IG - - - - - - later-field\r\n"
@@ -192,14 +207,16 @@ public class DailyReportTests
         Assert.All(read.Slots.Take(3), slot => Assert.Null(slot.Channel));
         Assert.Equal([10, 11, 12, 13], read.Slots.Select(slot => slot.Frames));
         Assert.Equal(new ReportChannel(2, 1.9, -17, 0.35, 0.21, 287, 'b'), read.Slots[3].Channel);
+        // The seventh field (already had) is read; anything after it on the header line is not.
+        Assert.Equal(2, read.Header.AlreadyHad);
         // Written back in this version's own form, which an older reader takes too.
-        Assert.Equal("MCR1 0.9.0 IO91lk sc 1/1 0\r\n09 W4 10 12 +0.1 IG\r\n10 W4 11 12 +0.1 IG\r\n11 W4 12 12 +0.1 IG\r\n12 W4 13 12 +0.1 IG 2 1.9/-17 0.35 0.21 287 b\r\n", read.Body);
+        Assert.Equal("MCR1 0.9.0 IO91lk sc 1/1 0 2\r\n09 W4 10 12 +0.1 IG\r\n10 W4 11 12 +0.1 IG\r\n11 W4 12 12 +0.1 IG\r\n12 W4 13 12 +0.1 IG 2 1.9/-17 0.35 0.21 287 b\r\n", read.Body);
     }
 
     [Fact]
     public void Numbers_NeverNegativeZero_AndNotFiniteIsNotKnown()
     {
-        var header = new ReportHeader("0.6.0", null, "sc", 0, 0, new Dictionary<string, int>());
+        var header = new ReportHeader("0.6.0", null, "sc", 0, 0, new Dictionary<string, int>(), null);
         var report = new DailyReport("G4ABC", Day, header,
         [
             new ReportSlot(new TimeOnly(9, 0), "W4", 3, -0.3, -0.04, [], new ReportChannel(2, 1.94, -0.4, -0.001, double.NaN, double.PositiveInfinity, 'b')),

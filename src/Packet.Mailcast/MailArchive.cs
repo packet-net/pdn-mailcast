@@ -69,9 +69,13 @@ public sealed class MailSnapshot
         // rather than scanning the whole archive on every poll.
         foreach (var entry in newestFirst)
         {
-            if (entry.Verdict is BbsVerdict.Accepted or BbsVerdict.AlreadyHad)
+            if (entry.Verdict is BbsVerdict.Accepted)
             {
                 Delivered++;
+            }
+            else if (entry.Verdict is BbsVerdict.AlreadyHad)
+            {
+                AlreadyHad++;
             }
             else if (entry.Verdict is BbsVerdict.Refused)
             {
@@ -89,8 +93,15 @@ public sealed class MailSnapshot
     /// <summary>How many are archived and not waiting.</summary>
     public int Archived => _newestFirst.Length - Waiting;
 
-    /// <summary>How many archived bulletins the BBS accepted or already had (issue #73).</summary>
+    /// <summary>
+    /// How many archived bulletins the BBS accepted (issue #73). Does not include
+    /// <see cref="AlreadyHad"/>, which issue #86 broke out as its own count so the Bulletins
+    /// summary line, each bulletin's own badge, and the daily report's header all agree.
+    /// </summary>
     public int Delivered { get; }
+
+    /// <summary>How many archived bulletins the BBS already had (issue #86).</summary>
+    public int AlreadyHad { get; }
 
     /// <summary>How many archived bulletins the BBS refused (issue #73).</summary>
     public int Refused { get; }
