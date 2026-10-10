@@ -177,6 +177,10 @@ public class DailyReportTests
     [InlineData(-33.87, 151.21, "QF56od")]
     [InlineData(40.75, -73.99, "FN30as")]
     [InlineData(90, 180, "RR99xx")]
+    // A point whose subsquare is "mm": MaidenheadLib's own LatLngToLocator(lat, lon, 0) drops the
+    // subsquare entirely for a point like this one (returns "AA24", 4 characters, rather than
+    // "AA24mm"), so this pins that Format still gives all 6.
+    [InlineData(-85.46, -174.98, "AA24mm")]
     public void Maidenhead_Format_GivesSixCharacters(double latitude, double longitude, string expected)
     {
         Assert.Equal(expected, Maidenhead.Format(latitude, longitude));

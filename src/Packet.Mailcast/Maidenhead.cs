@@ -49,14 +49,20 @@ public static class Maidenhead
         {
             return null;
         }
-        // The north pole and the antimeridian's east side belong to the last square, same as our
-        // own formula used to give them: MaidenheadLib does not clamp there, and without this it
-        // would hand back a locator whose field letter is one past 'R', outside a real locator's range.
+        // The north pole, and the antimeridian itself, belong to the last square, same as our own
+        // formula used to give them: MaidenheadLib does not clamp either (any longitude at
+        // latitude 90, not just the corner, and likewise any latitude at longitude 180), and
+        // without this it would hand back a locator whose field letter is one past 'R', outside a
+        // real locator's range.
         double lat = Math.Min(latitude, 89.999999);
         double lon = Math.Min(longitude, 179.999999);
-        // MaidenheadLib's precision parameter does not step 4, 6, 8, 10 characters: 0 is 4 characters
-        // (field and square only) and 1 is 8 (adding the subsquare letters, then an extra digit pair
-        // we do not want), so the 6 characters we want are the first 6 of the 8 that 1 gives.
+        // Precision 0 normally gives exactly the 6 characters we want (field, square, subsquare),
+        // but MaidenheadLib has a bug: when the subsquare comes out "mm" it returns only the first
+        // 4 characters instead (decompiled, it special-cases that one string literally), silently
+        // dropping the subsquare for about 1 in 600 points, e.g. (-85.46, -174.98) gives "AA24" at
+        // precision 0 rather than "AA24mm". Precision 1 does not have that bug (it always gives 8:
+        // field, square, subsquare, then an extra digit pair we do not want), so the 6 characters
+        // we want are the first 6 of the 8 that precision 1 gives, every time.
         return MaidenheadLocator.LatLngToLocator(lat, lon, 1)[..6];
     }
 }
