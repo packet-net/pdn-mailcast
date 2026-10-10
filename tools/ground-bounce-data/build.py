@@ -13,10 +13,11 @@ a small literal table transcribed from a PDF, below). Takes well under a minute.
 Data sources and licences (credited again in docs/receiver.md and in the files' own header
 comments, as each licence requires):
 
-- Towns: GeoNames (https://www.geonames.org/), cities5000.zip, CC BY 4.0
-  (https://creativecommons.org/licenses/by/4.0/). Filtered to the region this receiver cares
-  about (roughly Britain, Ireland and nearby Europe, 45 to 62 N, 15 W to 10 E) to keep the
-  embedded file small.
+- Towns: GeoNames (https://www.geonames.org/), CC BY 4.0
+  (https://creativecommons.org/licenses/by/4.0/). cities15000.zip (population over 15000, or a
+  capital) across the whole region a bounce can fall in (GB7RDG out to 2000 km, below), plus
+  cities5000.zip (over 5000) within the core of Britain and Ireland, to keep the embedded file a
+  sensible size while still naming the smaller towns where most receivers in practice are.
 
 - Sea names: Flanders Marine Institute (2018). IHO Sea Areas, version 3.
   https://doi.org/10.14284/323, CC BY 4.0. Fetched from Marine Regions' WFS
@@ -54,10 +55,21 @@ from shapely import simplify
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "src" / "Mailcast.Receiver" / "Data"
 
-# Roughly Britain, Ireland and nearby Europe: wide enough to cover every receiver and GB7RDG
-# path this feature is meant for, without embedding the whole world.
-MIN_LAT, MAX_LAT = 45.0, 62.0
-MIN_LON, MAX_LON = -15.0, 10.0
+# Wide enough to hold a ground bounce for any path from GB7RDG to a European receiver this
+# feature is meant for: a bounce point lies on the great circle to the receiver, so it is no
+# further from GB7RDG than the receiver itself, and this is every bearing out to 2000 km (found
+# by issue #89's own review: the first, narrower box cut off the southern Bay of Biscay, so a
+# receiver down there got no sea label at all, and a real offshore point nearby fell back to a
+# coastal town's name instead).
+MIN_LAT, MAX_LAT = 33.0, 70.0
+MIN_LON, MAX_LON = -29.0, 27.0
+
+# Within this smaller core (Britain and Ireland, where most receivers in practice are and where
+# a bounce needs the finest naming), towns keep GeoNames' cities5000 threshold (population over
+# 5000); everywhere else in the wider box uses cities15000 (over 15000, or a capital) so the
+# embedded file stays a sensible size while still having a plausible town for the rest of Europe.
+CORE_MIN_LAT, CORE_MAX_LAT = 49.0, 61.0
+CORE_MIN_LON, CORE_MAX_LON = -11.0, 2.0
 
 
 def fetch(url: str) -> bytes:
@@ -73,20 +85,40 @@ def write_gz(name: str, text: str) -> None:
 
 # --- Towns (GeoNames) -------------------------------------------------------------------------
 
-def build_towns() -> None:
-    raw = fetch("https://download.geonames.org/export/dump/cities5000.zip")
+def _read_cities(zip_name: str, txt_name: str) -> list[tuple[str, str, float, float, int]]:
+    raw = fetch(f"https://download.geonames.org/export/dump/{zip_name}")
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-        lines = zf.read("cities5000.txt").decode("utf-8").splitlines()
+        lines = zf.read(txt_name).decode("utf-8").splitlines()
     rows = []
     for line in lines:
         f = line.split("\t")
         # geonameid, name, asciiname, alternatenames, latitude, longitude, ..., population, ...
-        asciiname, lat, lon, population = f[2], float(f[4]), float(f[5]), int(f[14])
-        if MIN_LAT <= lat <= MAX_LAT and MIN_LON <= lon <= MAX_LON:
-            rows.append((asciiname, lat, lon, population))
-    rows.sort(key=lambda r: (-r[3], r[0]))
-    header = "# GeoNames cities5000, CC BY 4.0 (https://www.geonames.org/), filtered to " \
-        f"{MIN_LAT}-{MAX_LAT} N, {MIN_LON}-{MAX_LON} E. name\\tlat\\tlon\\tpopulation\n"
+        rows.append((f[0], f[2], float(f[4]), float(f[5]), int(f[14])))
+    return rows
+
+
+def build_towns() -> None:
+    # cities15000 (population over 15000, or a capital) across the whole region keeps the file a
+    # sensible size; cities5000 (over 5000) only within the core, where most receivers in
+    # practice are and where a bounce needs the finest naming, adds the smaller towns there
+    # (geonameid keyed, so a town in both never appears twice).
+    wide = {
+        gid: (name, lat, lon, pop)
+        for gid, name, lat, lon, pop in _read_cities("cities15000.zip", "cities15000.txt")
+        if MIN_LAT <= lat <= MAX_LAT and MIN_LON <= lon <= MAX_LON
+    }
+    core = {
+        gid: (name, lat, lon, pop)
+        for gid, name, lat, lon, pop in _read_cities("cities5000.zip", "cities5000.txt")
+        if CORE_MIN_LAT <= lat <= CORE_MAX_LAT and CORE_MIN_LON <= lon <= CORE_MAX_LON
+    }
+    rows = sorted({**wide, **core}.values(), key=lambda r: (-r[3], r[0]))
+    header = (
+        "# GeoNames, CC BY 4.0 (https://www.geonames.org/): cities15000 (population over 15000, "
+        f"or a capital) across {MIN_LAT}-{MAX_LAT} N, {MIN_LON}-{MAX_LON} E, plus cities5000 "
+        f"(over 5000) within the core {CORE_MIN_LAT}-{CORE_MAX_LAT} N, {CORE_MIN_LON}-{CORE_MAX_LON} E "
+        "(Britain and Ireland). name\\tlat\\tlon\\tpopulation\n"
+    )
     body = "\n".join(f"{n}\t{la}\t{lo}\t{p}" for n, la, lo, p in rows)
     write_gz("towns.txt.gz", header + body + "\n")
 

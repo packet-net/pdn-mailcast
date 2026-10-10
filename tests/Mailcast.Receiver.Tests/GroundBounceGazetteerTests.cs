@@ -43,8 +43,32 @@ public class GroundBounceGazetteerTests
     [Fact]
     public void Label_FarFromAnyTownOrSeaInTheGazetteer_IsNull()
     {
-        // Deep in the Sahara: outside the gazetteer's region (Britain, Ireland and nearby
-        // Europe) entirely, so neither a sea nor a plausible nearest town.
+        // Deep in the Sahara: outside the gazetteer's region (GB7RDG out to 2000 km) entirely, so
+        // neither a sea nor a plausible nearest town.
         Assert.Null(GroundBounceGazetteer.Label(23.0, 10.0));
+    }
+
+    [Theory]
+    [InlineData(44.0, -2.0)]
+    [InlineData(44.9, -1.5)]
+    public void Label_InTheSouthernBayOfBiscay_IsTheSea(double latitude, double longitude)
+    {
+        // Review of issue #89 found the first, narrower gazetteer region (45-62 N) cut off the
+        // southern Bay of Biscay: these two points, well inside it, got no sea label at all, and
+        // the second (an offshore point) fell back to "near Lesparre-Medoc", a real town about
+        // 25 km inland - wrong both ways. The region was widened (GB7RDG out to 2000 km) to cover
+        // this properly.
+        Assert.Equal("Bay of Biscay", GroundBounceGazetteer.Label(latitude, longitude));
+    }
+
+    [Fact]
+    public void Label_OnLand_FarFromEveryTown_IsNull_RatherThanAMisleadinglyDistantOne()
+    {
+        // The Cairngorms: on land, outside every sea polygon, but the nearest town (Westhill,
+        // near Aberdeen) is around 53 km away - well past MaxTownKm, so this is left unlabelled
+        // rather than called "near" a town the point is not actually close to. Falling outside
+        // every sea polygon is not the same as being confidently on land near somewhere named:
+        // the simplified sea polygons have real gaps (packet-net/pdn-mailcast#89 review).
+        Assert.Null(GroundBounceGazetteer.Label(57.05, -3.75));
     }
 }

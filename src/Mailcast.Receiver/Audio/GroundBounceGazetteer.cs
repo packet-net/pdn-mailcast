@@ -15,12 +15,20 @@ namespace Mailcast.Receiver;
 internal static class GroundBounceGazetteer
 {
     /// <summary>
-    /// How far a bounce point's nearest town may be and still be called "near" it, km. The bounce
-    /// point itself is only good to a few tens of km, so anything much further than that is
-    /// presumably open sea our simplified sea polygons do not cover (or outside the gazetteer's
-    /// own region), and naming some distant town would mislead rather than help.
+    /// How far a bounce point's nearest town may be and still be called "near" it, km. Falling
+    /// outside every sea polygon is not the same as being on land: the simplified sea polygons
+    /// have real gaps (a strait too narrow to survive simplification, a point just past the edge
+    /// of the gazetteer's own region), and a point in one of those gaps is still more likely to
+    /// be open water than the nearest named place on the coast. Review of issue #89 found this
+    /// the hard way: a point a few km off the French Atlantic coast, outside every sea polygon at
+    /// the time, was called "near Lesparre-Medoc" (a real town, about 25 km inland) rather than
+    /// left unlabelled or correctly put in the Bay of Biscay. 30 km keeps "near" meaning a town
+    /// the point is actually close to, in line with a bounce point itself only being good to a
+    /// few tens of km; the gazetteer's sea coverage was also widened to close the gap this came
+    /// from (tools/ground-bounce-data/build.py), but the cap stays regardless, since a gap is
+    /// always possible wherever the simplification happens to land.
     /// </summary>
-    private const double MaxTownKm = 150;
+    private const double MaxTownKm = 30;
 
     private const double EarthKm = 6371.0;
 
