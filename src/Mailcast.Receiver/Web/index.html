@@ -968,6 +968,7 @@ function mailSummary(m) {
   if (m.partial.length) parts.push(`${m.partial.length} coming in`);
   if (m.waiting) parts.push(`${m.waiting} waiting for your BBS`);
   if (m.delivered) parts.push(`${m.delivered} delivered`);
+  if (m.alreadyHad) parts.push(`${m.alreadyHad} already had`);
   if (m.refused) parts.push(`${m.refused} refused`);
   let note = (parts.length ? parts.join(", ") : "Nothing held yet.")
     + ` (each kept ${m.archive.days} days, ${m.archive.maxMegabytes} MB at most). Click one to read it.`;

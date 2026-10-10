@@ -151,7 +151,7 @@ The title is `MCR <callsign> <date>`, the date in UTC. Here is a whole day from 
 ```
 MCR G4ABC 2026-10-06
 
-MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
+MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1 0
 09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b
 10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b
 11 W4 214 18 +1.2 IG 2 1.8/-16 0.31 0.18 279 b
@@ -169,8 +169,9 @@ Fields are separated by one space, and `-` means not known. The first line is th
 2. The receiver's version.
 3. The web SDR's 6 character locator, from the position it reports, or `-` for a sound card.
 4. Where the audio came from: `sc` for a sound card, or the web SDR's name, such as `wessex.zapto.org`. A web SDR on your own network (an IP address, `localhost`, or a name like `sdr.local` or `sdr.lan`) is just `sdr`, so the report never carries your addresses.
-5. Bulletins rebuilt / delivered to the BBS that day.
+5. Bulletins rebuilt / delivered (accepted outright) to the BBS that day.
 6. Errors: `0`, or how many, a colon, and how many of each kind: `BBS` (a session with the BBS failed), `AUD` (the audio failed or was lost), `RIG` (a problem retuning the radio), `HOOK` (a hook command failed).
+7. How many of the day's bulletins the BBS already had (issue #86), such as `0` in the example above, or `3` for a day when the BBS answered FS `-` to three. A header with no seventh field at all, from a receiver before this was tracked, means not known, not zero: the old header folded this into field 5's delivered instead.
 
 Then one line for each slot listened to, in order:
 
@@ -190,7 +191,7 @@ When the slot's channel was measured, six more follow:
 11. The virtual height, km. Without the web SDR's position it is worked out for a 150 km path.
 12. What it was measured from: `b` the bursts, `p` the probe after the tone, whichever measured the slot better.
 
-A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the sixth field of the header and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
+A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the seventh field of the header (`-` or missing there means the already-had count is not known) and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
 
 ## The receiver's login on your BBS
 
@@ -270,7 +271,7 @@ http://127.0.0.1:8130/ shows:
 - the channel: what the radio path from GB7RDG was like in the last slot, and over the last day (see [The Channel tile](#the-channel-tile));
 - what was heard, slot by slot: every burst, and every frame in it (see [What was heard](#what-was-heard));
 - what to try if nothing is heard;
-- the bulletins this receiver holds (see [Bulletins](#bulletins)): one row each, newest first, a part-received one with a progress bar (named from any directory that has named it, or "not yet named" otherwise) and a complete one with what the BBS said about it and when. A summary line at the top counts how many are coming in, waiting for your BBS, delivered and refused. If the newest directory heard is not today's, it says so plainly instead of naming that stale date as if it were current;
+- the bulletins this receiver holds (see [Bulletins](#bulletins)): one row each, newest first, a part-received one with a progress bar (named from any directory that has named it, or "not yet named" otherwise) and a complete one with what the BBS said about it and when. A summary line at the top counts how many are coming in, waiting for your BBS, delivered, already had and refused. If the newest directory heard is not today's, it says so plainly instead of naming that stale date as if it were current;
 - the daily report, if you have turned it on: the last one as sent, what your BBS said, and when the next goes (see [Sending a daily report](#sending-a-daily-report));
 - the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too; for a sound card it also offers **Measure my filter** and typing the edges, above, which writes `dialKHz`. For a web SDR or a recording it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you. A **Test BBS login** button tries the login shown without exchanging any mail (see [Testing the login](#testing-the-login)).
 
@@ -334,7 +335,7 @@ The receiver keeps its own copy of every bulletin it rebuilds, so nothing is los
 
 A rebuilt bulletin waits in the outbox until your BBS has answered for it: accepted, already had (it has that BID) or refused. Then it moves to the archive with that answer and when it came. Copies are kept for `archive.days` (30) and up to `archive.maxMegabytes` (50 MB) in all, the oldest going first. Bulletins still waiting are never removed. Only bulletins are kept; nothing else the receiver hears goes to the BBS or the archive.
 
-The status page's **Bulletins** section lists everything this receiver holds, newest first, 25 to a page: a part-received object on top (a progress bar, named from any directory that has named it, or "not yet named" otherwise), then every complete bulletin, with its BID, from, to, @, title, date, size, and status. Each complete one also shows when it was completed (rebuilt), and, once archived, when it was delivered to your BBS. A waiting bulletin shows the BBS's last answer, if any, and the next try. A summary line at the top counts how many are coming in, waiting for your BBS, delivered and refused, plus, when the newest directory heard is not today's, a note saying so.
+The status page's **Bulletins** section lists everything this receiver holds, newest first, 25 to a page: a part-received object on top (a progress bar, named from any directory that has named it, or "not yet named" otherwise), then every complete bulletin, with its BID, from, to, @, title, date, size, and status. Each complete one also shows when it was completed (rebuilt), and, once archived, when it was delivered to your BBS. A waiting bulletin shows the BBS's last answer, if any, and the next try. A summary line at the top counts how many are coming in, waiting for your BBS, delivered, already had and refused (issue #86: already had is its own count, not folded into delivered), plus, when the newest directory heard is not today's, a note saying so.
 
 Click a complete one to read the whole bulletin as it will reach the BBS: its header lines, its R: lines and its text, what the BBS has said about it each time it was offered, and **Send to BBS again**. **Open as text** shows it on its own. A problem reaching your BBS at all (no answer, a login refused) is not about any one bulletin, so it shows in the **Your BBS** tile instead, not here. A delivery record for a bulletin since pruned from the archive (by `archive.days` or `archive.maxMegabytes`) has nothing left to open and so drops out of this section, though it is still in `GET /api/status`'s `deliveries` for as long as that keeps it (normally the shorter of the two).
 
@@ -344,7 +345,7 @@ The copies are a convenience: if one cannot be written (a full disk, say), that 
 
 The same is there for scripts, behind the page's password if it has one:
 
-- `GET /api/mail?offset=0&limit=50`: the list as JSON, newest first (at most 200 at a time): `total`, `waiting`, `archived`, `delivered` and `refused` (counts), `partial` (every part-received object, with `bid`, `title`, `received` and `needed`; never paged, since there are normally few of them), `archive` (`days`, `maxMegabytes`) and `items`, the page itself, each with `attempts`, what the BBS has said about that BID each time it was offered (oldest first), alongside its final `verdict`, `completed` and `delivered` times.
+- `GET /api/mail?offset=0&limit=50`: the list as JSON, newest first (at most 200 at a time): `total`, `waiting`, `archived`, `delivered`, `alreadyHad` and `refused` (counts; issue #86: `delivered` means the BBS accepted the bulletin outright, and `alreadyHad` is its own count, no longer folded into `delivered`), `partial` (every part-received object, with `bid`, `title`, `received` and `needed`; never paged, since there are normally few of them), `archive` (`days`, `maxMegabytes`) and `items`, the page itself, each with `attempts`, what the BBS has said about that BID each time it was offered (oldest first), alongside its final `verdict`, `completed` and `delivered` times.
 - `GET /api/mail/<id>`: one bulletin as plain text, with the `id` from the list.
 - `POST /api/mail/resend` with `{"id": "<id>"}` as `application/json`: sends one again. Like saving the settings, it is refused from another site.
 

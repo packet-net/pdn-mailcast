@@ -578,7 +578,8 @@ public class MailTests
     /// <summary>
     /// Issue #73: the combined Bulletins section's data, from the one endpoint - a part-received
     /// object, a delivered bulletin and a refused one, all at once, with the summary counts the
-    /// page's own heading is built from.
+    /// page's own heading is built from. Issue #86: a bulletin the BBS already had is its own
+    /// count, "alreadyHad", not folded into "delivered".
     /// </summary>
     [Fact]
     public async Task Mail_ShowsAPartReceivedAndADeliveredAndARefusedBulletin_WithSummaryCounts()
@@ -589,16 +590,20 @@ public class MailTests
         await using var _h = host;
         await using var _p = page;
         using var _c = http;
-        await RebuildAsync(host.Intake, Samples.Bulletin(1), Samples.Bulletin(2));
-        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "1_GB7RDG"
-            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
-            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Refused, "FS R: not wanted here")), host.Ledger, time, _ => { });
+        await RebuildAsync(host.Intake, Samples.Bulletin(1), Samples.Bulletin(2), Samples.Bulletin(3));
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid switch
+        {
+            "1_GB7RDG" => new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted),
+            "3_GB7RDG" => new DeliveryOutcome(b.Bid, DeliveryVerdict.AlreadyHad),
+            _ => new DeliveryOutcome(b.Bid, DeliveryVerdict.Refused, "FS R: not wanted here"),
+        }), host.Ledger, time, _ => { });
         await service.DeliverPendingAsync(CancellationToken.None);
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(900, bodyLines: 200)));
 
         var mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
         Assert.Equal(0, mail.GetProperty("waiting").GetInt32());
         Assert.Equal(1, mail.GetProperty("delivered").GetInt32());
+        Assert.Equal(1, mail.GetProperty("alreadyHad").GetInt32());
         Assert.Equal(1, mail.GetProperty("refused").GetInt32());
         var partial = Assert.Single(mail.GetProperty("partial").EnumerateArray());
         Assert.Equal(JsonValueKind.Null, partial.GetProperty("bid").ValueKind); // not yet named
@@ -609,6 +614,7 @@ public class MailTests
         Assert.Equal("accepted", items["1_GB7RDG"].GetProperty("verdict").GetString());
         Assert.Equal("refused", items["2_GB7RDG"].GetProperty("verdict").GetString());
         Assert.Equal("FS R: not wanted here", items["2_GB7RDG"].GetProperty("detail").GetString());
+        Assert.Equal("alreadyHad", items["3_GB7RDG"].GetProperty("verdict").GetString());
     }
 
     /// <summary>

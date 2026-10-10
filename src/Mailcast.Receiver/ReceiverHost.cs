@@ -173,6 +173,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Delivery.SessionFinished += report =>
         {
             feedback.NoteDelivered(report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted));
+            feedback.NoteAlreadyHad(report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.AlreadyHad));
             if (report.Failure is not null)
             {
                 feedback.NoteError(ReportErrors.Bbs);

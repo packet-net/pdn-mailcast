@@ -23,7 +23,7 @@ public class FeedbackLinBpqTests(ITestOutputHelper output)
             TimeProvider.System, output.WriteLine);
 
         var day = DateOnly.FromDateTime(DateTime.UtcNow);
-        var report = new DailyReport("G4ABC", day, new ReportHeader("0.6.0", "IO91lk", "wessex.zapto.org", 3, 3, new Dictionary<string, int> { ["BBS"] = 1 }),
+        var report = new DailyReport("G4ABC", day, new ReportHeader("0.6.0", "IO91lk", "wessex.zapto.org", 3, 3, new Dictionary<string, int> { ["BBS"] = 1 }, 0),
         [
             new ReportSlot(new TimeOnly(10, 0), "W4", 212, 18, 1.2, ["IG"], new ReportChannel(2, 1.9, -17, 0.35, 0.21, 290, 'b')),
             new ReportSlot(new TimeOnly(11, 0), null, 0, null, null, []),

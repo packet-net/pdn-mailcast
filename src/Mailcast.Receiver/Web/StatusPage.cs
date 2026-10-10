@@ -1308,9 +1308,11 @@ public sealed class StatusPage : IAsyncDisposable
     /// remembered directory or not; never paged, since there are normally few of them and they
     /// belong on top of every page the section shows (but the page itself only puts them there on
     /// its first page).</item>
-    /// <item>"delivered" and "refused": how many archived bulletins answered each way, for the
-    /// summary line ("N coming in, N waiting for your BBS, N delivered"), alongside the existing
-    /// "waiting" count.</item>
+    /// <item>"delivered", "alreadyHad" and "refused": how many archived bulletins answered each
+    /// way, for the summary line ("N coming in, N waiting for your BBS, N delivered, N already
+    /// had"), alongside the existing "waiting" count. Issue #86: "delivered" means the BBS
+    /// accepted the bulletin outright; "alreadyHad" is its own count now, rather than folded into
+    /// "delivered" as it was before.</item>
     /// </list>
     /// </summary>
     internal object MailList(System.Collections.Specialized.NameValueCollection query)
@@ -1332,6 +1334,8 @@ public sealed class StatusPage : IAsyncDisposable
             archived = mail.Archived,
             // Counted once, when the snapshot was built: see MailSnapshot (issue #73 review).
             delivered = mail.Delivered,
+            // Issue #86: its own count, no longer folded into "delivered".
+            alreadyHad = mail.AlreadyHad,
             refused = mail.Refused,
             partial,
             offset,
