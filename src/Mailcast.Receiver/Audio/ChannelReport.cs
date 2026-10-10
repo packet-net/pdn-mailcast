@@ -85,6 +85,14 @@ public sealed record ChannelReport
     /// <summary>The receiver's locator the hops were worked out for.</summary>
     public string? Locator { get; init; }
 
+    /// <summary>
+    /// The receiver's place the hops were worked out for; null on the same terms as
+    /// <see cref="Locator"/>. Kept alongside the locator (which is not always a parseable one:
+    /// a web SDR with no locator of its own falls back to a plain "lat,lon" string) so the Path
+    /// picture can place ground bounces on the real great circle, not just show the text.
+    /// </summary>
+    public GroundPlace? Place { get; init; }
+
     /// <summary>The averaged delay profile in dB against its peak, from <see cref="ProfileStartMs"/> after the first mode in steps of <see cref="ProfileStepMs"/>.</summary>
     public IReadOnlyList<double?> ProfileDb { get; init; } = [];
 
@@ -147,6 +155,7 @@ public sealed record ChannelReport
             Measurements = pictures.Count,
             Kept = kept,
             Locator = place?.Locator,
+            Place = place,
             DistanceKm = place is null ? null : Math.Round(PathGeometry.DistanceKm(place, PathGeometry.Gb7rdg)),
         };
         // One probe is a measurement in itself; bursts are short, so it takes a few.

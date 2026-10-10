@@ -109,13 +109,58 @@ internal static class ChannelPicture
             return new Ray(m, height, known, Hop(groundKm, HopsOf(m.Label!), height));
         })];
 
+    /// <summary>One named ground bounce: where to draw its dot, and where it falls in words.</summary>
+    private readonly record struct Bounce(PicturePoint Point, string Label);
+
+    /// <summary>
+    /// Every distinct ground bounce a 2 or more hop ray in <paramref name="rays"/> touches
+    /// (packet-net/pdn-mailcast#89): a single hop path shows nothing new, so <see cref="HopsOf"/>
+    /// 1 rays contribute none. A hop count of <c>n</c> bounces at the fractions 1/n, 2/n, ...,
+    /// (n-1)/n of the great circle from GB7RDG to <paramref name="endPlace"/> (the same equal-hops
+    /// assumption the picture's own geometry draws, see <see cref="Hop"/>); two rays that happen
+    /// to share a fraction (a short path's 2F and a longer one's first half, say) are only named
+    /// once. Named from the gazetteer, nearest town on land or sea and shipping forecast area at
+    /// sea; a fraction the gazetteer has nothing to say about (open ocean beyond its towns, outside
+    /// every sea polygon) is left out rather than shown blank. Empty when the receiver's place is
+    /// not known, since there is then no real bearing to put a bounce on.
+    /// </summary>
+    private static List<Bounce> GroundBounces(List<Ray> rays, GroundPlace? endPlace)
+    {
+        if (endPlace is null)
+        {
+            return [];
+        }
+        var seen = new HashSet<double>();
+        var bounces = new List<(double Fraction, PicturePoint Point)>();
+        foreach (var r in rays)
+        {
+            int hops = HopsOf(r.Mode.Label!);
+            for (int k = 1; k < hops; k++)
+            {
+                double fraction = (double)k / hops;
+                if (seen.Add(Math.Round(fraction, 6)))
+                {
+                    bounces.Add((fraction, r.Points[2 * k]));
+                }
+            }
+        }
+        return [.. bounces.OrderBy(b => b.Fraction)
+            .Select(b => (b.Point, Place: PathGeometry.IntermediatePoint(PathGeometry.Gb7rdg, endPlace, b.Fraction)))
+            .Select(b => (b.Point, Label: GroundBounceGazetteer.Label(b.Place.Latitude, b.Place.Longitude)))
+            .Where(b => b.Label is not null)
+            .Select(b => new Bounce(b.Point, b.Label!))];
+    }
+
     /// <summary>
     /// The side view's SVG for one slot: null when there is nothing plausible to draw (no
     /// distance known, or no labelled mode at all). <paramref name="endLocator"/> and the
     /// distance are only captioned when <paramref name="withLabels"/> is set (the main picture,
-    /// not the day strip's small ones).
+    /// not the day strip's small ones); <paramref name="endPlace"/> additionally names each 2 or
+    /// more hop ray's ground bounces (packet-net/pdn-mailcast#89) when it is known (a web SDR's
+    /// position, or a sound card station with a locator) - null leaves the picture exactly as it
+    /// was before that, bounces and all.
     /// </summary>
-    public static string? Svg(ChannelReport report, string? endLocator, int widthPx, bool withLabels)
+    public static string? Svg(ChannelReport report, string? endLocator, int widthPx, bool withLabels, GroundPlace? endPlace = null)
     {
         if (report is not { Enough: true, DistanceKm: { } groundKm } || report.Modes.Count == 0)
         {
@@ -129,15 +174,19 @@ internal static class ChannelPicture
         var ground = Arc(groundKm, 0);
         var layers = rays.Select(r => (r.HeightKm, r.HeightKnown)).Distinct()
             .Select(h => (h.HeightKm, h.HeightKnown, Points: Arc(groundKm, h.HeightKm))).ToList();
+        var bounces = withLabels ? GroundBounces(rays, endPlace) : [];
 
         var all = ground.Concat(layers.SelectMany(l => l.Points)).Concat(rays.SelectMany(r => r.Points)).ToList();
         double minX = all.Min(p => p.X), maxX = all.Max(p => p.X);
         double minY = all.Min(p => p.Y), maxY = all.Max(p => p.Y);
         // Room above the curves for the ray labels, one per line (see below), and below for the
         // end labels and the scale note (one line more when it also says a height was not
-        // measured).
+        // measured, another when there are named ground bounces to list).
         double padTop = withLabels ? 10 + (rays.Count * 13) : 4, padSide = 8;
-        double padBottom = withLabels ? (rays.Any(r => !r.HeightKnown) ? 64 : 50) : 14;
+        // One line to introduce the bounces, then one line per bounce (not joined with commas on
+        // one line): SVG text does not wrap, and with a sea name and a shipping forecast area
+        // both in brackets a joined line can run well past this picture's width.
+        double padBottom = withLabels ? (rays.Any(r => !r.HeightKnown) ? 64 : 50) + (bounces.Count > 0 ? 12 * (bounces.Count + 1) : 0) : 14;
         double scale = (widthPx - (2 * padSide)) / (maxX - minX);
         double height = ((maxY - minY) * scale) + padTop + padBottom;
         double Sx(PicturePoint p) => ((p.X - minX) * scale) + padSide;
@@ -198,6 +247,16 @@ internal static class ChannelPicture
                 + $"<text x=\"{F(Sx(start))}\" y=\"{F(Sy(start) + 16)}\" font-size=\"11\"{startAttrs}>GB7RDG IO91lk</text>"
                 + $"<circle cx=\"{F(Sx(end))}\" cy=\"{F(Sy(end))}\" r=\"4\" fill=\"var(--ink)\"/>"
                 + $"<text x=\"{F(Sx(end))}\" y=\"{F(Sy(end) + 16)}\" font-size=\"11\"{endAttrs}>{WebUtility.HtmlEncode(endLabel)}</text>");
+            foreach (var b in bounces)
+            {
+                // A small dot marking where each named ground bounce falls, hover text the words
+                // in full: a label at every dot's own position would risk running into either the
+                // top legend or another dot's label in a picture this narrow (packet-net/pdn-mailcast#89),
+                // so the words themselves are said once, below, in the order GB7RDG to the receiver.
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"<circle cx=\"{F(Sx(b.Point))}\" cy=\"{F(Sy(b.Point))}\" r=\"2.5\" fill=\"var(--soft)\">"
+                    + $"<title>{WebUtility.HtmlEncode(b.Label)}</title></circle>");
+            }
             bool anyNominal = rays.Any(r => !r.HeightKnown);
             // Kept short, and split onto its own lines, rather than one long line: SVG text does
             // not wrap, so a note this length in one line would run off the picture's width.
@@ -205,10 +264,22 @@ internal static class ChannelPicture
                 $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 30)}\" text-anchor=\"middle\" font-size=\"10\" fill=\"var(--soft)\">{Math.Round(groundKm)} km</text>");
             sb.Append(CultureInfo.InvariantCulture,
                 $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 42)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">Curve &amp; height exaggerated; distance to scale.</text>");
+            double nextNoteY = Sy(start) + 54;
             if (anyNominal)
             {
                 sb.Append(CultureInfo.InvariantCulture,
-                    $"<text x=\"{F(midX)}\" y=\"{F(Sy(start) + 54)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">Dashed: height unmeasured, nominal 300 km.</text>");
+                    $"<text x=\"{F(midX)}\" y=\"{F(nextNoteY)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">Dashed: height unmeasured, nominal 300 km.</text>");
+                nextNoteY += 12;
+            }
+            if (bounces.Count > 0)
+            {
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"<text x=\"{F(midX)}\" y=\"{F(nextNoteY)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">Ground bounces:</text>");
+                for (int i = 0; i < bounces.Count; i++)
+                {
+                    sb.Append(CultureInfo.InvariantCulture,
+                        $"<text x=\"{F(midX)}\" y=\"{F(nextNoteY + ((i + 1) * 12))}\" text-anchor=\"middle\" font-size=\"9\" fill=\"var(--soft)\">{WebUtility.HtmlEncode(bounces[i].Label)}</text>");
+                }
             }
         }
         sb.Append("</svg>");

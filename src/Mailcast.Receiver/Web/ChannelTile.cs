@@ -56,7 +56,7 @@ internal static class ChannelTile
             profile = latest is { Enough: true } r ? new { startMs = r.ProfileStartMs, stepMs = r.ProfileStepMs, db = r.ProfileDb } : null,
             // The side view of the path (packet-net/pdn-mailcast#50): null when there is nothing
             // plausible to draw (the receiver's place is not known, or nothing could be labelled).
-            pathSvg = latest is null ? null : ChannelPicture.Svg(latest, latest.Locator, MainPictureWidthPx, withLabels: true),
+            pathSvg = latest is null ? null : ChannelPicture.Svg(latest, latest.Locator, MainPictureWidthPx, withLabels: true, latest.Place),
             // The same slot measured the other way (the bursts when this is the probe's, or the
             // probe when this is the bursts'), when it was measured both ways.
             other = latest?.Other is { } o ? new

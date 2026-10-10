@@ -68,6 +68,32 @@ internal static class PathGeometry
         return 2 * EarthKm * Math.Asin(Math.Min(1, Math.Sqrt(h)));
     }
 
+    /// <summary>
+    /// The point a <paramref name="fraction"/> of the way along the great circle from
+    /// <paramref name="a"/> to <paramref name="b"/> (0 at <paramref name="a"/>, 1 at
+    /// <paramref name="b"/>): where a ground bounce falls (packet-net/pdn-mailcast#89), on the
+    /// same equal-hops assumption <see cref="ChannelPicture.Hop"/> draws. <paramref name="a"/>
+    /// when the two places coincide (no bearing to interpolate along).
+    /// </summary>
+    public static GroundPlace IntermediatePoint(GroundPlace a, GroundPlace b, double fraction)
+    {
+        double d = DistanceKm(a, b) / EarthKm;
+        if (d < 1e-9)
+        {
+            return a;
+        }
+        double p1 = a.Latitude * Math.PI / 180, l1 = a.Longitude * Math.PI / 180;
+        double p2 = b.Latitude * Math.PI / 180, l2 = b.Longitude * Math.PI / 180;
+        double sinD = Math.Sin(d);
+        double A = Math.Sin((1 - fraction) * d) / sinD, B = Math.Sin(fraction * d) / sinD;
+        double x = (A * Math.Cos(p1) * Math.Cos(l1)) + (B * Math.Cos(p2) * Math.Cos(l2));
+        double y = (A * Math.Cos(p1) * Math.Sin(l1)) + (B * Math.Cos(p2) * Math.Sin(l2));
+        double z = (A * Math.Sin(p1)) + (B * Math.Sin(p2));
+        double lat = Math.Atan2(z, Math.Sqrt((x * x) + (y * y))) * 180 / Math.PI;
+        double lon = Math.Atan2(y, x) * 180 / Math.PI;
+        return new GroundPlace(lat, lon, string.Empty);
+    }
+
     /// <summary>The delay of <paramref name="hops"/> hops off a layer at <paramref name="heightKm"/>, over <paramref name="groundKm"/>, in ms.</summary>
     public static double DelayMs(double groundKm, int hops, double heightKm)
     {
