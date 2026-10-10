@@ -54,10 +54,17 @@ internal sealed class FakeBbs : IAsyncDisposable
 
     /// <summary>
     /// Behave as a login that is a working Telnet user but not set up as a BBS forwarding
-    /// partner: after a correct password, answer as LinBPQ does to a brand new login (its own
-    /// SID, then asking for a name) instead of the forwarding banner, and then hang up.
+    /// partner: after a correct password, answer with its own bare prompt (SID, then a prompt
+    /// with no "de CALL" banner) instead of the forwarding prompt, and then hang up.
     /// </summary>
     public bool NotAPartner { get; set; }
+
+    /// <summary>
+    /// Behave as LinBPQ does when the login's BBS user has no Name set: after a correct
+    /// password, send its own SID and then its hardcoded new-user prompt, "Please enter your
+    /// Name", instead of the forwarding prompt or a bare one, and then hang up.
+    /// </summary>
+    public bool AsksForName { get; set; }
 
     /// <summary>Answer a correct password with one unrecognisable line, then hang up.</summary>
     public string? Garbled { get; set; }
@@ -119,6 +126,11 @@ internal sealed class FakeBbs : IAsyncDisposable
 
                 await stream.WriteAsync(Encoding.Latin1.GetBytes("TST:GB7TST} Connected to BBS\r"), _stop.Token);
                 if (NotAPartner)
+                {
+                    await stream.WriteAsync(Encoding.Latin1.GetBytes("[PDN-0.1.0-M$]\r>\r"), _stop.Token);
+                    return;
+                }
+                if (AsksForName)
                 {
                     await stream.WriteAsync(Encoding.Latin1.GetBytes("[PDN-0.1.0-M$]\rPlease enter your Name\r>\r"), _stop.Token);
                     return;

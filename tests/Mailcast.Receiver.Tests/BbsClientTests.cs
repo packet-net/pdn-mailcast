@@ -101,6 +101,25 @@ public class BbsClientTests
         Assert.Equal(DeliveryVerdict.NotOffered, Assert.Single(report.Outcomes).Verdict);
     }
 
+    /// <summary>Issue #84: a BBS user with no Name gets LinBPQ's new-user prompt in place of the
+    /// forwarding prompt. A real delivery session meeting it must fail plainly, rather than
+    /// starting an FBB session over a connection that is actually waiting for a Name (which hangs
+    /// until the idle timeout, or fails with a generic protocol error).</summary>
+    [Fact]
+    public async Task Deliver_LinBpqAsksForAName_FailsWithThePlainExplanation()
+    {
+        await using var bbs = new FakeBbs { AsksForName = true };
+
+        var report = await Client(bbs.Port).DeliverAsync([Samples.Bulletin(402)], CancellationToken.None);
+
+        Assert.False(report.Graceful);
+        Assert.Contains("Q0CAST", report.Failure, StringComparison.Ordinal);
+        Assert.Contains("asking for a name", report.Failure, StringComparison.Ordinal);
+        Assert.Contains("BBS Users", report.Failure, StringComparison.Ordinal);
+        Assert.Equal(DeliveryVerdict.NotOffered, Assert.Single(report.Outcomes).Verdict);
+        Assert.Empty(bbs.Taken);
+    }
+
     [Fact]
     public async Task Deliver_NothingListening_FailsAndOffersNothing()
     {
@@ -209,6 +228,24 @@ public class BbsClientTests
 
         Assert.Equal(BbsLoginTestOutcome.NotForwardingPartner, result.Outcome);
         Assert.Contains("Q0CAST", result.Said, StringComparison.Ordinal);
+    }
+
+    /// <summary>Issue #84: a user with no Name gets LinBPQ's new-user prompt, "Please enter your
+    /// Name" followed by a bare '>' (LinBPQ's MailDataDefs.c, NewUserPrompt, hardcoded and never
+    /// read from its config). That used to read as the bare-prompt NotForwardingPartner case;
+    /// it should instead say plainly that LinBPQ wants a Name for the login.</summary>
+    [Fact]
+    public async Task TestLogin_LinBpqAsksForAName_SaysSoPlainly()
+    {
+        await using var bbs = new FakeBbs { AsksForName = true };
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.NeedsName, result.Outcome);
+        Assert.Contains("Q0CAST", result.Said, StringComparison.Ordinal);
+        Assert.Contains("asking for a name", result.Said, StringComparison.Ordinal);
+        Assert.Contains("BBS Users", result.Said, StringComparison.Ordinal);
+        Assert.Null(result.Detail);
     }
 
     [Fact]

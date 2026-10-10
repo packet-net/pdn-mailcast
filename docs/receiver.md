@@ -215,7 +215,7 @@ Tested against LinBPQ 6.0.25.41.
 
    The receiver must use the FBBPORT, not the ordinary telnet port, because forwarding is binary. Leave the fourth field (the command run at login) empty: the receiver sends `BBS` itself. Restart LinBPQ.
 
-2. In the mail configuration (the web page's Mail Mgmt, or BPQMail's configuration), add a user **Q0CAST** and tick **BBS**, so it's a forwarding partner rather than an ordinary terminal user.
+2. In the mail configuration (the web page's Mail Mgmt, or BPQMail's configuration), add a user **Q0CAST** and tick **BBS**, so it's a forwarding partner rather than an ordinary terminal user. Also give it a **Name** (Web Mgmt, BBS Users): a BBS user with no Name gets LinBPQ's new-user prompt instead of the forwarding prompt, and the receiver reports that as needing a Name rather than logging in.
 
 3. On Q0CAST's forwarding page, tick **FBB Blocked** (forward in FBB's binary blocks, not line-by-line text), **Allow Binary** (LinBPQ's label for allowing compressed forwarding, which blocked forwarding also needs) and **Use B1 Protocol** (the simpler of FBB's two binary protocols). Leave the TO, AT, TIMES, Connect Script and HR Routes boxes empty, so nothing is ever queued for it, and leave Enable Forwarding, Request Reverse and the rest unticked. It does not need to be enabled for forwarding, because LinBPQ never has to call it. Click **Update** to save.
 
@@ -248,6 +248,7 @@ The settings page's **Test BBS login** button tries the host, port, login and pa
 - logged in as a forwarding partner: the login works;
 - the password is wrong;
 - the login works but is not set up as a BBS forwarding partner, such as Q0CAST added to the Telnet port but not to the mail configuration's Users;
+- the login works but LinBPQ is asking for a name, because the BBS user has none: give it a Name in LinBPQ's BBS user settings (Web Mgmt, BBS Users), then test again. A real delivery session that meets the same prompt fails the same way, rather than hanging or giving a generic error;
 - the BBS could not be reached, because the host or port refused the connection or never answered;
 - something else, with the BBS's own first line of reply.
 

@@ -60,6 +60,13 @@ public enum BbsLoginTestOutcome
     /// <summary>The login worked, but it is not set up as a BBS forwarding partner.</summary>
     NotForwardingPartner,
 
+    /// <summary>
+    /// The login worked, but LinBPQ is asking the login to register a Name, because its BBS user
+    /// has none. LinBPQ's own new-user prompt ("Please enter your Name"), hardcoded and sent in
+    /// place of the forwarding prompt; see <see cref="BbsClient.Classify"/>.
+    /// </summary>
+    NeedsName,
+
     /// <summary>The BBS could not be reached: it refused the connection, or never answered.</summary>
     Unreachable,
 
@@ -255,6 +262,10 @@ public sealed partial class BbsClient : IBbsSession
         {
             return new BbsLoginTestResult(BbsLoginTestOutcome.Ok, "OK, logged in as a forwarding partner.");
         }
+        if (AsksForName(text))
+        {
+            return new BbsLoginTestResult(BbsLoginTestOutcome.NeedsName, NeedsNameExplanation(_settings.Login));
+        }
         if (text.TrimEnd().EndsWith('>'))
         {
             return new BbsLoginTestResult(BbsLoginTestOutcome.NotForwardingPartner,
@@ -289,6 +300,21 @@ public sealed partial class BbsClient : IBbsSession
     /// <summary>Replaces every occurrence of the password tested with asterisks.</summary>
     private string Redact(string text) =>
         _settings.Password.Length == 0 ? text : text.Replace(_settings.Password, "***", StringComparison.Ordinal);
+
+    /// <summary>
+    /// True if <paramref name="text"/> is LinBPQ asking a login with no Name to register one,
+    /// rather than reaching the forwarding prompt. LinBPQ's new-user prompt is "Please enter
+    /// your Name" (MailDataDefs.c's NewUserPrompt), a fixed C string never read from its config,
+    /// unlike the regular and new-user BBS prompts (also confusingly called "NewUserPrompt" in
+    /// LinBPQ's config, but a different, configurable string sent only after a Name is set), so
+    /// matching the wording, case-insensitively, is as robust as this gets.
+    /// </summary>
+    private static bool AsksForName(string text) =>
+        text.Contains("enter your name", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The plain-English explanation for <see cref="AsksForName"/>, used both for the login test and a real delivery session.</summary>
+    private static string NeedsNameExplanation(string login) =>
+        $"\"{login}\" logged in, but LinBPQ is asking for a name: give this user a Name in LinBPQ's BBS user settings (Web Mgmt, BBS Users), then test again.";
 
     /// <summary>Offers <paramref name="bulletins"/> to the BBS in one session.</summary>
     public async Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)
@@ -540,6 +566,13 @@ public sealed partial class BbsClient : IBbsSession
             {
                 _beforeSession.AddRange(data);
                 string text = Encoding.Latin1.GetString([.. _beforeSession]);
+                if (AsksForName(text))
+                {
+                    // LinBPQ's new-user prompt also ends in a bare '>', which would otherwise
+                    // read as the forwarding prompt and start an FBB session over a connection
+                    // that is actually waiting for a Name; fail plainly instead.
+                    throw new SessionFailedException(NeedsNameExplanation(owner._settings.Login));
+                }
                 int sid = text.IndexOf('[', StringComparison.Ordinal);
                 if (sid < 0 || !text.AsSpan(sid).TrimEnd().EndsWith(">", StringComparison.Ordinal))
                 {
