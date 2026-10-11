@@ -26,6 +26,11 @@ internal sealed partial class FbbContainer : IAsyncDisposable
     /// <summary>FBB keeps 12 characters of a password, so a longer one could never log in.</summary>
     public const string Password = "mailcast12";
 
+    /// <summary>A plain Telnet user with the M flag but not B: not a forwarding partner, however it answers.</summary>
+    public const string PlainLogin = "Q1CAST";
+
+    public const string PlainPassword = "mailcast12";
+
     private FbbContainer(string id, int telnetPort)
     {
         Id = id;
@@ -114,6 +119,85 @@ internal sealed partial class FbbContainer : IAsyncDisposable
             {
             }
         }
+    }
+
+    /// <summary>
+    /// Completes <see cref="PlainLogin"/>'s first-ever registration over telnet (first name,
+    /// city, home BBS, zip code, as FBB's own new-user prompt asks for) and logs off with B.
+    /// Afterwards a dot-login to it reaches a bare prompt too, the same shape a real forwarding
+    /// partner's does, which is issue #108's coordinator follow-up: whether that bare prompt can
+    /// still be told apart from a real partner's. See <see cref="ProbeHandshakeAsync"/> and
+    /// BbsLoginTestFbbTests.cs, which use this to set up that case against a real FBB.
+    /// </summary>
+    public async Task RegisterPlainUserAsync(CancellationToken cancellation)
+    {
+        using var client = new TcpClient();
+        await client.ConnectAsync("127.0.0.1", TelnetPort, cancellation);
+        var stream = client.GetStream();
+        await ReadUntilAsync(stream, "allsign :", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($".{PlainLogin}\r"), cancellation);
+        await ReadUntilAsync(stream, "assword :", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"{PlainPassword}\r"), cancellation);
+        await ReadUntilAsync(stream, "first name", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("TestUser\r"), cancellation);
+        await ReadUntilAsync(stream, "ZIP code !", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("Reading\r"), cancellation);
+        await ReadUntilAsync(stream, "HomeBBS", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("GB7TST\r"), cancellation);
+        await ReadUntilAsync(stream, "ZIP code", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("RG11AA\r"), cancellation);
+        await ReadUntilAsync(stream, ">", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("B\r"), cancellation);
+        // Give FBB a moment to count this as a clean, finished session before the socket closes.
+        await Task.Delay(500, cancellation);
+    }
+
+    /// <summary>
+    /// Logs in as <paramref name="login"/> and, if the reply ends at a bare prompt, sends the
+    /// same harmless SID-and-FF handshake a real delivery session opens with when it has nothing
+    /// to send (<see cref="Mailcast.Receiver.Delivery.BbsClient"/>'s Run.FeedAsync): our SID, then
+    /// FF, meaning "nothing to propose". Returns FBB's reply to that handshake, or null if the
+    /// login never reached a bare prompt to send it to. Used to confirm, against a real FBB, that
+    /// a correctly set-up partner and an already-registered non-partner answer identically (issue
+    /// #108's coordinator follow-up); see BbsLoginTestFbbTests.cs.
+    /// </summary>
+    public async Task<string?> ProbeHandshakeAsync(string login, string password, CancellationToken cancellation)
+    {
+        using var client = new TcpClient();
+        await client.ConnectAsync("127.0.0.1", TelnetPort, cancellation);
+        var stream = client.GetStream();
+        await ReadUntilAsync(stream, "allsign :", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($".{login}\r"), cancellation);
+        await ReadUntilAsync(stream, "assword :", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"{password}\r"), cancellation);
+        string loginReply = await ReadUntilAsync(stream, ">", cancellation);
+        if (!loginReply.TrimEnd().EndsWith('>'))
+        {
+            return null;
+        }
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("[PDN-MAILCASTTEST-B1FHM$]\r\n"), cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("FF\r\n"), cancellation);
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        idle.CancelAfter(TimeSpan.FromSeconds(5));
+        var buffer = new byte[4096];
+        var reply = new StringBuilder();
+        try
+        {
+            while (true)
+            {
+                int read = await stream.ReadAsync(buffer, idle.Token);
+                if (read == 0)
+                {
+                    break;
+                }
+                reply.Append(Encoding.Latin1.GetString(buffer, 0, read));
+            }
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            // The idle timeout, not the caller's: whatever arrived in the 5 s is the answer.
+        }
+        return reply.ToString();
     }
 
     /// <summary>

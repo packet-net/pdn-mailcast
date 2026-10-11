@@ -247,14 +247,22 @@ public sealed partial class BbsClient : IBbsSession
     /// own forwarding prompt ("de CALL>"), exactly as LinBPQ does to a real forwarding partner.
     /// FBB never sends "de CALL": a real Linux FBB 7.0.11 (issue #108, captured in docker) answers
     /// a correctly set-up partner with its SID and a bare "(n) CALLSIGN BBS>" prompt, nothing
-    /// else, so for an FBB login that bare prompt is itself the forwarding prompt. The same
-    /// capture showed that a login FBB has never seen connect before goes through its own
-    /// new-user registration ("Please enter your first name :") unless it has the BBS flag, which
-    /// skips straight to the bare prompt above; once any connection has happened at all, FBB skips
-    /// registration from then on regardless of the BBS flag, so the registration prompt is only
-    /// the shape a freshly created, not-yet-a-partner account sends, which is exactly the case
-    /// docs/receiver.md's set-up steps are tested against.
+    /// else. A login FBB has never seen connect before goes through its own new-user registration
+    /// ("Please enter your first name :") unless it has the BBS flag, which skips straight to the
+    /// bare prompt above, so that prompt reliably means "not a forwarding partner".
     /// </summary>
+    /// <remarks>
+    /// A bare prompt from FBB is not reliable the other way: once a login has registered once
+    /// (first name, city, home BBS, zip code) and reconnects, it reaches a bare "(n) CALLSIGN BBS
+    /// (H for help) >" too, BBS flag or not. Tried telling the two apart with the same harmless
+    /// SID-and-FF handshake a real delivery session opens with when it has nothing to send
+    /// (<see cref="Run.FeedAsync"/>): against a real FBB 7.0.11 in docker, both a correctly set-up
+    /// partner and an already-registered non-partner answered FQ and closed cleanly, identically,
+    /// so the handshake does not tell them apart either (see BbsLoginTestFbbTests.cs and the PR
+    /// that added this remark). So for FBB a bare prompt is only ever Ok, never
+    /// NotForwardingPartner, and its wording says plainly that this is as far as the login test
+    /// can tell.
+    /// </remarks>
     private BbsLoginTestResult Classify(string text, bool closed)
     {
         if (RefusalFound(text))
@@ -279,11 +287,12 @@ public sealed partial class BbsClient : IBbsSession
             if (AsksForFirstName(text))
             {
                 return new BbsLoginTestResult(BbsLoginTestOutcome.NotForwardingPartner,
-                    $"\"{_settings.Login}\" logged in, but it is not set up as a BBS forwarding partner.");
+                    FbbNotSetUpExplanation(_settings.Login));
             }
             if (text.TrimEnd().EndsWith('>'))
             {
-                return new BbsLoginTestResult(BbsLoginTestOutcome.Ok, "OK, logged in as a forwarding partner.");
+                return new BbsLoginTestResult(BbsLoginTestOutcome.Ok,
+                    "Logged in; FBB can't confirm the BBS flag at login, so check it's set.");
             }
         }
         else if (text.TrimEnd().EndsWith('>'))
@@ -340,13 +349,17 @@ public sealed partial class BbsClient : IBbsSession
     /// True if <paramref name="text"/> is FBB's own new-user prompt, "Please enter your first
     /// name :" (issue #108, captured from a real FBB 7.0.11), asking a login FBB has never seen
     /// connect before to register. A login with the BBS flag skips this and reaches the bare
-    /// forwarding prompt directly, so seeing this instead means the login is not (yet) set up as
-    /// a BBS forwarding partner, worded the same as LinBPQ's bare-prompt NotForwardingPartner case
-    /// rather than NeedsName: unlike LinBPQ's name prompt (#84), giving this login a name on its
-    /// own would not make it a forwarding partner, only the BBS flag does.
+    /// forwarding prompt directly, so seeing this reliably means the login is not set up as a BBS
+    /// forwarding partner (see <see cref="Classify"/>'s remarks on why a bare prompt cannot be
+    /// read the other way around). Giving the login a name on its own would not change that,
+    /// unlike LinBPQ's name prompt (#84): only the BBS flag does.
     /// </summary>
     private static bool AsksForFirstName(string text) =>
         text.Contains("enter your first name", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The plain-English explanation for <see cref="AsksForFirstName"/>, used both for the login test and a real delivery session.</summary>
+    private static string FbbNotSetUpExplanation(string login) =>
+        $"\"{login}\" logged in, but FBB is treating it as a new user: give it the BBS flag (\"EU {login}\", then \"B\", on FBB's console), then test again.";
 
     /// <summary>Offers <paramref name="bulletins"/> to the BBS in one session.</summary>
     public async Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)
@@ -604,6 +617,13 @@ public sealed partial class BbsClient : IBbsSession
                     // read as the forwarding prompt and start an FBB session over a connection
                     // that is actually waiting for a Name; fail plainly instead.
                     throw new SessionFailedException(NeedsNameExplanation(owner._settings.Login));
+                }
+                if (AsksForFirstName(text))
+                {
+                    // FBB's own new-user prompt (issue #108): it ends in ':', not '>', so this
+                    // would otherwise just sit here until the idle timeout, waiting for an answer
+                    // that will never come; fail plainly instead, as the LinBPQ case above does.
+                    throw new SessionFailedException(FbbNotSetUpExplanation(owner._settings.Login));
                 }
                 int sid = text.IndexOf('[', StringComparison.Ordinal);
                 if (sid < 0 || !text.AsSpan(sid).TrimEnd().EndsWith(">", StringComparison.Ordinal))
