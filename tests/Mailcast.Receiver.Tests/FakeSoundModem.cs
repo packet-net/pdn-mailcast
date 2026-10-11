@@ -17,6 +17,11 @@ namespace Mailcast.Receiver.Tests;
 /// </summary>
 internal sealed class FakeSoundModem : IAsyncDisposable
 {
+    // Every test that opens the source talks to one of these. On a loaded CI runner (5 minutes for
+    // a suite that usually takes 1.5) the fake's hello can be later than the receiver's 10 s, which
+    // is then a refusal the test never meant to test; nothing here waits for it to run out.
+    static FakeSoundModem() => SoundModemAudioInput.OpenTimeout = TimeSpan.FromSeconds(30);
+
     private readonly CancellationTokenSource _stop = new();
     private TcpListener? _listener;
     private Task? _accept;

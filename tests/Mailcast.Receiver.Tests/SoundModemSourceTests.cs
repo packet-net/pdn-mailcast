@@ -42,7 +42,8 @@ public class SoundModemSourceTests
         throw new TimeoutException("no block came");
     });
 
-    private static async Task<T> Within<T>(Task<T> task) => await task.WaitAsync(TimeSpan.FromSeconds(10));
+    // Generous, for a loaded CI runner: a pass takes milliseconds, so only a failure waits this long.
+    private static async Task<T> Within<T>(Task<T> task) => await task.WaitAsync(TimeSpan.FromSeconds(30));
 
     // ---------- the setting ----------
 
