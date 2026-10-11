@@ -46,11 +46,15 @@ public class PskReporterMonitorTests
 
         // Twenty minutes of a broker with a spot every 15 s: judged from then on. Each step waits
         // for the monitor to take its spot, so a busy machine cannot make the broker look silent.
+        // Waits on SpotsHeld, not Messages: Offer counts a message (under its own short lock)
+        // before it parses and adds the spot (under a second lock), so Messages can already have
+        // moved on while the add is still in flight. A busy machine can stretch that gap enough for
+        // the next assertion to land inside it and find the spot still missing (issue #81).
         for (int i = 0; i < 20 * 4; i++)
         {
-            long taken = monitor.Feed.Messages;
+            long held = monitor.Feed.SpotsHeld;
             await c.PublishAsync("pskr/filter/v2/40m/FT8/G4AAA/M0BBB/IO91/IO86/223/279", Payload(10 + i, time.GetUtcNow().AddMinutes(-1), "G4AAA", "IO91lk", "M0BBB", "IO86ha"));
-            await Eventually(() => monitor.Feed.Messages > taken);
+            await Eventually(() => monitor.Feed.SpotsHeld > held);
             time.Advance(TimeSpan.FromSeconds(15));
         }
         await Eventually(() => c.Received.Contains((byte)12)); // PINGREQ, every 30 s however busy the feed
@@ -159,7 +163,10 @@ public class PskReporterMonitorTests
         wanted = false;
         await Eventually(() => c.Received.Contains((byte)14), time); // DISCONNECT
         await Eventually(() => !monitor.Feed.Connected);
-        Assert.Contains("pskreporter: unsubscribed, no slot within the hour", log);
+        // Feed.Connected goes false inside SessionAsync, before it unwinds its finally block and
+        // returns to RunAsync, which only then writes this log line: a real gap, usually tiny, that
+        // a busy machine can widen past the moment above. Wait for the line rather than racing it.
+        await Eventually(() => log.Contains("pskreporter: unsubscribed, no slot within the hour"));
         Assert.True(monitor.Current.FeedDown || monitor.Current.State == IonoState.Unknown);
         for (int i = 0; i < 10; i++)
         {
@@ -312,6 +319,7 @@ public class PskReporterMonitorTests
             Payload(10_000 + i, Start.AddMinutes(-2), $"G{i % 9}X{i % 997}", "IO91lk", $"M{i % 7}Y{i % 991}", "IO86ha")).ToList();
         var slowestCurrent = TimeSpan.Zero;
         long currents = 0;
+        long slowCurrents = 0;
         using var reading = new CancellationTokenSource();
         var reader = Task.Run(() =>
         {
@@ -324,11 +332,16 @@ public class PskReporterMonitorTests
                 {
                     slowestCurrent = watch.Elapsed;
                 }
+                if (watch.Elapsed > TimeSpan.FromMilliseconds(50))
+                {
+                    slowCurrents++;
+                }
                 currents++;
                 Thread.Sleep(5);
             }
         });
         var slowestOffer = TimeSpan.Zero;
+        long slowOffers = 0;
         var all = System.Diagnostics.Stopwatch.StartNew();
         foreach (var p in payloads)
         {
@@ -338,6 +351,10 @@ public class PskReporterMonitorTests
             {
                 slowestOffer = watch.Elapsed;
             }
+            if (watch.Elapsed > TimeSpan.FromMilliseconds(50))
+            {
+                slowOffers++;
+            }
             time.Advance(TimeSpan.FromMilliseconds(1));
         }
         all.Stop();
@@ -345,8 +362,16 @@ public class PskReporterMonitorTests
         await reader;
 
         Assert.True(all.Elapsed < TimeSpan.FromSeconds(10), $"60000 spots took {all.Elapsed}");
-        Assert.True(slowestOffer < TimeSpan.FromMilliseconds(250), $"slowest spot {slowestOffer}");
-        Assert.True(slowestCurrent < TimeSpan.FromMilliseconds(500), $"slowest reading {slowestCurrent} of {currents}");
+        // A busy machine (the rest of the suite, another copy of this test, a stress tool) can
+        // have the OS scheduler stall any one call for a while without the code being at fault,
+        // which is what made a single-worst-sample wall-clock ceiling flaky (issue #81). Bound how
+        // many of the many thousands of calls are slow instead of the single slowest one: a real
+        // per-call regression shows up here as most calls turning slow, not as one outlier.
+        Assert.True(slowOffers < payloads.Count / 100, $"{slowOffers} of {payloads.Count} spots took over 50 ms (slowest {slowestOffer})");
+        Assert.True(slowCurrents < currents / 20, $"{slowCurrents} of {currents} readings took over 50 ms (slowest {slowestCurrent})");
+        // Still catch an outright hang, as opposed to scheduler noise: generous, but bounded.
+        Assert.True(slowestOffer < TimeSpan.FromSeconds(5), $"slowest spot {slowestOffer}");
+        Assert.True(slowestCurrent < TimeSpan.FromSeconds(5), $"slowest reading {slowestCurrent} of {currents}");
         Assert.InRange(monitor.Feed.SpotsHeld, 1, PskReporterMonitor.MostSpots);
         Assert.InRange(monitor.HeldBytes, 1, PskReporterMonitor.MostBytes);
         Assert.Equal(60_000, monitor.Feed.Messages);
