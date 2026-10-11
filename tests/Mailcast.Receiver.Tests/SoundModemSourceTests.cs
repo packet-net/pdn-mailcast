@@ -42,7 +42,8 @@ public class SoundModemSourceTests
         throw new TimeoutException("no block came");
     });
 
-    private static async Task<T> Within<T>(Task<T> task) => await task.WaitAsync(TimeSpan.FromSeconds(10));
+    // Generous, for a loaded CI runner: a pass takes milliseconds, so only a failure waits this long.
+    private static async Task<T> Within<T>(Task<T> task) => await task.WaitAsync(TimeSpan.FromSeconds(30));
 
     // ---------- the setting ----------
 
@@ -261,7 +262,7 @@ public class SoundModemSourceTests
 
     private static async Task UntilAsync(Func<bool> done)
     {
-        var until = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (!done())
         {
             Assert.True(DateTime.UtcNow < until, "timed out");
@@ -726,7 +727,7 @@ public class SoundModemSourceTests
 
         await stop.CancelAsync();
         await run;
-        await second.Gone.WaitAsync(TimeSpan.FromSeconds(10));
+        await second.Gone.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -952,7 +953,7 @@ public class SoundModemSourceTests
         // Every block but the ten keyed ones reaches the measurement.
         await UntilAsync(() => Volatile.Read(ref heard) == blocks - 10);
         time.Advance(ReceiverHost.FilterMeasureDuration);
-        var (filter, problem) = await measuring.WaitAsync(TimeSpan.FromSeconds(10));
+        var (filter, problem) = await measuring.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.Null(problem);
         Assert.NotNull(filter);

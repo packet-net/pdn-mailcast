@@ -40,8 +40,9 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
     /// <summary>The name this receiver gives pdn-soundmodem, which shows it on its own page.</summary>
     public const string ClientName = "pdn-mailcast-receiver";
 
-    /// <summary>The longest connecting and waiting for the hello may take.</summary>
-    public static readonly TimeSpan OpenTimeout = TimeSpan.FromSeconds(10);
+    /// <summary>The longest connecting and waiting for the hello may take. Tests raise it, so a
+    /// heavily loaded build machine is not taken for a pdn-soundmodem that never answered.</summary>
+    public static TimeSpan OpenTimeout { get; internal set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Blocks held for the audio thread before the oldest is dropped: 6.4 s at 100 ms a block,
