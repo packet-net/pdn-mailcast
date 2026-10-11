@@ -184,7 +184,8 @@ public class StatusPageTests
         Assert.False(shown.GetProperty("feedback").GetProperty("enabled").GetBoolean());
         var status = await http.GetFromJsonAsync<JsonElement>("api/status");
         Assert.False(status.GetProperty("feedback").GetProperty("enabled").GetBoolean());
-        Assert.True(status.GetProperty("bbs").GetProperty("reachable").GetBoolean());
+        // Issue #99: nothing has actually been tried yet, so it is not known, not "fine".
+        Assert.Equal(JsonValueKind.Null, status.GetProperty("bbs").GetProperty("reachable").ValueKind);
 
         // From another site it is refused, like any other change of settings.
         using var foreign = new HttpRequestMessage(HttpMethod.Post, "api/settings") { Content = JsonContent.Create(FeedbackForm(true, "G4ABC")) };
@@ -261,7 +262,11 @@ public class StatusPageTests
         Assert.True(ReceiverConfig.Load(path).Feedback!.Enabled);
     }
 
-    /// <summary>The page offers the daily report only with a BBS to send it through: one that has answered, or not yet failed.</summary>
+    /// <summary>
+    /// The page offers the daily report only with a BBS to send it through: one that has
+    /// answered. Issue #99: before anything has actually been tried (a delivery session or a
+    /// Test BBS login), it is null, not true, not known yet rather than "fine".
+    /// </summary>
     [Fact]
     public void DailyReport_IsOfferedOnlyWithABbs()
     {
@@ -269,15 +274,22 @@ public class StatusPageTests
         DeliveryRecord Said(DeliveryVerdict verdict) => new(at, "B1", "Title", verdict, null);
         const string Refused = "cannot connect to 127.0.0.1:8011: Connection refused";
 
-        // Off with a BBS: nothing has failed, or it has answered before.
-        Assert.True(StatusPage.BbsReachable([], null, null));
-        Assert.True(StatusPage.BbsReachable([Said(DeliveryVerdict.Accepted)], null, Refused));
-        Assert.True(StatusPage.BbsReachable([Said(DeliveryVerdict.Deferred)], null, Refused));
-        Assert.True(StatusPage.BbsReachable([], new Feedback.SentReport { Answer = Feedback.FeedbackAnswer.Accepted }, Refused));
-        // Off without one: it has never answered, and the last session failed.
-        Assert.False(StatusPage.BbsReachable([], null, Refused));
-        Assert.False(StatusPage.BbsReachable([Said(DeliveryVerdict.NotOffered)], null, Refused));
-        Assert.False(StatusPage.BbsReachable([], new Feedback.SentReport { Answer = Feedback.FeedbackAnswer.Failed }, Refused));
+        // Nothing tried yet: not known, whichever way lastFailure happens to sit.
+        Assert.Null(StatusPage.BbsReachable(false, [], null, null, null));
+        Assert.Null(StatusPage.BbsReachable(false, [], null, null, null));
+
+        // Tried, and it has answered before, or just now: true.
+        Assert.True(StatusPage.BbsReachable(true, [Said(DeliveryVerdict.Accepted)], null, Refused, null));
+        Assert.True(StatusPage.BbsReachable(true, [Said(DeliveryVerdict.Deferred)], null, Refused, null));
+        Assert.True(StatusPage.BbsReachable(true, [], new Feedback.SentReport { Answer = Feedback.FeedbackAnswer.Accepted }, Refused, null));
+        Assert.True(StatusPage.BbsReachable(false, [], null, null, BbsLoginTestOutcome.Ok));
+
+        // Tried, and it never got that far: false.
+        Assert.False(StatusPage.BbsReachable(true, [], null, Refused, null));
+        Assert.False(StatusPage.BbsReachable(true, [Said(DeliveryVerdict.NotOffered)], null, Refused, null));
+        Assert.False(StatusPage.BbsReachable(true, [], new Feedback.SentReport { Answer = Feedback.FeedbackAnswer.Failed }, Refused, null));
+        Assert.False(StatusPage.BbsReachable(false, [], null, null, BbsLoginTestOutcome.Unreachable));
+        Assert.False(StatusPage.BbsReachable(false, [], null, null, BbsLoginTestOutcome.WrongPassword));
     }
 
     [Fact]
@@ -496,11 +508,18 @@ public class StatusPageTests
         using var _c = http;
         await using var bbs = new FakeBbs(); // default password "secret", matching Config()'s saved Bbs.Password
 
+        // Issue #99: not known yet, before the login is tested.
+        var before = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.Equal(JsonValueKind.Null, before.GetProperty("bbs").GetProperty("reachable").ValueKind);
+
         var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = bbs.Port });
         string body = await answer.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
         Assert.DoesNotContain("secret", body, StringComparison.Ordinal);
+        // Issue #99: a successful "Test BBS login" counts as having tried, so the daily report's opt-in can show.
+        var after = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.True(after.GetProperty("bbs").GetProperty("reachable").GetBoolean());
         var json = JsonSerializer.Deserialize<JsonElement>(body);
         Assert.Equal("ok", json.GetProperty("outcome").GetString());
         Assert.Equal(JsonValueKind.Null, json.GetProperty("detail").ValueKind);
@@ -558,6 +577,9 @@ public class StatusPageTests
 
         var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("unreachable", json.GetProperty("outcome").GetString());
+        // Issue #99: a failed "Test BBS login" is itself a thing tried, so it is false, not null.
+        var status = await http.GetFromJsonAsync<JsonElement>("api/status");
+        Assert.False(status.GetProperty("bbs").GetProperty("reachable").GetBoolean());
     }
 
     [Fact]

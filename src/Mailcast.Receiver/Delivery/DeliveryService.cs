@@ -58,6 +58,12 @@ public sealed class DeliveryService
     /// <summary>The last session's failure, or null if the last session worked.</summary>
     public string? LastFailure { get; private set; }
 
+    /// <summary>
+    /// Whether a session with the BBS has actually been tried yet, issue #99: <see cref="LastFailure"/>
+    /// alone cannot tell "never tried" from "the last one worked", both of which leave it null.
+    /// </summary>
+    public bool HasAttempted { get; private set; }
+
     /// <summary>When the next attempt is due, if one is waiting on a timer.</summary>
     public DateTimeOffset? NextAttempt { get; private set; }
 
@@ -144,6 +150,7 @@ public sealed class DeliveryService
     /// <summary>One session. Returns how long to wait before the next, or null to go straight on.</summary>
     private async Task<TimeSpan?> AttemptAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)
     {
+        HasAttempted = true;
         SessionReport report;
         try
         {

@@ -666,7 +666,9 @@ async function refresh() {
 
   $("bbs").innerHTML = `<dt>Delivering to</dt><dd>${esc(s.bbs.target)}</dd>
     <dt>Waiting</dt><dd>${s.bbs.waiting} bulletin${s.bbs.waiting === 1 ? "" : "s"}</dd>
-    ${s.bbs.lastFailure ? `<dt>Problem</dt><dd class="bad">${esc(s.bbs.lastFailure)}</dd>` : `<dt>Last session</dt><dd class="good">fine</dd>`}
+    ${s.bbs.reachable === null ? `<dt>Last session</dt><dd class="muted">not tried yet</dd>`
+      : s.bbs.lastFailure ? `<dt>Problem</dt><dd class="bad">${esc(s.bbs.lastFailure)}</dd>`
+      : `<dt>Last session</dt><dd class="good">fine</dd>`}
     ${s.bbs.nextAttempt ? `<dt>Next try</dt><dd>${when(s.bbs.nextAttempt)}</dd>` : ""}`;
 
   $("retuneBox").hidden = !s.retune;

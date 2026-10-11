@@ -138,6 +138,33 @@ public class DeliveryServiceTests
         Assert.Empty(rig.Intake.Pending());
     }
 
+    /// <summary>
+    /// Issue #99: with nothing in the outbox, no session is ever attempted, and
+    /// <see cref="DeliveryService.LastFailure"/> stays null throughout, exactly as it does right
+    /// after a session that succeeded. <see cref="DeliveryService.HasAttempted"/> is how the page
+    /// tells those two apart.
+    /// </summary>
+    [Fact]
+    public async Task HasAttempted_IsFalseWithNothingToSend_TrueOnceASessionHasBeenTried()
+    {
+        await using var rig = new Rig();
+
+        Assert.False(rig.Service.HasAttempted);
+        Assert.Null(rig.Service.LastFailure);
+
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            rig.Intake.Offer(frame);
+        }
+        await rig.Intake.DrainAsync(CancellationToken.None);
+        rig.Service.Nudge();
+        var (offered, answer) = await rig.NextCallAsync();
+
+        Assert.True(rig.Service.HasAttempted);
+
+        answer.SetResult(Answer(offered, DeliveryVerdict.Accepted));
+    }
+
     [Fact]
     public async Task UnconfirmedTransfer_ConfirmedByAlreadyHadNextTime_IsRecordedAsAccepted()
     {
