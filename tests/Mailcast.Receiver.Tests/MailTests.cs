@@ -236,6 +236,7 @@ public class MailTests
             : new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred)), host.Ledger, time, _ => { });
         await service.DeliverPendingAsync(CancellationToken.None);
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(970, bodyLines: 200))); // a part-received one too
+        await host.Intake.DrainAsync(CancellationToken.None);
 
         var status = await http.GetFromJsonAsync<JsonElement>("api/status");
 
@@ -599,6 +600,7 @@ public class MailTests
         }), host.Ledger, time, _ => { });
         await service.DeliverPendingAsync(CancellationToken.None);
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(900, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
 
         var mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
         Assert.Equal(0, mail.GetProperty("waiting").GetInt32());
@@ -634,6 +636,7 @@ public class MailTests
         var service = new DeliveryService(host.Intake, new AnsweringBbs(b => new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)), host.Ledger, time, _ => { });
         await service.DeliverPendingAsync(CancellationToken.None);
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(901, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
 
         var firstPage = await http.GetFromJsonAsync<JsonElement>("api/mail?offset=0&limit=1");
         var secondPage = await http.GetFromJsonAsync<JsonElement>("api/mail?offset=1&limit=1");
