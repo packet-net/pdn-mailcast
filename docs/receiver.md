@@ -42,6 +42,74 @@ The config file is `/etc/pdn-mailcast/receiver.json`. There are only a few setti
 
 To decode a recording once and deliver what it completes, run `pdn-mailcast-receiver --decode file.wav`.
 
+## Using it with pdn-soundmodem
+
+If pdn-soundmodem already runs your radio, the receiver can listen through it, on the same machine. This replaces pdn-soundmodem's built-in receiver (its `mailcast` section), which is going.
+
+You need pdn-soundmodem 0.88.0 or later and this receiver 0.9.0 or later (`--version` on either says which you have). pdn-soundmodem needs no `ms110d` modem for this. It does need its station page, which its `waterfall` section gives it; the packaged config has one.
+
+### Install
+
+If pdn-soundmodem came from the packet-net apt repository, the repository is already set up:
+
+```
+sudo apt update
+sudo apt install pdn-soundmodem pdn-mailcast-receiver
+```
+
+That also brings pdn-soundmodem up to date. If you installed pdn-soundmodem some other way, add the repository first with the two lines in [the README](../src/Mailcast.Receiver/README.md#1-install).
+
+### Set it up
+
+In `/etc/pdn-mailcast/receiver.json`, set `"audio": "soundmodem"`. If pdn-soundmodem's page is not on port 8107 (a second instance, `pdn-soundmodem@NAME`, say), use `"soundmodem:PORT"` with its `waterfall` port.
+
+Then copy across from the `mailcast` section of pdn-soundmodem's config (`/etc/pdn-soundmodem/soundmodem.json`):
+
+| pdn-soundmodem's `mailcast` | `receiver.json` | Notes |
+|---|---|---|
+| `bbs` | `bbs` | The same six keys (`type`, `host`, `port`, `login`, `password`, `command`) with the same defaults. Copy it as it is; nothing changes on your BBS. |
+| `sources` | `sources` | The same. |
+| `dialKHz` | `dialKHz` | The same: the dial a retune puts the radio on. The receiver takes 7051.8 to 7052.8 only (the signal's centre at 1000 to 2000 Hz), where the built-in took any HF dial. |
+| `retune` | `retune` | The same, and pdn-soundmodem still needs its `rig` section for it. See [Retuning through pdn-soundmodem](#retuning-through-pdn-soundmodem). |
+| `hooks` | `hooks` | The same keys and environment variables. They now run as the receiver's user, `pdn-mailcast`, so a script that used pdn-soundmodem's ssh key needs a key of the receiver's own; see [Running your own commands around each slot](#running-your-own-commands-around-each-slot). |
+| `stateDirectory` | leave it out | The receiver keeps its own, in `/var/lib/pdn-mailcast`. Nothing is carried over: part-heard bulletins start again, and GB7RDG repeats them. |
+
+For example, this in pdn-soundmodem:
+
+```json
+"mailcast": { "bbs": { "password": "pick-one" }, "retune": true, "sources": ["GB7RDG", "M0LTE"] }
+```
+
+becomes this in `receiver.json`, alongside the rest of the file:
+
+```json
+"audio": "soundmodem",
+"retune": true,
+"sources": ["GB7RDG", "M0LTE"],
+"bbs": { "type": "linBpq", "host": "127.0.0.1", "port": 8011, "login": "Q0CAST", "password": "pick-one", "command": "BBS" },
+```
+
+**On a Flex** there is no `rig` and nothing to retune. While the receiver is connected, pdn-soundmodem opens a headless slice's receive filter (a `flex:` device with no `@station`) to cover the signal. In attach mode the filter is SmartSDR's, so open it there: the signal is at 350 to 3250 Hz on the usual 7.052 MHz dial.
+
+**Measure my filter** is on the receiver's settings page now, and works the same on this source.
+
+### Switch over
+
+Do it between slots: in daylight, after :13 and before :58 past the hour.
+
+- **Without `retune`**: start the receiver (`sudo systemctl restart pdn-mailcast-receiver`) and leave the built-in running. Once the receiver has heard a whole slot, remove the `mailcast` section from pdn-soundmodem's config and restart pdn-soundmodem (`sudo systemctl restart pdn-soundmodem`). The receiver reconnects by itself.
+- **With `retune`**: switch in one go. Only one of the two can hold pdn-soundmodem's radio for a slot, and the other then misses it. Remove the `mailcast` section, restart pdn-soundmodem, then restart the receiver.
+
+The receiver may then offer your BBS bulletins the built-in already delivered. LinBPQ answers "already have" for those, so nothing arrives twice (tested), and the receiver's page counts them as already had. With FBB this has not been tested.
+
+Without the `mailcast` section, pdn-soundmodem may run its channel at 12 kHz rather than 48 kHz. The receiver copes, but without `retune` it then needs pdn-soundmodem's dial at 7.04925 MHz or above (a Flex on a lower dial, say). If it is lower, the receiver's log and page say so, and what to change.
+
+### Check it works
+
+- The receiver's page, http://127.0.0.1:8130/, shows a live spectrogram of pdn-soundmodem's audio, and from the next slot what was heard.
+- pdn-soundmodem's own page shows "listening: pdn-mailcast-receiver" at the top, linked to the receiver's page.
+- The receiver's journal (`journalctl -u pdn-mailcast-receiver -f`) says `audio: pdn-soundmodem on 127.0.0.1:8107, ...`, with the channel's rate and the dial it uses, and pdn-soundmodem's says `channel-audio: ... connected`. If pdn-soundmodem stops or restarts, the receiver says so and connects again after 1, 2, 5, 10 and then every 30 seconds.
+
 ## Retuning through pdn-soundmodem
 
 With `"audio": "soundmodem"`, if pdn-soundmodem's radio is usually somewhere else (on your packet frequency, say), add `"retune": true` and the receiver borrows it for each slot through pdn-soundmodem's receive window (pdn-soundmodem 0.88.0 or later, with a `rig` section, since it is pdn-soundmodem that tunes the radio). About a minute before each daylight slot pdn-soundmodem tunes its radio to `dialKHz`, with a passband up to the signal's top edge (3250 Hz at the usual dial), and holds all its own transmitting, so KISS frames sent meanwhile wait; 12 minutes after the slot starts (sooner if the slot ends early, later if the next follows straight on) the receiver gives the window back and pdn-soundmodem puts its radio back. The window needs no key and the receiver never reads pdn-soundmodem's config. `rig` and `bpq` are not used with this source, and `retune` does nothing with any other.
