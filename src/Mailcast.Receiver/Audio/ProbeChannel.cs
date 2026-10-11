@@ -361,7 +361,7 @@ internal static class ProbeChannel
             windowPower[j] = e;
         }
         double typical = ChannelMaths.Median([.. windowPower.Where((_, j) => present[firstIn + j])]);
-        var good = windowPower.Select((e, j) => present[firstIn + j] && e <= 6 * typical).ToArray();
+        var good = windowPower.Select((e, j) => present[firstIn + j] && e <= CrashRatio * typical).ToArray();
         // The probe gone, as against a window spoilt by a crash: a gap the Doppler run is never carried across.
         var missing = Enumerable.Range(0, span).Select(j => !present[firstIn + j]).ToArray();
         if (good.Count(g => g) < ChannelAnalysis.FewestSnapshots)
@@ -496,9 +496,14 @@ internal static class ProbeChannel
             double delay = g.Select((i, k) => paths[i].At * power[k]).Sum() / sum;
             found.Add((g, delay, 10 * Math.Log10(sum), paths[g[Array.IndexOf(power, power.Max())]].From));
         }
-        // Too faint to tell from a stronger mode's echo: left out, with its paths.
-        double strongest = found.Max(x => x.Power);
-        found = [.. found.Where(x => x.Power - strongest >= WeakestModeDb)];
+        // Too faint to tell from a stronger mode's echo: left out, with its paths. Close to the
+        // strongest mode (within NearLobeMs) the stricter NearLobeDb applies instead of
+        // WeakestModeDb: that is where a fast-fading path's own measurement shoulder lands
+        // (packet-net/pdn-mailcast#82), at a power no plain distance threshold shares with a
+        // genuine weak mode the same distance out.
+        var strongestMode = found.OrderByDescending(x => x.Power).First();
+        double strongest = strongestMode.Power;
+        found = [.. found.Where(x => x.Power - strongest >= (Math.Abs(x.Delay - strongestMode.Delay) * 1000 <= NearLobeMs ? NearLobeDb : WeakestModeDb))];
         var modeOf = found.SelectMany((x, m) => x.Members.Select(i => (Path: i, Mode: m))).OrderBy(x => x.Path).ToList();
         paths = [.. modeOf.Select(x => paths[x.Path])];
         earliest = paths[0].At;
@@ -524,14 +529,58 @@ internal static class ProbeChannel
     private const double Margin = 0.15e-3;
 
     /// <summary>
-    /// The weakest mode reported against the strongest, dB. A fading mode leaves faint echoes of
-    /// itself about half a millisecond either side, some 25 dB down, that no pass removes; a
-    /// real third hop has been seen at -22 dB (EI4HQ, 2026-10-05).
+    /// The weakest mode reported against the strongest, dB, for one farther than
+    /// <see cref="NearLobeMs"/> out: a real third hop has been seen at -22 dB (EI4HQ,
+    /// 2026-10-05), which this is kept clear of. Nearer than that, <see cref="NearLobeDb"/>
+    /// applies instead: see its remarks for why one threshold cannot serve both distances.
     /// </summary>
     public const double WeakestModeDb = -25;
 
+    /// <summary>
+    /// How far out <see cref="NearLobeDb"/>'s stricter threshold reaches, ms.
+    /// </summary>
+    /// <remarks>
+    /// A fast-fading single path leaves a faint, consistent echo of itself clustered 0.6 to
+    /// 0.7 ms either side: its own measurement shoulder. Each mode's own-frequency pass
+    /// (<see cref="Margin"/>) takes out a steady Doppler shift's smear, but a Doppler
+    /// <em>spread</em> keeps moving during the probe, and nothing takes that out. Measured
+    /// over 2000 single-path trials with a realistic spread up to 1.5 Hz two-sigma
+    /// (packet-net/pdn-mailcast#82): about 7% show one, always within 0.71 ms, as faint as
+    /// -24 dB but occasionally as strong as -8 dB. A single <see cref="WeakestModeDb"/> cannot
+    /// keep that out without also losing a genuine weak mode at the same distance and power
+    /// (real ones measured this close, close0.6ms's -3 dB, are far stronger than any shoulder
+    /// seen), so the two distances get their own threshold instead. <see cref="NearLobeMs"/>
+    /// stays well clear of the 0.71 ms worst seen and of two-path channels' own 1 ms and up.
+    /// </remarks>
+    public const double NearLobeMs = 0.85;
+
+    /// <summary>
+    /// The weakest mode kept within <see cref="NearLobeMs"/> of the strongest, dB: clear of the
+    /// -8 dB worst shoulder seen in 2000 trials, with margin, and still well under a genuine
+    /// close mode's power (close0.6ms's -3 dB).
+    /// </summary>
+    public const double NearLobeDb = -6;
+
     /// <summary>A mode's own-pass paths are kept if within this of its strongest, dB: the smear a fast-fading mode leaves either side of itself is weaker.</summary>
     private const double KeptDb = 10;
+
+    /// <summary>
+    /// A window whose power is this many times the run's typical window is a crash, and left
+    /// out of the Doppler run (see <see cref="Present"/>'s own remarks for the gap it leaves).
+    /// </summary>
+    /// <remarks>
+    /// Measured over 300 single-path and 2-mode trials, each with an 8 ms broadband noise burst
+    /// injected into one window (packet-net/pdn-mailcast#82). At the previous 6x (+7.8 dB),
+    /// plain fading alone already pushes some window over it about 8% of the time with no crash
+    /// at all, taking a good window for one. 10x (+10 dB) cuts that false-crash rate to about 1%.
+    /// A severe crash (+30 dB over the window's own level) is still caught almost as often (93%,
+    /// was 97%), and +40 dB always is, either way. A moderate one (+20 dB) was already missed
+    /// more often than not at 6x (73%) and is missed nearly always at 10x (97%): raising the
+    /// ratio trades away moderate crashes for the false positives fading was causing, which is
+    /// the honest balance here, but it is a real trade, not a free one; the crashes it keeps
+    /// catching reliably are the severe ones a plain fade could not be mistaken for.
+    /// </remarks>
+    internal const double CrashRatio = 10;
 
     /// <summary>Delays in ms, sorted, into runs with gaps under <paramref name="gapMs"/>: the analysis's own grouping.</summary>
     private static List<List<int>> Groups(IReadOnlyList<double> sortedMs, double gapMs)
