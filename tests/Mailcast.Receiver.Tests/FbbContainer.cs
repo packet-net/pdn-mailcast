@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -12,11 +13,13 @@ namespace Mailcast.Receiver.Tests;
 /// </summary>
 /// <remarks>
 /// There is no published FBB image to pull, so the image is built here, from a pinned Ubuntu and
-/// a pinned package version. Docker's cache makes every build after the first a no-op.
+/// a pinned package version. Docker's cache makes every build after the first a no-op. The tag
+/// carries a hash of Fbb/, so branches sharing a runner never test each other's image.
 /// </remarks>
 internal sealed partial class FbbContainer : IAsyncDisposable
 {
-    public const string Image = "pdn-mailcast-test-fbb:7.0.11";
+    /// <summary>The image built from Fbb/: <c>pdn-mailcast-test-fbb:7.0.11-</c> and 12 hex digits of its hash.</summary>
+    public static readonly string Image = "pdn-mailcast-test-fbb:7.0.11-" + FixtureHash(Path.Combine(AppContext.BaseDirectory, "Fbb"));
 
     public const string Login = "Q0CAST";
 
@@ -43,7 +46,16 @@ internal sealed partial class FbbContainer : IAsyncDisposable
             await LinBpqContainer.DockerAsync(cancellation, "start", id);
             string mapping = (await LinBpqContainer.DockerAsync(cancellation, "port", id, "6300/tcp")).Trim().Split('\n')[0];
             var container = new FbbContainer(id, int.Parse(mapping[(mapping.LastIndexOf(':') + 1)..], CultureInfo.InvariantCulture));
-            await container.WaitForLoginAsync(cancellation);
+            try
+            {
+                await container.WaitForLoginAsync(cancellation);
+            }
+            catch (OperationCanceledException e) when (cancellation.IsCancellationRequested)
+            {
+                // Whenever the deadline passes mid-try, so that a timeout always says why.
+                string logs = await LinBpqContainer.DockerAsync(CancellationToken.None, "logs", id);
+                throw new OperationCanceledException($"Q0CAST never logged in to FBB; {e.Message}; container log: {logs}", e, cancellation);
+            }
             return container;
         }
         catch
@@ -68,8 +80,7 @@ internal sealed partial class FbbContainer : IAsyncDisposable
         {
             if (cancellation.IsCancellationRequested)
             {
-                string logs = await LinBpqContainer.DockerAsync(CancellationToken.None, "logs", Id);
-                throw new OperationCanceledException($"Q0CAST never logged in to FBB; last seen: {lastSeen}; container log: {logs}");
+                throw new OperationCanceledException($"last seen: {lastSeen}", null, cancellation);
             }
             using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             attempt.CancelAfter(TimeSpan.FromSeconds(10));
@@ -103,6 +114,21 @@ internal sealed partial class FbbContainer : IAsyncDisposable
             {
             }
         }
+    }
+
+    /// <summary>
+    /// The first 12 hex digits of a SHA-256 over every file in <paramref name="dir"/>, each name
+    /// and then its contents, in name order.
+    /// </summary>
+    private static string FixtureHash(string dir)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (string file in Directory.EnumerateFiles(dir).Order(StringComparer.Ordinal))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(Path.GetFileName(file) + "\n"));
+            hash.AppendData(File.ReadAllBytes(file));
+        }
+        return Convert.ToHexStringLower(hash.GetHashAndReset())[..12];
     }
 
     /// <summary>

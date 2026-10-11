@@ -53,9 +53,6 @@ jobs:
           echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
       - name: Pull LinBPQ
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
-      # The test builds it too, from the cache once this has.
-      - name: Build the test FBB
-        run: docker build -q -t pdn-mailcast-test-fbb:7.0.11 tests/Mailcast.Receiver.Tests/Fbb
       - name: End-to-end test
         run: dotnet test tests/Mailcast.Receiver.Tests -c Release --filter "Category=Docker" --logger "console;verbosity=normal"
 

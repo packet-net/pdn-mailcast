@@ -286,7 +286,7 @@ Tested against FBB 7.0.11 (Ubuntu's `fbb` package) in docker; see `tests/Mailcas
 
    Leave `R` (read-only) out of the mode: on a read-only port FBB answers the receiver's forwarding request with "is not a valid command" and takes nothing.
 
-2. Add the user Q0CAST: on FBB's console, `EU Q0CAST` and `Y` to create it, then `B` for the BBS flag, `M` for the modem flag (telnet access), `W` and the password, and an empty line to finish. Without the B flag FBB treats Q0CAST as a new user and asks for its name instead of taking its mail. FBB keeps only 12 characters of a password, so use 12 or fewer; it ignores their case.
+2. Add the user Q0CAST: on FBB's console, `EU Q0CAST` and `Y` to create it, then `B` for the BBS flag, `M` for the modem flag (telnet access), `W`, a space and the password, e.g. `W mailcast12`, and an empty line to finish. Without the B flag FBB treats Q0CAST as a new user and asks for its name instead of taking its mail. FBB keeps only 12 characters of a password, so use 12 or fewer; it ignores their case.
 
 3. Don't add Q0CAST to `forward.sys`: FBB never needs to forward to it.
 
