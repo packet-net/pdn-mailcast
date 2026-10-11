@@ -96,7 +96,7 @@ public sealed partial class RetunerTests
             });
             Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks, earlyEnd);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
-            Retuner.Rig.Changed += RigChanges.Enqueue;
+            Retuner.Rig!.Changed += RigChanges.Enqueue;
         }
 
         public FakeRigctld Rig { get; }
@@ -180,7 +180,7 @@ public sealed partial class RetunerTests
                 }
                 await Step();
             }
-            Assert.True(done(), $"{what}; at {Clock.GetUtcNow():HH:mm:ss}: {Retuner.State}; rig {Retuner.Rig.Snapshot()}; said {string.Join(" | ", Log.TakeLast(8))}");
+            Assert.True(done(), $"{what}; at {Clock.GetUtcNow():HH:mm:ss}: {Retuner.State}; rig {Retuner.Rig!.Snapshot()}; said {string.Join(" | ", Log.TakeLast(8))}");
         }
 
         /// <summary>Steps until the clock reads <paramref name="at"/> or later, and the retuner is waiting again.</summary>
@@ -202,7 +202,7 @@ public sealed partial class RetunerTests
         public async Task RigUntil(Func<RigState, bool> done, string what, int most = 20)
         {
             int seen = RigChanges.Count;
-            bool Done() => RigChanges.Skip(seen).Any(done) || done(Retuner.Rig.Snapshot());
+            bool Done() => RigChanges.Skip(seen).Any(done) || done(Retuner.Rig!.Snapshot());
             for (int i = 0; i < most; i++)
             {
                 if (Done())
@@ -545,7 +545,7 @@ public sealed partial class RetunerTests
         }
 
         Assert.Equal(7_050_000, s.Rig.DialHz);
-        Assert.Null(s.Retuner.Rig.Snapshot().RestoreOwed);
+        Assert.Null(s.Retuner.Rig!.Snapshot().RestoreOwed);
         Assert.Equal(1, s.Node!.XmitOff(2));
         Assert.Equal(RetuneStage.Restoring, s.Retuner.Stage);
         Assert.Contains("the rig reads 7.050000 MHz USB", s.Retuner.State, StringComparison.Ordinal);

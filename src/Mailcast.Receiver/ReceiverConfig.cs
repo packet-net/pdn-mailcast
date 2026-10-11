@@ -253,6 +253,16 @@ public sealed record ReceiverConfig
     public BpqNodeSettings? Bpq { get; init; }
 
     /// <summary>
+    /// With <c>"audio": "soundmodem"</c>: for each slot, take that pdn-soundmodem's receive
+    /// window, so it tunes its own radio to <see cref="DialKHz"/> and holds all its transmitting
+    /// while the receiver listens, then puts both back. In place of <see cref="Rig"/> and
+    /// <see cref="Bpq"/> for that source; it does nothing with any other. Off (the default)
+    /// leaves pdn-soundmodem's radio where it is. Left out of a saved file while off.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Retune { get; init; }
+
+    /// <summary>
     /// Programs to run before and after each slot the receiver listens to, for a radio shared
     /// with something else. Null (the default) runs nothing.
     /// </summary>

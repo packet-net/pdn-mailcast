@@ -720,8 +720,10 @@ public sealed class StatusPage : IAsyncDisposable
             {
                 stage = retuner.Stage,
                 state = retuner.State,
-                rigctld = retuner.Endpoint.ToString(),
-                linBpq = config.Bpq?.ToString(),
+                rigctld = retuner.Endpoint?.ToString(),
+                // pdn-soundmodem's receive window and where, instead of rigctld and LinBPQ.
+                window = retuner.Window is { } window ? window.Where : null,
+                linBpq = retuner.Window is null ? config.Bpq?.ToString() : null,
                 nextSlot = retuner.NextSlot,
                 problem = retuner.LastProblem?.Text,
                 problemAt = retuner.LastProblem?.At,

@@ -52,7 +52,15 @@ public sealed class ReceiverHost : IAsyncDisposable
         Hooks = new SlotHooks(() => Config, time, log) { DialKHz = () => DialHz / 1000 };
         ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place) { AudioCentreHz = config.AudioCentreHz };
         ChannelWatch.Measured += FrameHistory.OnChannelMeasured;
-        if (config.Rig is not null)
+        if (config.Retune && AudioSource.Parse(config.Audio).Kind == AudioSourceKind.SoundModem)
+        {
+            // pdn-soundmodem's receive window: it tunes its own radio and holds its own
+            // transmitting, so neither rigctld nor LinBPQ is touched.
+            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.SoundModem, time, log,
+                new ReceiveWindow(() => AudioSource.Parse(Config.Audio) is { Kind: AudioSourceKind.SoundModem } s ? s.SoundModemPort : AudioSource.DefaultSoundModemPort),
+                () => Config.DialHz, FollowDial, Hooks, EarlyEndReason);
+        }
+        else if (config.Rig is not null)
         {
             Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks, EarlyEndReason);
         }
@@ -262,7 +270,21 @@ public sealed class ReceiverHost : IAsyncDisposable
     }
 
     /// <summary>Whether the retuner runs the hooks, in step with its own work: it is retuning the radio the audio comes from.</summary>
-    internal bool RetunerRunsHooks => Retuner is not null && AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa;
+    internal bool RetunerRunsHooks => Retuner is not null
+        && AudioSource.Parse(Config.Audio).Kind == (Retuner.Window is null ? AudioSourceKind.Alsa : AudioSourceKind.SoundModem);
+
+    /// <summary>
+    /// The retuner's word on where pdn-soundmodem's radio is as its receive window is taken (the
+    /// window's dial) and given back or lost (the rig's, or null when it did not say): the
+    /// running pipeline's band placement follows it.
+    /// </summary>
+    private void FollowDial(double? dialHz)
+    {
+        if (Pipeline is { } pipeline && pipeline.FollowDial(dialHz))
+        {
+            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz);
+        }
+    }
 
     /// <summary>
     /// Issue #49: the probe after a slot's tone is captured within about this long of the slot's
@@ -563,6 +585,11 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Retuner.SayIfLeftOver(Config.StateDirectory, _log);
         }
+        if (Config.Retune && AudioSource.Parse(Config.Audio).Kind != AudioSourceKind.SoundModem)
+        {
+            _log("config: \"retune\" is for \"audio\": \"soundmodem\" only, where pdn-soundmodem's receive window retunes its radio for each slot; it does nothing with this source"
+                + (Config.Rig is not null ? " (\"rig\" retunes the radio as before)" : ""));
+        }
         if (Config.Hooks is { } hooks && Hooks.Configured)
         {
             _log("hooks: "
@@ -823,6 +850,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                 Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
                 refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
+                if (source.Kind == AudioSourceKind.SoundModem)
+                {
+                    // pdn-soundmodem may have restarted mid-slot, which puts its rig back: the
+                    // retuner asks for its receive window again now, for what is left of the slot.
+                    Retuner?.SourceReconnected();
+                }
                 _ = NotePlaceAsync(pipeline.Source, config.Audio, token);
                 await pipeline.Finished.WaitAsync(token).ConfigureAwait(false);
                 why = pipeline.EndReason ?? "the audio stopped";
@@ -985,7 +1018,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The pipeline for <paramref name="source"/>, heard on <paramref name="config"/>'s dial.</summary>
     internal AudioPipeline CreatePipeline(AudioSource source, ReceiverConfig config) =>
-        AudioPipeline.Create(source, config.DialHz, _log, _time, config.Web.Port);
+        AudioPipeline.Create(source, config.DialHz, _log, _time, config.Web.Port, retunedByWindow: Retuner?.Window is not null);
 
     /// <summary>For tests: builds the pipeline for a source in place of the real one.</summary>
     internal Func<AudioSource, AudioPipeline>? PipelineFactory { get; set; }
