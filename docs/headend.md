@@ -162,7 +162,7 @@ It needs pdn-soundmodem with burst packing (#544) and the transmit lease (#545) 
   "rfFrequency": 7053800,
   "maxBurstSeconds": 18,
   "burstGatherSeconds": 0.5,
-  "identify": { "callsign": "GB7RDG", "intervalMinutes": 10 }
+  "identify": { "callsign": "M0LTE", "intervalMinutes": 10 }
 }
 ```
 
@@ -187,7 +187,7 @@ The head end is a forwarding partner that calls LinBPQ, logs in on its FBBPORT a
 
 GB7RDG's existing bulletin filters apply as for any partner, because LinBPQ chooses what to queue. Local bulletins (@GB7RDG) are not queued, which is right: they are for GB7RDG's own users.
 
-Q0HEAD is a Q callsign, which is never issued, so it cannot clash with a station, and it is never sent on the air (frames come from GB7RDG). FBB-style BBSs only accept logins shaped like a callsign. It must not be the receiver's login (Q0CAST) or GB7RDG itself.
+Q0HEAD is a Q callsign, which is never issued, so it cannot clash with a station, and it is never sent on the air (frames come from M0LTE, transmitted from GB7RDG's station). FBB-style BBSs only accept logins shaped like a callsign. It must not be the receiver's login (Q0CAST) or GB7RDG itself.
 
 If LinBPQ ever offers the head end a personal message or NTS traffic, the head end answers `=` (later), so LinBPQ keeps it queued rather than counting it delivered, and logs a WARNING naming the BID every time it is offered: the partner's routes need fixing, and the message sending on by hand. Bulletins over the size cap, or with a BID already held, are answered `-`.
 
@@ -219,7 +219,7 @@ Each slot logs one line about it, for example:
 ionosonde: MARGINAL, Fairford FF051 at 2026-10-06 11:30Z (12 min old, PROPquest): foF2 6.05 MHz, MUF 6.65/8.21/11.64 MHz at 100/500/1000 km (MUFs estimated from foF2 and M(3000)F2); 100 km closed, 500 km open, just, 1000 km good; skip zone about 280 km; sent in 2 frames
 ```
 
-Requests carry the User-Agent `pdn-mailcast-headend/VERSION (+https://github.com/packet-net/pdn-mailcast; GB7RDG)`, with the station's callsign.
+Requests carry the User-Agent `pdn-mailcast-headend/VERSION (+https://github.com/packet-net/pdn-mailcast; M0LTE)`, with the station's callsign.
 
 ## The PSK Reporter reading
 
