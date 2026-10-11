@@ -7,6 +7,7 @@ You need a Linux machine (a Pi is fine) running LinBPQ with its mail. It doesn't
 ## 1. Install
 
 ```
+sudo apt install curl gpg
 curl -fsSL https://packet-net.github.io/apt/pubkey.asc | sudo gpg --dearmor -o /usr/share/keyrings/packet-net.gpg
 echo "deb [signed-by=/usr/share/keyrings/packet-net.gpg] https://packet-net.github.io/apt ./" | sudo tee /etc/apt/sources.list.d/packet-net.list
 sudo apt update
