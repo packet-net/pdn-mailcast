@@ -129,6 +129,35 @@ public class StatusPageTests
             .Any(p => p.GetProperty("status").GetString() == "completedObject"));
     }
 
+    /// <summary>
+    /// The embedded WaterfallWebServer answers /channel-audio for any program on the same
+    /// machine, keyless, with the audio this receiver feeds it; on the receiver's own page that
+    /// is surprising rather than useful, since a pdn-soundmodem audio source pointed back at this
+    /// port would read the receiver's own feed. pdn-soundmodem has no option to turn it off
+    /// (filed as packet-net/pdn-soundmodem#683), so the receiver blocks the path itself, ahead of
+    /// the waterfall server, even with one attached. /rig-window already 404s on its own: this
+    /// receiver never sets WaterfallOptions.ReceiveWindowRig.
+    /// </summary>
+    [Fact]
+    public async Task Waterfall_DoesNotServeChannelAudioOrRigWindow()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        // Without a waterfall attached yet, the paths must still be refused, not answered with
+        // "no audio yet" as any other /waterfall/ path would be.
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync("waterfall/channel-audio")).StatusCode);
+
+        await using var pipeline = host.CreatePipeline(AudioSource.Parse(host.Config.Audio), host.Config);
+        page.Attach(pipeline);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync("waterfall/channel-audio")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync("waterfall/rig-window")).StatusCode);
+    }
+
     /// <summary>Issue #48: anything in the slot's place that is not a tick count a date can have is a 400.</summary>
     [Theory]
     [InlineData("abc")]
