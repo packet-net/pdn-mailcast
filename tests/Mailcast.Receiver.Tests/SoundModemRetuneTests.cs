@@ -427,6 +427,48 @@ public sealed class SoundModemRetuneTests
     }
 
     [Fact]
+    public async Task TheInputsMove_ChangesMidStream_WhenTheRadioIsRetuned()
+    {
+        await using var fake = new FakeSoundModem(rateHz: 12_000, dialHz: 7_052_000);
+        using var input = await SoundModemAudioInput.OpenAsync(fake.Port, CancellationToken.None);
+        var connection = await fake.NextAsync();
+        Assert.Null(input.MovedFromHz);
+        var tone = new float[1200];
+        for (int i = 0; i < tone.Length; i++)
+        {
+            tone[i] = (float)(0.5 * Math.Sin(2 * Math.PI * 3800 * i / 12_000));
+        }
+        var block = new float[OnAir.SampleRate / 10];
+        var moved = new float[OnAir.SampleRate / 10];
+
+        async Task<double?> NextAsync(ulong index)
+        {
+            await connection.SendAsync(index, tone);
+            return await Task.Run(() =>
+            {
+                for (int tries = 0; tries < 20; tries++)
+                {
+                    if (input.ReadBlock(block, moved, out _, out _, out double? from) > 0)
+                    {
+                        return from;
+                    }
+                }
+                throw new TimeoutException("no block came");
+            }).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.Null(await NextAsync(0));
+        // The window has moved the radio to 7.050 MHz: the signal at 3800 Hz, moved to 1800.
+        input.MoveFrom(3800);
+        Assert.Equal(3800, await NextAsync(1200));
+        Assert.Equal(3800, input.MovedFromHz);
+        Assert.Contains(moved, v => v != 0);
+        input.MoveFrom(null);
+        Assert.Null(await NextAsync(2400));
+        Assert.Null(input.MovedFromHz);
+    }
+
+    [Fact]
     public async Task APipelineStillOpening_IgnoresADialToFollow_AndIsPlacedOnceOpen()
     {
         await using var fake = new FakeSoundModem(dialHz: 7_052_300);
