@@ -1022,7 +1022,9 @@ public sealed class StatusPage : IAsyncDisposable
         {
             return null;
         }
-        var nextOpens = ListeningWindow.Next(now, host.Schedule).Opens;
+        // Issue #80: accounts for a window closed early (not just the clock schedule), or the
+        // page would offer "Listen now" as refused for a reason that is not true.
+        var nextOpens = host.NextWebSdrWindowOpens(now);
         var until = host.ListenNow.ActiveUntil(now, nextOpens);
         bool alreadyListening = host.Audio.Phase == AudioPhase.Listening && until is null;
         return new
