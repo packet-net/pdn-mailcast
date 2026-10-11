@@ -68,6 +68,13 @@ public sealed class Retuner : IAsyncDisposable
     /// <summary>How often a radio that is still transmitting after the drain is looked at again.</summary>
     public static readonly TimeSpan PttRetry = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// How soon a receive window pdn-soundmodem refused (409) is asked for again: a refusal is
+    /// usually brief (a frame being sent, or its rigctld not yet reconnected after a restart).
+    /// One for a transmit lease, which lasts a whole broadcast, waits <see cref="Check"/>.
+    /// </summary>
+    public static readonly TimeSpan RefusedRetry = TimeSpan.FromSeconds(10);
+
     /// <summary>How often a problem that goes on is said again in the log.</summary>
     public static readonly TimeSpan Reminder = TimeSpan.FromMinutes(10);
 
@@ -109,6 +116,9 @@ public sealed class Retuner : IAsyncDisposable
     private bool _windowMaybe;
     private bool _retakeNow;
     private bool _windowGaveUp;
+    private TimeSpan _retryEvery = Check;
+    private long? _askedDialHz;
+    private long? _heldDialHz;
     private DateTimeOffset _windowTried;
     private DateTimeOffset _windowRenewed;
 
@@ -768,9 +778,17 @@ public sealed class Retuner : IAsyncDisposable
         {
             return;
         }
+        long? held;
         lock (_gate)
         {
             _retakeNow = true;
+            held = _windowHeld ? _heldDialHz : null;
+        }
+        // A new stream's hello gives pdn-soundmodem's own dial, not the window's: while the
+        // window is held, the new pipeline is placed by the window's dial at once.
+        if (held is { } dial)
+        {
+            _dialFollows?.Invoke(dial);
         }
         Wake();
     }
@@ -799,6 +817,8 @@ public sealed class Retuner : IAsyncDisposable
             lock (_gate)
             {
                 _windowHeld = true;
+                _askedDialHz = dial;
+                _heldDialHz = (long)Math.Round(answer.WindowDialHz ?? dial);
             }
             _windowRenewed = _time.GetUtcNow();
             _windowGaveUp = false;
@@ -820,10 +840,11 @@ public sealed class Retuner : IAsyncDisposable
         // its stream connects again.
         _windowGaveUp = answer.Outcome == WindowOutcome.NoWindow;
         string why = answer.Why ?? "no reason given";
+        _retryEvery = answer.Outcome == WindowOutcome.Refused && !why.Contains("transmit lease", StringComparison.Ordinal) ? RefusedRetry : Check;
         string verb = answer.Outcome == WindowOutcome.Refused ? "refused its receive window" : "could not give its receive window";
         NoteProblem($"pdn-soundmodem {verb} for the {Hhmm(slot)} UTC slot: {why}");
         Loud($"retune: WARNING - pdn-soundmodem {verb} for the {Hhmm(slot)} UTC slot ({why}); listening on whatever its radio is on"
-            + (_windowGaveUp ? "" : $", and asking again every {Check.TotalSeconds:F0} s until {Hhmm(closes)} UTC"));
+            + (_windowGaveUp ? "" : $", and asking again every {_retryEvery.TotalSeconds:F0} s until {Hhmm(closes)} UTC"));
         SetState(RetuneStage.Idle, $"not tuned for the {Hhmm(slot)} UTC slot: pdn-soundmodem {verb} ({why}); listening on whatever its radio is on until {Hhmm(closes)} UTC");
         return false;
     }
@@ -854,14 +875,27 @@ public sealed class Retuner : IAsyncDisposable
                 {
                     Warn($"retune: WARNING - could not renew pdn-soundmodem's receive window ({renewal.Why})");
                 }
+                else if (dial != _askedDialHz)
+                {
+                    // "dialKHz" changed during the slot: the renewal moved the window there.
+                    lock (_gate)
+                    {
+                        _askedDialHz = dial;
+                        _heldDialHz = (long)Math.Round(renewal.WindowDialHz ?? dial);
+                    }
+                    _log($"retune: pdn-soundmodem's receive window moved to {OnAir.Mhz(dial)} MHz, the dial now set");
+                    _dialFollows?.Invoke(renewal.WindowDialHz ?? dial);
+                }
             }
+            long asked = _askedDialHz ?? dial;
             var state = await Window!.ReadAsync(cancellation).ConfigureAwait(false);
             string? lost = state.Outcome switch
             {
                 WindowOutcome.Granted when state.WindowDialHz is null => "pdn-soundmodem says no window is open now: it was restarted, or the window ran out",
-                WindowOutcome.Granted when Math.Abs(state.WindowDialHz!.Value - dial) >= 1 => $"pdn-soundmodem's rig is held on {OnAir.Mhz(state.WindowDialHz.Value)} MHz for something else",
+                WindowOutcome.Granted when Math.Abs(state.WindowDialHz!.Value - asked) >= 1 => $"pdn-soundmodem's window is on {OnAir.Mhz(state.WindowDialHz.Value)} MHz now, not the {OnAir.Mhz(asked)} MHz this receiver last asked for",
+                // Not running: pdn-soundmodem puts its rig back when it starts again.
                 WindowOutcome.Unreachable or WindowOutcome.NoWindow => state.Why,
-                // No answer in time, or one that makes no sense: nothing is known to have changed.
+                // No answer in time (busy or stuck), or one that makes no sense: nothing is known to have changed.
                 _ => null,
             };
             if (lost is null)
@@ -879,7 +913,7 @@ public sealed class Retuner : IAsyncDisposable
             _dialFollows?.Invoke(state.RigDialHz);
             retake = true;
         }
-        else if (!retake && (_windowGaveUp || now - _windowTried < Check))
+        else if (!retake && (_windowGaveUp || now - _windowTried < _retryEvery))
         {
             return;
         }

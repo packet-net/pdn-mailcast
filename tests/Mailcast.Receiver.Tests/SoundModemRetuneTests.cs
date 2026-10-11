@@ -28,7 +28,7 @@ public sealed class SoundModemRetuneTests
         private Task? _run;
         private TimeSpan? _pending;
 
-        public Station(FakeSoundModem fake, DateTimeOffset start, Func<DateTimeOffset, string?>? earlyEnd = null)
+        public Station(FakeSoundModem fake, DateTimeOffset start, Func<DateTimeOffset, string?>? earlyEnd = null, TimeSpan? requestTimeout = null)
         {
             Fake = fake;
             Port = fake.Port;
@@ -36,7 +36,7 @@ public sealed class SoundModemRetuneTests
             Config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = _dir.Path, Daylight = null, Retune = true };
             Config.Validate();
             Retuner = new Retuner(Config, () => Config.Schedule, () => true, Clock, Log.Enqueue,
-                new ReceiveWindow(() => Port), () => Config.DialHz, dial => Dials.Enqueue(dial), null, earlyEnd);
+                new ReceiveWindow(() => Port, requestTimeout ?? ReceiveWindow.RequestTimeout), () => Config.DialHz, dial => Dials.Enqueue(dial), null, earlyEnd);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
         }
 
@@ -332,18 +332,16 @@ public sealed class SoundModemRetuneTests
     public async Task AnEarlyEnd_GivesTheWindowBackSooner()
     {
         await using var fake = new FakeSoundModem(dialHz: PacketDialHz);
-        DateTimeOffset? now = null;
         Station? station = null;
         await using var s = station = new Station(fake, Noon.AddMinutes(-2), slot => station!.Clock.GetUtcNow() >= Noon.AddMinutes(6) ? "everything heard" : null);
         s.Start();
 
         await s.RunTo(Noon.AddMinutes(6).AddSeconds(5));
-        now = s.Clock.GetUtcNow();
 
         Assert.Null(fake.WindowDialHz);
         Assert.Contains(s.Log, l => l == "retune: ending the 12:00 UTC slot early: everything heard");
         Assert.Contains(s.Log, l => l.StartsWith("retune: gave pdn-soundmodem's receive window back", StringComparison.Ordinal));
-        Assert.True(now < Noon.AddMinutes(12));
+        Assert.True(s.Clock.GetUtcNow() < Noon.AddMinutes(12));
     }
 
     [Fact]
@@ -354,14 +352,95 @@ public sealed class SoundModemRetuneTests
         s.Start();
         await s.RunTo(Noon.AddSeconds(-5));
 
-        // Refused while still held (the transmitter keyed, say): the window stays ours.
-        fake.RefuseWith = "the transmitter is keyed";
+        // Refused while still held, as pdn-soundmodem's rig control can while it holds
+        // transmitting: the window stays ours.
+        fake.RefuseWith = "the rig is being retuned already; ask again in a moment";
         await s.RunTo(Noon.AddSeconds(5));
 
-        Assert.Contains(s.Log, l => l == "retune: WARNING - could not renew pdn-soundmodem's receive window (the transmitter is keyed)");
+        Assert.Contains(s.Log, l => l == "retune: WARNING - could not renew pdn-soundmodem's receive window (the rig is being retuned already; ask again in a moment)");
         Assert.True(s.Retuner.WindowHeld);
         Assert.Equal(BulletinDialHz, fake.WindowDialHz);
         Assert.DoesNotContain(s.Log, l => l.Contains("ended before", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ARefusalAtTheSlotsOpening_IsAskedAgainWithinSeconds_NotAMinute()
+    {
+        await using var fake = new FakeSoundModem(dialHz: PacketDialHz)
+        {
+            RefuseWith = "the transmitter is keyed, and the rig is never retuned in the middle of a transmission; ask again once it has unkeyed",
+        };
+        await using var s = new Station(fake, Noon.AddMinutes(-2));
+        s.Start();
+
+        await s.RunTo(Noon.AddMinutes(-1));
+        Assert.Contains(s.Log, l => l.StartsWith("retune: WARNING - pdn-soundmodem refused its receive window for the 12:00 UTC slot (the transmitter is keyed", StringComparison.Ordinal)
+            && l.EndsWith("and asking again every 10 s until 12:12 UTC", StringComparison.Ordinal));
+        fake.RefuseWith = null;
+
+        await s.RunTo(Noon.AddMinutes(-1).AddSeconds(10));
+
+        Assert.Equal(2, s.Takes().Count());
+        Assert.True(s.Retuner.WindowHeld);
+        Assert.Equal(BulletinDialHz, fake.WindowDialHz);
+    }
+
+    [Fact]
+    public async Task APdnSoundmodemThatDoesNotAnswerInTime_IsNotTakenToHaveLostTheWindow()
+    {
+        await using var fake = new FakeSoundModem(dialHz: PacketDialHz);
+        await using var s = new Station(fake, Noon.AddMinutes(-2), requestTimeout: TimeSpan.FromMilliseconds(300));
+        s.Start();
+        await s.RunTo(Noon.AddMinutes(2).AddSeconds(30));
+        int dials = s.Dials.Count;
+
+        fake.Hang = true;
+        await s.RunTo(Noon.AddMinutes(2).AddSeconds(45));
+        fake.Hang = false;
+        await s.RunTo(Noon.AddMinutes(3).AddSeconds(10));
+
+        Assert.True(s.Retuner.WindowHeld);
+        Assert.DoesNotContain(s.Log, l => l.Contains("ended before", StringComparison.Ordinal));
+        Assert.Equal(dials, s.Dials.Count);
+        Assert.Equal(BulletinDialHz, fake.WindowDialHz);
+    }
+
+    [Fact]
+    public async Task AStreamThatReconnectsWhileTheWindowIsHeld_IsPlacedByTheWindowsDial_WithoutAskingAgain()
+    {
+        await using var fake = new FakeSoundModem(dialHz: PacketDialHz);
+        await using var s = new Station(fake, Noon.AddMinutes(-2));
+        s.Start();
+        await s.RunTo(Noon.AddMinutes(3));
+        int takes = s.Takes().Count();
+        while (s.Dials.TryDequeue(out _))
+        {
+        }
+
+        s.Retuner.SourceReconnected();
+
+        // At once, before the retuner's own loop has run.
+        Assert.Equal([(double?)BulletinDialHz], s.Dials.ToArray());
+        await s.Resync();
+        Assert.Equal(takes, s.Takes().Count());
+        Assert.True(s.Retuner.WindowHeld);
+    }
+
+    [Fact]
+    public async Task APipelineStillOpening_IgnoresADialToFollow_AndIsPlacedOnceOpen()
+    {
+        await using var fake = new FakeSoundModem(dialHz: 7_052_300);
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            BulletinDialHz, _ => { }, TimeProvider.System, retunedByWindow: true);
+        await using var _ = pipeline;
+
+        Assert.False(pipeline.FollowDial(7_051_800));
+        await pipeline.OpenAsync(CancellationToken.None);
+        Assert.Equal(7_052_300, pipeline.DialHz);
+
+        // What Retuner.SourceReconnected then does for a window it holds.
+        Assert.True(pipeline.FollowDial(BulletinDialHz));
+        Assert.Equal(BulletinDialHz, pipeline.DialHz);
     }
 
     // ---------- the receiver as a whole ----------

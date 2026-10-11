@@ -854,6 +854,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 {
                     // pdn-soundmodem may have restarted mid-slot, which puts its rig back: the
                     // retuner asks for its receive window again now, for what is left of the slot.
+                    // If it still holds the window, this pipeline is placed by the window's dial.
                     Retuner?.SourceReconnected();
                 }
                 _ = NotePlaceAsync(pipeline.Source, config.Audio, token);

@@ -144,6 +144,9 @@ internal sealed class FakeSoundModem : IAsyncDisposable
     /// <summary>False for a station with no <c>rig</c> section: every window request is a 404.</summary>
     public bool HasRig { get; set; } = true;
 
+    /// <summary>When set, a request is held without an answer until this is cleared, as a stuck pdn-soundmodem would.</summary>
+    public bool Hang { get; set; }
+
     /// <summary>When set, a request for a window is refused with a 409 and this reason, as pdn-soundmodem does while a lease is held.</summary>
     public string? RefuseWith { get; set; }
 
@@ -189,6 +192,15 @@ internal sealed class FakeSoundModem : IAsyncDisposable
         var request = new WindowRequest(method, path, head, bodyText);
         WindowLog.Enqueue(request);
         WindowRequests.Writer.TryWrite(request);
+        if (Hang)
+        {
+            // Answered never: the client gives up first.
+            while (Hang && !_stop.IsCancellationRequested)
+            {
+                await Task.Delay(50);
+            }
+            return;
+        }
 
         int status;
         System.Text.Json.Nodes.JsonObject answer;

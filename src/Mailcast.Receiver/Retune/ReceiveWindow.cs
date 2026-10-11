@@ -25,6 +25,12 @@ public enum WindowOutcome
     /// <summary>pdn-soundmodem is not answering: not running, or restarting.</summary>
     Unreachable,
 
+    /// <summary>
+    /// pdn-soundmodem took the connection but did not answer in time: busy or stuck, not known
+    /// to have changed anything, so a window it may hold is not taken as lost.
+    /// </summary>
+    NoAnswer,
+
     /// <summary>Anything else: a 403, a 400, a 500, or an answer that is not a receive window's.</summary>
     Failed,
 }
@@ -58,16 +64,24 @@ public sealed class ReceiveWindow : IDisposable
 
     private readonly HttpClient _http;
     private readonly Func<int> _port;
+    private readonly TimeSpan _timeout;
 
     /// <summary>A client for the pdn-soundmodem whose page port <paramref name="port"/> says, asked afresh for each request.</summary>
     public ReceiveWindow(Func<int> port)
+        : this(port, RequestTimeout)
+    {
+    }
+
+    /// <summary>As the public one, with a request timeout of its own, for tests.</summary>
+    internal ReceiveWindow(Func<int> port, TimeSpan timeout)
     {
         _port = port;
+        _timeout = timeout;
         // pdn-soundmodem refuses anything relayed through a proxy, and a proxy from the
         // environment would never be what is wanted for 127.0.0.1 anyway.
         _http = new HttpClient(new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false })
         {
-            Timeout = RequestTimeout,
+            Timeout = timeout,
         };
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("pdn-mailcast-receiver", ReceiverHost.Version));
     }
@@ -121,7 +135,7 @@ public sealed class ReceiveWindow : IDisposable
         }
         catch (TaskCanceledException) when (!cancellation.IsCancellationRequested)
         {
-            return new(WindowOutcome.Unreachable, $"pdn-soundmodem on {where} did not answer within {RequestTimeout.TotalSeconds:F0} s", null, null);
+            return new(WindowOutcome.NoAnswer, $"pdn-soundmodem on {where} did not answer within {_timeout.TotalSeconds:F0} s", null, null);
         }
 
         JsonObject? answer = null;
