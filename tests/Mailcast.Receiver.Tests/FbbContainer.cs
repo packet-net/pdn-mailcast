@@ -53,13 +53,14 @@ internal sealed partial class FbbContainer : IAsyncDisposable
             var container = new FbbContainer(id, int.Parse(mapping[(mapping.LastIndexOf(':') + 1)..], CultureInfo.InvariantCulture));
             try
             {
+                await container.WaitForSetupAsync(cancellation);
                 await container.WaitForLoginAsync(cancellation);
             }
             catch (OperationCanceledException e) when (cancellation.IsCancellationRequested)
             {
                 // Whenever the deadline passes mid-try, so that a timeout always says why.
                 string logs = await LinBpqContainer.DockerAsync(CancellationToken.None, "logs", id);
-                throw new OperationCanceledException($"Q0CAST never logged in to FBB; {e.Message}; container log: {logs}", e, cancellation);
+                throw new OperationCanceledException($"FBB's container never finished starting up; {e.Message}; container log: {logs}", e, cancellation);
             }
             return container;
         }
@@ -67,6 +68,34 @@ internal sealed partial class FbbContainer : IAsyncDisposable
         {
             await LinBpqContainer.DockerAsync(CancellationToken.None, "rm", "-f", id);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Waits for start.sh's own log line for <see cref="PlainLogin"/>, which only ever prints
+    /// after its "EU Q0CAST ..." console command and echo have both already completed (start.sh
+    /// runs its lines in order, and <c>set -e</c> would stop it dead if an earlier one failed), so
+    /// seeing it means both users it creates really exist.
+    /// </summary>
+    /// <remarks>
+    /// Without this, a test using <see cref="PlainLogin"/> straight after <see cref="StartAsync"/>
+    /// returns could race ahead of start.sh's second "EU" console command and see FBB answer
+    /// "Unregistered callsign" for it (issue #113): <see cref="WaitForLoginAsync"/> below only ever
+    /// proved <see cref="Login"/> was ready, never <see cref="PlainLogin"/>, and the two "EU"
+    /// commands are seconds apart even on an otherwise idle host, since fbb-console paces every
+    /// line it sends with its own fixed sleeps.
+    /// </remarks>
+    private async Task WaitForSetupAsync(CancellationToken cancellation)
+    {
+        const string marker = "mailcast: " + PlainLogin + " set up";
+        while (true)
+        {
+            string logs = await LinBpqContainer.DockerAsync(cancellation, "logs", Id);
+            if (logs.Contains(marker, StringComparison.Ordinal))
+            {
+                return;
+            }
+            await Task.Delay(500, cancellation);
         }
     }
 
