@@ -10,6 +10,9 @@ public class BbsClientTests
     private static BbsClient Client(int port, string password = "secret") =>
         new(new BbsSettings { Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, _ => { });
 
+    private static BbsClient FbbClient(int port, string password = "mailcast12") =>
+        new(new BbsSettings { Type = BbsKind.Fbb, Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, _ => { });
+
     [Fact]
     public async Task Deliver_NewBulletins_BbsTakesThemAsAPartnerWouldSendThem()
     {
@@ -246,6 +249,113 @@ public class BbsClientTests
         Assert.Contains("asking for a name", result.Said, StringComparison.Ordinal);
         Assert.Contains("BBS Users", result.Said, StringComparison.Ordinal);
         Assert.Null(result.Detail);
+    }
+
+    /// <summary>Issue #108: an FBB login FBB has never seen connect before, which lacks the BBS
+    /// flag, gets FBB's own new-user prompt in place of the forwarding prompt. A real delivery
+    /// session meeting it must fail plainly, rather than waiting out the idle timeout for an
+    /// answer that will never come, as the LinBPQ case above does.</summary>
+    [Fact]
+    public async Task Deliver_FbbAsksForFirstName_FailsWithThePlainExplanation()
+    {
+        await using var fbb = new FakeFbb(FbbNotAPartnerReply);
+
+        var report = await FbbClient(fbb.Port).DeliverAsync([Samples.Bulletin(403)], CancellationToken.None);
+
+        Assert.False(report.Graceful);
+        Assert.Contains("Q0CAST", report.Failure, StringComparison.Ordinal);
+        Assert.Contains("new user", report.Failure, StringComparison.Ordinal);
+        Assert.Contains("BBS flag", report.Failure, StringComparison.Ordinal);
+        Assert.Equal(DeliveryVerdict.NotOffered, Assert.Single(report.Outcomes).Verdict);
+    }
+
+    /// <summary>
+    /// Issue #108: a real Linux FBB 7.0.11 never sends LinBPQ's "de CALL>" forwarding prompt, so
+    /// Classify's PromptCall regex never matched it, and a correctly set-up FBB forwarding
+    /// partner (the BBS flag set) fell through to NotForwardingPartner. These replies are the
+    /// exact bytes captured from a real FBB in docker (see tests/Mailcast.Receiver.Tests/Fbb,
+    /// from PR #107), for: the BBS flag set, a plain login FBB has never seen before and which
+    /// lacks the BBS flag, a login that has registered once before and lacks the BBS flag, and a
+    /// wrong password.
+    /// </summary>
+    private const string FbbForwardingPartnerReply =
+        "\r\nLogon Ok. Type NP to change password.\r\n\r\n[FBB-7.0.11-AB1FHMRX$]\rGB7FBB Mailbox, QTH Reading.\r(1) GB7FBB BBS>\r";
+
+    private const string FbbNotAPartnerReply =
+        "\r\nLogon Ok. Type NP to change password.\r\n\r\n[FBB-7.0.11-AB1FHMRX$]\rGB7FBB BBS, QTH IO91LK.\rHello ???, you are now on channel 1.\r"
+        + "Here are 0 active messages, 100 is last message and \r80 is the last you have listed.\r\rAssigned channels:\r"
+        + "Ch. 1   (TELNET) : Q1CAST-0  - Sun 11/10/26 14:03\r\rPlease enter your first name :";
+
+    /// <summary>
+    /// A login that registered once (first name, city, home BBS, zip code) and reconnects, still
+    /// without the BBS flag. Captured from a real FBB 7.0.11: once registered, it reaches the same
+    /// bare prompt shape a real partner does, "(n) CALL BBS (H for help) >", BBS flag or not.
+    /// </summary>
+    private const string FbbRegisteredNonPartnerReply =
+        "\r\nLogon Ok. Type NP to change password.\r\n\r\n[FBB-7.0.11-AB1FHMRX$]\rGB7FBB BBS, QTH IO91LK.\rHello TestUser, you are now on channel 1.\r"
+        + "Here are 0 active messages, 100 is last message and \r80 is the last you have listed.\r\rAssigned channels:\r"
+        + "Ch. 1   (TELNET) : Q1CAST-0  - Sun 11/10/26 14:45\r\r(1) GB7FBB BBS (H for help) >\r";
+
+    private const string FbbWrongPasswordReply = "Password error !\r\nPassword : ";
+
+    [Fact]
+    public async Task TestLogin_Fbb_GoodPasswordOnAForwardingPartner_ReachesTheForwardingPromptForReal()
+    {
+        await using var fbb = new FakeFbb(FbbForwardingPartnerReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.Ok, result.Outcome);
+        Assert.Contains("can't confirm the BBS flag", result.Said, StringComparison.Ordinal);
+        Assert.Null(result.Detail);
+    }
+
+    /// <summary>
+    /// A login FBB has never seen connect before, and which lacks the BBS flag, gets FBB's own
+    /// new-user prompt, "Please enter your first name :", instead of the bare forwarding prompt a
+    /// BBS-flagged login reaches directly. Unlike LinBPQ's name prompt (#84), giving this login a
+    /// name on its own would not make it a forwarding partner (only the BBS flag does), so this is
+    /// NotForwardingPartner, not NeedsName.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_Fbb_NotSetUpAsAPartner_SaysSoForReal()
+    {
+        await using var fbb = new FakeFbb(FbbNotAPartnerReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.NotForwardingPartner, result.Outcome);
+        Assert.Contains("Q0CAST", result.Said, StringComparison.Ordinal);
+        Assert.Contains("BBS flag", result.Said, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Coordinator follow-up to #108: an already-registered login without the BBS flag reaches a
+    /// bare prompt too, so Classify cannot confidently call this Ok the way it does for LinBPQ's
+    /// "de CALL>". Tried the harmless SID-and-FF handshake a real delivery session opens with when
+    /// it has nothing to send (see BbsLoginTestFbbTests.cs for the real-FBB confirmation that both
+    /// a partner and this case answer FQ identically), so the login test says Ok but hedges rather
+    /// than claiming it confirmed the BBS flag.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_Fbb_AlreadyRegisteredNonPartner_SaysOkButHedges()
+    {
+        await using var fbb = new FakeFbb(FbbRegisteredNonPartnerReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.Ok, result.Outcome);
+        Assert.Contains("can't confirm the BBS flag", result.Said, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestLogin_Fbb_WrongPassword_SaysSoForReal()
+    {
+        await using var fbb = new FakeFbb(FbbWrongPasswordReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
     }
 
     [Fact]

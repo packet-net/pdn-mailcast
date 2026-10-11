@@ -1,7 +1,8 @@
 #!/bin/bash
 # Starts FBB, then sets up the receiver's login through the sysop console, as docs/receiver.md's
 # Linux FBB section tells a sysop to: the user Q0CAST, with the B (BBS) and M (modem and
-# telnet) flags and a password.
+# telnet) flags and a password. Also sets up Q1CAST, a plain Telnet user with the M flag but not
+# B, for issue #108's Test BBS login cases against a login that is not a forwarding partner.
 set -e
 cd /var/ax25/fbb
 
@@ -21,5 +22,10 @@ fbb-console Sysop Reading GB7FBB RG1 "EU G0SYS" N P ""
 # EU makes the user (Y); B and M set its flags and W its password. An empty line ends the edit.
 fbb-console "EU Q0CAST" Y B M "W mailcast12" ""
 echo "mailcast: Q0CAST set up"
+# A plain Telnet user, M flag only, no B: issue #108's "not a forwarding partner" cases. Left
+# unregistered (no first name/city/home BBS/zip); the tests register it over telnet themselves
+# when a case needs it to have connected before.
+fbb-console "EU Q1CAST" Y M "W mailcast12" ""
+echo "mailcast: Q1CAST set up"
 
 wait "$fbb"
