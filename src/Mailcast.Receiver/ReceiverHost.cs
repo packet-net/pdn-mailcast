@@ -48,7 +48,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         // Issue #48: after Slots.OnFrame above, so the slot this piece belongs to is already
         // the one Slots.Last knows about.
         Intake.Piece += OnPieceHandled;
-        Hooks = new SlotHooks(() => Config, time, log);
+        // The dial the audio is really heard on: pdn-soundmodem's own, when it says one.
+        Hooks = new SlotHooks(() => Config, time, log) { DialKHz = () => DialHz / 1000 };
         ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place) { AudioCentreHz = config.AudioCentreHz };
         ChannelWatch.Measured += FrameHistory.OnChannelMeasured;
         if (config.Rig is not null)
@@ -461,9 +462,27 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// The USB dial the audio is heard on, in Hz: the running pipeline's (pdn-soundmodem's own,
-    /// when it says one), else the config's.
+    /// when it says one), else the last pdn-soundmodem said for this same <c>audio</c> while it is
+    /// reconnecting, else the config's.
     /// </summary>
-    public double DialHz => Pipeline?.DialHz ?? Config.DialHz;
+    public double DialHz => Pipeline?.DialHz ?? SoundModemDialSaid ?? Config.DialHz;
+
+    /// <summary>Where the signal's centre is in the audio the page's spectrogram shows, Hz; see <see cref="AudioPipeline.AudioCentreHz"/>.</summary>
+    public double AudioCentreHz => Pipeline?.AudioCentreHz ?? AudioPipeline.AudioCentreFor(DialHz);
+
+    private (string Audio, double DialHz)? _soundModemDial;
+
+    /// <summary>The dial pdn-soundmodem last said, while <c>audio</c> is still the source it said it for.</summary>
+    private double? SoundModemDialSaid
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _soundModemDial is { } said && string.Equals(said.Audio, _config.Audio, StringComparison.Ordinal) ? said.DialHz : null;
+            }
+        }
+    }
 
     /// <summary>A sentence on what the audio is doing, for the page and the log.</summary>
     public string AudioState => Audio.Words;
@@ -647,7 +666,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             _config = config;
             Intake.Sources = config.AcceptedSources;
             // A running pipeline that carries on keeps its dial (pdn-soundmodem's, if it said one).
-            ChannelWatch.AudioCentreHz = !audioChanged && _pipeline is { } running ? OnAir.AudioCentreHz(running.DialHz) : config.AudioCentreHz;
+            ChannelWatch.AudioCentreHz = !audioChanged && _pipeline is { } running ? running.AudioCentreHz : config.AudioCentreHz;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
             if (audioChanged)
             {
@@ -784,7 +803,11 @@ public sealed class ReceiverHost : IAsyncDisposable
                     Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
                 }
                 await pipeline.StartAsync(token).ConfigureAwait(false);
-                ChannelWatch.AudioCentreHz = OnAir.AudioCentreHz(pipeline.DialHz);
+                ChannelWatch.AudioCentreHz = pipeline.AudioCentreHz;
+                lock (_gate)
+                {
+                    _soundModemDial = pipeline.DialFromSoundModem ? (config.Audio, pipeline.DialHz) : null;
+                }
                 listening = _time.GetUtcNow();
                 if (pipeline.WebSdrDescription is { } about)
                 {
@@ -851,12 +874,27 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 soundModemFailures = 0;
             }
+            // A dial, rate or version pdn-soundmodem gives that this receiver cannot use stays so
+            // until someone changes it: asked about as seldom as a web SDR that refused us.
+            bool soundModem = pipeline.Source.Kind == AudioSourceKind.SoundModem;
             TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)]
-                : pipeline.Source.Kind == AudioSourceKind.SoundModem ? SoundModemRetry[Math.Min(soundModemFailures++, SoundModemRetry.Count - 1)]
+                : soundModem ? SoundModemRetry[Math.Min(soundModemFailures++, SoundModemRetry.Count - 1)]
                 : AudioRetry;
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
-            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait);
-            await DelayAsync(wait, cancellation).ConfigureAwait(false);
+            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
+            // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short.
+            if (soundModem)
+            {
+                lock (_gate)
+                {
+                    _audioRestart = restart;
+                }
+            }
+            await DelayAsync(wait, soundModem ? restart.Token : cancellation).ConfigureAwait(false);
+            lock (_gate)
+            {
+                _audioRestart = null;
+            }
         }
     }
 
@@ -1115,6 +1153,8 @@ public enum AudioPhase
 /// <summary>
 /// What the audio is doing: <paramref name="Words"/> for the log and the page's summary, and for a
 /// web SDR closed between slots when it opens again (<paramref name="Reopens"/>) and for which slot,
-/// or for a source that failed, why (<paramref name="Problem"/>) and when it is tried again.
+/// or for a source that failed, why (<paramref name="Problem"/>) and when it is tried again, and
+/// whether it is pdn-soundmodem giving something this receiver cannot use, which waiting will not
+/// mend (<paramref name="Lasting"/>), rather than pdn-soundmodem not answering.
 /// </summary>
-public sealed record AudioCondition(string Words, AudioPhase Phase, DateTimeOffset? Reopens = null, DateTimeOffset? ForSlot = null, string? Problem = null, DateTimeOffset? RetryAt = null);
+public sealed record AudioCondition(string Words, AudioPhase Phase, DateTimeOffset? Reopens = null, DateTimeOffset? ForSlot = null, string? Problem = null, DateTimeOffset? RetryAt = null, bool Lasting = false);

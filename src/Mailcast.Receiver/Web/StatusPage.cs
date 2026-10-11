@@ -125,12 +125,12 @@ public sealed class StatusPage : IAsyncDisposable
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
         {
-            DialFrequencyHz = pipeline.DialHz,
+            DialFrequencyHz = pipeline.SpectrumDialHz,
             Sideband = "usb",
             LinesPerSecond = 10,
             InputLevelMeter = true,
             Title = "pdn-mailcast receiver",
-            DeclaredBands = [new DeclaredBand(0, "mailcast", OnAir.AudioCentreHz(pipeline.DialHz), 2 * OnAir.HalfWidthHz)],
+            DeclaredBands = [new DeclaredBand(0, "mailcast", pipeline.AudioCentreHz, 2 * OnAir.HalfWidthHz)],
             Log = line => _log("web: " + Ascii.Clean(line)),
         });
         waterfall.Start();
@@ -681,6 +681,7 @@ public sealed class StatusPage : IAsyncDisposable
         var mail = _host.Intake.Mail();
         double? liveTone = _host.Pipeline?.Tone.LiveFrequencyHz;
         double dialHz = _host.DialHz;
+        double centreHz = _host.AudioCentreHz;
         return new
         {
             version = ReceiverHost.Version,
@@ -698,6 +699,8 @@ public sealed class StatusPage : IAsyncDisposable
                 forSlot = _host.Audio.ForSlot,
                 problem = _host.Audio.Problem,
                 retryAt = _host.Audio.RetryAt,
+                // pdn-soundmodem gives something this receiver cannot use, rather than not answering.
+                lasting = _host.Audio.Lasting,
                 // The dial the audio is heard on: pdn-soundmodem's own once it has said one.
                 dialKHz = dialHz / 1000,
                 dialFromSoundModem = _host.Pipeline?.DialFromSoundModem ?? false,
@@ -725,9 +728,9 @@ public sealed class StatusPage : IAsyncDisposable
             },
             markers = new
             {
-                centreHz = OnAir.AudioCentreHz(dialHz),
-                lowHz = OnAir.AudioCentreHz(dialHz) - OnAir.HalfWidthHz,
-                highHz = OnAir.AudioCentreHz(dialHz) + OnAir.HalfWidthHz,
+                centreHz,
+                lowHz = centreHz - OnAir.HalfWidthHz,
+                highHz = centreHz + OnAir.HalfWidthHz,
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },

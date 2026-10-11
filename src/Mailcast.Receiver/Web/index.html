@@ -1144,6 +1144,7 @@ function audioNote(s) {
       return `The web SDR ${sdr(s)} is closed between slots. The spectrogram comes back at ${utc(a.reopens)}, ready for the ${hhmm(a.forSlot)} slot.`;
     case "failed":
       return a.kind === "soundCard" ? `No audio from the sound card: ${a.problem}.${again} Check the radio is on and its USB lead is in, and the audio setting below.`
+        : a.kind === "soundModem" && a.lasting ? `pdn-soundmodem's audio cannot be used: ${a.problem}.${again} Once that is changed in pdn-soundmodem, restarting the receiver tries again at once.`
         : a.kind === "soundModem" ? `No audio from pdn-soundmodem: ${a.problem}.${again} Check pdn-soundmodem is running on this machine, and the audio setting below.`
         : a.kind === "webSdr" ? `No audio from the web SDR: ${a.problem}.${again}`
         : `Cannot play the recording: ${a.problem}.`;
@@ -1233,7 +1234,7 @@ function showFilterResult(filter, problem) {
   pendingDialKHz = there ? null : filter.dialKHz;
   const narrow = filter.narrow ? ` This is narrower than ${(FilterScanNarrowWidthHz / 1000).toFixed(1)} kHz, so some frames will still be lost on a weak, fading path; if your radio has a wider filter (often a DATA or PKT mode), use that instead.` : "";
   $("filterResult").innerHTML = `Your radio passes about ${filter.lowHz.toFixed(0)} to ${filter.highHz.toFixed(0)} Hz `
-    + `(${(filter.widthHz / 1000).toFixed(1)} kHz wide); set the dial to ${mhz(filter.dialKHz * 1000)} MHz USB${there ? " in pdn-soundmodem's own settings (its band plan or dialFrequency), which this receiver follows" : ""}.${narrow} `
+    + `(${(filter.widthHz / 1000).toFixed(1)} kHz wide); set the dial to ${mhz(filter.dialKHz * 1000)} MHz USB${there ? " in pdn-soundmodem's own settings (its waterfall.dialFrequencyHz if set, else its band plan or dialFrequency), which this receiver follows" : ""}.${narrow} `
     + (there ? "" : `<button type="button" id="useFilterDial">Use this dial</button>`);
   if (there) return;
   $("useFilterDial").addEventListener("click", async () => {

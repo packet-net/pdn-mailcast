@@ -1,5 +1,10 @@
 using System.Text.Json;
+using Mailcast.Receiver.Hooks;
+using M0LTE.Dsp;
+using M0LTE.Radio.Audio;
 using Microsoft.Extensions.Time.Testing;
+using Packet.SoundModem.Ms110d;
+using Packet.SoundModem.Waterfall;
 
 namespace Mailcast.Receiver.Tests;
 
@@ -165,6 +170,7 @@ public class SoundModemSourceTests
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => SoundModemAudioInput.OpenAsync(fake.Port, CancellationToken.None));
 
         Assert.Contains($"runs at {rate} Hz, which is not a whole fraction of 48000 Hz", e.Message, StringComparison.Ordinal);
+        Assert.True(e.Refused);
     }
 
     [Fact]
@@ -173,6 +179,19 @@ public class SoundModemSourceTests
         Assert.Null(AudioPipeline.SoundModemReach(12000, null, 7_052_000));
         Assert.Null(AudioPipeline.SoundModemReach(8000, null, 7_052_000));
         Assert.Contains("carries audio only up to 3000 Hz", AudioPipeline.SoundModemReach(6000, null, 7_052_000), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    // A headless Flex on 7.050 MHz: the signal at 2350 to 5250 Hz, as pdn-soundmodem's built-in receiver took it.
+    [InlineData(48000, 7_050_000)]
+    [InlineData(12000, 7_050_000)]
+    // The highest centre each channel carries whole, and the lowest this receiver takes.
+    [InlineData(48000, 7_031_250)]
+    [InlineData(12000, 7_049_250)]
+    [InlineData(48000, 7_052_800)]
+    public void ADialWhoseChannelCarriesTheWholeSignal_IsInReach(int rate, double dialHz)
+    {
+        Assert.Null(AudioPipeline.SoundModemReach(rate, dialHz, dialHz));
     }
 
     // ---------- gaps and keyed spans ----------
@@ -251,7 +270,7 @@ public class SoundModemSourceTests
     }
 
     [Fact]
-    public async Task TheModem_ListensAfresh_AfterEachKeyedSpan_NotDuringIt()
+    public async Task KeyedSpansOnTheStream_ResetTheModemOnceEach_AfterTheSpanNotDuringIt()
     {
         await using var fake = new FakeSoundModem();
         var (pipeline, connection, fed) = await StartAsync(fake);
@@ -283,7 +302,7 @@ public class SoundModemSourceTests
     }
 
     [Fact]
-    public async Task TheModem_ListensAfresh_OnAGapMarker_InTheSameWay()
+    public async Task GapsOnTheStream_ResetTheModem_MarkedOrByAJumpInTheIndex()
     {
         await using var fake = new FakeSoundModem();
         var log = new List<string>();
@@ -310,6 +329,257 @@ public class SoundModemSourceTests
             // Said once, then held back for a minute.
             Assert.Single(log, l => l.Contains("lost some audio", StringComparison.Ordinal));
         }
+    }
+
+    // ---------- the modem listening afresh, on real MS110D audio ----------
+
+    /// <summary>Never read: these tests feed the pipeline themselves.</summary>
+    private sealed class NoInput : IAudioInput
+    {
+        public int SampleRate => OnAir.SampleRate;
+
+        public int Read(Span<float> destination) => 0;
+    }
+
+    /// <summary>A frame of GB7RDG's, of random bytes.</summary>
+    private static byte[] Frame(int seed)
+    {
+        var payload = new byte[120];
+        new Random(seed).NextBytes(payload);
+        return Ax25UiFrame.Build(Samples.Source, OnAir.Destination, payload);
+    }
+
+    /// <summary>One MS110D burst at the modem's own 1800 Hz, moved to <paramref name="centreHz"/>.</summary>
+    private static float[] Burst(byte[] frame, double centreHz = OnAir.CentreAudioHz)
+    {
+        float[] native = new Ms110dModem(OnAir.SampleRate, _ => { }, new Ms110dTxSettings { WaveformNumber = 4 }).Modulate(frame, 0);
+        if (Math.Abs(centreHz - OnAir.CentreAudioHz) < 0.5)
+        {
+            return native;
+        }
+        var moved = new float[native.Length];
+        new FrequencyShifter(OnAir.SampleRate, centreHz - OnAir.CentreAudioHz).Process(native, moved);
+        return moved;
+    }
+
+    /// <summary>Seeded noise at 48 kHz, <paramref name="snrDb"/> below <paramref name="signal"/>'s power in 3 kHz, added to it.</summary>
+    private static float[] InNoise(float[] signal, double snrDb, int seed)
+    {
+        var rng = new Random(seed);
+        double power = signal.Average(s => (double)s * s);
+        double sigma = Math.Sqrt(power / Math.Pow(10, snrDb / 10) * (OnAir.SampleRate / 2.0) / 3000);
+        var air = new float[signal.Length];
+        for (int i = 0; i < air.Length; i++)
+        {
+            double u1 = 1.0 - rng.NextDouble(), u2 = rng.NextDouble();
+            air[i] = signal[i] + (float)(sigma * Math.Sqrt(-2 * Math.Log(u1)) * Math.Cos(2 * Math.PI * u2));
+        }
+        return air;
+    }
+
+    private static void FeedStream(AudioPipeline pipeline, float[] audio, bool transmitted = false)
+    {
+        for (int offset = 0; offset < audio.Length; offset += Block48)
+        {
+            pipeline.FeedStream(audio.AsSpan(offset, Math.Min(Block48, audio.Length - offset)), transmitted, gap: false);
+        }
+    }
+
+    /// <summary>
+    /// A pipeline that has heard the first half of one burst, preamble and all, so its modem is
+    /// locked on it part way through; and the frames it decodes from then on.
+    /// </summary>
+    private static (AudioPipeline Pipeline, List<byte[]> Frames) HalfwayThroughABurst()
+    {
+        var pipeline = AudioPipeline.ForInput(new NoInput(), _ => { }, TimeProvider.System, watch: false);
+        var frames = new List<byte[]>();
+        pipeline.Channel.FrameReceived += (_, frame) => frames.Add(frame);
+        FeedStream(pipeline, new float[OnAir.SampleRate]);
+        var first = Burst(Frame(1));
+        FeedStream(pipeline, first[..(first.Length / 2)]);
+        Assert.True(pipeline.Channel.CarrierDetect, "the half burst's preamble should have been heard");
+        Assert.Empty(frames);
+        return (pipeline, frames);
+    }
+
+    [Fact]
+    public async Task HalfABurst_ThenSilenceThatIsNotMarked_LeavesTheModemLockedOnIt()
+    {
+        // What the reset is for: without it the modem is still part way through the old burst.
+        var (pipeline, frames) = HalfwayThroughABurst();
+        await using var _ = pipeline;
+
+        FeedStream(pipeline, new float[OnAir.SampleRate / 2]);
+
+        Assert.True(pipeline.Channel.CarrierDetect);
+        Assert.Equal(0, pipeline.ModemResets);
+        Assert.Empty(frames);
+    }
+
+    [Fact]
+    public async Task TheModem_ListensAfresh_AfterAKeyedSpan_NotDuringIt_AndDecodesTheNextWholeBurst()
+    {
+        var (pipeline, frames) = HalfwayThroughABurst();
+        await using var _ = pipeline;
+
+        // Keyed: still where it was, part way through the old burst.
+        FeedStream(pipeline, new float[OnAir.SampleRate / 2], transmitted: true);
+        Assert.True(pipeline.Channel.CarrierDetect);
+        Assert.Equal(0, pipeline.ModemResets);
+
+        // The first block heard again: the old burst is let go, and the modem is searching.
+        FeedStream(pipeline, new float[Block48]);
+        Assert.Equal(1, pipeline.ModemResets);
+        Assert.False(pipeline.Channel.CarrierDetect);
+
+        var next = Frame(2);
+        FeedStream(pipeline, Burst(next));
+        FeedStream(pipeline, new float[OnAir.SampleRate]);
+        Assert.Equal([next], frames.Select(f => f[..next.Length]));
+    }
+
+    [Fact]
+    public async Task TheModem_ListensAfresh_OnAGap_AndDecodesTheNextWholeBurst()
+    {
+        var (pipeline, frames) = HalfwayThroughABurst();
+        await using var _ = pipeline;
+
+        pipeline.FeedStream(new float[Block48], transmitted: false, gap: true);
+        Assert.Equal(1, pipeline.ModemResets);
+        Assert.False(pipeline.Channel.CarrierDetect);
+
+        var next = Frame(2);
+        FeedStream(pipeline, Burst(next));
+        FeedStream(pipeline, new float[OnAir.SampleRate]);
+        Assert.Equal([next], frames.Select(f => f[..next.Length]));
+    }
+
+    [Fact]
+    public async Task ThroughTheStream_HalfABurst_AKeyedSpan_AndAGap_ThenWholeBursts_DecodeOnlyTheWholeOnes()
+    {
+        await using var fake = new FakeSoundModem();
+        var (pipeline, connection, fed) = await StartAsync(fake);
+        await using var _ = pipeline;
+        int frames = 0;
+        pipeline.Channel.FrameReceived += (_, _) => Interlocked.Increment(ref frames);
+        ulong index = 0;
+        int sent = 0;
+        async Task Send(float[] audio, bool transmitted = false, bool gap = false)
+        {
+            for (int offset = 0; offset < audio.Length; offset += Block48)
+            {
+                var block = audio[offset..Math.Min(audio.Length, offset + Block48)];
+                await connection.SendAsync(index, block, transmitted, gap && offset == 0);
+                index += (ulong)block.Length;
+                // No faster than the pipeline takes it in, so its queue never has to drop any.
+                if (++sent % 16 == 0)
+                {
+                    int now = sent;
+                    await UntilAsync(() => fed() == now);
+                }
+            }
+        }
+        var half = Burst(Frame(1));
+        half = half[..(half.Length / 2)];
+
+        await Send(new float[OnAir.SampleRate]);
+        await Send(half);
+        await Send(new float[OnAir.SampleRate / 2], transmitted: true);
+        await Send(Burst(Frame(2)));
+        await Send(new float[OnAir.SampleRate / 2]);
+        await Send(half);
+        await Send(new float[OnAir.SampleRate / 2], gap: true);
+        await Send(Burst(Frame(3)));
+        await Send(new float[OnAir.SampleRate]);
+        await UntilAsync(() => fed() == sent);
+
+        Assert.Equal(2, Volatile.Read(ref frames));
+        Assert.Equal(2, pipeline.ModemResets);
+    }
+
+    // ---------- a dial off the usual 1000 to 2000 Hz, as the built-in receiver took it ----------
+
+    [Theory]
+    [InlineData(48000, 7_050_000)] // a headless Flex on 7.050 MHz: the signal's centre at 3800 Hz
+    [InlineData(12000, 7_050_000)]
+    [InlineData(48000, 7_045_000)] // 8800 Hz, only a 48 kHz channel carries it
+    public async Task AnOffCentreDial_IsMovedToTheModemsCentre_AndDecodes(int rate, double dialHz)
+    {
+        await using var fake = new FakeSoundModem(rateHz: rate, dialHz: dialHz);
+        var log = new List<string>();
+        var (pipeline, connection, fed) = await StartAsync(fake, log);
+        await using var _ = pipeline;
+        int frames = 0;
+        pipeline.Channel.FrameReceived += (_, _) => Interlocked.Increment(ref frames);
+        double centre = OnAir.AudioCentreHz(dialHz);
+
+        // Asked for where the signal really is, so a headless Flex opens its filter for it.
+        using (var identify = JsonDocument.Parse(await Within(connection.Said.Reader.ReadAsync().AsTask())))
+        {
+            Assert.Equal((int)(centre - OnAir.HalfWidthHz), identify.RootElement.GetProperty("band").GetProperty("lowHz").GetInt32());
+            Assert.Equal((int)(centre + OnAir.HalfWidthHz), identify.RootElement.GetProperty("band").GetProperty("highHz").GetInt32());
+        }
+        Assert.Equal(dialHz, pipeline.DialHz);
+        // Everything here reads it moved to the usual dial's 1800 Hz.
+        Assert.Equal(OnAir.CentreAudioHz, pipeline.AudioCentreHz);
+        Assert.Equal(OnAir.CentreAudioHz, pipeline.Tone.ExpectedHz);
+        Assert.Equal(7_052_000, pipeline.SpectrumDialHz);
+        lock (log)
+        {
+            Assert.Contains(log, l => l.Contains(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"the signal's centre at {centre:F0} Hz in its audio"), StringComparison.Ordinal)
+                && l.Contains("a radio on a sound card needs its filter open", StringComparison.Ordinal)
+                && l.Contains("Its audio is moved to 1800 Hz here", StringComparison.Ordinal));
+        }
+
+        // Two bursts in noise, where the dial puts them, at the channel's own rate.
+        var air = InNoise([.. new float[OnAir.SampleRate], .. Burst(Frame(4), centre), .. new float[OnAir.SampleRate / 2], .. Burst(Frame(5), centre), .. new float[OnAir.SampleRate]], snrDb: 10, seed: 77);
+        int each = rate / 10;
+        if (rate != OnAir.SampleRate)
+        {
+            var decimator = new Decimator(OnAir.SampleRate, OnAir.SampleRate / rate);
+            var slow = new float[decimator.MaxOutput(air.Length)];
+            air = slow[..decimator.Process(air, slow)];
+        }
+        int blocks = air.Length / each;
+        for (int b = 0; b < blocks; b++)
+        {
+            await connection.SendAsync((ulong)(b * each), air[(b * each)..((b + 1) * each)]);
+            if (b % 16 == 15)
+            {
+                int now = b + 1;
+                await UntilAsync(() => fed() == now);
+            }
+        }
+        await UntilAsync(() => fed() == blocks);
+
+        Assert.Equal(2, Volatile.Read(ref frames));
+    }
+
+    [Fact]
+    public async Task AnOffCentreDial_TheSlotsToneIsMeasuredTooAsIfOnTheUsualDial()
+    {
+        // The tone detector reads only up to 4 kHz; the tone at 3800 Hz is moved to 1800 Hz first.
+        await using var fake = new FakeSoundModem(dialHz: 7_050_000);
+        var (pipeline, connection, fed) = await StartAsync(fake);
+        await using var _ = pipeline;
+        var tones = new System.Collections.Concurrent.ConcurrentQueue<ToneReport>();
+        pipeline.Tone.ToneMeasured += tones.Enqueue;
+        var air = InNoise([.. new float[2 * OnAir.SampleRate], .. Sine(OnAir.SampleRate, 3803, OnAir.ToneSeconds * OnAir.SampleRate), .. new float[3 * OnAir.SampleRate]], snrDb: 10, seed: 3);
+        int blocks = air.Length / Block48;
+        for (int b = 0; b < blocks; b++)
+        {
+            await connection.SendAsync((ulong)(b * Block48), air[(b * Block48)..((b + 1) * Block48)]);
+            if (b % 16 == 15)
+            {
+                int now = b + 1;
+                await UntilAsync(() => fed() == now);
+            }
+        }
+        await UntilAsync(() => fed() == blocks);
+
+        var tone = Assert.Single(tones);
+        // 3 Hz high on 7.050 MHz is 3 Hz high on the usual dial.
+        Assert.Equal(1803, tone.FrequencyHz, 0.5);
     }
 
     [Fact]
@@ -356,10 +626,14 @@ public class SoundModemSourceTests
         }
     }
 
-    [Fact]
-    public async Task ADialThatPutsTheSignalOutOfReach_IsRefused_SayingWhy()
+    [Theory]
+    // Below 1000 Hz the bottom of the signal is under DC.
+    [InlineData(48000, 7_053_000, "which would put the signal's centre at 800 Hz in its audio, below the 1000 Hz this receiver needs at least", "from 7.03125 to 7.0528 MHz")]
+    // Past what a 12 kHz channel carries.
+    [InlineData(12000, 7_048_000, "which would put the signal's centre at 5800 Hz in its audio, and its channel runs at 12000 Hz, which carries audio only up to 6000 Hz, while the signal reaches 7250 Hz", "from 7.04925 to 7.0528 MHz")]
+    public async Task ADialThatPutsTheSignalOutOfReach_IsRefused_SayingWhereToSetIt(int rate, double dialHz, string why, string range)
     {
-        await using var fake = new FakeSoundModem(dialHz: 7_040_000);
+        await using var fake = new FakeSoundModem(rateHz: rate, dialHz: dialHz);
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             ReceiverConfig.DefaultDialKHz * 1000, _ => { }, TimeProvider.System);
         await using var _ = pipeline;
@@ -367,8 +641,11 @@ public class SoundModemSourceTests
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.OpenAsync(CancellationToken.None));
 
         Assert.Contains("outside what pdn-soundmodem hears", e.Message, StringComparison.Ordinal);
-        Assert.Contains("It says its radio is on 7.040 MHz USB, which would put the signal's centre at 13800 Hz", e.Message, StringComparison.Ordinal);
-        Assert.Contains("from 7.0518 to 7.0528 MHz", e.Message, StringComparison.Ordinal);
+        Assert.Contains($"It says its radio is on {OnAir.Mhz(dialHz)} MHz USB, {why}", e.Message, StringComparison.Ordinal);
+        // Where pdn-soundmodem's dial comes from, a Flex's included.
+        Assert.Contains("set the dial pdn-soundmodem gives (its \"waterfall\".\"dialFrequencyHz\" if that is set, else its band plan's dial, which also tunes a Flex, else its \"dialFrequency\")", e.Message, StringComparison.Ordinal);
+        Assert.Contains(range, e.Message, StringComparison.Ordinal);
+        Assert.True(e.Refused);
     }
 
     [Fact]
@@ -380,6 +657,18 @@ public class SoundModemSourceTests
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => SoundModemAudioInput.OpenAsync(fake.Port, CancellationToken.None));
 
         Assert.Contains("needs pdn-soundmodem 0.88.0 or later", e.Message, StringComparison.Ordinal);
+        Assert.True(e.Refused);
+    }
+
+    [Fact]
+    public async Task APdnSoundmodemThatGoesBeforeItSaysHello_MayBeRestarting()
+    {
+        await using var fake = new FakeSoundModem { DropBeforeHello = true };
+
+        var e = await Assert.ThrowsAsync<AudioSourceException>(() => SoundModemAudioInput.OpenAsync(fake.Port, CancellationToken.None));
+
+        Assert.Contains("broke before it said hello (it may be restarting)", e.Message, StringComparison.Ordinal);
+        Assert.False(e.Refused);
     }
 
     // ---------- reconnecting ----------
@@ -463,15 +752,90 @@ public class SoundModemSourceTests
     }
 
     [Fact]
-    public async Task Hooks_RunAroundEverySlot_AsForASoundCard()
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task Hooks_RunAroundEverySlot_AsForASoundCard_WithTheDialPdnSoundmodemSays()
     {
+        await using var fake = new FakeSoundModem(dialHz: 7_052_300);
         using var dir = new TempDirectory();
-        await using var host = new ReceiverHost(Config(dir, 8107), TimeProvider.System, _ => { });
+        string record = Path.Combine(dir.Path, "runs");
+        // Half a second before "before" is due for the 12:00 slot (a minute ahead of its window
+        // opening at 11:58), so the clock only moves that far and the stream is never starved.
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 11, 56, 59, 500, TimeSpan.Zero));
+        var config = Config(dir, fake.Port) with
+        {
+            Hooks = new HooksSettings
+            {
+                Before = HookScript.Write(dir.Path, "before.sh", record),
+                After = HookScript.Write(dir.Path, "after.sh", record),
+            },
+        };
+        config.Validate();
+        await using var host = new ReceiverHost(config, time, _ => { });
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        var waits = System.Threading.Channels.Channel.CreateUnbounded<TimeSpan>();
+        host.Hooks.Waiting += d => waits.Writer.TryWrite(d);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+        await fake.NextAsync();
+        await PhaseAsync(conditions, AudioPhase.Listening);
 
-        var window = host.HookWindowAt(new DateTimeOffset(2026, 10, 11, 0, 30, 0, TimeSpan.Zero));
+        var wait = await Within(waits.Reader.ReadAsync().AsTask());
+        Assert.True(wait <= TimeSpan.FromSeconds(1), $"the hooks loop waits {wait} for \"before\"");
+        time.Advance(wait);
+        await UntilAsync(() => HookScript.Runs(record).Length > 0);
 
-        Assert.NotNull(window);
-        Assert.Equal(new DateTimeOffset(2026, 10, 11, 1, 0, 0, TimeSpan.Zero), window.Value.Slot);
+        // pdn-soundmodem's dial, not "dialKHz"'s 7052.0: the one the audio is heard on.
+        Assert.Equal(["before 2026-10-05T12:00:00Z 7052.3 7053.8 none"], HookScript.Runs(record));
+
+        await stop.CancelAsync();
+        await run;
+    }
+
+    [Theory]
+    [InlineData(48000, 7_053_000.0, null)]
+    [InlineData(11025, null, null)]
+    [InlineData(48000, null, "{\"type\":\"config\",\"sampleRate\":12000}")]
+    public async Task WhatPdnSoundmodemGives_ThatCannotBeUsed_IsAskedAboutAgainOnlyAfterMinutes(int rate, double? dialHz, string? hello)
+    {
+        await using var fake = new FakeSoundModem(rateHz: rate, dialHz: dialHz) { Hello = hello };
+        using var dir = new TempDirectory();
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        await using var host = new ReceiverHost(Config(dir, fake.Port), TimeProvider.System, log.Enqueue);
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        var failed = await PhaseAsync(conditions, AudioPhase.Failed);
+
+        Assert.True(failed.Lasting);
+        Assert.InRange(failed.RetryAt!.Value - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(4), TimeSpan.FromMinutes(5));
+        Assert.Contains(log, l => l.Contains("Trying again in 5 min.", StringComparison.Ordinal));
+
+        await stop.CancelAsync();
+        await run;
+    }
+
+    [Fact]
+    public async Task ANewAudioSetting_EndsALongWait_AtOnce()
+    {
+        await using var refusing = new FakeSoundModem(dialHz: 7_053_000);
+        await using var fake = new FakeSoundModem();
+        using var dir = new TempDirectory();
+        await using var host = new ReceiverHost(Config(dir, refusing.Port), TimeProvider.System, _ => { });
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+        Assert.True((await PhaseAsync(conditions, AudioPhase.Failed)).Lasting);
+
+        host.Reconfigure(Config(dir, fake.Port));
+
+        await fake.NextAsync();
+        await PhaseAsync(conditions, AudioPhase.Listening);
+        await stop.CancelAsync();
+        await run;
     }
 
     // ---------- measure ----------

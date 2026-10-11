@@ -36,6 +36,9 @@ internal sealed class FakeSoundModem : IAsyncDisposable
     /// <summary>The first message instead of the hello, as a pdn-soundmodem from before the stream sends its page's config.</summary>
     public string? Hello { get; init; }
 
+    /// <summary>Drops the connection straight after the upgrade, before any hello, as a pdn-soundmodem stopping just then does.</summary>
+    public bool DropBeforeHello { get; init; }
+
     /// <summary>The port it listens on.</summary>
     public int Port { get; private set; }
 
@@ -100,6 +103,11 @@ internal sealed class FakeSoundModem : IAsyncDisposable
 #pragma warning restore CA5350
         await stream.WriteAsync(Encoding.ASCII.GetBytes(
             $"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"), _stop.Token);
+        if (DropBeforeHello)
+        {
+            client.Dispose();
+            return;
+        }
         var socket = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.Zero);
         string hello = Hello ?? System.Text.Json.JsonSerializer.Serialize(new { type = "hello", rateHz = RateHz, dialHz = DialHz });
         await socket.SendAsync(Encoding.UTF8.GetBytes(hello), WebSocketMessageType.Text, true, _stop.Token);

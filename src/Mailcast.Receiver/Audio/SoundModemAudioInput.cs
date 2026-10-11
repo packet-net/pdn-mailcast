@@ -132,7 +132,7 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
             }
             catch (WebSocketException e) when (socket.HttpStatusCode is HttpStatusCode.Forbidden)
             {
-                throw new AudioSourceException($"pdn-soundmodem on {where} refused the channel audio stream (HTTP 403): it serves it only to a program on the same machine, connecting directly. {Ascii.Clean(e.Message)}");
+                throw new AudioSourceException($"pdn-soundmodem on {where} refused the channel audio stream (HTTP 403): it serves it only to a program on the same machine, connecting directly. {Ascii.Clean(e.Message)}", refused: true);
             }
             catch (WebSocketException e) when (Refused(e))
             {
@@ -143,11 +143,21 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
                 throw new AudioSourceException($"cannot open pdn-soundmodem's channel audio stream on {where}: {Ascii.Clean(e.Message)}");
             }
 
-            var (rate, dial) = await ReadHelloAsync(socket, where, timeout.Token).ConfigureAwait(false);
+            int rate;
+            double? dial;
+            try
+            {
+                (rate, dial) = await ReadHelloAsync(socket, where, timeout.Token).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is WebSocketException or IOException)
+            {
+                throw new AudioSourceException($"the channel audio stream from pdn-soundmodem on {where} broke before it said hello (it may be restarting): {Ascii.Clean(e.Message)}");
+            }
             if (rate > OnAir.SampleRate || OnAir.SampleRate % rate != 0)
             {
                 throw new AudioSourceException(
-                    $"pdn-soundmodem's channel on {where} runs at {rate} Hz, which is not a whole fraction of {OnAir.SampleRate} Hz (48000, 24000, 16000, 12000 or 8000), so this receiver cannot use its audio");
+                    $"pdn-soundmodem's channel on {where} runs at {rate} Hz, which is not a whole fraction of {OnAir.SampleRate} Hz (such as 48000, 24000 or 12000), so this receiver cannot use its audio",
+                    refused: true);
             }
             var input = new SoundModemAudioInput(socket, port, rate, dial);
             input._receive = input.ReceiveAsync();
@@ -210,18 +220,18 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String || type.GetString() != "hello")
             {
-                throw new AudioSourceException($"pdn-soundmodem on {where} {tooOld}");
+                throw new AudioSourceException($"pdn-soundmodem on {where} {tooOld}", refused: true);
             }
             if (!root.TryGetProperty("rateHz", out var rate) || rate.ValueKind != JsonValueKind.Number || !rate.TryGetInt32(out int rateHz) || rateHz <= 0)
             {
-                throw new AudioSourceException($"pdn-soundmodem on {where} said hello without its channel's rate");
+                throw new AudioSourceException($"pdn-soundmodem on {where} said hello without its channel's rate", refused: true);
             }
             double? dialHz = root.TryGetProperty("dialHz", out var dial) && dial.ValueKind == JsonValueKind.Number && dial.GetDouble() > 0 ? dial.GetDouble() : null;
             return (rateHz, dialHz);
         }
         catch (JsonException)
         {
-            throw new AudioSourceException($"pdn-soundmodem on {where} {tooOld}");
+            throw new AudioSourceException($"pdn-soundmodem on {where} {tooOld}", refused: true);
         }
     }
 
