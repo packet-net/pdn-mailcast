@@ -1144,7 +1144,7 @@ function audioNote(s) {
       return `The web SDR ${sdr(s)} is closed between slots. The spectrogram comes back at ${utc(a.reopens)}, ready for the ${hhmm(a.forSlot)} slot.`;
     case "failed":
       return a.kind === "soundCard" ? `No audio from the sound card: ${a.problem}.${again} Check the radio is on and its USB lead is in, and the audio setting below.`
-        : a.kind === "soundModem" && a.lasting ? `pdn-soundmodem's audio cannot be used: ${a.problem}.${again} Once that is changed in pdn-soundmodem, restarting the receiver tries again at once.`
+        : a.kind === "soundModem" && a.lasting ? `pdn-soundmodem's audio cannot be used: ${a.problem}.${again} Once that is changed in pdn-soundmodem, restarting the receiver, or changing the audio setting below, tries again at once.`
         : a.kind === "soundModem" ? `No audio from pdn-soundmodem: ${a.problem}.${again} Check pdn-soundmodem is running on this machine, and the audio setting below.`
         : a.kind === "webSdr" ? `No audio from the web SDR: ${a.problem}.${again}`
         : `Cannot play the recording: ${a.problem}.`;

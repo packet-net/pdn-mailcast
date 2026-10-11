@@ -461,14 +461,17 @@ public sealed class ReceiverHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// The USB dial the audio is heard on, in Hz: the running pipeline's (pdn-soundmodem's own,
-    /// when it says one), else the last pdn-soundmodem said for this same <c>audio</c> while it is
-    /// reconnecting, else the config's.
+    /// The USB dial the audio is heard on, in Hz: the running pipeline's once its dial is settled
+    /// (pdn-soundmodem's own, when it says one), else the last pdn-soundmodem said for this same
+    /// <c>audio</c> while it is reconnecting, else the config's.
     /// </summary>
-    public double DialHz => Pipeline?.DialHz ?? SoundModemDialSaid ?? Config.DialHz;
+    public double DialHz => Pipeline is { DialSettled: true } pipeline ? pipeline.DialHz : SoundModemDialSaid ?? Config.DialHz;
+
+    /// <summary>Whether <see cref="DialHz"/> is pdn-soundmodem's, said now or the last time while it reconnects.</summary>
+    public bool DialFromSoundModem => Pipeline is { DialSettled: true } pipeline ? pipeline.DialFromSoundModem : SoundModemDialSaid is not null;
 
     /// <summary>Where the signal's centre is in the audio the page's spectrogram shows, Hz; see <see cref="AudioPipeline.AudioCentreHz"/>.</summary>
-    public double AudioCentreHz => Pipeline?.AudioCentreHz ?? AudioPipeline.AudioCentreFor(DialHz);
+    public double AudioCentreHz => Pipeline is { DialSettled: true } pipeline ? pipeline.AudioCentreHz : AudioPipeline.AudioCentreFor(DialHz);
 
     private (string Audio, double DialHz)? _soundModemDial;
 
@@ -696,6 +699,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     private async Task SuperviseAudioAsync(CancellationToken cancellation)
     {
         int refusals = 0;
+        string? refusedFor = null;
         int soundModemFailures = 0;
         string? described = null;
         string? closedSaid = null;
@@ -877,6 +881,13 @@ public sealed class ReceiverHost : IAsyncDisposable
             // A dial, rate or version pdn-soundmodem gives that this receiver cannot use stays so
             // until someone changes it: asked about as seldom as a web SDR that refused us.
             bool soundModem = pipeline.Source.Kind == AudioSourceKind.SoundModem;
+            if (refused && soundModem && !string.Equals(why, refusedFor, StringComparison.Ordinal))
+            {
+                // Something else is wrong now (pdn-soundmodem upgraded, then its dial refused, say):
+                // the waits start again from the shortest.
+                refusals = 0;
+            }
+            refusedFor = refused && soundModem ? why : null;
             TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)]
                 : soundModem ? SoundModemRetry[Math.Min(soundModemFailures++, SoundModemRetry.Count - 1)]
                 : AudioRetry;

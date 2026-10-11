@@ -60,6 +60,8 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
     private readonly ClientWebSocket _socket;
     private readonly CancellationTokenSource _stop = new();
     private readonly Upsampler? _upsampler;
+    private readonly StreamShift? _shift;
+    private readonly Upsampler? _movedUpsampler;
     private readonly int _factor;
     private readonly object _gate = new();
     private readonly Queue<Block> _blocks = new();
@@ -69,18 +71,24 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
     private Task? _receive;
     private int _lost;
 
-    private SoundModemAudioInput(ClientWebSocket socket, int port, int channelRate, double? dialHz)
+    private SoundModemAudioInput(ClientWebSocket socket, int port, int channelRate, double? dialHz, double? moveFromHz)
     {
         _socket = socket;
         Port = port;
         ChannelRate = channelRate;
         DialHz = dialHz;
+        MovedFromHz = moveFromHz;
         _factor = OnAir.SampleRate / channelRate;
         _upsampler = _factor > 1 ? new Upsampler(OnAir.SampleRate, _factor) : null;
+        if (moveFromHz is { } from)
+        {
+            _shift = new StreamShift(channelRate, from, OnAir.CentreAudioHz, OnAir.HalfWidthHz);
+            _movedUpsampler = _factor > 1 ? new Upsampler(OnAir.SampleRate, _factor) : null;
+        }
     }
 
-    /// <summary>One block, at 48 kHz, with what pdn-soundmodem (or this input) said about it.</summary>
-    private sealed record Block(float[] Samples, bool Transmitted, bool Gap);
+    /// <summary>One block, at 48 kHz, with what pdn-soundmodem (or this input) said about it, and moved too when it is.</summary>
+    private sealed record Block(float[] Samples, float[]? Moved, bool Transmitted, bool Gap);
 
     /// <inheritdoc />
     public int SampleRate => OnAir.SampleRate;
@@ -93,6 +101,13 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
 
     /// <summary>The dial pdn-soundmodem says its radio is on, in Hz, or null when it does not know.</summary>
     public double? DialHz { get; }
+
+    /// <summary>
+    /// Where the signal's centre is in the audio when each block also comes moved to the usual
+    /// dial's 1800 Hz (see <see cref="StreamShift"/>), done here at the channel's own rate before a
+    /// slow channel is brought up to 48 kHz; null when blocks come only as they are.
+    /// </summary>
+    public double? MovedFromHz { get; }
 
     /// <summary>For tests: how many audio blocks have come in, whether or not the queue kept them.</summary>
     internal long BlocksReceived => Interlocked.Read(ref _received);
@@ -113,8 +128,15 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
     /// Connects to pdn-soundmodem on <paramref name="port"/> and reads its hello. Audio starts
     /// queueing at once; say what band is needed with <see cref="IdentifyAsync"/>.
     /// </summary>
+    /// <param name="port">pdn-soundmodem's page port.</param>
+    /// <param name="cancellation">Gives up.</param>
+    /// <param name="moveFrom">
+    /// Asked once the hello is in, with the channel's rate and the dial it said (or null): where
+    /// the signal's centre is, if each block should come moved to the usual dial's 1800 Hz as well
+    /// (<see cref="MovedFromHz"/>), or null if not.
+    /// </param>
     /// <exception cref="AudioSourceException">It could not be opened, or cannot be used; the message says why.</exception>
-    public static async Task<SoundModemAudioInput> OpenAsync(int port, CancellationToken cancellation)
+    public static async Task<SoundModemAudioInput> OpenAsync(int port, CancellationToken cancellation, Func<int, double?, double?>? moveFrom = null)
     {
         string where = Describe(port);
         var socket = new ClientWebSocket();
@@ -159,7 +181,7 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
                     $"pdn-soundmodem's channel on {where} runs at {rate} Hz, which is not a whole fraction of {OnAir.SampleRate} Hz (such as 48000, 24000 or 12000), so this receiver cannot use its audio",
                     refused: true);
             }
-            var input = new SoundModemAudioInput(socket, port, rate, dial);
+            var input = new SoundModemAudioInput(socket, port, rate, dial, moveFrom?.Invoke(rate, dial));
             input._receive = input.ReceiveAsync();
             return input;
         }
@@ -303,7 +325,13 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
                 }
                 bool gap = (flags & FlagGap) != 0 || (expected is { } next && next != index);
                 expected = index + (ulong)count;
-                Enqueue(Convert(buffer.AsSpan(HeaderBytes, 4 * count), count), (flags & FlagTransmitted) != 0, gap);
+                if (gap)
+                {
+                    // Nothing from before the hole rings on in the move's filters after it.
+                    _shift?.Reset();
+                }
+                var (samples, moved) = Convert(buffer.AsSpan(HeaderBytes, 4 * count), count);
+                Enqueue(samples, moved, (flags & FlagTransmitted) != 0, gap);
             }
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested)
@@ -317,24 +345,36 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
         End(why);
     }
 
-    /// <summary>A block's samples at the channel's rate, as 48 kHz.</summary>
-    private float[] Convert(ReadOnlySpan<byte> bytes, int count)
+    /// <summary>A block's samples at the channel's rate, as 48 kHz, and moved too when it is.</summary>
+    private (float[] Samples, float[]? Moved) Convert(ReadOnlySpan<byte> bytes, int count)
     {
         var samples = new float[count];
         for (int i = 0; i < count; i++)
         {
             samples[i] = BinaryPrimitives.ReadSingleLittleEndian(bytes.Slice(i * 4, 4));
         }
-        if (_upsampler is null)
+        float[]? moved = null;
+        if (_shift is not null)
+        {
+            moved = new float[count];
+            _shift.Process(samples, moved);
+            moved = Up(_movedUpsampler, moved);
+        }
+        return (Up(_upsampler, samples), moved);
+    }
+
+    private static float[] Up(Upsampler? upsampler, float[] samples)
+    {
+        if (upsampler is null)
         {
             return samples;
         }
-        var output = new float[_upsampler.OutputLength(count)];
-        _upsampler.Process(samples, output);
+        var output = new float[upsampler.OutputLength(samples.Length)];
+        upsampler.Process(samples, output);
         return output;
     }
 
-    private void Enqueue(float[] samples, bool transmitted, bool gap)
+    private void Enqueue(float[] samples, float[]? moved, bool transmitted, bool gap)
     {
         lock (_gate)
         {
@@ -347,7 +387,7 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
             {
                 _available.Release();
             }
-            _blocks.Enqueue(new Block(samples, transmitted, gap));
+            _blocks.Enqueue(new Block(samples, moved, transmitted, gap));
         }
         Interlocked.Increment(ref _received);
     }
@@ -367,12 +407,16 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
     /// <inheritdoc />
     public int Read(Span<float> destination) => ReadBlock(destination, out _, out _);
 
+    /// <inheritdoc cref="ReadBlock(Span{float}, Span{float}, out bool, out bool)"/>
+    public int ReadBlock(Span<float> destination, out bool transmitted, out bool gap) => ReadBlock(destination, default, out transmitted, out gap);
+
     /// <summary>
     /// The next block, waiting up to half a second for one: its sample count (0 if none came, or
     /// the stream has ended), whether it is silence standing in for a keyup, and whether audio was
-    /// lost before it. <paramref name="destination"/> must hold 100 ms at 48 kHz.
+    /// lost before it. <paramref name="destination"/> must hold 100 ms at 48 kHz, and so must
+    /// <paramref name="moved"/>, which gets the block moved when it comes moved (<see cref="MovedFromHz"/>).
     /// </summary>
-    public int ReadBlock(Span<float> destination, out bool transmitted, out bool gap)
+    public int ReadBlock(Span<float> destination, Span<float> moved, out bool transmitted, out bool gap)
     {
         transmitted = false;
         gap = false;
@@ -395,6 +439,10 @@ public sealed class SoundModemAudioInput : IAudioInput, IDisposable
             throw new InvalidOperationException($"a {block.Samples.Length}-sample block does not fit a {destination.Length}-sample read");
         }
         block.Samples.CopyTo(destination);
+        if (block.Moved is not null && !moved.IsEmpty)
+        {
+            block.Moved.CopyTo(moved);
+        }
         transmitted = block.Transmitted;
         return block.Samples.Length;
     }

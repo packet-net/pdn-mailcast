@@ -79,16 +79,27 @@ public sealed class AudioPipeline : IAsyncDisposable
     private float[] _shifted = [];
 
     /// <summary>
-    /// Moves pdn-soundmodem's audio, when its dial puts the signal's centre outside the 1000 to
-    /// 2000 Hz <see cref="_shift"/> is for, to the usual dial's 1800 Hz before anything here reads
-    /// it: null otherwise. See <see cref="StreamShift"/>.
+    /// pdn-soundmodem's audio comes moved as well as as it is, because its dial puts the signal's
+    /// centre outside the 1000 to 2000 Hz <see cref="_shift"/> is for: the input moves it to the
+    /// usual dial's 1800 Hz at the channel's own rate (see <see cref="StreamShift"/>), and
+    /// everything here but the level meter and "Measure my filter" reads it there.
     /// </summary>
-    private StreamShift? _streamShift;
+    private bool _moved;
+
+    /// <summary>Where a moved block is read into, beside the block as it came.</summary>
+    private float[]? _movedBlock;
+
+    /// <summary>
+    /// Whether <see cref="DialHz"/> is settled: at once for any source but pdn-soundmodem, whose
+    /// own dial is only known once its stream has said hello.
+    /// </summary>
+    public bool DialSettled { get; private set; }
 
     private AudioPipeline(AudioSource source, double dialHz, Action<string> log, TimeProvider time)
     {
         _source = source;
         DialHz = dialHz;
+        DialSettled = source.Kind != AudioSourceKind.SoundModem;
         _log = log;
         _time = time;
         _shift = ShiftFor(dialHz);
@@ -171,13 +182,13 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// except when pdn-soundmodem's dial puts it outside 1000 to 2000 Hz, when its audio is moved
     /// to the usual dial's 1800 Hz before any of them reads it (see <see cref="StreamShift"/>).
     /// </summary>
-    public double AudioCentreHz => _streamShift is null ? OnAir.AudioCentreHz(DialHz) : OnAir.CentreAudioHz;
+    public double AudioCentreHz => _moved ? OnAir.CentreAudioHz : OnAir.AudioCentreHz(DialHz);
 
     /// <summary>
     /// The dial the page's spectrogram labels its audio with: <see cref="DialHz"/>, or the usual
     /// dial when the audio has been moved to where the usual dial would put it.
     /// </summary>
-    internal double SpectrumDialHz => _streamShift is null ? DialHz : OnAir.TransmitHz - OnAir.CentreAudioHz;
+    internal double SpectrumDialHz => _moved ? OnAir.TransmitHz - OnAir.CentreAudioHz : DialHz;
 
     /// <summary>
     /// Where a pipeline heard on <paramref name="dialHz"/> puts the signal's centre in the audio
@@ -187,7 +198,7 @@ public sealed class AudioPipeline : IAsyncDisposable
     internal static double AudioCentreFor(double dialHz) => OnAir.AudioCentreHz(dialHz) is var centre && UsesOwnCentre(centre) ? centre : OnAir.CentreAudioHz;
 
     /// <summary>Whether a signal centred on <paramref name="centreHz"/> is read where it is (shifted for the modem alone) rather than moved first.</summary>
-    private static bool UsesOwnCentre(double centreHz) => centreHz >= ReceiverConfig.LowestAudioCentreHz && centreHz <= ReceiverConfig.HighestAudioCentreHz;
+    internal static bool UsesOwnCentre(double centreHz) => centreHz >= ReceiverConfig.LowestAudioCentreHz && centreHz <= ReceiverConfig.HighestAudioCentreHz;
 
     /// <summary>This receiver's own page port, which pdn-soundmodem's page links to.</summary>
     internal int PagePort { get; init; } = new WebSettings().Port;
@@ -273,8 +284,12 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// </summary>
     private async Task OpenSoundModemAsync(CancellationToken cancellation)
     {
-        var stream = await SoundModemAudioInput.OpenAsync(_source.SoundModemPort, cancellation).ConfigureAwait(false);
         double configured = DialHz;
+        // A dial that puts the signal outside 1000 to 2000 Hz has the input move its audio at the
+        // channel's own rate, before a slow channel is brought up to 48 kHz.
+        var stream = await SoundModemAudioInput.OpenAsync(_source.SoundModemPort, cancellation, (rate, said) =>
+            OnAir.AudioCentreHz(said ?? configured) is var at && SoundModemReach(rate, said, said ?? configured) is null && !UsesOwnCentre(at) ? at : null)
+            .ConfigureAwait(false);
         double dial = stream.DialHz ?? configured;
         double centre = OnAir.AudioCentreHz(dial);
         try
@@ -288,12 +303,13 @@ public sealed class AudioPipeline : IAsyncDisposable
                 DialHz = dial;
                 _shift = ShiftFor(dial);
             }
-            if (!UsesOwnCentre(centre))
+            if (stream.MovedFromHz is not null)
             {
                 // As pdn-soundmodem's built-in receiver did (MailcastReceiveShift): the whole of
                 // the audio is moved to the usual dial's 1800 Hz, the modem's own centre, so the
                 // modem, the tone detector and the channel measurement all read it there.
-                _streamShift = new StreamShift(centre);
+                _moved = true;
+                _movedBlock = new float[BlockSamples];
                 _shift = null;
             }
             Tone.ExpectedHz = AudioCentreHz;
@@ -312,6 +328,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         };
         _input = stream;
         _stream = stream;
+        DialSettled = true;
         if (stream.LostReason is { } already)
         {
             EndReason = Ascii.Clean(already);
@@ -325,7 +342,7 @@ public sealed class AudioPipeline : IAsyncDisposable
             ? $"the radio on USB dial {OnAir.Mhz(dial)} MHz (\"dialKHz\"; pdn-soundmodem does not say where its radio is)"
             : $"the radio on USB dial {OnAir.Mhz(dial)} MHz, as pdn-soundmodem says"
                 + (Math.Abs(dial - configured) >= 1 ? $" (\"dialKHz\", {OnAir.Mhz(configured)} MHz, is not used while it does)" : "");
-        string moved = _streamShift is null ? "" : string.Create(invariant,
+        string moved = !_moved ? "" : string.Create(invariant,
             $"; that is outside the {ReceiverConfig.LowestAudioCentreHz:F0} to {ReceiverConfig.HighestAudioCentreHz:F0} Hz a radio's own filter usually passes whole, "
             + $"which is fine for a Flex (pdn-soundmodem opens its filter for it) or an SDR, but a radio on a sound card needs its filter open from {centre - OnAir.HalfWidthHz:F0} to {centre + OnAir.HalfWidthHz:F0} Hz. "
             + $"Its audio is moved to {OnAir.CentreAudioHz:F0} Hz here, where the usual dial puts the signal");
@@ -483,7 +500,7 @@ public sealed class AudioPipeline : IAsyncDisposable
             while (!_stop.IsCancellationRequested)
             {
                 bool transmitted = false, gap = false;
-                int read = _stream is { } stream ? stream.ReadBlock(block, out transmitted, out gap) : _input!.Read(block);
+                int read = _stream is { } stream ? stream.ReadBlock(block, _movedBlock, out transmitted, out gap) : _input!.Read(block);
                 if (read == 0)
                 {
                     if (_input is WavInput)
@@ -498,7 +515,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
                 if (_stream is not null)
                 {
-                    FeedStream(block.AsSpan(0, read), transmitted, gap);
+                    FeedStream(block.AsSpan(0, read), _movedBlock is null ? default : _movedBlock.AsSpan(0, read), transmitted, gap);
                 }
                 else
                 {
@@ -525,7 +542,13 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// gap is not one signal, so the modem is made to listen afresh after each keyed span and on
     /// every gap, in the same way, rather than decoding across the hole.
     /// </summary>
-    internal void FeedStream(ReadOnlySpan<float> samples, bool transmitted, bool gap)
+    internal void FeedStream(ReadOnlySpan<float> samples, bool transmitted, bool gap) => FeedStream(samples, default, transmitted, gap);
+
+    /// <summary>
+    /// As <see cref="FeedStream(ReadOnlySpan{float}, bool, bool)"/>, with the same block moved to
+    /// the usual dial's 1800 Hz as well (<paramref name="moved"/>, empty when it is not moved).
+    /// </summary>
+    internal void FeedStream(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, bool transmitted, bool gap)
     {
         if (gap)
         {
@@ -538,7 +561,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         }
         _keyed = transmitted;
         // Keyed silence is not the band's audio: the level meter and "Measure my filter" skip it.
-        if (_streamShift is null)
+        if (moved.IsEmpty)
         {
             Feed(samples, heard: !transmitted);
             return;
@@ -548,7 +571,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         {
             SourceBlock?.Invoke(samples);
         }
-        Feed(_streamShift.Process(samples), heard: false);
+        Feed(moved, heard: false);
     }
 
     private void ResetModem()
@@ -792,57 +815,4 @@ public sealed class AudioSourceException(string message, bool refused = false) :
     /// version this receiver cannot use, which only changes when someone changes it.
     /// </summary>
     public bool Refused { get; } = refused;
-}
-
-/// <summary>
-/// Moves pdn-soundmodem's audio so a signal its dial puts outside 1000 to 2000 Hz lands on the
-/// usual dial's 1800 Hz, MS110D's own centre, upstream of everything that reads it: pdn-soundmodem's
-/// built-in receiver did the same (its <c>MailcastReceiveShift</c>), with the same filter
-/// lengths. It bandpasses to the signal's own width before shifting, never after: shifting down
-/// audio that has not been filtered first folds the noise below the signal onto it. Allocates
-/// nothing per block.
-/// </summary>
-internal sealed class StreamShift
-{
-    /// <summary>The Hilbert filter's length for the shift, as the built-in's.</summary>
-    private const int HilbertTaps = 639;
-
-    /// <summary>The bandpass's length, as the built-in's.</summary>
-    private const int BandpassTaps = 639;
-
-    /// <summary>How far the bandpass opens beyond the signal's edges, as the built-in's: room for their skirts.</summary>
-    private const double BandpassMarginHz = 300;
-
-    private readonly FirFilter _bandpass;
-    private readonly FrequencyShifter _shift;
-    private float[] _banded = [];
-    private float[] _moved = [];
-
-    /// <param name="centreHz">Where the signal's centre is in the audio as it comes.</param>
-    public StreamShift(double centreHz)
-    {
-        _bandpass = new FirFilter(FilterDesign.BandPass(
-            Math.Max(50, centreHz - OnAir.HalfWidthHz - BandpassMarginHz),
-            Math.Min((OnAir.SampleRate / 2.0) - 50, centreHz + OnAir.HalfWidthHz + BandpassMarginHz),
-            OnAir.SampleRate, BandpassTaps));
-        _shift = new FrequencyShifter(OnAir.SampleRate, OnAir.CentreAudioHz - centreHz, HilbertTaps);
-    }
-
-    /// <summary>One block moved; the span is good until the next call.</summary>
-    public ReadOnlySpan<float> Process(ReadOnlySpan<float> samples)
-    {
-        if (_banded.Length < samples.Length)
-        {
-            _banded = new float[samples.Length];
-            _moved = new float[samples.Length];
-        }
-        var banded = _banded.AsSpan(0, samples.Length);
-        for (int i = 0; i < samples.Length; i++)
-        {
-            banded[i] = _bandpass.Next(samples[i]);
-        }
-        var moved = _moved.AsSpan(0, samples.Length);
-        _shift.Process(banded, moved);
-        return moved;
-    }
 }

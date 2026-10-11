@@ -30,11 +30,14 @@ internal sealed class FakeSoundModem : IAsyncDisposable
     /// <summary>The channel's rate the hello says.</summary>
     public int RateHz { get; }
 
-    /// <summary>The dial the hello says, or null for "not known".</summary>
-    public double? DialHz { get; }
+    /// <summary>The dial the hello says, or null for "not known"; a change applies to the next connection.</summary>
+    public double? DialHz { get; set; }
 
-    /// <summary>The first message instead of the hello, as a pdn-soundmodem from before the stream sends its page's config.</summary>
-    public string? Hello { get; init; }
+    /// <summary>The first message instead of the hello, as a pdn-soundmodem from before the stream sends its page's config; a change applies to the next connection.</summary>
+    public string? Hello { get; set; }
+
+    /// <summary>The hello waits for this, as a pdn-soundmodem slow to answer does; a change applies to the next connection.</summary>
+    public Task HelloAfter { get; set; } = Task.CompletedTask;
 
     /// <summary>Drops the connection straight after the upgrade, before any hello, as a pdn-soundmodem stopping just then does.</summary>
     public bool DropBeforeHello { get; init; }
@@ -109,6 +112,7 @@ internal sealed class FakeSoundModem : IAsyncDisposable
             return;
         }
         var socket = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null, keepAliveInterval: TimeSpan.Zero);
+        await HelloAfter.WaitAsync(_stop.Token);
         string hello = Hello ?? System.Text.Json.JsonSerializer.Serialize(new { type = "hello", rateHz = RateHz, dialHz = DialHz });
         await socket.SendAsync(Encoding.UTF8.GetBytes(hello), WebSocketMessageType.Text, true, _stop.Token);
         var connection = new Connection(socket, client, text);

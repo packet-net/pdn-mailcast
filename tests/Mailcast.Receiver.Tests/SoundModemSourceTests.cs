@@ -454,12 +454,16 @@ public class SoundModemSourceTests
         Assert.Equal([next], frames.Select(f => f[..next.Length]));
     }
 
-    [Fact]
-    public async Task ThroughTheStream_HalfABurst_AKeyedSpan_AndAGap_ThenWholeBursts_DecodeOnlyTheWholeOnes()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(7_050_000.0)] // moved from 3800 Hz, so the move's filters are cleared on the gap too
+    public async Task ThroughTheStream_HalfABurst_AKeyedSpan_AndAGap_ThenWholeBursts_DecodeOnlyTheWholeOnes(double? dialHz)
     {
-        await using var fake = new FakeSoundModem();
+        await using var fake = new FakeSoundModem(dialHz: dialHz);
         var (pipeline, connection, fed) = await StartAsync(fake);
         await using var _ = pipeline;
+        double centre = OnAir.AudioCentreHz(dialHz ?? ReceiverConfig.DefaultDialKHz * 1000);
+        Assert.Equal(OnAir.CentreAudioHz, pipeline.AudioCentreHz);
         int frames = 0;
         pipeline.Channel.FrameReceived += (_, _) => Interlocked.Increment(ref frames);
         ulong index = 0;
@@ -479,17 +483,17 @@ public class SoundModemSourceTests
                 }
             }
         }
-        var half = Burst(Frame(1));
+        var half = Burst(Frame(1), centre);
         half = half[..(half.Length / 2)];
 
         await Send(new float[OnAir.SampleRate]);
         await Send(half);
         await Send(new float[OnAir.SampleRate / 2], transmitted: true);
-        await Send(Burst(Frame(2)));
+        await Send(Burst(Frame(2), centre));
         await Send(new float[OnAir.SampleRate / 2]);
         await Send(half);
         await Send(new float[OnAir.SampleRate / 2], gap: true);
-        await Send(Burst(Frame(3)));
+        await Send(Burst(Frame(3), centre));
         await Send(new float[OnAir.SampleRate]);
         await UntilAsync(() => fed() == sent);
 
@@ -812,6 +816,76 @@ public class SoundModemSourceTests
         Assert.True(failed.Lasting);
         Assert.InRange(failed.RetryAt!.Value - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(4), TimeSpan.FromMinutes(5));
         Assert.Contains(log, l => l.Contains("Trying again in 5 min.", StringComparison.Ordinal));
+
+        await stop.CancelAsync();
+        await run;
+    }
+
+    [Fact]
+    public async Task WhileReconnecting_TheDialIsTheOnePdnSoundmodemLastSaid_ForThePageAndTheHooks()
+    {
+        await using var fake = new FakeSoundModem(dialHz: 7_052_300);
+        using var dir = new TempDirectory();
+        await using var host = new ReceiverHost(Config(dir, fake.Port), TimeProvider.System, _ => { });
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+        var first = await fake.NextAsync();
+        await PhaseAsync(conditions, AudioPhase.Listening);
+        Assert.Equal(7_052_300, host.DialHz);
+
+        // pdn-soundmodem restarts and is slow to say hello again: the receiver is connecting,
+        // with a new pipeline that does not know the dial yet.
+        var hello = new TaskCompletionSource();
+        fake.HelloAfter = hello.Task;
+        await first.CloseAsync();
+        await PhaseAsync(conditions, AudioPhase.Failed);
+        await PhaseAsync(conditions, AudioPhase.Opening);
+        Assert.NotNull(host.Pipeline);
+        Assert.False(host.Pipeline.DialSettled);
+
+        Assert.Equal(7_052_300, host.DialHz);
+        Assert.True(host.DialFromSoundModem);
+        Assert.Equal(1500, host.AudioCentreHz, 3);
+        // What a hook run now is told in MAILCAST_DIAL_KHZ.
+        Assert.Equal(7052.3, host.Hooks.DialKHz!(), 6);
+
+        hello.SetResult();
+        await fake.NextAsync();
+        await PhaseAsync(conditions, AudioPhase.Listening);
+        Assert.Equal(7_052_300, host.DialHz);
+        await stop.CancelAsync();
+        await run;
+    }
+
+    [Fact]
+    public async Task ANewReasonToRefuse_StartsTheLongWaitsAgainFromTheShortest()
+    {
+        // Too old first; then, upgraded, its dial is out of reach.
+        await using var fake = new FakeSoundModem(dialHz: 7_053_000) { Hello = "{\"type\":\"config\",\"sampleRate\":12000}" };
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 11, 0, 30, 0, TimeSpan.Zero));
+        await using var host = new ReceiverHost(Config(dir, fake.Port), time, _ => { });
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        var tooOld = await PhaseAsync(conditions, AudioPhase.Failed);
+        Assert.Contains("0.88.0 or later", tooOld.Problem, StringComparison.Ordinal);
+        Assert.Equal(time.GetUtcNow() + TimeSpan.FromMinutes(5), tooOld.RetryAt);
+
+        fake.Hello = null;
+        time.Advance(TimeSpan.FromMinutes(5));
+        var dial = await PhaseAsync(conditions, AudioPhase.Failed);
+        Assert.Contains("outside what pdn-soundmodem hears", dial.Problem, StringComparison.Ordinal);
+        Assert.Equal(time.GetUtcNow() + TimeSpan.FromMinutes(5), dial.RetryAt);
+
+        // The same reason again waits longer.
+        time.Advance(TimeSpan.FromMinutes(5));
+        var again = await PhaseAsync(conditions, AudioPhase.Failed);
+        Assert.Equal(time.GetUtcNow() + TimeSpan.FromMinutes(10), again.RetryAt);
 
         await stop.CancelAsync();
         await run;

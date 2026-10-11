@@ -703,7 +703,7 @@ public sealed class StatusPage : IAsyncDisposable
                 lasting = _host.Audio.Lasting,
                 // The dial the audio is heard on: pdn-soundmodem's own once it has said one.
                 dialKHz = dialHz / 1000,
-                dialFromSoundModem = _host.Pipeline?.DialFromSoundModem ?? false,
+                dialFromSoundModem = _host.DialFromSoundModem,
                 centreKHz = config.CentreHz / 1000,
                 webSdr = WebSdrView(config.Audio, _host.WebSdrAbout),
             },
