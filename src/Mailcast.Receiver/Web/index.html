@@ -673,8 +673,10 @@ async function refresh() {
   if (s.retune) {
     const r = s.retune;
     $("retune").innerHTML = `<dt>Now</dt><dd>${esc(r.state)}</dd>
-      <dt>Rig</dt><dd>rigctld at ${esc(r.rigctld)}</dd>
-      <dt>LinBPQ</dt><dd>${r.linBpq ? esc(r.linBpq) : "not held off: nothing else transmits on this radio"}</dd>
+      ${r.window ? `<dt>Rig</dt><dd>pdn-soundmodem's receive window on ${esc(r.window)}</dd>
+      <dt>Transmitting</dt><dd>held by pdn-soundmodem while its rig is on the bulletin frequency</dd>`
+      : `<dt>Rig</dt><dd>rigctld at ${esc(r.rigctld)}</dd>
+      <dt>LinBPQ</dt><dd>${r.linBpq ? esc(r.linBpq) : "not held off: nothing else transmits on this radio"}</dd>`}
       ${r.problem ? `<dt>Last problem</dt><dd class="bad">${esc(r.problem)} (${when(r.problemAt)})</dd>` : ""}`;
   }
 

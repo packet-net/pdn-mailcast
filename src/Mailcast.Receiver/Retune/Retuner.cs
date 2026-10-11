@@ -68,6 +68,13 @@ public sealed class Retuner : IAsyncDisposable
     /// <summary>How often a radio that is still transmitting after the drain is looked at again.</summary>
     public static readonly TimeSpan PttRetry = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// How soon a receive window pdn-soundmodem refused (409) is asked for again: a refusal is
+    /// usually brief (a frame being sent, or its rigctld not yet reconnected after a restart).
+    /// One for a transmit lease, which lasts a whole broadcast, waits <see cref="Check"/>.
+    /// </summary>
+    public static readonly TimeSpan RefusedRetry = TimeSpan.FromSeconds(10);
+
     /// <summary>How often a problem that goes on is said again in the log.</summary>
     public static readonly TimeSpan Reminder = TimeSpan.FromMinutes(10);
 
@@ -79,6 +86,8 @@ public sealed class Retuner : IAsyncDisposable
     private readonly Func<SlotSchedule> _schedule;
     private readonly Func<bool> _onRadio;
     private readonly RigTuning _tuning;
+    private readonly Func<double>? _windowDialHz;
+    private readonly Action<double?>? _dialFollows;
     private readonly BpqNodeSettings? _bpq;
     private readonly SlotHooks? _hooks;
     /// <summary>Issue #49: given the slot's start, says why its window can end now, or null to keep going.</summary>
@@ -101,6 +110,17 @@ public sealed class Retuner : IAsyncDisposable
     private string? _lastProblem;
     private DateTimeOffset? _lastProblemAt;
     private DateTimeOffset? _nextSlot;
+    // pdn-soundmodem's receive window: ours now; maybe ours (a request whose answer was lost),
+    // so owed a release; asked for again at once; and when it was last asked for and renewed.
+    private bool _windowHeld;
+    private bool _windowMaybe;
+    private bool _retakeNow;
+    private bool _windowGaveUp;
+    private TimeSpan _retryEvery = Check;
+    private long? _askedDialHz;
+    private long? _heldDialHz;
+    private DateTimeOffset _windowTried;
+    private DateTimeOffset _windowRenewed;
 
     /// <summary>
     /// A retuner for <paramref name="config"/>'s <c>rig</c> and <c>bpq</c>. Slots come from
@@ -160,11 +180,55 @@ public sealed class Retuner : IAsyncDisposable
         }
     }
 
-    /// <summary>pdn-soundmodem's rig control, on the config's rigctld.</summary>
-    public RigControl Rig { get; }
+    /// <summary>
+    /// A retuner that takes the receive window of the pdn-soundmodem the audio comes from for each
+    /// slot (the config's <c>"retune": true</c> with <c>"audio": "soundmodem"</c>), instead of
+    /// tuning through rigctld and holding LinBPQ off: pdn-soundmodem tunes its own rig and holds
+    /// its own transmitting. The timing, the hooks and the early end are the same as with
+    /// <c>rig</c>. <paramref name="dialHz"/> is the dial to ask for, read afresh for each request;
+    /// <paramref name="dialFollows"/> is told the dial the radio is on as the window is taken (its
+    /// dial) and given back or lost (the rig's, or null when pdn-soundmodem did not say), so the
+    /// audio's band placement can follow it.
+    /// </summary>
+    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, ReceiveWindow window, Func<double> dialHz, Action<double?>? dialFollows, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        _time = time;
+        _log = log;
+        _schedule = schedule;
+        _onRadio = onRadio;
+        _hooks = hooks;
+        _earlyEnd = earlyEnd;
+        // pdn-soundmodem holds its own transmitting; LinBPQ is not this retuner's to hold off.
+        _bpq = null;
+        _tuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
+        _windowDialHz = dialHz;
+        _dialFollows = dialFollows;
+        _file = InterlockFile.PathIn(config.StateDirectory);
+        _rigRestoreFile = "";
+        Window = window;
+    }
 
-    /// <summary>Where rigctld is.</summary>
-    public RigctldEndpoint Endpoint { get; }
+    /// <summary>pdn-soundmodem's rig control, on the config's rigctld; null when retuning through pdn-soundmodem's receive window.</summary>
+    public RigControl? Rig { get; }
+
+    /// <summary>Where rigctld is; null when retuning through pdn-soundmodem's receive window.</summary>
+    public RigctldEndpoint? Endpoint { get; }
+
+    /// <summary>The pdn-soundmodem receive window this retunes through, or null for rigctld.</summary>
+    public ReceiveWindow? Window { get; }
+
+    /// <summary>What does the tuning, for the page: rigctld's address, or pdn-soundmodem's receive window and where.</summary>
+    public string Via => Window is { } window ? $"pdn-soundmodem's receive window on {window.Where}" : $"rigctld at {Endpoint}";
+
+    /// <summary>The dial asked for: the config's, read afresh with a receive window.</summary>
+    private long DialNow => _windowDialHz is { } dial ? (long)Math.Round(dial()) : _tuning.DialHz;
+
+    /// <summary>
+    /// The band a receive window asks pdn-soundmodem's rig to pass, in Hz of audio: up to the
+    /// signal's top edge at <paramref name="dialHz"/>, 3250 Hz at the usual dial.
+    /// </summary>
+    internal static int WindowWidthHz(double dialHz) => (int)Math.Ceiling(OnAir.AudioCentreHz(dialHz) + OnAir.HalfWidthHz);
 
     /// <summary>LinBPQ's node, or null for a radio nothing else transmits on.</summary>
     public BpqNode? Node { get; }
@@ -262,7 +326,9 @@ public sealed class Retuner : IAsyncDisposable
     {
         try
         {
-            _log(_bpq is null
+            _log(Window is not null
+                ? $"retune: the radio is retuned through pdn-soundmodem's receive window on {Window.Where} to dial {OnAir.Mhz(DialNow)} MHz for each slot; pdn-soundmodem holds its own transmitting meanwhile"
+                : _bpq is null
                 ? $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot; \"dedicatedRadio\" says nothing else transmits on it"
                 : $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot, with LinBPQ port {_bpq.HfPort}'s transmit held off meanwhile through its node at {_bpq.Host}:{_bpq.Port} as {_bpq.User}");
             Recover();
@@ -273,7 +339,10 @@ public sealed class Retuner : IAsyncDisposable
                 _hooks.Recover();
                 _finished = _hooks.RecoveredSlot ?? _finished;
             }
-            await Rig.StartAsync(cancellation).ConfigureAwait(false);
+            if (Rig is not null)
+            {
+                await Rig.StartAsync(cancellation).ConfigureAwait(false);
+            }
             await SayPortAsync(cancellation).ConfigureAwait(false);
             while (!cancellation.IsCancellationRequested)
             {
@@ -362,7 +431,7 @@ public sealed class Retuner : IAsyncDisposable
             return;
         }
         // Where rig control will put the rig back to, read before it starts and removes the file.
-        var target = RigRestoreFile.Read(_rigRestoreFile, Endpoint, out _, out _);
+        var target = RigRestoreFile.Read(_rigRestoreFile, Endpoint!, out _, out _);
         lock (_gate)
         {
             _owedOn = true;
@@ -408,7 +477,9 @@ public sealed class Retuner : IAsyncDisposable
         }
         if (!_onRadio())
         {
-            SetState(RetuneStage.Idle, "not retuning: the audio does not come from the radio's sound card");
+            SetState(RetuneStage.Idle, Window is null
+                ? "not retuning: the audio does not come from the radio's sound card"
+                : "not retuning: the audio does not come from pdn-soundmodem");
             await WaitAsync(Check, cancellation).ConfigureAwait(false);
             return;
         }
@@ -494,25 +565,39 @@ public sealed class Retuner : IAsyncDisposable
                 WriteNote("tuned", slot);
             }
 
-            var result = await Task.Run(() => Rig.Tune(_tuning, Length(closes), Owner), CancellationToken.None).ConfigureAwait(false);
-            if (result.Granted || result.Outcome == RigTuneOutcome.Failed)
+            string held = _bpq is null ? "" : $"; LinBPQ port {_bpq.HfPort} transmit off";
+            if (Window is not null)
             {
-                // Refused leaves the rig where it was; anything else may have moved it.
+                // A refusal is said, and the slot listened to on whatever pdn-soundmodem's radio
+                // is on; the window is asked for again through the slot.
                 lock (_gate)
                 {
-                    _rigMoved = true;
-                    _restoreTarget = result.Window?.RestoreTo ?? Rig.Snapshot().RestoreOwed ?? _restoreTarget;
+                    _retakeNow = false;
                 }
+                _windowGaveUp = false;
+                await TakeWindowAsync(slot, closes, again: false, cancellation).ConfigureAwait(false);
             }
-            if (!result.Granted)
+            else
             {
-                NoteProblem($"could not tune the rig for the {Hhmm(slot)} UTC slot: {result.Why}");
-                Warn($"retune: WARNING - could not tune the rig for the {Hhmm(slot)} UTC slot ({result.Why})");
-                return;
+                var result = await Task.Run(() => Rig!.Tune(_tuning, Length(closes), Owner), CancellationToken.None).ConfigureAwait(false);
+                if (result.Granted || result.Outcome == RigTuneOutcome.Failed)
+                {
+                    // Refused leaves the rig where it was; anything else may have moved it.
+                    lock (_gate)
+                    {
+                        _rigMoved = true;
+                        _restoreTarget = result.Window?.RestoreTo ?? Rig!.Snapshot().RestoreOwed ?? _restoreTarget;
+                    }
+                }
+                if (!result.Granted)
+                {
+                    NoteProblem($"could not tune the rig for the {Hhmm(slot)} UTC slot: {result.Why}");
+                    Warn($"retune: WARNING - could not tune the rig for the {Hhmm(slot)} UTC slot ({result.Why})");
+                    return;
+                }
+                SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
+                _log($"retune: tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
             }
-            string held = _bpq is null ? "" : $"; LinBPQ port {_bpq.HfPort} transmit off";
-            SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
-            _log($"retune: tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
 
             try
             {
@@ -528,8 +613,21 @@ public sealed class Retuner : IAsyncDisposable
                             slot = next;
                             closes = next + After;
                             _hooks?.Extend(slot);
-                            _log($"retune: the {Hhmm(slot)} UTC slot follows straight on, so the rig stays tuned until {Hhmm(closes)} UTC");
-                            SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
+                            if (Window is not null)
+                            {
+                                _log(WindowHeld
+                                    ? $"retune: the {Hhmm(slot)} UTC slot follows straight on, so pdn-soundmodem's receive window is kept until {Hhmm(closes)} UTC"
+                                    : $"retune: the {Hhmm(slot)} UTC slot follows straight on; still asking for pdn-soundmodem's receive window, until {Hhmm(closes)} UTC");
+                                if (WindowHeld)
+                                {
+                                    SetState(RetuneStage.Tuned, WindowWords(slot, closes));
+                                }
+                            }
+                            else
+                            {
+                                _log($"retune: the {Hhmm(slot)} UTC slot follows straight on, so the rig stays tuned until {Hhmm(closes)} UTC");
+                                SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
+                            }
                         }
                         else
                         {
@@ -549,7 +647,12 @@ public sealed class Retuner : IAsyncDisposable
                     {
                         continue;
                     }
-                    if (Rig.Snapshot().Window is null)
+                    if (Window is not null)
+                    {
+                        await KeepWindowAsync(slot, closes, cancellation).ConfigureAwait(false);
+                        continue;
+                    }
+                    if (Rig!.Snapshot().Window is null)
                     {
                         Warn("retune: WARNING - the rig's tuning window ended before the slot did (rig control put it back); not listening on the bulletin frequency for the rest of this slot");
                         NoteProblem("the rig's tuning window ended before the slot did");
@@ -607,7 +710,7 @@ public sealed class Retuner : IAsyncDisposable
             string problem;
             try
             {
-                if (!await RigPtt.TransmittingAsync(Endpoint, cancellation).ConfigureAwait(false))
+                if (!await RigPtt.TransmittingAsync(Endpoint!, cancellation).ConfigureAwait(false))
                 {
                     return true;
                 }
@@ -637,7 +740,7 @@ public sealed class Retuner : IAsyncDisposable
     {
         try
         {
-            if (!await RigPtt.TransmittingAsync(Endpoint, cancellation).ConfigureAwait(false))
+            if (!await RigPtt.TransmittingAsync(Endpoint!, cancellation).ConfigureAwait(false))
             {
                 return false;
             }
@@ -652,10 +755,217 @@ public sealed class Retuner : IAsyncDisposable
         return true;
     }
 
+    /// <summary>Whether pdn-soundmodem's receive window is ours now, as far as this retuner knows.</summary>
+    internal bool WindowHeld
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _windowHeld;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The audio stream from pdn-soundmodem has connected again: in a slot, a receive window lost
+    /// while it was away (pdn-soundmodem restarting puts its rig back) is asked for again at once,
+    /// for what is left of the slot, rather than at the next minute.
+    /// </summary>
+    internal void SourceReconnected()
+    {
+        if (Window is null)
+        {
+            return;
+        }
+        long? held;
+        lock (_gate)
+        {
+            _retakeNow = true;
+            held = _windowHeld ? _heldDialHz : null;
+        }
+        // A new stream's hello gives pdn-soundmodem's own dial, not the window's: while the
+        // window is held, the new pipeline is placed by the window's dial at once.
+        if (held is { } dial)
+        {
+            _dialFollows?.Invoke(dial);
+        }
+        Wake();
+    }
+
+    /// <summary>The page's and the log's words for a slot the receive window is held for.</summary>
+    private string WindowWords(DateTimeOffset slot, DateTimeOffset closes) =>
+        $"tuned to {OnAir.Mhz(DialNow)} MHz through pdn-soundmodem's receive window for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC; pdn-soundmodem holds its transmitting";
+
+    /// <summary>
+    /// Asks pdn-soundmodem for its receive window, for the slot until <paramref name="closes"/>
+    /// (<paramref name="again"/> when it was lost part way). True when granted; otherwise the
+    /// refusal is said plainly, on the page too, and the slot is listened to on whatever its
+    /// radio is on.
+    /// </summary>
+    private async Task<bool> TakeWindowAsync(DateTimeOffset slot, DateTimeOffset closes, bool again, CancellationToken cancellation)
+    {
+        long dial = DialNow;
+        _windowTried = _time.GetUtcNow();
+        lock (_gate)
+        {
+            _windowMaybe = true;
+        }
+        var answer = await Window!.TakeAsync(dial, WindowWidthHz(dial), Length(closes), cancellation).ConfigureAwait(false);
+        if (answer.Outcome == WindowOutcome.Granted)
+        {
+            lock (_gate)
+            {
+                _windowHeld = true;
+                _askedDialHz = dial;
+                _heldDialHz = (long)Math.Round(answer.WindowDialHz ?? dial);
+            }
+            _windowRenewed = _time.GetUtcNow();
+            _windowGaveUp = false;
+            _said = null;
+            _dialFollows?.Invoke(answer.WindowDialHz ?? dial);
+            string words = WindowWords(slot, closes);
+            SetState(RetuneStage.Tuned, words);
+            _log(again
+                ? $"retune: took pdn-soundmodem's receive window for what is left of the {Hhmm(slot)} UTC slot: {words}"
+                : $"retune: {words}");
+            return true;
+        }
+        lock (_gate)
+        {
+            // A 409 or a 404 is a plain no: nothing was tuned, and nothing is owed a release.
+            _windowMaybe = answer.Outcome is not (WindowOutcome.Refused or WindowOutcome.NoWindow);
+        }
+        // Without a rig section it will not have one until it restarts: asked again only once
+        // its stream connects again.
+        _windowGaveUp = answer.Outcome == WindowOutcome.NoWindow;
+        string why = answer.Why ?? "no reason given";
+        _retryEvery = answer.Outcome == WindowOutcome.Refused && !why.Contains("transmit lease", StringComparison.Ordinal) ? RefusedRetry : Check;
+        string verb = answer.Outcome == WindowOutcome.Refused ? "refused its receive window" : "could not give its receive window";
+        NoteProblem($"pdn-soundmodem {verb} for the {Hhmm(slot)} UTC slot: {why}");
+        Loud($"retune: WARNING - pdn-soundmodem {verb} for the {Hhmm(slot)} UTC slot ({why}); listening on whatever its radio is on"
+            + (_windowGaveUp ? "" : $", and asking again every {_retryEvery.TotalSeconds:F0} s until {Hhmm(closes)} UTC"));
+        SetState(RetuneStage.Idle, $"not tuned for the {Hhmm(slot)} UTC slot: pdn-soundmodem {verb} ({why}); listening on whatever its radio is on until {Hhmm(closes)} UTC");
+        return false;
+    }
+
+    /// <summary>
+    /// In a slot, every <see cref="WindowPoll"/> and at once when pdn-soundmodem's stream
+    /// connects again: renews the receive window every <see cref="Check"/>, sees it is still
+    /// open, and asks for it again if it was lost or refused (every <see cref="Check"/>, or at
+    /// once after a reconnect).
+    /// </summary>
+    private async Task KeepWindowAsync(DateTimeOffset slot, DateTimeOffset closes, CancellationToken cancellation)
+    {
+        var now = _time.GetUtcNow();
+        bool retake;
+        lock (_gate)
+        {
+            retake = _retakeNow;
+            _retakeNow = false;
+        }
+        if (WindowHeld)
+        {
+            long dial = DialNow;
+            if (now - _windowRenewed >= Check)
+            {
+                _windowRenewed = now;
+                var renewal = await Window!.TakeAsync(dial, WindowWidthHz(dial), Length(closes), cancellation).ConfigureAwait(false);
+                if (renewal.Outcome != WindowOutcome.Granted)
+                {
+                    Warn($"retune: WARNING - could not renew pdn-soundmodem's receive window ({renewal.Why})");
+                }
+                else if (dial != _askedDialHz)
+                {
+                    // "dialKHz" changed during the slot: the renewal moved the window there.
+                    lock (_gate)
+                    {
+                        _askedDialHz = dial;
+                        _heldDialHz = (long)Math.Round(renewal.WindowDialHz ?? dial);
+                    }
+                    _log($"retune: pdn-soundmodem's receive window moved to {OnAir.Mhz(dial)} MHz, the dial now set");
+                    _dialFollows?.Invoke(renewal.WindowDialHz ?? dial);
+                }
+            }
+            long asked = _askedDialHz ?? dial;
+            var state = await Window!.ReadAsync(cancellation).ConfigureAwait(false);
+            string? lost = state.Outcome switch
+            {
+                WindowOutcome.Granted when state.WindowDialHz is null => "pdn-soundmodem says no window is open now: it was restarted, or the window ran out",
+                WindowOutcome.Granted when Math.Abs(state.WindowDialHz!.Value - asked) >= 1 => $"pdn-soundmodem's window is on {OnAir.Mhz(state.WindowDialHz.Value)} MHz now, not the {OnAir.Mhz(asked)} MHz this receiver last asked for",
+                // Not running: pdn-soundmodem puts its rig back when it starts again.
+                WindowOutcome.Unreachable or WindowOutcome.NoWindow => state.Why,
+                // No answer in time (busy or stuck), or one that makes no sense: nothing is known to have changed.
+                _ => null,
+            };
+            if (lost is null)
+            {
+                return;
+            }
+            lock (_gate)
+            {
+                _windowHeld = false;
+                _windowMaybe = state.Outcome != WindowOutcome.Granted;
+            }
+            NoteProblem($"pdn-soundmodem's receive window ended before the {Hhmm(slot)} UTC slot did: {lost}");
+            Warn($"retune: WARNING - pdn-soundmodem's receive window ended before the {Hhmm(slot)} UTC slot did ({lost}); listening on whatever its radio is on until it can be taken again");
+            SetState(RetuneStage.Idle, $"the receive window for the {Hhmm(slot)} UTC slot was lost ({lost}); asking for it again");
+            _dialFollows?.Invoke(state.RigDialHz);
+            retake = true;
+        }
+        else if (!retake && (_windowGaveUp || now - _windowTried < _retryEvery))
+        {
+            return;
+        }
+        await TakeWindowAsync(slot, closes, again: true, cancellation).ConfigureAwait(false);
+    }
+
+    /// <summary>Gives pdn-soundmodem's receive window back, which puts its radio back, and says how that went.</summary>
+    private async Task ReleaseWindowAsync()
+    {
+        bool maybe, held;
+        lock (_gate)
+        {
+            maybe = _windowMaybe;
+            held = _windowHeld;
+        }
+        if (!maybe && !held)
+        {
+            return;
+        }
+        // Not the receiver's cancellation: this runs as it stops, too.
+        var answer = await Window!.ReleaseAsync(CancellationToken.None).ConfigureAwait(false);
+        lock (_gate)
+        {
+            _windowMaybe = false;
+            _windowHeld = false;
+        }
+        if (answer.Outcome == WindowOutcome.Granted)
+        {
+            if (held || answer.Released)
+            {
+                _log($"retune: gave pdn-soundmodem's receive window back; it puts its radio back"
+                    + (answer.RigDialHz is { } back ? $", now on {OnAir.Mhz(back)} MHz" : ""));
+            }
+        }
+        else if (held)
+        {
+            NoteProblem($"could not give pdn-soundmodem's receive window back: {answer.Why}");
+            Warn($"retune: WARNING - could not give pdn-soundmodem's receive window back ({answer.Why}); pdn-soundmodem puts its radio back by itself when the window runs out, within {RigControl.MaxWindow.TotalMinutes:F0} minutes");
+        }
+        _dialFollows?.Invoke(answer.RigDialHz);
+        SetState(RetuneStage.Idle, "the slot is over");
+    }
+
     /// <summary>Ends the rig's window, which puts it back, and says how that went.</summary>
     private async Task ReleaseAsync()
     {
-        if (Rig.Snapshot().Window is null)
+        if (Window is not null)
+        {
+            await ReleaseWindowAsync().ConfigureAwait(false);
+            return;
+        }
+        if (Rig!.Snapshot().Window is null)
         {
             return;
         }
@@ -677,7 +987,7 @@ public sealed class Retuner : IAsyncDisposable
     private async Task<bool> HoldAsync(DateTimeOffset slot, CancellationToken cancellation)
     {
         int port = _bpq!.HfPort;
-        if (!Rig.Connected)
+        if (!Rig!.Connected)
         {
             // LinBPQ is not taken off the air for a slot the rig cannot be tuned for.
             string why = $"rigctld at {Endpoint} is not connected";
@@ -854,7 +1164,7 @@ public sealed class Retuner : IAsyncDisposable
     /// </summary>
     private bool RigSafe(out string why)
     {
-        var state = Rig.Snapshot();
+        var state = Rig!.Snapshot();
         bool moved;
         RigTuning? target;
         lock (_gate)
@@ -1071,6 +1381,10 @@ public sealed class Retuner : IAsyncDisposable
         {
             await Node.DisposeAsync().ConfigureAwait(false);
         }
-        await Rig.DisposeAsync().ConfigureAwait(false);
+        if (Rig is not null)
+        {
+            await Rig.DisposeAsync().ConfigureAwait(false);
+        }
+        Window?.Dispose();
     }
 }

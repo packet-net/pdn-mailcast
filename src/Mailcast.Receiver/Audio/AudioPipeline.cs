@@ -95,10 +95,28 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// </summary>
     public bool DialSettled { get; private set; }
 
+    /// <summary>The config's dial, which pdn-soundmodem's receive window tunes its radio to for each slot.</summary>
+    private readonly double _configDialHz;
+
+    /// <summary>The dial pdn-soundmodem's hello said its radio was on, or null.</summary>
+    private double? _saidDialHz;
+
+    /// <summary>pdn-soundmodem's channel rate, once its stream is open.</summary>
+    private int _channelRate = OnAir.SampleRate;
+
+    /// <summary>Where the input moves the signal from, as last asked of it (null: not moved); a block made otherwise is from before a retune.</summary>
+    private double? _movedFromHz;
+
+    /// <summary>A dial <see cref="FollowDial"/> moved to, for the audio thread to place the signal by before its next block.</summary>
+    private double? _pendingDialHz;
+
+    private readonly object _dialGate = new();
+
     private AudioPipeline(AudioSource source, double dialHz, Action<string> log, TimeProvider time)
     {
         _source = source;
         DialHz = dialHz;
+        _configDialHz = dialHz;
         DialSettled = source.Kind != AudioSourceKind.SoundModem;
         _log = log;
         _time = time;
@@ -203,6 +221,116 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>This receiver's own page port, which pdn-soundmodem's page links to.</summary>
     internal int PagePort { get; init; } = new WebSettings().Port;
 
+    /// <summary>
+    /// Whether pdn-soundmodem's receive window retunes its radio to the config's dial for each slot
+    /// (<c>"retune": true</c>): a dial pdn-soundmodem says that puts the signal out of reach is then
+    /// not refused, and the signal is placed by the config's dial until the window moves the radio.
+    /// </summary>
+    internal bool RetunedByWindow { get; init; }
+
+    /// <summary>Whether pdn-soundmodem's channel carries the signal heard on <paramref name="dialHz"/>, as <see cref="SoundModemReach"/> judges it.</summary>
+    private bool Reachable(double dialHz) => SoundModemReach(_channelRate, dialHz, dialHz) is null;
+
+    /// <summary>
+    /// With <see cref="RetunedByWindow"/>: pdn-soundmodem's radio has moved, as its receive window
+    /// was taken (to the window's dial) or given back or lost (to <paramref name="rigDialHz"/>,
+    /// the rig's dial if pdn-soundmodem said it). The signal is placed by that dial when its
+    /// channel carries the signal there; by the hello's dial when the rig's is not known; and
+    /// otherwise by the config's, the dial the window tunes to, since nothing can be heard until
+    /// it does. The audio thread moves to it before its next block: the modem's shift or the
+    /// input's move to 1800 Hz (its filters started afresh), and the modem listens afresh. Ignored
+    /// until the stream's own dial is settled (<see cref="DialSettled"/>), which would overwrite
+    /// it; the retuner places a pipeline that opens while it holds the window once it has. True if
+    /// the dial changed.
+    /// </summary>
+    internal bool FollowDial(double? rigDialHz)
+    {
+        if (!RetunedByWindow || !DialSettled || _stream is null)
+        {
+            return false;
+        }
+        double dial = rigDialHz is { } rig && Reachable(rig) ? rig
+            : rigDialHz is null && _saidDialHz is { } said && Reachable(said) ? said
+            : _configDialHz;
+        lock (_dialGate)
+        {
+            if (Math.Abs(dial - DialHz) < 0.5)
+            {
+                return false;
+            }
+            DialHz = dial;
+            DialFromSoundModem = Math.Abs(dial - _configDialHz) >= 0.5;
+            _pendingDialHz = dial;
+        }
+        double centre = OnAir.AudioCentreHz(dial);
+        string moved = UsesOwnCentre(centre) ? "" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $", moved to {OnAir.CentreAudioHz:F0} Hz here");
+        _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"audio: pdn-soundmodem's radio is on USB dial {OnAir.Mhz(dial)} MHz now, the signal's centre at {centre:F0} Hz in its audio{moved}"));
+        return true;
+    }
+
+    /// <summary>On the audio thread, between blocks: places the signal by a dial <see cref="FollowDial"/> moved to.</summary>
+    private void PlaceByPendingDial()
+    {
+        double dial;
+        lock (_dialGate)
+        {
+            if (_pendingDialHz is not { } pending)
+            {
+                return;
+            }
+            dial = pending;
+            _pendingDialHz = null;
+        }
+        double centre = OnAir.AudioCentreHz(dial);
+        double? from = UsesOwnCentre(centre) ? null : centre;
+        if (from is null)
+        {
+            _moved = false;
+            _shift = ShiftFor(dial);
+        }
+        else
+        {
+            _moved = true;
+            _shift = null;
+            _movedBlock ??= new float[BlockSamples];
+        }
+        if (from != _movedFromHz)
+        {
+            _movedFromHz = from;
+            _stream?.MoveFrom(from);
+        }
+        Tone.ExpectedHz = from is null ? centre : OnAir.CentreAudioHz;
+        // The audio either side of a retune is not one signal.
+        ResetModem();
+    }
+
+    /// <summary>For tests: how many blocks were dropped because they were made with the input's move from before a retune.</summary>
+    internal int DroppedAtRetune => Volatile.Read(ref _droppedAtRetune);
+
+    private int _droppedAtRetune;
+
+    /// <summary>
+    /// One block of pdn-soundmodem's channel audio as the input gave it, with where it was moved
+    /// from (<paramref name="movedFrom"/>, null if not moved): on the audio thread, after the read.
+    /// A dial <see cref="FollowDial"/> moved to is placed first, so a block made with the input's
+    /// move from before the retune (its tag no longer the one asked for) is dropped rather than fed
+    /// under the new placement; the modem listens afresh at the retune anyway. A retune between
+    /// two dials neither of which is moved changes no tag, so the block or so already queued then
+    /// goes through with the new dial's shift for the modem. False when dropped.
+    /// </summary>
+    internal bool FeedTagged(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, double? movedFrom, bool transmitted, bool gap)
+    {
+        PlaceByPendingDial();
+        if (movedFrom != _movedFromHz)
+        {
+            Interlocked.Increment(ref _droppedAtRetune);
+            return false;
+        }
+        FeedPlaced(samples, movedFrom is null ? default : moved, transmitted, gap);
+        return true;
+    }
+
     /// <summary>How many times the modem has been made to listen afresh after a gap or a keyed span in pdn-soundmodem's audio.</summary>
     internal int ModemResets => Volatile.Read(ref _modemResets);
 
@@ -260,8 +388,8 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// Builds a pipeline for <paramref name="source"/>, heard on the USB dial <paramref name="dialHz"/>.
     /// Call <see cref="StartAsync"/> once anything that listens is attached.
     /// </summary>
-    public static AudioPipeline Create(AudioSource source, double dialHz, Action<string> log, TimeProvider? time = null, int? pagePort = null) =>
-        new(source, dialHz, log, time ?? TimeProvider.System) { PagePort = pagePort ?? new WebSettings().Port };
+    public static AudioPipeline Create(AudioSource source, double dialHz, Action<string> log, TimeProvider? time = null, int? pagePort = null, bool retunedByWindow = false) =>
+        new(source, dialHz, log, time ?? TimeProvider.System) { PagePort = pagePort ?? new WebSettings().Port, RetunedByWindow = retunedByWindow };
 
     /// <summary>
     /// Opens a source whose dial is only known once it is open, ahead of <see cref="StartAsync"/>,
@@ -291,10 +419,21 @@ public sealed class AudioPipeline : IAsyncDisposable
             OnAir.AudioCentreHz(said ?? configured) is var at && SoundModemReach(rate, said, said ?? configured) is null && !UsesOwnCentre(at) ? at : null)
             .ConfigureAwait(false);
         double dial = stream.DialHz ?? configured;
+        _channelRate = stream.ChannelRate;
+        _saidDialHz = stream.DialHz;
+        _movedFromHz = stream.MovedFromHz;
+        // With the receive window, a radio out of reach now is tuned to the config's dial for
+        // each slot: the signal is placed by that (the input moves nothing, since the dial it was
+        // asked about is out of reach), and only a channel that cannot carry it there is refused.
+        double? awayHz = RetunedByWindow && stream.DialHz is { } saidDial && !Reachable(saidDial) && Reachable(configured) ? saidDial : null;
+        if (awayHz is not null)
+        {
+            dial = configured;
+        }
         double centre = OnAir.AudioCentreHz(dial);
         try
         {
-            if (SoundModemReach(stream.ChannelRate, stream.DialHz, dial) is { } refusal)
+            if (SoundModemReach(stream.ChannelRate, awayHz is null ? stream.DialHz : null, dial) is { } refusal)
             {
                 throw new AudioSourceException(refusal, refused: true);
             }
@@ -313,7 +452,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 _shift = null;
             }
             Tone.ExpectedHz = AudioCentreHz;
-            DialFromSoundModem = stream.DialHz is not null;
+            DialFromSoundModem = stream.DialHz is not null && awayHz is null;
             await stream.IdentifyAsync(PagePort, centre - OnAir.HalfWidthHz, centre + OnAir.HalfWidthHz, cancellation).ConfigureAwait(false);
         }
         catch
@@ -338,7 +477,9 @@ public sealed class AudioPipeline : IAsyncDisposable
         string rate = stream.ChannelRate == OnAir.SampleRate
             ? $"its channel at {OnAir.SampleRate} Hz"
             : $"its channel at {stream.ChannelRate} Hz, brought up to {OnAir.SampleRate} Hz";
-        string where = stream.DialHz is null
+        string where = awayHz is { } away
+            ? $"the radio on USB dial {OnAir.Mhz(away)} MHz as pdn-soundmodem says, which puts the signal out of reach until its receive window tunes it to {OnAir.Mhz(configured)} MHz (\"dialKHz\") for each slot"
+            : stream.DialHz is null
             ? $"the radio on USB dial {OnAir.Mhz(dial)} MHz (\"dialKHz\"; pdn-soundmodem does not say where its radio is)"
             : $"the radio on USB dial {OnAir.Mhz(dial)} MHz, as pdn-soundmodem says"
                 + (Math.Abs(dial - configured) >= 1 ? $" (\"dialKHz\", {OnAir.Mhz(configured)} MHz, is not used while it does)" : "");
@@ -347,7 +488,7 @@ public sealed class AudioPipeline : IAsyncDisposable
             + $"which is fine for a Flex (pdn-soundmodem opens its filter for it) or an SDR, but a radio on a sound card needs its filter open from {centre - OnAir.HalfWidthHz:F0} to {centre + OnAir.HalfWidthHz:F0} Hz. "
             + $"Its audio is moved to {OnAir.CentreAudioHz:F0} Hz here, where the usual dial puts the signal");
         _log(string.Create(invariant,
-            $"audio: pdn-soundmodem on {stream.Where}, {rate}, {where}, the signal's centre at {centre:F0} Hz in its audio{moved}"));
+            $"audio: pdn-soundmodem on {stream.Where}, {rate}, {where}, the signal's centre {(awayHz is null ? "at" : "then at")} {centre:F0} Hz in its audio{moved}"));
     }
 
     /// <summary>
@@ -388,7 +529,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 + $"from {OnAir.Mhz(OnAir.TransmitHz - highestCentre)} to {OnAir.Mhz(OnAir.TransmitHz - ReceiverConfig.LowestAudioCentreHz)} MHz, usually {OnAir.Mhz(ReceiverConfig.DefaultDialKHz * 1000)} MHz");
         return signal + string.Create(invariant,
             $"It says its radio is on {OnAir.Mhz(dialHz)} MHz USB, which would put the signal's centre at {centre:F0} Hz in its audio, {why}. "
-            + $"Nothing is retuned for it: {range}");
+            + $"Nothing is retuned for it: {range}; or, if pdn-soundmodem has a \"rig\" section, set \"retune\": true here for its receive window to tune the radio for each slot");
     }
 
     /// <summary>Opens the source and starts the audio thread.</summary>
@@ -500,7 +641,8 @@ public sealed class AudioPipeline : IAsyncDisposable
             while (!_stop.IsCancellationRequested)
             {
                 bool transmitted = false, gap = false;
-                int read = _stream is { } stream ? stream.ReadBlock(block, _movedBlock, out transmitted, out gap) : _input!.Read(block);
+                double? movedFrom = null;
+                int read = _stream is { } stream ? stream.ReadBlock(block, _movedBlock, out transmitted, out gap, out movedFrom) : _input!.Read(block);
                 if (read == 0)
                 {
                     if (_input is WavInput)
@@ -515,7 +657,8 @@ public sealed class AudioPipeline : IAsyncDisposable
                 Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
                 if (_stream is not null)
                 {
-                    FeedStream(block.AsSpan(0, read), _movedBlock is null ? default : _movedBlock.AsSpan(0, read), transmitted, gap);
+                    // Placed after the read: a retune almost always lands while the read waits.
+                    FeedTagged(block.AsSpan(0, read), movedFrom is null ? default : _movedBlock.AsSpan(0, read), movedFrom, transmitted, gap);
                 }
                 else
                 {
@@ -538,7 +681,7 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>
     /// One block of pdn-soundmodem's channel audio, on the audio thread (or a test's). A keyed
     /// block is already silence and goes through as it is, so every clock here keeps pace with
-    /// pdn-soundmodem's; but MS110D is a stream mode, and the audio either side of a keyup or a
+    /// pdn-soundmodem's (except across a block dropped at a retune, see <see cref="FeedTagged"/>); but MS110D is a stream mode, and the audio either side of a keyup or a
     /// gap is not one signal, so the modem is made to listen afresh after each keyed span and on
     /// every gap, in the same way, rather than decoding across the hole.
     /// </summary>
@@ -549,6 +692,13 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// the usual dial's 1800 Hz as well (<paramref name="moved"/>, empty when it is not moved).
     /// </summary>
     internal void FeedStream(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, bool transmitted, bool gap)
+    {
+        PlaceByPendingDial();
+        FeedPlaced(samples, moved, transmitted, gap);
+    }
+
+    /// <summary>As <see cref="FeedStream(ReadOnlySpan{float}, ReadOnlySpan{float}, bool, bool)"/>, with the placement already settled for this block.</summary>
+    private void FeedPlaced(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, bool transmitted, bool gap)
     {
         if (gap)
         {
