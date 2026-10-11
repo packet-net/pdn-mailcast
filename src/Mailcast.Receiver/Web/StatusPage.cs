@@ -52,6 +52,9 @@ public sealed class StatusPage : IAsyncDisposable
     private readonly Dictionary<ulong, DateTimeOffset> _resentAt = [];
     private DateTimeOffset? _lastBbsTestAt;
 
+    /// <summary>What the last "Test BBS login" found, issue #99: counts towards <see cref="BbsReachable"/> until a real delivery session has.</summary>
+    private BbsLoginTestOutcome? _lastBbsTestOutcome;
+
     private readonly SessionStore _sessions;
     private readonly Dictionary<HttpListenerContext, string?> _sockets = [];
     private readonly SignInThrottle _throttle;
@@ -120,7 +123,19 @@ public sealed class StatusPage : IAsyncDisposable
         _log($"web: status page at {Url}{(_host.Config.Web.Lan ? " and on the local network" : "")}");
     }
 
-    /// <summary>Gives a new pipeline its waterfall, before its audio starts.</summary>
+    /// <summary>
+    /// Gives a new pipeline its waterfall, before its audio starts.
+    /// </summary>
+    /// <remarks>
+    /// Issue #100: pdn-soundmodem's own full page, at <c>/waterfall/</c>, reports a
+    /// <c>daemonVersion</c> taken from the <c>Packet.SoundModem</c> package this receiver is built
+    /// against (pinned in Directory.Packages.props), not whatever pdn-soundmodem is actually
+    /// installed, or running wherever the audio comes from. <see cref="WaterfallOptions"/> has
+    /// nothing to override that with, so this is left as it is; see
+    /// <see href="https://github.com/packet-net/pdn-soundmodem/issues/677">pdn-soundmodem#677</see>,
+    /// filed to ask for one. This receiver's own page, index.html, never reads or shows that
+    /// field itself, only pdn-soundmodem's bundled page does.
+    /// </remarks>
     internal void Attach(AudioPipeline pipeline)
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
@@ -713,8 +728,9 @@ public sealed class StatusPage : IAsyncDisposable
                 lastFailure = _host.Delivery.LastFailure,
                 nextAttempt = _host.Delivery.NextAttempt,
                 waiting = _host.Intake.Mail().Waiting, // from memory: this page is asked every few seconds
-                // Whether there is a BBS to send through, for the daily report's opt-in.
-                reachable = BbsReachable(_host.Ledger.Recent, _host.Feedback.Last, _host.Delivery.LastFailure),
+                // Whether there is a BBS to send through, for the daily report's opt-in; null
+                // until something has actually been tried (issue #99).
+                reachable = BbsReachable(_host.Delivery.HasAttempted, _host.Ledger.Recent, _host.Feedback.Last, _host.Delivery.LastFailure, _lastBbsTestOutcome),
             },
             retune = _host.Retuner is not { } retuner ? null : new
             {
@@ -841,15 +857,26 @@ public sealed class StatusPage : IAsyncDisposable
     }
 
     /// <summary>
-    /// Whether the receiver has a BBS to send through, as far as it knows: the BBS has answered
-    /// for a bulletin or a daily report, or no session with it has failed yet. False for a
-    /// receiver whose BBS has never been reached, such as one set up to listen only, with
-    /// nothing at the BBS's address; the page offers the daily report only when this is true.
+    /// Whether the receiver has a BBS to send through, as far as it knows: null until a delivery
+    /// session or a "Test BBS login" has actually been tried (issue #99: before that, there is
+    /// nothing to base an answer on, and silence is not the same as "it works"); true once one has
+    /// reached the BBS and gotten an answer worth calling reachable, even a refusal of one bulletin
+    /// (the BBS answered, so it is there to send through); false once one has been tried and never
+    /// got that far. The page offers the daily report only when this is true.
     /// </summary>
-    internal static bool BbsReachable(IReadOnlyList<DeliveryRecord> recent, SentReport? report, string? lastFailure) =>
-        lastFailure is null
-        || recent.Any(r => r.Verdict is DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Deferred or DeliveryVerdict.Refused or DeliveryVerdict.Unconfirmed)
-        || report?.Answer is FeedbackAnswer.Accepted or FeedbackAnswer.Refused or FeedbackAnswer.Deferred;
+    internal static bool? BbsReachable(bool deliveryAttempted, IReadOnlyList<DeliveryRecord> recent, SentReport? report, string? lastFailure, BbsLoginTestOutcome? lastTest)
+    {
+        bool answered = recent.Any(r => r.Verdict is DeliveryVerdict.Accepted or DeliveryVerdict.AlreadyHad or DeliveryVerdict.Deferred or DeliveryVerdict.Refused or DeliveryVerdict.Unconfirmed)
+            || report?.Answer is FeedbackAnswer.Accepted or FeedbackAnswer.Refused or FeedbackAnswer.Deferred
+            || lastTest == BbsLoginTestOutcome.Ok;
+        if (answered)
+        {
+            return true;
+        }
+        bool tried = deliveryAttempted || lastFailure is not null || recent.Count > 0
+            || (report is not null && report.Answer != FeedbackAnswer.Pending) || lastTest is not null;
+        return tried ? false : null;
+    }
 
     /// <summary>
     /// The ionosonde tile: the head end's newest reading, aged by this receiver's clock and
@@ -1700,6 +1727,7 @@ public sealed class StatusPage : IAsyncDisposable
             // the password, and the type name only, not the exception's own message, which could
             // quote back something given to it.
             _log($"web: testing the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)} failed unexpectedly ({e.GetType().Name})");
+            _lastBbsTestOutcome = BbsLoginTestOutcome.UnexpectedReply;
             await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
             {
                 outcome = BbsLoginTestOutcome.UnexpectedReply,
@@ -1708,6 +1736,7 @@ public sealed class StatusPage : IAsyncDisposable
             }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
             return;
         }
+        _lastBbsTestOutcome = result.Outcome;
         _log($"web: tested the BBS login for {Ascii.Clean(login)} from {RemoteAddress(context.Request)}: {Ascii.Clean(result.Said)}");
         await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new
         {
