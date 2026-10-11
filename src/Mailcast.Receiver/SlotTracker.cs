@@ -202,17 +202,40 @@ public sealed class SlotTracker
     /// leaves whatever was already there): kept beside the slot's frames as a cross-check, and
     /// (issue #49) as the exact rotation list the early-end check judges completeness against.
     /// </summary>
+    /// <remarks>
+    /// Issue #72: only replaces what is already tracked for this slot when nothing is tracked
+    /// yet, or when <paramref name="directory"/> belongs to it (<see cref="BelongsToSameSlot"/>).
+    /// A stray directory heard mid-slot (a decode of an old directory, a second head end, or a
+    /// test head end on the air at the same time) must not take its place: the early-end check
+    /// would then judge completeness against the wrong rotation, and the window could never end
+    /// early for this slot.
+    /// </remarks>
     public void OnDirectory(BroadcastDirectory directory)
     {
         ArgumentNullException.ThrowIfNull(directory);
         lock (_gate)
         {
-            if (_current is not null)
+            if (_current is null)
             {
-                _current = _current with { HeardDirectory = directory, ListedWaveform = directory.Mode ?? _current.ListedWaveform };
+                return;
             }
+            if (_current.HeardDirectory is { } tracked && !BelongsToSameSlot(tracked, directory))
+            {
+                return;
+            }
+            _current = _current with { HeardDirectory = directory, ListedWaveform = directory.Mode ?? _current.ListedWaveform };
         }
     }
+
+    /// <summary>
+    /// Issue #72: whether <paramref name="candidate"/> may take the place of <paramref name="tracked"/>
+    /// as the slot's own directory: the same day's rotation (even as a different object, such as
+    /// the other waveform's resend of it), or a newer one (the day rolling over mid-slot). The
+    /// same day but a different rotation, or an older day, is someone else's or something stale,
+    /// not this slot's.
+    /// </summary>
+    private static bool BelongsToSameSlot(BroadcastDirectory tracked, BroadcastDirectory candidate) =>
+        candidate.Date > tracked.Date || (candidate.Date == tracked.Date && candidate.Entries.SequenceEqual(tracked.Entries));
 
     /// <summary>Issue #49: the probe audio after the slot's tone has been captured.</summary>
     public void OnProbeCaptured()
