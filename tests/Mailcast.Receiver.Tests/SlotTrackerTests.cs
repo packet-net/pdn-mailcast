@@ -12,6 +12,10 @@ public class SlotTrackerTests
     /// <summary>A directory naming <paramref name="mode"/> as the waveform the slot went out on (null for a head end that does not say).</summary>
     private static BroadcastDirectory Directory(string? mode = null) => new(DateOnly.FromDateTime(DateTime.UtcNow), [], mode: mode);
 
+    /// <summary>A directory with one entry, on <paramref name="date"/>, so two can be compared as the same or a different rotation.</summary>
+    private static BroadcastDirectory DirectoryWithEntry(DateOnly date, ulong objectId = 1) =>
+        new(date, [new DirectoryEntry(objectId, 0, 100, "1_GB7RDG", "Club news")]);
+
     private static ToneReport Tone(double seconds = 10) => new(1801, 1, 12, TimeSpan.FromSeconds(seconds));
 
     [Fact]
@@ -199,6 +203,77 @@ public class SlotTrackerTests
         slots.OnDirectory(Directory("ms110d-wn4"));
 
         Assert.Null(slots.Last);
+    }
+
+    [Fact]
+    public void OnDirectory_StrayOlderDirectory_DoesNotReplaceTheOneTracked()
+    {
+        // Issue #72: a stray directory from an earlier day (a decode of an old directory's
+        // frame, say) arriving mid-slot must not take the place of the one already tracked for
+        // this slot, or the early-end check would judge completeness against the wrong rotation.
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        var todayDate = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
+        var today = DirectoryWithEntry(todayDate);
+        slots.OnDirectory(today);
+
+        var strayOlder = DirectoryWithEntry(todayDate.AddDays(-1), objectId: 99);
+        slots.OnDirectory(strayOlder);
+
+        Assert.Same(today, slots.Last!.HeardDirectory);
+    }
+
+    [Fact]
+    public void OnDirectory_StrayDirectorySameDateButADifferentRotation_DoesNotReplaceTheOneTracked()
+    {
+        // Issue #72: same day, but a different rotation (a second head end, or a test head end
+        // on the air at the same time): still not this slot's.
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        var today = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
+        var tracked = DirectoryWithEntry(today, objectId: 1);
+        slots.OnDirectory(tracked);
+
+        var strayOtherRotation = DirectoryWithEntry(today, objectId: 99);
+        slots.OnDirectory(strayOtherRotation);
+
+        Assert.Same(tracked, slots.Last!.HeardDirectory);
+    }
+
+    [Fact]
+    public void OnDirectory_SameDateAndRotation_DifferentObject_StillReplaces()
+    {
+        // The two waveforms taking turns resend the same rotation as a different object (the
+        // mode is part of what is hashed): still this slot's, so it may replace what is tracked.
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        var today = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
+        slots.OnDirectory(DirectoryWithEntry(today, objectId: 1));
+
+        var resend = DirectoryWithEntry(today, objectId: 1);
+        slots.OnDirectory(resend);
+
+        Assert.Same(resend, slots.Last!.HeardDirectory);
+    }
+
+    [Fact]
+    public void OnDirectory_NewerDate_Replaces()
+    {
+        // Issue #72: the day rolling over mid-slot is this slot's too, even with an entirely
+        // different rotation.
+        var time = new FakeTimeProvider(At(13, 0, 5));
+        var slots = new SlotTracker(time, _ => { }, Hourly);
+        slots.OnFrame();
+        var today = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
+        slots.OnDirectory(DirectoryWithEntry(today, objectId: 1));
+
+        var tomorrow = DirectoryWithEntry(today.AddDays(1), objectId: 99);
+        slots.OnDirectory(tomorrow);
+
+        Assert.Same(tomorrow, slots.Last!.HeardDirectory);
     }
 
     [Fact]

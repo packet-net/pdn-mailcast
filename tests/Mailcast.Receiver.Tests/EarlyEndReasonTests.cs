@@ -187,6 +187,39 @@ public class EarlyEndReasonTests
     }
 
     [Fact]
+    public async Task StrayOlderDirectory_ArrivingMidSlot_DoesNotStopTheSlotEndingEarly()
+    {
+        // Issue #72: today's rotation, heard and complete.
+        await using var f = new Fixture(SlotStart.AddSeconds(2));
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            await f.HearAsync(frame);
+        }
+        f.Host.Slots.OnProbeCaptured();
+        f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+        Assert.NotNull(f.Host.EarlyEndReason(SlotStart)); // ready, before the stray directory
+
+        // A stray directory from an earlier day arrives mid-slot (a decode of an old directory's
+        // frame, a second head end, or a test head end on the air at the same time). It lists a
+        // bulletin this receiver has never heard, so if it took the place of the slot's own
+        // tracked directory, the early-end check would wait forever for something that is never
+        // coming. It is older than today's rotation, so it must not take that place.
+        var strayDirectory = new BroadcastDirectory(
+            DateOnly.FromDateTime(SlotStart.UtcDateTime).AddDays(-1),
+            [new DirectoryEntry(0xDEADBEEF_00000001, 0, 100, "99_GB7XYZ", "Stray directory")]);
+        var strayTransfer = TransferObject.ForDirectory(strayDirectory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var stray = Ax25UiFrame.Build(Samples.Source, OnAir.Destination, strayTransfer.Frame(0).ToBytes());
+        await f.HearAsync(stray);
+
+        // Hearing any frame resets the quiet clock (conservatively, in case something new is on
+        // its way), so wait that out again before judging whether the slot's own directory is
+        // still the one tracked.
+        f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
+
+        Assert.NotNull(f.Host.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
     public async Task WrongSlot_IsNull()
     {
         await using var f = new Fixture(SlotStart.AddSeconds(2));
