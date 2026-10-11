@@ -86,7 +86,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             return new ListenNowService.Result(false, "Listen now is for a web SDR receiver only.", null);
         }
         var now = _time.GetUtcNow();
-        var nextOpens = ListeningWindow.Next(now, Schedule).Opens;
+        var nextOpens = NextWebSdrWindowOpens(now);
         var result = ListenNow.Request(now, nextOpens, alreadyListening: Audio.Phase == AudioPhase.Listening);
         if (result.Ok)
         {
@@ -798,9 +798,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                 closingSlot = slot;
                 // Issue #57: a "Listen now" session's close is re-checked against the schedule
                 // every time, not just at grant, so a window GB7RDG's directory moves earlier
-                // mid-session is still never overlapped.
+                // mid-session is still never overlapped. Issue #80: NextWebSdrWindowOpens, not
+                // the raw schedule, so a session granted during what would have been the rest of
+                // a window that ended early is not mistaken for overlapping that same window
+                // (already over) and cut off at once.
                 Func<DateTimeOffset, DateTimeOffset>? recomputeCloses = !listenNow ? null
-                    : now => ListenNow.ActiveUntil(now, ListeningWindow.Next(now, Schedule).Opens) ?? now;
+                    : now => ListenNow.ActiveUntil(now, NextWebSdrWindowOpens(now)) ?? now;
                 _ = CloseAtAsync(opens, closes, slot, recomputeCloses, closeAt, restart.Token);
             }
 
@@ -963,6 +966,26 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         get { lock (_gate) { return _earlyEndFinished; } }
         set { lock (_gate) { _earlyEndFinished = value; } }
+    }
+
+    /// <summary>
+    /// Issue #80: when the web SDR's next window really opens, from <paramref name="now"/>: the
+    /// schedule's own next window, unless that is the one just closed early
+    /// (<see cref="EarlyEndFinished"/>), which is not reopened for the rest of it, the same as
+    /// <see cref="SuperviseAudioAsync"/> treats it for the audio loop itself. Without this, a
+    /// "Listen now" request made during what would have been the rest of that window sees it as
+    /// still open by the clock (<see cref="ListeningWindow.Next(DateTimeOffset,SlotSchedule)"/>
+    /// alone does not know it ended early), and is refused as if a slot's window were about to
+    /// open, which is not true.
+    /// </summary>
+    internal DateTimeOffset NextWebSdrWindowOpens(DateTimeOffset now)
+    {
+        var (opens, closes, slot) = ListeningWindow.Next(now, Schedule);
+        if (slot == EarlyEndFinished?.Slot)
+        {
+            (opens, _, _) = ListeningWindow.Next(closes, Schedule);
+        }
+        return opens;
     }
 
     /// <summary>

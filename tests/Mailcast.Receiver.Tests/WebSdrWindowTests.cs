@@ -575,6 +575,51 @@ public class WebSdrWindowTests
     }
 
     [Fact]
+    public async Task ListenNow_AfterAnEarlyEnd_OpensRatherThanRefusingWithTheWrongReason()
+    {
+        // Issue #80: open at 12:01, in the 12:00 slot's window (opens 11:58, closes 12:12), and
+        // end it early the same way as EarlyEnd_WebSdr_ClosesBeforeTheUsualEnd_OnceEverythingIsHeardAndQuiet.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero));
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            rig.Host.Intake.Offer(frame);
+        }
+        await rig.Host.Intake.DrainAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        rig.Host.Slots.OnProbeCaptured();
+
+        for (int i = 0; i < 6 && !input.Disposed; i++)
+        {
+            rig.Clock.Advance(ReceiverHost.EarlyEndPoll);
+            await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.True(input.Disposed);
+        await rig.AudioAsync(AudioPhase.Closed);
+        Assert.Contains(rig.Log, l => l.Contains("ending the 12:00 UTC slot's window early", StringComparison.Ordinal));
+
+        // Still well inside what would have been the rest of the 12:00 slot's window, had it
+        // not ended early (that ran to 12:12; this is still only a couple of minutes past 12:01).
+        // Pressing "Listen now" here must not be refused as though the 10:00 slot's window
+        // (which already happened) were a few minutes away: the real next window is 14:00's,
+        // nearly two hours off, so a request now should simply open.
+        Assert.True(rig.Clock.GetUtcNow() < new DateTimeOffset(2026, 10, 5, 12, 12, 0, TimeSpan.Zero));
+        var result = rig.Host.RequestListenNow();
+
+        Assert.True(result.Ok, result.Reason);
+        Assert.Null(result.Reason);
+
+        // The status page's "Listen now" tile agrees: the session just granted is open (not
+        // refused), with no leftover "wrong reason" sitting in its problem field.
+        var page = new Mailcast.Receiver.Web.StatusPage(rig.Host, null, _ => { });
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        var listenNow = json.GetProperty("listenNow");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Null, listenNow.GetProperty("until").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, listenNow.GetProperty("problem").ValueKind);
+    }
+
+    [Fact]
     public void Page_AsksForTheSpectrogramOnlyWhileTheAudioIsLive_AndExplainsOtherwise()
     {
         // The page is a file, not a program this suite can run: these check that its logic is the one described.
