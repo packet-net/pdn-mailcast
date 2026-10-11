@@ -56,6 +56,8 @@ SDR users: nothing else to do. If your radio's own receive filter is narrower, e
 
 If pdn-soundmodem (0.88.0 or later) already runs your radio on this machine, set `"audio": "soundmodem"` (or `"soundmodem:PORT"` if its page is not on port 8107) and restart the receiver. It listens through pdn-soundmodem's own audio, with no `ms110d` modem needed there, and **Measure my filter** works the same. Its dial follows pdn-soundmodem's when pdn-soundmodem gives one. If pdn-soundmodem's radio is usually on another frequency, add `"retune": true` and the receiver takes pdn-soundmodem's receive window for each slot: pdn-soundmodem tunes its radio to `dialKHz` and holds its own transmitting until the slot is over (pdn-soundmodem needs a `rig` section for this). See [Retuning through pdn-soundmodem](../../docs/receiver.md#retuning-through-pdn-soundmodem).
 
+Moving from pdn-soundmodem's built-in receiver (its `mailcast` section)? [Using it with pdn-soundmodem](../../docs/receiver.md#using-it-with-pdn-soundmodem) says what to copy across and how to switch over.
+
 ## Linux FBB
 
 Instead of step 2: add a telnet port in `port.sys`, add user **Q0CAST** (`EU Q0CAST`) with the **B** and **M** flags and a password, and don't add it to `forward.sys`. In the receiver's config set `"type": "fbb"` and FBB's telnet port. (Not tested yet.)
