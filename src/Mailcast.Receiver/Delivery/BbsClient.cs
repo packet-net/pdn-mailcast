@@ -239,13 +239,21 @@ public sealed partial class BbsClient : IBbsSession
 
     /// <summary>The reply has said enough to classify: a refusal, an unknown command, or a prompt at the end.</summary>
     private static bool Settled(string text) =>
-        RefusalFound(text) || text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase) || text.TrimEnd().EndsWith('>');
+        RefusalFound(text) || text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase)
+        || text.TrimEnd().EndsWith('>') || AsksForFirstName(text);
 
     /// <summary>
     /// What a login test's reply means. <see cref="PromptCall"/> matching means the BBS sent its
-    /// own forwarding prompt ("de CALL>"), exactly as it does to a real forwarding partner; a bare
-    /// prompt with no "de CALL" means the login worked but is not a BBS user set up to forward,
-    /// such as LinBPQ asking a brand new login to register a name.
+    /// own forwarding prompt ("de CALL>"), exactly as LinBPQ does to a real forwarding partner.
+    /// FBB never sends "de CALL": a real Linux FBB 7.0.11 (issue #108, captured in docker) answers
+    /// a correctly set-up partner with its SID and a bare "(n) CALLSIGN BBS>" prompt, nothing
+    /// else, so for an FBB login that bare prompt is itself the forwarding prompt. The same
+    /// capture showed that a login FBB has never seen connect before goes through its own
+    /// new-user registration ("Please enter your first name :") unless it has the BBS flag, which
+    /// skips straight to the bare prompt above; once any connection has happened at all, FBB skips
+    /// registration from then on regardless of the BBS flag, so the registration prompt is only
+    /// the shape a freshly created, not-yet-a-partner account sends, which is exactly the case
+    /// docs/receiver.md's set-up steps are tested against.
     /// </summary>
     private BbsLoginTestResult Classify(string text, bool closed)
     {
@@ -266,7 +274,19 @@ public sealed partial class BbsClient : IBbsSession
         {
             return new BbsLoginTestResult(BbsLoginTestOutcome.NeedsName, NeedsNameExplanation(_settings.Login));
         }
-        if (text.TrimEnd().EndsWith('>'))
+        if (_settings.Type == BbsKind.Fbb)
+        {
+            if (AsksForFirstName(text))
+            {
+                return new BbsLoginTestResult(BbsLoginTestOutcome.NotForwardingPartner,
+                    $"\"{_settings.Login}\" logged in, but it is not set up as a BBS forwarding partner.");
+            }
+            if (text.TrimEnd().EndsWith('>'))
+            {
+                return new BbsLoginTestResult(BbsLoginTestOutcome.Ok, "OK, logged in as a forwarding partner.");
+            }
+        }
+        else if (text.TrimEnd().EndsWith('>'))
         {
             return new BbsLoginTestResult(BbsLoginTestOutcome.NotForwardingPartner,
                 $"\"{_settings.Login}\" logged in, but it is not set up as a BBS forwarding partner.");
@@ -315,6 +335,18 @@ public sealed partial class BbsClient : IBbsSession
     /// <summary>The plain-English explanation for <see cref="AsksForName"/>, used both for the login test and a real delivery session.</summary>
     private static string NeedsNameExplanation(string login) =>
         $"\"{login}\" logged in, but LinBPQ is asking for a name: give this user a Name in LinBPQ's BBS user settings (Web Mgmt, BBS Users), then test again.";
+
+    /// <summary>
+    /// True if <paramref name="text"/> is FBB's own new-user prompt, "Please enter your first
+    /// name :" (issue #108, captured from a real FBB 7.0.11), asking a login FBB has never seen
+    /// connect before to register. A login with the BBS flag skips this and reaches the bare
+    /// forwarding prompt directly, so seeing this instead means the login is not (yet) set up as
+    /// a BBS forwarding partner, worded the same as LinBPQ's bare-prompt NotForwardingPartner case
+    /// rather than NeedsName: unlike LinBPQ's name prompt (#84), giving this login a name on its
+    /// own would not make it a forwarding partner, only the BBS flag does.
+    /// </summary>
+    private static bool AsksForFirstName(string text) =>
+        text.Contains("enter your first name", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Offers <paramref name="bulletins"/> to the BBS in one session.</summary>
     public async Task<SessionReport> DeliverAsync(IReadOnlyList<Bulletin> bulletins, CancellationToken cancellation)

@@ -10,6 +10,9 @@ public class BbsClientTests
     private static BbsClient Client(int port, string password = "secret") =>
         new(new BbsSettings { Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, _ => { });
 
+    private static BbsClient FbbClient(int port, string password = "mailcast12") =>
+        new(new BbsSettings { Type = BbsKind.Fbb, Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, _ => { });
+
     [Fact]
     public async Task Deliver_NewBulletins_BbsTakesThemAsAPartnerWouldSendThem()
     {
@@ -246,6 +249,63 @@ public class BbsClientTests
         Assert.Contains("asking for a name", result.Said, StringComparison.Ordinal);
         Assert.Contains("BBS Users", result.Said, StringComparison.Ordinal);
         Assert.Null(result.Detail);
+    }
+
+    /// <summary>
+    /// Issue #108: a real Linux FBB 7.0.11 never sends LinBPQ's "de CALL>" forwarding prompt, so
+    /// Classify's PromptCall regex never matched it, and a correctly set-up FBB forwarding
+    /// partner (the BBS flag set) fell through to NotForwardingPartner. These three replies are
+    /// the exact bytes captured from a real FBB in docker (see tests/Mailcast.Receiver.Tests/Fbb,
+    /// from PR #107), for: the BBS flag set, a plain login FBB has never seen before and which
+    /// lacks the BBS flag, and a wrong password.
+    /// </summary>
+    private const string FbbForwardingPartnerReply =
+        "\r\nLogon Ok. Type NP to change password.\r\n\r\n[FBB-7.0.11-AB1FHMRX$]\rGB7FBB Mailbox, QTH Reading.\r(1) GB7FBB BBS>\r";
+
+    private const string FbbNotAPartnerReply =
+        "\r\nLogon Ok. Type NP to change password.\r\n\r\n[FBB-7.0.11-AB1FHMRX$]\rGB7FBB BBS, QTH IO91LK.\rHello ???, you are now on channel 1.\r"
+        + "Here are 0 active messages, 100 is last message and \r80 is the last you have listed.\r\rAssigned channels:\r"
+        + "Ch. 1   (TELNET) : Q1CAST-0  - Sun 11/10/26 14:03\r\rPlease enter your first name :";
+
+    private const string FbbWrongPasswordReply = "Password error !\r\nPassword : ";
+
+    [Fact]
+    public async Task TestLogin_Fbb_GoodPasswordOnAForwardingPartner_ReachesTheForwardingPromptForReal()
+    {
+        await using var fbb = new FakeFbb(FbbForwardingPartnerReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.Ok, result.Outcome);
+        Assert.Null(result.Detail);
+    }
+
+    /// <summary>
+    /// A login FBB has never seen connect before, and which lacks the BBS flag, gets FBB's own
+    /// new-user prompt, "Please enter your first name :", instead of the bare forwarding prompt a
+    /// BBS-flagged login reaches directly. Unlike LinBPQ's name prompt (#84), giving this login a
+    /// name on its own would not make it a forwarding partner (only the BBS flag does), so this is
+    /// NotForwardingPartner, not NeedsName.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_Fbb_NotSetUpAsAPartner_SaysSoForReal()
+    {
+        await using var fbb = new FakeFbb(FbbNotAPartnerReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.NotForwardingPartner, result.Outcome);
+        Assert.Contains("Q0CAST", result.Said, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestLogin_Fbb_WrongPassword_SaysSoForReal()
+    {
+        await using var fbb = new FakeFbb(FbbWrongPasswordReply);
+
+        var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
     }
 
     [Fact]
