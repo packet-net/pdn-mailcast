@@ -48,6 +48,8 @@ If pdn-soundmodem already runs your radio, the receiver can listen through it, o
 
 You need pdn-soundmodem 0.88.0 or later and this receiver 0.9.0 or later (`--version` on either says which you have). pdn-soundmodem needs no `ms110d` modem for this. It does need its station page, which its `waterfall` section gives it; the packaged config has one.
 
+**New to both?** Install, set `"audio": "soundmodem"` and your `bbs` in `receiver.json`, run `sudo systemctl restart pdn-mailcast-receiver`, then go to [Check it works](#check-it-works). The table and "Switch over" below are only for moving from pdn-soundmodem's built-in receiver.
+
 ### Install
 
 If pdn-soundmodem came from the packet-net apt repository, the repository is already set up:
@@ -69,7 +71,7 @@ Then copy across from the `mailcast` section of pdn-soundmodem's config (`/etc/p
 |---|---|---|
 | `bbs` | `bbs` | The same six keys (`type`, `host`, `port`, `login`, `password`, `command`) with the same defaults. Copy it as it is; nothing changes on your BBS. |
 | `sources` | `sources` | The same. |
-| `dialKHz` | `dialKHz` | The same: the dial a retune puts the radio on. The receiver takes 7051.8 to 7052.8 only (the signal's centre at 1000 to 2000 Hz), where the built-in took any HF dial. |
+| `dialKHz` | `dialKHz` | The same: the dial a retune puts the radio on, now 7051.8 to 7052.8 only. See "Which dial" below. |
 | `retune` | `retune` | The same, and pdn-soundmodem still needs its `rig` section for it. See [Retuning through pdn-soundmodem](#retuning-through-pdn-soundmodem). |
 | `hooks` | `hooks` | The same keys and environment variables. They now run as the receiver's user, `pdn-mailcast`, so a script that used pdn-soundmodem's ssh key needs a key of the receiver's own; see [Running your own commands around each slot](#running-your-own-commands-around-each-slot). |
 | `stateDirectory` | leave it out | The receiver keeps its own, in `/var/lib/pdn-mailcast`. Nothing is carried over: part-heard bulletins start again, and GB7RDG repeats them. |
@@ -93,6 +95,8 @@ becomes this in `receiver.json`, alongside the rest of the file:
 
 **Measure my filter** is on the receiver's settings page now, and works the same on this source.
 
+**Which dial.** Without `retune`, the receiver listens on whatever dial pdn-soundmodem's radio is on, and any dial whose channel carries the whole signal will do. On a 48 kHz channel that is a wide range. On a 12 kHz channel the dial must be 7.04925 MHz or above. pdn-soundmodem drops to 12 kHz once its `mailcast` section is gone, if it has no 48 kHz modems. With `retune`, the radio is moved to `dialKHz` for each slot, and that must be 7051.8 to 7052.8. If a dial will not do, the receiver's log and page say so, and what to change.
+
 ### Switch over
 
 Do it between slots: in daylight, after :13 and before :58 past the hour.
@@ -102,12 +106,10 @@ Do it between slots: in daylight, after :13 and before :58 past the hour.
 
 The receiver may then offer your BBS bulletins the built-in already delivered. LinBPQ answers "already have" for those, so nothing arrives twice (tested), and the receiver's page counts them as already had. With FBB this has not been tested.
 
-Without the `mailcast` section, pdn-soundmodem may run its channel at 12 kHz rather than 48 kHz. The receiver copes, but without `retune` it then needs pdn-soundmodem's dial at 7.04925 MHz or above (a Flex on a lower dial, say). If it is lower, the receiver's log and page say so, and what to change.
-
 ### Check it works
 
 - The receiver's page, http://127.0.0.1:8130/, shows a live spectrogram of pdn-soundmodem's audio, and from the next slot what was heard.
-- pdn-soundmodem's own page shows "listening: pdn-mailcast-receiver" at the top, linked to the receiver's page.
+- pdn-soundmodem's own page shows "listening: pdn-mailcast-receiver" at the top, linked to the receiver's page. From another machine the link only works if the receiver's page is on the network: `"web": { "lan": true, "password": "..." }`.
 - The receiver's journal (`journalctl -u pdn-mailcast-receiver -f`) says `audio: pdn-soundmodem on 127.0.0.1:8107, ...`, with the channel's rate and the dial it uses, and pdn-soundmodem's says `channel-audio: ... connected`. If pdn-soundmodem stops or restarts, the receiver says so and connects again after 1, 2, 5, 10 and then every 30 seconds.
 
 ## Retuning through pdn-soundmodem
