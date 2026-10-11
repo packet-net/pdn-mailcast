@@ -462,10 +462,87 @@ public sealed class SoundModemRetuneTests
         input.MoveFrom(3800);
         Assert.Equal(3800, await NextAsync(1200));
         Assert.Equal(3800, input.MovedFromHz);
-        Assert.Contains(moved, v => v != 0);
+        // The tone is at 1800 Hz in the moved block now, not at 3800 (the second half, past the filters' start).
+        var settled = moved.AsSpan(moved.Length / 2).ToArray();
+        Assert.True(Power(settled, 1800) > 100 * Power(settled, 3800), $"1800 Hz {Power(settled, 1800)}, 3800 Hz {Power(settled, 3800)}");
         input.MoveFrom(null);
         Assert.Null(await NextAsync(2400));
         Assert.Null(input.MovedFromHz);
+    }
+
+    /// <summary>The power of <paramref name="hz"/> in 48 kHz audio (Goertzel).</summary>
+    private static double Power(float[] samples, double hz)
+    {
+        double coefficient = 2 * Math.Cos(2 * Math.PI * hz / OnAir.SampleRate), s1 = 0, s2 = 0;
+        foreach (float x in samples)
+        {
+            double s0 = x + (coefficient * s1) - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+        return (s1 * s1) + (s2 * s2) - (coefficient * s1 * s2);
+    }
+
+    [Fact]
+    public async Task ABlockAlreadyQueued_KeepsTheMoveItWasMadeWith()
+    {
+        await using var fake = new FakeSoundModem(rateHz: 12_000, dialHz: 7_052_000);
+        using var input = await SoundModemAudioInput.OpenAsync(fake.Port, CancellationToken.None);
+        var connection = await fake.NextAsync();
+        var samples = new float[1200];
+
+        await connection.SendAsync(0, samples);
+        await WaitForAsync(() => input.BlocksReceived == 1);
+        input.MoveFrom(3800);
+        await connection.SendAsync(1200, samples);
+        await WaitForAsync(() => input.BlocksReceived == 2);
+
+        var block = new float[OnAir.SampleRate / 10];
+        var moved = new float[OnAir.SampleRate / 10];
+        Assert.True(input.ReadBlock(block, moved, out _, out _, out double? first) > 0);
+        Assert.True(input.ReadBlock(block, moved, out _, out _, out double? second) > 0);
+        Assert.Null(first);
+        Assert.Equal(3800, second);
+    }
+
+    private static async Task WaitForAsync(Func<bool> done)
+    {
+        for (int i = 0; i < 200 && !done(); i++)
+        {
+            await Task.Delay(25);
+        }
+        Assert.True(done());
+    }
+
+    [Fact]
+    public async Task ARetuneWhileTheAudioThreadWaits_DropsTheBlockMadeWithTheOldMove_AndFeedsTheNext()
+    {
+        await using var fake = new FakeSoundModem(rateHz: 12_000, dialHz: BulletinDialHz);
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            BulletinDialHz, _ => { }, TimeProvider.System, retunedByWindow: true);
+        await using var _ = pipeline;
+        int heard = 0;
+        pipeline.SourceBlock += _ => Interlocked.Increment(ref heard);
+        await pipeline.OpenAsync(CancellationToken.None);
+        var connection = await fake.NextAsync();
+        await pipeline.StartAsync(CancellationToken.None);
+        var samples = new float[1200];
+        samples[0] = 0.1f;
+
+        await connection.SendAsync(0, samples);
+        await WaitForAsync(() => Volatile.Read(ref heard) == 1);
+
+        // The window gives the radio back to 7.050 MHz while the audio thread waits for a block:
+        // the next block was made unmoved and is dropped; the one after comes moved and is fed.
+        Assert.True(pipeline.FollowDial(7_050_000));
+        await connection.SendAsync(1200, samples);
+        await WaitForAsync(() => pipeline.DroppedAtRetune == 1);
+        await connection.SendAsync(2400, samples);
+        await WaitForAsync(() => Volatile.Read(ref heard) == 2);
+
+        Assert.Equal(1, pipeline.DroppedAtRetune);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 3);
+        Assert.Equal(1800, pipeline.Tone.ExpectedHz, 3);
     }
 
     [Fact]
@@ -615,10 +692,17 @@ public sealed class SoundModemRetuneTests
         Assert.True(pipeline.FollowDial(7_040_000));
         Assert.Equal(7_040_000, pipeline.DialHz);
         Assert.Equal(1800, AudioPipeline.AudioCentreFor(pipeline.DialHz), 3);
-        pipeline.FeedStream(new float[OnAir.SampleRate / 10], transmitted: false, gap: false);
+        var block = new float[OnAir.SampleRate / 10];
+        // A block the input made before it was asked to move (no tag) is dropped, not fed under
+        // the new placement.
+        Assert.False(pipeline.FeedTagged(block, default, movedFrom: null, transmitted: false, gap: false));
+        Assert.Equal(1, pipeline.DroppedAtRetune);
         Assert.Equal(1800, pipeline.AudioCentreHz, 3);
         Assert.Equal(1800, pipeline.Tone.ExpectedHz, 3);
         Assert.Equal(1, pipeline.ModemResets);
+        // One made with the new move goes through.
+        Assert.True(pipeline.FeedTagged(block, block, movedFrom: 13_800, transmitted: false, gap: false));
+        Assert.Equal(1, pipeline.DroppedAtRetune);
         // Not said: the hello's dial, in reach.
         Assert.True(pipeline.FollowDial(null));
         Assert.Equal(7_052_300, pipeline.DialHz);

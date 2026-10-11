@@ -300,9 +300,35 @@ public sealed class AudioPipeline : IAsyncDisposable
             _movedFromHz = from;
             _stream?.MoveFrom(from);
         }
-        Tone.ExpectedHz = AudioCentreHz;
+        Tone.ExpectedHz = from is null ? centre : OnAir.CentreAudioHz;
         // The audio either side of a retune is not one signal.
         ResetModem();
+    }
+
+    /// <summary>For tests: how many blocks were dropped because they were made with the input's move from before a retune.</summary>
+    internal int DroppedAtRetune => Volatile.Read(ref _droppedAtRetune);
+
+    private int _droppedAtRetune;
+
+    /// <summary>
+    /// One block of pdn-soundmodem's channel audio as the input gave it, with where it was moved
+    /// from (<paramref name="movedFrom"/>, null if not moved): on the audio thread, after the read.
+    /// A dial <see cref="FollowDial"/> moved to is placed first, so a block made with the input's
+    /// move from before the retune (its tag no longer the one asked for) is dropped rather than fed
+    /// under the new placement; the modem listens afresh at the retune anyway. A retune between
+    /// two dials neither of which is moved changes no tag, so the block or so already queued then
+    /// goes through with the new dial's shift for the modem. False when dropped.
+    /// </summary>
+    internal bool FeedTagged(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, double? movedFrom, bool transmitted, bool gap)
+    {
+        PlaceByPendingDial();
+        if (movedFrom != _movedFromHz)
+        {
+            Interlocked.Increment(ref _droppedAtRetune);
+            return false;
+        }
+        FeedPlaced(samples, movedFrom is null ? default : moved, transmitted, gap);
+        return true;
     }
 
     /// <summary>How many times the modem has been made to listen afresh after a gap or a keyed span in pdn-soundmodem's audio.</summary>
@@ -616,10 +642,6 @@ public sealed class AudioPipeline : IAsyncDisposable
             {
                 bool transmitted = false, gap = false;
                 double? movedFrom = null;
-                if (_stream is not null)
-                {
-                    PlaceByPendingDial();
-                }
                 int read = _stream is { } stream ? stream.ReadBlock(block, _movedBlock, out transmitted, out gap, out movedFrom) : _input!.Read(block);
                 if (read == 0)
                 {
@@ -635,13 +657,8 @@ public sealed class AudioPipeline : IAsyncDisposable
                 Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
                 if (_stream is not null)
                 {
-                    if (movedFrom != _movedFromHz)
-                    {
-                        // Made before the radio was retuned, with the move that went with it; the
-                        // modem was made to listen afresh at the retune.
-                        continue;
-                    }
-                    FeedStream(block.AsSpan(0, read), movedFrom is null ? default : _movedBlock.AsSpan(0, read), transmitted, gap);
+                    // Placed after the read: a retune almost always lands while the read waits.
+                    FeedTagged(block.AsSpan(0, read), movedFrom is null ? default : _movedBlock.AsSpan(0, read), movedFrom, transmitted, gap);
                 }
                 else
                 {
@@ -664,7 +681,7 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>
     /// One block of pdn-soundmodem's channel audio, on the audio thread (or a test's). A keyed
     /// block is already silence and goes through as it is, so every clock here keeps pace with
-    /// pdn-soundmodem's; but MS110D is a stream mode, and the audio either side of a keyup or a
+    /// pdn-soundmodem's (except across a block dropped at a retune, see <see cref="FeedTagged"/>); but MS110D is a stream mode, and the audio either side of a keyup or a
     /// gap is not one signal, so the modem is made to listen afresh after each keyed span and on
     /// every gap, in the same way, rather than decoding across the hole.
     /// </summary>
@@ -677,6 +694,12 @@ public sealed class AudioPipeline : IAsyncDisposable
     internal void FeedStream(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, bool transmitted, bool gap)
     {
         PlaceByPendingDial();
+        FeedPlaced(samples, moved, transmitted, gap);
+    }
+
+    /// <summary>As <see cref="FeedStream(ReadOnlySpan{float}, ReadOnlySpan{float}, bool, bool)"/>, with the placement already settled for this block.</summary>
+    private void FeedPlaced(ReadOnlySpan<float> samples, ReadOnlySpan<float> moved, bool transmitted, bool gap)
+    {
         if (gap)
         {
             ResetModem();
