@@ -92,8 +92,9 @@ public sealed record ReceiverConfig
 {
     /// <summary>
     /// Where the audio comes from: an ALSA device such as <c>plughw:CARD=Device,DEV=0</c>, an
-    /// UberSDR web receiver as <c>ubersdr:wessex.zapto.org</c>, or a recording as
-    /// <c>wav:/path/to/file.wav</c>.
+    /// UberSDR web receiver as <c>ubersdr:wessex.zapto.org</c>, the pdn-soundmodem on this
+    /// machine as <c>soundmodem</c> (its usual page port, 8107) or <c>soundmodem:PORT</c>, or a
+    /// recording as <c>wav:/path/to/file.wav</c>.
     /// </summary>
     public string Audio { get; init; } = "ubersdr:wessex.zapto.org";
 
@@ -385,7 +386,7 @@ public sealed record ReceiverConfig
         // JSON can say null for anything; say which setting rather than fail on it later.
         if (Audio is null)
         {
-            throw new ConfigException("\"audio\" is null: give an ALSA device, a ubersdr: web receiver or a wav: recording");
+            throw new ConfigException("\"audio\" is null: give an ALSA device, a ubersdr: web receiver, soundmodem or a wav: recording");
         }
         if (Bbs is null || Bbs.Host is null || Bbs.Login is null || Bbs.Password is null || Bbs.Command is null)
         {
