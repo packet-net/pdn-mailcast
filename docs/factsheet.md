@@ -1,6 +1,6 @@
 # pdn-mailcast technical fact sheet
 
-A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a standalone program or a web SDR and forwarded into the listener's own BBS. Figures are as configured and measured on 2026-10-05. The design and its reasoning are in [design.md](design.md).
+A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from GB7RDG's station, received by a standalone program or a web SDR and forwarded into the listener's own BBS. Figures are as configured and measured on 2026-10-05. The design and its reasoning are in [design.md](design.md).
 
 ## Signal
 
@@ -16,7 +16,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | Bursts | Frames queued together share one burst of up to 18 s, one preamble each; each burst is its own keyup |
 | Power | 50 W setting on a Flex 6500; measured forward power about 41 W median during data, 44 W during the tone; SWR 1.02 to 1.09 |
 | Transmit level | pdn-soundmodem `txAmplitude` 1.0 (data peaks at about 0.75 of full scale; the tone at 0.8) |
-| Identification | AX.25 source callsign GB7RDG on every frame, plus CW ident GB7RDG at 20 wpm on the signal centre at the start of each slot and when the transmitter is released |
+| Identification | AX.25 source callsign M0LTE on every frame, plus CW ident M0LTE at 20 wpm on the signal centre at the start of each slot and when the transmitter is released |
 | Accepted sources | Frames may come from GB7RDG or M0LTE; receivers accept both (the receiver's `sources` setting), so the broadcast can move to M0LTE without a receiver update |
 
 ## Timetable
@@ -35,7 +35,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 
 | | |
 |---|---|
-| Link layer | AX.25 UI frame, GB7RDG to MCAST, PID F0, carried as IL2P with CRC inside the MS110D bit stream |
+| Link layer | AX.25 UI frame, M0LTE to MCAST, PID F0, carried as IL2P with CRC inside the MS110D bit stream |
 | Frame payload | 271 bytes: version (1), flags (1), object ID (8), dictionary ID (2), RaptorQ OTI (12), ESI (3), symbol (240), CRC-32 (4) |
 | Object ID | First 8 bytes of SHA-256 over the dictionary ID and the object, so every object checks itself |
 | Forward error correction | RaptorQ (RFC 6330), one source block per object, 240-byte symbols; any K plus a couple of symbols rebuilds an object, and pieces from different slots add up |
@@ -43,7 +43,7 @@ A one-way HF transmission of packet BBS bulletins from GB7RDG, received by a sta
 | Compression | zstd with a trained 64 KB dictionary (`gb7rdg-1`, ID 1), checksum required; bulletins come down to about 30% of their size |
 | Content types | First byte of each object: 1 packet mail bulletin (FBB/BPQ message format), 2 directory, 3 reserved for DAPPS, 4 propagation reading, 112 to 127 experimental; top bit set means a length-prefixed metadata block follows |
 | Ionosonde reading | From 0.6.0, in each slot that keys: is 40 m open from Reading at 100, 500 and 1000 km, by Chilton's (else Fairford's, else Dourbes') latest sounding from GIRO or PROPquest, with the skip zone. Content type 4, one object per source: 24 bytes for the ionosonde, not compressed, in 2 frames of 55 bytes, inside the airtime budget and not in the directory. Observe only: it never changes what or when the head end sends. D-layer absorption is not modelled |
-| PSK Reporter reading | In each slot that keys, beside the ionosonde's: is 40 m open at 100, 500 and 1000 km by the last 30 minutes of FT8, FT4 and WSPR spots between UK and Irish stations on PSK Reporter's public MQTT feed, with the spots, stations and median SNR behind each verdict, and a skip zone. Open means open for FT8, which decodes far below what MS110D needs, so it is no promise GB7RDG will be heard; the medians are the better guide. Never calls a quiet distance closed without evidence; UNKNOWN when the feed was down. Content type 4, source 3: 27 bytes, in 2 frames of 59 bytes. 80 m is judged too, at the head end only. Observe only |
+| PSK Reporter reading | In each slot that keys, beside the ionosonde's: is 40 m open at 100, 500 and 1000 km by the last 30 minutes of FT8, FT4 and WSPR spots between UK and Irish stations on PSK Reporter's public MQTT feed, with the spots, stations and median SNR behind each verdict, and a skip zone. Open means open for FT8, which decodes far below what MS110D needs, so it is no promise M0LTE will be heard; the medians are the better guide. Never calls a quiet distance closed without evidence; UNKNOWN when the feed was down. Content type 4, source 3: 27 bytes, in 2 frames of 59 bytes. 80 m is judged too, at the head end only. Observe only |
 | Directory | Sent in every slot that keys: the bulletins in rotation (BID, title, size, content type), the timetable, the daylight rule and the slot's waveform; text, versioned, unknown fields ignored. A slot with nothing to send keys nothing, directory included; 0.3.0 skipped slots that way when no share was due, the budget rule only when nothing is in rotation |
 | Bulletin format | Key: value header (type, from, to, at, BID, date, title), blank line, then the message with its R: lines, as a BBS partner would forward it |
 

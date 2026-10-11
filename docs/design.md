@@ -4,7 +4,7 @@ Status: draft, 2026-10-04; built and on the air since 2026-10-05, every hour sin
 
 ## What it is
 
-Every hour on the hour in daylight, GB7RDG sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
+Every hour on the hour in daylight, M0LTE sends its recent bulletins on 40 m, transmitted from GB7RDG's station. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
 
 Two ideas make a one-way link work:
 
@@ -16,7 +16,7 @@ Two ideas make a one-way link work:
 | Question | Decision |
 |---|---|
 | What is sent | Bulletins only. No personal mail. |
-| Who sends | GB7RDG, a Flex 6500 on 40 m. |
+| Who sends | M0LTE, transmitted from GB7RDG's station, a Flex 6500 on 40 m. |
 | When | Every hour on the hour in daylight, from 2 hours after sunrise to 30 minutes before sunset near Reading: 09:00 to 17:00 UTC in early October, 11:00 to 15:00 in midwinter, 06:00 to 19:00 in midsummer. A short slot of a few minutes. Until 2026-10-05 it was once a day at 12:00 UTC, which a head end can still be set to. |
 | Where | Centred on 7.0538 MHz (USB dial 7.052 MHz), occupying about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz. |
 | Receivers | Linux, with LinBPQ or FBB mail. |
@@ -52,7 +52,7 @@ The first on-air runs, on 2026-10-05, used 240-byte pieces rather than 940, whic
 
 ### Hourly
 
-From v0.2.0 GB7RDG sends every hour on the hour instead. A bulletin goes out first in the slot after it arrives, with enough pieces to rebuild it from that slot alone (1.5 times its pieces, plus 2), then again 5, 10, 17 and 25 hours later with 0.7 times its pieces each time, always fresh ones. So it is heard in five different hours of the day over a little more than a day, and a listener who missed one hour gets it later. A web SDR receiver listens to every third slot, to stay inside its allowance; whichever third it hears, it gets at least 1.4 times each bulletin's pieces. [headend.md](headend.md) has the details and the settings.
+From v0.2.0 M0LTE sends every hour on the hour instead. A bulletin goes out first in the slot after it arrives, with enough pieces to rebuild it from that slot alone (1.5 times its pieces, plus 2), then again 5, 10, 17 and 25 hours later with 0.7 times its pieces each time, always fresh ones. So it is heard in five different hours of the day over a little more than a day, and a listener who missed one hour gets it later. A web SDR receiver listens to every third slot, to stay inside its allowance; whichever third it hears, it gets at least 1.4 times each bulletin's pieces. [headend.md](headend.md) has the details and the settings.
 
 That is about twice as many pieces as the daily plan, plus a tone, idents and the directory every hour. On GB7RDG's volume, in 240-byte pieces, it comes to about 3.3 minutes on the air in an average hour (the directory's bigger floor, issue #69, gives a weak station a better chance of it in one slot, at a little more of this), under 6 in 19 hours out of 20, and about 8 in the busiest hour.
 
@@ -128,7 +128,7 @@ GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports
 
 ## On-air format
 
-Every frame is an AX.25 UI frame from `GB7RDG`, which takes care of identification, to a fixed destination such as `MCAST`. The payload is:
+Every frame is an AX.25 UI frame from `M0LTE`, transmitted from GB7RDG's station, which takes care of identification, to a fixed destination such as `MCAST`. The payload is:
 
 | Field | Size | Meaning |
 |---|---|---|
