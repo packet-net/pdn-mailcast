@@ -57,7 +57,7 @@ SDR users: nothing else to do. If your radio's own receive filter is narrower, e
 
 If pdn-soundmodem (0.89.0 or later) already runs your radio on this machine, set `"audio": "soundmodem"` (or `"soundmodem:PORT"` if its page is not on port 8107) and restart the receiver. It listens through pdn-soundmodem's own audio, with no `ms110d` modem needed there, and **Measure my filter** works the same. Its dial follows pdn-soundmodem's when pdn-soundmodem gives one. If pdn-soundmodem's radio is usually on another frequency, add `"retune": true` and the receiver takes pdn-soundmodem's receive window for each slot: pdn-soundmodem tunes its radio to `dialKHz` and holds its own transmitting until the slot is over (pdn-soundmodem needs a `rig` section for this). See [Retuning through pdn-soundmodem](../../docs/receiver.md#retuning-through-pdn-soundmodem).
 
-Moving from pdn-soundmodem's built-in receiver (its `mailcast` section)? [Using it with pdn-soundmodem](../../docs/receiver.md#using-it-with-pdn-soundmodem) says what to copy across and how to switch over.
+Moving from pdn-soundmodem's built-in receiver (its `mailcast` section)? [Moving from pdn-soundmodem's built-in receiver](../../docs/moving-from-built-in.md) says what to copy across and how to switch over.
 
 ## Linux FBB
 

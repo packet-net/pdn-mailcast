@@ -44,11 +44,11 @@ To decode a recording once and deliver what it completes, run `pdn-mailcast-rece
 
 ## Using it with pdn-soundmodem
 
-If pdn-soundmodem already runs your radio, the receiver can listen through it, on the same machine. This replaces pdn-soundmodem's built-in receiver (its `mailcast` section), which is going.
+If pdn-soundmodem already runs your radio, the receiver can listen through it, on the same machine.
+
+**Moving from pdn-soundmodem's built-in receiver** (a `mailcast` section in its config)? Follow [Moving from pdn-soundmodem's built-in receiver](moving-from-built-in.md) instead: it covers what to copy and how to switch over.
 
 You need pdn-soundmodem 0.89.0 or later and this receiver 0.9.0 or later (`--version` on either says which you have). 0.88.0 works too, but on a web receiver (and now and then on a Flex) it reports audio as lost when it was only late, and the receiver then starts its decoder afresh and can miss frames. pdn-soundmodem needs no `ms110d` modem for this. It does need its station page, which its `waterfall` section gives it; the packaged config has one.
-
-**New to both?** Install, set `"audio": "soundmodem"` and your `bbs` in `receiver.json`, run `sudo systemctl restart pdn-mailcast-receiver`, then go to [Check it works](#check-it-works). The table and "Switch over" below are only for moving from pdn-soundmodem's built-in receiver.
 
 ### Install
 
@@ -65,46 +65,13 @@ That also brings pdn-soundmodem up to date. If you installed pdn-soundmodem some
 
 In `/etc/pdn-mailcast/receiver.json`, set `"audio": "soundmodem"`. If pdn-soundmodem's page is not on port 8107 (a second instance, `pdn-soundmodem@NAME`, say), use `"soundmodem:PORT"` with its `waterfall` port.
 
-Then copy across from the `mailcast` section of pdn-soundmodem's config (`/etc/pdn-soundmodem/soundmodem.json`):
-
-| pdn-soundmodem's `mailcast` | `receiver.json` | Notes |
-|---|---|---|
-| `bbs` | `bbs` | The same six keys (`type`, `host`, `port`, `login`, `password`, `command`) with the same defaults. Copy it as it is; nothing changes on your BBS. |
-| `sources` | `sources` | The same. |
-| `dialKHz` | `dialKHz` | The same: the dial a retune puts the radio on, now 7051.8 to 7052.8 only. See "Which dial" below. |
-| `retune` | `retune` | The same, and pdn-soundmodem still needs its `rig` section for it. See [Retuning through pdn-soundmodem](#retuning-through-pdn-soundmodem). |
-| `hooks` | `hooks` | The same keys and environment variables. They now run as the receiver's user, `pdn-mailcast`, so a script that used pdn-soundmodem's ssh key needs a key of the receiver's own; see [Running your own commands around each slot](#running-your-own-commands-around-each-slot). |
-| `stateDirectory` | leave it out | The receiver keeps its own, in `/var/lib/pdn-mailcast`. Nothing is carried over: part-heard bulletins start again, and M0LTE repeats them. |
-
-For example, this in pdn-soundmodem:
-
-```json
-"mailcast": { "bbs": { "password": "pick-one" }, "retune": true, "sources": ["GB7RDG", "M0LTE"] }
-```
-
-becomes this in `receiver.json`, alongside the rest of the file:
-
-```json
-"audio": "soundmodem",
-"retune": true,
-"sources": ["GB7RDG", "M0LTE"],
-"bbs": { "type": "linBpq", "host": "127.0.0.1", "port": 8011, "login": "Q0CAST", "password": "pick-one", "command": "BBS" },
-```
+Set your `bbs` too (see [Configuration](#configuration)), then restart the receiver: `sudo systemctl restart pdn-mailcast-receiver`.
 
 **On a Flex** there is no `rig` and nothing to retune. While the receiver is connected, pdn-soundmodem opens a headless slice's receive filter (a `flex:` device with no `@station`) to cover the signal. In attach mode the filter is SmartSDR's, so open it there: the signal is at 350 to 3250 Hz on the usual 7.052 MHz dial.
 
-**Measure my filter** is on the receiver's settings page now, and works the same on this source.
+**Measure my filter**, on the receiver's settings page, works on this source too.
 
-**Which dial.** Without `retune`, the receiver listens on whatever dial pdn-soundmodem's radio is on, and any dial whose channel carries the whole signal will do. On a 48 kHz channel that is a wide range. On a 12 kHz channel the dial must be 7.04925 MHz or above. pdn-soundmodem drops to 12 kHz once its `mailcast` section is gone, if it has no 48 kHz modems. With `retune`, the radio is moved to `dialKHz` for each slot, and that must be 7051.8 to 7052.8. If a dial will not do, the receiver's log and page say so, and what to change.
-
-### Switch over
-
-Do it between slots: in daylight, after :13 and before :58 past the hour.
-
-- **Without `retune`**: start the receiver (`sudo systemctl restart pdn-mailcast-receiver`) and leave the built-in running. Once the receiver has heard a whole slot, remove the `mailcast` section from pdn-soundmodem's config and restart pdn-soundmodem (`sudo systemctl restart pdn-soundmodem`). The receiver reconnects by itself.
-- **With `retune`**: switch in one go. Only one of the two can hold pdn-soundmodem's radio for a slot, and the other then misses it. Remove the `mailcast` section, restart pdn-soundmodem, then restart the receiver.
-
-The receiver may then offer your BBS bulletins the built-in already delivered. LinBPQ answers "already have" for those, so nothing arrives twice (tested), and the receiver's page counts them as already had. With FBB this has not been tested.
+**Which dial.** Without `retune`, the receiver listens on whatever dial pdn-soundmodem's radio is on, and any dial whose channel carries the whole signal will do. On a 48 kHz channel that is a wide range. On a 12 kHz channel the dial must be 7.04925 MHz or above. pdn-soundmodem runs at 12 kHz unless one of its modems needs 48 kHz. With `retune`, the radio is moved to `dialKHz` for each slot, and that must be 7051.8 to 7052.8. If a dial will not do, the receiver's log and page say so, and what to change.
 
 ### Check it works
 
