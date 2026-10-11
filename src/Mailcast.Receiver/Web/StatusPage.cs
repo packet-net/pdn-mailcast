@@ -29,6 +29,15 @@ public sealed class StatusPage : IAsyncDisposable
 {
     private const string WaterfallBase = "/waterfall/";
 
+    /// <summary>
+    /// Blocked ahead of the embedded <see cref="WaterfallWebServer"/>, which otherwise always
+    /// answers it: a loopback-only, keyless stream of the audio this receiver feeds it. On this
+    /// page's own port that is surprising, not useful - a pdn-soundmodem audio source pointed at
+    /// the receiver's own port would read the receiver back its own audio. pdn-soundmodem has no
+    /// option to turn this path off; filed as packet-net/pdn-soundmodem#683.
+    /// </summary>
+    private const string ChannelAudioPath = WaterfallBase + "channel-audio";
+
     /// <summary>The largest settings form, or any other request body, accepted.</summary>
     public const int MaxFormBytes = 16 * 1024;
 
@@ -123,19 +132,7 @@ public sealed class StatusPage : IAsyncDisposable
         _log($"web: status page at {Url}{(_host.Config.Web.Lan ? " and on the local network" : "")}");
     }
 
-    /// <summary>
-    /// Gives a new pipeline its waterfall, before its audio starts.
-    /// </summary>
-    /// <remarks>
-    /// Issue #100: pdn-soundmodem's own full page, at <c>/waterfall/</c>, reports a
-    /// <c>daemonVersion</c> taken from the <c>Packet.SoundModem</c> package this receiver is built
-    /// against (pinned in Directory.Packages.props), not whatever pdn-soundmodem is actually
-    /// installed, or running wherever the audio comes from. <see cref="WaterfallOptions"/> has
-    /// nothing to override that with, so this is left as it is; see
-    /// <see href="https://github.com/packet-net/pdn-soundmodem/issues/677">pdn-soundmodem#677</see>,
-    /// filed to ask for one. This receiver's own page, index.html, never reads or shows that
-    /// field itself, only pdn-soundmodem's bundled page does.
-    /// </remarks>
+    /// <summary>Gives a new pipeline its waterfall, before its audio starts.</summary>
     internal void Attach(AudioPipeline pipeline)
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
@@ -147,6 +144,10 @@ public sealed class StatusPage : IAsyncDisposable
             Title = "pdn-mailcast receiver",
             DeclaredBands = [new DeclaredBand(0, "mailcast", pipeline.AudioCentreHz, 2 * OnAir.HalfWidthHz)],
             Log = line => _log("web: " + Ascii.Clean(line)),
+            // Issue #100: report this receiver's own version, the same one its page and the daily
+            // report show, instead of the bundled Packet.SoundModem library's build (pinned in
+            // Directory.Packages.props), which drifts behind the real pdn-soundmodem elsewhere.
+            VersionLabel = ReceiverHost.Version,
         });
         waterfall.Start();
         pipeline.SourceBlock += waterfall.MeterInputClipping;
@@ -213,6 +214,12 @@ public sealed class StatusPage : IAsyncDisposable
             if (!await AdmitAsync(context, path, id => session = id).ConfigureAwait(false))
             {
                 return; // answered: the sign-in page, or why not
+            }
+
+            if (path == ChannelAudioPath)
+            {
+                await RespondAsync(context, 404, "text/plain", "Not found.\n").ConfigureAwait(false);
+                return;
             }
 
             if (path.StartsWith(WaterfallBase, StringComparison.Ordinal) || path == "/waterfall")
