@@ -123,7 +123,19 @@ public sealed class StatusPage : IAsyncDisposable
         _log($"web: status page at {Url}{(_host.Config.Web.Lan ? " and on the local network" : "")}");
     }
 
-    /// <summary>Gives a new pipeline its waterfall, before its audio starts.</summary>
+    /// <summary>
+    /// Gives a new pipeline its waterfall, before its audio starts.
+    /// </summary>
+    /// <remarks>
+    /// Issue #100: pdn-soundmodem's own full page, at <c>/waterfall/</c>, reports a
+    /// <c>daemonVersion</c> taken from the <c>Packet.SoundModem</c> package this receiver is built
+    /// against (pinned in Directory.Packages.props), not whatever pdn-soundmodem is actually
+    /// installed, or running wherever the audio comes from. <see cref="WaterfallOptions"/> has
+    /// nothing to override that with, so this is left as it is; see
+    /// <see href="https://github.com/packet-net/pdn-soundmodem/issues/677">pdn-soundmodem#677</see>,
+    /// filed to ask for one. This receiver's own page, index.html, never reads or shows that
+    /// field itself, only pdn-soundmodem's bundled page does.
+    /// </remarks>
     internal void Attach(AudioPipeline pipeline)
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
