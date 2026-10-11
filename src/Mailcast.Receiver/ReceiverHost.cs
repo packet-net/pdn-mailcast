@@ -48,7 +48,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         // Issue #48: after Slots.OnFrame above, so the slot this piece belongs to is already
         // the one Slots.Last knows about.
         Intake.Piece += OnPieceHandled;
-        Hooks = new SlotHooks(() => Config, time, log);
+        // The dial the audio is really heard on: pdn-soundmodem's own, when it says one.
+        Hooks = new SlotHooks(() => Config, time, log) { DialKHz = () => DialHz / 1000 };
         ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place) { AudioCentreHz = config.AudioCentreHz };
         ChannelWatch.Measured += FrameHistory.OnChannelMeasured;
         if (config.Rig is not null)
@@ -90,16 +91,17 @@ public sealed class ReceiverHost : IAsyncDisposable
     public static readonly TimeSpan FilterMeasureDuration = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Listens to <see cref="FilterMeasureDuration"/> of this sound card's own audio and measures
-    /// its receive filter (<see cref="FilterScan.Analyse"/>): only for a sound card, and never
-    /// while a slot's own window is open (nothing should be tuned away from the signal then).
+    /// Listens to <see cref="FilterMeasureDuration"/> of this radio's own audio and measures its
+    /// receive filter (<see cref="FilterScan.Analyse"/>): only for a sound card or pdn-soundmodem
+    /// (whose keyed silence is left out), and never while a slot's own window is open (nothing
+    /// should be tuned away from the signal then).
     /// </summary>
     public async Task<(RadioFilter? Filter, string? Problem)> MeasureFilterAsync(CancellationToken cancellation)
     {
         var pipeline = Pipeline;
-        if (pipeline is null || AudioSource.Parse(Config.Audio).Kind != AudioSourceKind.Alsa)
+        if (pipeline is null || AudioSource.Parse(Config.Audio).Kind is not (AudioSourceKind.Alsa or AudioSourceKind.SoundModem))
         {
-            return (null, "\"Measure my filter\" is for a sound card only.");
+            return (null, "\"Measure my filter\" is for a sound card or pdn-soundmodem only.");
         }
         var now = _time.GetUtcNow();
         var window = ListeningWindow.SoundCard(now, Schedule);
@@ -371,7 +373,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                         closes = early.At;
                     }
                     return new HookWindow(opens, closes, slot);
-                case AudioSourceKind.Alsa:
+                case AudioSourceKind.Alsa or AudioSourceKind.SoundModem:
+                    // pdn-soundmodem's radio, like a sound card's, is heard all the time.
                     return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
                 default:
                     return null;
@@ -453,6 +456,33 @@ public sealed class ReceiverHost : IAsyncDisposable
             lock (_gate)
             {
                 return _pipeline;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The USB dial the audio is heard on, in Hz: the running pipeline's once its dial is settled
+    /// (pdn-soundmodem's own, when it says one), else the last pdn-soundmodem said for this same
+    /// <c>audio</c> while it is reconnecting, else the config's.
+    /// </summary>
+    public double DialHz => Pipeline is { DialSettled: true } pipeline ? pipeline.DialHz : SoundModemDialSaid ?? Config.DialHz;
+
+    /// <summary>Whether <see cref="DialHz"/> is pdn-soundmodem's, said now or the last time while it reconnects.</summary>
+    public bool DialFromSoundModem => Pipeline is { DialSettled: true } pipeline ? pipeline.DialFromSoundModem : SoundModemDialSaid is not null;
+
+    /// <summary>Where the signal's centre is in the audio the page's spectrogram shows, Hz; see <see cref="AudioPipeline.AudioCentreHz"/>.</summary>
+    public double AudioCentreHz => Pipeline is { DialSettled: true } pipeline ? pipeline.AudioCentreHz : AudioPipeline.AudioCentreFor(DialHz);
+
+    private (string Audio, double DialHz)? _soundModemDial;
+
+    /// <summary>The dial pdn-soundmodem last said, while <c>audio</c> is still the source it said it for.</summary>
+    private double? SoundModemDialSaid
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _soundModemDial is { } said && string.Equals(said.Audio, _config.Audio, StringComparison.Ordinal) ? said.DialHz : null;
             }
         }
     }
@@ -638,7 +668,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 || _config.DialKHz != config.DialKHz;
             _config = config;
             Intake.Sources = config.AcceptedSources;
-            ChannelWatch.AudioCentreHz = config.AudioCentreHz;
+            // A running pipeline that carries on keeps its dial (pdn-soundmodem's, if it said one).
+            ChannelWatch.AudioCentreHz = !audioChanged && _pipeline is { } running ? running.AudioCentreHz : config.AudioCentreHz;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
             if (audioChanged)
             {
@@ -650,6 +681,17 @@ public sealed class ReceiverHost : IAsyncDisposable
         Delivery.Nudge();
     }
 
+    /// <summary>
+    /// The waits before connecting to pdn-soundmodem again after its stream could not be opened
+    /// or ended, one after another; the last repeats. Short at first, because pdn-soundmodem
+    /// restarting takes a few seconds and a slot is going on meanwhile.
+    /// </summary>
+    public static readonly IReadOnlyList<TimeSpan> SoundModemRetry =
+        [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10), AudioRetry];
+
+    /// <summary>A pdn-soundmodem stream that ran this long before it ended starts the waits in <see cref="SoundModemRetry"/> again from the shortest.</summary>
+    internal static readonly TimeSpan SoundModemSteady = TimeSpan.FromMinutes(1);
+
     /// <summary>The waits after a web receiver refuses us for now; the last repeats.</summary>
     public static readonly IReadOnlyList<TimeSpan> RefusedBackoff =
         [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(30)];
@@ -657,6 +699,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     private async Task SuperviseAudioAsync(CancellationToken cancellation)
     {
         int refusals = 0;
+        string? refusedFor = null;
+        int soundModemFailures = 0;
         string? described = null;
         string? closedSaid = null;
         while (!cancellation.IsCancellationRequested)
@@ -745,12 +789,30 @@ public sealed class ReceiverHost : IAsyncDisposable
 
             string? why = null;
             bool refused = false;
+            DateTimeOffset? listening = null;
             try
             {
+                // pdn-soundmodem says its radio's dial when its stream opens, and everything
+                // attached (the page's spectrogram, its marks) has to see the dial it really is.
+                bool openFirst = source.Kind == AudioSourceKind.SoundModem;
+                if (openFirst)
+                {
+                    Audio = new($"connecting to pdn-soundmodem on {SoundModemAudioInput.Describe(source.SoundModemPort)}", AudioPhase.Opening);
+                    await pipeline.OpenAsync(token).ConfigureAwait(false);
+                }
                 Attach(pipeline);
                 PipelineCreated?.Invoke(pipeline);
-                Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
+                if (!openFirst)
+                {
+                    Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
+                }
                 await pipeline.StartAsync(token).ConfigureAwait(false);
+                ChannelWatch.AudioCentreHz = pipeline.AudioCentreHz;
+                lock (_gate)
+                {
+                    _soundModemDial = pipeline.DialFromSoundModem ? (config.Audio, pipeline.DialHz) : null;
+                }
+                listening = _time.GetUtcNow();
                 if (pipeline.WebSdrDescription is { } about)
                 {
                     lock (_gate)
@@ -812,10 +874,38 @@ public sealed class ReceiverHost : IAsyncDisposable
                 await WaitForRestartAsync(cancellation).ConfigureAwait(false);
                 continue;
             }
-            TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)] : AudioRetry;
+            if (listening is { } since && _time.GetUtcNow() - since >= SoundModemSteady)
+            {
+                soundModemFailures = 0;
+            }
+            // A dial, rate or version pdn-soundmodem gives that this receiver cannot use stays so
+            // until someone changes it: asked about as seldom as a web SDR that refused us.
+            bool soundModem = pipeline.Source.Kind == AudioSourceKind.SoundModem;
+            if (refused && soundModem && !string.Equals(why, refusedFor, StringComparison.Ordinal))
+            {
+                // Something else is wrong now (pdn-soundmodem upgraded, then its dial refused, say):
+                // the waits start again from the shortest.
+                refusals = 0;
+            }
+            refusedFor = refused && soundModem ? why : null;
+            TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)]
+                : soundModem ? SoundModemRetry[Math.Min(soundModemFailures++, SoundModemRetry.Count - 1)]
+                : AudioRetry;
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
-            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait);
-            await DelayAsync(wait, cancellation).ConfigureAwait(false);
+            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
+            // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short.
+            if (soundModem)
+            {
+                lock (_gate)
+                {
+                    _audioRestart = restart;
+                }
+            }
+            await DelayAsync(wait, soundModem ? restart.Token : cancellation).ConfigureAwait(false);
+            lock (_gate)
+            {
+                _audioRestart = null;
+            }
         }
     }
 
@@ -895,7 +985,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The pipeline for <paramref name="source"/>, heard on <paramref name="config"/>'s dial.</summary>
     internal AudioPipeline CreatePipeline(AudioSource source, ReceiverConfig config) =>
-        AudioPipeline.Create(source, config.DialHz, _log, _time);
+        AudioPipeline.Create(source, config.DialHz, _log, _time, config.Web.Port);
 
     /// <summary>For tests: builds the pipeline for a source in place of the real one.</summary>
     internal Func<AudioSource, AudioPipeline>? PipelineFactory { get; set; }
@@ -1074,6 +1164,8 @@ public enum AudioPhase
 /// <summary>
 /// What the audio is doing: <paramref name="Words"/> for the log and the page's summary, and for a
 /// web SDR closed between slots when it opens again (<paramref name="Reopens"/>) and for which slot,
-/// or for a source that failed, why (<paramref name="Problem"/>) and when it is tried again.
+/// or for a source that failed, why (<paramref name="Problem"/>) and when it is tried again, and
+/// whether it is pdn-soundmodem giving something this receiver cannot use, which waiting will not
+/// mend (<paramref name="Lasting"/>), rather than pdn-soundmodem not answering.
 /// </summary>
-public sealed record AudioCondition(string Words, AudioPhase Phase, DateTimeOffset? Reopens = null, DateTimeOffset? ForSlot = null, string? Problem = null, DateTimeOffset? RetryAt = null);
+public sealed record AudioCondition(string Words, AudioPhase Phase, DateTimeOffset? Reopens = null, DateTimeOffset? ForSlot = null, string? Problem = null, DateTimeOffset? RetryAt = null, bool Lasting = false);

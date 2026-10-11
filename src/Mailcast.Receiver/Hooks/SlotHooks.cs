@@ -115,6 +115,12 @@ public sealed class SlotHooks : IDisposable
     /// <summary>What starts the programs.</summary>
     public HookRunner Runner { get; }
 
+    /// <summary>
+    /// The USB dial the audio is heard on, in kHz, for <c>MAILCAST_DIAL_KHZ</c>: pdn-soundmodem's
+    /// own when it says one. Left out, the config's <c>dialKHz</c>.
+    /// </summary>
+    public Func<double>? DialKHz { get; init; }
+
     /// <summary>The note's path.</summary>
     public string NotePath => _file;
 
@@ -425,8 +431,8 @@ public sealed class SlotHooks : IDisposable
         return window is { } found && finished is { } done && found.Slot <= done ? null : window;
     }
 
-    private static IReadOnlyDictionary<string, string> Environment(string hook, DateTimeOffset slot, ReceiverConfig config, bool? beforeOk) =>
-        SlotHookEnvironment.For(hook, slot, config.DialKHz, config.CentreHz / 1000, beforeOk);
+    private IReadOnlyDictionary<string, string> Environment(string hook, DateTimeOffset slot, ReceiverConfig config, bool? beforeOk) =>
+        SlotHookEnvironment.For(hook, slot, DialKHz?.Invoke() ?? config.DialKHz, config.CentreHz / 1000, beforeOk);
 
     private void WriteNote(Note note)
     {

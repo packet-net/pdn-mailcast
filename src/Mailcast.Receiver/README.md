@@ -52,6 +52,10 @@ Set your radio to USB on **7.052 MHz** (the signal is centred on 7.0538 MHz), wi
 
 SDR users: nothing else to do. If your radio's own receive filter is narrower, especially 2.4 kHz or less, the right dial is 7.0538 MHz minus the middle of that filter, and the settings page works it out for you: either **Measure my filter** (it listens to about 10 s of band noise with nothing tuned in and reports the filter and the dial), or type the filter's low and high edge in Hz yourself. A worked example: a filter from 367 to 2190 Hz (an FT-450D's narrow setting) gives a dial of 7.05252 MHz. Either way a button writes the dial for you; `"dialKHz"` in `receiver.json` takes it too.
 
+## Using pdn-soundmodem
+
+If pdn-soundmodem (0.88.0 or later) already runs your radio on this machine, set `"audio": "soundmodem"` (or `"soundmodem:PORT"` if its page is not on port 8107) and restart the receiver. It listens through pdn-soundmodem's own audio, with no `ms110d` modem needed there, and **Measure my filter** works the same. Its dial follows pdn-soundmodem's when pdn-soundmodem gives one.
+
 ## Linux FBB
 
 Instead of step 2: add a telnet port in `port.sys`, add user **Q0CAST** (`EU Q0CAST`) with the **B** and **M** flags and a password, and don't add it to `forward.sys`. In the receiver's config set `"type": "fbb"` and FBB's telnet port. (Not tested yet.)

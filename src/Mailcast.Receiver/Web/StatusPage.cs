@@ -125,12 +125,12 @@ public sealed class StatusPage : IAsyncDisposable
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
         {
-            DialFrequencyHz = pipeline.DialHz,
+            DialFrequencyHz = pipeline.SpectrumDialHz,
             Sideband = "usb",
             LinesPerSecond = 10,
             InputLevelMeter = true,
             Title = "pdn-mailcast receiver",
-            DeclaredBands = [new DeclaredBand(0, "mailcast", OnAir.AudioCentreHz(pipeline.DialHz), 2 * OnAir.HalfWidthHz)],
+            DeclaredBands = [new DeclaredBand(0, "mailcast", pipeline.AudioCentreHz, 2 * OnAir.HalfWidthHz)],
             Log = line => _log("web: " + Ascii.Clean(line)),
         });
         waterfall.Start();
@@ -680,6 +680,8 @@ public sealed class StatusPage : IAsyncDisposable
         var held = _host.Intake.HeldBulletins();
         var mail = _host.Intake.Mail();
         double? liveTone = _host.Pipeline?.Tone.LiveFrequencyHz;
+        double dialHz = _host.DialHz;
+        double centreHz = _host.AudioCentreHz;
         return new
         {
             version = ReceiverHost.Version,
@@ -697,7 +699,11 @@ public sealed class StatusPage : IAsyncDisposable
                 forSlot = _host.Audio.ForSlot,
                 problem = _host.Audio.Problem,
                 retryAt = _host.Audio.RetryAt,
-                dialKHz = config.DialKHz,
+                // pdn-soundmodem gives something this receiver cannot use, rather than not answering.
+                lasting = _host.Audio.Lasting,
+                // The dial the audio is heard on: pdn-soundmodem's own once it has said one.
+                dialKHz = dialHz / 1000,
+                dialFromSoundModem = _host.DialFromSoundModem,
                 centreKHz = config.CentreHz / 1000,
                 webSdr = WebSdrView(config.Audio, _host.WebSdrAbout),
             },
@@ -722,9 +728,9 @@ public sealed class StatusPage : IAsyncDisposable
             },
             markers = new
             {
-                centreHz = config.AudioCentreHz,
-                lowHz = config.AudioCentreHz - OnAir.HalfWidthHz,
-                highHz = config.AudioCentreHz + OnAir.HalfWidthHz,
+                centreHz,
+                lowHz = centreHz - OnAir.HalfWidthHz,
+                highHz = centreHz + OnAir.HalfWidthHz,
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },
@@ -940,15 +946,17 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>
     /// How the page judges the input level: <c>target</c> for a sound card, whose level you set,
     /// so it says when peaks are outside -18 to -9 dBFS; <c>clippingOnly</c> for a web SDR or a
-    /// recording, whose level is not yours to set and which the modem copes with unless it clips.
+    /// recording, whose level is not yours to set and which the modem copes with unless it clips;
+    /// and for pdn-soundmodem, whose level is set there, not here.
     /// </summary>
     internal static string LevelAdvice(string audio) => AudioSource.Parse(audio).Kind == AudioSourceKind.Alsa ? "target" : "clippingOnly";
 
-    /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c> or <c>recording</c>.</summary>
+    /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c>, <c>soundModem</c> or <c>recording</c>.</summary>
     internal static string AudioKind(string audio) => AudioSource.Parse(audio).Kind switch
     {
         AudioSourceKind.UberSdr => "webSdr",
         AudioSourceKind.Wav => "recording",
+        AudioSourceKind.SoundModem => "soundModem",
         _ => "soundCard",
     };
 
@@ -1738,7 +1746,7 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>
     /// POST /api/filter/measure: listens to <see cref="ReceiverHost.FilterMeasureDuration"/> of
-    /// this sound card's own audio and measures its receive filter, for the settings page's
+    /// this radio's own audio (a sound card's, or pdn-soundmodem's) and measures its receive filter, for the settings page's
     /// "Measure my filter". A problem, not a filter, if it could not be used or measured.
     /// </summary>
     private async Task MeasureFilterAsync(HttpListenerContext context)

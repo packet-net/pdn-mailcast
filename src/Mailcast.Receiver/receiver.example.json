@@ -2,6 +2,7 @@
   // Where the audio comes from. One of:
   //   "ubersdr:wessex.zapto.org"       a web receiver; the receiver tunes it itself
   //   "plughw:CARD=Device,DEV=0"       a sound card on your radio, set to USB on "dialKHz"
+  //   "soundmodem"                     the pdn-soundmodem on this machine ("soundmodem:PORT" if not on 8107)
   //   "wav:/path/to/recording.wav"     a recording, for testing
   "audio": "ubersdr:wessex.zapto.org",
 

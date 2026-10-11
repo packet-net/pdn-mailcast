@@ -69,7 +69,7 @@ public sealed class ToneDetector
     private const int ExcludeBins = 20;
     private const int SidebandBins = 26;
 
-    private readonly double _expectedHz;
+    private double _expectedHz;
     private readonly Decimator _decimator;
     private readonly float[] _decimated;
     private readonly float[] _block = new float[Size];
@@ -104,6 +104,16 @@ public sealed class ToneDetector
             _window[i] = (float)(0.5 - (0.5 * Math.Cos(2 * Math.PI * i / Size)));
         }
         _noise = new double[(int)((NoiseHighHz - NoiseLowHz) / BinHz) + 1];
+    }
+
+    /// <summary>
+    /// Where the tone is looked for, Hz. Moved only before any audio has been fed: the
+    /// pipeline learns pdn-soundmodem's dial when it opens the stream, after this was made.
+    /// </summary>
+    public double ExpectedHz
+    {
+        get => _expectedHz;
+        internal set => _expectedHz = value;
     }
 
     /// <summary>Raised when a tone has ended, with what was measured.</summary>
