@@ -98,7 +98,7 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "version $version, publish $publish"
 
-  # The whole suite, the docker LinBPQ tests included (the hosted runner has docker). Nothing is
+  # The whole suite, the docker LinBPQ and FBB tests included (the hosted runner has docker). Nothing is
   # built for release unless this passes.
   test:
     # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests

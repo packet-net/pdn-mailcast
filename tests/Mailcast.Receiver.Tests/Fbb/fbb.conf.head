@@ -1,0 +1,11 @@
+#
+# FBB set-up file for the receiver's tests: the lines the fbb script asks for on a first run.
+#
+version = FBB7.0.11
+callsign = GB7FBB.#38.GBR.EURO
+ssid = 0
+qraloc = IO91LK
+city = Reading
+name = Sysop
+sysop = G0SYS
+loca = 0

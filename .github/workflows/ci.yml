@@ -32,7 +32,8 @@ jobs:
         run: dotnet test -c Release --no-build --filter "Category!=Docker"
 
   # The receiver end to end: a day's slot modulated into a noisy recording, decoded by the
-  # receiver and delivered into a real LinBPQ in docker (tests/Mailcast.Receiver.Tests/EndToEndTests.cs).
+  # receiver and delivered into a real LinBPQ and a real Linux FBB in docker
+  # (tests/Mailcast.Receiver.Tests/EndToEndTests.cs).
   receiver-end-to-end:
     # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
     # from forks stay on GitHub's machines, so outside code never runs on ours.

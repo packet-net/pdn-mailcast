@@ -1,0 +1,6 @@
+#!/bin/bash
+# One session on FBB's sysop console (xfbbC), as the sysop G0SYS: each argument is a line typed
+# at FBB's prompt, then B (bye), which ends the session; xfbbC does not end at the end of its
+# input by itself. The pauses let FBB answer each line before the next arrives.
+(sleep 1; for line in "$@" B; do printf '%s\n' "$line"; sleep 0.5; done) \
+    | timeout 60 xfbbC -c -r -i G0SYS -w sysop-test
