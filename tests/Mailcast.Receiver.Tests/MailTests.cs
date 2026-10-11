@@ -599,6 +599,7 @@ public class MailTests
         }), host.Ledger, time, _ => { });
         await service.DeliverPendingAsync(CancellationToken.None);
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(900, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
 
         var mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
         Assert.Equal(0, mail.GetProperty("waiting").GetInt32());
