@@ -1,0 +1,15 @@
+# FBB7.0.11
+#
+# One telnet port, 6300 (189C in hex), as docs/receiver.md's Linux FBB section adds one.
+#
+#Ports TNCs
+ 1     1
+#
+#Com Interface Adress (Hex)  Baud
+ 1   9         189C          0
+#
+#TNC NbCh Com MultCh Pacln Maxfr NbFwd MxBloc M/P-Fwd Mode  Freq
+ 0   0    0   0      0     0     0     0      00/01   ----  File-fwd.
+ 1   8    1   0      250   2     1     10     00/60   TUW   Telnet
+#
+# End of file.

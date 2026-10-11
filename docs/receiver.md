@@ -274,21 +274,25 @@ LinBPQ holds bulletins older than its BID lifetime and maximum age. If you have 
 
 ### Linux FBB
 
-Not tested yet: this is from FBB 7.0.11's documentation and source.
+Tested against FBB 7.0.11 (Ubuntu's `fbb` package) in docker; see `tests/Mailcast.Receiver.Tests/Fbb`.
 
 1. In `port.sys`, add a telnet port (interface 9, address in hex, so `189C` is port 6300) and a TNC line for it with mode `T`, for example:
 
    ```
    2    9         189C               0
    ...
-   2    8    2   0      250   2     1     10     00/60   TUWR  Telnet
+   2    8    2   0      250   2     1     10     00/60   TUW   Telnet
    ```
 
-2. Add the user Q0CAST (`EU Q0CAST`), give it the **B** (BBS) flag and the **M** flag (modem and telnet access), and set its password.
+   Leave `R` (read-only) out of the mode: on a read-only port FBB answers the receiver's forwarding request with "is not a valid command" and takes nothing.
+
+2. Add the user Q0CAST: on FBB's console, `EU Q0CAST` and `Y` to create it, then `B` for the BBS flag, `M` for the modem flag (telnet access), `W` and the password, and an empty line to finish. Without the B flag FBB treats Q0CAST as a new user and asks for its name instead of taking its mail. FBB keeps only 12 characters of a password, so use 12 or fewer; it ignores their case.
 
 3. Don't add Q0CAST to `forward.sys`: FBB never needs to forward to it.
 
 4. In the receiver's config use `"type": "fbb"`, FBB's host and port, and the password. The receiver logs in as `.Q0CAST`: the dot asks FBB for a binary session, without which FBB would mangle the compressed transfers.
+
+FBB answers "already have" for a bulletin it already holds, so a second receiver, or one that lost its state, never puts a bulletin in twice.
 
 ### Testing the login
 
@@ -420,4 +424,4 @@ out/pdn-mailcast-receiver --config src/Mailcast.Receiver/receiver.example.json
 
 `scripts/build-receiver-deb.sh linux-x64 0.1.0` builds the .deb into `artifacts/`.
 
-The test suite includes one test that decodes a simulated slot into a real LinBPQ in docker. It is tagged `Category=Docker`: `dotnet test --filter Category=Docker` runs it, and `--filter "Category!=Docker"` leaves it out.
+The test suite includes two tests that decode a simulated slot into a real BBS in docker, one LinBPQ and one Linux FBB (built from `tests/Mailcast.Receiver.Tests/Fbb` on first use). They are tagged `Category=Docker`: `dotnet test --filter Category=Docker` runs them, and `--filter "Category!=Docker"` leaves them out.

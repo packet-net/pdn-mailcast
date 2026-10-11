@@ -1,0 +1,9 @@
+#
+# Password for all non defined callsigns (one case dependant line)
+#
+not-used
+#
+# Rights and password specific to callsigns: the sysop, for the xfbbC console.
+#
+G0SYS 63 1023 sysop-test
+#

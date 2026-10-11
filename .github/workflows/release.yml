@@ -98,7 +98,7 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "version $version, publish $publish"
 
-  # The whole suite, the docker LinBPQ tests included (the hosted runner has docker). Nothing is
+  # The whole suite, the docker LinBPQ and FBB tests included (the hosted runner has docker). Nothing is
   # built for release unless this passes.
   test:
     # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
@@ -121,6 +121,10 @@ jobs:
       - name: Pull LinBPQ
         timeout-minutes: 5
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
+      # The test builds it too, from the cache once this has.
+      - name: Build the test FBB
+        timeout-minutes: 5
+        run: docker build -q -t pdn-mailcast-test-fbb:7.0.11 tests/Mailcast.Receiver.Tests/Fbb
       - name: Build (Release)
         run: dotnet build -c Release
       - name: Test

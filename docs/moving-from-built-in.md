@@ -74,7 +74,7 @@ Do it between slots: in daylight, after :13 and before :58 past the hour.
 
 ## Good to know
 
-- **Nothing arrives twice.** The receiver may offer your BBS bulletins the built-in already delivered. LinBPQ answers "already have", and the receiver's page counts them as already had. With FBB this has not been tested yet.
+- **Nothing arrives twice.** The receiver may offer your BBS bulletins the built-in already delivered. LinBPQ and FBB both answer "already have", and the receiver's page counts them as already had.
 - **Part-heard bulletins start again.** Nothing is carried over from the built-in, and M0LTE repeats every bulletin, so they complete in a later slot.
 - **On a Flex** there is nothing to retune. While the receiver is connected, pdn-soundmodem opens a headless slice's receive filter to cover the signal. In attach mode, open SmartSDR's filter to cover 350 to 3250 Hz on the usual 7.052 MHz dial.
 - **Your dial.** Without the `mailcast` section, pdn-soundmodem may run at 12 kHz instead of 48 kHz. Without `retune`, its dial then needs to be 7.04925 MHz or above. If it isn't, the receiver's log and page say so, and what to change. More in [Which dial](receiver.md#using-it-with-pdn-soundmodem).
