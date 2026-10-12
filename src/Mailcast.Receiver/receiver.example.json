@@ -6,6 +6,11 @@
   //   "wav:/path/to/recording.wav"     a recording, for testing
   "audio": "ubersdr:wessex.zapto.org",
 
+  // Where your radio is, as a 4 or 6 character Maidenhead locator, for a sound card,
+  // soundmodem or a recording. It names the radio path's hops and goes in the daily report.
+  // A web SDR says where it is itself, so with one this is not used.
+  // "locator": "IO91lk",
+
   // The USB dial in kHz. The web SDR is tuned here, and your radio should be too if you use
   // a sound card. The signal itself always stays on 7.0538 MHz: the best dial for a sound card
   // is 7.0538 MHz minus the middle of its own receive filter, which the status page's "Measure

@@ -97,6 +97,10 @@ internal static class ChannelTile
                 dopplerSpreadHz = h.DopplerSpreadHz,
                 virtualHeightKm = h.VirtualHeightKm,
                 words = h.Words,
+                // Where the receiver was for this slot, for the globe of where it bounced; null
+                // when it was not known.
+                latitude = h.Place?.Latitude,
+                longitude = h.Place?.Longitude,
                 // A small, unlabelled side view for the day strip; null for the same reasons as
                 // the main one above.
                 pathSvg = ChannelPicture.Svg(h, h.Locator, StripPictureWidthPx, withLabels: false),
