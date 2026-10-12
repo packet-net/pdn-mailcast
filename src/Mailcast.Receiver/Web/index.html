@@ -272,7 +272,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
         <input type="range" id="globeSlot" min="0" max="0" value="0" aria-label="Slot">
         <button type="button" class="plain" id="globeIn" aria-label="Zoom in">+</button>
         <button type="button" class="plain" id="globeOut" aria-label="Zoom out">-</button>
-        <button type="button" class="plain" id="globeFar">See how thin the layer is</button>
+        <button type="button" class="plain" id="globeFar">Side view</button>
       </div>
       <div id="globeSaid" class="muted"></div>
     </details>
@@ -607,7 +607,7 @@ const Globe = (() => {
   $("globeOut").addEventListener("click", () => zoom(1.25));
   $("globeFar").addEventListener("click", () => {
     const far = view.dist > 4000;
-    $("globeFar").textContent = far ? "See how thin the layer is" : "Back to the paths";
+    $("globeFar").textContent = far ? "Side view" : "Close view";
     flyTo(far ? NEAR_VIEW : FAR_VIEW);
   });
   cv.addEventListener("pointerdown", e => { cancelAnimationFrame(flight); drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch }; cv.setPointerCapture(e.pointerId); });
