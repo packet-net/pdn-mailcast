@@ -124,10 +124,19 @@ jobs:
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
       - name: Build (Release)
         run: dotnet build -c Release
+      # In two steps, as ci.yml runs them in separate jobs: everything but the LinBPQ-in-Docker
+      # end-to-end tests first, then those on their own. Run all at once, the Docker tests' load
+      # pushed a different timing test past its limit on each attempt on a busy runner
+      # (v0.10.1 and v0.10.2 never released for that).
       - name: Test
         # A normal run is a few minutes; a hang must not hold the release for hours.
         timeout-minutes: 20
-        run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
+        run: dotnet test -c Release --no-build --filter "Category!=Docker" --logger "console;verbosity=normal"
+      - name: Test against LinBPQ in Docker
+        timeout-minutes: 20
+        run: |
+          dotnet test tests/Mailcast.Receiver.Tests -c Release --no-build --filter "Category=Docker" --logger "console;verbosity=normal"
+          dotnet test tests/Mailcast.HeadEnd.Tests -c Release --no-build --filter "Category=Docker" --logger "console;verbosity=normal"
 
   deb:
     needs: [version, test]
