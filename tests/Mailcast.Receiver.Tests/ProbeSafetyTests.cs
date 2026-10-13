@@ -14,7 +14,11 @@ namespace Mailcast.Receiver.Tests;
 /// Gated by <c>MAILCAST_PROBE_SAFETY</c> (a trial count) since a few hundred trials each are slow;
 /// with it unset a handful run as a smoke test only. Writes a table to the test output and, with
 /// <c>MAILCAST_PROBE_SAFETY_OUT</c> set, to that file too.
+/// <para>Its trials fill every core of the thread pool for a minute or more, so it runs on its
+/// own (<see cref="RunsAlone"/>): beside it, the fakes that other tests talk to over
+/// loopback could not get a thread to answer within their real timeouts.</para>
 /// </remarks>
+[Collection(RunsAlone.Name)]
 public class ProbeSafetyTests(ITestOutputHelper output)
 {
     private const int Rate = OnAir.SampleRate;
