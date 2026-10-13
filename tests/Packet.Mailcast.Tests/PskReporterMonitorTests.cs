@@ -361,7 +361,10 @@ public class PskReporterMonitorTests
         await reading.CancelAsync();
         await reader;
 
-        Assert.True(all.Elapsed < TimeSpan.FromSeconds(10), $"60000 spots took {all.Elapsed}");
+        // The whole run takes about 4 s on an idle runner, but a loaded one has taken 10 to 15 s
+        // with nothing wrong in the code. The per-call bounds below catch a real slowdown; this
+        // only has to catch the work going badly out of proportion, such as quadratic in the spots.
+        Assert.True(all.Elapsed < TimeSpan.FromSeconds(60), $"60000 spots took {all.Elapsed}");
         // A busy machine (the rest of the suite, another copy of this test, a stress tool) can
         // have the OS scheduler stall any one call for a while without the code being at fault,
         // which is what made a single-worst-sample wall-clock ceiling flaky (issue #81). Bound how
