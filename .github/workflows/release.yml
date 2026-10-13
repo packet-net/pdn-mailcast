@@ -1,7 +1,8 @@
 name: release
 
 # The release pipeline, after pdn-soundmodem's and pdn-bbs's: test, then build the two Debian
-# packages (pdn-mailcast-receiver and pdn-mailcast-headend) for amd64, arm64 and armhf and the
+# packages (pdn-mailcast-receiver and pdn-mailcast-headend) for amd64, arm64 and armhf, the
+# receiver's Windows zip (win-x64), and the
 # M0LTE.RaptorQ and Packet.Mailcast NuGet packages, attach them to a GitHub Release, tell packet-net/apt, and hand
 # the .nupkg files to nuget.yml for nuget.org.
 #
@@ -226,6 +227,59 @@ jobs:
           path: artifacts/pdn-mailcast-*_${{ needs.version.outputs.version }}_${{ matrix.arch }}.deb
           if-no-files-found: error
 
+  # The receiver for Windows: a zip of one folder (self-contained, as the .debs), published from
+  # Linux like armhf, since nothing in it needs Windows to build. Its contents are checked here;
+  # running it is for a Windows machine (see issue #119).
+  zip:
+    needs: [version, test]
+    name: zip win-x64
+    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
+    # from forks stay on GitHub's machines, so outside code never runs on ours.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        if: runner.environment == 'github-hosted'
+        with:
+          dotnet-version: 10.0.x
+      # Self-hosted runners use their own .NET 10 (setup-dotnet cannot write to the system
+      # install there); DOTNET_ROOT lets the test apphosts find it, as in pdn-soundmodem.
+      - name: Use the runner's .NET
+        if: runner.environment != 'github-hosted'
+        run: |
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::this self-hosted runner has no .NET 10 SDK"; dotnet --list-sdks; exit 1; }
+          echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(which dotnet)")")" >> "$GITHUB_ENV"
+
+      - name: Build the receiver .zip
+        run: scripts/build-receiver-zip.sh "$VERSION"
+
+      - name: Verify .zip contents
+        run: |
+          set -euo pipefail
+          zip="artifacts/pdn-mailcast-receiver_${VERSION}_win-x64.zip"
+          test -f "$zip" || { echo "::error::$zip was not built"; exit 1; }
+          listing="$(python3 -m zipfile -l "$zip")"
+          echo "$listing"
+          for f in pdn-mailcast-receiver.exe receiver.example.json install-service.ps1 README.txt README.md LICENSE; do
+            grep -q "pdn-mailcast-receiver/$f " <<<"$listing" || { echo "::error::$f is not in the zip"; exit 1; }
+          done
+          # A Windows PE executable, not a Linux one published by mistake.
+          python3 - "$zip" <<'PY'
+          import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              head = z.open("pdn-mailcast-receiver/pdn-mailcast-receiver.exe").read(2)
+          sys.exit(0 if head == b"MZ" else "pdn-mailcast-receiver.exe is not a Windows executable")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdn-mailcast-zip-win-x64
+          path: artifacts/pdn-mailcast-receiver_${{ needs.version.outputs.version }}_win-x64.zip
+          if-no-files-found: error
+
   nupkg:
     needs: [version, test]
     # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
@@ -266,7 +320,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [version, deb, nupkg]
+    needs: [version, deb, zip, nupkg]
     if: needs.version.outputs.publish == 'true'
     # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
     # from forks stay on GitHub's machines, so outside code never runs on ours.
@@ -296,7 +350,8 @@ jobs:
           set -euo pipefail
           ls -l
           [ "$(find . -maxdepth 1 -name '*.deb' | wc -l)" = 6 ] || { echo "::error::expected six .debs"; exit 1; }
-          sha256sum ./*.deb ./*.nupkg | sed 's# \./# #' > SHA256SUMS
+          [ "$(find . -maxdepth 1 -name '*_win-x64.zip' | wc -l)" = 1 ] || { echo "::error::expected the Windows .zip"; exit 1; }
+          sha256sum ./*.deb ./*.zip ./*.nupkg | sed 's# \./# #' > SHA256SUMS
           cat SHA256SUMS
 
       - name: GitHub Release
@@ -311,11 +366,11 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then prerelease="--prerelease"; fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG exists: replacing its assets and notes"
-            gh release upload "$TAG" ./artifacts/*.deb ./artifacts/*.nupkg ./artifacts/SHA256SUMS --clobber
+            gh release upload "$TAG" ./artifacts/*.deb ./artifacts/*.zip ./artifacts/*.nupkg ./artifacts/SHA256SUMS --clobber
             gh release edit "$TAG" --notes-file "$RUNNER_TEMP/relnotes.md"
           else
             gh release create "$TAG" \
-              ./artifacts/*.deb ./artifacts/*.nupkg ./artifacts/SHA256SUMS \
+              ./artifacts/*.deb ./artifacts/*.zip ./artifacts/*.nupkg ./artifacts/SHA256SUMS \
               --target "$GITHUB_SHA" \
               --title "pdn-mailcast $VERSION" \
               --notes-file "$RUNNER_TEMP/relnotes.md" \

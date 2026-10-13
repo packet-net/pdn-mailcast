@@ -10,6 +10,10 @@
 
   <ItemGroup>
     <PackageReference Include="pdn-soundmodem" />
+    <!-- WASAPI sound cards, used only on Windows (behind OperatingSystem.IsWindows()); it builds anywhere. -->
+    <PackageReference Include="pdn-soundmodem-windows" />
+    <!-- Running as a Windows service; likewise Windows-only, and builds anywhere. -->
+    <PackageReference Include="System.ServiceProcess.ServiceController" />
   </ItemGroup>
 
   <ItemGroup>

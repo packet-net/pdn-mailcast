@@ -586,7 +586,7 @@ public sealed class SoundModemRetuneTests
         using var dir = new TempDirectory();
         var withRig = new ReceiverConfig
         {
-            Audio = "plughw:CARD=Device,DEV=0",
+            Audio = Samples.SoundCard,
             StateDirectory = dir.Path,
             Retune = true,
             Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
@@ -599,7 +599,7 @@ public sealed class SoundModemRetuneTests
             Assert.Equal("rigctld at 127.0.0.1:4532", host.Retuner.Via);
         }
 
-        foreach (string audio in new[] { "plughw:CARD=Device,DEV=0", "ubersdr:wessex.zapto.org", "wav:/nonexistent.wav" })
+        foreach (string audio in new[] { Samples.SoundCard, "ubersdr:wessex.zapto.org", "wav:/nonexistent.wav" })
         {
             await using var host = new ReceiverHost(new ReceiverConfig { Audio = audio, StateDirectory = dir.Path, Retune = true, Web = FreeWeb() }, TimeProvider.System, _ => { });
             Assert.Null(host.Retuner);

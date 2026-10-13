@@ -177,6 +177,20 @@ public class UpdateCheckTests
         Assert.Equal("sudo apt install ./pdn-mailcast-receiver_0.5.2_armhf.deb", view.GetProperty("command").GetString());
     }
 
+    [Fact]
+    public async Task Newer_OnWindows_GivesTheZip_AndNoAptCommand()
+    {
+        var repo = new FakeRepo(_ => Ok(RealIndex()));
+        using var check = new UpdateCheck(new FakeTimeProvider(Start), _ => { }, "0.5.1", "amd64", repo, fromAptRepo: () => false) { Windows = true };
+
+        await check.CheckOnceAsync(CancellationToken.None);
+
+        var view = View(check);
+        Assert.True(view.GetProperty("newer").GetBoolean());
+        Assert.Equal("https://github.com/packet-net/pdn-mailcast/releases/download/v0.5.2/pdn-mailcast-receiver_0.5.2_win-x64.zip", view.GetProperty("download").GetString());
+        Assert.Equal(JsonValueKind.Null, view.GetProperty("command").ValueKind);
+    }
+
     [Theory]
     [InlineData("0.5.2")]
     [InlineData("0.5.2+3f2a9c1")]

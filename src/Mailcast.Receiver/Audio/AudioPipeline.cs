@@ -550,6 +550,21 @@ public sealed class AudioPipeline : IAsyncDisposable
                 _log($"audio: sound card {_source.Target} at {OnAir.SampleRate} Hz, the radio on USB dial {OnAir.Mhz(DialHz)} MHz");
                 break;
 
+            case AudioSourceKind.WindowsSoundCard when OperatingSystem.IsWindows():
+                var (card, name) = WindowsSoundCards.Open(_source.Target, OnAir.SampleRate);
+                card.Faulted += e =>
+                {
+                    // It reads nothing from then on: end, and the supervisor opens it again.
+                    EndReason = $"the sound card {Ascii.Clean(name)} stopped: {Ascii.Clean(e.Message)}";
+                    _stop.Cancel();
+                };
+                _input = card;
+                _log($"audio: sound card {name} at {OnAir.SampleRate} Hz, the radio on USB dial {OnAir.Mhz(DialHz)} MHz");
+                break;
+
+            case AudioSourceKind.WindowsSoundCard:
+                throw new AudioSourceException($"{_source} is a Windows sound card, and this is not Windows");
+
             case AudioSourceKind.UberSdr:
                 var endpoint = UberSdrDevice.Parse(_source.Target);
                 var tuning = WebSdrTuning;
@@ -662,7 +677,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 }
                 else
                 {
-                    Feed(block.AsSpan(0, read), soundCard: _input is AlsaAudioInput);
+                    Feed(block.AsSpan(0, read), soundCard: _source.IsSoundCard);
                 }
             }
         }

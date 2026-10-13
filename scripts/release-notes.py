@@ -120,7 +120,7 @@ def main():
     if not any(section in groups for section in order):
         lines.append("No recorded changes.")
         lines.append("")
-    lines.append("Packages: `pdn-mailcast-receiver` and `pdn-mailcast-headend` as `.deb` for amd64, arm64 and armhf, and the M0LTE.RaptorQ NuGet package, are attached; verify downloads against `SHA256SUMS`. To run a receiver, see [src/Mailcast.Receiver/README.md](https://github.com/packet-net/pdn-mailcast/blob/main/src/Mailcast.Receiver/README.md); for the head end, [docs/headend.md](https://github.com/packet-net/pdn-mailcast/blob/main/docs/headend.md).")
+    lines.append("Packages: `pdn-mailcast-receiver` and `pdn-mailcast-headend` as `.deb` for amd64, arm64 and armhf, the receiver for Windows as `pdn-mailcast-receiver_VERSION_win-x64.zip`, and the M0LTE.RaptorQ NuGet package, are attached; verify downloads against `SHA256SUMS`. To run a receiver, see [src/Mailcast.Receiver/README.md](https://github.com/packet-net/pdn-mailcast/blob/main/src/Mailcast.Receiver/README.md); for the head end, [docs/headend.md](https://github.com/packet-net/pdn-mailcast/blob/main/docs/headend.md).")
     print("\n".join(lines))
 
 

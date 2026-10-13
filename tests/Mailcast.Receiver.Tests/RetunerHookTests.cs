@@ -1,4 +1,3 @@
-using System.Runtime.Versioning;
 using Mailcast.Receiver.Hooks;
 using Mailcast.Receiver.Retune;
 using Packet.SoundModem.Rig;
@@ -9,7 +8,6 @@ namespace Mailcast.Receiver.Tests;
 /// The hooks with a retuned radio: "before" ahead of LinBPQ being held off and the rig tuned, and
 /// "after" once the rig is back and LinBPQ released, on the same fake clocks as the rest.
 /// </summary>
-[UnsupportedOSPlatform("windows")]
 public sealed partial class RetunerTests
 {
     /// <summary>Both hooks as scripts noting each run in <paramref name="record"/>; "before" has a 60 s timeout.</summary>

@@ -16,11 +16,14 @@ public enum AudioSourceKind
 
     /// <summary>The channel audio stream of a pdn-soundmodem on this machine.</summary>
     SoundModem,
+
+    /// <summary>A Windows recording device, read through WASAPI: the Windows counterpart of <see cref="Alsa"/>.</summary>
+    WindowsSoundCard,
 }
 
 /// <summary>The config's "audio" setting, parsed.</summary>
 /// <param name="Kind">What it is.</param>
-/// <param name="Target">The ALSA device, the full ubersdr: string, the WAV file's path, or pdn-soundmodem's page port.</param>
+/// <param name="Target">The ALSA device, the full ubersdr: string, the WAV file's path, pdn-soundmodem's page port, or the Windows recording device's name.</param>
 public sealed record AudioSource(AudioSourceKind Kind, string Target)
 {
     /// <summary>
@@ -33,19 +36,34 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
     /// <summary>The setting's own word for pdn-soundmodem on this machine.</summary>
     public const string SoundModemWord = "soundmodem";
 
+    /// <summary>The setting's own word for a Windows recording device, as <c>soundcard:NAME</c>.</summary>
+    public const string WindowsSoundCardWord = "soundcard";
+
+    /// <summary>Whether this is a sound card on this machine (ALSA, or a Windows recording device), whose level is the operator's to set.</summary>
+    public bool IsSoundCard => Kind is AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard;
+
     /// <summary>pdn-soundmodem's page port, for a <see cref="AudioSourceKind.SoundModem"/> source; 0 for any other.</summary>
     public int SoundModemPort => Kind == AudioSourceKind.SoundModem ? int.Parse(Target, System.Globalization.CultureInfo.InvariantCulture) : 0;
 
-    /// <summary>Parses the setting. Throws <see cref="ConfigException"/> for one that cannot work.</summary>
-    public static AudioSource Parse(string? setting)
+    /// <summary>Parses the setting, as this machine reads it. Throws <see cref="ConfigException"/> for one that cannot work.</summary>
+    public static AudioSource Parse(string? setting) => Parse(setting, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Parses the setting as Windows (<paramref name="windows"/>) or Linux reads it: a sound card
+    /// is <c>soundcard:NAME</c> on Windows and an ALSA device anywhere else.
+    /// </summary>
+    internal static AudioSource Parse(string? setting, bool windows)
     {
         string value = setting?.Trim() ?? "";
         if (value.Length == 0)
         {
-            throw new ConfigException(
-                "\"audio\" is empty: give an ALSA device such as plughw:CARD=Device,DEV=0, "
-                + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, "
-                + "or a recording as wav:/path/file.wav");
+            throw new ConfigException(windows
+                ? "\"audio\" is empty: give a sound card by its Windows name such as soundcard:Microphone (USB Audio Device), "
+                    + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, "
+                    + "or a recording as wav:C:\\slot.wav"
+                : "\"audio\" is empty: give an ALSA device such as plughw:CARD=Device,DEV=0, "
+                    + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, "
+                    + "or a recording as wav:/path/file.wav");
         }
 
         if (value.Equals(SoundModemWord, StringComparison.OrdinalIgnoreCase))
@@ -83,7 +101,24 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
             return new AudioSource(AudioSourceKind.UberSdr, value);
         }
 
-        return new AudioSource(AudioSourceKind.Alsa, value);
+        if (!windows)
+        {
+            return new AudioSource(AudioSourceKind.Alsa, value);
+        }
+
+        if (value.StartsWith(WindowsSoundCardWord + ":", StringComparison.OrdinalIgnoreCase))
+        {
+            string name = value[(WindowsSoundCardWord.Length + 1)..].Trim();
+            return name.Length == 0
+                ? throw new ConfigException("\"audio\": soundcard: needs the recording device's name as Windows shows it, such as soundcard:Microphone (USB Audio Device)")
+                : new AudioSource(AudioSourceKind.WindowsSoundCard, name);
+        }
+
+        // There is no ALSA on Windows: anything else would have been an ALSA device.
+        throw new ConfigException(Ascii.Clean(
+            $"\"audio\": {value} is not something the receiver can open on Windows. Give a sound card by its Windows name, such as "
+            + "soundcard:Microphone (USB Audio Device) (the status page's settings list the ones it can see), "
+            + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, or a recording as wav:C:\\slot.wav"));
     }
 
     /// <inheritdoc />
@@ -91,6 +126,7 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
     {
         AudioSourceKind.Wav => "wav:" + Target,
         AudioSourceKind.SoundModem => SoundModemPort == DefaultSoundModemPort ? SoundModemWord : $"{SoundModemWord}:{Target}",
+        AudioSourceKind.WindowsSoundCard => $"{WindowsSoundCardWord}:{Target}",
         _ => Target,
     };
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace Mailcast.Receiver.Updates;
 
@@ -67,10 +68,26 @@ public sealed class UpdateCheck : IDisposable
     }
 
     /// <summary>A check for this receiver, on this machine, against the real repository.</summary>
+    /// <remarks>
+    /// On Windows the apt repository's amd64 package still says which version is newest (every
+    /// release builds both), but the page offers the release's Windows zip rather than apt. Only
+    /// x64 has a Windows build, so anything else on Windows checks nothing.
+    /// </remarks>
     public UpdateCheck(TimeProvider time, Action<string> log)
-        : this(time, log, ThisVersion(), AptPackages.ThisArchitecture())
+        : this(time, log, ThisVersion(),
+            !OperatingSystem.IsWindows() ? AptPackages.ThisArchitecture()
+            : RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.X64 ? AptPackages.Architecture(RuntimeInformation.ProcessArchitecture)
+            : null,
+            fromAptRepo: OperatingSystem.IsWindows() ? () => false : null)
     {
+        Windows = OperatingSystem.IsWindows();
     }
+
+    /// <summary>Whether this receiver runs on Windows, where an upgrade is the release's zip, not a .deb or apt.</summary>
+    internal bool Windows { get; init; }
+
+    /// <summary>The release asset a Windows receiver upgrades from, as release.yml names it.</summary>
+    internal static string WindowsZip(string version) => $"{AptPackages.ReceiverPackage}_{version}_win-x64.zip";
 
     /// <summary>This receiver's version, in full (0.6.0, or 0.7.0-rc1), without a local build's <c>+</c> suffix.</summary>
     public string Current { get; }
@@ -211,6 +228,20 @@ public sealed class UpdateCheck : IDisposable
     {
         var f = _found;
         bool newer = f is { Newer: true };
+        if (Windows)
+        {
+            return new
+            {
+                latest = f?.Latest,
+                current = Current,
+                newer,
+                checkedAt = f?.CheckedAt,
+                aptRepo = (bool?)false,
+                release = newer ? $"{ReleasesUrl}/tag/v{f!.Latest}" : null,
+                download = newer ? $"{ReleasesUrl}/download/v{f!.Latest}/{WindowsZip(f.Latest)}" : null,
+                command = (string?)null,
+            };
+        }
         string? deb = newer && !f!.FromAptRepo ? $"{AptPackages.ReceiverPackage}_{f.Latest}_{Architecture}.deb" : null;
         return new
         {

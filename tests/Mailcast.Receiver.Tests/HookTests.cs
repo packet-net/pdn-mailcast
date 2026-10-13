@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Runtime.Versioning;
 using System.Threading.Channels;
 using Mailcast.Receiver.Hooks;
 using Microsoft.Extensions.Time.Testing;
@@ -8,16 +7,26 @@ using Packet.Mailcast;
 namespace Mailcast.Receiver.Tests;
 
 /// <summary>Tiny real hook scripts that note each run, with what they were told, in a file.</summary>
-[UnsupportedOSPlatform("windows")]
 internal static class HookScript
 {
     /// <summary>
     /// A script that appends "HOOK SLOT DIAL CENTRE BEFORE_OK" (BEFORE_OK "none" when not given)
     /// to <paramref name="record"/>, runs <paramref name="then"/>, then exits with <paramref name="exit"/>.
+    /// On Windows it is a batch file (<paramref name="name"/>.cmd), and <paramref name="then"/> is cmd's.
     /// </summary>
     public static HookCommand Write(string dir, string name, string record, int exit = 0, int timeoutSeconds = 60, string then = "")
     {
         string path = Path.Combine(dir, name);
+        if (OperatingSystem.IsWindows())
+        {
+            // The redirection goes first, or a digit ending the line (BEFORE_OK's 1) would be read as a handle.
+            path += ".cmd";
+            File.WriteAllText(path,
+                "@echo off\r\nset \"B=none\"\r\nif defined MAILCAST_BEFORE_OK set \"B=%MAILCAST_BEFORE_OK%\"\r\n"
+                + $">>\"{record}\" echo %MAILCAST_HOOK% %MAILCAST_SLOT_UTC% %MAILCAST_DIAL_KHZ% %MAILCAST_CENTRE_KHZ% %B%\r\n{then}\r\nexit {exit}\r\n");
+            // With forward slashes, which Windows takes as well, so a test can put it in JSON as it is.
+            return new HookCommand { Command = path.Replace('\\', '/'), TimeoutSeconds = timeoutSeconds };
+        }
         File.WriteAllText(path, $"#!/bin/sh\necho \"$MAILCAST_HOOK $MAILCAST_SLOT_UTC $MAILCAST_DIAL_KHZ $MAILCAST_CENTRE_KHZ ${{MAILCAST_BEFORE_OK-none}}\" >> '{record}'\n{then}\nexit {exit}\n");
         File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         return new HookCommand { Command = path, TimeoutSeconds = timeoutSeconds };
@@ -32,7 +41,6 @@ internal static class HookScript
 /// a web SDR's and a sound card's windows (the retuner's are in <see cref="RetunerTests"/>). The
 /// loop's waits are on a fake clock moved by exactly what it asked for; nothing is timed.
 /// </summary>
-[UnsupportedOSPlatform("windows")]
 public sealed class HookTests
 {
     private static DateTimeOffset At(int hour, int minute, int second = 0) => new(2026, 10, 5, hour, minute, second, TimeSpan.Zero);
@@ -85,8 +93,8 @@ public sealed class HookTests
     [Theory]
     [InlineData("""{ "command": "" }""", "\"hooks\".\"before\": \"command\" is empty")]
     [InlineData("""{ "command": "stop-ardop" }""", "\"command\" \"stop-ardop\" is not a full path")]
-    [InlineData("""{ "command": "/nonexistent/stop-ardop" }""", "/nonexistent/stop-ardop does not exist")]
-    [InlineData("""{ "command": "/" }""", "is a folder, not a program")]
+    [InlineData("""{ "command": "MISSING" }""", "MISSING does not exist")]
+    [InlineData("""{ "command": "FOLDER" }""", "is a folder, not a program")]
     [InlineData("""{ "command": "SCRIPT", "args": "stop" }""", "\"hooks\" setting that cannot be read (at $.hooks.before.args)")]
     [InlineData("""{ "command": "SCRIPT", "args": ["stop", 3] }""", "\"hooks\" setting that cannot be read (at $.hooks.before.args[1])")]
     [InlineData("""{ "command": "SCRIPT", "args": ["stop", null] }""", "\"args\" has a null in it")]
@@ -99,15 +107,23 @@ public sealed class HookTests
     {
         using var dir = new TempDirectory();
         var script = HookScript.Write(dir.Path, "stop-ardop", Path.Combine(dir.Path, "runs"));
+        // Full paths on this machine, with forward slashes (which Windows takes) to sit in JSON as they are.
+        string missing = Path.Combine(dir.Path, "nonexistent", "stop-ardop").Replace('\\', '/');
+        string folder = dir.Path.Replace('\\', '/');
 
-        var e = Refused($$"""{ "hooks": { "before": {{before.Replace("SCRIPT", script.Command, StringComparison.Ordinal)}} } }""");
+        var e = Refused($$"""{ "hooks": { "before": {{before.Replace("SCRIPT", script.Command, StringComparison.Ordinal).Replace("MISSING", missing, StringComparison.Ordinal).Replace("FOLDER", folder, StringComparison.Ordinal)}} } }""");
 
-        Assert.Contains(expected, e.Message, StringComparison.Ordinal);
+        Assert.Contains(expected.Replace("MISSING", missing, StringComparison.Ordinal), e.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Config_AHookThatIsNotExecutable_IsRefusedSayingHowToFixIt()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            // Execute bits are Unix's: Windows has nothing for this to show.
+            return;
+        }
         using var dir = new TempDirectory();
         var script = HookScript.Write(dir.Path, "start-ardop", Path.Combine(dir.Path, "runs"));
         File.SetUnixFileMode(script.Command, UnixFileMode.UserRead | UnixFileMode.UserWrite);
@@ -120,9 +136,10 @@ public sealed class HookTests
     [Fact]
     public void Config_AHookExecutableOnlyByOthers_IsRefused()
     {
-        if (Environment.UserName == "root")
+        if (Environment.UserName == "root" || OperatingSystem.IsWindows())
         {
-            // root may execute anything with any execute bit, so this cannot be shown as root.
+            // root may execute anything with any execute bit, so this cannot be shown as root;
+            // and execute bits are Unix's.
             return;
         }
         using var dir = new TempDirectory();
@@ -170,7 +187,7 @@ public sealed class HookTests
     public async Task Windows_SoundCard_AreTheSameAroundEverySlot()
     {
         using var dir = new TempDirectory();
-        await using var host = Host(dir, "plughw:CARD=Device,DEV=0");
+        await using var host = Host(dir, Samples.SoundCard);
 
         Assert.Equal(new HookWindow(At(9, 58), At(10, 12), At(10, 0)), host.HookWindowAt(At(9, 20)));
         Assert.Equal(new HookWindow(At(8, 58), At(9, 12), At(9, 0)), host.HookWindowAt(At(9, 11, 59)));
@@ -182,7 +199,7 @@ public sealed class HookTests
     public async Task Windows_RetunedRadio_AreTheRetunersAndARecordingHasNone()
     {
         using var dir = new TempDirectory();
-        await using (var retuned = Host(dir, "plughw:CARD=Device,DEV=0", rig: true))
+        await using (var retuned = Host(dir, Samples.SoundCard, rig: true))
         {
             Assert.True(retuned.RetunerRunsHooks);
         }
@@ -207,7 +224,7 @@ public sealed class HookTests
         private Task? _run;
         private TimeSpan? _pending;
 
-        public Loop(DateTimeOffset start, string audio = "plughw:CARD=Device,DEV=0", int beforeExit = 0, string? dir = null, int everyMinutes = 60, bool withBefore = true, int afterExit = 0, string afterThen = "")
+        public Loop(DateTimeOffset start, string? audio = null, int beforeExit = 0, string? dir = null, int everyMinutes = 60, bool withBefore = true, int afterExit = 0, string afterThen = "")
         {
             if (dir is null)
             {
@@ -219,7 +236,7 @@ public sealed class HookTests
             Clock = new FakeTimeProvider(start);
             Config = new ReceiverConfig
             {
-                Audio = audio,
+                Audio = audio ?? Samples.SoundCard,
                 StateDirectory = dir,
                 Daylight = null,
                     EveryMinutes = everyMinutes,
@@ -434,6 +451,11 @@ public sealed class HookTests
     [InlineData(0, "kill -TERM $$")]
     public async Task AfterFailsOrIsKilled_TheNoteStays_SoTheNextStartRunsItAgain(int exit, string then)
     {
+        if (then.Length > 0 && OperatingSystem.IsWindows())
+        {
+            // Killed by a signal is Unix's; failing is shown on Windows by the other case.
+            return;
+        }
         using var dir = new TempDirectory();
         await using (var first = new Loop(At(11, 56, 30), dir: dir.Path, afterExit: exit, afterThen: then))
         {

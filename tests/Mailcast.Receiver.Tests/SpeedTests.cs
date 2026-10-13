@@ -253,7 +253,7 @@ public class SpeedTests
     [InlineData("wav:/tmp/slot.wav", "clippingOnly")]
     public void LevelAdvice_DependsOnWhereTheAudioComesFrom(string audio, string advice)
     {
-        Assert.Equal(advice, StatusPage.LevelAdvice(audio));
+        Assert.Equal(advice, StatusPage.LevelAdvice(Samples.OnThisMachine(audio)));
     }
 
     [Fact]

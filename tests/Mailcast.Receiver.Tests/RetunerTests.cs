@@ -79,7 +79,7 @@ public sealed partial class RetunerTests
             var settings = bpq ?? Node?.Settings();
             Config = new ReceiverConfig
             {
-                Audio = "plughw:CARD=Device,DEV=0",
+                Audio = Samples.SoundCard,
                 StateDirectory = Dir,
                 Daylight = null,
                 Rig = new RigSettings { Rigctld = Rig.Endpoint.ToString(), DedicatedRadio = dedicated },

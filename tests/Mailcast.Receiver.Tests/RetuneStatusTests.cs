@@ -26,7 +26,7 @@ public sealed class RetuneStatusTests
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {
-            Audio = "plughw:CARD=Device,DEV=0",
+            Audio = Samples.SoundCard,
             StateDirectory = dir.Path,
             Rig = new RigSettings { Rigctld = "127.0.0.1:4532" },
             Bpq = new BpqNodeSettings { User = "sysop", Password = "s3cret-sysop", HfPort = 2 },
