@@ -784,7 +784,7 @@ public sealed record IonosphereConfig
     public double StaleMinutes { get; init; } = 45;
 
     /// <summary>The ionosondes by URSI code, best first; empty turns the reading off.</summary>
-    public IReadOnlyList<string> Stations { get; init; } = ["RL052", "FF051", "DB049"];
+    public IReadOnlyList<string> Stations { get; init; } = ["FF051", "RL052", "DB049"];
 
     /// <summary>As the core library takes them.</summary>
     public Packet.Mailcast.Propagation.IonoSettings ToSettings() => new()

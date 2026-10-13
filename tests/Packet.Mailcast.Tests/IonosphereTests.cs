@@ -112,13 +112,13 @@ public class IonosphereTests
     }
 
     [Fact]
-    public void Stations_ChiltonFirst_ThenFairford_ThenDourbes_AndOnlyFreshOnesWinOnOrder()
+    public void Stations_FairfordFirst_ThenChilton_ThenDourbes_AndOnlyFreshOnesWinOnOrder()
     {
-        var chilton = Chilton(6.0, m3000: 3.0, at: Now.AddMinutes(-30));
-        var fairford = new IonoSounding("FF051", Now.AddMinutes(-5), IonoSource.PropQuest, 7.0, M3000: 3.0);
-        var dourbes = new IonoSounding("DB049", Now.AddMinutes(-2), IonoSource.Giro, 8.0, M3000: 3.0);
-        Assert.Equal("RL052", IonoEvaluator.Evaluate([dourbes, fairford, chilton], Settings, Now).Station);
-        Assert.Equal("FF051", IonoEvaluator.Evaluate([dourbes, fairford, chilton with { Time = Now.AddMinutes(-50) }], Settings, Now).Station);
+        var chilton = Chilton(6.0, m3000: 3.0, at: Now.AddMinutes(-2));
+        var fairford = new IonoSounding("FF051", Now.AddMinutes(-30), IonoSource.PropQuest, 7.0, M3000: 3.0);
+        var dourbes = new IonoSounding("DB049", Now.AddMinutes(-1), IonoSource.Giro, 8.0, M3000: 3.0);
+        Assert.Equal("FF051", IonoEvaluator.Evaluate([dourbes, chilton, fairford], Settings, Now).Station);
+        Assert.Equal("RL052", IonoEvaluator.Evaluate([dourbes, chilton, fairford with { Time = Now.AddMinutes(-50) }], Settings, Now).Station);
         Assert.Equal("DB049", IonoEvaluator.Evaluate([dourbes, fairford with { Time = Now.AddHours(-2) }], Settings, Now).Station);
 
         // None fresh: the newest, as UNKNOWN.

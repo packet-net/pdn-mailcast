@@ -160,11 +160,12 @@ public sealed record IonoSettings
     public TimeSpan StaleAfter { get; init; } = DefaultStaleAfter;
 
     /// <summary>
-    /// The ionosondes, best first: the first with a fresh sounding is used. Chilton (RL052) is
-    /// near Reading, Fairford (FF051) about 85 km away, Dourbes (DB049) in Belgium. Empty turns the
-    /// reading off.
+    /// The ionosondes, best first: the first with a fresh sounding is used. Fairford (FF051) is
+    /// about 85 km from Reading and sounds every 7.5 minutes. Chilton (RL052) is nearer but has sent
+    /// GIRO nothing since 2024-08-22, so it only comes second, in case it returns. Dourbes (DB049)
+    /// is in Belgium. Empty turns the reading off.
     /// </summary>
-    public IReadOnlyList<string> Stations { get; init; } = ["RL052", "FF051", "DB049"];
+    public IReadOnlyList<string> Stations { get; init; } = ["FF051", "RL052", "DB049"];
 }
 
 /// <summary>
