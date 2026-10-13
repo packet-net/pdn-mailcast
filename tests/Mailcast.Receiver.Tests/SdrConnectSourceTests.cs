@@ -65,6 +65,15 @@ public class SdrConnectSourceTests
     }
 
     [Fact]
+    public void SettingsPage_SavesSdrConnectAndTheLocator()
+    {
+        var saved = StatusPage.Apply(new ReceiverConfig(), new StatusPage.SettingsForm("sdrconnect:192.168.1.20", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS", Locator: "IO91lk"));
+
+        Assert.Equal("sdrconnect:192.168.1.20", saved.Audio);
+        Assert.Equal("IO91lk", saved.Locator);
+    }
+
+    [Fact]
     public void EmptyAudio_MentionsSdrConnect()
     {
         Assert.Contains("sdrconnect:", Assert.Throws<ConfigException>(() => AudioSource.Parse("", windows: false)).Message, StringComparison.Ordinal);

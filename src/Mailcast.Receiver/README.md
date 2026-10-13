@@ -70,15 +70,18 @@ On the Windows PC:
 3. Make sure Windows treats your network as **Private** (Settings, Network & internet): SDRconnect's firewall rule only lets the receiver in on a Private network. If it has to stay Public, allow TCP port 5454 in.
 4. Note the PC's IP address (`ipconfig` shows it). Use a wired connection if you can: the receiver takes the radio's raw signal, about 8 Mbit/s, which Wi-Fi does not always keep up with.
 
-On the receiver's machine, put that address in `/etc/pdn-mailcast/receiver.json`:
+On the receiver's machine, open its status page (see [3. Start it](#3-start-it)) and, under **Settings**:
 
-```
-"audio": "sdrconnect:192.168.1.20",
-```
+1. For **Audio**, choose **SDRconnect (SDRplay) on another computer**.
+2. In the box below it, put the PC's address after `sdrconnect:`, such as `sdrconnect:192.168.1.20` (add `:PORT` if you changed SDRconnect's port).
+3. Fill in **Your locator**.
+4. Click **Save**. It takes effect at once, with nothing to restart.
 
-(add `:PORT` if you changed SDRconnect's port), then `sudo systemctl restart pdn-mailcast-receiver`. The status page should say it is listening to SDRconnect, with the level meter moving. If it can't connect, the page and the log say why, and it keeps trying.
+Or set `"audio": "sdrconnect:192.168.1.20"` in `/etc/pdn-mailcast/receiver.json` and restart the receiver.
 
-While the receiver runs, leave SDRconnect's tuning alone: the receiver tunes it for 7.052 MHz USB (the radio itself sits a little below that) and puts it back if it is moved. Set `"locator"` to your own locator, as for any radio of your own.
+The page should then say it is listening to SDRconnect, with the level meter moving. If it can't connect, the page and the log say why, and it keeps trying.
+
+While the receiver runs, leave SDRconnect's tuning alone: the receiver tunes it for 7.052 MHz USB (the radio itself sits a little below that) and puts it back if it is moved.
 
 ## Windows
 
