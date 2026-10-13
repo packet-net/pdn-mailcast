@@ -594,46 +594,32 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// </summary>
     internal static string SdrConnectProblem(SdrConnectEndpoint endpoint, Exception error)
     {
-        var socket = Inner<System.Net.Sockets.SocketException>(error);
         string said = Ascii.Clean(error.Message).TrimEnd('.', ' ');
-        if (socket?.SocketErrorCode is System.Net.Sockets.SocketError.ConnectionRefused)
+        SdrConnectFailure? reason = error switch
         {
-            return $"SDRconnect at {endpoint} refused the connection. Check that SDRconnect is running on that computer, "
+            SdrConnectUnreachableException u => u.Reason,
+            SdrConnectRefusedException r => r.Reason,
+            _ => null,
+        };
+        return reason switch
+        {
+            SdrConnectFailure.Refused =>
+                $"SDRconnect at {endpoint} refused the connection. Check that SDRconnect is running on that computer, "
                 + "that its WebSocket Server is switched on (it starts off: in SDRconnect, Other Actions -> Preferences -> WebSocket Server), "
-                + $"and that its port is {endpoint.Port}";
-        }
-        if (socket?.SocketErrorCode is System.Net.Sockets.SocketError.HostNotFound or System.Net.Sockets.SocketError.NoData or System.Net.Sockets.SocketError.TryAgain)
-        {
-            return $"cannot find the computer {endpoint.Host} for SDRconnect. Check the name, or give its IP address instead, such as sdrconnect:192.168.1.20";
-        }
-        // pdn-soundmodem says a connect that timed out only in words ("no answer from ..."): a
-        // Windows firewall drops what it does not let in, rather than refusing it.
-        if (socket?.SocketErrorCode is System.Net.Sockets.SocketError.TimedOut or System.Net.Sockets.SocketError.HostUnreachable or System.Net.Sockets.SocketError.NetworkUnreachable
-            || (socket is null && error is IOException && error.InnerException?.Message.Contains("no answer", StringComparison.OrdinalIgnoreCase) == true))
-        {
-            return $"no answer from SDRconnect at {endpoint}. Check that this is the right address for that computer and that it is on, "
-                + $"and that its firewall lets this machine in: Windows lets SDRconnect through only on a network it treats as Private, "
-                + $"so set that network to Private in Windows' settings, or allow TCP port {endpoint.Port} in";
-        }
-        if (said.Contains("can_control", StringComparison.Ordinal))
-        {
-            return $"SDRconnect at {endpoint} will not let the receiver tune its radio (it says can_control is false). "
+                + $"and that its port is {endpoint.Port}",
+            SdrConnectFailure.NameNotFound =>
+                $"cannot find the computer {endpoint.Host} for SDRconnect. Check the name, or give its IP address instead, such as sdrconnect:192.168.1.20",
+            // A Windows firewall drops what it does not let in, rather than refusing it.
+            SdrConnectFailure.NoAnswer =>
+                $"no answer from SDRconnect at {endpoint}. Check that this is the right address for that computer and that it is on, "
+                + "and that its firewall lets this machine in: Windows lets SDRconnect through only on a network it treats as Private, "
+                + $"so set that network to Private in Windows' settings, or allow TCP port {endpoint.Port} in",
+            SdrConnectFailure.CannotControl =>
+                $"SDRconnect at {endpoint} will not let the receiver tune its radio (it says can_control is false). "
                 + "Check that SDRconnect has the radio selected and started, that only one copy of SDRconnect is running, "
-                + "and that it is not itself connected to another SDRconnect as a client";
-        }
-        return $"cannot use SDRconnect at {endpoint}: {said}";
-    }
-
-    private static T? Inner<T>(Exception? error) where T : Exception
-    {
-        for (var e = error; e is not null; e = e.InnerException)
-        {
-            if (e is T found)
-            {
-                return found;
-            }
-        }
-        return null;
+                + "and that it is not itself connected to another SDRconnect as a client",
+            _ => $"cannot use SDRconnect at {endpoint}: {said}",
+        };
     }
 
     /// <summary>Opens the source and starts the audio thread.</summary>

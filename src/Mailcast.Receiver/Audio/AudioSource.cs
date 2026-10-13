@@ -59,7 +59,8 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
     /// <summary>SDRconnect's address, for a <see cref="AudioSourceKind.SdrConnect"/> source.</summary>
     /// <exception cref="InvalidOperationException">This is not an SDRconnect source.</exception>
     public SdrConnectEndpoint SdrConnectEndpoint => Kind == AudioSourceKind.SdrConnect
-        ? SdrConnectDevice.Parse(Target)
+        && SdrConnectEndpoint.TryParse(Target[(SdrConnectWord.Length + 1)..], out var endpoint, out _)
+        ? endpoint
         : throw new InvalidOperationException($"{this} is not SDRconnect");
 
     /// <summary>Parses the setting, as this machine reads it. Throws <see cref="ConfigException"/> for one that cannot work.</summary>
@@ -105,16 +106,11 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
                 : new AudioSource(AudioSourceKind.Wav, path);
         }
 
-        if (SdrConnectDevice.IsSdrConnect(value))
+        if (value.StartsWith(SdrConnectWord + ":", StringComparison.OrdinalIgnoreCase))
         {
             string where = value[(SdrConnectWord.Length + 1)..].Trim();
-            try
+            if (!SdrConnectEndpoint.TryParse(where, out _, out _))
             {
-                _ = SdrConnectDevice.Parse(value);
-            }
-            catch (Exception e) when (e is ArgumentException or InvalidDataException)
-            {
-                // pdn-soundmodem's own words are about its "device" setting, not this one.
                 throw new ConfigException(Ascii.Clean(where.Length == 0
                     ? "\"audio\": sdrconnect: needs the computer SDRconnect runs on, such as sdrconnect:192.168.1.20"
                     : $"\"audio\": sdrconnect:{where} is not a computer and a port. Give the computer SDRconnect runs on, such as "

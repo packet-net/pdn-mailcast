@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Net.WebSockets;
 using Mailcast.Receiver.Feedback;
 using Mailcast.Receiver.Web;
 using Packet.SoundModem.SdrConnect;
@@ -104,28 +103,33 @@ public class SdrConnectSourceTests
     public void Problem_ConnectTimedOut_PointsAtTheWindowsFirewall()
     {
         var endpoint = new SdrConnectEndpoint("192.168.1.20", 5454);
-        // As pdn-soundmodem gives a connect that ran out of time: in words only.
-        var timedOut = new IOException("cannot reach SDRconnect at ws://192.168.1.20:5454/: no answer from ws://192.168.1.20:5454/ within 15 s",
-            new WebSocketException("no answer from ws://192.168.1.20:5454/ within 15 s"));
-        var dropped = new IOException("cannot reach SDRconnect", new WebSocketException("unable to connect", new SocketException((int)SocketError.TimedOut)));
+        var timedOut = new SdrConnectUnreachableException(SdrConnectFailure.NoAnswer, "no answer from ws://192.168.1.20:5454/ within 15 s");
 
-        foreach (var error in new Exception[] { timedOut, dropped })
-        {
-            string said = AudioPipeline.SdrConnectProblem(endpoint, error);
-            Assert.StartsWith("no answer from SDRconnect at 192.168.1.20:5454", said, StringComparison.Ordinal);
-            Assert.Contains("Private", said, StringComparison.Ordinal);
-            Assert.Contains("TCP port 5454", said, StringComparison.Ordinal);
-        }
+        string said = AudioPipeline.SdrConnectProblem(endpoint, timedOut);
+
+        Assert.StartsWith("no answer from SDRconnect at 192.168.1.20:5454", said, StringComparison.Ordinal);
+        Assert.Contains("Private", said, StringComparison.Ordinal);
+        Assert.Contains("TCP port 5454", said, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Problem_UnknownName_SaysToGiveTheAddress()
     {
-        var error = new IOException("cannot reach SDRconnect", new WebSocketException("unable to connect", new SocketException((int)SocketError.HostNotFound)));
+        var error = new SdrConnectUnreachableException(SdrConnectFailure.NameNotFound, "cannot reach SDRconnect (name not found)");
 
         string said = AudioPipeline.SdrConnectProblem(new SdrConnectEndpoint("shack-pc", 5454), error);
 
         Assert.Contains("cannot find the computer shack-pc", said, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Problem_AnythingElse_SaysWhatSdrConnectSaid()
+    {
+        var error = new SdrConnectRefusedException(SdrConnectFailure.NoSetUp, "SDRconnect at 192.168.1.20:5454 accepted the connection but did not finish setting up within 20 s.");
+
+        string said = AudioPipeline.SdrConnectProblem(new SdrConnectEndpoint("192.168.1.20", 5454), error);
+
+        Assert.Equal("cannot use SDRconnect at 192.168.1.20:5454: SDRconnect at 192.168.1.20:5454 accepted the connection but did not finish setting up within 20 s", said);
     }
 
     [Fact]
