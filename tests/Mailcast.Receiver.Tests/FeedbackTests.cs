@@ -418,7 +418,7 @@ public class FeedbackTests
     [InlineData("plughw:CARD=Device,DEV=0", "sc")]
     public void Audio_WebSdrIsNamedOnlyWhenItIsAPublicName(string audio, string expected)
     {
-        Assert.Equal(expected, ReportAudio.For(AudioSource.Parse(audio)));
+        Assert.Equal(expected, ReportAudio.For(AudioSource.Parse(Samples.OnThisMachine(audio))));
     }
 
     [Theory]

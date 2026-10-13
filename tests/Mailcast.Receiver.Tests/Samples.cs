@@ -8,6 +8,18 @@ namespace Mailcast.Receiver.Tests;
 /// <summary>Bulletins and broadcast frames for the tests.</summary>
 internal static class Samples
 {
+    /// <summary>
+    /// A sound card as this machine's "audio" setting names one: an ALSA device, or on Windows a
+    /// recording device by its name (issue #119). Nothing in the tests opens it.
+    /// </summary>
+    public static readonly string SoundCard = OnThisMachine("plughw:CARD=Device,DEV=0");
+
+    /// <summary>An ALSA card's setting (<c>plughw:CARD=NAME,...</c>) as this machine would give that card: on Windows, <c>soundcard:NAME</c>. Anything else as it is.</summary>
+    public static string OnThisMachine(string audio) =>
+        OperatingSystem.IsWindows() && audio.StartsWith("plughw:CARD=", StringComparison.Ordinal)
+            ? AudioSource.WindowsSoundCardWord + ":" + audio["plughw:CARD=".Length..].Split(',')[0]
+            : audio;
+
     public static readonly DateOnly Day = new(2026, 10, 4);
 
     /// <summary>The callsign the head end sends as today.</summary>

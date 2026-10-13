@@ -440,7 +440,7 @@ public class StatusPageTests
     [Fact]
     public void Schedule_SoundCard_HasNoWebSdrPart()
     {
-        var config = new ReceiverConfig { Audio = "plughw:CARD=Device,DEV=0", Daylight = null };
+        var config = new ReceiverConfig { Audio = Samples.SoundCard, Daylight = null };
 
         var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T("2026-10-05T13:20:00Z")), ReceiverConfig.JsonLine);
 
@@ -519,7 +519,7 @@ public class StatusPageTests
         Assert.Equal(7052.5, saved.DialKHz);
 
         // A sound card's own dial (typed or measured) writes dialKHz directly through the form.
-        var narrowed = StatusPage.Apply(host.Config, new StatusPage.SettingsForm("plughw:CARD=Device,DEV=0", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS", DialKHz: 7052.3));
+        var narrowed = StatusPage.Apply(host.Config, new StatusPage.SettingsForm(Samples.SoundCard, "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS", DialKHz: 7052.3));
         Assert.Equal(7052.3, narrowed.DialKHz);
     }
 

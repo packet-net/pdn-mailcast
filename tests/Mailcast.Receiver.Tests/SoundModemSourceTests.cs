@@ -76,12 +76,12 @@ public class SoundModemSourceTests
     [Fact]
     public void OtherSources_AreUnchanged()
     {
-        Assert.Equal(AudioSourceKind.Alsa, AudioSource.Parse("plughw:CARD=Device,DEV=0").Kind);
+        Assert.Equal(AudioSourceKind.Alsa, AudioSource.Parse("plughw:CARD=Device,DEV=0", windows: false).Kind);
         Assert.Equal(AudioSourceKind.UberSdr, AudioSource.Parse("ubersdr:wessex.zapto.org").Kind);
         Assert.Equal(AudioSourceKind.Wav, AudioSource.Parse("wav:/tmp/x.wav").Kind);
         Assert.Equal("soundModem", Web.StatusPage.AudioKind("soundmodem"));
         Assert.Equal("clippingOnly", Web.StatusPage.LevelAdvice("soundmodem"));
-        Assert.Equal("target", Web.StatusPage.LevelAdvice("plughw:CARD=Device,DEV=0"));
+        Assert.Equal("target", Web.StatusPage.LevelAdvice(Samples.SoundCard));
     }
 
     // ---------- shape ----------
@@ -757,7 +757,6 @@ public class SoundModemSourceTests
     }
 
     [Fact]
-    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public async Task Hooks_RunAroundEverySlot_AsForASoundCard_WithTheDialPdnSoundmodemSays()
     {
         await using var fake = new FakeSoundModem(dialHz: 7_052_300);

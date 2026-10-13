@@ -62,7 +62,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         else if (config.Rig is not null)
         {
-            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.Alsa, time, log, Hooks, EarlyEndReason);
+            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).IsSoundCard, time, log, Hooks, EarlyEndReason);
         }
         ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
@@ -107,7 +107,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     public async Task<(RadioFilter? Filter, string? Problem)> MeasureFilterAsync(CancellationToken cancellation)
     {
         var pipeline = Pipeline;
-        if (pipeline is null || AudioSource.Parse(Config.Audio).Kind is not (AudioSourceKind.Alsa or AudioSourceKind.SoundModem))
+        if (pipeline is null || AudioSource.Parse(Config.Audio) is not ({ IsSoundCard: true } or { Kind: AudioSourceKind.SoundModem }))
         {
             return (null, "\"Measure my filter\" is for a sound card or pdn-soundmodem only.");
         }
@@ -276,7 +276,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>Whether the retuner runs the hooks, in step with its own work: it is retuning the radio the audio comes from.</summary>
     internal bool RetunerRunsHooks => Retuner is not null
-        && AudioSource.Parse(Config.Audio).Kind == (Retuner.Window is null ? AudioSourceKind.Alsa : AudioSourceKind.SoundModem);
+        && (Retuner.Window is null ? AudioSource.Parse(Config.Audio).IsSoundCard : AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.SoundModem);
 
     /// <summary>
     /// The retuner's word on where pdn-soundmodem's radio is as its receive window is taken (the
@@ -400,7 +400,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                         closes = early.At;
                     }
                     return new HookWindow(opens, closes, slot);
-                case AudioSourceKind.Alsa or AudioSourceKind.SoundModem:
+                case AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem:
                     // pdn-soundmodem's radio, like a sound card's, is heard all the time.
                     return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
                 default:

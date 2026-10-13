@@ -245,7 +245,20 @@ public sealed record ReceiverConfig
     public IReadOnlyList<TimeOnly> WebSdrSlots => ListeningWindow.WebSdrSlots(Schedule);
 
     /// <summary>Where the pieces heard, the rebuilt bulletins and the delivery record are kept.</summary>
-    public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast";
+    public string StateDirectory { get; init; } = DefaultStateDirectory;
+
+    /// <summary>The config file when <c>--config</c> does not name one: /etc/pdn-mailcast/receiver.json, or on Windows %ProgramData%\pdn-mailcast\receiver.json.</summary>
+    public static string DefaultPath => OperatingSystem.IsWindows()
+        ? Path.Combine(WindowsFolder, "receiver.json")
+        : "/etc/pdn-mailcast/receiver.json";
+
+    /// <summary>The state directory when the config does not name one: /var/lib/pdn-mailcast, or on Windows %ProgramData%\pdn-mailcast\state.</summary>
+    public static string DefaultStateDirectory => OperatingSystem.IsWindows()
+        ? Path.Combine(WindowsFolder, "state")
+        : "/var/lib/pdn-mailcast";
+
+    /// <summary>The receiver's own folder on Windows, %ProgramData%\pdn-mailcast (usually C:\ProgramData\pdn-mailcast).</summary>
+    private static string WindowsFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "pdn-mailcast");
 
     /// <summary>
     /// The radio's rigctld, for a radio shared with packet: the receiver tunes it to

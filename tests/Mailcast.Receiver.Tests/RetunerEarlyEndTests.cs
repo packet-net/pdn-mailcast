@@ -1,4 +1,3 @@
-using System.Runtime.Versioning;
 using Mailcast.Receiver.Retune;
 
 namespace Mailcast.Receiver.Tests;
@@ -8,7 +7,6 @@ namespace Mailcast.Receiver.Tests;
 /// LinBPQ through the normal end-of-window path, so the "after" hook still runs, in the same
 /// order as a window that closes in the usual way.
 /// </summary>
-[UnsupportedOSPlatform("windows")]
 public sealed partial class RetunerTests
 {
     [Fact]

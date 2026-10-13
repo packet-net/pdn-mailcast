@@ -1,4 +1,3 @@
-using System.Runtime.Versioning;
 using M0LTE.Radio.Audio;
 using Mailcast.Receiver.Hooks;
 using Microsoft.Extensions.Time.Testing;
@@ -243,7 +242,7 @@ public class WebSdrWindowTests
     [Fact]
     public async Task SoundCard_IsNotHeldToTheWebSdrSlots()
     {
-        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero), c => c with { Audio = "plughw:CARD=Device,DEV=0" });
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero), c => c with { Audio = Samples.SoundCard });
 
         await rig.Inputs.Reader.ReadAsync();
         Assert.DoesNotContain(rig.Log, l => l.Contains("closed until", StringComparison.Ordinal));
@@ -358,7 +357,7 @@ public class WebSdrWindowTests
         Assert.Equal("sdr.example.org:8073", rig.StatusAudio().GetProperty("webSdr").GetProperty("host").GetString());
         Assert.Contains("the web SDR sdr.example.org:8073 is closed", rig.Host.AudioState, StringComparison.Ordinal);
 
-        Assert.Null(Mailcast.Receiver.Web.StatusPage.WebSdrView("plughw:CARD=Device,DEV=0", null));
+        Assert.Null(Mailcast.Receiver.Web.StatusPage.WebSdrView(Samples.SoundCard, null));
     }
 
     private const System.Text.Json.JsonValueKind JsonValueKindNull = System.Text.Json.JsonValueKind.Null;
@@ -368,7 +367,7 @@ public class WebSdrWindowTests
     {
         using var dir = new TempDirectory();
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero));
-        var config = new ReceiverConfig { Audio = "plughw:CARD=NoSuchCard,DEV=0", StateDirectory = dir.Path };
+        var config = new ReceiverConfig { Audio = Samples.OnThisMachine("plughw:CARD=NoSuchCard,DEV=0"), StateDirectory = dir.Path };
         await using var host = new ReceiverHost(config, clock, _ => { });
         var failed = new TaskCompletionSource<AudioCondition>(TaskCreationOptions.RunContinuationsAsynchronously);
         host.AudioChanged += c =>
@@ -526,8 +525,15 @@ public class WebSdrWindowTests
         Assert.DoesNotContain(rig.Log, l => l.Contains("ending the 12:00 UTC slot's window early", StringComparison.Ordinal));
     }
 
+    /// <summary>Whether an "after" has been started and has not yet said how it ended.</summary>
+    private static bool AfterRunning(IEnumerable<string> log)
+    {
+        var lines = log.ToList();
+        return lines.Count(l => l.StartsWith("hooks: running \"after\"", StringComparison.Ordinal))
+            > lines.Count(l => l.StartsWith("hooks: \"after\" ", StringComparison.Ordinal) || l.StartsWith("hooks: WARNING - \"after\"", StringComparison.Ordinal));
+    }
+
     [Fact]
-    [UnsupportedOSPlatform("windows")]
     public async Task EarlyEnd_WebSdrWithHooks_RunsAfterSoonerThanTheUsualClose()
     {
         using var scripts = new TempDirectory();
@@ -566,6 +572,13 @@ public class WebSdrWindowTests
         // "after" then, not at the usual close.
         for (int i = 0; i < 15 && !HookScript.Runs(record).Any(l => l.StartsWith("after ", StringComparison.Ordinal)); i++)
         {
+            // A hook is a real process timed on the fake clock: let one that has started finish
+            // before the clock moves, or a slow start (cmd.exe's, on Windows) would time it out.
+            var startedBy = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (AfterRunning(rig.Log) && DateTime.UtcNow < startedBy)
+            {
+                await Task.Delay(10);
+            }
             rig.Clock.Advance(SlotHooks.Check);
             await rig.HookWaits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         }

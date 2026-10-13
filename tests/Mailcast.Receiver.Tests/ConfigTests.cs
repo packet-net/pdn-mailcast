@@ -204,7 +204,7 @@ public class ConfigTests
         string path = Path.Combine(dir.Path, "receiver.json");
         var config = new ReceiverConfig
         {
-            Audio = "plughw:CARD=Device,DEV=0",
+            Audio = Samples.SoundCard,
             Bbs = new BbsSettings { Type = BbsKind.Fbb, Host = "10.0.0.2", Port = 6300, Login = "Q0CAST", Password = "pw" },
             Web = new WebSettings { Port = 9000, Lan = true, Password = "page" },
             StateDirectory = dir.Path,
@@ -302,7 +302,7 @@ public class ConfigTests
     [InlineData("wav:/tmp/slot.wav", AudioSourceKind.Wav)]
     public void AudioSetting_IsReadAsItsKind(string setting, AudioSourceKind kind)
     {
-        Assert.Equal(kind, AudioSource.Parse(setting).Kind);
+        Assert.Equal(kind, AudioSource.Parse(setting, windows: false).Kind);
     }
 }
 
@@ -323,7 +323,7 @@ public class RetuneConfigTests
     [Fact]
     public void Default_HasNoRigAndNoBpq()
     {
-        var config = Load("""{ "audio": "plughw:CARD=Device,DEV=0" }""");
+        var config = Load($$"""{ "audio": "{{Samples.SoundCard}}" }""");
 
         Assert.Null(config.Rig);
         Assert.Null(config.Bpq);
@@ -332,7 +332,7 @@ public class RetuneConfigTests
     [Fact]
     public void RigWithBpq_Loads()
     {
-        var config = Load($$"""{ "audio": "plughw:CARD=Device,DEV=0", "rig": { "rigctld": "127.0.0.1:4532" }, {{Bpq}} }""");
+        var config = Load($$"""{ "audio": "{{Samples.SoundCard}}", "rig": { "rigctld": "127.0.0.1:4532" }, {{Bpq}} }""");
 
         Assert.Equal(new Packet.SoundModem.Rig.RigctldEndpoint("127.0.0.1", 4532), config.Rig!.Endpoint);
         Assert.False(config.Rig.DedicatedRadio);

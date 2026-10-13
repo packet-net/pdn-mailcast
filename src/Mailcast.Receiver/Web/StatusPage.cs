@@ -71,7 +71,7 @@ public sealed class StatusPage : IAsyncDisposable
     private readonly ReceiverHost _host;
     private readonly string? _configPath;
     private readonly Action<string> _log;
-    private readonly HttpListener _listener = new();
+    private HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private WaterfallWebServer? _waterfall;
@@ -90,8 +90,7 @@ public sealed class StatusPage : IAsyncDisposable
         }
         else
         {
-            _listener.Prefixes.Add($"http://127.0.0.1:{web.Port}/");
-            _listener.Prefixes.Add($"http://localhost:{web.Port}/");
+            OnThisMachine(_listener, web.Port);
         }
         Url = $"http://127.0.0.1:{web.Port}/";
         CookieName = $"pdn-mailcast-{web.Port}";
@@ -127,9 +126,35 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>Starts listening. Throws <see cref="HttpListenerException"/> if the port is taken.</summary>
     public void Start()
     {
-        _listener.Start();
+        bool lan = _host.Config.Web.Lan;
+        try
+        {
+            _listener.Start();
+        }
+        catch (HttpListenerException e) when (lan && OperatingSystem.IsWindows() && e.ErrorCode == AccessDenied)
+        {
+            // Windows lets only an administrator (the service is one), or a user it has reserved
+            // the address for, listen on every address: the page is still worth having here.
+            _listener.Close();
+            _listener = new HttpListener();
+            OnThisMachine(_listener, _host.Config.Web.Port);
+            _listener.Start();
+            lan = false;
+            _log($"web: Windows will not let {Environment.UserName} serve the page on the local network, so it is on this machine only. "
+                + "Run the receiver as the service (install-service.ps1), or once, from an administrator command prompt: "
+                + $"netsh http add urlacl url=http://+:{_host.Config.Web.Port}/ user=\"{Environment.UserDomainName}\\{Environment.UserName}\"");
+        }
         _accept = AcceptAsync();
-        _log($"web: status page at {Url}{(_host.Config.Web.Lan ? " and on the local network" : "")}");
+        _log($"web: status page at {Url}{(lan ? " and on the local network" : "")}");
+    }
+
+    /// <summary>Windows' ERROR_ACCESS_DENIED, which http.sys gives for an address this user may not listen on.</summary>
+    private const int AccessDenied = 5;
+
+    private static void OnThisMachine(HttpListener listener, int port)
+    {
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Prefixes.Add($"http://localhost:{port}/");
     }
 
     /// <summary>Gives a new pipeline its waterfall, before its audio starts.</summary>
@@ -988,7 +1013,7 @@ public sealed class StatusPage : IAsyncDisposable
     /// recording, whose level is not yours to set and which the modem copes with unless it clips;
     /// and for pdn-soundmodem, whose level is set there, not here.
     /// </summary>
-    internal static string LevelAdvice(string audio) => AudioSource.Parse(audio).Kind == AudioSourceKind.Alsa ? "target" : "clippingOnly";
+    internal static string LevelAdvice(string audio) => AudioSource.Parse(audio).IsSoundCard ? "target" : "clippingOnly";
 
     /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c>, <c>soundModem</c> or <c>recording</c>.</summary>
     internal static string AudioKind(string audio) => AudioSource.Parse(audio).Kind switch
@@ -1129,6 +1154,7 @@ public sealed class StatusPage : IAsyncDisposable
             callsign = config.Feedback?.Callsign,
         },
         soundCards = SoundCards(),
+        windows = OperatingSystem.IsWindows(),
     };
 
     /// <summary>
@@ -1829,9 +1855,13 @@ public sealed class StatusPage : IAsyncDisposable
         await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(FilterView(result), ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 
-    /// <summary>The sound cards ALSA knows, as device names the audio setting takes.</summary>
+    /// <summary>The sound cards this machine has, as the audio setting takes them: ALSA's devices, or on Windows its recording devices.</summary>
     private static string[] SoundCards()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            return WindowsSoundCards.Settings();
+        }
         try
         {
             return [.. File.ReadAllLines("/proc/asound/cards")
