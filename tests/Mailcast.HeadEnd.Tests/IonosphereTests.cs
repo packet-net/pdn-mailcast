@@ -272,7 +272,7 @@ public class IonosphereTests
     {
         var settings = Config.Ionosphere.ToSettings();
         Assert.Equal((7.1, 0.85, TimeSpan.FromMinutes(45)), (settings.OpenMhz, settings.ReliableFactor, settings.StaleAfter));
-        Assert.Equal(["RL052", "FF051", "DB049"], settings.Stations);
+        Assert.Equal(["FF051", "RL052", "DB049"], settings.Stations);
         var custom = HeadEndConfig.Parse("""{ "station": { "apiKey": "k" }, "ionosphere": { "openMhz": 7.2, "stations": ["ff051"] } }""");
         Assert.Equal(["FF051"], custom.Ionosphere.ToSettings().Stations);
         Assert.Empty(HeadEndConfig.Parse("""{ "station": { "apiKey": "k" }, "ionosphere": { "stations": [] } }""").Ionosphere.Stations);

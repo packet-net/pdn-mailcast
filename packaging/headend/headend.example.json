@@ -108,7 +108,7 @@
     "openMhz": 7.1,
     "reliableFactor": 0.85,
     "staleMinutes": 45,
-    "stations": ["RL052", "FF051", "DB049"]
+    "stations": ["FF051", "RL052", "DB049"]
   },
 
   // The PSK Reporter reading: the last 30 minutes of FT8, FT4 and WSPR spots on 40 and 80 m
