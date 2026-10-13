@@ -322,6 +322,24 @@ public class StatusPageTests
     }
 
     [Fact]
+    public async Task Globe_IsClosedByDefault_AndItsCoastlinesAreServed()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        string html = await http.GetStringAsync("/");
+        Assert.Contains("<details id=\"globeDetails\">", html, StringComparison.Ordinal);
+        Assert.Contains("Where it bounced", html, StringComparison.Ordinal);
+
+        using var globe = JsonDocument.Parse(await http.GetStringAsync("/globe.json"));
+        Assert.True(globe.RootElement.GetProperty("near").GetArrayLength() > 10);
+        Assert.True(globe.RootElement.GetProperty("world").GetArrayLength() > 100);
+    }
+
+    [Fact]
     public async Task DailyReport_Panel_IsOnThePage()
     {
         using var dir = new TempDirectory();

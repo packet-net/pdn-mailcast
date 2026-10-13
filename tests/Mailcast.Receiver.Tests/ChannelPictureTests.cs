@@ -305,5 +305,8 @@ public class ChannelPictureTests
         var history = channel.GetProperty("history").EnumerateArray().ToList();
         Assert.Single(history);
         Assert.StartsWith("<svg", history[0].GetProperty("pathSvg").GetString(), StringComparison.Ordinal);
+        // Where the receiver was, for the globe of where it bounced.
+        Assert.Equal(place!.Latitude, history[0].GetProperty("latitude").GetDouble(), 6);
+        Assert.Equal(place.Longitude, history[0].GetProperty("longitude").GetDouble(), 6);
     }
 }

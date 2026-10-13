@@ -253,6 +253,9 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/" or "/index.html", "GET"):
                     await RespondAsync(context, 200, "text/html; charset=utf-8", Page.Value).ConfigureAwait(false);
                     break;
+                case ("/globe.json", "GET"):
+                    await RespondAsync(context, 200, "application/json", Globe.Value).ConfigureAwait(false);
+                    break;
                 case ("/api/status", "GET"):
                     await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(Status(), ReceiverConfig.JsonLine)).ConfigureAwait(false);
                     break;
@@ -1101,6 +1104,7 @@ public sealed class StatusPage : IAsyncDisposable
     internal static object SettingsView(ReceiverConfig config) => new
     {
         audio = config.Audio,
+        locator = config.Locator,
         dialKHz = config.DialKHz,
         sources = config.AcceptedSources,
         sourcesSet = config.Sources is not null,
@@ -1134,10 +1138,11 @@ public sealed class StatusPage : IAsyncDisposable
     /// and a null <paramref name="Feedback"/> the daily report as it is. A null <paramref name="DialKHz"/>
     /// keeps the dial as it is too: the settings page only sends one for a sound card, from the
     /// receive filter choice (<c>7052</c> or <c>7052.3</c>); a web SDR source keeps the usual 7.052.
+    /// A null <paramref name="Locator"/> keeps the receiver's locator as it is, and an empty one clears it.
     /// </summary>
     internal sealed record SettingsForm(string Audio, string Type, string Host, int Port, string Login, string? Password, string Command,
         string? PagePassword = null, string? CurrentPagePassword = null, IReadOnlyList<string?>? Sources = null, FeedbackForm? Feedback = null,
-        double? DialKHz = null);
+        double? DialKHz = null, string? Locator = null);
 
     /// <summary>
     /// The daily report's part of the settings form: on or off, and the callsign it is sent from.
@@ -1192,6 +1197,7 @@ public sealed class StatusPage : IAsyncDisposable
         {
             Audio = form.Audio.Trim(),
             DialKHz = form.DialKHz ?? current.DialKHz,
+            Locator = form.Locator is null ? current.Locator : form.Locator.Trim() is { Length: > 0 } locator ? locator : null,
             Bbs = current.Bbs with
             {
                 Type = kind,
@@ -1861,6 +1867,9 @@ public sealed class StatusPage : IAsyncDisposable
     }
 
     private static readonly Lazy<string> Page = new(() => Embedded("index.html"));
+
+    /// <summary>The coastlines for the globe of where the signal bounced, fetched only when that section is opened.</summary>
+    private static readonly Lazy<string> Globe = new(() => Embedded("globe.json"));
 
     private static readonly Lazy<string> SignInTemplate = new(() => Embedded("signin.html"));
 

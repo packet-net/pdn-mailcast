@@ -98,6 +98,15 @@ public sealed record ReceiverConfig
     /// </summary>
     public string Audio { get; init; } = "ubersdr:wessex.zapto.org";
 
+    /// <summary>
+    /// Where the receiver is, as a 4 or 6 character Maidenhead locator, for a sound card, a
+    /// pdn-soundmodem or a recording: it names the hops, places the ground bounces, and goes in
+    /// the daily report. A web SDR says where it is itself, so this is not used with one. Null
+    /// (the default) leaves the place unknown. Left out of a saved file while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Locator { get; init; }
+
     /// <summary>The usual USB dial, in kHz: 7.052 MHz, which puts the signal's centre on 7.0538 MHz.</summary>
     public const double DefaultDialKHz = 7052.0;
 
@@ -419,6 +428,10 @@ public sealed record ReceiverConfig
             throw new ConfigException("\"stateDirectory\" or \"slotUtc\" is null");
         }
         _ = AudioSource.Parse(Audio);
+        if (Locator is not null && !Maidenhead.TryParse(Locator.Trim(), out _, out _))
+        {
+            throw new ConfigException($"\"locator\" \"{Ascii.Clean(Locator)}\" is not a 4 or 6 character Maidenhead locator, such as IO91 or IO91lk");
+        }
         _ = SlotStart;
         if (EveryMinutes < ShortestEveryMinutes || 1440 % EveryMinutes != 0)
         {

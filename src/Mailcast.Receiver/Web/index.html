@@ -34,6 +34,17 @@
   .todayRow { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
   .todayRow > div { flex: 1 1 280px; min-width: 280px; }
   h2 { margin: 0 0 10px; font-size: 16px; }
+  /* The globe of where it bounced: closed by default, drawn only once opened. */
+  #globeDetails > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  #globeDetails > summary::-webkit-details-marker { display: none; }
+  #globeDetails > summary::before { content: "\25B8"; color: var(--soft); }
+  #globeDetails[open] > summary::before { content: "\25BE"; }
+  #globeDetails > summary h2 { margin: 0; display: inline; }
+  .globeWrap { position: relative; margin-top: 8px; }
+  #globe { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 760; background: #05090b; border-radius: 8px; touch-action: none; cursor: grab; }
+  #globeStamp { position: absolute; left: 12px; top: 10px; color: #dce8e6; font-weight: 600; pointer-events: none; }
+  .globeControls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 10px 0 6px; }
+  #globeSlot { flex: 1 1 200px; min-width: 0; }
   .big { font-size: 26px; font-weight: 600; }
   .muted { color: var(--soft); }
   .bulletin-time time { white-space: nowrap; }
@@ -179,7 +190,7 @@
     </form>
     <details>
       <summary>What's in it</summary>
-      <p>Your callsign and the date, the receiver's version, the web SDR it listens through and its locator (or just "sc" for a sound card), and for each slot it listened to: the speed, the frames heard, the tone's signal to noise and offset, and the radio path as measured. For example:</p>
+      <p>Your callsign and the date, the receiver's version, where it listens (the web SDR and the locator it gives, or "sc" for a sound card and the locator you set under Settings), and for each slot it listened to: the speed, the frames heard, the tone's signal to noise and offset, and the radio path as measured. For example:</p>
       <pre>MCR G4ABC 2026-10-06
 
 MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
@@ -189,7 +200,8 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
       <p><a href="https://github.com/packet-net/pdn-mailcast/blob/main/docs/receiver.md#sending-a-daily-report" target="_blank" rel="noopener">Every field explained</a></p>
     </details>
   </div>
-  <div id="optInOn" hidden><span id="optInLine"></span> <a href="#" id="optInOff">Turn off</a> <span id="optInOffSaid"></span></div>
+  <div id="optInOn" hidden><span id="optInLine"></span> <a href="#" id="optInOff">Turn off</a> <span id="optInOffSaid"></span>
+    <div id="optInNoLocator" class="muted" hidden>Your locator isn't set, so your reports can't say where you are. <a href="#locatorSection">Set it under Settings</a>.</div></div>
 </div>
 <main>
   <section>
@@ -245,6 +257,25 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
   <section class="wide">
     <h2>Today</h2>
     <div id="channelToday" class="muted">Nothing measured yet.</div>
+  </section>
+
+  <section class="wide" id="globeBox" hidden>
+    <details id="globeDetails">
+      <summary><h2>Where it bounced</h2> <span class="muted">a globe of today's paths from GB7RDG</span></summary>
+      <p class="muted">Each slot's path from GB7RDG to this receiver, up to the virtual height measured and back down, on a true-size round Earth with nothing exaggerated. The bright points are where it turned round, and a ring marks where a two hop signal touched the ground. Where each bounce sits along the path is an estimate: halfway for one hop, a quarter and three quarters for two. Drag to turn, scroll or use + and - to zoom.</p>
+      <div class="globeWrap">
+        <canvas id="globe" width="1200" height="760" aria-label="This receiver's radio paths from GB7RDG on a globe"></canvas>
+        <div id="globeStamp"></div>
+      </div>
+      <div class="globeControls">
+        <button type="button" id="globePlay">Play the day</button>
+        <input type="range" id="globeSlot" min="0" max="0" value="0" aria-label="Slot">
+        <button type="button" class="plain" id="globeIn" aria-label="Zoom in">+</button>
+        <button type="button" class="plain" id="globeOut" aria-label="Zoom out">-</button>
+        <button type="button" class="plain" id="globeFar">Side view</button>
+      </div>
+      <div id="globeSaid" class="muted"></div>
+    </details>
   </section>
 
   <section class="wide" id="heardBox">
@@ -327,6 +358,12 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
         <input id="dial" readonly>
       </label>
       <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal itself always stays on 7.0538 MHz. An SDR or a web SDR needs no change here.</div>
+      <div id="locatorSection" hidden>
+        <label>Your locator
+          <input id="locator" maxlength="6" autocomplete="off" spellcheck="false" placeholder="IO91lk">
+        </label>
+        <div class="muted">Where your radio is, as a 4 or 6 character Maidenhead locator: <code>"locator"</code> in receiver.json. It names the radio path's hops and where they come down, and goes in the daily report. A web SDR says where it is itself.</div>
+      </div>
       <div id="filterSection" hidden>
         <div class="row">
           <button type="button" id="measureFilter">Measure my filter</button>
@@ -375,6 +412,234 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 "use strict";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+/* ---------- the globe of where it bounced ----------
+   Today's paths from GB7RDG to this receiver on a sphere 6371 km in radius, to scale, drawn the
+   way the receiver models them (packet-net/pdn-mailcast#60): straight rays from the ground up to
+   a mirror at the virtual height and back down, the bounces equally spaced along the great
+   circle. The section is closed by default; the coastlines (globe.json, about 300 kB) are only
+   fetched, and anything only drawn, once it is opened. */
+const Globe = (() => {
+  const R = 6371, DEG = Math.PI / 180;
+  const GB7RDG = { lat: 51.4375, lon: -0.9583 };
+  const NEAR_VIEW = { yaw: -0.35, pitch: 0.42, dist: 1250 };
+  /* Side on, from far out: the camera sits nearly level with the receiver's horizon, so GB7RDG and
+     its paths sit on the Earth's edge with the layer a thin line over the curve of the world. */
+  const FAR_VIEW = { yaw: -1.2, pitch: 0.06, dist: 14000 };
+  const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+  const mul = (a, k) => ({ x: a.x * k, y: a.y * k, z: a.z * k });
+  const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const cross = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+  const norm = a => mul(a, 1 / Math.hypot(a.x, a.y, a.z));
+  const unit = p => ({ x: Math.cos(p.lat * DEG) * Math.cos(p.lon * DEG), y: Math.cos(p.lat * DEG) * Math.sin(p.lon * DEG), z: Math.sin(p.lat * DEG) });
+  const at = (u, h = 0) => mul(u, R + h);
+  function slerp(a, b, f) {
+    const w = Math.acos(Math.max(-1, Math.min(1, dot(a, b))));
+    return w < 1e-9 ? a : add(mul(a, Math.sin((1 - f) * w) / Math.sin(w)), mul(b, Math.sin(f * w) / Math.sin(w)));
+  }
+  const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+  const INK = "#dce8e6", SOFT = "#8aa29f", RAY = "#ffb547", DOUBT = "#e07a6b", LAND = "#1a2b2a", COAST = "#3f5c58", SEA = "#10222a";
+  const TX = unit(GB7RDG);
+
+  let coast = null, loading = false, slots = [], idx = 0, drawOn = 1, view = { ...NEAR_VIEW }, CAM = null, focus = TX;
+  let playing = null, flight = null, drag = null;
+  const cv = $("globe"), ctx = cv.getContext("2d");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function camera() {
+    const U = focus, E = norm(cross({ x: 0, y: 0, z: 1 }, U)), N = cross(U, E);
+    const off = add(add(mul(E, Math.cos(view.pitch) * Math.sin(view.yaw)), mul(N, -Math.cos(view.pitch) * Math.cos(view.yaw))), mul(U, Math.sin(view.pitch)));
+    const cam = add(at(U), mul(off, view.dist));
+    const f = norm(sub(at(U, 120), cam)), r = norm(cross(f, U));
+    return { cam, f, r, u: cross(r, f) };
+  }
+  function proj(p) {
+    const v = sub(p, CAM.cam), zc = dot(v, CAM.f);
+    if (zc < 5) return null;
+    const F = cv.width * 0.95;
+    return { x: cv.width / 2 + F * dot(v, CAM.r) / zc, y: cv.height / 2 - F * dot(v, CAM.u) / zc };
+  }
+  const seen = p => dot(p, CAM.cam) > R * R;
+  function line(pts, style, width, dash) {
+    ctx.beginPath(); let on = false;
+    for (const q of pts) { if (!q) { on = false; continue; } if (!on) { ctx.moveTo(q.x, q.y); on = true; } else ctx.lineTo(q.x, q.y); }
+    ctx.strokeStyle = style; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+  }
+  /* The outline of a sphere of radius rs as the camera sees it: where its lines of sight graze it. */
+  function limbOf(rs) {
+    const d = Math.hypot(CAM.cam.x, CAM.cam.y, CAM.cam.z), c = norm(CAM.cam);
+    const centre = mul(c, rs * rs / d), rad = rs * Math.sqrt(1 - (rs * rs) / (d * d));
+    const a = norm(cross(c, { x: 0, y: 0, z: 1 })), b = cross(c, a);
+    return { c, centre, rad, pts: Array.from({ length: 361 }, (_, i) => { const t = i / 360 * 2 * Math.PI; return proj(add(centre, add(mul(a, rad * Math.cos(t)), mul(b, rad * Math.sin(t))))); }) };
+  }
+  function fillBelowLimb(pts, style) {
+    let shape = pts.slice(0, 360);
+    if (shape.some(q => !q)) {
+      // From near the ground part of the outline is behind the camera: the longest unbroken run
+      // of it is the horizon, and the Earth is everything below that.
+      const gap = shape.findIndex(q => !q), turned = shape.slice(gap).concat(shape.slice(0, gap));
+      let best = [], run = [];
+      for (const q of turned.concat([null])) { if (q) run.push(q); else { if (run.length > best.length) best = run; run = []; } }
+      const deep = cv.height * 40;
+      shape = best.length ? best.concat([{ x: best[best.length - 1].x, y: deep }, { x: best[0].x, y: deep }]) : [];
+    }
+    if (!shape.length) return;
+    ctx.beginPath(); shape.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+    ctx.fillStyle = style; ctx.fill();
+  }
+  function earth() {
+    ctx.fillStyle = "#05090b"; ctx.fillRect(0, 0, cv.width, cv.height);
+    const limb = limbOf(R);
+    fillBelowLimb(limb.pts, SEA);
+    line(limb.pts, "rgba(124,198,255,0.22)", 8); line(limb.pts, "rgba(124,198,255,0.4)", 2.5);
+    // Land; a coast running round the far side is pulled onto the limb, so it is cut off there.
+    const onLimb = p => { const s = sub(p, mul(limb.c, dot(p, limb.c))), l = Math.hypot(s.x, s.y, s.z); return l < 1e-6 ? null : proj(add(limb.centre, mul(s, limb.rad / l))); };
+    for (const ring of coast.world.concat(coast.near)) {
+      const ps = ring.map(([lon, lat]) => at(unit({ lat, lon }))), vis = ps.map(seen);
+      if (!vis.some(Boolean)) continue;
+      const pts = ps.map((p, i) => vis[i] ? proj(p) : onLimb(p));
+      if (pts.some(q => !q)) continue;
+      ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+      ctx.fillStyle = LAND; ctx.fill();
+      line(pts.map((q, i) => vis[i] ? q : null), COAST, 1.2);
+    }
+  }
+  /* The F layer: a faint sheet over the paths from near, and its whole shell round the Earth from far out. */
+  function layer(h) {
+    const s = "rgba(255,181,71,0.12)";
+    const g = (lat, lon) => seen(at(unit({ lat, lon }))) ? proj(at(unit({ lat, lon }), h)) : null;
+    for (let lon = -6; lon <= 3; lon += 1) line(Array.from({ length: 19 }, (_, i) => g(49.5 + i * 0.5, lon)), s, 1);
+    for (let lat = 49.5; lat <= 58.5; lat += 1) line(Array.from({ length: 19 }, (_, i) => g(lat, -6 + i * 0.5)), s, 1);
+    if (view.dist > 4000) line(limbOf(R + h).pts, "rgba(255,181,71,0.75)", 1.5);
+  }
+  function spot(p, rad, fill, glow) {
+    const q = proj(p); if (!q) return;
+    if (glow) { const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, rad * 4); g.addColorStop(0, glow); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, rad * 4, 0, 7); ctx.fill(); }
+    ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(q.x, q.y, rad, 0, 7); ctx.fill();
+  }
+  function label(p, text, color, dx = 8, dy = -8) {
+    const q = proj(p); if (!q) return;
+    ctx.font = `600 ${Math.round(cv.width / 60)}px system-ui, sans-serif`; ctx.fillStyle = color; ctx.fillText(text, q.x + dx, q.y + dy);
+  }
+  /* One slot's path, drawn on with progress f (0 to 1). */
+  function path(s, f) {
+    const RX = unit(s.place), measured = s.h != null, h = s.h ?? 300, colour = measured ? RAY : SOFT;
+    for (const n of s.hops) {
+      const pts = [];
+      for (let k = 0; k < n; k++) pts.push(at(slerp(TX, RX, k / n)), at(slerp(TX, RX, (k + 0.5) / n), h), at(slerp(TX, RX, (k + 1) / n)));
+      const upto = f * (pts.length - 1), drawn = [proj(pts[0])];
+      for (let i = 0; i < pts.length - 1 && i < upto; i++) drawn.push(proj(add(pts[i], mul(sub(pts[i + 1], pts[i]), Math.min(1, upto - i)))));
+      line(drawn, colour, n === 1 ? 2.6 : 1.7, !measured ? [6, 6] : n > 1 ? [2, 4] : null);
+      if (f < 1) continue;
+      for (let k = 0; k < n; k++) {
+        const m = slerp(TX, RX, (k + 0.5) / n);
+        line([proj(at(m, h)), proj(at(m))], "rgba(220,232,230,0.25)", 1, [2, 3]);
+        spot(at(m, h), n === 1 ? 4.5 : 3.5, colour, measured ? hexA(colour, 0.55) : null);
+      }
+      if (n > 1) for (let k = 1; k < n; k++) { const q = proj(at(slerp(TX, RX, k / n))); if (q) { ctx.strokeStyle = colour; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, 7, 4, 0, 0, 7); ctx.stroke(); } }
+    }
+    if (f >= 1) label(at(slerp(TX, RX, 0.5), h), measured ? `${Math.round(h)} km` : "height not measured", measured ? INK : SOFT, 10, -6);
+  }
+  function draw() {
+    if (!coast || !$("globeDetails").open) return;
+    CAM = camera();
+    earth();
+    const s = slots[idx];
+    if (s?.h != null) layer(s.h);
+    // The day's earlier reflection points, faint, where the ray turned round.
+    for (let i = 0; i < idx; i++) {
+      const o = slots[i]; if (o.h == null) continue;
+      for (const k of [0.5]) spot(at(slerp(TX, unit(o.place), k), o.h), 2.2, "rgba(255,181,71,0.35)");
+    }
+    if (s) path(s, drawOn);
+    if (s) { spot(at(unit(s.place)), 5, "#7cc6ff"); label(at(unit(s.place)), "This receiver", "#7cc6ff"); }
+    spot(at(TX), 6, RAY, "rgba(255,181,71,0.6)"); label(at(TX), "GB7RDG", RAY, 10, 18);
+    if (view.dist > 4000 && s?.h != null) {
+      ctx.font = `500 ${Math.round(cv.width / 64)}px system-ui, sans-serif`; ctx.fillStyle = INK;
+      ctx.fillText(`The layer is ${Math.round(s.h)} km up on an Earth ${R} km in radius.`, 16, cv.height - 18);
+    }
+    $("globeStamp").textContent = s ? `${utc(s.slot)}${s.h != null ? `, ${Math.round(s.h)} km up` : ""}` : "";
+  }
+  function go(i, animate) {
+    idx = i; $("globeSlot").value = i;
+    if (animate && !reduceMotion) {
+      const t0 = performance.now();
+      const step = t => { drawOn = Math.min(1, (t - t0) / 700); draw(); if (drawOn < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    } else { drawOn = 1; draw(); }
+  }
+  function flyTo(to) {
+    cancelAnimationFrame(flight);
+    if (reduceMotion) { view = { ...to }; draw(); return; }
+    const from = { ...view }, t0 = performance.now();
+    const step = t => {
+      const k = Math.min(1, (t - t0) / 2200), e = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+      view = { yaw: from.yaw + (to.yaw - from.yaw) * e, pitch: from.pitch + (to.pitch - from.pitch) * e, dist: Math.exp(Math.log(from.dist) + (Math.log(to.dist) - Math.log(from.dist)) * e) };
+      draw(); if (k < 1) flight = requestAnimationFrame(step);
+    };
+    flight = requestAnimationFrame(step);
+  }
+  const zoom = k => { view.dist = Math.max(300, Math.min(30000, view.dist * k)); draw(); };
+  async function load() {
+    if (coast || loading) return;
+    loading = true;
+    $("globeSaid").textContent = "Loading the coastlines...";
+    try {
+      const r = await fetch("globe.json", { credentials: "same-origin" });
+      if (!r.ok) throw new Error(`the receiver answered ${r.status}`);
+      coast = await r.json();
+      $("globeSaid").textContent = "Coastlines: Natural Earth, public domain.";
+      draw();
+    } catch (e) {
+      $("globeSaid").textContent = `Cannot load the coastlines: ${e.message}`;
+    } finally { loading = false; }
+  }
+
+  $("globeDetails").addEventListener("toggle", () => { if ($("globeDetails").open) { load(); draw(); } });
+  $("globeSlot").addEventListener("input", () => go(+$("globeSlot").value, false));
+  $("globePlay").addEventListener("click", () => {
+    if (playing) { clearInterval(playing); playing = null; $("globePlay").textContent = "Play the day"; return; }
+    $("globePlay").textContent = "Pause";
+    go(0, true);
+    playing = setInterval(() => { if (idx >= slots.length - 1) { $("globePlay").click(); return; } go(idx + 1, true); }, 1400);
+  });
+  $("globeIn").addEventListener("click", () => zoom(1 / 1.25));
+  $("globeOut").addEventListener("click", () => zoom(1.25));
+  $("globeFar").addEventListener("click", () => {
+    const far = view.dist > 4000;
+    $("globeFar").textContent = far ? "Side view" : "Close view";
+    flyTo(far ? NEAR_VIEW : FAR_VIEW);
+  });
+  cv.addEventListener("pointerdown", e => { cancelAnimationFrame(flight); drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", e => {
+    if (!drag) return;
+    view.yaw = drag.yaw - (e.clientX - drag.x) * 0.006;
+    view.pitch = Math.max(0.02, Math.min(1.5, drag.pitch + (e.clientY - drag.y) * 0.005));
+    draw();
+  });
+  cv.addEventListener("pointerup", () => { drag = null; });
+  cv.addEventListener("wheel", e => { if (!$("globeDetails").open) return; e.preventDefault(); zoom(1 + Math.sign(e.deltaY) * 0.08); }, { passive: false });
+
+  /* From the status: the day's slots with a path to draw, each with where the receiver was. The
+     section stays hidden until the receiver knows where it is (a web SDR, or "locator" set). */
+  return function update(st) {
+    const c = st.channel;
+    const list = (c?.history ?? []).filter(h => h.enough && h.latitude != null && h.longitude != null && h.modes.some(m => m.label)).map(h => {
+      const labels = h.modes.map(m => m.label).filter(Boolean);
+      const hops = [...new Set(labels.filter(l => /^\dF$/.test(l)).map(l => +l[0]))].sort();
+      return { slot: h.slot, place: { lat: h.latitude, lon: h.longitude }, h: h.virtualHeightKm, hops: hops.length ? hops : [1] };
+    });
+    $("globeBox").hidden = list.length === 0;
+    const atEnd = idx >= slots.length - 1;
+    const changed = list.length !== slots.length || list.at(-1)?.slot !== slots.at(-1)?.slot;
+    slots = list;
+    $("globeSlot").max = Math.max(0, slots.length - 1);
+    // The camera circles the middle of the path.
+    if (slots.length) focus = norm(add(TX, unit(slots.at(-1).place)));
+    if (changed && !playing) go(atEnd ? slots.length - 1 : Math.min(idx, slots.length - 1), false);
+  };
+})();
+function globe(s) { Globe(s); }
 /* A short status word or two, coloured, with the full sentence as a tooltip: keeps a narrow BBS
    or Answer column from wrapping into a tall stack of single words on a phone. */
 const badgeClass = short => ["accepted", "complete"].includes(short) ? "good"
@@ -643,6 +908,7 @@ async function refresh() {
   schedule(s);
   spectrogram(s);
   channel(s);
+  globe(s);
   heard(s);
 
   if (s.slot) {
@@ -738,6 +1004,7 @@ function optIn(s) {
   $("optIn").classList.toggle("on", on);
   $("optInAsk").hidden = on;
   $("optInOn").hidden = !on;
+  $("optInNoLocator").hidden = !on || !settings || settings.audio.startsWith("ubersdr:") || !!settings.locator;
   if (on) $("optInLine").textContent = `Daily report, a public bulletin on GB7RDG (MCAST): on${f.next ? `, next at ${day(f.next)}${utc(f.next)}` : ""}.`;
   const call = $("optInCall");
   if (settings && !call.value && document.activeElement !== call && settings.feedback.callsign) call.value = settings.feedback.callsign;
@@ -1204,6 +1471,7 @@ async function loadSettings() {
   const kind = a.startsWith("ubersdr:") ? "ubersdr" : a.startsWith("wav:") ? "wav" : /^soundmodem(:|$)/i.test(a) ? "soundmodem" : "alsa";
   $("audioKind").value = kind;
   $("audioWhere").value = a;
+  $("locator").value = settings.locator || "";
   $("dial").value = `${mhz(settings.dialKHz)} MHz (signal centre 7.0538 MHz)`;
   $("alsaOption").textContent = `Sound card on my radio (USB, dial ${mhz(settings.dialKHz)} MHz)`;
   updateFilter(kind);
@@ -1227,6 +1495,7 @@ async function loadSettings() {
 }
 function updateFilter(kind) {
   $("filterSection").hidden = kind !== "alsa" && kind !== "soundmodem";
+  $("locatorSection").hidden = kind === "ubersdr";
 }
 /* Shows a measured or typed filter's result, with a button to write its dial through the normal
    settings save; set to null to clear it. */
@@ -1298,6 +1567,8 @@ $("settings").addEventListener("submit", async e => {
     login: $("login").value, password: $("password").value, command: $("command").value,
     pagePassword: $("pagePassword").value, currentPagePassword: $("currentPagePassword").value,
   };
+  /* A web SDR says where it is, so the locator is only sent for the other sources; left out, it is kept. */
+  if (!$("locatorSection").hidden) form.locator = $("locator").value;
   /* Only when changed, so saving other settings leaves a config without "sources" following the default. */
   const sources = $("sources").value.split(/[\s,]+/).filter(Boolean);
   if (sources.join(", ") !== settings.sources.join(", ")) form.sources = sources;

@@ -233,16 +233,21 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// Where the receiver is, for naming the hops: where the web SDR in use says it is, once it
-    /// has said; null for a sound card or a recording.
+    /// has said; for a sound card, pdn-soundmodem or a recording, the configured
+    /// <see cref="ReceiverConfig.Locator"/>, or null without one.
     /// </summary>
     public GroundPlace? Place
     {
         get
         {
-            var audio = Config.Audio;
+            var config = Config;
+            if (AudioSource.Parse(config.Audio).Kind != AudioSourceKind.UberSdr)
+            {
+                return GroundPlace.FromLocator(config.Locator);
+            }
             lock (_gate)
             {
-                return _webSdrPlace is { } p && p.Source == audio ? p.Place : null;
+                return _webSdrPlace is { } p && p.Source == config.Audio ? p.Place : null;
             }
         }
     }
