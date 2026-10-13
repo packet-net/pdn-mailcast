@@ -59,6 +59,27 @@ If pdn-soundmodem (0.89.0 or later) already runs your radio on this machine, set
 
 Moving from pdn-soundmodem's built-in receiver (its `mailcast` section)? [Moving from pdn-soundmodem's built-in receiver](../../docs/moving-from-built-in.md) says what to copy across and how to switch over.
 
+## Using an SDRplay radio through SDRconnect
+
+If your SDRplay radio (an RSP1A, say) runs in SDRconnect on a Windows PC, the receiver can listen to it over your network and tune it itself. No audio cable, real or virtual, is needed.
+
+On the Windows PC:
+
+1. Update SDRconnect to 1.0.6 or later, and run only one copy of it.
+2. In SDRconnect, go to **Other Actions**, **Preferences**, **WebSocket Server** and switch it on (it starts off). Leave its port at 5454.
+3. Make sure Windows treats your network as **Private** (Settings, Network & internet): SDRconnect's firewall rule only lets the receiver in on a Private network. If it has to stay Public, allow TCP port 5454 in.
+4. Note the PC's IP address (`ipconfig` shows it). Use a wired connection if you can: the receiver takes the radio's raw signal, about 8 Mbit/s, which Wi-Fi does not always keep up with.
+
+On the receiver's machine, put that address in `/etc/pdn-mailcast/receiver.json`:
+
+```
+"audio": "sdrconnect:192.168.1.20",
+```
+
+(add `:PORT` if you changed SDRconnect's port), then `sudo systemctl restart pdn-mailcast-receiver`. The status page should say it is listening to SDRconnect, with the level meter moving. If it can't connect, the page and the log say why, and it keeps trying.
+
+While the receiver runs, leave SDRconnect's tuning alone: the receiver tunes it for 7.052 MHz USB (the radio itself sits a little below that) and puts it back if it is moved. Set `"locator"` to your own locator, as for any radio of your own.
+
 ## Windows
 
 The receiver runs on Windows 10 or 11 (x64) too. Download `pdn-mailcast-receiver_VERSION_win-x64.zip` from the [latest release](https://github.com/packet-net/pdn-mailcast/releases/latest) and unzip it somewhere to keep, such as `C:\Program Files\pdn-mailcast-receiver`. There is no .NET to install. Then, from an administrator PowerShell in that folder:
