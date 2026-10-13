@@ -45,6 +45,10 @@
   #globeStamp { position: absolute; left: 12px; top: 10px; color: #dce8e6; font-weight: 600; pointer-events: none; }
   .globeControls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 10px 0 6px; }
   #globeSlot { flex: 1 1 200px; min-width: 0; }
+  /* About two thirds of the window tall at most, and never wider than 900px, so on a desktop the globe
+     sits in the page instead of filling it; 360px at least, for a phone held sideways. The controls
+     follow the picture's width. */
+  .globeWrap, .globeControls, #globeSaid { width: min(100%, max(360px, min(900px, calc(62vh * 1200 / 760)))); margin-left: auto; margin-right: auto; }
   .big { font-size: 26px; font-weight: 600; }
   .muted { color: var(--soft); }
   .bulletin-time time { white-space: nowrap; }
