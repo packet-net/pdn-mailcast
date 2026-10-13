@@ -60,17 +60,17 @@ public class IonosondeMonitorTests
     public async Task FreshGiro_IsOneRequest_WithTheUserAgent_AndNoPropQuest()
     {
         var time = new FakeTimeProvider(Start);
-        var net = new FakeNetwork { Giro = r => Text(r.RequestUri!.Query.Contains("ursiCode=RL052", StringComparison.Ordinal) ? GiroAt(Start, 5).Replace("FF051, FAIRFORD", "RL052, CHILTON", StringComparison.Ordinal) : "") };
+        var net = new FakeNetwork { Giro = r => Text(r.RequestUri!.Query.Contains("ursiCode=FF051", StringComparison.Ordinal) ? GiroAt(Start, 5) : "") };
         using var monitor = new IonosondeMonitor(new IonoSettings(), Agent, time, handler: net);
         await monitor.PollAsync(CancellationToken.None);
         var request = Assert.Single(net.Requests);
         Assert.Equal(Agent, string.Join(' ', request.Headers.UserAgent.Select(p => p.ToString())));
         Assert.DoesNotContain('@', request.Headers.UserAgent.ToString());
         Assert.Equal(
-            "https://lgdc.uml.edu/fastchar/getbest?ursiCode=RL052&charName=foF2,MUF(D),M(D)&DMUF=3000&fromDate=2026/10/06+07:20:00&toDate=2026/10/06+13:20:00",
+            "https://lgdc.uml.edu/fastchar/getbest?ursiCode=FF051&charName=foF2,MUF(D),M(D)&DMUF=3000&fromDate=2026/10/06+07:20:00&toDate=2026/10/06+13:20:00",
             request.RequestUri!.ToString());
         var r = monitor.Current;
-        Assert.Equal(("RL052", IonoSource.Giro, 5), (r.Station, r.Source, r.AgeMinutes));
+        Assert.Equal(("FF051", IonoSource.Giro, 5), (r.Station, r.Source, r.AgeMinutes));
         Assert.NotEqual(IonoState.Unknown, r.State);
         Assert.Equal(Agent, IonosondeMonitor.UserAgentFor("0.6.0", "GB7RDG"));
     }
@@ -85,7 +85,7 @@ public class IonosondeMonitorTests
         await monitor.PollAsync(CancellationToken.None);
         Assert.Equal((1, 1), (net.To("lgdc.uml.edu"), net.To("propquest.org")));
         Assert.Equal(
-            "https://propquest.org/JSON-grab-ionosphere?DATE1=2026-10-06&DATE2=2026-10-06&OBSERVATORY=RL052,FF051,DB049",
+            "https://propquest.org/JSON-grab-ionosphere?DATE1=2026-10-06&DATE2=2026-10-06&OBSERVATORY=FF051,RL052,DB049",
             net.Requests[1].RequestUri!.ToString());
         var r = monitor.Current;
         Assert.Equal(("FF051", IonoSource.PropQuest, 20, IonoState.Marginal), (r.Station, r.Source, r.AgeMinutes, r.State));
