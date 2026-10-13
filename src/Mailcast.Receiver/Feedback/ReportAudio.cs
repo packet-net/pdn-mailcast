@@ -8,6 +8,9 @@ internal static class ReportAudio
     /// <summary>What the header says for a sound card.</summary>
     public const string SoundCard = "sc";
 
+    /// <summary>What it says for an SDRplay radio through SDRconnect, wherever it is.</summary>
+    public const string SdrConnect = "sdrconnect";
+
     /// <summary>What it says for a web SDR on a private address, which is nobody else's business.</summary>
     public const string PrivateSdr = "sdr";
 
@@ -36,8 +39,10 @@ internal static class ReportAudio
     }
 
     /// <summary>The header's audio for a config's <c>audio</c>.</summary>
-    public static string For(AudioSource source) =>
-        source.Kind == AudioSourceKind.UberSdr
-            ? WebSdr(Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target).Host)
-            : SoundCard;
+    public static string For(AudioSource source) => source.Kind switch
+    {
+        AudioSourceKind.UberSdr => WebSdr(Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target).Host),
+        AudioSourceKind.SdrConnect => SdrConnect,
+        _ => SoundCard,
+    };
 }

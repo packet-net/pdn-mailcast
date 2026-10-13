@@ -352,10 +352,11 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
           <option value="ubersdr">Web SDR</option>
           <option value="alsa" id="alsaOption">Sound card on my radio (USB)</option>
           <option value="soundmodem">pdn-soundmodem on this machine</option>
+          <option value="sdrconnect">SDRconnect (SDRplay) on another computer</option>
           <option value="wav">Recording</option>
         </select>
       </label>
-      <label id="audioWhereLabel">Web SDR, sound card, soundmodem (or soundmodem:PORT) or file
+      <label id="audioWhereLabel">Web SDR, sound card, soundmodem (or soundmodem:PORT), sdrconnect:ADDRESS or file
         <input id="audioWhere" list="cards" autocomplete="off">
         <datalist id="cards"></datalist>
       </label>
@@ -655,7 +656,7 @@ const badge = (short, full) => `<span class="badge ${badgeClass(short)}"${full &
 const mhz = khz => String(+(khz / 1000).toFixed(6));
 const when = t => t ? new Date(t).toLocaleString() : "";
 let status = null, levelSeen = false;
-const whose = s => s && s.audio.kind === "recording" ? "the recording's" : s && s.audio.kind === "soundModem" ? "pdn-soundmodem's" : "the web SDR's";
+const whose = s => s && s.audio.kind === "recording" ? "the recording's" : s && s.audio.kind === "soundModem" ? "pdn-soundmodem's" : s && s.audio.kind === "sdrConnect" ? "SDRconnect's" : "the web SDR's";
 /* Which web SDR, by its address from the config, such as wessex.zapto.org. */
 const sdr = s => s.audio.webSdr ? s.audio.webSdr.host : "";
 
@@ -1100,8 +1101,9 @@ const day = t => new Date(t).toISOString().slice(0, 10) !== new Date().toISOStri
 const at = t => `${day(t)}${utc(t)} (${local(t)} your time)`;
 function schedule(s) {
   const c = s.schedule, a = s.audio, web = c.webSdr;
-  const kind = a.source.startsWith("ubersdr:") ? "web" : a.source.startsWith("wav:") ? "wav" : "radio";
+  const kind = a.source.startsWith("ubersdr:") ? "web" : a.source.startsWith("wav:") ? "wav" : /^sdrconnect:/i.test(a.source) ? "sdrconnect" : "radio";
   const tuning = kind === "web" ? `The web SDR ${esc(sdr(s))} is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
+    : kind === "sdrconnect" ? `The receiver tunes SDRconnect (${esc(a.source.slice(11))}) for it (USB, dial ${mhz(a.dialKHz)} MHz); leave its tuning alone while the receiver runs.`
     : kind === "radio" && a.dialFromSoundModem ? `pdn-soundmodem says its radio is on USB with the dial on ${mhz(a.dialKHz)} MHz.`
     : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
@@ -1127,6 +1129,7 @@ function schedule(s) {
     "40 m changes through the day, so some slots may not reach you. Give it a few slots before changing anything.",
   ];
   if (c.daylight) tips.splice(1, 0, `GB7RDG sends only in daylight, ${esc(c.daylight.words)}, because 40 m does not reach UK stations at night. Today that is ${c.today.length ? c.today.join(", ") + " UTC" : "no slots at all"}.`);
+  if (kind === "sdrconnect") tips.push("Check SDRconnect is running with its WebSocket Server on, and that the level meter moves.");
   if (kind === "radio") tips.push(`Check the radio is on USB at ${mhz(a.dialKHz)} MHz with a receive filter at least 3 kHz wide, and that the level meter moves.`);
   if (web) tips.push(`If ${esc(sdr(s))} never hears it, try another UberSDR receiver in the settings below.`);
   tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
@@ -1428,12 +1431,13 @@ function audioNote(s) {
         : a.kind === "soundModem" && a.lasting ? `pdn-soundmodem's audio cannot be used: ${a.problem}.${again} Once that is changed in pdn-soundmodem, restarting the receiver, or changing the audio setting below, tries again at once.`
         : a.kind === "soundModem" ? `No audio from pdn-soundmodem: ${a.problem}.${again} Check pdn-soundmodem is running on this machine, and the audio setting below.`
         : a.kind === "webSdr" ? `No audio from the web SDR: ${a.problem}.${again}`
+        : a.kind === "sdrConnect" ? `No audio from SDRconnect: ${a.problem}.${again}`
         : `Cannot play the recording: ${a.problem}.`;
     case "ended":
       return "The recording has played to its end.";
     case "opening":
       return a.kind === "webSdr" ? `Opening the web SDR ${sdr(s)}...` : a.kind === "soundCard" ? "Opening the sound card..."
-        : a.kind === "soundModem" ? "Connecting to pdn-soundmodem..." : "Opening the recording...";
+        : a.kind === "soundModem" ? "Connecting to pdn-soundmodem..." : a.kind === "sdrConnect" ? "Connecting to SDRconnect..." : "Opening the recording...";
     default:
       return "Waiting for audio...";
   }
@@ -1478,7 +1482,7 @@ async function loadSettings() {
   if (!r.ok) { $("saved").innerHTML = `<span class="bad">Cannot load the settings: ${esc(r.error)}</span>`; return; }
   settings = r.body;
   const a = settings.audio;
-  const kind = a.startsWith("ubersdr:") ? "ubersdr" : a.startsWith("wav:") ? "wav" : /^soundmodem(:|$)/i.test(a) ? "soundmodem" : "alsa";
+  const kind = a.startsWith("ubersdr:") ? "ubersdr" : a.startsWith("wav:") ? "wav" : /^soundmodem(:|$)/i.test(a) ? "soundmodem" : /^sdrconnect:/i.test(a) ? "sdrconnect" : "alsa";
   $("audioKind").value = kind;
   $("audioWhere").value = a;
   $("locator").value = settings.locator || "";
@@ -1554,7 +1558,8 @@ $("audioKind").addEventListener("change", () => {
   if (k === "ubersdr" && !v.value.startsWith("ubersdr:")) v.value = "ubersdr:wessex.zapto.org";
   if (k === "wav" && !v.value.startsWith("wav:")) v.value = settings && settings.windows ? "wav:C:\\path\\to\\recording.wav" : "wav:/path/to/recording.wav";
   if (k === "soundmodem" && !/^soundmodem(:|$)/i.test(v.value)) v.value = "soundmodem";
-  if (k === "alsa" && (v.value.startsWith("ubersdr:") || v.value.startsWith("wav:") || /^soundmodem(:|$)/i.test(v.value))) v.value = settings && (settings.soundCards[0] || (settings.windows ? "soundcard:" : "")) || "plughw:CARD=Device,DEV=0";
+  if (k === "sdrconnect" && !/^sdrconnect:/i.test(v.value)) v.value = "sdrconnect:192.168.1.20";
+  if (k === "alsa" && (v.value.startsWith("ubersdr:") || v.value.startsWith("wav:") || /^soundmodem(:|$)/i.test(v.value) || /^sdrconnect:/i.test(v.value))) v.value = settings && (settings.soundCards[0] || (settings.windows ? "soundcard:" : "")) || "plughw:CARD=Device,DEV=0";
   updateFilter(k);
 });
 $("testBbs").addEventListener("click", async () => {

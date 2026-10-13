@@ -2,14 +2,16 @@ using M0LTE.Dsp;
 using M0LTE.Radio.Audio;
 using Packet.SoundModem.Audio;
 using Packet.SoundModem.Channel;
+using Packet.SoundModem.Iq;
 using Packet.SoundModem.Ms110d;
+using Packet.SoundModem.SdrConnect;
 using Packet.SoundModem.UberSdr;
 
 namespace Mailcast.Receiver;
 
 /// <summary>
-/// Audio in, frames out: a source (sound card, web receiver, pdn-soundmodem's channel audio
-/// stream or recording), pdn-soundmodem's channel with one MS110D modem, and the tone detector
+/// Audio in, frames out: a source (sound card, web receiver, SDRconnect, pdn-soundmodem's
+/// channel audio stream or recording), pdn-soundmodem's channel with one MS110D modem, and the tone detector
 /// beside it.
 /// </summary>
 /// <remarks>
@@ -49,6 +51,7 @@ public sealed class AudioPipeline : IAsyncDisposable
     private readonly CancellationTokenSource _stop = new();
     private IAudioInput? _input;
     private UberSdrAudioInput? _webSdr;
+    private SdrConnectIqInput? _sdrConnect;
     private SoundModemAudioInput? _stream;
     private bool _keyed;
     private int _modemResets;
@@ -532,6 +535,107 @@ public sealed class AudioPipeline : IAsyncDisposable
             + $"Nothing is retuned for it: {range}; or, if pdn-soundmodem has a \"rig\" section, set \"retune\": true here for its receive window to tune the radio for each slot");
     }
 
+    /// <summary>
+    /// The sideband filter SDRconnect's IQ is heard through, Hz above the dial: the signal on this
+    /// dial with a little room either side, so the modem hears the signal and not much else.
+    /// </summary>
+    internal static (double Low, double High) SdrConnectFilter(double dialHz)
+    {
+        double centre = OnAir.AudioCentreHz(dialHz);
+        return (Math.Max(100, centre - OnAir.HalfWidthHz - 150), centre + OnAir.HalfWidthHz + 150);
+    }
+
+    /// <summary>
+    /// Connects to SDRconnect, points its radio a little below the dial (clear of its DC spike)
+    /// and demodulates its IQ here as USB on <see cref="DialHz"/>, at the modem's rate.
+    /// pdn-soundmodem's client reconnects by itself after a drop, and raises Lost only once
+    /// SDRconnect has delivered nothing for some minutes; the supervisor then opens it afresh.
+    /// </summary>
+    private async Task OpenSdrConnectAsync(CancellationToken cancellation)
+    {
+        var endpoint = _source.SdrConnectEndpoint;
+        var (low, high) = SdrConnectFilter(DialHz);
+        void Journal(string line) => _log(Ascii.Clean(line));
+        SdrConnectIqInput input;
+        try
+        {
+            input = await SdrConnectIqInput.OpenAsync(
+                endpoint,
+                new SdrConnectOptions { CentreFrequencyHz = DialHz, Journal = Journal },
+                new IqChannelSpec { OffsetHz = 0, Demodulation = IqDemodulation.Usb, Name = "mailcast", SsbLowHz = low, SsbHighHz = high },
+                new IqReceiverOptions { DspRate = OnAir.SampleRate, Journal = Journal },
+                DialHz,
+                cancellation).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or ArgumentException or System.Net.WebSockets.WebSocketException or HttpRequestException)
+        {
+            throw new AudioSourceException(SdrConnectProblem(endpoint, e));
+        }
+        input.Lost += reason =>
+        {
+            EndReason = Ascii.Clean(reason);
+            _stop.Cancel();
+        };
+        _input = input;
+        _sdrConnect = input;
+        string device = input.Source.Report.TryGetValue(SdrConnectProtocol.Properties.ActiveDevice, out string? name) && name.Length > 0
+            ? $" ({Ascii.Clean(name)})" : "";
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        string rate = input.Source.SampleRate.ToString(invariant);
+        string filter = string.Create(invariant, $"{low:F0} to {high:F0} Hz");
+        _log($"audio: SDRconnect {endpoint}{device}, its IQ at {rate} S/s with the LO on {OnAir.Mhz(input.Source.CentreFrequencyHz)} MHz, "
+            + $"heard here as USB on dial {OnAir.Mhz(DialHz)} MHz ({filter}), signal centre {OnAir.Mhz(OnAir.TransmitHz)} MHz. "
+            + "The receiver tunes SDRconnect itself: leave its tuning alone while it runs");
+    }
+
+    /// <summary>
+    /// Why SDRconnect could not be opened, in words for whoever set it up: the usual causes of each
+    /// failure (nothing listening, a firewall, a radio it will not let us tune) said as such.
+    /// </summary>
+    internal static string SdrConnectProblem(SdrConnectEndpoint endpoint, Exception error)
+    {
+        var socket = Inner<System.Net.Sockets.SocketException>(error);
+        string said = Ascii.Clean(error.Message).TrimEnd('.', ' ');
+        if (socket?.SocketErrorCode is System.Net.Sockets.SocketError.ConnectionRefused)
+        {
+            return $"SDRconnect at {endpoint} refused the connection. Check that SDRconnect is running on that computer, "
+                + "that its WebSocket Server is switched on (it starts off: in SDRconnect, Other Actions -> Preferences -> WebSocket Server), "
+                + $"and that its port is {endpoint.Port}";
+        }
+        if (socket?.SocketErrorCode is System.Net.Sockets.SocketError.HostNotFound or System.Net.Sockets.SocketError.NoData or System.Net.Sockets.SocketError.TryAgain)
+        {
+            return $"cannot find the computer {endpoint.Host} for SDRconnect. Check the name, or give its IP address instead, such as sdrconnect:192.168.1.20";
+        }
+        // pdn-soundmodem says a connect that timed out only in words ("no answer from ..."): a
+        // Windows firewall drops what it does not let in, rather than refusing it.
+        if (socket?.SocketErrorCode is System.Net.Sockets.SocketError.TimedOut or System.Net.Sockets.SocketError.HostUnreachable or System.Net.Sockets.SocketError.NetworkUnreachable
+            || (socket is null && error is IOException && error.InnerException?.Message.Contains("no answer", StringComparison.OrdinalIgnoreCase) == true))
+        {
+            return $"no answer from SDRconnect at {endpoint}. Check that this is the right address for that computer and that it is on, "
+                + $"and that its firewall lets this machine in: Windows lets SDRconnect through only on a network it treats as Private, "
+                + $"so set that network to Private in Windows' settings, or allow TCP port {endpoint.Port} in";
+        }
+        if (said.Contains("can_control", StringComparison.Ordinal))
+        {
+            return $"SDRconnect at {endpoint} will not let the receiver tune its radio (it says can_control is false). "
+                + "Check that SDRconnect has the radio selected and started, that only one copy of SDRconnect is running, "
+                + "and that it is not itself connected to another SDRconnect as a client";
+        }
+        return $"cannot use SDRconnect at {endpoint}: {said}";
+    }
+
+    private static T? Inner<T>(Exception? error) where T : Exception
+    {
+        for (var e = error; e is not null; e = e.InnerException)
+        {
+            if (e is T found)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
     /// <summary>Opens the source and starts the audio thread.</summary>
     /// <exception cref="AudioSourceException">The source could not be opened; the message says why.</exception>
     public async Task StartAsync(CancellationToken cancellation)
@@ -595,6 +699,10 @@ public sealed class AudioPipeline : IAsyncDisposable
                     + (WebSdrDescription is { } said ? $" ({said})" : ""));
                 break;
 
+            case AudioSourceKind.SdrConnect:
+                await OpenSdrConnectAsync(cancellation).ConfigureAwait(false);
+                break;
+
             case AudioSourceKind.Wav:
                 _input = WavInput.Open(_source.Target);
                 _log($"audio: recording {_source.Target}");
@@ -617,7 +725,8 @@ public sealed class AudioPipeline : IAsyncDisposable
     /// <summary>
     /// Ends the pipeline if a source that should be delivering has said nothing for
     /// <see cref="StarvedAfter"/>, so the supervisor reopens it. A web receiver between sessions
-    /// (reconnecting, or refused until its allowance resets) is quiet on purpose and not counted.
+    /// (reconnecting, or refused until its allowance resets) is quiet on purpose and not counted,
+    /// nor is SDRconnect while pdn-soundmodem's client reconnects to it.
     /// A blocked read cannot be interrupted, so this works beside the audio thread, not in it.
     /// </summary>
     private async Task WatchAsync()
@@ -629,7 +738,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 var tick = Task.Delay(TimeSpan.FromSeconds(5), _time, _stop.Token);
                 WatchWaiting?.Invoke();
                 await tick.ConfigureAwait(false);
-                if (_webSdr is { SessionLive: false })
+                if (_webSdr is { SessionLive: false } || _sdrConnect is { SessionLive: false })
                 {
                     Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
                     continue;

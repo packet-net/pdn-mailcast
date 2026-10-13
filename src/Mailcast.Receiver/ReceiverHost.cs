@@ -400,8 +400,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                         closes = early.At;
                     }
                     return new HookWindow(opens, closes, slot);
-                case AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem:
-                    // pdn-soundmodem's radio, like a sound card's, is heard all the time.
+                case AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect:
+                    // pdn-soundmodem's radio and SDRconnect's, like a sound card's, are heard all the time.
                     return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
                 default:
                     return null;

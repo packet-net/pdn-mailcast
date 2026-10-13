@@ -1,3 +1,4 @@
+using Packet.SoundModem.SdrConnect;
 using Packet.SoundModem.UberSdr;
 
 namespace Mailcast.Receiver;
@@ -19,11 +20,18 @@ public enum AudioSourceKind
 
     /// <summary>A Windows recording device, read through WASAPI: the Windows counterpart of <see cref="Alsa"/>.</summary>
     WindowsSoundCard,
+
+    /// <summary>
+    /// An SDRplay radio through SDRconnect's WebSocket API, usually on another computer: its IQ,
+    /// demodulated here, with the receiver tuning it. A radio of your own, heard all the time,
+    /// but not a sound card.
+    /// </summary>
+    SdrConnect,
 }
 
 /// <summary>The config's "audio" setting, parsed.</summary>
 /// <param name="Kind">What it is.</param>
-/// <param name="Target">The ALSA device, the full ubersdr: string, the WAV file's path, pdn-soundmodem's page port, or the Windows recording device's name.</param>
+/// <param name="Target">The ALSA device, the full ubersdr: or sdrconnect: string, the WAV file's path, pdn-soundmodem's page port, or the Windows recording device's name.</param>
 public sealed record AudioSource(AudioSourceKind Kind, string Target)
 {
     /// <summary>
@@ -39,11 +47,20 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
     /// <summary>The setting's own word for a Windows recording device, as <c>soundcard:NAME</c>.</summary>
     public const string WindowsSoundCardWord = "soundcard";
 
+    /// <summary>The setting's own word for SDRconnect, as <c>sdrconnect:HOST[:PORT]</c>.</summary>
+    public const string SdrConnectWord = "sdrconnect";
+
     /// <summary>Whether this is a sound card on this machine (ALSA, or a Windows recording device), whose level is the operator's to set.</summary>
     public bool IsSoundCard => Kind is AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard;
 
     /// <summary>pdn-soundmodem's page port, for a <see cref="AudioSourceKind.SoundModem"/> source; 0 for any other.</summary>
     public int SoundModemPort => Kind == AudioSourceKind.SoundModem ? int.Parse(Target, System.Globalization.CultureInfo.InvariantCulture) : 0;
+
+    /// <summary>SDRconnect's address, for a <see cref="AudioSourceKind.SdrConnect"/> source.</summary>
+    /// <exception cref="InvalidOperationException">This is not an SDRconnect source.</exception>
+    public SdrConnectEndpoint SdrConnectEndpoint => Kind == AudioSourceKind.SdrConnect
+        ? SdrConnectDevice.Parse(Target)
+        : throw new InvalidOperationException($"{this} is not SDRconnect");
 
     /// <summary>Parses the setting, as this machine reads it. Throws <see cref="ConfigException"/> for one that cannot work.</summary>
     public static AudioSource Parse(string? setting) => Parse(setting, OperatingSystem.IsWindows());
@@ -60,10 +77,10 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
             throw new ConfigException(windows
                 ? "\"audio\" is empty: give a sound card by its Windows name such as soundcard:Microphone (USB Audio Device), "
                     + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, "
-                    + "or a recording as wav:C:\\slot.wav"
+                    + "SDRconnect on another computer as sdrconnect:192.168.1.20, or a recording as wav:C:\\slot.wav"
                 : "\"audio\" is empty: give an ALSA device such as plughw:CARD=Device,DEV=0, "
                     + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, "
-                    + "or a recording as wav:/path/file.wav");
+                    + "SDRconnect on another computer as sdrconnect:192.168.1.20, or a recording as wav:/path/file.wav");
         }
 
         if (value.Equals(SoundModemWord, StringComparison.OrdinalIgnoreCase))
@@ -86,6 +103,25 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
             return path.Length == 0
                 ? throw new ConfigException("\"audio\": wav: needs the path of the recording, such as wav:/tmp/slot.wav")
                 : new AudioSource(AudioSourceKind.Wav, path);
+        }
+
+        if (SdrConnectDevice.IsSdrConnect(value))
+        {
+            string where = value[(SdrConnectWord.Length + 1)..].Trim();
+            try
+            {
+                _ = SdrConnectDevice.Parse(value);
+            }
+            catch (Exception e) when (e is ArgumentException or InvalidDataException)
+            {
+                // pdn-soundmodem's own words are about its "device" setting, not this one.
+                throw new ConfigException(Ascii.Clean(where.Length == 0
+                    ? "\"audio\": sdrconnect: needs the computer SDRconnect runs on, such as sdrconnect:192.168.1.20"
+                    : $"\"audio\": sdrconnect:{where} is not a computer and a port. Give the computer SDRconnect runs on, such as "
+                        + $"sdrconnect:192.168.1.20, or sdrconnect:192.168.1.20:5455 if its WebSocket port is not the usual {SdrConnectProtocol.DefaultPort} "
+                        + "(an IPv6 address goes in brackets, such as sdrconnect:[fd00::5])"));
+            }
+            return new AudioSource(AudioSourceKind.SdrConnect, SdrConnectWord + ":" + where);
         }
 
         if (UberSdrDevice.IsUberSdr(value))
@@ -118,7 +154,8 @@ public sealed record AudioSource(AudioSourceKind Kind, string Target)
         throw new ConfigException(Ascii.Clean(
             $"\"audio\": {value} is not something the receiver can open on Windows. Give a sound card by its Windows name, such as "
             + "soundcard:Microphone (USB Audio Device) (the status page's settings list the ones it can see), "
-            + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, or a recording as wav:C:\\slot.wav"));
+            + "a web receiver such as ubersdr:wessex.zapto.org, pdn-soundmodem on this machine as soundmodem, "
+            + "SDRconnect on another computer as sdrconnect:192.168.1.20, or a recording as wav:C:\\slot.wav"));
     }
 
     /// <inheritdoc />
