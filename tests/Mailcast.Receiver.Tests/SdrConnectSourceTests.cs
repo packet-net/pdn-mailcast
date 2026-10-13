@@ -90,6 +90,56 @@ public class SdrConnectSourceTests
         Assert.True(high > centre + OnAir.HalfWidthHz);
     }
 
+    [Fact]
+    public async Task SettingsPage_ACorrectedAddress_IsTriedAtOnce_NotAfterTheWaitForTheWrongOne()
+    {
+        // The usual first-time mistake: the wrong address saved, then the right one. The right
+        // one is tried as soon as it is saved, as the README says, not after the 30 s wait the
+        // wrong one started.
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        int closed = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig
+        {
+            Audio = $"sdrconnect:127.0.0.1:{closed}",
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Web = new WebSettings { Port = 18137 },
+        };
+        await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        var failed = await PhaseAsync(conditions, AudioPhase.Failed, TimeSpan.FromSeconds(30));
+        Assert.Contains("refused the connection", failed.Problem, StringComparison.Ordinal);
+        host.Reconfigure(config with { Audio = sdr.Audio });
+
+        // Well inside the 30 s wait.
+        await PhaseAsync(conditions, AudioPhase.Listening, TimeSpan.FromSeconds(10));
+        Assert.True(sdr.Connections >= 1);
+
+        await stop.CancelAsync();
+        await run;
+    }
+
+    private static async Task<AudioCondition> PhaseAsync(System.Threading.Channels.Channel<AudioCondition> conditions, AudioPhase phase, TimeSpan within)
+    {
+        using var giveUp = new CancellationTokenSource(within);
+        while (true)
+        {
+            var condition = await conditions.Reader.ReadAsync(giveUp.Token);
+            if (condition.Phase == phase)
+            {
+                return condition;
+            }
+        }
+    }
+
     // ---------- what is said when it will not open ----------
 
     [Fact]

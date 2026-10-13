@@ -935,15 +935,17 @@ public sealed class ReceiverHost : IAsyncDisposable
                 : AudioRetry;
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
             Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
-            // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short.
-            if (soundModem)
+            // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short; so
+            // it does for SDRconnect, whose address is typed in and so often corrected.
+            bool endedBySetting = soundModem || pipeline.Source.Kind == AudioSourceKind.SdrConnect;
+            if (endedBySetting)
             {
                 lock (_gate)
                 {
                     _audioRestart = restart;
                 }
             }
-            await DelayAsync(wait, soundModem ? restart.Token : cancellation).ConfigureAwait(false);
+            await DelayAsync(wait, endedBySetting ? restart.Token : cancellation).ConfigureAwait(false);
             lock (_gate)
             {
                 _audioRestart = null;
