@@ -131,6 +131,36 @@ public class DailyReportTests
     }
 
     [Theory]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0", null)] // no eighth field: an older sender's
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2", null)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 -", null)] // explicitly not known
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 0", 0)] // none given up
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 - 4", 4)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 a-later-field", 4)]
+    public void Parse_GivenUpField_KnownOrNot(string headerLine, int? expected)
+    {
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", headerLine + "\r\n");
+        Assert.Equal(expected, read.Header.GivenUp);
+    }
+
+    /// <summary>The eighth field always comes with a seventh, "-" if that one is not known, and not at all when it is not known itself.</summary>
+    [Theory]
+    [InlineData(null, null, "MCR1 0.6.0 - sc 3/1 0 -")]
+    [InlineData(2, null, "MCR1 0.6.0 - sc 3/1 0 2")]
+    [InlineData(null, 1, "MCR1 0.6.0 - sc 3/1 0 - 1")]
+    [InlineData(2, 0, "MCR1 0.6.0 - sc 3/1 0 2 0")]
+    public void Header_GivenUpField_WrittenWithTheSeventh(int? alreadyHad, int? givenUp, string expected)
+    {
+        var header = new ReportHeader("0.6.0", null, "sc", 3, 1, new Dictionary<string, int>(), alreadyHad, givenUp);
+        var report = new DailyReport("G4ABC", Day, header, []);
+        Assert.Equal(expected + "\r\n", report.Body);
+        var read = DailyReport.Parse(report.Title, report.Body);
+        Assert.Equal(alreadyHad, read.Header.AlreadyHad);
+        Assert.Equal(givenUp, read.Header.GivenUp);
+    }
+
+    [Theory]
+    [InlineData("MCR G4ABC 2026-10-06", "MCR1 0.6.0 - sc 0/0 0 0 x\r\n")]
     [InlineData("Hello", "MCR1 0.6.0 - sc 0/0 0\r\n")]
     [InlineData("MCR G4ABC 2026-13-01", "MCR1 0.6.0 - sc 0/0 0\r\n")]
     [InlineData("MCR G4ABC 2026-10-06", "no header here\r\n")]
@@ -151,7 +181,7 @@ public class DailyReportTests
     {
         // The example in docs/receiver.md, "The daily report's format".
         string body = string.Join("\r\n",
-            "MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1 0",
+            "MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1 0 1",
             "09 W4 196 11 +1.3 IM 2 2.1/-14 0.42 0.31 301 b",
             "10 W3 188 15 +1.2 IG 2 1.9/-17 0.35 0.21 287 b",
             "11 W4 214 18 +1.2 IG 2 1.8/-16 0.31 0.18 279 b",
@@ -170,6 +200,7 @@ public class DailyReportTests
         Assert.Null(report.Slots[3].Channel!.TwoFDelayMs);
         Assert.Null(report.Slots[8].Channel);
         Assert.Equal(["IP"], report.Slots[8].Verdicts);
+        Assert.Equal(1, report.Header.GivenUp);
     }
 
     [Theory]
@@ -199,7 +230,7 @@ public class DailyReportTests
     [Fact]
     public void Parse_LinesFromALaterVersion_KeepWhatThisReads()
     {
-        string body = "MCR1 0.9.0 IO91lk sc 1/1 0 2 header-extra\r\n"
+        string body = "MCR1 0.9.0 IO91lk sc 1/1 0 2 1 header-extra\r\n"
             + "09 W4 10 12 +0.1 IG\r\n"
             + "10 W4 11 12 +0.1 IG -\r\n"
             + "11 W4 12 12 +0.1 IG - - - - - - later-field\r\n"
@@ -211,10 +242,11 @@ public class DailyReportTests
         Assert.All(read.Slots.Take(3), slot => Assert.Null(slot.Channel));
         Assert.Equal([10, 11, 12, 13], read.Slots.Select(slot => slot.Frames));
         Assert.Equal(new ReportChannel(2, 1.9, -17, 0.35, 0.21, 287, 'b'), read.Slots[3].Channel);
-        // The seventh field (already had) is read; anything after it on the header line is not.
+        // The seventh (already had) and eighth (given up) fields are read; anything after them on the header line is not.
         Assert.Equal(2, read.Header.AlreadyHad);
+        Assert.Equal(1, read.Header.GivenUp);
         // Written back in this version's own form, which an older reader takes too.
-        Assert.Equal("MCR1 0.9.0 IO91lk sc 1/1 0 2\r\n09 W4 10 12 +0.1 IG\r\n10 W4 11 12 +0.1 IG\r\n11 W4 12 12 +0.1 IG\r\n12 W4 13 12 +0.1 IG 2 1.9/-17 0.35 0.21 287 b\r\n", read.Body);
+        Assert.Equal("MCR1 0.9.0 IO91lk sc 1/1 0 2 1\r\n09 W4 10 12 +0.1 IG\r\n10 W4 11 12 +0.1 IG\r\n11 W4 12 12 +0.1 IG\r\n12 W4 13 12 +0.1 IG 2 1.9/-17 0.35 0.21 287 b\r\n", read.Body);
     }
 
     [Fact]

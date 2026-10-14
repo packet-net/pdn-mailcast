@@ -133,6 +133,12 @@ public sealed class Intake : IAsyncDisposable
     /// </summary>
     public event Action<BroadcastDirectory>? DirectoryHeard;
 
+    /// <summary>
+    /// Part-received objects a directory has just shown the head end stopped sending (raised on
+    /// the worker), each once as it is marked: see <see cref="ReceiverStore.NoLongerSentRetention"/>.
+    /// </summary>
+    public event Action<IReadOnlyList<ulong>>? NoLongerSent;
+
     /// <summary>Issue #49: the ionosonde reading for the slot now on was received.</summary>
     public event Action<IonoReading>? IonosphereHeard;
 
@@ -372,11 +378,14 @@ public sealed class Intake : IAsyncDisposable
     /// frames; but the work it does under the lock is bounded the same way <see cref="Pending"/>
     /// and <see cref="PartialObjects"/> already are, and this is read only for the status page's
     /// poll, seconds apart, never per frame, so holding the lock a little longer here is fine.
+    /// For the same reason it first drops any object due to go now that the head end has stopped
+    /// sending it, which otherwise waits for the next frame.
     /// </summary>
     public IReadOnlyList<HeldBulletin> HeldBulletins()
     {
         lock (_gate)
         {
+            _store.DropNoLongerSent();
             return _store.HeldBulletins();
         }
     }
@@ -482,6 +491,10 @@ public sealed class Intake : IAsyncDisposable
 
     private void Report(AcceptResult result)
     {
+        if (result.NoLongerSent is { Count: > 0 } stopped)
+        {
+            NoLongerSent?.Invoke(stopped);
+        }
         switch (result.Outcome)
         {
             case FrameOutcome.Stored:

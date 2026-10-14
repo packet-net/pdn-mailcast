@@ -180,6 +180,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             Audio = () => ReportAudio.For(AudioSource.Parse(Config.Audio)),
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
+        Intake.NoLongerSent += feedback.NoteGivenUp;
         Delivery.SessionFinished += report =>
         {
             feedback.NoteDelivered(report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted));

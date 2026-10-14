@@ -1387,7 +1387,8 @@ public sealed class StatusPage : IAsyncDisposable
     /// <item>"partial": every object still part-received (issue #68's progress bars), named by a
     /// remembered directory or not; never paged, since there are normally few of them and they
     /// belong on top of every page the section shows (but the page itself only puts them there on
-    /// its first page).</item>
+    /// its first page). Each says whether the head end has stopped sending it ("noLongerSent"),
+    /// and if so when it will be cleared ("clearsAt").</item>
     /// <item>"delivered", "alreadyHad" and "refused": how many archived bulletins answered each
     /// way, for the summary line ("N coming in, N waiting for your BBS, N delivered, N already
     /// had"), alongside the existing "waiting" count. Issue #86: "delivered" means the BBS
@@ -1406,6 +1407,10 @@ public sealed class StatusPage : IAsyncDisposable
             title = h.Title,
             received = h.Received,
             needed = h.Needed,
+            // The head end has stopped sending it, so it can never be finished, and it is
+            // cleared at clearsAt; false, with clearsAt null, while it is still being sent.
+            noLongerSent = h.NoLongerSentSince is not null,
+            clearsAt = h.ClearedAt,
         }).ToList();
         return new
         {

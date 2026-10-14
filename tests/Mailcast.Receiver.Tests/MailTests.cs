@@ -577,6 +577,40 @@ public class MailTests
     }
 
     /// <summary>
+    /// A part-received bulletin that a directory heard since its last piece leaves out, which the
+    /// head end has stopped sending: GET /api/mail says so and when it will be cleared, and the
+    /// intake tells the daily report once.
+    /// </summary>
+    [Fact]
+    public async Task Mail_APartReceivedBulletinNoLongerSent_SaysWhenItWillBeCleared()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        var givenUp = new List<ulong>();
+        host.Intake.NoLongerSent += ids => givenUp.AddRange(ids);
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(901, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        time.Advance(TimeSpan.FromHours(1));
+        await RebuildAsync(host.Intake, Samples.Bulletin(1)); // a slot whose directory lists only 1_GB7RDG
+
+        var mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
+        var partial = Assert.Single(mail.GetProperty("partial").EnumerateArray());
+        Assert.True(partial.GetProperty("noLongerSent").GetBoolean());
+        Assert.Equal(Start.AddHours(25), partial.GetProperty("clearsAt").GetDateTimeOffset());
+        Assert.Single(givenUp);
+
+        time.Advance(TimeSpan.FromHours(24));
+        mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
+        Assert.Empty(mail.GetProperty("partial").EnumerateArray());
+        Assert.Equal(0, host.Intake.PartialObjects);
+    }
+
+    /// <summary>
     /// Issue #73: the combined Bulletins section's data, from the one endpoint - a part-received
     /// object, a delivered bulletin and a refused one, all at once, with the summary counts the
     /// page's own heading is built from. Issue #86: a bulletin the BBS already had is its own
@@ -611,6 +645,8 @@ public class MailTests
         Assert.Equal(JsonValueKind.Null, partial.GetProperty("bid").ValueKind); // not yet named
         Assert.Equal(1, partial.GetProperty("received").GetInt32());
         Assert.True(partial.GetProperty("needed").GetInt32() > 1);
+        Assert.False(partial.GetProperty("noLongerSent").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, partial.GetProperty("clearsAt").ValueKind);
 
         var items = mail.GetProperty("items").EnumerateArray().ToDictionary(i => i.GetProperty("bid").GetString()!);
         Assert.Equal("accepted", items["1_GB7RDG"].GetProperty("verdict").GetString());

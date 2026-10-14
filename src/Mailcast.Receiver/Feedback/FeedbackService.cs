@@ -192,6 +192,30 @@ public sealed class FeedbackService
         }
     }
 
+    /// <summary>
+    /// Part-received bulletins were given up because the head end has stopped sending them,
+    /// counted on today's UTC date, each object once whichever of the days kept it was marked on.
+    /// </summary>
+    public void NoteGivenUp(IReadOnlyList<ulong> objectIds)
+    {
+        ArgumentNullException.ThrowIfNull(objectIds);
+        if (objectIds.Count == 0)
+        {
+            return;
+        }
+        Count(d =>
+        {
+            foreach (ulong id in objectIds)
+            {
+                string key = ObjectId.Format(id);
+                if (!_state.Days.Exists(other => other.GivenUp.Contains(key)))
+                {
+                    d.GivenUp.Add(key);
+                }
+            }
+        });
+    }
+
     /// <summary>Something went wrong, of the kind <paramref name="code"/> (see <see cref="ReportErrors"/>).</summary>
     public void NoteError(string code) => Count(d => d.Errors[code] = d.Errors.GetValueOrDefault(code) + 1);
 
@@ -484,7 +508,7 @@ public sealed class FeedbackService
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
-            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad);
+            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count);
         return new DailyReport(settings.From, record.Day, header, slots);
     }
 
@@ -687,6 +711,12 @@ public sealed class FeedbackService
         /// are noted and sessions answered, same as any other count would starting mid-day.
         /// </summary>
         public int AlreadyHad { get; set; }
+
+        /// <summary>
+        /// The objects given up because the head end stopped sending them, by ID in hex, so each is
+        /// counted once. Empty in a feedback.json from before this was kept, as for <see cref="AlreadyHad"/>.
+        /// </summary>
+        public List<string> GivenUp { get; set; } = [];
 
         public SortedDictionary<string, int> Errors { get; set; } = new(StringComparer.Ordinal);
     }
