@@ -136,7 +136,9 @@ public sealed class HeadEndStore
 
     /// <summary>
     /// The bulletins in rotation in the slot starting at <paramref name="slot"/>: those not yet
-    /// carried, and those still in their carrying slots. Pass them to
+    /// carried, and those still in their carrying slots (under the budget rule, those not yet
+    /// retired for good, the leftover tier included: their tier follows from NextEsi and
+    /// FirstSlot, so a restart puts each back where it was). Pass them to
     /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?)"/>.
     /// </summary>
     public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot) =>

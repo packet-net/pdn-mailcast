@@ -15,7 +15,8 @@ namespace Mailcast.HeadEnd.Planning;
 /// <param name="IonosphereFrames">How many of <paramref name="Frames"/> carry the reading (content type 4).</param>
 /// <param name="PskReporter">The PSK Reporter reading as the slot was planned; null when the head end takes none.</param>
 /// <param name="PskReporterFrames">How many of <paramref name="Frames"/> carry it (content type 4, source 3).</param>
-public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0)
+/// <param name="LeftoverInRotation">How many of <paramref name="BulletinsInRotation"/> are in the budget rule's leftover tier (<see cref="BroadcastScheduler.Leftover"/>).</param>
+public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0)
 {
     /// <summary>A plan with nothing in it.</summary>
     public static SlotPlan Empty(DateTimeOffset slot) => new(slot, [], 0, null);
@@ -49,7 +50,7 @@ public interface ISlotPlanner
 /// such: each slot is filled afresh, the least covered bulletins first. Either way every symbol is
 /// fresh, because each object's next ESI only ever moves on past what was handed to the modem. A
 /// scheduled slot in which no bulletin has anything to send sends nothing, not even the
-/// directory.</para>
+/// directory; under the budget rule, nor does one with only the leftover tier to send.</para>
 /// <para>The waveform is chosen first, since the budget rule fills the slot by that waveform's
 /// airtime: a slot at 600 bps carries about half what one at 1200 bps does.</para>
 /// </remarks>
@@ -105,11 +106,11 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         }
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
-            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots);
+            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
         bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0);
+        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins);
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>

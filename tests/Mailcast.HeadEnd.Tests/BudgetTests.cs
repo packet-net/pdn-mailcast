@@ -110,7 +110,8 @@ public class BudgetTests(ITestOutputHelper output)
         """);
 
     /// <summary>One simulated slot.</summary>
-    private sealed record SlotResult(DateTimeOffset Slot, string Mode, int Frames, int BulletinsSent, int NewBulletins, int InRotation, TimeSpan OnAir, IReadOnlyDictionary<string, int> Symbols);
+    /// <param name="Leftover">The bulletins in the leftover tier as the slot was planned, of those <paramref name="InRotation"/> counts.</param>
+    private sealed record SlotResult(DateTimeOffset Slot, string Mode, int Frames, int BulletinsSent, int NewBulletins, int InRotation, TimeSpan OnAir, IReadOnlyDictionary<string, int> Symbols, int DirectoryFrames, IReadOnlySet<string> Leftover);
 
     /// <summary>Bulletins arriving over <paramref name="days"/> days, <paramref name="perDay"/> a day, at the hours GB7RDG's arrive.</summary>
     private static List<(DateTimeOffset At, Bulletin Bulletin)> Arrivals(DateTimeOffset start, int days, int perDay, int seed = 2026)
@@ -143,11 +144,13 @@ public class BudgetTests(ITestOutputHelper output)
                 headEnd.Offer(arrivals[next].Bulletin, DateOnly.FromDateTime(arrivals[next].At.UtcDateTime));
                 next++;
             }
-            int inRotation = headEnd.InRotation(slot).Count;
+            var inRotation = headEnd.InRotation(slot);
+            var leftover = inRotation.Where(c => BroadcastScheduler.Leftover(c, slot, headEnd.Options.Budget!)).Select(c => c.Bid).ToHashSet(StringComparer.Ordinal);
             var (plan, waveform) = headEnd.Run(slot);
             var symbols = plan.Objects.Where(o => o.Bid is not null && o.Count > 0).ToDictionary(o => o.Bid!, o => o.Count, StringComparer.Ordinal);
             int fresh = symbols.Keys.Count(seen.Add);
-            results.Add(new SlotResult(slot, waveform.Mode, plan.BulletinFrames == 0 ? 0 : plan.Frames.Count, symbols.Count, fresh, inRotation, headEnd.OnAir(plan, waveform), symbols));
+            Assert.Equal(leftover.Count, plan.LeftoverBulletins);
+            results.Add(new SlotResult(slot, waveform.Mode, plan.BulletinFrames == 0 ? 0 : plan.Frames.Count, symbols.Count, fresh, inRotation.Count, headEnd.OnAir(plan, waveform), symbols, plan.BulletinFrames == 0 ? 0 : plan.Objects[0].Count, leftover));
         }
         return results;
     }
@@ -157,7 +160,7 @@ public class BudgetTests(ITestOutputHelper output)
         foreach (var r in results)
         {
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"{r.Slot.UtcDateTime:yyyy-MM-dd HH:mm} {r.Mode,-11} {r.Frames,4} frames, {r.BulletinsSent,3} of {r.InRotation,3} bulletins ({r.NewBulletins,2} first heard), {r.OnAir.TotalMinutes:0.0} min"));
+                $"{r.Slot.UtcDateTime:yyyy-MM-dd HH:mm} {r.Mode,-11} {r.Frames,4} frames, {r.BulletinsSent,3} of {r.InRotation,3} bulletins ({r.Leftover.Count,2} leftover, {r.NewBulletins,2} first heard), {r.OnAir.TotalMinutes:0.0} min"));
         }
     }
 
@@ -283,12 +286,12 @@ public class BudgetTests(ITestOutputHelper output)
 
         // The bulletins first carried that day: how much of each went out in all, and whether a
         // listener who hears only one, two or three of the slots it was in rotation for (from its
-        // first to its last), chosen at random, rebuilds it with a spare piece.
+        // first to its last before the leftover tier), chosen at random, rebuilds it with a spare piece.
         var first = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
         var lastSlot = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
         foreach (var r in results)
         {
-            foreach (string bid in r.Symbols.Keys)
+            foreach (string bid in r.Symbols.Keys.Where(b => !r.Leftover.Contains(b)))
             {
                 first.TryAdd(bid, r.Slot);
                 lastSlot[bid] = r.Slot;
@@ -324,7 +327,56 @@ public class BudgetTests(ITestOutputHelper output)
         else
         {
             // Every other slot at 600 bps carries half as much, so a listener needs a couple more.
-            Assert.True(rebuilt[4] > 0.9, $"five slots rebuild only {rebuilt[4]:P0}");
+            // (91% before the leftover tier; its bulletins, still listed, make the directory a
+            // little bigger, which on a day this full is a few frames less for the rest.)
+            Assert.True(rebuilt[4] > 0.85, $"five slots rebuild only {rebuilt[4]:P0}");
+        }
+    }
+
+    /// <summary>
+    /// The airtime the leftover tier costs, by season: GB7RDG's sample (about 25 bulletins a day,
+    /// which fills every slot) and a lighter one of 10 a day, closer to what GB7RDG's slots carried
+    /// in October 2026 (about two thirds of each slot used). Six days of each, the slots taking
+    /// turns on WN4 and WN3 as GB7RDG's do, the last three measured.
+    /// </summary>
+    /// <remarks>
+    /// Before the leftover tier, on the light sample: 7.17 min in an average slot in December,
+    /// 5.75 in October and 4.34 in June, each bulletin 4.5, 5.9 and 6.0 K in all. On the full one
+    /// every slot was already at its fill, 7.75 min.
+    /// </remarks>
+    [Theory]
+    [InlineData("2026-12-18", 25)]
+    [InlineData("2026-10-02", 25)]
+    [InlineData("2026-06-18", 25)]
+    [InlineData("2026-12-18", 10)]
+    [InlineData("2026-10-02", 10)]
+    [InlineData("2026-06-18", 10)]
+    public void Gb7rdgVolume_AirtimeBySeason_LeftoverTierUsesTheSpareAirtime(string start, int perDay)
+    {
+        using var headEnd = new HeadEnd("\"modes\": [\"ms110d-wn4\", \"ms110d-wn3\"]");
+        var rule = headEnd.Options.Budget!;
+        var from = DateTimeOffset.Parse(start + "T00:00:00Z", CultureInfo.InvariantCulture);
+        var results = Simulate(headEnd, from, 6, Arrivals(from, 6, perDay));
+        var measured = results.Where(r => r.Slot >= from.AddDays(3)).ToList();
+        double mean = measured.Average(r => r.OnAir.TotalMinutes);
+        double worst = measured.Max(r => r.OnAir.TotalMinutes);
+
+        // Bulletins first carried in the first three days, long retired by the end: how much of
+        // each went out in all, and how much of that before the leftover tier.
+        var gone = results.Where(r => r.Slot < from.AddDays(3)).SelectMany(r => r.Symbols.Keys).Distinct(StringComparer.Ordinal)
+            .Select(headEnd.Held).Where(c => c.FirstSlot is { } f && f < from.AddDays(3)).ToList();
+        double coverage = gone.Average(c => c.NextEsi / (double)c.Transfer.SourceSymbols);
+        double normal = gone.Average(c => results.Where(r => !r.Leftover.Contains(c.Bid)).Sum(r => r.Symbols.GetValueOrDefault(c.Bid)) / (double)c.Transfer.SourceSymbols);
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"from {start}, {perDay} a day: {measured.Count} daylight slots in 3 days, {measured.Count(r => r.Frames > 0)} keyed, {mean:0.00} min in an average one ({mean / headEnd.Config.FillLimit.TotalMinutes:P0} of the {headEnd.Config.FillLimit.TotalMinutes:0.0} min fill), {worst:0.00} in the worst; each bulletin {coverage:0.0} K in all, {normal:0.0} K of it before the leftover tier; {measured.Where(r => r.Frames > 0).Average(r => r.DirectoryFrames):0.0} directory frames and {measured.Average(r => r.Leftover.Count):0.0} leftover bulletins listed in an average slot"));
+
+        Assert.All(results, r => Assert.True(r.OnAir <= headEnd.Config.FillLimit, $"{r.Slot:yyyy-MM-dd HH:mm} on {r.Mode} would take {r.OnAir.TotalMinutes:0.00} min"));
+        Assert.All(gone, c => Assert.True(c.NextEsi <= BroadcastScheduler.RetireSymbols(c.Transfer.SourceSymbols, rule)));
+        if (perDay == 10 && start != "2026-12-18")
+        {
+            // Spare airtime goes to the leftover tier: well past 6 K on a light day, the slots fuller.
+            Assert.True(coverage > 7.5, $"{coverage:0.0} K");
+            Assert.True(mean > 5.9, $"{mean:0.00} min");
         }
     }
 
@@ -381,7 +433,16 @@ public class BudgetTests(ITestOutputHelper output)
         var reopened = new HeadEndStore(state.Path, Compression.Default, options);
         Assert.All(reopened.InRotation(morning.AddHours(1)), c => Assert.Equal(morning, c.FirstSlot));
         Assert.Equal(2, reopened.InRotation(morning.AddHours(35)).Count);
-        Assert.Empty(reopened.InRotation(morning.AddHours(36)));
+        // 36 hours on they are in the leftover tier, and 48 hours on they are gone.
+        var rule = options.Budget!;
+        Assert.All(reopened.InRotation(morning.AddHours(36)), c => Assert.True(BroadcastScheduler.Leftover(c, morning.AddHours(36), rule)));
+        Assert.Equal(2, reopened.InRotation(morning.AddHours(47)).Count);
+        // With nothing else in rotation the planner keys nothing, but says what is in the leftover tier.
+        var leftoverOnly = planner.Plan(morning.AddHours(37));
+        Assert.Empty(leftoverOnly.Frames);
+        Assert.Equal(2, leftoverOnly.BulletinsInRotation);
+        Assert.Equal(2, leftoverOnly.LeftoverInRotation);
+        Assert.Empty(reopened.InRotation(morning.AddHours(48)));
     }
 
     [Fact]
@@ -427,19 +488,26 @@ public class BudgetTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void RetiredBulletins_LeaveTheSlotsAndTheDirectory_AndAnEmptyRotationKeysNothing()
+    public void LeftoverBulletinsAlone_KeyNothing_ButStayListedUntilTheyRetire()
     {
-        // One small bulletin on a quiet day: 0.6 K a slot until 6 K, then gone.
+        // One bulletin on a quiet spell: 0.6 K a slot until 6 K, then the leftover tier, which
+        // never keys a slot on its own; it stays in rotation, and so in the directory, until 48
+        // hours after its first slot, then it is gone.
         using var headEnd = new HeadEnd();
         var day = new DateTimeOffset(2026, 10, 6, 0, 0, 0, TimeSpan.Zero);
-        var results = Simulate(headEnd, day, 2, [(day.AddHours(2), Bulletins.Make(61, 9000))]);
+        var results = Simulate(headEnd, day, 4, [(day.AddHours(2), Bulletins.Make(61, 9000))]);
         Print(results);
+        var rule = headEnd.Options.Budget!;
         var c = headEnd.Held(Bulletins.Make(61, 9000).Bid);
-        int retire = BroadcastScheduler.RetireSymbols(c.Transfer.SourceSymbols, headEnd.Options.Budget!);
-        Assert.Equal(retire, (int)c.NextEsi);
+        int k = c.Transfer.SourceSymbols;
+        // It may finish the slot in which it reached 6 K, up to its cap, but nothing more.
+        Assert.InRange((int)c.NextEsi, BroadcastScheduler.LeftoverSymbols(k, rule), BroadcastScheduler.LeftoverSymbols(k, rule) + BroadcastScheduler.CapSymbols(k, rule) - 1);
         var last = results.FindLastIndex(r => r.Frames > 0);
-        Assert.True(last < results.Count - 1, "it retired before the end");
+        Assert.True(last < results.Count - 1, "it stopped before the end");
         Assert.All(results.Skip(last + 1), r => Assert.Equal(0, r.Frames));
-        Assert.Equal(0, results[last + 1].InRotation);
+        var quiet = results.Skip(last + 1).ToList();
+        Assert.All(quiet.Where(r => r.Slot < c.FirstSlot!.Value.AddHours(48)), r => Assert.Equal(1, r.InRotation));
+        Assert.All(quiet.Where(r => r.Slot >= c.FirstSlot!.Value.AddHours(48)), r => Assert.Equal(0, r.InRotation));
+        Assert.Contains(quiet, r => r.InRotation == 0);
     }
 }

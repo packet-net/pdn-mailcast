@@ -38,13 +38,38 @@ public class SlotRunnerTests(ITestOutputHelper output)
 
         public List<int> Progress { get; } = [];
 
-        public SlotReport Run(int frames, Action? first = null) =>
+        public SlotReport Run(int frames, Action? first = null, int bulletins = 10, int leftover = 0) =>
             Time.Run(() =>
             {
                 // Anything started here runs on the virtual clock's own pump, as the slot does.
                 first?.Invoke();
-                return Runner.RunAsync(Day, [.. Enumerable.Range(0, frames).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None, Progress.Add);
+                return Runner.RunAsync(Day, [.. Enumerable.Range(0, frames).Select(i => FakeAirtime.Frame(i))], bulletins, CancellationToken.None, Progress.Add, leftoverInRotation: leftover);
             });
+    }
+
+    [Fact]
+    public void Run_CountsTheLeftoverTier_InTheJournalAndTheReport()
+    {
+        var rig = new Rig();
+        var report = rig.Run(20, bulletins: 15, leftover: 4);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(15, report.BulletinsInRotation);
+        Assert.Equal(4, report.LeftoverInRotation);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("20 frames for 15 bulletins (4 leftover) in ", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains(", 15 bulletins in rotation (4 leftover), tone sent", StringComparison.Ordinal));
+        Assert.All(rig.Journal.Lines, l => Assert.True(l.All(char.IsAscii), l));
+
+        // None in the leftover tier: the lines as they always were.
+        var plain = new Rig();
+        plain.Run(20, bulletins: 15);
+        Assert.Contains(plain.Journal.Lines, l => l.Contains(", 15 bulletins in rotation, tone sent", StringComparison.Ordinal));
+
+        // Nothing but the leftover tier: nothing keys, and the journal says why.
+        var only = new Rig();
+        var skipped = only.Run(0, bulletins: 3, leftover: 3);
+        Assert.Equal(SlotOutcome.Skipped, skipped.Outcome);
+        Assert.Contains(only.Journal.Lines, l => l.Contains("skipped: nothing to send: only 3 leftover bulletins, which go only in a slot that keys anyway", StringComparison.Ordinal));
+        Assert.Empty(only.Station.Keyups);
     }
 
     private static void AssertNothingKeyedOutsideTheLease(FakeStation station)

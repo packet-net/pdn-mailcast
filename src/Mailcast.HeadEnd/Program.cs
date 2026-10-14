@@ -160,7 +160,7 @@ public static partial class Program
             journal.Write(string.Create(CultureInfo.InvariantCulture,
                 $"airtime on {waveform.Mode}: {airtime.PerBurst.TotalSeconds:0.00} s a burst, {airtime.Burst([1003]).TotalSeconds - airtime.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)"));
             journal.Write(string.Create(CultureInfo.InvariantCulture,
-                $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {waveform.Mode}, about {runner.Airtime(plan.Frames, bursts, airtime).TotalMinutes:0.0} min of bursts, {runner.Model(airtime).Slot([.. plan.Frames.Select(f => runner.Ax25(f).Length)], bursts).TotalMinutes:0.0} min on the air with the tone and idents{(scheduleOptions.Budget is null ? "" : string.Create(CultureInfo.InvariantCulture, $" (filled to {config.FillLimit.TotalMinutes:0.0})"))}"));
+                $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation{(plan.LeftoverInRotation > 0 ? string.Create(CultureInfo.InvariantCulture, $" ({plan.LeftoverInRotation} leftover)") : "")}, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {waveform.Mode}, about {runner.Airtime(plan.Frames, bursts, airtime).TotalMinutes:0.0} min of bursts, {runner.Model(airtime).Slot([.. plan.Frames.Select(f => runner.Ax25(f).Length)], bursts).TotalMinutes:0.0} min on the air with the tone and idents{(scheduleOptions.Budget is null ? "" : string.Create(CultureInfo.InvariantCulture, $" (filled to {config.FillLimit.TotalMinutes:0.0})"))}"));
 
             if (options.GetValueOrDefault("--wav") is string wavPath)
             {
@@ -322,7 +322,7 @@ public static partial class Program
             return $"carrying: fixed shares {string.Join(", ", options.SlotShares.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture)))} K in slots {string.Join(", ", options.SlotOffsets)} after the first; {modes}";
         }
         return string.Create(CultureInfo.InvariantCulture,
-            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, retired after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h; {modes}");
+            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h only in airtime nothing else wants (the leftover tier), retired after {Math.Max(BroadcastScheduler.LeftoverCoverage, rule.RetireCoverage):0.##} K or {BroadcastScheduler.RetireAge(rule).TotalHours:0.#} h; {modes}");
     }
 
     private static async Task<int> RunNowAsync(HeadEndConfig config)
