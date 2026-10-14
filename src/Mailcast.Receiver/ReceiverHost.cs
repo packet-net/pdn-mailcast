@@ -684,6 +684,14 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The longest --decode waits for the channel measurement once the mail is delivered.</summary>
     internal static readonly TimeSpan DecodeMeasureWait = TimeSpan.FromMinutes(2);
 
+    /// <summary>Whether going from <paramref name="a"/> to <paramref name="b"/> restarts the audio: its source, or when it listens.</summary>
+    private static bool AudioSettingsDiffer(ReceiverConfig a, ReceiverConfig b) =>
+        !string.Equals(a.Audio, b.Audio, StringComparison.Ordinal)
+        || !string.Equals(a.SlotUtc, b.SlotUtc, StringComparison.Ordinal)
+        || a.EveryMinutes != b.EveryMinutes
+        || a.Daylight != b.Daylight
+        || a.DialKHz != b.DialKHz;
+
     /// <summary>
     /// Puts a new configuration in force: the BBS settings at once, and the audio pipeline is
     /// restarted if its source changed.
@@ -693,11 +701,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         CancellationTokenSource? restart = null;
         lock (_gate)
         {
-            bool audioChanged = !string.Equals(_config.Audio, config.Audio, StringComparison.Ordinal)
-                || !string.Equals(_config.SlotUtc, config.SlotUtc, StringComparison.Ordinal)
-                || _config.EveryMinutes != config.EveryMinutes
-                || _config.Daylight != config.Daylight
-                || _config.DialKHz != config.DialKHz;
+            bool audioChanged = AudioSettingsDiffer(_config, config);
             _config = config;
             Intake.Sources = config.AcceptedSources;
             // A running pipeline that carries on keeps its dial (pdn-soundmodem's, if it said one).
@@ -934,17 +938,27 @@ public sealed class ReceiverHost : IAsyncDisposable
                 : soundModem ? SoundModemRetry[Math.Min(soundModemFailures++, SoundModemRetry.Count - 1)]
                 : AudioRetry;
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
-            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
             // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short; so
-            // it does for SDRconnect, whose address is typed in and so often corrected.
+            // it does for SDRconnect, whose address is typed in and so often corrected. Armed
+            // before the failure is announced, so a correction made the moment it is seen (the
+            // page shows it, then the address is fixed) finds a wait to end, and checked against
+            // the settings this attempt started with, so one saved while it was failing (when
+            // there was no wait yet to end) is not lost either: either way, no 30 s for nothing.
             bool endedBySetting = soundModem || pipeline.Source.Kind == AudioSourceKind.SdrConnect;
+            bool alreadyChanged = false;
             if (endedBySetting)
             {
                 lock (_gate)
                 {
                     _audioRestart = restart;
+                    alreadyChanged = AudioSettingsDiffer(config, _config);
                 }
             }
+            if (alreadyChanged)
+            {
+                restart.Cancel();
+            }
+            Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
             await DelayAsync(wait, endedBySetting ? restart.Token : cancellation).ConfigureAwait(false);
             lock (_gate)
             {
