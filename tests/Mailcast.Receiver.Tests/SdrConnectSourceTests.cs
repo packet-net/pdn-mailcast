@@ -127,6 +127,52 @@ public class SdrConnectSourceTests
         await run;
     }
 
+    [Fact]
+    public async Task ACorrectedAddress_SavedTheMomentTheFailureIsAnnounced_IsNotLost()
+    {
+        // The worst case of the one above, and what made it flaky on a busy machine: the address
+        // corrected from inside the "failed" announcement itself, before the receiver has gone
+        // on to wait. The receiver once announced the failure first and armed the wait's early
+        // end after, so a correction in between found nothing to end and waited the full 30 s.
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        int closed = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        var page = new TcpListener(IPAddress.Loopback, 0);
+        page.Start();
+        int pagePort = ((IPEndPoint)page.LocalEndpoint).Port;
+        page.Stop();
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig
+        {
+            Audio = $"sdrconnect:127.0.0.1:{closed}",
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Web = new WebSettings { Port = pagePort },
+        };
+        await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        int corrected = 0;
+        host.AudioChanged += c =>
+        {
+            if (c.Phase == AudioPhase.Failed && Interlocked.Exchange(ref corrected, 1) == 0)
+            {
+                host.Reconfigure(config with { Audio = sdr.Audio });
+            }
+            conditions.Writer.TryWrite(c);
+        };
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        await PhaseAsync(conditions, AudioPhase.Failed, TimeSpan.FromSeconds(30));
+        await PhaseAsync(conditions, AudioPhase.Listening, TimeSpan.FromSeconds(10));
+        Assert.True(sdr.Connections >= 1);
+
+        await stop.CancelAsync();
+        await run;
+    }
+
     private static async Task<AudioCondition> PhaseAsync(System.Threading.Channels.Channel<AudioCondition> conditions, AudioPhase phase, TimeSpan within)
     {
         using var giveUp = new CancellationTokenSource(within);
