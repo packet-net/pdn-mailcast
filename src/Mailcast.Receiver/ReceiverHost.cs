@@ -400,8 +400,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                         closes = early.At;
                     }
                     return new HookWindow(opens, closes, slot);
-                case AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem:
-                    // pdn-soundmodem's radio, like a sound card's, is heard all the time.
+                case AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect:
+                    // pdn-soundmodem's radio and SDRconnect's, like a sound card's, are heard all the time.
                     return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
                 default:
                     return null;
@@ -935,15 +935,17 @@ public sealed class ReceiverHost : IAsyncDisposable
                 : AudioRetry;
             _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
             Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
-            // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short.
-            if (soundModem)
+            // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short; so
+            // it does for SDRconnect, whose address is typed in and so often corrected.
+            bool endedBySetting = soundModem || pipeline.Source.Kind == AudioSourceKind.SdrConnect;
+            if (endedBySetting)
             {
                 lock (_gate)
                 {
                     _audioRestart = restart;
                 }
             }
-            await DelayAsync(wait, soundModem ? restart.Token : cancellation).ConfigureAwait(false);
+            await DelayAsync(wait, endedBySetting ? restart.Token : cancellation).ConfigureAwait(false);
             lock (_gate)
             {
                 _audioRestart = null;

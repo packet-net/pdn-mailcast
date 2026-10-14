@@ -3,11 +3,12 @@
   //   "ubersdr:wessex.zapto.org"       a web receiver; the receiver tunes it itself
   //   "plughw:CARD=Device,DEV=0"       a sound card on your radio, set to USB on "dialKHz"
   //   "soundmodem"                     the pdn-soundmodem on this machine ("soundmodem:PORT" if not on 8107)
+  //   "sdrconnect:192.168.1.20"        an SDRplay radio in SDRconnect on another computer; the receiver tunes it
   //   "wav:/path/to/recording.wav"     a recording, for testing
   "audio": "ubersdr:wessex.zapto.org",
 
   // Where your radio is, as a 4 or 6 character Maidenhead locator, for a sound card,
-  // soundmodem or a recording. It names the radio path's hops and goes in the daily report.
+  // soundmodem, sdrconnect or a recording. It names the radio path's hops and goes in the daily report.
   // A web SDR says where it is itself, so with one this is not used.
   // "locator": "IO91lk",
 

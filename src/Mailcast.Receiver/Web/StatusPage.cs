@@ -1010,15 +1010,17 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>
     /// How the page judges the input level: <c>target</c> for a sound card, whose level you set,
     /// so it says when peaks are outside -18 to -9 dBFS; <c>clippingOnly</c> for a web SDR or a
-    /// recording, whose level is not yours to set and which the modem copes with unless it clips;
+    /// recording, whose level is not yours to set and which the modem copes with unless it clips
+    /// (SDRconnect's IQ too, demodulated here at the level it arrives at);
     /// and for pdn-soundmodem, whose level is set there, not here.
     /// </summary>
     internal static string LevelAdvice(string audio) => AudioSource.Parse(audio).IsSoundCard ? "target" : "clippingOnly";
 
-    /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c>, <c>soundModem</c> or <c>recording</c>.</summary>
+    /// <summary>The audio source's kind, as the page names it: <c>webSdr</c>, <c>soundCard</c>, <c>soundModem</c>, <c>sdrConnect</c> or <c>recording</c>.</summary>
     internal static string AudioKind(string audio) => AudioSource.Parse(audio).Kind switch
     {
         AudioSourceKind.UberSdr => "webSdr",
+        AudioSourceKind.SdrConnect => "sdrConnect",
         AudioSourceKind.Wav => "recording",
         AudioSourceKind.SoundModem => "soundModem",
         _ => "soundCard",
