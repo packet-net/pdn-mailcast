@@ -1,8 +1,26 @@
 #!/bin/sh
 set -e
 
-if [ -d /run/systemd/system ] && [ "$1" = "remove" ] && command -v deb-systemd-invoke >/dev/null; then
-    deb-systemd-invoke stop pdn-mailcast-receiver.service >/dev/null || true
+UNIT=pdn-mailcast-receiver.service
+# Set while an upgrade has the service stopped, so postinst knows to start it again.
+MARK=/run/pdn-mailcast-receiver.upgrade-was-running
+
+if [ -d /run/systemd/system ] && command -v deb-systemd-invoke >/dev/null; then
+    case "$1" in
+        remove)
+            deb-systemd-invoke stop "$UNIT" >/dev/null || true
+            ;;
+        upgrade)
+            # Stop before dpkg replaces the files, not after: a .NET service still running
+            # loads some assemblies lazily, and one shutting down after the swap can find a
+            # different version of a library it needs (0.9.1 to 0.12.0 crashed in
+            # FlexMonitor.CloseAsync looking for its old M0LTE.Flex). postinst starts it again.
+            if systemctl --quiet is-active "$UNIT" 2>/dev/null; then
+                : > "$MARK"
+                deb-systemd-invoke stop "$UNIT" >/dev/null || true
+            fi
+            ;;
+    esac
 fi
 
 exit 0

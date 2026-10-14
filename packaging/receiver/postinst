@@ -38,7 +38,14 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
         # Not started on a first install: the BBS has to be set up first. An upgrade restarts
         # a receiver that was running, so it picks up the new binary.
         if [ -n "${2:-}" ] && command -v deb-systemd-invoke >/dev/null; then
-            deb-systemd-invoke try-restart "$UNIT" >/dev/null || true
+            if [ -e /run/pdn-mailcast-receiver.upgrade-was-running ]; then
+                # Stopped by the old version's prerm for the upgrade: start it again.
+                rm -f /run/pdn-mailcast-receiver.upgrade-was-running
+                deb-systemd-invoke start "$UNIT" >/dev/null || true
+            else
+                # From a version whose prerm left it running: restart it if it still is.
+                deb-systemd-invoke try-restart "$UNIT" >/dev/null || true
+            fi
         fi
     fi
 fi
