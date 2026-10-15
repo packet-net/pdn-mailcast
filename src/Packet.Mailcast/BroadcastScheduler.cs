@@ -34,12 +34,21 @@ public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnl
 /// next symbol to whichever bulletin in rotation has the least coverage and room left, so new
 /// bulletins come first and the rest share what is left evenly. No bulletin gets more than
 /// <see cref="SlotCap"/> K in one slot, which spreads it over the day's slots rather than
-/// spending a whole slot on it, and it leaves the rotation once it has had
-/// <see cref="RetireCoverage"/> K in all, or <see cref="RetireAfter"/> after its first slot,
-/// whichever comes first. So that a listener who hears only a few slots still rebuilds each
+/// spending a whole slot on it. So that a listener who hears only a few slots still rebuilds each
 /// bulletin, every slot first gives each bulletin in rotation a floor, the least covered first,
 /// enough that any <see cref="SpreadSlots"/> slots carry K and a spare piece; only then does
 /// the rest of the budget go, again the least covered first, up to the cap.
+/// <para>
+/// Once a bulletin has had <see cref="RetireCoverage"/> K in all, or <see cref="RetireAfter"/> has
+/// passed since its first slot, whichever comes first, it moves to the leftover tier: it gets only
+/// the airtime left once every other bulletin in rotation has had all a slot will give it, the
+/// least covered first and still up to the cap, and only in a slot that sends pieces of some
+/// other bulletin (a one-off slot with nothing else sends the directory alone), after all of
+/// them, so a slot cut short loses the leftover tier's pieces first. It retires
+/// for good at <see cref="BroadcastScheduler.LeftoverCoverage"/> K or
+/// <see cref="BroadcastScheduler.LeftoverHours"/> hours after its first slot (or at this rule's own
+/// limits, if they are later), and only then leaves the slots and the directory.
+/// </para>
 /// </remarks>
 public sealed record BudgetRule
 {
@@ -52,10 +61,10 @@ public sealed record BudgetRule
     /// <summary>The most of one bulletin a slot carries, as a multiple of its K (at least one symbol).</summary>
     public double SlotCap { get; init; } = 0.6;
 
-    /// <summary>A bulletin retires once this many K of it have been sent in all.</summary>
+    /// <summary>A bulletin moves to the leftover tier once this many K of it have been sent in all.</summary>
     public double RetireCoverage { get; init; } = 6.0;
 
-    /// <summary>A bulletin retires this long after its first slot, whatever its coverage.</summary>
+    /// <summary>A bulletin moves to the leftover tier this long after its first slot, whatever its coverage.</summary>
     public TimeSpan RetireAfter { get; init; } = TimeSpan.FromHours(36);
 }
 
@@ -218,6 +227,12 @@ public sealed class SlotBroadcast
     /// <summary>The slot's day, UTC.</summary>
     public DateOnly Date => DateOnly.FromDateTime(Slot.UtcDateTime);
 
+    /// <summary>
+    /// How many of the bulletins in <see cref="Directory"/> are in the budget rule's leftover tier
+    /// (<see cref="BroadcastScheduler.Leftover"/>): listed, but sent only in airtime nothing else wants.
+    /// </summary>
+    public int LeftoverBulletins { get; internal init; }
+
     /// <summary>The objects in rotation in this slot.</summary>
     public BroadcastDirectory Directory { get; }
 
@@ -274,6 +289,20 @@ public sealed class SlotBroadcast
 /// </remarks>
 public static class BroadcastScheduler
 {
+    /// <summary>
+    /// Under the budget rule, a bulletin in the leftover tier retires for good once this many K of
+    /// it have been sent in all: about one frame in ten heard over its time on the air rebuilds it.
+    /// Fixed; a <see cref="BudgetRule.RetireCoverage"/> above it is used instead.
+    /// </summary>
+    public const double LeftoverCoverage = 10.0;
+
+    /// <summary>
+    /// Under the budget rule, a bulletin in the leftover tier retires for good this many hours after
+    /// its first slot, whatever its coverage. Fixed; a <see cref="BudgetRule.RetireAfter"/> above it
+    /// is used instead.
+    /// </summary>
+    public const int LeftoverHours = 48;
+
     /// <summary>How many symbols an object of K source symbols gets in each of its carrying slots.</summary>
     public static int[] SymbolsPerCarrying(int sourceSymbols, ScheduleOptions options)
     {
@@ -325,7 +354,8 @@ public static class BroadcastScheduler
 
     /// <summary>
     /// Whether a bulletin is in rotation in a slot: carried in it, or still owed from a carrying.
-    /// Under the budget rule, whether it has not yet retired (<see cref="Retired"/>).
+    /// Under the budget rule, whether it has not yet retired for good (<see cref="Retired"/>), the
+    /// leftover tier included.
     /// </summary>
     public static bool InRotation(CarriedBulletin carried, DateTimeOffset slot, ScheduleOptions options)
     {
@@ -347,12 +377,11 @@ public static class BroadcastScheduler
     }
 
     /// <summary>
-    /// Whether a bulletin has left the rotation under the budget rule: it has had
-    /// <see cref="BudgetRule.RetireCoverage"/> K in all, or its first slot was
-    /// <see cref="BudgetRule.RetireAfter"/> or more before <paramref name="slot"/>. One never
-    /// carried has no age yet, so a bulletin a head end took in but never sent under this rule
-    /// (one an older head end sent without recording its first slot, say) is in rotation from its
-    /// next ESI on.
+    /// Whether a bulletin has left the rotation for good under the budget rule: it has had
+    /// <see cref="RetireSymbols"/> in all, or its first slot was <see cref="RetireAge"/> or more
+    /// before <paramref name="slot"/>. One never carried has no age yet, so a bulletin a head end
+    /// took in but never sent under this rule (one an older head end sent without recording its
+    /// first slot, say) is in rotation from its next ESI on.
     /// </summary>
     public static bool Retired(CarriedBulletin carried, DateTimeOffset slot, BudgetRule rule)
     {
@@ -362,15 +391,57 @@ public static class BroadcastScheduler
         {
             return true;
         }
-        return carried.FirstSlot is DateTimeOffset first && slot - first >= rule.RetireAfter;
+        return carried.FirstSlot is DateTimeOffset first && slot - first >= RetireAge(rule);
     }
 
-    /// <summary>How many symbols in all a bulletin of K source symbols retires after.</summary>
+    /// <summary>
+    /// Whether a bulletin is in the budget rule's leftover tier in a slot: not retired for good, but
+    /// it has had <see cref="LeftoverSymbols"/> in all, or its first slot was
+    /// <see cref="BudgetRule.RetireAfter"/> or more before <paramref name="slot"/>. It is still
+    /// listed in the directory, but gets only airtime that no other bulletin in rotation wants.
+    /// </summary>
+    public static bool Leftover(CarriedBulletin carried, DateTimeOffset slot, BudgetRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(carried);
+        ArgumentNullException.ThrowIfNull(rule);
+        if (Retired(carried, slot, rule))
+        {
+            return false;
+        }
+        return carried.NextEsi >= LeftoverSymbols(carried.Transfer.SourceSymbols, rule)
+            || (carried.FirstSlot is DateTimeOffset first && slot - first >= rule.RetireAfter);
+    }
+
+    /// <summary>How many symbols in all a bulletin of K source symbols moves to the leftover tier after: <see cref="BudgetRule.RetireCoverage"/> K.</summary>
+    public static int LeftoverSymbols(int sourceSymbols, BudgetRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        return Symbols(rule.RetireCoverage, sourceSymbols);
+    }
+
+    /// <summary>
+    /// How many symbols in all a bulletin of K source symbols retires for good after:
+    /// <see cref="LeftoverCoverage"/> K, or <see cref="BudgetRule.RetireCoverage"/> K if that is more.
+    /// </summary>
     public static int RetireSymbols(int sourceSymbols, BudgetRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        return Math.Max(1, (int)Math.Ceiling((rule.RetireCoverage * sourceSymbols) - 1e-9));
+        return Symbols(Math.Max(LeftoverCoverage, rule.RetireCoverage), sourceSymbols);
     }
+
+    /// <summary>
+    /// How long after its first slot a bulletin retires for good, whatever its coverage:
+    /// <see cref="LeftoverHours"/>, or <see cref="BudgetRule.RetireAfter"/> if that is longer.
+    /// </summary>
+    public static TimeSpan RetireAge(BudgetRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        var leftover = TimeSpan.FromHours(LeftoverHours);
+        return rule.RetireAfter > leftover ? rule.RetireAfter : leftover;
+    }
+
+    private static int Symbols(double coverage, int sourceSymbols) =>
+        Math.Max(1, (int)Math.Ceiling((coverage * sourceSymbols) - 1e-9));
 
     /// <summary>The floor a slot gives a bulletin of K source symbols before any gets more: <see cref="BudgetRule.SpreadSlots"/>.</summary>
     public static int FloorSymbols(int sourceSymbols, BudgetRule rule)
@@ -505,7 +576,7 @@ public static class BroadcastScheduler
             carried.Add(new CarriedBulletin(bulletin.Bid, bulletin.Title, serialized.Length, firstSeen, transfer, first, firstSlot));
         }
         var plan = Plan(carried, slot, seed, compression, options);
-        return new SlotBroadcast(plan.Slot, plan.Directory, plan.Objects, plan.Frames, skipped);
+        return new SlotBroadcast(plan.Slot, plan.Directory, plan.Objects, plan.Frames, skipped) { LeftoverBulletins = plan.LeftoverBulletins };
     }
 
     /// <summary>Plans a day's slot at midnight UTC: <see cref="Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?)"/>.</summary>
@@ -579,6 +650,7 @@ public static class BroadcastScheduler
             .ToList();
 
         var bulletins = new List<(CarriedBulletin Carried, int Index)>();
+        var leftover = new List<bool>();
         var entries = new List<DirectoryEntry>();
         var takenBids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var takenIds = new HashSet<ulong>();
@@ -589,6 +661,7 @@ public static class BroadcastScheduler
                 continue;
             }
             bulletins.Add((c, index));
+            leftover.Add(options.Budget is { } r && Leftover(c, slot, r));
             entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind));
         }
 
@@ -598,10 +671,11 @@ public static class BroadcastScheduler
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 
         int[] counts;
+        int[] main; // of each count, the pieces from before the leftover tier's turn, which go first
         anyRoom = false;
         if (options.Budget is { } rule)
         {
-            counts = Fill(bulletins.Select(b => b.Carried).ToList(), directoryObject, options, rule, budget!, extras, out anyRoom);
+            counts = Fill(bulletins.Select(b => b.Carried).ToList(), leftover, directoryObject, options, rule, budget!, extras, out anyRoom, out main);
         }
         else
         {
@@ -616,12 +690,13 @@ public static class BroadcastScheduler
                 uint due = (uint)DueAt(c.Transfer.SourceSymbols, c.FirstSlot ?? slot, slot, options);
                 counts[i] = c.NextEsi >= due ? 0 : (int)(due - c.NextEsi);
             }
+            main = counts;
         }
 
         int? directoryCap = null;
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, counts, seed, options, extras, directoryCap);
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, counts, main, seed, options, extras, leftover.Count(l => l), directoryCap);
             if (budget is null || options.Budget is null
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {
@@ -631,16 +706,18 @@ public static class BroadcastScheduler
             {
                 // The fill counts frames in a different order from the one they go in, which only
                 // matters when objects have different symbol sizes: if the real order runs over,
-                // take a symbol from the best covered bulletin and try again.
+                // take a symbol from the best covered bulletin and try again, a piece from the
+                // leftover tier's turn first, so that it never costs another bulletin a piece.
                 int most = -1;
                 for (int i = 0; i < counts.Length; i++)
                 {
-                    if (counts[i] > 0 && (most < 0 || Coverage(bulletins[i].Carried, counts[i]) > Coverage(bulletins[most].Carried, counts[most])))
+                    if (counts[i] > 0 && (most < 0 || (counts[i] > main[i], leftover[i], Coverage(bulletins[i].Carried, counts[i])).CompareTo((counts[most] > main[most], leftover[most], Coverage(bulletins[most].Carried, counts[most]))) > 0))
                     {
                         most = i;
                     }
                 }
                 counts[most]--;
+                main[most] = Math.Min(main[most], counts[most]);
                 continue;
             }
             // No bulletin frames left to give up (none in rotation, or the fill already gave up
@@ -714,21 +791,30 @@ public static class BroadcastScheduler
     /// The budget rule's share of the slot for each bulletin, in order: one symbol at a time to the
     /// bulletin with the least coverage that still has room, ties to the first in order, until the
     /// next symbol would take the slot over budget. Room is first each bulletin's floor
-    /// (<see cref="FloorSymbols"/>), then its slot cap, and never past its retiring coverage.
+    /// (<see cref="FloorSymbols"/>), then its slot cap, never past <see cref="LeftoverSymbols"/>,
+    /// and none at all for one in the leftover tier. Only when every bulletin has had all that
+    /// room, and some of them something, does the leftover tier get a turn: again up to the slot
+    /// cap, now never past <see cref="RetireSymbols"/>, which also lets a bulletin that reached its
+    /// leftover coverage in this slot carry on. So the leftover tier never takes a piece from
+    /// another bulletin, and never gets pieces in a slot that has none of any other. <paramref name="main"/> is each count
+    /// before the leftover tier's turn: those pieces go first in the slot (<see cref="Build"/>).
     /// </summary>
-    private static int[] Fill(List<CarriedBulletin> bulletins, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, out bool anyRoom)
+    private static int[] Fill(List<CarriedBulletin> bulletins, List<bool> leftover, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, out bool anyRoom, out int[] main)
     {
         var counts = new int[bulletins.Count];
         int[] extraLengths = [.. extras.Select(f => f.ToBytes().Length)];
         var room = new int[bulletins.Count];
+        var spare = new int[bulletins.Count];
         var lengths = new int[bulletins.Count];
         var floor = new int[bulletins.Count];
         for (int i = 0; i < bulletins.Count; i++)
         {
             var c = bulletins[i];
-            int left = RetireSymbols(c.Transfer.SourceSymbols, rule) - (int)Math.Min(c.NextEsi, int.MaxValue);
-            room[i] = Math.Clamp(left, 0, CapSymbols(c.Transfer.SourceSymbols, rule));
-            floor[i] = Math.Min(room[i], FloorSymbols(c.Transfer.SourceSymbols, rule));
+            int k = c.Transfer.SourceSymbols;
+            int sent = (int)Math.Min(c.NextEsi, int.MaxValue);
+            room[i] = leftover[i] ? 0 : Math.Clamp(LeftoverSymbols(k, rule) - sent, 0, CapSymbols(k, rule));
+            spare[i] = Math.Clamp(RetireSymbols(k, rule) - sent, 0, CapSymbols(k, rule));
+            floor[i] = Math.Min(room[i], FloorSymbols(k, rule));
             lengths[i] = c.Transfer.Frame(c.NextEsi).ToBytes().Length;
         }
         int directoryLength = directory.Frame(0).ToBytes().Length;
@@ -743,8 +829,17 @@ public static class BroadcastScheduler
             return budget.Airtime(all) <= budget.Limit;
         }
         anyRoom = room.Any(r => r > 0);
-        foreach (var limit in new[] { floor, room })
+        main = counts;
+        foreach (var limit in new[] { floor, room, spare })
         {
+            if (limit == spare)
+            {
+                if (counts.All(n => n == 0))
+                {
+                    break; // a slot with nothing but the leftover tier to send keys nothing
+                }
+                main = (int[])counts.Clone();
+            }
             var queue = new PriorityQueue<int, (double Coverage, int Order)>();
             for (int i = 0; i < bulletins.Count; i++)
             {
@@ -770,8 +865,13 @@ public static class BroadcastScheduler
         return counts;
     }
 
-    /// <summary>Makes the slot's frames from each bulletin's count: the directory's share, then the interleaving.</summary>
-    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, int[] counts, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int? directoryFramesCap = null)
+    /// <summary>
+    /// Makes the slot's frames from each bulletin's count: the directory's share, then the
+    /// interleaving. The first <paramref name="main"/> pieces of each bulletin are interleaved over
+    /// the slot's first part and the rest (the leftover tier's turn) after them all, so a slot cut
+    /// short loses the leftover tier's pieces before any other.
+    /// </summary>
+    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, int[] counts, int[] main, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null)
     {
         var scheduled = new List<ScheduledObject>();
         for (int i = 0; i < bulletins.Count; i++)
@@ -785,16 +885,18 @@ public static class BroadcastScheduler
         int directoryFrames = Math.Max(1, Math.Min(DirectoryFrames(directoryObject, bulletinFrames, options), directoryFramesCap ?? int.MaxValue));
         scheduled.Insert(0, new ScheduledObject(directoryObject, 0, directoryFirst, directoryFrames));
 
-        // Interleave the bulletins by position (i + u) / n.
+        // Interleave the bulletins by position (i + u) / n, the leftover tier's turn after
+        // everything else: its pieces of an object by 1 + (i - m + u) / (n - m), m the rest.
         var rng = new Random(seed);
         var order = new List<(double Position, int Object, int Index)>();
         for (int j = 1; j < scheduled.Count; j++)
         {
             double phase = rng.NextDouble();
             int n = scheduled[j].Count;
+            int m = Math.Min(main[j - 1], n);
             for (int i = 0; i < n; i++)
             {
-                order.Add(((i + phase) / n, j, i));
+                order.Add((i < m ? (i + phase) / m : 1 + ((i - m + phase) / (n - m)), j, i));
             }
         }
         order.Sort((a, b) =>
@@ -831,9 +933,9 @@ public static class BroadcastScheduler
                 int place = 1 + (int)((((2L * i) + 1) * before) / (2L * extras.Count));
                 frames.Insert(Math.Min(place, frames.Count), extras[i]);
             }
-            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras);
+            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras) { LeftoverBulletins = leftoverBulletins };
         }
-        return new SlotBroadcast(slot, directory, scheduled, frames, []);
+        return new SlotBroadcast(slot, directory, scheduled, frames, []) { LeftoverBulletins = leftoverBulletins };
     }
 
     /// <summary>Midnight UTC at the start of a day.</summary>

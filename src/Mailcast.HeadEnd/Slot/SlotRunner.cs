@@ -118,10 +118,11 @@ public sealed class SlotRunner
     /// The waveform the slot goes out on, which the modem is switched to first when it says so;
     /// null for the configured one, left as it is.
     /// </param>
-    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null, SlotWaveform? waveform = null)
+    /// <param name="leftoverInRotation">How many of <paramref name="bulletinsInRotation"/> are in the budget rule's leftover tier, for the log and the report.</param>
+    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null, SlotWaveform? waveform = null, int leftoverInRotation = 0)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        using var run = new Run(this, slot, frames, bulletinsInRotation, queued, requestedBy, waveform);
+        using var run = new Run(this, slot, frames, bulletinsInRotation, leftoverInRotation, queued, requestedBy, waveform);
         return await run.ExecuteAsync(cancellation);
     }
 
@@ -180,8 +181,13 @@ public sealed class SlotRunner
     private static string Degrees(double c) => c.ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>One slot's state.</summary>
-    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, Action<int>? onQueued, string? requestedBy, SlotWaveform? waveform) : IDisposable
+    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, int leftover, Action<int>? onQueued, string? requestedBy, SlotWaveform? waveform) : IDisposable
     {
+        /// <summary>"15 bulletins", or "15 bulletins (4 leftover)" with some in the leftover tier.</summary>
+        private string Bulletins(string after = "") => leftover > 0
+            ? string.Create(CultureInfo.InvariantCulture, $"{bulletins} bulletins{after} ({leftover} leftover)")
+            : string.Create(CultureInfo.InvariantCulture, $"{bulletins} bulletins{after}");
+
         private readonly IAirtime _airtime = waveform?.Airtime ?? owner._airtime;
         private readonly string _mode = waveform?.Mode ?? owner._settings.Mode;
         private TimeSpan? _estimate;
@@ -235,13 +241,15 @@ public sealed class SlotRunner
             }
             if (frames.Count == 0)
             {
-                return Finish(SlotOutcome.Skipped, "nothing to send");
+                return Finish(SlotOutcome.Skipped, leftover > 0 && leftover == bulletins
+                    ? $"nothing to send: only {leftover} leftover bulletins, which go only in a slot that sends other bulletins too"
+                    : "nothing to send");
             }
             var model = owner.Model(_airtime);
             var lengths = owner.Lengths(frames);
             var sizes = model.BurstSizes(lengths);
             _estimate = model.Slot(lengths, sizes);
-            Say($"starting at {Clock(_start)}Z, {frames.Count} frames for {bulletins} bulletins in {sizes.Count} bursts on {_mode}, about {Minutes(_estimate.Value)} min on the air with the tone and idents");
+            Say($"starting at {Clock(_start)}Z, {frames.Count} frames for {Bulletins()} in {sizes.Count} bursts on {_mode}, about {Minutes(_estimate.Value)} min on the air with the tone and idents");
 
             if (S.RequireClockSync)
             {
@@ -850,6 +858,7 @@ public sealed class SlotRunner
                 FramesQueued = _queued,
                 Bursts = _bursts,
                 BulletinsInRotation = bulletins,
+                LeftoverInRotation = leftover,
                 ToneSent = _toneSent,
                 ProbeSent = _probeId is not null,
                 ProbeId = _probeId,
@@ -866,7 +875,7 @@ public sealed class SlotRunner
             switch (outcome)
             {
                 case SlotOutcome.Completed:
-                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {bulletins} bulletins in rotation, tone {(_toneSent ? "sent" : "not sent")}, probe {(_probeId is not null ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
+                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {Bulletins(" in rotation")}, tone {(_toneSent ? "sent" : "not sent")}, probe {(_probeId is not null ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
                     break;
                 case SlotOutcome.Aborted:
                     Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode} ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");

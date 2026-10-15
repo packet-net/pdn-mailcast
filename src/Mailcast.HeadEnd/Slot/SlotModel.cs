@@ -159,6 +159,9 @@ public sealed record SlotReport
 
     public int BulletinsInRotation { get; init; }
 
+    /// <summary>How many of <see cref="BulletinsInRotation"/> were in the budget rule's leftover tier: listed, but sent only in airtime nothing else wanted.</summary>
+    public int LeftoverInRotation { get; init; }
+
     public bool ToneSent { get; init; }
 
     /// <summary>True when the channel probe followed the tone, all of it.</summary>

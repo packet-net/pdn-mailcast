@@ -121,30 +121,201 @@ public class BudgetSchedulerTests
     }
 
     [Fact]
-    public void Retire_AfterSixK_OrThirtySixHoursFromTheFirstSlot()
+    public void Leftover_AfterSixK_OrThirtySixHours_RetiredAfterTenK_OrFortyEightHours()
     {
         var rule = Options.Budget!;
         var c = Held(6, 6000);
         int k = c.Transfer.SourceSymbols;
-        Assert.False(BroadcastScheduler.Retired(c, Slot, rule));
-        Assert.False(BroadcastScheduler.Retired(c with { NextEsi = (uint)(6 * k) - 1, FirstSlot = Slot }, Slot, rule));
-        Assert.True(BroadcastScheduler.Retired(c with { NextEsi = (uint)(6 * k), FirstSlot = Slot }, Slot, rule));
-        Assert.False(BroadcastScheduler.Retired(c with { NextEsi = 3, FirstSlot = Slot.AddHours(-35) }, Slot, rule));
-        Assert.True(BroadcastScheduler.Retired(c with { NextEsi = 3, FirstSlot = Slot.AddHours(-36) }, Slot, rule));
+        Assert.Equal(6 * k, BroadcastScheduler.LeftoverSymbols(k, rule));
+        Assert.Equal(10 * k, BroadcastScheduler.RetireSymbols(k, rule));
+        Assert.Equal(TimeSpan.FromHours(48), BroadcastScheduler.RetireAge(rule));
+
+        bool Leftover(uint next, DateTimeOffset? first) => BroadcastScheduler.Leftover(c with { NextEsi = next, FirstSlot = first }, Slot, rule);
+        bool Retired(uint next, DateTimeOffset? first) => BroadcastScheduler.Retired(c with { NextEsi = next, FirstSlot = first }, Slot, rule);
+        Assert.False(Leftover(0, null) || Retired(0, null));
+        Assert.False(Leftover((uint)(6 * k) - 1, Slot));
+        Assert.True(Leftover((uint)(6 * k), Slot));
+        Assert.False(Retired((uint)(10 * k) - 1, Slot));
+        Assert.True(Retired((uint)(10 * k), Slot));
+        Assert.False(Leftover((uint)(10 * k), Slot));
+        Assert.False(Leftover(3, Slot.AddHours(-35)));
+        Assert.True(Leftover(3, Slot.AddHours(-36)));
+        Assert.False(Retired(3, Slot.AddHours(-47)));
+        Assert.True(Retired(3, Slot.AddHours(-48)));
         // No first slot, no age: one an older head end sent without recording it is still in rotation.
         Assert.False(BroadcastScheduler.Retired(c with { NextEsi = 3, FirstSlot = null }, Slot.AddDays(10), rule));
+        Assert.True(BroadcastScheduler.InRotation(c with { NextEsi = (uint)(6 * k), FirstSlot = Slot }, Slot, Options));
+        Assert.False(BroadcastScheduler.InRotation(c with { NextEsi = (uint)(10 * k), FirstSlot = Slot }, Slot, Options));
 
-        // Retired ones are neither sent nor listed; nearly retired ones get only what is left.
-        var gone = c with { NextEsi = (uint)(6 * k), FirstSlot = Slot.AddHours(-3) };
-        var aged = AtCoverage(7, 6000, 1, Slot.AddHours(-40));
-        var nearly = AtCoverage(8, 6000, 0) is var n ? n with { NextEsi = (uint)(6 * n.Transfer.SourceSymbols) - 2, FirstSlot = Slot.AddHours(-3) } : null!;
-        var plan = BroadcastScheduler.Plan([gone, aged, nearly], Slot, 1, Compression.Default, Options, null, Frames(1000));
-        Assert.Equal([nearly.Bid], plan.Directory.Entries.Select(e => e.Bid));
+        // Retired ones are neither sent nor listed; leftover ones are listed, and with room to
+        // spare get up to their cap, never past 10 K.
+        var gone = c with { NextEsi = (uint)(10 * k), FirstSlot = Slot.AddHours(-3) };
+        var old = AtCoverage(7, 6000, 1, Slot.AddHours(-48));
+        var aged = AtCoverage(8, 6000, 1, Slot.AddHours(-40));
+        var nearly = AtCoverage(9, 6000, 0) is var n ? n with { NextEsi = (uint)(10 * n.Transfer.SourceSymbols) - 2, FirstSlot = Slot.AddHours(-3) } : null!;
+        var fresh = AtCoverage(10, 6000, 0);
+        var plan = BroadcastScheduler.Plan([gone, old, aged, nearly, fresh], Slot, 1, Compression.Default, Options, null, Frames(1000));
+        Assert.Equal(new[] { aged.Bid, fresh.Bid, nearly.Bid }.Order(StringComparer.Ordinal), plan.Directory.Entries.Select(e => e.Bid).Order(StringComparer.Ordinal));
+        Assert.Equal(2, plan.LeftoverBulletins);
         Assert.Equal(2, ByBid(plan)[nearly.Bid].Count);
+        Assert.Equal(BroadcastScheduler.CapSymbols(aged.Transfer.SourceSymbols, rule), ByBid(plan)[aged.Bid].Count);
 
-        var none = BroadcastScheduler.Plan([gone, aged], Slot, 1, Compression.Default, Options, null, Frames(1000));
+        var none = BroadcastScheduler.Plan([gone, old], Slot, 1, Compression.Default, Options, null, Frames(1000));
         Assert.Equal(0, none.BulletinFrames);
         Assert.Empty(none.Directory.Entries);
+    }
+
+    [Fact]
+    public void Leftover_LimitsAreTheRulesOwn_WhenThoseAreLater()
+    {
+        var c = Held(11, 6000);
+        int k = c.Transfer.SourceSymbols;
+        var rule = new BudgetRule { RetireCoverage = 12, RetireAfter = TimeSpan.FromHours(60) };
+        Assert.Equal(12 * k, BroadcastScheduler.LeftoverSymbols(k, rule));
+        Assert.Equal(12 * k, BroadcastScheduler.RetireSymbols(k, rule));
+        Assert.Equal(TimeSpan.FromHours(60), BroadcastScheduler.RetireAge(rule));
+        // No leftover tier by coverage: from normal carrying straight to retired.
+        Assert.False(BroadcastScheduler.Leftover(c with { NextEsi = (uint)(12 * k) - 1, FirstSlot = Slot }, Slot, rule));
+        Assert.True(BroadcastScheduler.Retired(c with { NextEsi = (uint)(12 * k), FirstSlot = Slot }, Slot, rule));
+        Assert.True(BroadcastScheduler.Retired(c with { NextEsi = 3, FirstSlot = Slot.AddHours(-60) }, Slot, rule));
+    }
+
+    [Fact]
+    public void Leftover_NeverTakesAPieceFromTheRest()
+    {
+        var rule = Options.Budget!;
+        var rng = new Random(23);
+        int shared = 0;
+        for (int trial = 0; trial < 60; trial++)
+        {
+            var normal = Enumerable.Range(0, rng.Next(1, 12))
+                .Select(i => AtCoverage((trial * 100) + i, 1000 + rng.Next(12000), rng.NextDouble() * 5.5))
+                .ToList();
+            var leftover = Enumerable.Range(0, rng.Next(1, 8))
+                .Select(i => AtCoverage((trial * 100) + 50 + i, 1000 + rng.Next(12000), 6 + (rng.NextDouble() * 3.5)))
+                .ToList();
+            int budget = 10 + rng.Next(200);
+            var plan = BroadcastScheduler.Plan([.. normal, .. leftover], Slot, trial, Compression.Default, Options, null, Frames(budget));
+            var objects = ByBid(plan);
+            Assert.Equal(leftover.Count, plan.LeftoverBulletins);
+            Assert.True(plan.Frames.Count <= budget || plan.BulletinFrames == 0);
+            if (leftover.Sum(l => objects[l.Bid].Count) == 0)
+            {
+                continue;
+            }
+            shared++;
+            // A leftover piece went out, so every other bulletin had all a slot gives it.
+            foreach (var c in normal)
+            {
+                int k = c.Transfer.SourceSymbols;
+                int room = Math.Min(BroadcastScheduler.CapSymbols(k, rule), BroadcastScheduler.LeftoverSymbols(k, rule) - (int)c.NextEsi);
+                Assert.True(objects[c.Bid].Count >= room, $"trial {trial}: {c.Bid} got {objects[c.Bid].Count} of {room} while the leftover tier was sent");
+            }
+            Assert.All(leftover, l => Assert.True(objects[l.Bid].NextEsi <= BroadcastScheduler.RetireSymbols(l.Transfer.SourceSymbols, rule)));
+        }
+        Assert.True(shared > 10, $"only {shared} trials had room for the leftover tier");
+
+        // A tight slot: the leftover tier gets nothing, the rest fill it, and both are listed.
+        var busy = Enumerable.Range(0, 6).Select(i => AtCoverage(900 + i, 6000, 1)).ToList();
+        var spare = AtCoverage(950, 6000, 6.5);
+        var tight = BroadcastScheduler.Plan([.. busy, spare], Slot, 1, Compression.Default, Options, null, Frames(30));
+        Assert.Equal(0, ByBid(tight)[spare.Bid].Count);
+        Assert.True(tight.BulletinFrames > 0);
+        Assert.Contains(tight.Directory.Entries, e => e.Bid == spare.Bid);
+    }
+
+    [Fact]
+    public void Leftover_GoesAfterEveryOtherPiece_SoASlotCutShortLosesItFirst()
+    {
+        var rule = Options.Budget!;
+        var normal = Enumerable.Range(0, 5).Select(i => AtCoverage(700 + i, 3000 + (i * 1500), i * 0.8)).ToList();
+        // One crossing 6 K in this slot, whose pieces past 6 K come from the leftover tier's turn.
+        var crossing = AtCoverage(710, 6000, 5.8);
+        var leftover = Enumerable.Range(0, 4).Select(i => AtCoverage(720 + i, 2000 + (i * 2000), 6.5 + i)).ToList();
+        var held = new List<CarriedBulletin>([.. normal, crossing, .. leftover]);
+        var plan = BroadcastScheduler.Plan(held, Slot, 3, Compression.Default, Options, null, Frames(1000));
+        var byId = held.ToDictionary(c => c.Transfer.ObjectId);
+        bool Spare(MailcastFrame f) => byId[f.ObjectId] is var c
+            && (BroadcastScheduler.Leftover(c, Slot, rule) || f.EncodingSymbolId >= BroadcastScheduler.LeftoverSymbols(c.Transfer.SourceSymbols, rule));
+        var pieces = plan.Frames.Select((f, i) => (f, i)).Where(x => byId.ContainsKey(x.f.ObjectId)).ToList();
+        Assert.Contains(pieces, x => Spare(x.f));
+        Assert.Contains(pieces, x => !Spare(x.f));
+        Assert.Contains(pieces, x => byId[x.f.ObjectId] == crossing && Spare(x.f));
+
+        // Cut the slot at every frame: whatever went, no leftover-turn piece went before any other.
+        for (int cut = 0; cut <= plan.Frames.Count; cut++)
+        {
+            var sent = pieces.Where(x => x.i < cut).ToList();
+            if (sent.Any(x => Spare(x.f)))
+            {
+                Assert.Equal(pieces.Count(x => !Spare(x.f)), sent.Count(x => !Spare(x.f)));
+            }
+        }
+
+        // The directory still runs through the whole slot, the leftover tier's part included.
+        ulong directoryId = plan.Objects[0].Transfer.ObjectId;
+        int firstSpare = pieces.First(x => Spare(x.f)).i;
+        Assert.Equal(directoryId, plan.Frames[0].ObjectId);
+        Assert.Contains(plan.Frames.Skip(firstSpare), f => f.ObjectId == directoryId);
+    }
+
+    [Fact]
+    public void Leftover_Alone_KeysNothing_ButIsStillListed()
+    {
+        var spare = AtCoverage(12, 6000, 7);
+        var aged = AtCoverage(13, 3000, 2, Slot.AddHours(-40));
+        var plan = BroadcastScheduler.Plan([spare, aged], Slot, 1, Compression.Default, Options, null, Frames(1000));
+        Assert.Equal(0, plan.BulletinFrames);
+        Assert.Equal(2, plan.Directory.Entries.Count);
+        Assert.Equal(2, plan.LeftoverBulletins);
+
+        // One fresh bulletin and the slot keys, the leftover tier with it.
+        var fresh = AtCoverage(14, 2000, 0);
+        var keyed = BroadcastScheduler.Plan([spare, aged, fresh], Slot, 1, Compression.Default, Options, null, Frames(1000));
+        Assert.All(ByBid(keyed).Values, o => Assert.True(o.Count > 0, $"{o.Bid} got nothing"));
+    }
+
+    [Fact]
+    public void Leftover_SurvivesARestart_FromTheStore()
+    {
+        string root = Directory.CreateTempSubdirectory("mailcast-leftover-").FullName;
+        try
+        {
+            var rule = Options.Budget!;
+            var store = new HeadEndStore(root, Compression.Default, Options);
+            var a = store.Offer(TestBulletins.Make(15, 6000), new DateOnly(2026, 10, 6))!;
+            int k = a.Transfer.SourceSymbols;
+            var slot = Slot;
+            // Plenty of room in every slot: 0.6 K a slot, so twelve slots take it past 6 K.
+            for (int i = 0; i < 12; i++, slot = slot.AddHours(1))
+            {
+                store.Commit(BroadcastScheduler.Plan(store.InRotation(slot), slot, 1, Compression.Default, Options, store.DirectoryNextEsi, Frames(1000)));
+            }
+            var held = store.InRotation(slot).Single(c => c.Bid == a.Bid);
+            Assert.True(BroadcastScheduler.Leftover(held, slot, rule), $"{held.NextEsi} of K {k} sent");
+            Assert.Equal(Slot, held.FirstSlot);
+
+            // A restart reads the same NextEsi and FirstSlot, so the same tier, and carries on from there.
+            var reopened = new HeadEndStore(root, Compression.Default, Options);
+            var again = reopened.InRotation(slot).Single(c => c.Bid == a.Bid);
+            Assert.Equal(held, again with { Transfer = held.Transfer });
+            Assert.True(BroadcastScheduler.Leftover(again, slot, rule));
+            // A new bulletin keys the slot, and the leftover tier goes with it.
+            _ = reopened.Offer(TestBulletins.Make(17, 3000), new DateOnly(2026, 10, 6))!;
+            var plan = BroadcastScheduler.Plan(reopened.InRotation(slot), slot, 1, Compression.Default, Options, reopened.DirectoryNextEsi, Frames(1000));
+            Assert.Equal(again.NextEsi, ByBid(plan)[a.Bid].FirstEsi);
+            Assert.True(ByBid(plan)[a.Bid].Count > 0);
+            Assert.Contains(plan.Directory.Entries, e => e.Bid == a.Bid);
+            reopened.Commit(plan);
+
+            // And it is gone 48 hours after its first slot, from the store's view as from the scheduler's.
+            Assert.Contains(new HeadEndStore(root, Compression.Default, Options).InRotation(Slot.AddHours(47)), c => c.Bid == a.Bid);
+            Assert.DoesNotContain(new HeadEndStore(root, Compression.Default, Options).InRotation(Slot.AddHours(48)), c => c.Bid == a.Bid);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     /// <summary>

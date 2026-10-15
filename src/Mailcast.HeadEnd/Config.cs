@@ -686,10 +686,16 @@ public sealed record ScheduleConfig
     /// <summary>Each slot first gives every bulletin in rotation enough that any this many slots rebuild it. Left out, 3.</summary>
     public int? SpreadSlots { get; init; }
 
-    /// <summary>A bulletin retires once this many K of it have been sent. Left out, 6.</summary>
+    /// <summary>
+    /// After this many K of it have been sent, a bulletin goes only in airtime nothing else wants
+    /// (the leftover tier) until 10 K, when it retires; set above 10, it retires here instead. Left out, 6.
+    /// </summary>
     public double? RetireCoverage { get; init; }
 
-    /// <summary>A bulletin retires this many hours after its first slot. Left out, 36.</summary>
+    /// <summary>
+    /// This many hours after its first slot, a bulletin goes only in airtime nothing else wants
+    /// (the leftover tier) until 48 hours, when it retires; set above 48, it retires here instead. Left out, 36.
+    /// </summary>
     public double? RetireHours { get; init; }
 
     /// <summary>
