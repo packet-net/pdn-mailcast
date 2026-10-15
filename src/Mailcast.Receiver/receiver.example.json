@@ -71,5 +71,10 @@
   // "feedback": { "enabled": true, "callsign": "your callsign" }, as docs/receiver.md says
   // under "Sending a daily report".
 
+  // GB7RDG's directory signing key is built in, so the status page shows its signed bulletins
+  // as "signed by GB7RDG". To trust another transmitter as well, add its label and the public
+  // key from its head end's start-up line, as docs/receiver.md says under "Signed directories":
+  // "trustedKeys": [ { "label": "GB7XYZ", "publicKey": "..." } ],
+
   "stateDirectory": "/var/lib/pdn-mailcast"
 }

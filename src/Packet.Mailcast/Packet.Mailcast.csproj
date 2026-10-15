@@ -12,6 +12,8 @@
   <ItemGroup>
     <PackageReference Include="MaidenheadLib" />
     <PackageReference Include="ZstdSharp.Port" />
+    <!-- Ed25519 for signed directories: .NET 10 has none of its own, and this is fully managed, so it publishes self-contained for every RID. -->
+    <PackageReference Include="BouncyCastle.Cryptography" />
   </ItemGroup>
 
   <ItemGroup>

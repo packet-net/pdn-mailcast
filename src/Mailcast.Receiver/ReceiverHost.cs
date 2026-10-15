@@ -34,6 +34,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             Time = time,
             ArchiveRetention = TimeSpan.FromDays(config.Archive.Days),
             ArchiveMaxBytes = config.Archive.MaxMegabytes * 1024L * 1024,
+            TrustedKeys = config.AllTrustedKeys,
         });
         Intake.Sources = config.AcceptedSources;
         Ledger = new DeliveryLedger(config.StateDirectory);

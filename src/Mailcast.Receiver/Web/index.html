@@ -1233,6 +1233,9 @@ function partialRow(p) {
   if (p.noLongerSent) {
     st.append(el("div", `GB7RDG has stopped sending this one, so it can't be finished. It will be cleared ${day(p.clearsAt) ? "" : "at "}${at(p.clearsAt)}.`, "muted stopped-note"));
   }
+  /* Rebuilt, but the only list naming it failed its signature check: held until a good one does. */
+  if (p.withheld) st.append(el("div", "Complete, but held: only a list that failed its signature check names it.", "muted stopped-note"));
+  if (p.signature) st.append(el("div", p.signature, "muted"));
   cell.append(st);
   tr.append(cell);
   return tr;
@@ -1248,6 +1251,7 @@ function mailRow(m) {
   if (m.waiting && m.nextAttempt) st.append(el("div", `next try ${when(m.nextAttempt)}`, "muted"));
   if (m.detail) st.append(el("div", m.detail, "muted"));
   if (m.completed) st.append(timeLine("completed", m.completed));
+  if (m.signature) st.append(el("div", m.signature, "muted"));
   if (!m.waiting) st.append(timeLine(m.verdict === "refused" ? "refused by BBS" : "delivered to BBS", m.delivered));
   const cell = td(null, null, "Status");
   cell.append(st);
@@ -1270,6 +1274,9 @@ function mailSummary(m) {
   let note = (parts.length ? parts.join(", ") : "Nothing held yet.")
     + ` (each kept ${m.archive.days} days, ${m.archive.maxMegabytes} MB at most). Click one to read it.`;
   if (status && status.directory && status.directory.stale) note += ` Newest list heard is from ${status.directory.date}.`;
+  /* Signed directories: whether the list in use is signed, and why the last one heard was not used, if it was not. */
+  if (m.signature) note += ` Newest list: ${m.signature}.`;
+  if (m.rejected) note += ` The last list heard was not used: ${m.rejected}.`;
   return note;
 }
 async function refreshMail() {
@@ -1309,6 +1316,7 @@ async function view(m) {
   const dl = el("dl");
   for (const [k, v] of [["BID", m.bid], ["From", m.from], ["To", m.to + (m.at ? "@" + m.at : "")], ["Title", m.title],
     ["Status", m.status + (m.detail ? ": " + m.detail : "")]]) dl.append(el("dt", k), el("dd", v));
+  if (m.signature) dl.append(el("dt", "Signature"), el("dd", m.signature));
   $("viewHead").replaceChildren(dl);
   if (m.attempts && m.attempts.length) {
     // Issue #73: what the BBS said each time this BID was offered, oldest first, so a bulletin

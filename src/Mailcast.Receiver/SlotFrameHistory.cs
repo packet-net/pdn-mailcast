@@ -54,7 +54,7 @@ public sealed record HeardPiece(DateTimeOffset Heard, uint? Esi, PieceStatus Sta
             FrameOutcome.UnknownDictionary => PieceStatus.UnknownDictionary,
             FrameOutcome.Stored => PieceStatus.New,
             FrameOutcome.Duplicate or FrameOutcome.AlreadyComplete => PieceStatus.AlreadyHeld,
-            FrameOutcome.Rejected => PieceStatus.Rejected,
+            FrameOutcome.Rejected or FrameOutcome.RejectedDirectory => PieceStatus.Rejected,
             _ => PieceStatus.CompletedObject,
         };
         string what = result.Outcome switch
@@ -63,6 +63,7 @@ public sealed record HeardPiece(DateTimeOffset Heard, uint? Esi, PieceStatus Sta
             FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin => $"bulletin {bulletin.Bid}, \"{bulletin.Title}\"",
             FrameOutcome.CompletedDirectory or FrameOutcome.AlreadyComplete when result.Directory is { } dir =>
                 $"directory for {dir.Date:yyyy-MM-dd}",
+            FrameOutcome.RejectedDirectory when result.Check is { } check => $"directory not used: {check.Reason}",
             FrameOutcome.CompletedIonosphere => "propagation reading (ionosonde)",
             FrameOutcome.CompletedPskReporter => "propagation reading (PSK Reporter)",
             FrameOutcome.CompletedUnhandled or FrameOutcome.CompletedUnknown when result.ContentType is { } type =>

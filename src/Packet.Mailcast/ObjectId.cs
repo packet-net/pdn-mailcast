@@ -15,14 +15,40 @@ namespace Packet.Mailcast;
 public static class ObjectId
 {
     /// <summary>The ID of an object's octets, compressed with the given dictionary.</summary>
-    public static ulong Of(ushort dictionaryId, ReadOnlySpan<byte> objectBytes)
+    public static ulong Of(ushort dictionaryId, ReadOnlySpan<byte> objectBytes) =>
+        BinaryPrimitives.ReadUInt64BigEndian(FullHash(dictionaryId, objectBytes));
+
+    /// <summary>
+    /// How many octets of the SHA-256 a signed directory checks each object against: the eight
+    /// of the ID, which the entry already gives, and the next eight, which it lists as
+    /// <see cref="DirectoryEntry.Hash"/>. With the 8-octet ID alone, two bulletins made together
+    /// to share an ID take about 2^32 work: post one through a BBS that feeds the head end, send
+    /// the other, and the signed listing would vouch for it. At 16 octets that is about 2^64, and
+    /// making an object to match a listed one about 2^128. The whole 32 octets would cost 16 more
+    /// octets an entry on the air, every time the directory is sent.
+    /// </summary>
+    public const int LongHashOctets = 16;
+
+    /// <summary>How many octets of the hash a signed directory lists, beyond the ID's eight.</summary>
+    public const int ListedHashOctets = LongHashOctets - 8;
+
+    /// <summary>
+    /// Octets 8 to 15 of the SHA-256 that <see cref="Of"/> takes the first eight of, as 16
+    /// lower-case hex digits: what a signed directory lists for each entry, so that with the ID
+    /// an object is checked against 16 octets, and one made to match the short ID still cannot
+    /// match a signed listing.
+    /// </summary>
+    public static string LongHash(ushort dictionaryId, ReadOnlySpan<byte> objectBytes) =>
+        Convert.ToHexStringLower(FullHash(dictionaryId, objectBytes).AsSpan(8, ListedHashOctets));
+
+    private static byte[] FullHash(ushort dictionaryId, ReadOnlySpan<byte> objectBytes)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         Span<byte> id = stackalloc byte[2];
         BinaryPrimitives.WriteUInt16BigEndian(id, dictionaryId);
         hash.AppendData(id);
         hash.AppendData(objectBytes);
-        return BinaryPrimitives.ReadUInt64BigEndian(hash.GetHashAndReset());
+        return hash.GetHashAndReset();
     }
 
     /// <summary>Sixteen hex digits, as used in the directory, file names and logs.</summary>

@@ -137,6 +137,12 @@ public sealed record ScheduleOptions
     public int Alignment { get; init; } = MailcastFrame.StandardAlignment;
 
     /// <summary>
+    /// The head end's directory signing key, or null to send directories unsigned. With one, each
+    /// directory also lists every object's long hash (see <see cref="BroadcastDirectory"/>).
+    /// </summary>
+    public DirectorySigner? Signer { get; init; }
+
+    /// <summary>
     /// An hourly station's carrying: enough for a clean rebuild from the first slot alone (1.5 K
     /// and two spare symbols, which survives a fifth of the frames lost), then four repeats of
     /// 0.7 K, 5, 10, 17 and 25 hours later, so a bulletin goes out in five different hours of the
@@ -662,11 +668,12 @@ public static class BroadcastScheduler
             }
             bulletins.Add((c, index));
             leftover.Add(options.Budget is { } r && Leftover(c, slot, r));
-            entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind));
+            entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind,
+                options.Signer is null ? null : ObjectId.LongHash(c.Transfer.DictionaryId, c.Transfer.Bytes)));
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
-        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode);
+        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer);
         var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 

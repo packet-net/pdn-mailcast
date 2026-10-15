@@ -727,6 +727,7 @@ public sealed class StatusPage : IAsyncDisposable
         var config = _host.Config;
         var slot = _host.Slots.Last;
         var (directory, _) = _host.Intake.Progress();
+        var (newestCheck, lastHeard) = _host.Intake.DirectoryChecks();
         var held = _host.Intake.HeldBulletins();
         var mail = _host.Intake.Mail();
         double? liveTone = _host.Pipeline?.Tone.LiveFrequencyHz;
@@ -843,6 +844,18 @@ public sealed class StatusPage : IAsyncDisposable
                 date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                 entries = directory.Entries.Count,
                 stale = directory.Date != DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime),
+                // "signed by GB7RDG" or "not signed".
+                signature = newestCheck?.Describe(),
+            },
+            // The directory heard most recently, used or not: "signed" (by a trusted key, named
+            // in "signedBy"), "unsigned", or "rejected" (not used, "reason" says why).
+            lastDirectory = lastHeard is null ? null : new
+            {
+                date = lastHeard.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                state = SignatureWord(lastHeard.Check.State),
+                signedBy = lastHeard.Check.SignedBy,
+                reason = lastHeard.Check.Reason,
+                words = lastHeard.Check.Describe(),
             },
             // Issue #68: every bulletin still relevant, complete or not, whether or not the
             // newest directory heard happens to name it; see Intake.HeldBulletins. Issue #73
@@ -869,6 +882,8 @@ public sealed class StatusPage : IAsyncDisposable
                     deliveredAt = final?.At,
                     deliveredVerdict = final?.Verdict,
                     deliveredDetail = final?.Detail,
+                    signature = p.Signature,
+                    withheld = p.Withheld,
                 };
             }),
             // Issue #73 review: kept on this endpoint, unchanged in shape, for the same reason as
@@ -1401,7 +1416,10 @@ public sealed class StatusPage : IAsyncDisposable
         int offset = Math.Max(0, int.TryParse(query["offset"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int o) ? o : 0);
         int limit = int.TryParse(query["limit"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int l) ? Math.Clamp(l, 1, MaxMailPage) : 50;
         var mail = _host.Intake.Mail(); // in memory, newest first, already counted: no files, no lock, no sorting
-        var partial = _host.Intake.HeldBulletins().Where(h => !h.Complete).Select(h => new
+        var held = _host.Intake.HeldBulletins();
+        // What the directories still remembered say of each: "signed by GB7RDG" only once its own hash matched (see HeldBulletin.Signature).
+        var signatures = held.Where(h => h.Signature is not null).ToDictionary(h => h.ObjectId, h => h.Signature!);
+        var partial = held.Where(h => !h.Complete).Select(h => new
         {
             bid = h.Bid,
             title = h.Title,
@@ -1411,7 +1429,11 @@ public sealed class StatusPage : IAsyncDisposable
             // cleared at clearsAt; false, with clearsAt null, while it is still being sent.
             noLongerSent = h.NoLongerSentSince is not null,
             clearsAt = h.ClearedAt,
+            signature = signatures.GetValueOrDefault(h.ObjectId),
+            // Rebuilt, but only a directory that failed its signature check lists it.
+            withheld = h.Withheld,
         }).ToList();
+        var (newestCheck, lastHeard) = _host.Intake.DirectoryChecks();
         return new
         {
             total = mail.Count,
@@ -1426,9 +1448,20 @@ public sealed class StatusPage : IAsyncDisposable
             offset,
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
-            items = mail.Page(offset, limit).Select(MailView).ToList(),
+            items = mail.Page(offset, limit).Select(m => MailView(m, signatures.GetValueOrDefault(m.ObjectId))).ToList(),
+            // The newest directory in use: "signed by GB7RDG" or "not signed"; and, when the
+            // directory heard most recently was not used, why.
+            signature = newestCheck?.Describe(),
+            rejected = lastHeard is { Check.Usable: false } ? lastHeard.Check.Reason : null,
         };
     }
+
+    private static string SignatureWord(Packet.Mailcast.SignatureState state) => state switch
+    {
+        Packet.Mailcast.SignatureState.Trusted => "signed",
+        Packet.Mailcast.SignatureState.None => "unsigned",
+        _ => "rejected",
+    };
 
     /// <summary>
     /// The BBS's final answer for a bulletin on the progress list, if it has one: from the archive
@@ -1448,7 +1481,7 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>One bulletin for the list: what it is, where it is, what the BBS has said, and
     /// (issue #73) its delivery history, for the reader to show when it is opened.</summary>
-    private object MailView(Packet.Mailcast.MailEntry m)
+    private object MailView(Packet.Mailcast.MailEntry m, string? signature)
     {
         string status, statusShort;
         DeliveryRecord? last = null;
@@ -1498,6 +1531,8 @@ public sealed class StatusPage : IAsyncDisposable
             // Issue #47: when it was rebuilt, and (once archived) when the BBS answered, shown together.
             completed = m.Completed,
             delivered = m.Waiting ? (DateTimeOffset?)null : m.Time,
+            // As HeldBulletin.Signature: "signed by GB7RDG" only once its own hash matched; null once no directory remembered names it.
+            signature,
             // Issue #73: every answer this session remembers for this BID, oldest first, for the
             // reader to show as "what the BBS said" each time it was offered.
             attempts = _host.Ledger.History(m.Bid).Select(r => new
