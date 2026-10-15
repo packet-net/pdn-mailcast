@@ -54,7 +54,7 @@ public sealed record ReportSlot(
 /// one line per slot listened to, fields separated by single spaces, <c>-</c> for a value not
 /// known.</para>
 /// <code>
-/// MCR1 0.6.0 IO91lk wessex.zapto.org 12/12 2:BBS1,AUD1
+/// MCR1 0.6.0 IO91lk wessex.zapto.org 12/12 2:BBS1,AUD1 0 1
 /// 09 W4 212 18 +1.2 IG 2 1.9/-17 0.35 0.21 290 b
 /// 10 W3 0 4 +1.1 IM
 /// </code>
@@ -63,12 +63,16 @@ public sealed record ReportSlot(
 /// errors (<c>0</c>, or the count, a colon and each code with its count), and (issue #86) how
 /// many of the day's bulletins the BBS already had, as its own seventh field: <c>-</c> for a
 /// header with no seventh field at all, which means not known rather than zero, since an older
-/// sender folded this into delivered instead of counting it apart. A reader ignores a field
-/// after the seventh too, so the header can grow further still.</para>
+/// sender folded this into delivered instead of counting it apart. The eighth field is how many
+/// part-received bulletins were given up that day: dropped, that day, because the head end had
+/// stopped sending them; a
+/// header without it does not know. Whenever the eighth is written, so is the seventh (as
+/// <c>-</c> if need be). A reader ignores a field after the eighth, so the header can grow
+/// further still.</para>
 /// <para>Slot: the hour (HHMM if the slot is not on the hour), waveform, frames, tone SNR (dB),
 /// tone offset (Hz), verdicts (joined by <c>+</c>), then, only with a channel measurement, the
 /// modes, the 2F delay/power (ms/dB), delay spread (ms), Doppler spread (Hz), virtual height (km)
-/// and basis. A reader ignores fields after the sixth on the header line and after the twelfth on
+/// and basis. A reader ignores fields after the eighth on the header line and after the twelfth on
 /// a slot line, and takes <c>-</c> as the seventh to mean no channel measurement whatever follows,
 /// so format 1 can grow at the ends of its lines: a later field on a line with no measurement
 /// comes after six <c>-</c>.</para>
@@ -174,8 +178,9 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             ? "0"
             : string.Create(CultureInfo.InvariantCulture, $"{h.Errors.Values.Sum()}:{string.Join(',', h.Errors.Where(e => e.Value > 0).OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => string.Create(CultureInfo.InvariantCulture, $"{e.Key}{e.Value}")))}");
         string alreadyHad = h.AlreadyHad is { } a ? a.ToString(CultureInfo.InvariantCulture) : Missing;
+        string givenUp = h.GivenUp is { } g ? string.Create(CultureInfo.InvariantCulture, $" {g}") : "";
         return string.Create(CultureInfo.InvariantCulture,
-            $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors} {alreadyHad}");
+            $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors} {alreadyHad}{givenUp}");
     }
 
     private static string SlotLine(ReportSlot s)
@@ -225,14 +230,17 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         // Field 7 (issue #86): how many the BBS already had, as its own count. Missing
         // altogether (a header with only six fields, an older sender's) or "-" both mean not
         // known, not zero: the older format folded this into field 5's delivered instead.
-        int? alreadyHad = f.Length > 6 ? ParseAlreadyHad(f[6]) : null;
-        return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad);
+        int? alreadyHad = f.Length > 6 ? ParseCount(f[6], "an already-had") : null;
+        // Field 8: how many part-received bulletins were given up (dropped because the head end
+        // had stopped sending them) that day. Missing, or "-", means not known: an older sender's report.
+        int? givenUp = f.Length > 7 ? ParseCount(f[7], "a given-up") : null;
+        return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad, givenUp);
     }
 
-    private static int? ParseAlreadyHad(string field) =>
+    private static int? ParseCount(string field, string what) =>
         field == Missing ? null
         : TryInt(field, out int value) ? value
-        : throw new FormatException($"\"{field}\" is not an already-had count.");
+        : throw new FormatException($"\"{field}\" is not {what} count.");
 
     private static Dictionary<string, int> ParseErrors(string field)
     {
@@ -412,4 +420,9 @@ public static class ReportErrors
 /// before this was tracked apart, where it is not known (not necessarily zero) because the old
 /// format folded it into <paramref name="Delivered"/> instead.
 /// </param>
-public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad);
+/// <param name="GivenUp">
+/// Part-received bulletins given up in the day: dropped that day because the head end had
+/// stopped sending them, each counted once. Null when not known: read from a header with no
+/// eighth field, or <c>-</c> there; and, written, null leaves the field out.
+/// </param>
+public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad, int? GivenUp = null);

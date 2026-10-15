@@ -184,7 +184,7 @@ public class FeedbackTests
 
         var mail = Assert.Single(rig.Bbs.Sent);
         var lines = mail.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("MCR1 0.6.0 IO91lk sc 1/1 3:AUD1,BBS2 0", lines[0]);
+        Assert.Equal("MCR1 0.6.0 IO91lk sc 1/1 3:AUD1,BBS2 0 0", lines[0]);
         Assert.Equal(3, lines.Length);
         Assert.Equal($"{Slots[1]:HH} - 0 - - -", lines[1]);
         Assert.Equal($"{Slots[2]:HH} - 7 - - IM+PG 2 1.9/-17 0.35 0.21 287 b", lines[2]);
@@ -214,7 +214,7 @@ public class FeedbackTests
         var report = DailyReport.Parse(mail.Title, mail.Body);
         Assert.Equal((3, 0, 3), (report.Header.Rebuilt, report.Header.Delivered, report.Header.AlreadyHad));
         var lines = mail.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("MCR1 0.6.0 IO91lk sc 3/0 0 3", lines[0]);
+        Assert.Equal("MCR1 0.6.0 IO91lk sc 3/0 0 3 0", lines[0]);
     }
 
     /// <summary>
@@ -249,6 +249,31 @@ public class FeedbackTests
         var mail = Assert.Single(rig.Bbs.Sent);
         var report = DailyReport.Parse(mail.Title, mail.Body);
         Assert.Equal((2, 1, 2), (report.Header.Rebuilt, report.Header.Delivered, report.Header.AlreadyHad));
+        Assert.Equal(0, report.Header.GivenUp);
+    }
+
+    /// <summary>
+    /// The header's eighth field counts the bulletins given up because the head end stopped
+    /// sending them, each object once however often it is reported, and is kept across a restart.
+    /// </summary>
+    [Fact]
+    public async Task GivenUp_CountsEachObjectOnce_InTheReportsHeader()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 1);
+        service.NoteGivenUp([0x1111UL, 0x2222UL, 0x1111UL]);
+        service = rig.Start();
+        service.NoteGivenUp([0x2222UL, 0x3333UL]);
+        service.NoteGivenUp([]);
+
+        await rig.AtAsync(service, ReportAt);
+
+        var mail = Assert.Single(rig.Bbs.Sent);
+        var report = DailyReport.Parse(mail.Title, mail.Body);
+        Assert.Equal(3, report.Header.GivenUp);
+        Assert.EndsWith(" 0 3", mail.Body.Split("\r\n")[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -271,7 +296,7 @@ public class FeedbackTests
         Assert.Equal("refused", view.GetProperty("answer").GetString());
         Assert.Equal("refused by the BBS: the BBS answered Reject; it is not sent again", view.GetProperty("lastAnswer").GetString());
         Assert.Equal(ReportAt, view.GetProperty("lastSent").GetDateTimeOffset());
-        Assert.StartsWith("MCR G4ABC 2026-10-06\nMCR1 0.6.0 IO91lk sc 0/0 0 0\n", view.GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("MCR G4ABC 2026-10-06\nMCR1 0.6.0 IO91lk sc 0/0 0 0 0\n", view.GetProperty("text").GetString(), StringComparison.Ordinal);
         Assert.Equal(FeedbackService.ReportTime(Schedule, Day.AddDays(1)), view.GetProperty("next").GetDateTimeOffset());
         Assert.Contains(rig.Log, l => l.Contains("was refused by the BBS", StringComparison.Ordinal));
     }

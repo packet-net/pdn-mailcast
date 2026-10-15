@@ -133,6 +133,14 @@ public sealed class Intake : IAsyncDisposable
     /// </summary>
     public event Action<BroadcastDirectory>? DirectoryHeard;
 
+    /// <summary>
+    /// Part-received bulletins given up: dropped because the head end stopped sending them (see
+    /// <see cref="ReceiverStore.NoLongerSentRetention"/>), each once, as it is dropped. Raised
+    /// outside the store's lock, on the worker or on whichever thread asked for
+    /// <see cref="HeldBulletins"/>.
+    /// </summary>
+    public event Action<IReadOnlyList<ulong>>? GivenUp;
+
     /// <summary>Issue #49: the ionosonde reading for the slot now on was received.</summary>
     public event Action<IonoReading>? IonosphereHeard;
 
@@ -372,12 +380,36 @@ public sealed class Intake : IAsyncDisposable
     /// frames; but the work it does under the lock is bounded the same way <see cref="Pending"/>
     /// and <see cref="PartialObjects"/> already are, and this is read only for the status page's
     /// poll, seconds apart, never per frame, so holding the lock a little longer here is fine.
+    /// For the same reason it first drops any object due to go now that the head end has stopped
+    /// sending it, which otherwise waits for the next frame.
     /// </summary>
     public IReadOnlyList<HeldBulletin> HeldBulletins()
     {
+        IReadOnlyList<HeldBulletin> held;
+        IReadOnlyList<ulong> givenUp;
         lock (_gate)
         {
-            return _store.HeldBulletins();
+            _store.DropNoLongerSent();
+            held = _store.HeldBulletins();
+            givenUp = _store.TakeGivenUp();
+        }
+        RaiseGivenUp(givenUp);
+        return held;
+    }
+
+    private void RaiseGivenUp(IReadOnlyList<ulong> givenUp)
+    {
+        if (givenUp.Count == 0)
+        {
+            return;
+        }
+        try
+        {
+            GivenUp?.Invoke(givenUp);
+        }
+        catch (Exception e)
+        {
+            _log($"store: a listener failed: {Ascii.Clean(e.Message)}");
         }
     }
 
@@ -434,6 +466,7 @@ public sealed class Intake : IAsyncDisposable
     {
         AcceptResult result;
         MailParts? parts = null;
+        IReadOnlyList<ulong> givenUp = [];
         try
         {
             lock (_gate)
@@ -441,6 +474,7 @@ public sealed class Intake : IAsyncDisposable
                 try
                 {
                     result = _store.Accept(payload.Span);
+                    givenUp = _store.TakeGivenUp();
                     if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
                     {
                         _progress = (_store.Directory, _store.Progress());
@@ -452,6 +486,7 @@ public sealed class Intake : IAsyncDisposable
                 }
             }
             Publish(parts);
+            RaiseGivenUp(givenUp);
         }
         catch (Exception e)
         {

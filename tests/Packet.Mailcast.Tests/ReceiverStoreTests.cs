@@ -571,4 +571,225 @@ public class ReceiverStoreTests
             Assert.NotNull(repeat.Directory);
         }
     }
+
+    /// <summary>A big bulletin's object, several pieces long, so one piece leaves it part-received.</summary>
+    private static TransferObject BigObject(int number)
+    {
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Assert.True(obj.SourceSymbols > 1);
+        return obj;
+    }
+
+    /// <summary>The one frame of a small directory of <paramref name="date"/> listing <paramref name="listed"/>.</summary>
+    private static MailcastFrame DirectoryFrame(DateOnly date, params TransferObject[] listed)
+    {
+        var directory = new BroadcastDirectory(date, listed.Select((o, i) => new DirectoryEntry(o.ObjectId, o.DictionaryId, 9000, $"{i + 1}_TEST", $"Bulletin {i + 1}")));
+        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Assert.Equal(1, obj.SourceSymbols);
+        return obj.Frame(0);
+    }
+
+    /// <summary>
+    /// A part-received object that a directory heard after its last piece leaves out has been
+    /// retired by the head end: it is marked, shows when it will be cleared, and goes 24 h later,
+    /// not 14 days. Named by an earlier directory or never named at all, the same.
+    /// </summary>
+    [Fact]
+    public void NoLongerSent_AbsentFromALaterDirectory_IsMarkedThenDroppedAfter24Hours()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, Log = log.Add });
+        var named = BigObject(51);
+        var unnamed = BigObject(52);
+        var stays = BigObject(53);
+        Assert.Equal(FrameOutcome.CompletedDirectory, store.Accept(DirectoryFrame(Day1, named, stays).ToBytes()).Outcome);
+        time.Advance(TimeSpan.FromMinutes(5));
+        store.Accept(named.Frame(0).ToBytes());
+        store.Accept(unnamed.Frame(0).ToBytes());
+        store.Accept(stays.Frame(0).ToBytes());
+        Assert.All(store.HeldBulletins(), h => Assert.Null(h.NoLongerSentSince));
+
+        time.Advance(TimeSpan.FromHours(1)); // the next slot's directory has only "stays"
+        var heard = time.GetUtcNow();
+        var result = store.Accept(DirectoryFrame(Day1, stays).ToBytes());
+        Assert.Equal(FrameOutcome.CompletedDirectory, result.Outcome);
+        Assert.Equal(new[] { named.ObjectId, unnamed.ObjectId }.Order(), result.NoLongerSent!.Order());
+        Assert.Empty(store.TakeGivenUp()); // marked, not given up yet
+
+        var held = store.HeldBulletins();
+        var namedRow = Assert.Single(held, h => h.ObjectId == named.ObjectId);
+        Assert.Equal("1_TEST", namedRow.Bid);
+        Assert.Equal(heard, namedRow.NoLongerSentSince);
+        Assert.Equal(heard + TimeSpan.FromHours(24), namedRow.ClearedAt);
+        Assert.Equal(heard, Assert.Single(held, h => h.ObjectId == unnamed.ObjectId).NoLongerSentSince);
+        var staysRow = Assert.Single(held, h => h.ObjectId == stays.ObjectId);
+        Assert.Null(staysRow.NoLongerSentSince);
+        Assert.Null(staysRow.ClearedAt);
+        Assert.Equal(stays.ObjectId, held[0].ObjectId); // still being sent: above the given-up ones
+        Assert.Contains(log, l => l.Contains(ObjectId.Format(named.ObjectId) + " (1_TEST) has 1 of", StringComparison.Ordinal)
+            && l.Contains("no longer in the directory", StringComparison.Ordinal) && l.Contains("2026-10-05 10:05 UTC", StringComparison.Ordinal));
+        Assert.All(log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
+
+        // Hearing the same directory again marks nothing twice.
+        Assert.Null(store.Accept(DirectoryFrame(Day1, stays).ToBytes()).NoLongerSent);
+
+        time.Advance(TimeSpan.FromHours(23));
+        store.DropNoLongerSent();
+        Assert.Equal(3, store.PartialObjects);
+        time.Advance(TimeSpan.FromHours(1));
+        store.Accept(stays.Frame(1).ToBytes()); // any frame drops what is due
+        Assert.Equal(1, store.PartialObjects);
+        Assert.Equal(stays.ObjectId, Assert.Single(store.HeldBulletins(), h => !h.Complete).ObjectId);
+        Assert.Contains(log, l => l.Contains(ObjectId.Format(unnamed.ObjectId) + " dropped with 1 of", StringComparison.Ordinal));
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(dir.Path, "stopped")));
+        Assert.Equal(new[] { named.ObjectId, unnamed.ObjectId }.Order(), store.TakeGivenUp().Order());
+        Assert.Empty(store.TakeGivenUp()); // each handed over once
+    }
+
+    /// <summary>
+    /// A directory heard before the object's last piece says nothing about it: the object may
+    /// have joined the rotation since. Nor does one older than the newest directory heard.
+    /// </summary>
+    [Fact]
+    public void NoLongerSent_NotMarkedByADirectoryBeforeItsLastPiece_OrByAnOlderDay()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var obj = BigObject(54);
+        var other = BigObject(55);
+        store.Accept(DirectoryFrame(Day1.AddDays(1), other).ToBytes());
+        time.Advance(TimeSpan.FromMinutes(1));
+        store.Accept(obj.Frame(0).ToBytes()); // after the directory: it may be new to the rotation
+        Assert.Null(Assert.Single(store.HeldBulletins(), h => h.ObjectId == obj.ObjectId).NoLongerSentSince);
+
+        time.Advance(TimeSpan.FromHours(1));
+        var stale = store.Accept(DirectoryFrame(Day1).ToBytes()); // yesterday's: not about now
+        Assert.Equal(FrameOutcome.CompletedDirectory, stale.Outcome);
+        Assert.Null(stale.NoLongerSent);
+        Assert.Null(Assert.Single(store.HeldBulletins(), h => h.ObjectId == obj.ObjectId).NoLongerSentSince);
+    }
+
+    /// <summary>
+    /// The mark is kept across a restart, and undone by a new piece (the head end sending it
+    /// again) or by a later directory that lists it again (the one that left it out was a stray).
+    /// </summary>
+    [Fact]
+    public void NoLongerSent_SurvivesARestart_AndANewPieceOrAListingUndoesIt()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
+        var log = new List<string>();
+        var options = TestStores.Fast with { Time = time, Log = log.Add };
+        var store = new ReceiverStore(dir.Path, Compression.Default, options);
+        var requeued = BigObject(56);
+        var relisted = BigObject(57);
+        var gone = BigObject(58);
+        store.Accept(requeued.Frame(0).ToBytes());
+        store.Accept(relisted.Frame(0).ToBytes());
+        store.Accept(gone.Frame(0).ToBytes());
+        time.Advance(TimeSpan.FromHours(1));
+        var marked = time.GetUtcNow();
+        Assert.Equal(3, store.Accept(DirectoryFrame(Day1).ToBytes()).NoLongerSent!.Count);
+
+        time.Advance(TimeSpan.FromHours(2));
+        var reopened = new ReceiverStore(dir.Path, Compression.Default, options);
+        Assert.All(reopened.HeldBulletins(), h => Assert.Equal(marked, h.NoLongerSentSince));
+
+        reopened.Accept(requeued.Frame(1).ToBytes());
+        Assert.Contains(log, l => l.Contains(ObjectId.Format(requeued.ObjectId) + " has a new piece", StringComparison.Ordinal));
+        time.Advance(TimeSpan.FromMinutes(1));
+        Assert.Null(reopened.Accept(DirectoryFrame(Day1, requeued, relisted).ToBytes()).NoLongerSent);
+        Assert.Contains(log, l => l.Contains(ObjectId.Format(relisted.ObjectId) + " (2_TEST) is in the directory again", StringComparison.Ordinal));
+        var held = reopened.HeldBulletins();
+        Assert.Null(Assert.Single(held, h => h.ObjectId == requeued.ObjectId).NoLongerSentSince);
+        Assert.Null(Assert.Single(held, h => h.ObjectId == relisted.ObjectId).NoLongerSentSince);
+        Assert.Equal(marked, Assert.Single(held, h => h.ObjectId == gone.ObjectId).NoLongerSentSince);
+
+        time.Advance(TimeSpan.FromHours(22)); // 24 h and a minute after the mark
+        var again = new ReceiverStore(dir.Path, Compression.Default, options);
+        Assert.Equal(2, again.PartialObjects);
+        Assert.DoesNotContain(again.HeldBulletins(), h => h.ObjectId == gone.ObjectId);
+        Assert.Equal([gone.ObjectId], again.TakeGivenUp()); // the two whose mark was undone are not given up
+        Assert.Single(Directory.EnumerateDirectories(Path.Combine(dir.Path, "objects")), d => Path.GetFileName(d).StartsWith(ObjectId.Format(requeued.ObjectId), StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Only bulletins are marked: a directory or a propagation reading is never listed in a
+    /// directory, so its absence means nothing. Without piece 0 (which carries the content type)
+    /// or a directory naming it, an object is not known to be a bulletin and keeps the 14 days.
+    /// </summary>
+    [Fact]
+    public void NoLongerSent_OnlyObjectsKnownToBeBulletins_AreMarked()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+
+        // A directory too big for one piece, as the other waveform's resend might be: piece 0
+        // says it is a directory.
+        var many = Enumerable.Range(0, 300).Select(i => BigObject(1000 + i)).ToArray();
+        var bigDirectory = TransferObject.ForDirectory(
+            new BroadcastDirectory(Day1, many.Select((o, i) => new DirectoryEntry(o.ObjectId, o.DictionaryId, 9000, $"{i}_TEST", $"Bulletin number {i} with a title"))),
+            ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Assert.True(bigDirectory.SourceSymbols > 1);
+        Assert.Equal((byte)ObjectKind.Directory, bigDirectory.Frame(0).Symbol.Span[0]); // systematic: piece 0 starts with the type
+        store.Accept(bigDirectory.Frame(0).ToBytes());
+
+        var nameless = BigObject(60); // a bulletin, but neither piece 0 nor any directory says so
+        store.Accept(nameless.Frame(3).ToBytes());
+        var namedOnly = BigObject(61); // no piece 0, but a directory named it
+        store.Accept(DirectoryFrame(Day1, namedOnly).ToBytes());
+        time.Advance(TimeSpan.FromMinutes(1));
+        store.Accept(namedOnly.Frame(3).ToBytes());
+        Assert.Equal((byte)ObjectKind.Bulletin, namedOnly.Frame(0).Symbol.Span[0]);
+
+        time.Advance(TimeSpan.FromHours(1));
+        var result = store.Accept(DirectoryFrame(Day1).ToBytes());
+        Assert.Equal([namedOnly.ObjectId], result.NoLongerSent);
+        var held = store.HeldBulletins();
+        Assert.Null(Assert.Single(held, h => h.ObjectId == bigDirectory.ObjectId).NoLongerSentSince);
+        Assert.Null(Assert.Single(held, h => h.ObjectId == nameless.ObjectId).NoLongerSentSince);
+
+        time.Advance(TimeSpan.FromHours(25));
+        store.DropNoLongerSent();
+        Assert.Equal([namedOnly.ObjectId], store.TakeGivenUp());
+        Assert.Equal(2, store.PartialObjects); // the other two wait out the usual 14 days
+    }
+
+    /// <summary>
+    /// A stray directory dated tomorrow (a test head end, issue #72) marks nothing, and does not
+    /// stop today's real directories from marking. Any directory that lists a marked bulletin,
+    /// whatever its date, takes the mark away.
+    /// </summary>
+    [Fact]
+    public void NoLongerSent_AFutureDirectoryMarksNothing_AndAnyListingClearsAMark()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
+        var obj = BigObject(62);
+        var other = BigObject(63);
+        store.Accept(obj.Frame(0).ToBytes());
+        store.Accept(other.Frame(0).ToBytes());
+        time.Advance(TimeSpan.FromHours(1));
+
+        Assert.Null(store.Accept(DirectoryFrame(Day1.AddDays(1)).ToBytes()).NoLongerSent);
+        Assert.All(store.HeldBulletins(), h => Assert.Null(h.NoLongerSentSince));
+
+        time.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal([obj.ObjectId], store.Accept(DirectoryFrame(Day1, other).ToBytes()).NoLongerSent);
+
+        // Yesterday's directory, or tomorrow's, that lists it still clears the mark.
+        time.Advance(TimeSpan.FromMinutes(1));
+        store.Accept(DirectoryFrame(Day1.AddDays(-1), obj).ToBytes());
+        Assert.All(store.HeldBulletins(), h => Assert.Null(h.NoLongerSentSince));
+        time.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal([obj.ObjectId], store.Accept(DirectoryFrame(Day1, other, BigObject(64)).ToBytes()).NoLongerSent);
+        time.Advance(TimeSpan.FromMinutes(1));
+        store.Accept(DirectoryFrame(Day1.AddDays(1), obj, other).ToBytes());
+        Assert.All(store.HeldBulletins(), h => Assert.Null(h.NoLongerSentSince));
+    }
 }

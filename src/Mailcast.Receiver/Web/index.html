@@ -61,6 +61,8 @@
   td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; min-width: 80px; }
   .bar > span { display: block; height: 100%; background: var(--accent); }
+  .bar.stopped > span { background: var(--soft); opacity: .5; }
+  .stopped-note { margin-top: 4px; font-size: 13px; max-width: 32em; }
   #spectro { width: 100%; height: 260px; display: block; background: #0d1117; border-radius: 6px; }
   .spectroBox { position: relative; }
   #specNotice { position: absolute; inset: 0; margin: 0; padding: 18px 24px; display: grid; place-items: center; text-align: center;
@@ -1215,16 +1217,23 @@ function partialRow(p) {
   tr.append(bidCell, td("-", null, "From"), td("-", null, "To"), td("-", null, "@"), td(p.title || "", null, "Title"),
     td("-", "num", "Date"), td("-", "num", "Size"));
   const cell = td(null, null, "Status");
+  const st = el("div"); // one block, so on a phone it all sits in the value column of the card
   if (p.needed) {
-    const bar = el("div", null, "bar");
+    const bar = el("div", null, p.noLongerSent ? "bar stopped" : "bar");
     bar.title = `${p.received} of ${p.needed}`;
     const fill = el("span");
     fill.style.width = `${Math.min(100, 100 * p.received / p.needed)}%`;
     bar.append(fill);
-    cell.append(bar);
+    st.append(bar);
   } else {
-    cell.append(el("span", "none yet", "muted"));
+    st.append(el("span", "none yet", "muted"));
   }
+  /* The head end has retired it before enough pieces were heard: say so, rather than leave a
+     bar that looks as if it might still fill. */
+  if (p.noLongerSent) {
+    st.append(el("div", `GB7RDG has stopped sending this one, so it can't be finished. It will be cleared ${day(p.clearsAt) ? "" : "at "}${at(p.clearsAt)}.`, "muted stopped-note"));
+  }
+  cell.append(st);
   tr.append(cell);
   return tr;
 }
@@ -1251,7 +1260,9 @@ function mailRow(m) {
    own schedule, so it may still be null the first time refreshMail() lands first. */
 function mailSummary(m) {
   const parts = [];
-  if (m.partial.length) parts.push(`${m.partial.length} coming in`);
+  const stopped = m.partial.filter(p => p.noLongerSent).length;
+  if (m.partial.length > stopped) parts.push(`${m.partial.length - stopped} coming in`);
+  if (stopped) parts.push(`${stopped} no longer sent`);
   if (m.waiting) parts.push(`${m.waiting} waiting for your BBS`);
   if (m.delivered) parts.push(`${m.delivered} delivered`);
   if (m.alreadyHad) parts.push(`${m.alreadyHad} already had`);

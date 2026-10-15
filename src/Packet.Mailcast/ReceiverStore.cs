@@ -110,7 +110,11 @@ public sealed class MailParts
 /// <param name="ContentType">The object's content type, for <see cref="FrameOutcome.CompletedUnhandled"/> and <see cref="FrameOutcome.CompletedUnknown"/>.</param>
 /// <param name="Ionosphere">The reading the frame completed, for <see cref="FrameOutcome.CompletedIonosphere"/>.</param>
 /// <param name="PskReporter">The reading the frame completed, for <see cref="FrameOutcome.CompletedPskReporter"/>.</param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null);
+/// <param name="NoLongerSent">
+/// Part-received bulletins this frame's directory (completed or repeated) showed the head end has
+/// stopped sending, newly marked so (see <see cref="ReceiverStore.NoLongerSentRetention"/>); null if none.
+/// </param>
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null);
 
 /// <summary>How far one directory entry has got at this receiver.</summary>
 /// <param name="Entry">The directory's entry.</param>
@@ -134,7 +138,12 @@ public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Rec
 /// <param name="Complete">Whether it has been rebuilt.</param>
 /// <param name="Received">Symbols held, if not complete.</param>
 /// <param name="Needed">Symbols needed at least (K), if any have been received.</param>
-public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed);
+/// <param name="NoLongerSentSince">
+/// For a part-received bulletin, when a directory showed the head end has stopped sending it, so it
+/// can never be finished; null while it is still being sent, and for a complete one.
+/// </param>
+/// <param name="ClearedAt">When such an object is to be dropped (<see cref="ReceiverStore.NoLongerSentRetention"/> after <paramref name="NoLongerSentSince"/>); null otherwise.</param>
+public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed, DateTimeOffset? NoLongerSentSince = null, DateTimeOffset? ClearedAt = null);
 
 /// <summary>Settings for a <see cref="ReceiverStore"/>.</summary>
 public sealed record ReceiverStoreOptions
@@ -201,6 +210,7 @@ public sealed record ReceiverStoreOptions
 /// <code>
 /// objects/OOOOOOOOOOOOOOOO-DDDD-OTI/EEEEEE.sym   one symbol: object ID, dictionary ID, OTI in hex; ESI in hex
 /// done/OOOOOOOOOOOOOOOO                          the object has been rebuilt, and when; later frames are ignored
+/// stopped/OOOOOOOOOOOOOOOO                       a partial object the head end no longer sends, and since when
 /// outbox/OOOOOOOOOOOOOOOO.bulletin               a rebuilt bulletin not yet acknowledged
 /// archive/OOOOOOOOOOOOOOOO.mail                  an acknowledged bulletin and the BBS's answer (see MailArchive)
 /// quarantine/                                    outbox and archive files that could not be read
@@ -227,6 +237,13 @@ public sealed record ReceiverStoreOptions
 /// Done markers, partial objects and archived bulletins expire (<see cref="ReceiverStoreOptions"/>),
 /// so the store does not grow without bound. Expiry never touches the outbox.
 /// </para>
+/// <para>
+/// A directory lists every bulletin in rotation, so a partial bulletin a directory leaves out,
+/// heard after the bulletin's last new piece, has been retired by the head end and can never be
+/// finished. It is marked so, and dropped (given up) <see cref="NoLongerSentRetention"/> later
+/// rather than after <see cref="ReceiverStoreOptions.PartialRetention"/>. A new piece of it, or
+/// any directory that lists it again, takes the mark away.
+/// </para>
 /// <para>Not thread-safe: use one store from one thread, except <see cref="Mail"/> and
 /// <see cref="ReadMail(ulong, out bool)"/>, which any thread may call.</para>
 /// </remarks>
@@ -252,6 +269,9 @@ public sealed class ReceiverStore
     private readonly ReceiverStoreOptions _options;
     private readonly Dictionary<string, Instance> _instances = [];
     private readonly Dictionary<ulong, DateTimeOffset> _done = [];
+    private readonly string _stoppedDir;
+    private readonly Dictionary<ulong, DateTimeOffset> _stopped = [];
+    private readonly List<ulong> _givenUp = [];
     private readonly HashSet<string> _unusable = [];
     private DateTimeOffset _lastExpiry;
 
@@ -267,6 +287,7 @@ public sealed class ReceiverStore
         _doneDir = Path.Combine(root, "done");
         _outbox = Path.Combine(root, "outbox");
         _quarantine = Path.Combine(root, "quarantine");
+        _stoppedDir = Path.Combine(root, "stopped");
         System.IO.Directory.CreateDirectory(_objects);
         System.IO.Directory.CreateDirectory(_doneDir);
         System.IO.Directory.CreateDirectory(_outbox);
@@ -361,6 +382,7 @@ public sealed class ReceiverStore
                 Log($"skipped unreadable partial object {Path.GetFileName(dir)}: {e.Message}");
             }
         }
+        LoadStopped();
         Expire();
         foreach (var instance in _instances.Values.ToList())
         {
@@ -390,6 +412,12 @@ public sealed class ReceiverStore
 
     /// <summary>How long a directory is remembered by its object ID.</summary>
     public static readonly TimeSpan KnownDirectoriesRetention = TimeSpan.FromHours(48);
+
+    /// <summary>
+    /// How long a partial object is kept once a directory has shown the head end stopped sending
+    /// it: long enough to see on the status page why it will never fill, no longer.
+    /// </summary>
+    public static readonly TimeSpan NoLongerSentRetention = TimeSpan.FromHours(24);
 
     /// <summary>Where the newest ionosonde reading is kept, as the object that carried it, under the store's folder.</summary>
     public const string IonosphereFile = "ionosphere.bin";
@@ -514,6 +542,10 @@ public sealed class ReceiverStore
         {
             Expire();
         }
+        else
+        {
+            DropNoLongerSent(now);
+        }
         if (!MailcastFrame.TryParse(payload, out var frame) || frame is null)
         {
             return new AcceptResult(FrameOutcome.NotAFrame);
@@ -529,12 +561,14 @@ public sealed class ReceiverStore
             // as it keeps being heard, rather than the clock running out 48 h after the one time
             // it was originally rebuilt.
             BroadcastDirectory? repeated = null;
+            IReadOnlyList<ulong>? stopped = null;
             if (_knownDirectories.TryGetValue(frame.ObjectId, out var known))
             {
                 repeated = known.Directory;
                 RememberDirectory(frame.ObjectId, known.Directory);
+                stopped = CheckRotation(known.Directory, now);
             }
-            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: repeated);
+            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: repeated, NoLongerSent: stopped);
         }
         if (!_compression.Knows(frame.DictionaryId))
         {
@@ -566,6 +600,11 @@ public sealed class ReceiverStore
         }
         DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), symbol, now, _options.FlushToDisk);
         instance.LastPiece = now;
+        if (_stopped.ContainsKey(frame.ObjectId))
+        {
+            Log($"partial object {Describe(frame.ObjectId)} has a new piece, so the head end is sending it again; kept");
+            ForgetStopped(frame.ObjectId);
+        }
         if (isNew)
         {
             EnforcePartialLimit(instance);
@@ -881,10 +920,12 @@ public sealed class ReceiverStore
                 bid = mailEntry.Bid;
                 title = mailEntry.Title;
             }
-            result.Add(new HeldBulletin(id, bid, title, complete, received, needed));
+            DateTimeOffset? stoppedSince = !complete && _stopped.TryGetValue(id, out var since) ? since : null;
+            result.Add(new HeldBulletin(id, bid, title, complete, received, needed, stoppedSince, stoppedSince + NoLongerSentRetention));
         }
         return [.. result
             .OrderBy(r => r.Complete) // part-received first: the most actionable
+            .ThenBy(r => r.NoLongerSentSince is not null) // and of those, the ones still being sent
             .ThenByDescending(r => r.Received)
             .ThenBy(r => r.Bid is null) // named rows before ones still "not yet named"
             .ThenBy(r => r.Bid, StringComparer.Ordinal)
@@ -917,6 +958,7 @@ public sealed class ReceiverStore
             }
         }
         PruneKnownDirectories(now);
+        DropNoLongerSent(now);
         foreach (var instance in _instances.Values.ToList())
         {
             if (now - instance.LastPiece > _options.PartialRetention)
@@ -926,6 +968,221 @@ public sealed class ReceiverStore
             }
         }
     }
+
+    /// <summary>
+    /// Compares the partial objects held with a directory just heard (completed, or a repeat of
+    /// one known), and returns those newly marked as no longer sent. The head end lists every
+    /// bulletin in rotation, so a bulletin the directory leaves out, whose last new piece came
+    /// before the directory did, has been retired and can never be finished.
+    /// </summary>
+    /// <remarks>
+    /// <para>Only objects known to be bulletins are marked (<see cref="IsKnownBulletin"/>):
+    /// directories and the propagation readings are never listed, so their absence says nothing.</para>
+    /// <para>Any directory that lists a marked object takes the mark away, whatever its date, which
+    /// undoes a mark a stray directory (issue #72: an old one, or another head end's) may have
+    /// made. Only marking is limited by date: a directory older than the newest plausible one
+    /// heard, or dated after today by this receiver's clock, says nothing about what is being
+    /// sent now.</para>
+    /// </remarks>
+    private List<ulong>? CheckRotation(BroadcastDirectory directory, DateTimeOffset heardAt)
+    {
+        var listed = new HashSet<ulong>(directory.Entries.Select(e => e.ObjectId));
+        DateOnly latest = LatestPlausibleDate(heardAt);
+        bool canMark = directory.Date <= latest && directory.Date >= NewestDirectoryDate(latest);
+        List<ulong>? marked = null;
+        foreach (var held in _instances.Values.GroupBy(i => i.ObjectId).OrderBy(g => g.Key))
+        {
+            ulong id = held.Key;
+            if (listed.Contains(id))
+            {
+                if (_stopped.ContainsKey(id))
+                {
+                    Log($"partial object {Describe(id)} is in the directory again, so the head end is still sending it; kept");
+                    ForgetStopped(id);
+                }
+                continue;
+            }
+            if (!canMark || _stopped.ContainsKey(id) || held.Max(i => i.LastPiece) >= heardAt || !IsKnownBulletin(id, held))
+            {
+                continue;
+            }
+            var fullest = held.MaxBy(i => i.Symbols.Count)!;
+            WriteStopped(id, heardAt);
+            Log($"partial object {Describe(id)} has {fullest.Symbols.Count} of {fullest.Oti.SourceBlockSymbols(0)} pieces and is no longer in the directory: "
+                + $"the head end has stopped sending it, so it can't be finished; dropping it at {(heardAt + NoLongerSentRetention).UtcDateTime:yyyy-MM-dd HH:mm} UTC");
+            (marked ??= []).Add(id);
+        }
+        return marked;
+    }
+
+    /// <summary>
+    /// The latest directory date that can be about now: today by this receiver's clock, or
+    /// tomorrow within the last hour of the UTC day, so a few minutes' difference between the two
+    /// clocks around midnight does not count as a directory from the future.
+    /// </summary>
+    private static DateOnly LatestPlausibleDate(DateTimeOffset now) => DateOnly.FromDateTime((now + TimeSpan.FromHours(1)).UtcDateTime);
+
+    /// <summary>The newest date of any directory heard (the newest, or one still remembered) that is not after <paramref name="latest"/>.</summary>
+    private DateOnly NewestDirectoryDate(DateOnly latest)
+    {
+        var newest = DateOnly.MinValue;
+        foreach (var date in _knownDirectories.Values.Select(k => k.Directory.Date).Append(Directory?.Date ?? DateOnly.MinValue))
+        {
+            if (date <= latest && date > newest)
+            {
+                newest = date;
+            }
+        }
+        return newest;
+    }
+
+    /// <summary>
+    /// Whether a partial object is known to be a bulletin: a directory heard (the newest, or one
+    /// still remembered) lists it as one, or its piece 0 is held. The frame header does not say
+    /// what an object is, but RaptorQ is systematic: piece 0 is the object's first octets, and the
+    /// first of those is its content type (<see cref="ContentType"/>). An object that is neither
+    /// is left to the ordinary <see cref="ReceiverStoreOptions.PartialRetention"/>.
+    /// </summary>
+    private bool IsKnownBulletin(ulong objectId, IEnumerable<Instance> held)
+    {
+        foreach (var instance in held)
+        {
+            if (instance.Symbols.TryGetValue(0, out var first) && first.Length > 0)
+            {
+                return (first[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Bulletin;
+            }
+        }
+        if (Directory?.Find(objectId) is { } entry)
+        {
+            return entry.Type == (byte)ObjectKind.Bulletin;
+        }
+        foreach (var (directory, _) in _knownDirectories.Values)
+        {
+            if (directory.Find(objectId) is { } remembered)
+            {
+                return remembered.Type == (byte)ObjectKind.Bulletin;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Drops every partial object marked as no longer sent more than
+    /// <see cref="NoLongerSentRetention"/> ago. Runs with each frame, and cheaply: the marks are
+    /// few. A caller that shows the list between frames calls it first, so nothing overdue shows.
+    /// Each object dropped this way is given up: see <see cref="TakeGivenUp"/>.
+    /// </summary>
+    public void DropNoLongerSent() => DropNoLongerSent(_options.Time.GetUtcNow());
+
+    /// <summary>
+    /// The objects given up (dropped because the head end stopped sending them) since the last
+    /// call, oldest first, so the owner can count them outside whatever lock guards the store.
+    /// Held in memory only.
+    /// </summary>
+    public IReadOnlyList<ulong> TakeGivenUp()
+    {
+        if (_givenUp.Count == 0)
+        {
+            return [];
+        }
+        var taken = _givenUp.ToList();
+        _givenUp.Clear();
+        return taken;
+    }
+
+    private void DropNoLongerSent(DateTimeOffset now)
+    {
+        if (_stopped.Count == 0)
+        {
+            return;
+        }
+        foreach (var (id, since) in _stopped.Where(kv => now - kv.Value >= NoLongerSentRetention).OrderBy(kv => kv.Key).ToList())
+        {
+            var held = _instances.Values.Where(i => i.ObjectId == id).ToList();
+            var fullest = held.MaxBy(i => i.Symbols.Count);
+            Log(fullest is null
+                ? $"partial object {Describe(id)} dropped: the head end stopped sending it at {since.UtcDateTime:yyyy-MM-dd HH:mm} UTC"
+                : $"partial object {Describe(id)} dropped with {fullest.Symbols.Count} of {fullest.Oti.SourceBlockSymbols(0)} pieces: the head end stopped sending it at {since.UtcDateTime:yyyy-MM-dd HH:mm} UTC");
+            foreach (var instance in held)
+            {
+                Remove(instance);
+            }
+            ForgetStopped(id); // Remove has, unless there was nothing to remove
+            _givenUp.Add(id);
+        }
+    }
+
+    private void WriteStopped(ulong objectId, DateTimeOffset since)
+    {
+        System.IO.Directory.CreateDirectory(_stoppedDir);
+        DurableFile.WriteAtomically(StoppedPath(objectId), Bulletin.TextEncoding.GetBytes(since.ToString("o", CultureInfo.InvariantCulture)), flush: _options.FlushToDisk);
+        _stopped[objectId] = since;
+    }
+
+    private void ForgetStopped(ulong objectId)
+    {
+        _stopped.Remove(objectId);
+        TryDelete(StoppedPath(objectId));
+    }
+
+    /// <summary>
+    /// Reads the no-longer-sent marks, once the partial objects are loaded: a mark whose object is
+    /// no longer held goes, as does one that does not read.
+    /// </summary>
+    private void LoadStopped()
+    {
+        if (!System.IO.Directory.Exists(_stoppedDir))
+        {
+            return;
+        }
+        var held = new HashSet<ulong>(_instances.Values.Select(i => i.ObjectId));
+        foreach (var file in System.IO.Directory.EnumerateFiles(_stoppedDir))
+        {
+            if (!ObjectId.TryParse(Path.GetFileName(file), out ulong id) || !held.Contains(id))
+            {
+                TryDelete(file);
+                continue;
+            }
+            string text;
+            try
+            {
+                text = File.ReadAllText(file).Trim();
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+            if (DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var since))
+            {
+                _stopped[id] = since;
+            }
+            else
+            {
+                Log($"stopped/{Path.GetFileName(file)} unreadable, removed");
+                TryDelete(file);
+            }
+        }
+    }
+
+    /// <summary>An object's ID, with its BID when a directory still remembered names it: for log lines.</summary>
+    private string Describe(ulong objectId)
+    {
+        string? bid = Directory?.Find(objectId)?.Bid;
+        if (bid is null)
+        {
+            foreach (var (directory, _) in _knownDirectories.Values)
+            {
+                if (directory.Find(objectId) is { } entry)
+                {
+                    bid = entry.Bid;
+                    break;
+                }
+            }
+        }
+        return bid is null ? ObjectId.Format(objectId) : $"{ObjectId.Format(objectId)} ({bid})";
+    }
+
+    private string StoppedPath(ulong objectId) => Path.Combine(_stoppedDir, ObjectId.Format(objectId));
 
     private void EnforcePartialLimit(Instance keep)
     {
@@ -1090,7 +1347,8 @@ public sealed class ReceiverStore
                 HeardScheduleDate = directory.Date;
             }
             MarkDone(instance);
-            return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory);
+            var stopped = CheckRotation(directory, _options.Time.GetUtcNow());
+            return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped);
         }
 
         Bulletin bulletin;
@@ -1156,6 +1414,10 @@ public sealed class ReceiverStore
         if (System.IO.Directory.Exists(instance.Path))
         {
             System.IO.Directory.Delete(instance.Path, recursive: true);
+        }
+        if (_stopped.ContainsKey(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
+        {
+            ForgetStopped(instance.ObjectId);
         }
     }
 
