@@ -1231,7 +1231,7 @@ function partialRow(p) {
   /* The head end has retired it before enough pieces were heard: say so, rather than leave a
      bar that looks as if it might still fill. */
   if (p.noLongerSent) {
-    st.append(el("div", `GB7RDG has stopped sending this one, so it can't be finished. It will be cleared ${day(p.clearsAt) ? "tomorrow at" : "at"} ${utc(p.clearsAt)} (${local(p.clearsAt)} your time).`, "muted stopped-note"));
+    st.append(el("div", `GB7RDG has stopped sending this one, so it can't be finished. It will be cleared at ${at(p.clearsAt)}.`, "muted stopped-note"));
   }
   cell.append(st);
   tr.append(cell);

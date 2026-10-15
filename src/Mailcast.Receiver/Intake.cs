@@ -134,10 +134,12 @@ public sealed class Intake : IAsyncDisposable
     public event Action<BroadcastDirectory>? DirectoryHeard;
 
     /// <summary>
-    /// Part-received objects a directory has just shown the head end stopped sending (raised on
-    /// the worker), each once as it is marked: see <see cref="ReceiverStore.NoLongerSentRetention"/>.
+    /// Part-received bulletins given up: dropped because the head end stopped sending them (see
+    /// <see cref="ReceiverStore.NoLongerSentRetention"/>), each once, as it is dropped. Raised
+    /// outside the store's lock, on the worker or on whichever thread asked for
+    /// <see cref="HeldBulletins"/>.
     /// </summary>
-    public event Action<IReadOnlyList<ulong>>? NoLongerSent;
+    public event Action<IReadOnlyList<ulong>>? GivenUp;
 
     /// <summary>Issue #49: the ionosonde reading for the slot now on was received.</summary>
     public event Action<IonoReading>? IonosphereHeard;
@@ -383,10 +385,31 @@ public sealed class Intake : IAsyncDisposable
     /// </summary>
     public IReadOnlyList<HeldBulletin> HeldBulletins()
     {
+        IReadOnlyList<HeldBulletin> held;
+        IReadOnlyList<ulong> givenUp;
         lock (_gate)
         {
             _store.DropNoLongerSent();
-            return _store.HeldBulletins();
+            held = _store.HeldBulletins();
+            givenUp = _store.TakeGivenUp();
+        }
+        RaiseGivenUp(givenUp);
+        return held;
+    }
+
+    private void RaiseGivenUp(IReadOnlyList<ulong> givenUp)
+    {
+        if (givenUp.Count == 0)
+        {
+            return;
+        }
+        try
+        {
+            GivenUp?.Invoke(givenUp);
+        }
+        catch (Exception e)
+        {
+            _log($"store: a listener failed: {Ascii.Clean(e.Message)}");
         }
     }
 
@@ -443,6 +466,7 @@ public sealed class Intake : IAsyncDisposable
     {
         AcceptResult result;
         MailParts? parts = null;
+        IReadOnlyList<ulong> givenUp = [];
         try
         {
             lock (_gate)
@@ -450,6 +474,7 @@ public sealed class Intake : IAsyncDisposable
                 try
                 {
                     result = _store.Accept(payload.Span);
+                    givenUp = _store.TakeGivenUp();
                     if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
                     {
                         _progress = (_store.Directory, _store.Progress());
@@ -461,6 +486,7 @@ public sealed class Intake : IAsyncDisposable
                 }
             }
             Publish(parts);
+            RaiseGivenUp(givenUp);
         }
         catch (Exception e)
         {
@@ -491,10 +517,6 @@ public sealed class Intake : IAsyncDisposable
 
     private void Report(AcceptResult result)
     {
-        if (result.NoLongerSent is { Count: > 0 } stopped)
-        {
-            NoLongerSent?.Invoke(stopped);
-        }
         switch (result.Outcome)
         {
             case FrameOutcome.Stored:

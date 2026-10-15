@@ -193,8 +193,8 @@ public sealed class FeedbackService
     }
 
     /// <summary>
-    /// Part-received bulletins were given up because the head end has stopped sending them,
-    /// counted on today's UTC date, each object once whichever of the days kept it was marked on.
+    /// Part-received bulletins were given up: dropped because the head end had stopped sending
+    /// them. Counted on today's UTC date, the day they were dropped, each object once.
     /// </summary>
     public void NoteGivenUp(IReadOnlyList<ulong> objectIds)
     {
@@ -713,7 +713,7 @@ public sealed class FeedbackService
         public int AlreadyHad { get; set; }
 
         /// <summary>
-        /// The objects given up because the head end stopped sending them, by ID in hex, so each is
+        /// The objects given up (dropped because the head end stopped sending them), by ID in hex, so each is
         /// counted once. Empty in a feedback.json from before this was kept, as for <see cref="AlreadyHad"/>.
         /// </summary>
         public List<string> GivenUp { get; set; } = [];

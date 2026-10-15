@@ -578,8 +578,8 @@ public class MailTests
 
     /// <summary>
     /// A part-received bulletin that a directory heard since its last piece leaves out, which the
-    /// head end has stopped sending: GET /api/mail says so and when it will be cleared, and the
-    /// intake tells the daily report once.
+    /// head end has stopped sending: GET /api/mail says so and when it will be cleared, and once
+    /// it is cleared (here by the page asking, between frames) the intake tells the daily report.
     /// </summary>
     [Fact]
     public async Task Mail_APartReceivedBulletinNoLongerSent_SaysWhenItWillBeCleared()
@@ -591,7 +591,7 @@ public class MailTests
         await using var _p = page;
         using var _c = http;
         var givenUp = new List<ulong>();
-        host.Intake.NoLongerSent += ids => givenUp.AddRange(ids);
+        host.Intake.GivenUp += ids => givenUp.AddRange(ids);
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(901, bodyLines: 200)));
         await host.Intake.DrainAsync(CancellationToken.None);
 
@@ -602,12 +602,13 @@ public class MailTests
         var partial = Assert.Single(mail.GetProperty("partial").EnumerateArray());
         Assert.True(partial.GetProperty("noLongerSent").GetBoolean());
         Assert.Equal(Start.AddHours(25), partial.GetProperty("clearsAt").GetDateTimeOffset());
-        Assert.Single(givenUp);
+        Assert.Empty(givenUp); // marked, not yet given up
 
         time.Advance(TimeSpan.FromHours(24));
         mail = await http.GetFromJsonAsync<JsonElement>("api/mail");
         Assert.Empty(mail.GetProperty("partial").EnumerateArray());
         Assert.Equal(0, host.Intake.PartialObjects);
+        Assert.Single(givenUp);
     }
 
     /// <summary>

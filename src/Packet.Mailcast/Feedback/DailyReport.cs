@@ -64,7 +64,8 @@ public sealed record ReportSlot(
 /// many of the day's bulletins the BBS already had, as its own seventh field: <c>-</c> for a
 /// header with no seventh field at all, which means not known rather than zero, since an older
 /// sender folded this into delivered instead of counting it apart. The eighth field is how many
-/// part-received bulletins were given up that day because the head end stopped sending them; a
+/// part-received bulletins were given up that day: dropped, that day, because the head end had
+/// stopped sending them; a
 /// header without it does not know. Whenever the eighth is written, so is the seventh (as
 /// <c>-</c> if need be). A reader ignores a field after the eighth, so the header can grow
 /// further still.</para>
@@ -230,8 +231,8 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         // altogether (a header with only six fields, an older sender's) or "-" both mean not
         // known, not zero: the older format folded this into field 5's delivered instead.
         int? alreadyHad = f.Length > 6 ? ParseCount(f[6], "an already-had") : null;
-        // Field 8: how many part-received bulletins were given up because the head end stopped
-        // sending them. Missing, or "-", means not known: an older sender's report.
+        // Field 8: how many part-received bulletins were given up (dropped because the head end
+        // had stopped sending them) that day. Missing, or "-", means not known: an older sender's report.
         int? givenUp = f.Length > 7 ? ParseCount(f[7], "a given-up") : null;
         return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad, givenUp);
     }
@@ -420,8 +421,8 @@ public static class ReportErrors
 /// format folded it into <paramref name="Delivered"/> instead.
 /// </param>
 /// <param name="GivenUp">
-/// Part-received bulletins given up in the day because the head end stopped sending them, each
-/// counted once, on the day it was given up. Null when not known: read from a header with no
+/// Part-received bulletins given up in the day: dropped that day because the head end had
+/// stopped sending them, each counted once. Null when not known: read from a header with no
 /// eighth field, or <c>-</c> there; and, written, null leaves the field out.
 /// </param>
 public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad, int? GivenUp = null);
