@@ -242,7 +242,7 @@ public sealed class SlotRunner
             if (frames.Count == 0)
             {
                 return Finish(SlotOutcome.Skipped, leftover > 0 && leftover == bulletins
-                    ? $"nothing to send: only {leftover} leftover bulletins, which go only in a slot that keys anyway"
+                    ? $"nothing to send: only {leftover} leftover bulletins, which go only in a slot that sends other bulletins too"
                     : "nothing to send");
             }
             var model = owner.Model(_airtime);

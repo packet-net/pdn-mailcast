@@ -225,6 +225,41 @@ public class BudgetSchedulerTests
     }
 
     [Fact]
+    public void Leftover_GoesAfterEveryOtherPiece_SoASlotCutShortLosesItFirst()
+    {
+        var rule = Options.Budget!;
+        var normal = Enumerable.Range(0, 5).Select(i => AtCoverage(700 + i, 3000 + (i * 1500), i * 0.8)).ToList();
+        // One crossing 6 K in this slot, whose pieces past 6 K come from the leftover tier's turn.
+        var crossing = AtCoverage(710, 6000, 5.8);
+        var leftover = Enumerable.Range(0, 4).Select(i => AtCoverage(720 + i, 2000 + (i * 2000), 6.5 + i)).ToList();
+        var held = new List<CarriedBulletin>([.. normal, crossing, .. leftover]);
+        var plan = BroadcastScheduler.Plan(held, Slot, 3, Compression.Default, Options, null, Frames(1000));
+        var byId = held.ToDictionary(c => c.Transfer.ObjectId);
+        bool Spare(MailcastFrame f) => byId[f.ObjectId] is var c
+            && (BroadcastScheduler.Leftover(c, Slot, rule) || f.EncodingSymbolId >= BroadcastScheduler.LeftoverSymbols(c.Transfer.SourceSymbols, rule));
+        var pieces = plan.Frames.Select((f, i) => (f, i)).Where(x => byId.ContainsKey(x.f.ObjectId)).ToList();
+        Assert.Contains(pieces, x => Spare(x.f));
+        Assert.Contains(pieces, x => !Spare(x.f));
+        Assert.Contains(pieces, x => byId[x.f.ObjectId] == crossing && Spare(x.f));
+
+        // Cut the slot at every frame: whatever went, no leftover-turn piece went before any other.
+        for (int cut = 0; cut <= plan.Frames.Count; cut++)
+        {
+            var sent = pieces.Where(x => x.i < cut).ToList();
+            if (sent.Any(x => Spare(x.f)))
+            {
+                Assert.Equal(pieces.Count(x => !Spare(x.f)), sent.Count(x => !Spare(x.f)));
+            }
+        }
+
+        // The directory still runs through the whole slot, the leftover tier's part included.
+        ulong directoryId = plan.Objects[0].Transfer.ObjectId;
+        int firstSpare = pieces.First(x => Spare(x.f)).i;
+        Assert.Equal(directoryId, plan.Frames[0].ObjectId);
+        Assert.Contains(plan.Frames.Skip(firstSpare), f => f.ObjectId == directoryId);
+    }
+
+    [Fact]
     public void Leftover_Alone_KeysNothing_ButIsStillListed()
     {
         var spare = AtCoverage(12, 6000, 7);

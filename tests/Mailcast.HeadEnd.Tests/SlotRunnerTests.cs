@@ -68,7 +68,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         var only = new Rig();
         var skipped = only.Run(0, bulletins: 3, leftover: 3);
         Assert.Equal(SlotOutcome.Skipped, skipped.Outcome);
-        Assert.Contains(only.Journal.Lines, l => l.Contains("skipped: nothing to send: only 3 leftover bulletins, which go only in a slot that keys anyway", StringComparison.Ordinal));
+        Assert.Contains(only.Journal.Lines, l => l.Contains("skipped: nothing to send: only 3 leftover bulletins, which go only in a slot that sends other bulletins too", StringComparison.Ordinal));
         Assert.Empty(only.Station.Keyups);
     }
 

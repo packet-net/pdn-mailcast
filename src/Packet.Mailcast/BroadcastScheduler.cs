@@ -42,7 +42,9 @@ public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnl
 /// Once a bulletin has had <see cref="RetireCoverage"/> K in all, or <see cref="RetireAfter"/> has
 /// passed since its first slot, whichever comes first, it moves to the leftover tier: it gets only
 /// the airtime left once every other bulletin in rotation has had all a slot will give it, the
-/// least covered first and still up to the cap, and only in a slot that keys anyway. It retires
+/// least covered first and still up to the cap, and only in a slot that sends pieces of some
+/// other bulletin (a one-off slot with nothing else sends the directory alone), after all of
+/// them, so a slot cut short loses the leftover tier's pieces first. It retires
 /// for good at <see cref="BroadcastScheduler.LeftoverCoverage"/> K or
 /// <see cref="BroadcastScheduler.LeftoverHours"/> hours after its first slot (or at this rule's own
 /// limits, if they are later), and only then leaves the slots and the directory.
@@ -669,10 +671,11 @@ public static class BroadcastScheduler
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 
         int[] counts;
+        int[] main; // of each count, the pieces from before the leftover tier's turn, which go first
         anyRoom = false;
         if (options.Budget is { } rule)
         {
-            counts = Fill(bulletins.Select(b => b.Carried).ToList(), leftover, directoryObject, options, rule, budget!, extras, out anyRoom);
+            counts = Fill(bulletins.Select(b => b.Carried).ToList(), leftover, directoryObject, options, rule, budget!, extras, out anyRoom, out main);
         }
         else
         {
@@ -687,12 +690,13 @@ public static class BroadcastScheduler
                 uint due = (uint)DueAt(c.Transfer.SourceSymbols, c.FirstSlot ?? slot, slot, options);
                 counts[i] = c.NextEsi >= due ? 0 : (int)(due - c.NextEsi);
             }
+            main = counts;
         }
 
         int? directoryCap = null;
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, counts, seed, options, extras, leftover.Count(l => l), directoryCap);
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, counts, main, seed, options, extras, leftover.Count(l => l), directoryCap);
             if (budget is null || options.Budget is null
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {
@@ -702,17 +706,18 @@ public static class BroadcastScheduler
             {
                 // The fill counts frames in a different order from the one they go in, which only
                 // matters when objects have different symbol sizes: if the real order runs over,
-                // take a symbol from the best covered bulletin and try again, the leftover tier's
-                // first, so that it never costs another bulletin a piece.
+                // take a symbol from the best covered bulletin and try again, a piece from the
+                // leftover tier's turn first, so that it never costs another bulletin a piece.
                 int most = -1;
                 for (int i = 0; i < counts.Length; i++)
                 {
-                    if (counts[i] > 0 && (most < 0 || (leftover[i], Coverage(bulletins[i].Carried, counts[i])).CompareTo((leftover[most], Coverage(bulletins[most].Carried, counts[most]))) > 0))
+                    if (counts[i] > 0 && (most < 0 || (counts[i] > main[i], leftover[i], Coverage(bulletins[i].Carried, counts[i])).CompareTo((counts[most] > main[most], leftover[most], Coverage(bulletins[most].Carried, counts[most]))) > 0))
                     {
                         most = i;
                     }
                 }
                 counts[most]--;
+                main[most] = Math.Min(main[most], counts[most]);
                 continue;
             }
             // No bulletin frames left to give up (none in rotation, or the fill already gave up
@@ -791,9 +796,10 @@ public static class BroadcastScheduler
     /// room, and some of them something, does the leftover tier get a turn: again up to the slot
     /// cap, now never past <see cref="RetireSymbols"/>, which also lets a bulletin that reached its
     /// leftover coverage in this slot carry on. So the leftover tier never takes a piece from
-    /// another bulletin, and never keys a slot on its own.
+    /// another bulletin, and never gets pieces in a slot that has none of any other. <paramref name="main"/> is each count
+    /// before the leftover tier's turn: those pieces go first in the slot (<see cref="Build"/>).
     /// </summary>
-    private static int[] Fill(List<CarriedBulletin> bulletins, List<bool> leftover, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, out bool anyRoom)
+    private static int[] Fill(List<CarriedBulletin> bulletins, List<bool> leftover, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, out bool anyRoom, out int[] main)
     {
         var counts = new int[bulletins.Count];
         int[] extraLengths = [.. extras.Select(f => f.ToBytes().Length)];
@@ -823,11 +829,16 @@ public static class BroadcastScheduler
             return budget.Airtime(all) <= budget.Limit;
         }
         anyRoom = room.Any(r => r > 0);
+        main = counts;
         foreach (var limit in new[] { floor, room, spare })
         {
-            if (limit == spare && counts.All(n => n == 0))
+            if (limit == spare)
             {
-                break; // a slot with nothing but the leftover tier to send keys nothing
+                if (counts.All(n => n == 0))
+                {
+                    break; // a slot with nothing but the leftover tier to send keys nothing
+                }
+                main = (int[])counts.Clone();
             }
             var queue = new PriorityQueue<int, (double Coverage, int Order)>();
             for (int i = 0; i < bulletins.Count; i++)
@@ -854,8 +865,13 @@ public static class BroadcastScheduler
         return counts;
     }
 
-    /// <summary>Makes the slot's frames from each bulletin's count: the directory's share, then the interleaving.</summary>
-    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, int[] counts, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null)
+    /// <summary>
+    /// Makes the slot's frames from each bulletin's count: the directory's share, then the
+    /// interleaving. The first <paramref name="main"/> pieces of each bulletin are interleaved over
+    /// the slot's first part and the rest (the leftover tier's turn) after them all, so a slot cut
+    /// short loses the leftover tier's pieces before any other.
+    /// </summary>
+    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, int[] counts, int[] main, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null)
     {
         var scheduled = new List<ScheduledObject>();
         for (int i = 0; i < bulletins.Count; i++)
@@ -869,16 +885,18 @@ public static class BroadcastScheduler
         int directoryFrames = Math.Max(1, Math.Min(DirectoryFrames(directoryObject, bulletinFrames, options), directoryFramesCap ?? int.MaxValue));
         scheduled.Insert(0, new ScheduledObject(directoryObject, 0, directoryFirst, directoryFrames));
 
-        // Interleave the bulletins by position (i + u) / n.
+        // Interleave the bulletins by position (i + u) / n, the leftover tier's turn after
+        // everything else: its pieces of an object by 1 + (i - m + u) / (n - m), m the rest.
         var rng = new Random(seed);
         var order = new List<(double Position, int Object, int Index)>();
         for (int j = 1; j < scheduled.Count; j++)
         {
             double phase = rng.NextDouble();
             int n = scheduled[j].Count;
+            int m = Math.Min(main[j - 1], n);
             for (int i = 0; i < n; i++)
             {
-                order.Add(((i + phase) / n, j, i));
+                order.Add((i < m ? (i + phase) / m : 1 + ((i - m + phase) / (n - m)), j, i));
             }
         }
         order.Sort((a, b) =>
