@@ -222,6 +222,16 @@ public class SdrConnectSourceTests
     }
 
     [Fact]
+    public void ShortfallAdvice_NamesNoSettingAndIsPlainAscii()
+    {
+        string advice = AudioPipeline.SdrConnectShortfallAdvice;
+
+        Assert.DoesNotContain("\"", advice, StringComparison.Ordinal);
+        Assert.EndsWith(".", advice, StringComparison.Ordinal);
+        Assert.True(advice.All(c => c is >= ' ' and <= '~'), advice);
+    }
+
+    [Fact]
     public void Problem_ConnectTimedOut_FromAnAddressThatAnsweredEarlier_SaysSdrConnectHasGone()
     {
         var endpoint = new SdrConnectEndpoint("192.168.40.61", 5454);

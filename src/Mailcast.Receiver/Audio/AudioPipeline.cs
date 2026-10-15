@@ -561,7 +561,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         {
             input = await SdrConnectIqInput.OpenAsync(
                 endpoint,
-                new SdrConnectOptions { CentreFrequencyHz = DialHz, Journal = Journal },
+                new SdrConnectOptions { CentreFrequencyHz = DialHz, ShortfallAdvice = SdrConnectShortfallAdvice, Journal = Journal },
                 new IqChannelSpec { OffsetHz = 0, Demodulation = IqDemodulation.Usb, Name = "mailcast", SsbLowHz = low, SsbHighHz = high },
                 new IqReceiverOptions { DspRate = OnAir.SampleRate, Journal = Journal },
                 DialHz,
@@ -587,6 +587,13 @@ public sealed class AudioPipeline : IAsyncDisposable
             + $"heard here as USB on dial {OnAir.Mhz(DialHz)} MHz ({filter}), signal centre {OnAir.Mhz(OnAir.TransmitHz)} MHz. "
             + "The receiver tunes SDRconnect itself: leave its tuning alone while it runs");
     }
+
+    /// <summary>
+    /// What the journal adds when SDRconnect's IQ arrives short of its rate: this receiver has no
+    /// setting that needs less of the link, so it says what helps instead.
+    /// </summary>
+    internal const string SdrConnectShortfallAdvice =
+        "A wired link for both this machine and the PC is best; this machine being busy, such as with a web page open on it, can cause it too.";
 
     /// <summary>
     /// Whether SDRconnect at this source's address has been listened to before in this run: then
