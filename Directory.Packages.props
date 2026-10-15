@@ -10,6 +10,7 @@
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="ZstdSharp.Port" Version="0.8.8" />
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageVersion Include="pdn-soundmodem" Version="0.91.1" />
     <PackageVersion Include="pdn-soundmodem-windows" Version="0.91.1" />
     <PackageVersion Include="System.ServiceProcess.ServiceController" Version="10.0.0" />

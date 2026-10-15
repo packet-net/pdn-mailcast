@@ -258,6 +258,32 @@ slots today (2026-10-05): 14, 13 completed, 0 cut short, 1 skipped
 
 When some bulletins are in the leftover tier, the slot lines and `--plan` say how many, for example `38 bulletins in rotation (4 leftover)`.
 
+`signing` says whether directories are signed (`signs`) and with which key (`keyId`): see [Signing the directory](#signing-the-directory).
+
+## Signing the directory
+
+With a signing key, the head end signs every directory it sends. Receivers from 0.14.0 check the signature, so a listener can tell bulletins from this transmitter from a stray or forged source; older receivers ignore it and carry on as before. Without a key, directories go out unsigned, exactly as they always have.
+
+Make the key once, on the head end, and let the service read it:
+
+```
+sudo sh -c 'umask 077; openssl genpkey -algorithm ed25519 -out /etc/pdn-mailcast-headend/signing-key.pem'
+sudo chown root:pdn-mailcast-headend /etc/pdn-mailcast-headend/signing-key.pem
+sudo chmod 0640 /etc/pdn-mailcast-headend/signing-key.pem
+sudo systemctl restart pdn-mailcast-headend
+```
+
+The place is fixed: there is no setting for it. At start-up the journal says which way it is, in one line:
+
+```
+signing: directories are signed with key 6f39d04c925c01cf, public key e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=
+signing: no key at /etc/pdn-mailcast-headend/signing-key.pem, so directories go out unsigned
+```
+
+`pdn-mailcast-headend --check-config` prints the same line. A key file that is there but cannot be read, or is not an Ed25519 key, stops the service with the reason, rather than sending unsigned by surprise.
+
+The public key in that line is what listeners trust. GB7RDG's is built into the receiver. Another transmitter gives its line to listeners, who add the key to `trustedKeys` in their receiver.json (see the receiver's docs). Keep the private key private and backed up: a new key means every receiver has to be told the new public key.
+
 ## Offline
 
 `pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone and the channel probe, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.timeUtc` if left out), daylight or not, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state.
@@ -266,7 +292,7 @@ The published pdn-soundmodem package cannot pack frames yet, so offline every fr
 
 ## Configuration
 
-`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with GB7RDG's hourly daylight slot settings and the defaults for the rest. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file.
+`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with GB7RDG's hourly daylight slot settings and the defaults for the rest. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file, and says whether directories will be signed.
 
 `schedule.symbolSize` sets the frame size: the bytes of bulletin each frame carries, 64 to 940 in steps of 4 (940 if left out). Smaller frames survive fades and other stations' transmissions better, and since a bulletin rounds up to whole pieces they waste less on short bulletins too. On 2026-10-05 a busy 40 m band left almost nothing of 940-byte frames, and 240 is the size to try first. Receivers read the size from each frame, so nothing changes at their end. A bulletin keeps the size it was first encoded with.
 

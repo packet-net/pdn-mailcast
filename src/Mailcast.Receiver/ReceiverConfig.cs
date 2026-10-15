@@ -50,6 +50,16 @@ public sealed record BbsSettings
     public string Command { get; init; } = "BBS";
 }
 
+/// <summary>One transmitter key the owner trusts, besides the built-in ones (<see cref="TrustedKey.BuiltIn"/>).</summary>
+public sealed record TrustedKeySettings
+{
+    /// <summary>What the page and the log call the transmitter, such as its callsign.</summary>
+    public string Label { get; init; } = "";
+
+    /// <summary>Its public key in base64, as its head end logs it at start-up.</summary>
+    public string PublicKey { get; init; } = "";
+}
+
 /// <summary>The local web page.</summary>
 public sealed record WebSettings
 {
@@ -296,6 +306,40 @@ public sealed record ReceiverConfig
     /// </summary>
     public FeedbackSettings? Feedback { get; init; }
 
+    /// <summary>
+    /// Transmitter keys to trust as well as the built-in ones (GB7RDG's): a directory signed by
+    /// one of these, or by a built-in key, shows as "signed by" its label. Null (the default)
+    /// adds none. Left out of a saved file while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<TrustedKeySettings>? TrustedKeys { get; init; }
+
+    /// <summary>
+    /// Every key this receiver trusts: the built-in ones, then <see cref="TrustedKeys"/>. Throws
+    /// <see cref="ConfigException"/> if one of those cannot be read.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyList<TrustedKey> AllTrustedKeys
+    {
+        get
+        {
+            var keys = new List<TrustedKey>(TrustedKey.BuiltIn);
+            for (int i = 0; i < (TrustedKeys?.Count ?? 0); i++)
+            {
+                var setting = TrustedKeys![i] ?? throw new ConfigException($"\"trustedKeys\" entry {i + 1} is null: give a \"label\" and a \"publicKey\"");
+                try
+                {
+                    keys.Add(TrustedKey.Parse(setting.Label, setting.PublicKey));
+                }
+                catch (FormatException e)
+                {
+                    throw new ConfigException($"\"trustedKeys\" entry {i + 1}: {e.Message}; give a \"label\" and the transmitter's \"publicKey\" in base64, as its head end logs it");
+                }
+            }
+            return keys;
+        }
+    }
+
     internal static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -491,6 +535,7 @@ public sealed record ReceiverConfig
         Bpq?.Validate();
         Hooks?.Validate();
         Feedback?.Validate();
+        _ = AllTrustedKeys;
         if (Rig is { DedicatedRadio: false } && Bpq is null)
         {
             throw new ConfigException(

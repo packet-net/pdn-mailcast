@@ -67,8 +67,23 @@ public sealed class Intake : IAsyncDisposable
         _pskReporter = _store.PskReporter;
         _time = (options ?? new ReceiverStoreOptions()).Time;
         _progress = (_store.Directory, _store.Progress());
+        _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
         _worker = Task.Run(RunAsync);
     }
+
+    private volatile Tuple<DirectoryCheck?, HeardDirectoryCheck?> _directoryChecksHeld = Tuple.Create<DirectoryCheck?, HeardDirectoryCheck?>(null, null);
+
+    private (DirectoryCheck? Newest, HeardDirectoryCheck? LastHeard) _directoryChecks
+    {
+        get => (_directoryChecksHeld.Item1, _directoryChecksHeld.Item2);
+        set => _directoryChecksHeld = Tuple.Create(value.Newest, value.LastHeard);
+    }
+
+    /// <summary>
+    /// What the signature check of the newest directory in use (<see cref="Progress"/>'s) found,
+    /// and the directory heard most recently, used or not, with its check. Takes no lock.
+    /// </summary>
+    public (DirectoryCheck? Newest, HeardDirectoryCheck? LastHeard) DirectoryChecks() => _directoryChecks;
 
     private SlotTimetable? _heardSchedule;
     private volatile IonoReading? _ionosphere;
@@ -475,9 +490,14 @@ public sealed class Intake : IAsyncDisposable
                 {
                     result = _store.Accept(payload.Span);
                     givenUp = _store.TakeGivenUp();
-                    if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary))
+                    if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary)
+                        || result.Released is not null)
                     {
                         _progress = (_store.Directory, _store.Progress());
+                    }
+                    if (result.Check is not null)
+                    {
+                        _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
                     }
                 }
                 finally
@@ -524,14 +544,17 @@ public sealed class Intake : IAsyncDisposable
                 break;
             case FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin:
                 Interlocked.Increment(ref _framesStored);
-                _log($"bulletin complete: {Ascii.Clean(bulletin.Bid)} from {Ascii.Clean(bulletin.From)} to {Ascii.Clean(bulletin.To)}"
-                    + $"{(bulletin.At.Length > 0 ? "@" + Ascii.Clean(bulletin.At) : "")}, \"{Ascii.Clean(bulletin.Title)}\"");
-                BulletinCompleted?.Invoke(bulletin);
+                Completed(bulletin);
+                break;
+            case FrameOutcome.Withheld or FrameOutcome.RejectedDirectory:
+                // The store has said why, once.
+                Interlocked.Increment(ref _framesStored);
                 break;
             case FrameOutcome.CompletedDirectory when result.Directory is { } directory:
                 Interlocked.Increment(ref _framesStored);
                 _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation"
-                    + (directory.Mode is { } mode ? $", sent on {Waveform.Words(mode)}" : ""));
+                    + (directory.Mode is { } mode ? $", sent on {Waveform.Words(mode)}" : "")
+                    + (result.Check is { } check ? $", {Ascii.Clean(check.Describe())}" : ""));
                 DirectoryHeard?.Invoke(directory);
                 SlotTimetable? changed = null;
                 lock (_gate)
@@ -588,5 +611,16 @@ public sealed class Intake : IAsyncDisposable
             default:
                 break;
         }
+        foreach (var released in result.Released ?? [])
+        {
+            Completed(released);
+        }
+    }
+
+    private void Completed(Bulletin bulletin)
+    {
+        _log($"bulletin complete: {Ascii.Clean(bulletin.Bid)} from {Ascii.Clean(bulletin.From)} to {Ascii.Clean(bulletin.To)}"
+            + $"{(bulletin.At.Length > 0 ? "@" + Ascii.Clean(bulletin.At) : "")}, \"{Ascii.Clean(bulletin.Title)}\"");
+        BulletinCompleted?.Invoke(bulletin);
     }
 }

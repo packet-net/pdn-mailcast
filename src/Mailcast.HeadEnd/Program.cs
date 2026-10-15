@@ -19,6 +19,12 @@ public static partial class Program
 {
     private const string DefaultConfig = "/etc/pdn-mailcast-headend/headend.json";
 
+    /// <summary>
+    /// The directory signing key: when this file is there, every directory is signed with it. A
+    /// fixed place, not a setting. Made with <c>openssl genpkey -algorithm ed25519</c>; see docs/headend.md.
+    /// </summary>
+    public const string SigningKeyPath = "/etc/pdn-mailcast-headend/signing-key.pem";
+
     private const string Usage = """
         pdn-mailcast-headend: the GB7RDG mailcast head end.
 
@@ -36,6 +42,7 @@ public static partial class Program
               (POST /run). It is a whole slot with the usual checks, counted like any other, and
               the schedule carries on afterwards.
           pdn-mailcast-headend --check-config [--config FILE]
+              Checks the configuration, and says whether directories will be signed.
           pdn-mailcast-headend --version
 
         Exit codes: 0 fine, 1 failed, 2 the configuration or the command line is wrong.
@@ -80,16 +87,35 @@ public static partial class Program
             return 2;
         }
 
-        if (options.ContainsKey("--check-config"))
-        {
-            Console.WriteLine($"{configPath}: fine");
-            return 0;
-        }
-
+        // Needs no key: it only asks the running service.
         if (options.ContainsKey("--run-now"))
         {
             return await RunNowAsync(config);
         }
+
+        DirectorySigner? signer;
+        try
+        {
+            signer = DirectorySigner.LoadIfPresent(SigningKeyPath);
+        }
+        catch (FormatException e)
+        {
+            if (!offline)
+            {
+                await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; fix or remove it");
+                return 2;
+            }
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; this run's directories are unsigned");
+            signer = null;
+        }
+
+        if (options.ContainsKey("--check-config"))
+        {
+            Console.WriteLine($"{configPath}: fine");
+            Console.WriteLine(DescribeSigning(signer, SigningKeyPath));
+            return 0;
+        }
+
 
         DateOnly? date = null;
         if (options.TryGetValue("--date", out string? dateText))
@@ -117,12 +143,17 @@ public static partial class Program
         {
             var day = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
             DateTimeOffset slot = config.ToSlotSchedule().SlotAtOrBefore(new DateTimeOffset(day.ToDateTime(at, DateTimeKind.Utc)));
-            return Offline(config, options, slot, journal);
+            return Offline(config, options, slot, journal, signer);
         }
-        return await ServiceAsync(config, journal);
+        return await ServiceAsync(config, journal, signer);
     }
 
-    private static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateTimeOffset slot, ConsoleJournal journal)
+    /// <summary>One plain line on whether directories are signed, and with which key.</summary>
+    internal static string DescribeSigning(DirectorySigner? signer, string path) => signer is null
+        ? $"signing: no key at {path}, so directories go out unsigned"
+        : $"signing: directories are signed with key {KeyId.Format(signer.KeyId)}, public key {signer.PublicKeyBase64}";
+
+    private static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateTimeOffset slot, ConsoleJournal journal, DirectorySigner? signer)
     {
         var day = DateOnly.FromDateTime(slot.UtcDateTime);
         // Offline work never touches the head end's own state: it runs on a copy, or on a store
@@ -130,7 +161,7 @@ public static partial class Program
         string scratch = Directory.CreateTempSubdirectory("mailcast-offline-").FullName;
         try
         {
-            ScheduleOptions scheduleOptions = config.ToScheduleOptions();
+            ScheduleOptions scheduleOptions = config.ToScheduleOptions() with { Signer = signer };
             if (options.GetValueOrDefault("--bulletins") is string source)
             {
                 var fresh = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
@@ -206,9 +237,10 @@ public static partial class Program
         return into;
     }
 
-    private static async Task<int> ServiceAsync(HeadEndConfig config, ConsoleJournal journal)
+    private static async Task<int> ServiceAsync(HeadEndConfig config, ConsoleJournal journal, DirectorySigner? signer)
     {
         journal.Write($"pdn-mailcast-headend {Version} starting");
+        journal.Write(DescribeSigning(signer, SigningKeyPath));
         TimeProvider time = TimeProvider.System;
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) =>
@@ -224,7 +256,7 @@ public static partial class Program
                 stop.Cancel();
             });
 
-        ScheduleOptions scheduleOptions = config.ToScheduleOptions();
+        ScheduleOptions scheduleOptions = config.ToScheduleOptions() with { Signer = signer };
         SlotSettings settings = config.ToSlotSettings();
         Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);
@@ -261,7 +293,7 @@ public static partial class Program
             ? $"flex: reading PA temperature and reference from {config.Flex.Host}, stopping at {config.Flex.PaTemperatureLimitC:0.#} C"
             : "flex: not configured, so no PA temperature watch and no reference check");
 
-        var status = new StatusStore(config.StateDirectory, time) { Ionosphere = reading, PskReporter = spots, PskReporterFeed = pskReporter is null ? null : () => pskReporter.Feed };
+        var status = new StatusStore(config.StateDirectory, time) { Ionosphere = reading, PskReporter = spots, PskReporterFeed = pskReporter is null ? null : () => pskReporter.Feed, SigningKeyId = signer?.KeyId };
         journal.Write(reading is null
             ? "ionosonde: off (\"ionosphere\".\"stations\" is empty)"
             : string.Create(CultureInfo.InvariantCulture, $"ionosonde: observe only, from {string.Join(", ", ionoSettings.Stations)} by GIRO then PROPquest, at most every {IonosondeMonitor.PollEvery.TotalMinutes:0} min near a slot; open at {ionoSettings.OpenMhz:0.###} MHz, reliable at {ionoSettings.ReliableFactor:0.###} of the MUF, stale after {ionoSettings.StaleAfter.TotalMinutes:0} min"));

@@ -89,6 +89,9 @@ public sealed class StatusStore
     /// <summary>How the PSK Reporter feed is doing, for <c>pskReporterFeed</c>; null leaves it out.</summary>
     public Func<Packet.Mailcast.Propagation.PskFeedStatus>? PskReporterFeed { get; set; }
 
+    /// <summary>The directory signing key's ID, for <c>signing</c>; null when directories go out unsigned.</summary>
+    public ulong? SigningKeyId { get; set; }
+
     /// <summary>Why the last slot report could not be saved, if it could not; null when it was.</summary>
     public string? LastWriteProblem { get; private set; }
 
@@ -250,6 +253,12 @@ public sealed class StatusStore
                 iono = Reading(),
                 pskReporter = Observed(PskReporter),
                 pskReporterFeed = Observed(PskReporterFeed),
+                // Whether directories are signed, and with which key (see docs/headend.md).
+                signing = new
+                {
+                    signs = SigningKeyId is not null,
+                    keyId = SigningKeyId is { } id ? Packet.Mailcast.KeyId.Format(id) : null,
+                },
             };
             try
             {
