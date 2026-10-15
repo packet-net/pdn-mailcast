@@ -166,16 +166,19 @@ public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Rec
 /// can never be finished; null while it is still being sent, and for a complete one.
 /// </param>
 /// <param name="ClearedAt">When such an object is to be dropped (<see cref="ReceiverStore.NoLongerSentRetention"/> after <paramref name="NoLongerSentSince"/>); null otherwise.</param>
-/// <param name="ListedBy">
-/// The signature check of the directories that name it: signed by a trusted key when one of them
-/// is (<see cref="DirectoryCheck.SignedBy"/> says whose), otherwise not signed; null when no
-/// directory still remembered names it.
+/// <param name="Signature">
+/// What the directories still remembered that name it say about it, in a few words: "signed by
+/// GB7RDG" only for a complete bulletin whose own hash matches the one a trusted signed directory
+/// lists; "does not match GB7RDG's signed list" when it does not; "in GB7RDG's signed list" for
+/// one not yet complete, or rebuilt before its hash was kept; "not signed" when only unsigned
+/// directories name it; null when none does.
 /// </param>
+/// <param name="SignedBy">The trusted key's label, only when <paramref name="Signature"/> is "signed by" it.</param>
 /// <param name="Withheld">
 /// Whether it is rebuilt but held back because only directories that failed their signature
 /// check list it (<see cref="FrameOutcome.Withheld"/>).
 /// </param>
-public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed, DateTimeOffset? NoLongerSentSince = null, DateTimeOffset? ClearedAt = null, DirectoryCheck? ListedBy = null, bool Withheld = false);
+public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed, DateTimeOffset? NoLongerSentSince = null, DateTimeOffset? ClearedAt = null, string? Signature = null, string? SignedBy = null, bool Withheld = false);
 
 /// <summary>Settings for a <see cref="ReceiverStore"/>.</summary>
 public sealed record ReceiverStoreOptions
@@ -247,8 +250,9 @@ public sealed record ReceiverStoreOptions
 /// <para>Files under the root directory, each written to a temporary name, flushed and renamed:</para>
 /// <code>
 /// objects/OOOOOOOOOOOOOOOO-DDDD-OTI/EEEEEE.sym   one symbol: object ID, dictionary ID, OTI in hex; ESI in hex
-/// done/OOOOOOOOOOOOOOOO                          the object has been rebuilt, and when; later frames are ignored
+/// done/OOOOOOOOOOOOOOOO                          the object has been rebuilt, and when (and a bulletin's long hash); later frames are ignored
 /// stopped/OOOOOOOOOOOOOOOO                       a partial object the head end no longer sends, and since when
+/// held/OOOOOOOOOOOOOOOO                          a rebuilt bulletin held back by its directory's signature, and since when
 /// outbox/OOOOOOOOOOOOOOOO.bulletin               a rebuilt bulletin not yet acknowledged
 /// archive/OOOOOOOOOOOOOOOO.mail                  an acknowledged bulletin and the BBS's answer (see MailArchive)
 /// quarantine/                                    outbox and archive files that could not be read
@@ -317,6 +321,23 @@ public sealed class ReceiverStore
     private readonly ReceiverStoreOptions _options;
     private readonly Dictionary<string, Instance> _instances = [];
     private readonly Dictionary<ulong, DateTimeOffset> _done = [];
+
+    /// <summary>
+    /// The long hash (<see cref="ObjectId.LongHash"/>) of each rebuilt bulletin, kept in its done
+    /// marker, so that "signed by" is only ever said of a bulletin checked against a signed listing.
+    /// </summary>
+    private readonly Dictionary<ulong, string> _doneHashes = [];
+
+    /// <summary>
+    /// Bulletins held back (<see cref="FrameOutcome.Withheld"/>), kept in <c>held/</c> so that a
+    /// restart, or the rejected directory being forgotten, never lets one through: only a
+    /// directory that may be used, listing it, does.
+    /// </summary>
+    private readonly HashSet<ulong> _held = [];
+    private readonly string _heldDir;
+
+    /// <summary>Delivered bulletins already logged as not matching a signed listing, so each is said once.</summary>
+    private readonly HashSet<ulong> _mismatchSaid = [];
     private readonly string _stoppedDir;
     private readonly Dictionary<ulong, DateTimeOffset> _stopped = [];
     private readonly List<ulong> _givenUp = [];
@@ -336,6 +357,7 @@ public sealed class ReceiverStore
         _outbox = Path.Combine(root, "outbox");
         _quarantine = Path.Combine(root, "quarantine");
         _stoppedDir = Path.Combine(root, "stopped");
+        _heldDir = Path.Combine(root, "held");
         System.IO.Directory.CreateDirectory(_objects);
         System.IO.Directory.CreateDirectory(_doneDir);
         System.IO.Directory.CreateDirectory(_outbox);
@@ -348,7 +370,11 @@ public sealed class ReceiverStore
         {
             if (ObjectId.TryParse(Path.GetFileName(marker), out ulong id))
             {
-                _done[id] = ReadDoneTime(marker);
+                (_done[id], string? hash) = ReadDone(marker);
+                if (hash is not null)
+                {
+                    _doneHashes[id] = hash;
+                }
             }
         }
         foreach (var file in System.IO.Directory.EnumerateFiles(_outbox, "*.bulletin"))
@@ -442,6 +468,21 @@ public sealed class ReceiverStore
             }
         }
         LoadStopped();
+        if (System.IO.Directory.Exists(_heldDir))
+        {
+            var partial = new HashSet<ulong>(_instances.Values.Select(i => i.ObjectId));
+            foreach (var file in System.IO.Directory.EnumerateFiles(_heldDir))
+            {
+                if (ObjectId.TryParse(Path.GetFileName(file), out ulong id) && partial.Contains(id))
+                {
+                    _held.Add(id);
+                }
+                else
+                {
+                    TryDelete(file);
+                }
+            }
+        }
         Expire();
         foreach (var instance in _instances.Values.ToList())
         {
@@ -654,6 +695,7 @@ public sealed class ReceiverStore
                 RememberDirectory(frame.ObjectId, known.Directory, known.Check);
                 stopped = CheckRotation(known.Directory, now);
                 released = ReleaseWithheld(known.Directory);
+                SayMismatches(known.Directory, known.Check);
             }
             else if (_rejectedDirectories.TryGetValue(frame.ObjectId, out var rejected))
             {
@@ -948,24 +990,14 @@ public sealed class ReceiverStore
         // station stuck on one directory for days still gets every title even once that
         // directory has fallen out of the 48 h cache below (issue #68 review).
         var named = new Dictionary<ulong, (string Bid, string Title, DateTimeOffset HeardAt)>();
-        // A trusted signature on any directory naming an object wins over none.
-        var listedBy = new Dictionary<ulong, DirectoryCheck>();
-        void Listed(ulong id, DirectoryCheck check)
-        {
-            if (!listedBy.TryGetValue(id, out var have) || (have.State != SignatureState.Trusted && check.State == SignatureState.Trusted))
-            {
-                listedBy[id] = check;
-            }
-        }
         if (Directory is { } newest)
         {
             foreach (var entry in newest.Entries)
             {
                 named[entry.ObjectId] = (entry.Bid, entry.Title, DateTimeOffset.MinValue);
-                Listed(entry.ObjectId, NewestCheck ?? DirectoryCheck.NotSigned);
             }
         }
-        foreach (var (directory, heardAt, check) in _knownDirectories.Values)
+        foreach (var (directory, heardAt, _) in _knownDirectories.Values)
         {
             foreach (var entry in directory.Entries)
             {
@@ -973,7 +1005,6 @@ public sealed class ReceiverStore
                 {
                     named[entry.ObjectId] = (entry.Bid, entry.Title, heardAt);
                 }
-                Listed(entry.ObjectId, check);
             }
         }
 
@@ -1030,7 +1061,8 @@ public sealed class ReceiverStore
                 title = mailEntry.Title;
             }
             DateTimeOffset? stoppedSince = !complete && _stopped.TryGetValue(id, out var since) ? since : null;
-            result.Add(new HeldBulletin(id, bid, title, complete, received, needed, stoppedSince, stoppedSince + NoLongerSentRetention, listedBy.GetValueOrDefault(id), withheld.Contains(id)));
+            var (signature, signedBy) = SignatureOf(id);
+            result.Add(new HeldBulletin(id, bid, title, complete, received, needed, stoppedSince, stoppedSince + NoLongerSentRetention, signature, signedBy, withheld.Contains(id)));
         }
         return [.. result
             .OrderBy(r => r.Complete) // part-received first: the most actionable
@@ -1064,6 +1096,7 @@ public sealed class ReceiverStore
             {
                 File.Delete(DonePath(id));
                 _done.Remove(id);
+                _doneHashes.Remove(id);
             }
         }
         PruneKnownDirectories(now);
@@ -1469,6 +1502,7 @@ public sealed class ReceiverStore
             MarkDone(instance);
             var stopped = CheckRotation(directory, _options.Time.GetUtcNow());
             var released = ReleaseWithheld(directory);
+            SayMismatches(directory, check);
             return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped, Check: check, Released: released);
         }
 
@@ -1482,11 +1516,18 @@ public sealed class ReceiverStore
             return Unusable(instance, "is a bulletin that does not parse: " + e.Message);
         }
 
-        switch (Admit(instance.ObjectId, instance.DictionaryId, data))
+        string longHash = ObjectId.LongHash(instance.DictionaryId, data);
+        switch (Admit(instance.ObjectId, longHash))
         {
             case Admission.WrongHash:
                 return Unusable(instance, $"({bulletin.Bid}) does not match the hash its signed directory lists for it, so it is not delivered");
             case Admission.Hold:
+                if (_held.Add(instance.ObjectId))
+                {
+                    System.IO.Directory.CreateDirectory(_heldDir);
+                    DurableFile.WriteAtomically(Path.Combine(_heldDir, ObjectId.Format(instance.ObjectId)),
+                        Bulletin.TextEncoding.GetBytes(_options.Time.GetUtcNow().ToString("o", CultureInfo.InvariantCulture)), flush: _options.FlushToDisk);
+                }
                 if (instance.Withheld is null)
                 {
                     instance.Withheld = data;
@@ -1502,7 +1543,7 @@ public sealed class ReceiverStore
         DurableFile.WriteAtomically(Path.Combine(_outbox, name), content, written, _options.FlushToDisk); // flushes the outbox folder too
         _outboxItems[name] = new OutboxItem(name, instance.ObjectId, content, bulletin, written);
         MailChanged();
-        MarkDone(instance);
+        MarkDone(instance, longHash);
         return new AcceptResult(FrameOutcome.CompletedBulletin, instance.ObjectId, Bulletin: bulletin);
     }
 
@@ -1518,17 +1559,11 @@ public sealed class ReceiverStore
     /// be used and lists it decides: a trusted signed one only if the long hash matches. Failing
     /// that, it is held if a rejected directory lists it, and delivered, as always, if nothing does.
     /// </summary>
-    private Admission Admit(ulong objectId, ushort dictionaryId, byte[] data)
+    private Admission Admit(ulong objectId, string hash)
     {
-        var listings = _knownDirectories.Values.Select(k => (k.Directory, k.Check));
-        if (Directory is { } newest && NewestCheck is { } newestCheck)
-        {
-            listings = listings.Append((newest, newestCheck));
-        }
         bool listed = false;
-        string? hash = null;
         bool signedListing = false;
-        foreach (var (directory, check) in listings)
+        foreach (var (directory, check) in UsableDirectories())
         {
             if (directory.Find(objectId) is not { } entry)
             {
@@ -1538,7 +1573,6 @@ public sealed class ReceiverStore
             if (check.State == SignatureState.Trusted)
             {
                 signedListing = true;
-                hash ??= ObjectId.LongHash(dictionaryId, data);
                 if (string.Equals(entry.Hash, hash, StringComparison.Ordinal))
                 {
                     return Admission.Deliver;
@@ -1553,7 +1587,76 @@ public sealed class ReceiverStore
         {
             return Admission.Deliver;
         }
-        return _rejectedDirectories.Values.Any(r => r.Directory.Find(objectId) is not null) ? Admission.Hold : Admission.Deliver;
+        return _held.Contains(objectId) || _rejectedDirectories.Values.Any(r => r.Directory.Find(objectId) is not null) ? Admission.Hold : Admission.Deliver;
+    }
+
+    /// <summary>The directories that may be used: the newest, and those remembered, with their checks.</summary>
+    private IEnumerable<(BroadcastDirectory Directory, DirectoryCheck Check)> UsableDirectories()
+    {
+        var listings = _knownDirectories.Values.Select(k => (k.Directory, k.Check));
+        return Directory is { } newest && NewestCheck is { } newestCheck ? listings.Append((newest, newestCheck)) : listings;
+    }
+
+    /// <summary>
+    /// What the usable directories say about one object, as <see cref="HeldBulletin.Signature"/>
+    /// and <see cref="HeldBulletin.SignedBy"/>: "signed by" only when its own kept hash matches a
+    /// trusted signed listing.
+    /// </summary>
+    private (string? Words, string? SignedBy) SignatureOf(ulong objectId)
+    {
+        bool complete = _done.ContainsKey(objectId);
+        string? hash = _doneHashes.GetValueOrDefault(objectId);
+        string? signedList = null, mismatched = null;
+        bool unsignedList = false;
+        foreach (var (directory, check) in UsableDirectories())
+        {
+            if (directory.Find(objectId) is not { } entry)
+            {
+                continue;
+            }
+            if (check.State != SignatureState.Trusted)
+            {
+                unsignedList = true;
+                continue;
+            }
+            if (complete && hash is not null)
+            {
+                if (string.Equals(entry.Hash, hash, StringComparison.Ordinal))
+                {
+                    return ($"signed by {check.SignedBy}", check.SignedBy);
+                }
+                mismatched ??= check.SignedBy;
+            }
+            signedList ??= check.SignedBy;
+        }
+        if (mismatched is not null)
+        {
+            return ($"does not match {mismatched}'s signed list", null);
+        }
+        if (signedList is not null)
+        {
+            return ($"in {signedList}'s signed list", null);
+        }
+        return (unsignedList ? "not signed" : null, null);
+    }
+
+    /// <summary>
+    /// A trusted signed directory has just been heard: says once of each bulletin it lists that
+    /// was delivered before (unchecked, as when no directory listed it yet) and does not match it.
+    /// </summary>
+    private void SayMismatches(BroadcastDirectory directory, DirectoryCheck check)
+    {
+        if (check.State != SignatureState.Trusted)
+        {
+            return;
+        }
+        foreach (var entry in directory.Entries)
+        {
+            if (_doneHashes.TryGetValue(entry.ObjectId, out string? hash) && !string.Equals(entry.Hash, hash, StringComparison.Ordinal) && _mismatchSaid.Add(entry.ObjectId))
+            {
+                Log($"bulletin {entry.Bid} ({ObjectId.Format(entry.ObjectId)}) was delivered before {check.SignedBy}'s signed directory listed it, and does not match the hash that directory gives for it");
+            }
+        }
     }
 
     /// <summary>
@@ -1593,28 +1696,40 @@ public sealed class ReceiverStore
         return new AcceptResult(FrameOutcome.Rejected, instance.ObjectId, Detail: detail);
     }
 
-    private void MarkDone(Instance instance)
+    private void MarkDone(Instance instance, string? hash = null)
     {
-        WriteDone(instance.ObjectId);
+        WriteDone(instance.ObjectId, hash);
         foreach (var other in _instances.Values.Where(i => i.ObjectId == instance.ObjectId).ToList())
         {
             Remove(other);
         }
     }
 
-    private void WriteDone(ulong objectId)
+    /// <summary>
+    /// Writes a done marker: when, and for a bulletin, a second line with its long hash
+    /// (<see cref="ObjectId.LongHash"/>). A receiver before signing reads only a time and, finding
+    /// two lines, takes the file's own time instead, which is the same.
+    /// </summary>
+    private void WriteDone(ulong objectId, string? hash = null)
     {
         var now = _options.Time.GetUtcNow();
-        DurableFile.WriteAtomically(DonePath(objectId), Bulletin.TextEncoding.GetBytes(now.ToString("o", CultureInfo.InvariantCulture)), flush: _options.FlushToDisk);
+        string text = now.ToString("o", CultureInfo.InvariantCulture) + (hash is null ? "" : "\n" + hash);
+        DurableFile.WriteAtomically(DonePath(objectId), Bulletin.TextEncoding.GetBytes(text), now, flush: _options.FlushToDisk);
         _done[objectId] = now;
+        if (hash is not null)
+        {
+            _doneHashes[objectId] = hash;
+        }
     }
 
-    private static DateTimeOffset ReadDoneTime(string marker)
+    private static (DateTimeOffset When, string? Hash) ReadDone(string marker)
     {
-        var text = File.ReadAllText(marker).Trim();
-        return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var when)
-            ? when
+        var lines = File.ReadAllText(marker).Trim().Split('\n');
+        var when = DateTimeOffset.TryParse(lines[0].Trim(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
+            ? at
             : new DateTimeOffset(File.GetLastWriteTimeUtc(marker), TimeSpan.Zero);
+        string? hash = lines.Length > 1 && lines[1].Trim() is { Length: ObjectId.ListedHashOctets * 2 } h && h.All(char.IsAsciiHexDigitLower) ? h : null;
+        return (when, hash);
     }
 
     private void Remove(Instance instance)
@@ -1627,6 +1742,11 @@ public sealed class ReceiverStore
         if (_stopped.ContainsKey(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
         {
             ForgetStopped(instance.ObjectId);
+        }
+        if (_held.Contains(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
+        {
+            _held.Remove(instance.ObjectId);
+            TryDelete(Path.Combine(_heldDir, ObjectId.Format(instance.ObjectId)));
         }
     }
 

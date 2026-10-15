@@ -11,7 +11,8 @@ namespace Packet.Mailcast;
 /// <param name="Title">The subject line.</param>
 /// <param name="Type">The object's content type (<see cref="ContentType"/>): 1, a packet mail bulletin, unless the directory says otherwise.</param>
 /// <param name="Hash">
-/// The object's long hash (<see cref="Mailcast.ObjectId.LongHash"/>), 32 lower-case hex digits,
+/// The object's long hash (<see cref="Mailcast.ObjectId.LongHash"/>): octets 8 to 15 of its
+/// SHA-256, the ID being octets 0 to 7, as 16 lower-case hex digits,
 /// which a signed directory gives for every entry; null when the directory does not.
 /// </param>
 public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Size, string Bid, string Title, byte Type = (byte)ObjectKind.Bulletin, string? Hash = null);
@@ -48,8 +49,9 @@ public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Siz
 /// </para>
 /// <para>
 /// From v0.14.0 a head end with a signing key signs the directory. Each entry's line then also
-/// gives its object's long hash, <c>hash=</c> and 32 hex digits: the first 16 octets of the same
-/// SHA-256 whose first 8 are the object ID (<see cref="Mailcast.ObjectId.LongHash"/>). The last entry's line
+/// gives its object's long hash, <c>hash=</c> and 16 hex digits: octets 8 to 15 of the same
+/// SHA-256 whose first 8 are the object ID (<see cref="Mailcast.ObjectId.LongHash"/>), so that
+/// with the ID an object is checked against 16 octets. The last entry's line
 /// ends with two more fields: <c>key=</c> and the signing key's ID (<see cref="KeyId"/>, 16 hex
 /// digits), then <c>sig=</c> and the Ed25519 signature in base64 (64 octets). The signature is
 /// over every octet of the serialised directory before the tab that starts the <c>sig=</c> field,
@@ -105,7 +107,7 @@ public sealed class BroadcastDirectory
             }
             if (e.Hash is { } hash && !IsLongHash(hash))
             {
-                throw new ArgumentException($"Entry {e.Bid} has a hash that is not {ObjectId.LongHashOctets * 2} lower-case hex digits.", nameof(entries));
+                throw new ArgumentException($"Entry {e.Bid} has a hash that is not {ObjectId.ListedHashOctets * 2} lower-case hex digits.", nameof(entries));
             }
         }
         _signer = Entries.Count > 0 ? signer : null;
@@ -239,7 +241,7 @@ public sealed class BroadcastDirectory
         return new DirectoryCheck(SignatureState.Trusted, SignedBy: key.Label);
     }
 
-    private static bool IsLongHash(string text) => text.Length == ObjectId.LongHashOctets * 2 && text.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
+    private static bool IsLongHash(string text) => text.Length == ObjectId.ListedHashOctets * 2 && text.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
 
     /// <summary>Reads the serialised form. Throws <see cref="FormatException"/> if it is not one.</summary>
     public static BroadcastDirectory Parse(ReadOnlySpan<byte> serialized)

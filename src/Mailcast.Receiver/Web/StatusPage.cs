@@ -882,7 +882,7 @@ public sealed class StatusPage : IAsyncDisposable
                     deliveredAt = final?.At,
                     deliveredVerdict = final?.Verdict,
                     deliveredDetail = final?.Detail,
-                    signature = p.ListedBy?.Describe(),
+                    signature = p.Signature,
                     withheld = p.Withheld,
                 };
             }),
@@ -1417,8 +1417,8 @@ public sealed class StatusPage : IAsyncDisposable
         int limit = int.TryParse(query["limit"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int l) ? Math.Clamp(l, 1, MaxMailPage) : 50;
         var mail = _host.Intake.Mail(); // in memory, newest first, already counted: no files, no lock, no sorting
         var held = _host.Intake.HeldBulletins();
-        // "signed by GB7RDG" or "not signed", while a directory still remembered names it.
-        var signatures = held.Where(h => h.ListedBy is not null).ToDictionary(h => h.ObjectId, h => h.ListedBy!.Describe());
+        // What the directories still remembered say of each: "signed by GB7RDG" only once its own hash matched (see HeldBulletin.Signature).
+        var signatures = held.Where(h => h.Signature is not null).ToDictionary(h => h.ObjectId, h => h.Signature!);
         var partial = held.Where(h => !h.Complete).Select(h => new
         {
             bid = h.Bid,
@@ -1531,7 +1531,7 @@ public sealed class StatusPage : IAsyncDisposable
             // Issue #47: when it was rebuilt, and (once archived) when the BBS answered, shown together.
             completed = m.Completed,
             delivered = m.Waiting ? (DateTimeOffset?)null : m.Time,
-            // "signed by GB7RDG" or "not signed", while a directory still remembered names it; null after.
+            // As HeldBulletin.Signature: "signed by GB7RDG" only once its own hash matched; null once no directory remembered names it.
             signature,
             // Issue #73: every answer this session remembers for this BID, oldest first, for the
             // reader to show as "what the BBS said" each time it was offered.

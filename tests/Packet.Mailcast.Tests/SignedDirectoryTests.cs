@@ -27,7 +27,7 @@ public class SignedDirectoryTests(ITestOutputHelper output)
         string text = Bulletin.TextEncoding.GetString(bytes);
         string last = text.Split('\n')[^2];
         Assert.Contains($"\tkey={KeyId.Format(Signer.KeyId)}\tsig=", last, StringComparison.Ordinal);
-        Assert.All(text.Split('\n')[2..^1], line => Assert.Matches("\thash=[0-9a-f]{32}(\t|$)", line));
+        Assert.All(text.Split('\n')[2..^1], line => Assert.Matches("\thash=[0-9a-f]{16}(\t|$)", line));
 
         var parsed = BroadcastDirectory.Parse(bytes);
         Assert.Equal(bytes, parsed.Serialize()); // exactly the octets read, so the signature still checks
@@ -181,13 +181,14 @@ public class SignedDirectoryTests(ITestOutputHelper output)
         foreach (var o in plan.Objects.Where(o => o.Bid is not null))
         {
             Assert.Equal(ObjectId.LongHash(o.Transfer.DictionaryId, o.Transfer.Bytes), plan.Directory.Find(o.Transfer.ObjectId)!.Hash);
-            Assert.StartsWith(ObjectId.Format(o.Transfer.ObjectId), plan.Directory.Find(o.Transfer.ObjectId)!.Hash, StringComparison.Ordinal);
+            // Octets 8 to 15 of the SHA-256: the ID, on the same line, is octets 0 to 7.
+            Assert.DoesNotContain(ObjectId.Format(o.Transfer.ObjectId), plan.Directory.Find(o.Transfer.ObjectId)!.Hash, StringComparison.Ordinal);
         }
     }
 
     /// <summary>
     /// What signing costs on the air, for a typical 25-bulletin rotation at GB7RDG's 240-octet
-    /// pieces: the long hashes and the signature add about 430 octets after compression, two
+    /// pieces: the hashes and the signature add about 370 octets after compression, two
     /// more source symbols, and so (with issue #69's floor, about five frames a symbol) about ten
     /// more directory frames a slot. Kept as a guard, so a later change that makes it much worse shows.
     /// </summary>
@@ -269,7 +270,7 @@ public class SignedDirectoryStoreTests
         Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, a).Outcome);
         Assert.Single(store.Pending());
         var row = Assert.Single(store.HeldBulletins());
-        Assert.Equal("signed by TEST", row.ListedBy!.Describe());
+        Assert.Equal("signed by TEST", row.Signature);
         Assert.False(row.Withheld);
     }
 
@@ -284,7 +285,7 @@ public class SignedDirectoryStoreTests
         Assert.Equal(FrameOutcome.CompletedDirectory, result.Outcome);
         Assert.Equal(DirectoryCheck.NotSigned, result.Check);
         Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, a).Outcome);
-        Assert.Equal("not signed", Assert.Single(store.HeldBulletins()).ListedBy!.Describe());
+        Assert.Equal("not signed", Assert.Single(store.HeldBulletins()).Signature);
 
         // A bulletin no directory lists is delivered as always.
         Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, Small(3)).Outcome);
@@ -352,7 +353,7 @@ public class SignedDirectoryStoreTests
         var row = Assert.Single(store.HeldBulletins(), h => h.ObjectId == a.ObjectId);
         Assert.True(row.Withheld);
         Assert.Null(row.Bid);
-        Assert.Null(row.ListedBy);
+        Assert.Null(row.Signature);
         Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(a.Frame(5).ToBytes()).Outcome);
         Assert.Single(log, l => l.Contains("held, not delivered", StringComparison.Ordinal));
 
@@ -416,6 +417,77 @@ public class SignedDirectoryStoreTests
             TrustedKeys = [.. Keys, TrustedKey.Parse("FRIEND", Stranger.PublicKeyBase64)],
         });
         Assert.Single(trusting.Pending());
-        Assert.Equal("signed by FRIEND", Assert.Single(trusting.HeldBulletins()).ListedBy!.Describe());
+        Assert.Equal("signed by FRIEND", Assert.Single(trusting.HeldBulletins()).Signature);
+    }
+
+    /// <summary>
+    /// A bulletin rebuilt before any directory listed it is delivered unchecked, as always. A
+    /// trusted signed directory heard later only makes it "signed by" if its own kept hash matches:
+    /// an object made to share only the 8-octet ID with a listed one says plainly that it does not.
+    /// </summary>
+    [Fact]
+    public void SignedBy_IsOnlySaidOfABulletinWhoseOwnHashMatched_EvenOneDeliveredBeforeTheList()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 15, 9, 0, 0, TimeSpan.Zero));
+        var log = new List<string>();
+        var store = Open(dir.Path, time, log);
+        var good = Small(20);
+        var forged = Small(21);
+        Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, good).Outcome);
+        Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, forged).Outcome);
+        Assert.All(store.HeldBulletins(), h => Assert.Null(h.Signature)); // no directory names them yet
+
+        // The signed list names both IDs, but gives "forged" the hash of another object, as if
+        // it were the other half of a pair made to share an ID.
+        var other = Small(22);
+        var partial = Big(23);
+        store.Accept(partial.Frame(0).ToBytes());
+        var directory = new BroadcastDirectory(Day, [Entry(good, 0), Entry(forged, 1, ObjectId.LongHash(other.DictionaryId, other.Bytes)), Entry(partial, 2)], signer: Signer);
+        FeedAll(store, DirectoryFrames(directory));
+        FeedAll(store, DirectoryFrames(directory)); // a repeat says nothing more
+
+        var rows = store.HeldBulletins().ToDictionary(h => h.ObjectId);
+        Assert.Equal("signed by TEST", rows[good.ObjectId].Signature);
+        Assert.Equal("TEST", rows[good.ObjectId].SignedBy);
+        Assert.Equal("does not match TEST's signed list", rows[forged.ObjectId].Signature);
+        Assert.Null(rows[forged.ObjectId].SignedBy);
+        Assert.Single(log, l => l.Contains(ObjectId.Format(forged.ObjectId), StringComparison.Ordinal) && l.Contains("does not match the hash", StringComparison.Ordinal));
+
+        // The hash is kept with the done marker, so a restart says the same.
+        rows = Open(dir.Path, time, []).HeldBulletins().ToDictionary(h => h.ObjectId);
+        Assert.Equal("signed by TEST", rows[good.ObjectId].Signature);
+        Assert.Equal("does not match TEST's signed list", rows[forged.ObjectId].Signature);
+        Assert.Equal("in TEST's signed list", Assert.Single(rows.Values, h => !h.Complete).Signature);
+
+        // One rebuilt by a receiver from before signing has no hash kept: never "signed by".
+        File.WriteAllText(Path.Combine(dir.Path, "done", ObjectId.Format(good.ObjectId)), time.GetUtcNow().ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("in TEST's signed list", Open(dir.Path, time, []).HeldBulletins().Single(h => h.ObjectId == good.ObjectId).Signature);
+    }
+
+    /// <summary>
+    /// A held bulletin stays held across a restart even once the rejected directory that listed
+    /// it is forgotten, and a good directory heard after the restart releases it with no new piece.
+    /// </summary>
+    [Fact]
+    public void Held_SurvivesARestart_AndTheRejectedDirectoryBeingForgotten()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 15, 9, 0, 0, TimeSpan.Zero));
+        var store = Open(dir.Path, time, []);
+        var a = Small(30);
+        Assert.Equal(FrameOutcome.RejectedDirectory, FeedAll(store, DirectoryFrames(Stranger, a)).Outcome);
+        Assert.Equal(FrameOutcome.Withheld, FeedObject(store, a).Outcome);
+        Assert.True(File.Exists(Path.Combine(dir.Path, "held", ObjectId.Format(a.ObjectId))));
+
+        time.Advance(ReceiverStore.KnownDirectoriesRetention + TimeSpan.FromHours(1));
+        store = Open(dir.Path, time, []);
+        Assert.Empty(store.Pending());
+        Assert.True(Assert.Single(store.HeldBulletins()).Withheld);
+
+        var released = FeedAll(store, DirectoryFrames(null, a));
+        Assert.Equal(TestBulletins.Make(30, 400).Bid, Assert.Single(released.Released!).Bid);
+        Assert.Single(store.Pending());
+        Assert.False(File.Exists(Path.Combine(dir.Path, "held", ObjectId.Format(a.ObjectId))));
     }
 }
