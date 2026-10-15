@@ -561,7 +561,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         {
             input = await SdrConnectIqInput.OpenAsync(
                 endpoint,
-                new SdrConnectOptions { CentreFrequencyHz = DialHz, Journal = Journal },
+                new SdrConnectOptions { CentreFrequencyHz = DialHz, ShortfallAdvice = SdrConnectShortfallAdvice, Journal = Journal },
                 new IqChannelSpec { OffsetHz = 0, Demodulation = IqDemodulation.Usb, Name = "mailcast", SsbLowHz = low, SsbHighHz = high },
                 new IqReceiverOptions { DspRate = OnAir.SampleRate, Journal = Journal },
                 DialHz,
@@ -569,7 +569,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or ArgumentException or System.Net.WebSockets.WebSocketException or HttpRequestException)
         {
-            throw new AudioSourceException(SdrConnectProblem(endpoint, e));
+            throw new AudioSourceException(SdrConnectProblem(endpoint, e, SdrConnectAnsweredBefore));
         }
         input.Lost += reason =>
         {
@@ -589,10 +589,33 @@ public sealed class AudioPipeline : IAsyncDisposable
     }
 
     /// <summary>
+    /// What the journal adds when SDRconnect's IQ arrives short of its rate: this receiver has no
+    /// setting that needs less of the link, so it says what helps instead.
+    /// </summary>
+    internal const string SdrConnectShortfallAdvice =
+        "A wired link for both this machine and the PC is best; this machine being busy, such as with a web page open on it, can cause it too.";
+
+    /// <summary>
+    /// Whether SDRconnect at this source's address has been listened to before in this run: then
+    /// no answer from it means SDRconnect has gone, not that it was never let in. Set by the
+    /// receiver before <see cref="StartAsync"/>.
+    /// </summary>
+    internal bool SdrConnectAnsweredBefore { get; set; }
+
+    /// <summary>
     /// Why SDRconnect could not be opened, in words for whoever set it up: the usual causes of each
     /// failure (nothing listening, a firewall, a radio it will not let us tune) said as such.
     /// </summary>
-    internal static string SdrConnectProblem(SdrConnectEndpoint endpoint, Exception error)
+    /// <remarks>
+    /// No answer is what Windows gives when SDRconnect is not running at all, as well as when its
+    /// firewall keeps this machine out: SDRconnect's program rule covers its port only while it
+    /// runs, and Windows drops a connection to a port nothing holds rather than refusing it. So
+    /// that is said first, and an address that answered earlier in this run is said to have gone
+    /// rather than to be firewalled. On a network Windows treats as Public, SDRconnect's installer
+    /// leaves a rule that blocks it, and a block rule wins over any allow rule: allowing the port
+    /// in does not help, which is why that is not suggested.
+    /// </remarks>
+    internal static string SdrConnectProblem(SdrConnectEndpoint endpoint, Exception error, bool answeredBefore = false)
     {
         string said = Ascii.Clean(error.Message).TrimEnd('.', ' ');
         SdrConnectFailure? reason = error switch
@@ -609,11 +632,16 @@ public sealed class AudioPipeline : IAsyncDisposable
                 + $"and that its port is {endpoint.Port}",
             SdrConnectFailure.NameNotFound =>
                 $"cannot find the computer {endpoint.Host} for SDRconnect. Check the name, or give its IP address instead, such as sdrconnect:192.168.1.20",
-            // A Windows firewall drops what it does not let in, rather than refusing it.
+            // Windows drops what it does not let in, and a port nobody holds, rather than refusing it.
+            SdrConnectFailure.NoAnswer when answeredBefore =>
+                $"no answer from SDRconnect at {endpoint}, which answered earlier: SDRconnect has most likely been closed, "
+                + "or that computer is asleep or off. The receiver connects again by itself once SDRconnect is running "
+                + "again with its WebSocket Server on",
             SdrConnectFailure.NoAnswer =>
-                $"no answer from SDRconnect at {endpoint}. Check that this is the right address for that computer and that it is on, "
-                + "and that its firewall lets this machine in: Windows lets SDRconnect through only on a network it treats as Private, "
-                + $"so set that network to Private in Windows' settings, or allow TCP port {endpoint.Port} in",
+                $"no answer from SDRconnect at {endpoint}. Check that SDRconnect is running on that computer with its WebSocket Server on "
+                + "(Windows gives no answer at all when it is not), that this is the right address and the computer is on, "
+                + "and that Windows treats that network as Private: on a Public one SDRconnect's own firewall rule blocks this machine, "
+                + "whatever else is allowed",
             SdrConnectFailure.CannotControl =>
                 $"SDRconnect at {endpoint} will not let the receiver tune its radio (it says can_control is false). "
                 + "Check that SDRconnect has the radio selected and started, that only one copy of SDRconnect is running, "

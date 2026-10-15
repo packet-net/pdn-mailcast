@@ -205,16 +205,88 @@ public class SdrConnectSourceTests
     }
 
     [Fact]
-    public void Problem_ConnectTimedOut_PointsAtTheWindowsFirewall()
+    public void Problem_ConnectTimedOut_SaysSdrConnectMayNotBeRunning_ThenTheWindowsFirewall()
     {
         var endpoint = new SdrConnectEndpoint("192.168.1.20", 5454);
         var timedOut = new SdrConnectUnreachableException(SdrConnectFailure.NoAnswer, "no answer from ws://192.168.1.20:5454/ within 15 s");
 
         string said = AudioPipeline.SdrConnectProblem(endpoint, timedOut);
 
-        Assert.StartsWith("no answer from SDRconnect at 192.168.1.20:5454", said, StringComparison.Ordinal);
+        Assert.StartsWith("no answer from SDRconnect at 192.168.1.20:5454. Check that SDRconnect is running", said, StringComparison.Ordinal);
         Assert.Contains("Private", said, StringComparison.Ordinal);
-        Assert.Contains("TCP port 5454", said, StringComparison.Ordinal);
+        // SDRconnect's own rule blocks it on a Public network, and in Windows a block beats any
+        // allow: a rule letting the port in does nothing, so it is not suggested.
+        Assert.DoesNotContain("TCP port", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("port 5454 in", said, StringComparison.Ordinal);
+        Assert.True(said.All(c => c is >= ' ' and <= '~'), said);
+    }
+
+    [Fact]
+    public void ShortfallAdvice_NamesNoSettingAndIsPlainAscii()
+    {
+        string advice = AudioPipeline.SdrConnectShortfallAdvice;
+
+        Assert.DoesNotContain("\"", advice, StringComparison.Ordinal);
+        Assert.EndsWith(".", advice, StringComparison.Ordinal);
+        Assert.True(advice.All(c => c is >= ' ' and <= '~'), advice);
+    }
+
+    [Fact]
+    public void Problem_ConnectTimedOut_FromAnAddressThatAnsweredEarlier_SaysSdrConnectHasGone()
+    {
+        var endpoint = new SdrConnectEndpoint("192.168.40.61", 5454);
+        var timedOut = new SdrConnectUnreachableException(SdrConnectFailure.NoAnswer, "no answer from ws://192.168.40.61:5454/ within 15 s");
+
+        string said = AudioPipeline.SdrConnectProblem(endpoint, timedOut, answeredBefore: true);
+
+        Assert.StartsWith("no answer from SDRconnect at 192.168.40.61:5454, which answered earlier: SDRconnect has most likely been closed", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private", said, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheSameFailureOverAndOver_IsSaidAgainOnlyEveryTenMinutes_WithTheAttemptsBetweenCounted()
+    {
+        // SDRconnect closed on its PC for a quarter of an hour was once the same line every 45 s.
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        int closed = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig
+        {
+            Audio = $"sdrconnect:127.0.0.1:{closed}",
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Web = new WebSettings { Port = 18139 },
+        };
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 15, 15, 0, 0, TimeSpan.Zero));
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        await using var host = new ReceiverHost(config, clock, log.Enqueue);
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        // 25 attempts, 30 s apart: twelve and a half minutes.
+        for (int attempt = 0; attempt < 25; attempt++)
+        {
+            await PhaseAsync(conditions, AudioPhase.Failed, TimeSpan.FromSeconds(30));
+            var next = PhaseAsync(conditions, AudioPhase.Opening, TimeSpan.FromSeconds(30));
+            while (!next.IsCompleted)
+            {
+                clock.Advance(TimeSpan.FromSeconds(1));
+                await Task.WhenAny(next, Task.Delay(5));
+            }
+            await next;
+        }
+
+        string[] said = [.. log.Where(l => l.Contains("refused the connection", StringComparison.Ordinal))];
+        Assert.Equal(2, said.Length);
+        Assert.DoesNotContain("more failed", said[0], StringComparison.Ordinal);
+        Assert.Matches(@"\((19|20|21) more failed attempts since the last line\)$", said[1]);
+
+        await stop.CancelAsync();
+        await run;
     }
 
     [Fact]
