@@ -67,7 +67,7 @@ On the Windows PC:
 
 1. Update SDRconnect to 1.0.6 or later, and run only one copy of it.
 2. In SDRconnect, go to **Other Actions**, **Preferences**, **WebSocket Server** and switch it on (it starts off). Leave its port at 5454.
-3. Make sure Windows treats your network as **Private** (Settings, Network & internet): SDRconnect's firewall rule only lets the receiver in on a Private network. If it has to stay Public, allow TCP port 5454 in.
+3. Make sure Windows treats your network as **Private** (Settings, Network & internet): SDRconnect's firewall rule only lets the receiver in on a Private network. On a Public one its rule blocks the receiver, and in Windows a block rule wins over any allow rule, so allowing port 5454 in does not help; if the network has to stay Public, change the SDRconnect rule for the Public profile from Block to Allow in Windows Defender Firewall's advanced settings, under Inbound Rules.
 4. Note the PC's IP address (`ipconfig` shows it). Use a wired connection if you can: the receiver takes the radio's raw signal, about 8 Mbit/s, which Wi-Fi does not always keep up with.
 
 On the receiver's machine, open its status page (see [3. Start it](#3-start-it)) and, under **Settings**:

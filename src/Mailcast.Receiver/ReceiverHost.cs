@@ -734,9 +734,20 @@ public sealed class ReceiverHost : IAsyncDisposable
     public static readonly IReadOnlyList<TimeSpan> RefusedBackoff =
         [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(30)];
 
+    /// <summary>
+    /// How often the same failure, attempt after attempt, is said again in the journal: SDRconnect
+    /// closed on its PC for a quarter of an hour was one identical line every 45 s. Between, the
+    /// attempts are counted, and the status page says the failure as it stands throughout.
+    /// </summary>
+    public static readonly TimeSpan RepeatedFailureEvery = TimeSpan.FromMinutes(10);
+
     private async Task SuperviseAudioAsync(CancellationToken cancellation)
     {
         int refusals = 0;
+        string? sdrConnectAnswered = null;
+        string? failureSaid = null;
+        DateTimeOffset failureSaidAt = default;
+        int failuresUnsaid = 0;
         string? refusedFor = null;
         int soundModemFailures = 0;
         string? described = null;
@@ -822,6 +833,8 @@ public sealed class ReceiverHost : IAsyncDisposable
             using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
             CancellationToken token = running?.Token ?? restart.Token;
             var pipeline = PipelineFactory?.Invoke(source) ?? CreatePipeline(source, config);
+            pipeline.SdrConnectAnsweredBefore = source.Kind == AudioSourceKind.SdrConnect
+                && string.Equals(sdrConnectAnswered, config.Audio, StringComparison.OrdinalIgnoreCase);
             Slots.Schedule = source.Kind == AudioSourceKind.Wav ? null : Schedule;
             lock (_gate)
             {
@@ -854,6 +867,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                     _soundModemDial = pipeline.DialFromSoundModem ? (config.Audio, pipeline.DialHz) : null;
                 }
                 listening = _time.GetUtcNow();
+                failureSaid = null;
+                failuresUnsaid = 0;
+                if (source.Kind == AudioSourceKind.SdrConnect)
+                {
+                    sdrConnectAnswered = config.Audio;
+                }
                 if (pipeline.WebSdrDescription is { } about)
                 {
                     lock (_gate)
@@ -939,7 +958,20 @@ public sealed class ReceiverHost : IAsyncDisposable
             TimeSpan wait = refused ? RefusedBackoff[Math.Min(refusals++, RefusedBackoff.Count - 1)]
                 : soundModem ? SoundModemRetry[Math.Min(soundModemFailures++, SoundModemRetry.Count - 1)]
                 : AudioRetry;
-            _log($"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.");
+            string line = $"audio: {why}. Trying again in {(wait.TotalMinutes >= 1 ? $"{wait.TotalMinutes:F0} min" : $"{wait.TotalSeconds:F0} s")}.";
+            DateTimeOffset now = _time.GetUtcNow();
+            if (line == failureSaid && now - failureSaidAt < RepeatedFailureEvery)
+            {
+                failuresUnsaid++;
+            }
+            else
+            {
+                _log(failuresUnsaid == 0 ? line
+                    : $"{line} ({failuresUnsaid} more failed attempt{(failuresUnsaid == 1 ? "" : "s")} since the last line)");
+                failureSaid = line;
+                failureSaidAt = now;
+                failuresUnsaid = 0;
+            }
             // For pdn-soundmodem a new "audio" setting ends the wait at once, long or short; so
             // it does for SDRconnect, whose address is typed in and so often corrected. Armed
             // before the failure is announced, so a correction made the moment it is seen (the
