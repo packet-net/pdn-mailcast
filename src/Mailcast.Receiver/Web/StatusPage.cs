@@ -1071,7 +1071,7 @@ public sealed class StatusPage : IAsyncDisposable
         // page would offer "Listen now" as refused for a reason that is not true.
         var nextOpens = host.NextWebSdrWindowOpens(now);
         var until = host.ListenNow.ActiveUntil(now, nextOpens);
-        bool alreadyListening = host.Audio.Phase == AudioPhase.Listening && until is null;
+        bool alreadyListening = (host.Audio.Phase is AudioPhase.Listening or AudioPhase.Reconnecting) && until is null;
         return new
         {
             usesLeft = host.ListenNow.UsesLeft(now),
@@ -1088,6 +1088,7 @@ public sealed class StatusPage : IAsyncDisposable
         AudioPhase.Closed => "closed",
         AudioPhase.Opening => "opening",
         AudioPhase.Listening => "listening",
+        AudioPhase.Reconnecting => "reconnecting",
         AudioPhase.Failed => "failed",
         AudioPhase.Ended => "ended",
         _ => "starting",

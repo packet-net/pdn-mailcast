@@ -88,7 +88,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         var now = _time.GetUtcNow();
         var nextOpens = NextWebSdrWindowOpens(now);
-        var result = ListenNow.Request(now, nextOpens, alreadyListening: Audio.Phase == AudioPhase.Listening);
+        var result = ListenNow.Request(now, nextOpens, alreadyListening: Audio.Phase is AudioPhase.Listening or AudioPhase.Reconnecting);
         if (result.Ok)
         {
             WakeListenNow();
@@ -752,6 +752,9 @@ public sealed class ReceiverHost : IAsyncDisposable
         int soundModemFailures = 0;
         string? described = null;
         string? closedSaid = null;
+        // Why the last attempt failed, for the page while the next is opening: the same audio
+        // setting only, since a changed one is a fresh start.
+        (string Audio, string Why)? lastFailure = null;
         while (!cancellation.IsCancellationRequested)
         {
             using var restart = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -797,6 +800,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 if (opens > _time.GetUtcNow())
                 {
+                    // A failure in a window gone by is not the last try before the next opening.
+                    lastFailure = null;
                     Audio = new($"the web SDR {WebSdrHost(source)} is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
                     if (AudioState != closedSaid)
                     {
@@ -844,6 +849,8 @@ public sealed class ReceiverHost : IAsyncDisposable
             string? why = null;
             bool refused = false;
             DateTimeOffset? listening = null;
+            string? before = lastFailure is { } failure && string.Equals(failure.Audio, config.Audio, StringComparison.OrdinalIgnoreCase) ? failure.Why : null;
+            void ShowDrop() => ShowReconnecting(pipeline);
             try
             {
                 // pdn-soundmodem says its radio's dial when its stream opens, and everything
@@ -851,14 +858,14 @@ public sealed class ReceiverHost : IAsyncDisposable
                 bool openFirst = source.Kind == AudioSourceKind.SoundModem;
                 if (openFirst)
                 {
-                    Audio = new($"connecting to pdn-soundmodem on {SoundModemAudioInput.Describe(source.SoundModemPort)}", AudioPhase.Opening);
+                    Audio = new($"connecting to pdn-soundmodem on {SoundModemAudioInput.Describe(source.SoundModemPort)}", AudioPhase.Opening, Problem: before);
                     await pipeline.OpenAsync(token).ConfigureAwait(false);
                 }
                 Attach(pipeline);
                 PipelineCreated?.Invoke(pipeline);
                 if (!openFirst)
                 {
-                    Audio = new($"opening {pipeline.Source}", AudioPhase.Opening);
+                    Audio = new($"opening {pipeline.Source}", AudioPhase.Opening, Problem: before);
                 }
                 await pipeline.StartAsync(token).ConfigureAwait(false);
                 ChannelWatch.AudioCentreHz = pipeline.AudioCentreHz;
@@ -880,7 +887,15 @@ public sealed class ReceiverHost : IAsyncDisposable
                         _webSdrAbout = (config.Audio, about);
                     }
                 }
-                Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
+                lock (_gate)
+                {
+                    Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
+                }
+                lastFailure = null;
+                // SDRconnect or a web SDR may drop and be reconnected to by its own client
+                // without the pipeline ending: the page says so meanwhile.
+                pipeline.ReconnectingChanged += ShowDrop;
+                ShowReconnecting(pipeline);
                 refusals = 0;
                 PipelineStarted?.Invoke(pipeline);
                 if (source.Kind == AudioSourceKind.SoundModem)
@@ -915,6 +930,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             }
             finally
             {
+                pipeline.ReconnectingChanged -= ShowDrop;
                 lock (_gate)
                 {
                     _audioRestart = null;
@@ -992,11 +1008,42 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 restart.Cancel();
             }
+            lastFailure = (config.Audio, why);
             Audio = new($"{why}; trying again shortly", AudioPhase.Failed, Problem: why, RetryAt: _time.GetUtcNow() + wait, Lasting: refused && soundModem);
             await DelayAsync(wait, endedBySetting ? restart.Token : cancellation).ConfigureAwait(false);
             lock (_gate)
             {
                 _audioRestart = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Says on the page whether <paramref name="pipeline"/>'s source has dropped and is being
+    /// reconnected to by its own client (SDRconnect, a web SDR), or is back: only while it is the
+    /// pipeline listening, so nothing said late overwrites what the supervisor has said since.
+    /// </summary>
+    private void ShowReconnecting(AudioPipeline pipeline)
+    {
+        lock (_gate)
+        {
+            if (_pipeline != pipeline || Audio.Phase is not (AudioPhase.Listening or AudioPhase.Reconnecting))
+            {
+                return;
+            }
+            if (pipeline.Reconnecting is not { } drop)
+            {
+                if (Audio.Phase == AudioPhase.Reconnecting)
+                {
+                    Audio = new($"listening to {pipeline.Source}", AudioPhase.Listening);
+                    _log($"audio: {pipeline.Source} is back; listening again");
+                }
+                return;
+            }
+            if (Audio.Phase != AudioPhase.Reconnecting || Audio.Words != drop.Words)
+            {
+                // Its client has already said it in the journal.
+                Audio = new(drop.Words, AudioPhase.Reconnecting, Problem: drop.Reason);
             }
         }
     }
@@ -1265,6 +1312,13 @@ public enum AudioPhase
 
     /// <summary>Audio is coming in.</summary>
     Listening,
+
+    /// <summary>
+    /// The source (SDRconnect, a web SDR) has dropped and its own client is reconnecting to it;
+    /// <see cref="AudioCondition.Problem"/> says why, if it said. Back to <see cref="Listening"/>
+    /// once its audio comes again; after five minutes of nothing the source is opened afresh.
+    /// </summary>
+    Reconnecting,
 
     /// <summary>The source could not be opened or stopped; it is tried again at <see cref="AudioCondition.RetryAt"/>.</summary>
     Failed,

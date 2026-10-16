@@ -632,6 +632,73 @@ public class WebSdrWindowTests
         Assert.Equal(System.Text.Json.JsonValueKind.Null, listenNow.GetProperty("problem").ValueKind);
     }
 
+    /// <summary>Fails at its first read, as a web SDR's stream that broke would.</summary>
+    private sealed class FailingInput : IAudioInput
+    {
+        public int SampleRate => OnAir.SampleRate;
+
+        public int Read(Span<float> destination) => throw new IOException("the stream broke");
+    }
+
+    [Fact]
+    public async Task Opening_AtTheNextWindow_DoesNotSayTheLastWindowsFailure()
+    {
+        // The web SDR failed near the end of the 12:00 window and was closed until 13:58: when it
+        // opens for the 14:00 slot, a "Last try" about a failure two hours old would be stale.
+        using var dir = new TempDirectory();
+        var clock = new SteppableClock(new DateTimeOffset(2026, 10, 5, 12, 5, 0, TimeSpan.Zero));
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        await using var host = new ReceiverHost(config, clock, _ => { });
+        int opened = 0;
+        host.PipelineFactory = source => AudioPipeline.ForInput(
+            Interlocked.Increment(ref opened) == 1 ? new FailingInput() : new QuietInput(), _ => { }, clock, source, watch: false);
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        async Task<AudioCondition> Phase(AudioPhase phase)
+        {
+            while (true)
+            {
+                var c = await conditions.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+                if (c.Phase == phase)
+                {
+                    return c;
+                }
+            }
+        }
+
+        var failed = await Phase(AudioPhase.Failed);
+        Assert.Contains("the stream broke", failed.Problem, StringComparison.Ordinal);
+
+        // The window ends (12:12) while it waits to try again: closed until 13:58.
+        clock.Step = TimeSpan.FromMinutes(10);
+        var closedTask = Phase(AudioPhase.Closed);
+        while (!closedTask.IsCompleted)
+        {
+            clock.Advance(TimeSpan.FromSeconds(5));
+            await Task.WhenAny(closedTask, Task.Delay(20));
+        }
+        await closedTask;
+
+        // The clock reaches 13:58: the web SDR is opened for the 14:00 slot.
+        clock.Step = new DateTimeOffset(2026, 10, 5, 13, 58, 0, TimeSpan.Zero) - (clock.GetUtcNow() - clock.Step);
+        var openingTask = Phase(AudioPhase.Opening);
+        while (!openingTask.IsCompleted)
+        {
+            clock.Advance(TimeSpan.FromSeconds(5));
+            await Task.WhenAny(openingTask, Task.Delay(20));
+        }
+        var opening = await openingTask;
+
+        Assert.Null(opening.Problem);
+        await Phase(AudioPhase.Listening);
+
+        await stop.CancelAsync();
+        await run;
+    }
+
     [Fact]
     public void Page_AsksForTheSpectrogramOnlyWhileTheAudioIsLive_AndExplainsOtherwise()
     {
@@ -647,5 +714,38 @@ public class WebSdrWindowTests
         Assert.Contains("${w.about ? ` (${esc(w.about)})` : \"\"}", html, StringComparison.Ordinal);
         Assert.Contains("No audio from the sound card", html, StringComparison.Ordinal);
         Assert.Contains("id=\"specNotice\"", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    // As pdn-soundmodem 0.92.0's UberSdrAudioInput says them, after the "ubersdr: " it puts in front.
+    [InlineData("ubersdr: stream from wessex.zapto.org ended (The remote party closed the WebSocket connection without completing the close handshake.)",
+        "lost the web SDR wessex.zapto.org (The remote party closed the WebSocket connection without completing the close handshake); reconnecting")]
+    [InlineData("ubersdr: reconnecting to wessex.zapto.org", "lost the web SDR wessex.zapto.org (the session ended); reconnecting")]
+    [InlineData("ubersdr: the session ended after 120 ms with only 0 ms of audio (the receiver closed the stream); backing off 10s before reconnecting to wessex.zapto.org",
+        "lost the web SDR wessex.zapto.org (it ended the session almost at once); reconnecting")]
+    [InlineData("ubersdr: wessex.zapto.org unreachable (Name or service not known (wessex.zapto.org:443)); retrying in 5s",
+        "lost the web SDR wessex.zapto.org (Name or service not known (wessex.zapto.org:443)); reconnecting")]
+    [InlineData("ubersdr: wessex.zapto.org is refusing us for now (daily limit reached); asking again in 15 min",
+        "the web SDR wessex.zapto.org is refusing us for now (daily limit reached); asking again later")]
+    [InlineData("ubersdr: wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today). The stream will be retried patiently; audio starts when the receiver lets us back in.",
+        "the web SDR wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today); asking again later")]
+    public async Task ClientLine_ThatSaysTheWebSdrDropped_GivesTheWordsAndWhy(string line, string words)
+    {
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
+
+        Assert.Equal(words, pipeline.DropSaid(line)?.Words);
+        Assert.Null(pipeline.DropSaid("ubersdr: reconnected to wessex.zapto.org"));
+    }
+
+    [Fact]
+    public async Task ClientLine_WebSdrReconnecting_SaysWhyItsLastStreamEnded()
+    {
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
+
+        pipeline.DropSaid("ubersdr: stream from wessex.zapto.org ended (Connection reset by peer)");
+        var drop = pipeline.DropSaid("ubersdr: reconnecting to wessex.zapto.org");
+
+        Assert.Equal("Connection reset by peer", drop?.Reason);
+        Assert.Equal("lost the web SDR wessex.zapto.org (Connection reset by peer); reconnecting", drop?.Words);
     }
 }

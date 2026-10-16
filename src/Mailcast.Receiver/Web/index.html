@@ -1452,11 +1452,15 @@ function audioNote(s) {
         : a.kind === "webSdr" ? `No audio from the web SDR: ${a.problem}.${again}`
         : a.kind === "sdrConnect" ? `No audio from SDRconnect: ${a.problem}.${again}`
         : `Cannot play the recording: ${a.problem}.`;
+    case "reconnecting":
+      return `${a.state.charAt(0).toUpperCase()}${a.state.slice(1)}... The spectrogram comes back once its audio does.`
+        + (a.kind === "sdrConnect" ? " If SDRconnect was closed, start it again with its WebSocket Server on: the receiver picks it up by itself." : "");
     case "ended":
       return "The recording has played to its end.";
     case "opening":
-      return a.kind === "webSdr" ? `Opening the web SDR ${sdr(s)}...` : a.kind === "soundCard" ? "Opening the sound card..."
-        : a.kind === "soundModem" ? "Connecting to pdn-soundmodem..." : a.kind === "sdrConnect" ? "Connecting to SDRconnect..." : "Opening the recording...";
+      return (a.kind === "webSdr" ? `Opening the web SDR ${sdr(s)}...` : a.kind === "soundCard" ? "Opening the sound card..."
+        : a.kind === "soundModem" ? "Connecting to pdn-soundmodem..." : a.kind === "sdrConnect" ? "Connecting to SDRconnect..." : "Opening the recording...")
+        + (a.problem ? ` Last try: ${a.problem}.` : "");
     default:
       return "Waiting for audio...";
   }
