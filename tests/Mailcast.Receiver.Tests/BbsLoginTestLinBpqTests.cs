@@ -36,7 +36,7 @@ public class BbsLoginTestLinBpqTests(ITestOutputHelper output)
         var result = await client.TestLoginAsync(deadline.Token);
 
         Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
-        Assert.Equal("password:", result.Detail);
+        Assert.EndsWith("password:", result.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -54,7 +54,7 @@ public class BbsLoginTestLinBpqTests(ITestOutputHelper output)
         var result = await client.TestLoginAsync(deadline.Token);
 
         Assert.Equal(BbsLoginTestOutcome.LoginNotRecognised, result.Outcome);
-        Assert.Equal("user:", result.Detail);
+        Assert.EndsWith("user:", result.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>

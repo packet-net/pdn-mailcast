@@ -318,7 +318,7 @@ Each test also goes to the journal (or `receiver.log` on Windows), so you can se
 
 ```
 bbs: login test: sent LinBPQ at 192.168.1.127:8011 the login "M7TAW", a password and the command "BBS", each line ending in CR, all at once
-bbs: login test: the BBS answered 5 bytes, "user:"
+bbs: login test: the BBS answered "user:"
 bbs: login test: LinBPQ asked for the login again, so no USER= line on this port has the login "M7TAW"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly.
 ```
 

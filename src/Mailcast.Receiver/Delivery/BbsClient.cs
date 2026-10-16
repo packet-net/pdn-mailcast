@@ -341,7 +341,7 @@ public sealed partial class BbsClient : IBbsSession
 
     /// <summary>Logs what the BBS answered a login with, as <see cref="Shown"/> gives it.</summary>
     private void LogHeard(string what, string text, bool closed) =>
-        _log($"bbs: {what}: the BBS answered {(text.Length == 0 ? "nothing" : $"{text.Length} bytes, \"{Shown(text)}\"")}{(closed ? ", then closed the connection" : "")}");
+        _log($"bbs: {what}: the BBS answered {(text.Length == 0 ? "nothing" : $"\"{Shown(text)}\"")}{(closed ? ", then closed the connection" : "")}");
 
     /// <summary>
     /// The BBS's whole reply, as one plain ASCII line for the log and the settings page: the

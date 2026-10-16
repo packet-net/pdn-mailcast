@@ -225,7 +225,7 @@ public class BbsClientTests
         Assert.Equal("the login \"Q0CAST\", a password and the command \"BBS\", each line ending in CR, all at once", result.Sent);
         Assert.Contains(log, l => l.StartsWith("bbs: login test: sent LinBPQ at 127.0.0.1:", StringComparison.Ordinal) && l.Contains("a password and the command", StringComparison.Ordinal));
         // Whether the close is seen too depends on timing: the reply is settled at "password:".
-        Assert.Contains(log, l => l.StartsWith("bbs: login test: the BBS answered 9 bytes, \"password:\"", StringComparison.Ordinal));
+        Assert.Contains(log, l => l.StartsWith("bbs: login test: the BBS answered \"password:\"", StringComparison.Ordinal));
         Assert.All(log, l => Assert.DoesNotContain("wrong", l, StringComparison.Ordinal));
         Assert.All(log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
     }
@@ -280,7 +280,7 @@ public class BbsClientTests
         Assert.Contains("it said \"user:\"", report.Failure, StringComparison.Ordinal);
         Assert.Contains(log, l => l.StartsWith("bbs: delivery login: sent LinBPQ at 127.0.0.1:", StringComparison.Ordinal)
             && l.Contains("the login \"Q0CAST\", a password and the command", StringComparison.Ordinal));
-        Assert.Contains(log, l => l.StartsWith("bbs: delivery login: the BBS answered 5 bytes, \"user:\"", StringComparison.Ordinal));
+        Assert.Contains(log, l => l.StartsWith("bbs: delivery login: the BBS answered \"user:\"", StringComparison.Ordinal));
         Assert.All(log, l => Assert.DoesNotContain("secret", l, StringComparison.Ordinal));
     }
 
