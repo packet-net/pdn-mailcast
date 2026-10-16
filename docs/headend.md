@@ -185,7 +185,7 @@ The head end is a forwarding partner that calls LinBPQ, logs in on its FBBPORT a
 
 2. In the mail configuration, add a user **Q0HEAD** and tick **BBS**.
 
-3. On Q0HEAD's forwarding page, tick **FBB Blocked** (forward in FBB's binary blocks, not line-by-line text), **Allow Binary** (LinBPQ's label for allowing compressed forwarding, which blocked forwarding also needs) and **Use B1 Protocol** (the simpler of FBB's two binary protocols). Set **Hierarchical Routes (Flood Bulls)** (the HRB box) to `WW` and **BBS HA** to `Q0HEAD.#42.GBR.EURO`, so it gets the same flood bulletins as any partner in the UK: @WW, @EURO and @GBR all reach it. Set **TO** to `MCAST`, so listeners' daily reports reach it too (see below). Leave **AT** and **HR (Personals and Directed Bulls)** (the HRP box) empty, so personal mail is never queued for it. It does not need to be enabled for forwarding, and needs no connect script. Click **Update** to save.
+3. On Q0HEAD's forwarding page, tick **FBB Blocked** (forward in FBB's binary blocks, not line-by-line text), **Allow Binary** (LinBPQ's label for allowing compressed forwarding, which blocked forwarding also needs) and **Use B1 Protocol** (the simpler of FBB's two binary protocols). Set **Hierarchical Routes (Flood Bulls)** (the HRB box) to `WW` and **BBS HA** to `Q0HEAD.#42.GBR.EURO`, so it gets the same flood bulletins as any partner in the UK: @WW, @EURO and @GBR all reach it. Leave **TO**, **AT** and **HR (Personals and Directed Bulls)** (the HRP box) empty, so personal mail is never queued for it. It does not need to be enabled for forwarding, and needs no connect script. Click **Update** to save.
 
 4. Put the password in the head end's `intake.fbb.password`, with `"port": 8011`.
 
@@ -195,18 +195,30 @@ Q0HEAD is a Q callsign, which is never issued, so it cannot clash with a station
 
 If LinBPQ ever offers the head end a personal message or NTS traffic, the head end answers `=` (later), so LinBPQ keeps it queued rather than counting it delivered, and logs a WARNING naming the BID every time it is offered: the partner's routes need fixing, and the message sending on by hand. Bulletins over the size cap, or with a BID already held, are answered `-`.
 
-Listeners' daily reports are public bulletins on GB7RDG, to `MCAST@GB7RDG.#42.GBR.EURO` (see [receiver.md](receiver.md#sending-a-daily-report)), and the head end never broadcasts one. They stay on GB7RDG for anyone to read whatever the head end does with them.
+Listeners' daily reports are public bulletins on GB7RDG, to `MCAST@GB7RDG.#42.GBR.EURO` (see [receiver.md](receiver.md#sending-a-daily-report)), and the head end never broadcasts one. A bulletin to MCAST is answered `-`, so LinBPQ counts it handed over and doesn't offer it again. A bulletin addressed anywhere else whose title starts `MCR ` and whose body has an `MCR1` header line is taken from LinBPQ, for the same reason, and then dropped. Either way the journal says so once for each BID. The file drop refuses both too.
 
-From 0.16.0 the head end tells listeners which reports reached GB7RDG. Since they are addressed to GB7RDG itself, LinBPQ queues them for no partner unless one asks for them by name, which is what **TO** `MCAST` on Q0HEAD does: LinBPQ then queues every bulletin to MCAST for the head end, as for any partner with a TO route. The head end asks for each (it needs the title), notes the callsign and the day from the title `MCR G4ABC 2026-10-15`, and drops it; LinBPQ counts it handed over and doesn't offer it again. Only the callsign and day are kept, in `reports.json` in the state directory, each callsign's newest for 14 days and at most 1,000 callsigns (past that the oldest go). Every directory then lists the callsigns whose newest report is from that day or the two before, at most 100 of them, the newest reports first, so a flood of made-up reports cannot grow the directory without limit (see [Reports in the directory](#reports-in-the-directory)). A bulletin to MCAST that isn't a report is dropped the same way. Personal mail or NTS traffic to MCAST, which the TO route also hands over, is answered `-`, so LinBPQ counts it handed over, and is never broadcast; the journal says so once for each BID. A bulletin addressed anywhere else whose title starts `MCR ` and whose body has an `MCR1` header line is taken and noted, then dropped, too. The journal says what became of each, once for each BID:
+From 0.16.0 the head end tells listeners which reports reached GB7RDG, without touching them and with no change to LinBPQ's forwarding. The reports are there for anyone to read, so the head end reads the list of them as any user can: it logs in to the BBS as an ordinary reader, lists the bulletins to MCAST (`L> MCAST`), takes the callsign and day from each `MCR G4ABC 2026-10-15` title, and logs off. It never reads a report itself, and a line counts only when the callsign in the title is also the message's sender. It reads just before each slot plans its directory, and at most every 15 minutes. What it learns is kept in `reports.json` in the state directory: each callsign's newest report for 14 days, at most 1,000 callsigns (past that the oldest go). Every directory then lists the callsigns whose newest report is for that day or the two before, at most 100 of them, the latest to arrive first, so a flood of made-up reports cannot grow the directory without limit (see [Reports in the directory](#reports-in-the-directory)).
+
+It needs a login on the BBS, in `intake.reports`:
+
+```json
+"reports": {
+  "host": "127.0.0.1",
+  "port": 8011,
+  "user": "Q0CAST",
+  "password": "...",
+  "login": [ { "send": "{user}" }, { "send": "{password}" }, { "send": "BBS" } ]
+}
+```
+
+On GB7RDG that is the Q0CAST login receivers use, which already exists: a USER= line on the FBBPORT and a BBS user. LinBPQ logins are case-sensitive, so `user` must match the USER= line exactly. `login` is as for `intake.fbb`, and the default is LinBPQ's FBBPORT, as shown. Tested against a real LinBPQ 6.0.25.41 in docker with a login set up like Q0CAST (a BBS user with a forwarding record): it lists bulletins as any user would. Nothing about the password is ever logged. The journal says when new reports turn up, and why a reading failed:
 
 ```
-intake: daily report 6288K7G4ABC from G4ABC, G4ABC for 2026-10-15: noted, so the directory lists G4ABC's report for 2026-10-15; the report itself is never broadcast
-intake (FBB): 0 taken, 3 refused (2 of them daily reports, noted for the directory); 30 held
+reports: 2 new of 14 listed on the BBS, which the directory now lists: G4ABC for 2026-10-15, G8BPQ for 2026-10-15
+intake (reports): 127.0.0.1:8011: the BBS asked for the password again, so it did not take the password for "Q0CAST"; it said "..."
 ```
 
-Without the TO route nothing changes: no report is offered, and the directory says nothing about reports, so receivers say nothing either. The list starts with the first report the head end ever notes. A head end before 0.16.0 answers a bulletin to MCAST `-` without reading it, so turning the TO route on before upgrading the head end loses those reports to the list, but nothing else. The file drop refuses reports, and doesn't note them.
-
-pdn-bbs, and any other FBB BBS, needs the same: a route that hands bulletins to MCAST to the head end's partner.
+Without `intake.reports` nothing is read, and the directory says nothing about reports, so receivers say nothing either. With it, the directory says nothing until the first reading has worked, so a login that does not work never tells listeners GB7RDG has had none.
 
 ### Later, packet.net's BBS
 
@@ -216,7 +228,7 @@ pdn-bbs speaks the same FBB B1F forwarding, and its `fbbTcp` listener (BPQ's FBB
 
 The list goes on the directory's first line, after the mode, as `reports=2026-10-15:G4ABC,G8BPQ;2026-10-14:M9TWM` (the days newest first, each callsign once, under its newest report's day), or `reports=` when there are none lately. Being on an entry line, the signature covers it. Receivers before 0.16.0 ignore it, like any field after the title, and their signature check still passes.
 
-It costs little on the air. With 30 bulletins in rotation GB7RDG's directory is about 1,470 bytes compressed, 7 of the 240-byte symbols. Ten listeners add about 65 bytes compressed, a quarter of a symbol. The directory goes out about 35 times a slot (enough for a station that hears a quarter of the frames to rebuild it), so an extra symbol costs about 5 more frames, roughly 9 seconds; on average the list costs about 2 seconds a slot. Under the budget rule that comes out of the slot's fill, not on top of it.
+It costs little on the air. With 30 bulletins in rotation GB7RDG's directory is about 1,470 bytes compressed, 7 of the 240-byte symbols. Ten listeners add about 65 bytes compressed, a quarter of a symbol. The directory goes out about 35 times a slot (enough for a station that hears a quarter of the frames to rebuild it), so an extra symbol costs about 5 more frames, roughly 9 seconds; on average the list costs about 2 seconds a slot. Under the budget rule that comes out of the slot's fill, not on top of it. At the cap of 100 listeners the field adds about 380 bytes compressed, a symbol and a half: at most about 2 more symbols, about 18 seconds a slot.
 
 ## Bulletins by file
 

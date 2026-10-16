@@ -53,6 +53,16 @@ public class ReportReceiptsTests(ITestOutputHelper output)
         Assert.Equal(["G4ABC", "G4DEF"], listed.Newest.Keys);
     }
 
+    [Fact]
+    public void ForDay_ListsAtMostAHundred_TheNewestDaysFirst_ThenInTheOrderGiven()
+    {
+        var given = Enumerable.Range(0, 150).Select(i => new KeyValuePair<string, DateOnly>($"G{i:D3}A", i < 30 ? Day.AddDays(-2) : Day.AddDays(-1))).ToList();
+        var listed = ReportReceipts.ForDay(Day, given);
+        Assert.Equal(ReportReceipts.MostListed, listed.Newest.Count);
+        Assert.All(given.Skip(30).Take(100), p => Assert.True(listed.Newest.ContainsKey(p.Key)));
+        Assert.DoesNotContain(listed.Newest.Values, d => d == Day.AddDays(-2));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(3)]
@@ -116,7 +126,7 @@ public class ReportReceiptsTests(ITestOutputHelper output)
     /// <summary>
     /// What the list costs on the air: the directory's compressed octets and source symbols at
     /// GB7RDG's 240-octet frames, with 30 bulletins in rotation (a busy day), without the list and
-    /// with 5, 10 and 20 listeners in it. Printed for the record; the bound is loose on purpose.
+    /// with 5, 10, 20 and 100 (the most listed) listeners in it. Printed for the record; the bound is loose on purpose.
     /// </summary>
     [Fact]
     public void Airtime_TheListAddsLittleToTheDirectory()
@@ -125,15 +135,16 @@ public class ReportReceiptsTests(ITestOutputHelper output)
             TransferObject.ForDirectory(Directory(30, reports), ZstdDictionary.Gb7rdg1Id, Compression.Default, 240, MailcastFrame.StandardAlignment);
         string[] calls = ["G8BPQ", "GM8BPQ", "G7TAJ", "M9TWM", "GM4CXF", "G4ABC", "M0XYZ", "2E0ABC", "G0DEF", "MW1GHI",
             "GI4JKL", "M7MNO", "G3PQR", "EI2STU", "G6VWX", "M1YZA", "GW0BCD", "G4EFG", "M5HIJ", "2M0KLM"];
-        ReportReceipts Listeners(int n) => new(calls.Take(n).Select((c, i) => new KeyValuePair<string, DateOnly>(c, Day.AddDays(-1 - (i % 4 == 3 ? 1 : 0)))));
+        ReportReceipts Listeners(int n) => new(calls.Concat(Enumerable.Range(0, 100).Select(i => $"{(i % 3 == 0 ? "M" : "G")}{i % 8}{(char)('A' + (i * 7 % 26))}{(char)('A' + (i * 11 % 26))}{(char)('A' + (i * 5 % 26))}")).Distinct().Take(n)
+            .Select((c, i) => new KeyValuePair<string, DateOnly>(c, Day.AddDays(-1 - (i % 4 == 3 ? 1 : 0)))));
         var none = Object(null);
         output.WriteLine($"directory, 30 bulletins, 240-octet symbols: {Directory(30, null).Serialize().Length} octets, {none.Bytes.Length} compressed, {none.SourceSymbols} symbols without the list");
-        foreach (int n in new[] { 5, 10, 20 })
+        foreach (int n in new[] { 5, 10, 20, ReportReceipts.MostListed })
         {
             var list = Listeners(n);
             var with = Object(list);
             output.WriteLine($"  {n} listeners: field {list.ToField().Length + 1} octets, {with.Bytes.Length - none.Bytes.Length:+0;-0} compressed, {with.SourceSymbols} symbols (+{with.SourceSymbols - none.SourceSymbols})");
-            Assert.InRange(with.SourceSymbols - none.SourceSymbols, 0, n <= 10 ? 1 : 2);
+            Assert.InRange(with.SourceSymbols - none.SourceSymbols, 0, n <= 10 ? 1 : n <= 20 ? 2 : 4);
         }
     }
 }

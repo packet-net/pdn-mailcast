@@ -97,6 +97,10 @@
       "pollMinutes": 30,
       "sessionTimeoutSeconds": 300
     }
+    // To tell listeners whose daily reports reached the BBS, add a login the head end can list
+    // them with (L> MCAST) as an ordinary reader, before each slot and at most every 15 minutes.
+    // Left out, nothing is read and the directory says nothing about reports. On GB7RDG:
+    // "reports": { "host": "127.0.0.1", "port": 8011, "user": "Q0CAST", "password": "" }
   },
 
   // The ionosonde reading: is 40 m open from Reading, and how far out. Observe only: it is logged,

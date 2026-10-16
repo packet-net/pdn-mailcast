@@ -2,7 +2,6 @@ using System.Net.Sockets;
 using System.Text;
 using Packet.Fbb;
 using Packet.Mailcast;
-using Packet.Mailcast.Feedback;
 
 namespace Mailcast.HeadEnd.Intake;
 
@@ -12,12 +11,10 @@ namespace Mailcast.HeadEnd.Intake;
 /// takes what the BBS proposes. Bulletins up to the size cap are accepted; bulletins over the cap
 /// or already held are answered <c>-</c>; personal mail and NTS traffic, which should never be
 /// routed here, are answered <c>=</c> (later) so the BBS keeps them, with a warning. A listener's
-/// daily report is never kept for the broadcast (see <see cref="IntakePolicy.DailyReportRefusal"/>).
-/// With a <see cref="ReportLog"/>, a bulletin to MCAST is asked for, so that a report's callsign
-/// and day can be noted for the directory's list (issue #136), and then dropped; without one it
-/// is answered <c>-</c>. One addressed anywhere else that turns out to be a report once its title
-/// and body arrive is noted the same way and not kept. Either way the BBS counts it handed over
-/// and does not offer it again, and the journal says so once for each BID.
+/// daily report is never taken: a bulletin to MCAST is answered <c>-</c>, and one that turns out
+/// to be a report once its title and body arrive is not kept (see <see cref="IntakePolicy.DailyReportRefusal"/>).
+/// Either way the BBS counts it handed over and does not offer it again, and the journal says so
+/// once for each BID.
 /// </summary>
 /// <remarks>
 /// <para>The head end always calls, on its own timer and just before each slot, so the BBS needs
@@ -32,7 +29,6 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     private readonly RotationStore _store;
     private readonly IntakePolicy _policy;
     private readonly IJournal _journal;
-    private readonly ReportLog? _reports;
     private readonly TimeProvider _time;
     private readonly Func<CancellationToken, Task<Stream>> _connect;
     private readonly SemaphoreSlim _one = new(1, 1);
@@ -41,13 +37,12 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     /// <summary>The most report BIDs remembered for saying once; past it the record starts again.</summary>
     private const int MostReportsRemembered = 10_000;
 
-    public FbbIntake(FbbIntakeConfig config, RotationStore store, IntakePolicy policy, IJournal journal, TimeProvider time, Func<CancellationToken, Task<Stream>>? connect = null, ReportLog? reports = null)
+    public FbbIntake(FbbIntakeConfig config, RotationStore store, IntakePolicy policy, IJournal journal, TimeProvider time, Func<CancellationToken, Task<Stream>>? connect = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _journal = journal ?? throw new ArgumentNullException(nameof(journal));
-        _reports = reports;
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _connect = connect ?? ConnectTcpAsync;
     }
@@ -103,7 +98,7 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     private async Task<IntakeResult> SessionAsync(DateOnly today, CancellationToken cancellation)
     {
         await using Stream stream = await _connect(cancellation).ConfigureAwait(false);
-        byte[] leftover = await LoginAsync(stream, cancellation).ConfigureAwait(false);
+        byte[] leftover = await BbsLogin.LogInAsync(stream, _config.Login, _config.User, _config.Password, _config.PartnerCallsign, cancellation).ConfigureAwait(false);
 
         var session = new FbbSession(new FbbSessionConfig
         {
@@ -128,7 +123,7 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             }
             over = await ApplyAsync(stream, session, session.Advance(new FbbPeerData(buffer.AsMemory(0, n))), today, counts, cancellation).ConfigureAwait(false);
         }
-        return new IntakeResult(counts.Accepted, counts.Refused, counts.Problem, counts.Reports);
+        return new IntakeResult(counts.Accepted, counts.Refused, counts.Problem);
     }
 
     /// <summary>Carries out the session's actions. True once the session is over.</summary>
@@ -172,14 +167,6 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             _journal.Write("intake: refused a B2F (FC) proposal; this partner speaks B1F only");
             return FsAnswer.AlreadyHave;
         }
-        if (char.ToUpperInvariant(fa.MessageType) != 'B' && DailyReport.IsReportAddressee(fa.To))
-        {
-            // The TO route that hands the head end listeners' reports hands it anything else to
-            // MCAST too. "-": the BBS counts it handed over, and it is never broadcast.
-            counts.Refused++;
-            RefusedReport(fa, $"type {fa.MessageType} to {DailyReport.BulletinTo}, where listeners' daily reports go, is never broadcast");
-            return FsAnswer.AlreadyHave;
-        }
         if (char.ToUpperInvariant(fa.MessageType) != 'B')
         {
             // A personal or NTS message routed here is a routing mistake on the BBS. "=" (later)
@@ -190,12 +177,6 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         }
         if (IntakePolicy.DailyReportRefusal(fa.To) is { } report)
         {
-            if (_reports is not null && _policy.Refusal(fa.MessageType, fa.Bid, fa.Size) is null)
-            {
-                // Asked for, so its title says whose report it is and for which day; it is never
-                // kept, so never sent (see Take).
-                return FsAnswer.Accept;
-            }
             // "-": the BBS counts it handed over and does not offer it again.
             counts.Refused++;
             RefusedReport(fa, report);
@@ -223,17 +204,6 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         {
             // Taken, so the BBS does not offer it again, but never kept, so never sent.
             counts.Refused++;
-            if (_reports is not null && DailyReport.LooksLikeReport(delivered.Title, text)
-                && DailyReport.TryParseTitle(delivered.Title, out string callsign, out DateOnly day)
-                && ReportReceipts.IsListable(callsign))
-            {
-                counts.Reports++;
-                bool newest = _reports.Note(callsign, day, _time.GetUtcNow(), fa.Bid);
-                Say(fa, newest
-                    ? $"intake: daily report {fa.Bid} from {fa.From}, {callsign} for {day:yyyy-MM-dd}: noted, so the directory lists {callsign}'s report for {day:yyyy-MM-dd}; the report itself is never broadcast"
-                    : $"intake: daily report {fa.Bid} from {fa.From}, {callsign} for {day:yyyy-MM-dd}: one for that day or later was already noted; the report itself is never broadcast");
-                return;
-            }
             RefusedReport(fa, report);
             return;
         }
@@ -266,11 +236,7 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     }
 
     /// <summary>Says once for each BID that a daily report was refused.</summary>
-    private void RefusedReport(FaProposal fa, string why) =>
-        Say(fa, $"intake: refused {fa.Bid} from {fa.From} to {fa.To}@{fa.AtBbs}: {why}");
-
-    /// <summary>Writes <paramref name="line"/> about a daily report, once for each BID.</summary>
-    private void Say(FaProposal fa, string line)
+    private void RefusedReport(FaProposal fa, string why)
     {
         if (_reportsSaid.Count >= MostReportsRemembered)
         {
@@ -278,69 +244,8 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         }
         if (_reportsSaid.Add(fa.Bid))
         {
-            _journal.Write(line);
+            _journal.Write($"intake: refused {fa.Bid} from {fa.From} to {fa.To}@{fa.AtBbs}: {why}");
         }
-    }
-
-    /// <summary>
-    /// Works through the login steps: waits for each step's text (any case, ignoring telnet
-    /// negotiation), then sends its line. Returns whatever arrived after the last expected text,
-    /// which belongs to the forwarding session.
-    /// </summary>
-    private async Task<byte[]> LoginAsync(Stream stream, CancellationToken cancellation)
-    {
-        var received = new List<byte>();
-        var buffer = new byte[1024];
-        foreach (LoginStep step in _config.Login)
-        {
-            if (!string.IsNullOrEmpty(step.Expect))
-            {
-                int at;
-                while ((at = Find(received, step.Expect)) < 0)
-                {
-                    int n = await stream.ReadAsync(buffer, cancellation).ConfigureAwait(false);
-                    if (n == 0)
-                    {
-                        throw new IOException($"the BBS closed the connection while the head end waited for \"{step.Expect}\"");
-                    }
-                    received.AddRange(StripTelnet(buffer.AsSpan(0, n)));
-                }
-                received.RemoveRange(0, at + step.Expect.Length);
-            }
-            if (step.Send is not null)
-            {
-                string line = step.Send
-                    .Replace("{user}", _config.User, StringComparison.Ordinal)
-                    .Replace("{password}", _config.Password, StringComparison.Ordinal)
-                    .Replace("{call}", _config.PartnerCallsign, StringComparison.Ordinal);
-                await stream.WriteAsync(Encoding.Latin1.GetBytes(line + "\r"), cancellation).ConfigureAwait(false);
-                await stream.FlushAsync(cancellation).ConfigureAwait(false);
-            }
-        }
-        return [.. received];
-    }
-
-    private static int Find(List<byte> haystack, string needle)
-    {
-        string text = Encoding.Latin1.GetString([.. haystack]);
-        return text.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>Drops telnet IAC sequences, which a telnet port may send before its prompt.</summary>
-    private static List<byte> StripTelnet(ReadOnlySpan<byte> data)
-    {
-        var plain = new List<byte>(data.Length);
-        for (int i = 0; i < data.Length; i++)
-        {
-            if (data[i] == 0xFF && i + 1 < data.Length)
-            {
-                byte command = data[i + 1];
-                i += command is >= 0xFB and <= 0xFE ? 2 : 1;
-                continue;
-            }
-            plain.Add(data[i]);
-        }
-        return plain;
     }
 
     private static string SidVersion()
@@ -357,50 +262,6 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
 
         public int Refused { get; set; }
 
-        public int Reports { get; set; }
-
         public string? Problem { get; set; }
-    }
-
-    /// <summary>A network stream that closes its client.</summary>
-    private sealed class OwningStream(TcpClient client) : Stream
-    {
-        private readonly NetworkStream _inner = client.GetStream();
-
-        public override bool CanRead => true;
-
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => true;
-
-        public override long Length => throw new NotSupportedException();
-
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-
-        public override void Flush() => _inner.Flush();
-
-        public override Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
-
-        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
-
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => _inner.ReadAsync(buffer, cancellationToken);
-
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => _inner.WriteAsync(buffer, cancellationToken);
-
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-
-        public override void SetLength(long value) => throw new NotSupportedException();
-
-        public override void Write(byte[] buffer, int offset, int count) => _inner.Write(buffer, offset, count);
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                _inner.Dispose();
-                client.Dispose();
-            }
-            base.Dispose(disposing);
-        }
     }
 }

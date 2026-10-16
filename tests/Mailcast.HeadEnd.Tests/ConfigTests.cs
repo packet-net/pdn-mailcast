@@ -30,6 +30,17 @@ public class ConfigTests
         Assert.Equal(FbbIntakeConfig.LinBpqFbbPort, config.Intake.Fbb.Login);
     }
 
+    [Fact]
+    public void Parse_TheReportReader_IsOffUnlessGiven_AndDefaultsToLinBpqsFbbPortAsQ0Cast()
+    {
+        Assert.Null(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""").Intake.Reports);
+        var reports = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "intake": {"reports": {"password": "p"}}}""").Intake.Reports!;
+        Assert.Equal(("127.0.0.1", 8011, "Q0CAST", "p"), (reports.Host, reports.Port, reports.User, reports.Password));
+        Assert.Equal(FbbIntakeConfig.LinBpqFbbPort, reports.Login);
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "intake": {"reports": {"user": ""}}}"""));
+        Assert.Contains("\"reports\" needs a \"user\"", e.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("""{"station": {}}""", "apiKey")]
     [InlineData("""{"station": {"apiKey": "k", "leaseSeconds": 60}}""", "leaseSeconds")]

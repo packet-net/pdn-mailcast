@@ -5,11 +5,11 @@ using Packet.Mailcast.Feedback;
 namespace Mailcast.HeadEnd.Intake;
 
 /// <summary>
-/// The listeners' daily reports that have reached the head end (issue #136): for each callsign,
-/// the day of its newest report and when that arrived, kept in <see cref="FileName"/> in the state
-/// directory. The directory lists the recent ones (<see cref="ReportReceipts"/>), so a listener's
-/// receiver can say whether GB7RDG got its report. The reports themselves are never kept, and
-/// never broadcast.
+/// The listeners' daily reports that have reached the BBS (issue #136), as <see cref="ReportReader"/>
+/// learns them from its list: for each callsign, the day of its newest report and when the head
+/// end first saw it, kept in <see cref="FileName"/> in the state directory. The directory lists
+/// the recent ones (<see cref="ReportReceipts"/>), so a listener's receiver can say whether GB7RDG
+/// got its report. The reports themselves are never read, kept or broadcast.
 /// </summary>
 public sealed class ReportLog
 {
@@ -59,8 +59,8 @@ public sealed class ReportLog
         }
     }
 
-    /// <summary>One callsign's newest report: its day, when it arrived and its BID.</summary>
-    public sealed record Heard(DateOnly Day, DateTimeOffset Arrived, string Bid);
+    /// <summary>One callsign's newest report: its day, when the head end first saw it, and its message number on the BBS.</summary>
+    public sealed record Heard(DateOnly Day, DateTimeOffset Arrived, string Message);
 
     /// <summary>Each callsign's newest report, in callsign order.</summary>
     public IReadOnlyList<KeyValuePair<string, Heard>> All
@@ -75,13 +75,14 @@ public sealed class ReportLog
     }
 
     /// <summary>
-    /// Notes a report from <paramref name="callsign"/> for <paramref name="day"/>. True when it
+    /// Notes a report from <paramref name="callsign"/> for <paramref name="day"/>, saved at the next
+    /// <see cref="MarkRead"/>. True when it
     /// is the newest yet from that callsign, so the directory will list it; false when one for
     /// that day or a later one was already noted, the callsign cannot be listed, or the day is
     /// after the day it arrived (a receiver with its clock wrong), which would otherwise hide
     /// that callsign's real reports until then.
     /// </summary>
-    public bool Note(string callsign, DateOnly day, DateTimeOffset arrived, string bid)
+    public bool Note(string callsign, DateOnly day, DateTimeOffset arrived, string message)
     {
         if (!ReportReceipts.IsListable(callsign) || day > DateOnly.FromDateTime(arrived.UtcDateTime))
         {
@@ -93,8 +94,7 @@ public sealed class ReportLog
             {
                 return false;
             }
-            _heard[callsign] = new Heard(day, arrived, bid);
-            _active = true;
+            _heard[callsign] = new Heard(day, arrived, message);
             foreach (var old in _heard.Where(p => p.Value.Day < day.AddDays(-RememberDays)).Select(p => p.Key).ToList())
             {
                 _heard.Remove(old);
@@ -103,16 +103,27 @@ public sealed class ReportLog
             {
                 _heard.Remove(old);
             }
-            Save();
             return true;
         }
     }
 
     /// <summary>
+    /// The BBS's list has been read, whether or not it held anything new: what was noted is saved,
+    /// and from now on the directory says which reports there are, even if none.
+    /// </summary>
+    public void MarkRead()
+    {
+        lock (_gate)
+        {
+            _active = true;
+            Save();
+        }
+    }
+
+    /// <summary>
     /// What a directory dated <paramref name="today"/> lists (<see cref="ReportReceipts.ForDay"/>):
-    /// null, so the directory says nothing, until the first report has ever arrived. A head end
-    /// whose BBS does not hand it reports (no route for MCAST) would otherwise tell every listener
-    /// that GB7RDG has had none.
+    /// null, so the directory says nothing, until the BBS's list has been read once. A head end
+    /// that cannot read it would otherwise tell every listener that GB7RDG has had none.
     /// </summary>
     public ReportReceipts? For(DateOnly today)
     {

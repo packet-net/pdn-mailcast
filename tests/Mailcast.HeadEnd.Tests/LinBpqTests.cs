@@ -9,8 +9,7 @@ namespace Mailcast.HeadEnd.Tests;
 
 /// <summary>
 /// The intake against a real LinBPQ in docker, configured as docs/headend.md says: bulletins
-/// posted on the BBS reach the head end, personal mail and local bulletins do not, and a
-/// listener's daily report, to MCAST at the BBS itself, reaches it to be noted but never kept.
+/// posted on the BBS reach the head end, personal mail and local bulletins do not.
 /// </summary>
 [Trait("Category", "Docker")]
 public sealed class LinBpqTests
@@ -38,9 +37,7 @@ public sealed class LinBpqTests
             string euro = await sysop.PostAsync("SB RSGB @ EURO", "Mailcast EURO test", "to Europe", timeout.Token);
             string local = await sysop.PostAsync("SB LOCAL @ GB7TST", "Local notice", "stays here", timeout.Token);
             string personal = await sysop.PostAsync("SP G4XYZ @ GB7XYZ.#12.GBR.EURO", "Personal", "for one person", timeout.Token);
-            var reportDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
-            string report = await sysop.PostAsync("SB MCAST @ GB7TST.#42.GBR.EURO", $"MCR G4TST {reportDay:yyyy-MM-dd}", "MCR1 0.16.0 IO91lk sc 3/3 0 0 0\r\n10 W4 212 18 +1.2 IG", timeout.Token);
-            Assert.Contains("Q0HEAD 4 Msgs", await sysop.CommandAsync("FWD QUEUE", timeout.Token), StringComparison.Ordinal);
+            Assert.Contains("Q0HEAD 3 Msgs", await sysop.CommandAsync("FWD QUEUE", timeout.Token), StringComparison.Ordinal);
 
             using var state = new TempDirectory();
             var journal = new MemoryJournal();
@@ -55,17 +52,13 @@ public sealed class LinBpqTests
                 Login = FbbIntakeConfig.LinBpqFbbPort,
                 SessionTimeoutSeconds = 60,
             };
-            var reports = new ReportLog(state.Path, journal);
-            using var intake = new FbbIntake(config, store, new IntakePolicy(32 * 1024), journal, TimeProvider.System, reports: reports);
+            using var intake = new FbbIntake(config, store, new IntakePolicy(32 * 1024), journal, TimeProvider.System);
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var result = await intake.CollectAsync(today, timeout.Token);
 
             Assert.True(result.Problem is null, $"{result.Problem}\n{string.Join('\n', journal.Lines)}");
             Assert.Equal(3, result.Accepted);
-            Assert.Equal(1, result.Refused);
-            Assert.Equal(1, result.Reports);
-            Assert.Equal(reportDay, reports.For(today)!.For("G4TST"));
-            Assert.False(store.Holds(report));
+            Assert.Equal(0, result.Refused);
             var directory = store.Plan(BroadcastScheduler.Midnight(today).AddHours(12), 1, Compression.Default, new ScheduleOptions()).Directory;
             Assert.Equal(new[] { ww, gbr, euro }.Order(), directory.Entries.Select(e => e.Bid).Order());
             Assert.DoesNotContain(local, directory.Entries.Select(e => e.Bid));
@@ -76,6 +69,63 @@ public sealed class LinBpqTests
             var again = await intake.CollectAsync(today, timeout.Token);
             Assert.Null(again.Problem);
             Assert.Equal(0, again.Accepted);
+        }
+        finally
+        {
+            await Docker(CancellationToken.None, "rm", "-f", id);
+        }
+    }
+
+    /// <summary>
+    /// Issue #136: the report reader logs in as Q0CAST, set up as a receiver's login is on GB7RDG
+    /// (a BBS user with a forwarding record), lists the bulletins to MCAST and notes each report
+    /// whose sender is the callsign in its title. Nothing on the BBS changes: the reports are
+    /// still there to read.
+    /// </summary>
+    [Fact]
+    public async Task ReportReader_ListsTheReportsToMcast_AsAReceiversLogin()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        string fixture = Path.Combine(AppContext.BaseDirectory, "LinBpq");
+        string id = (await Docker(timeout.Token, "create", "-p", "127.0.0.1::8011", "-p", "127.0.0.1::8010", Image)).Trim();
+        try
+        {
+            await Docker(timeout.Token, "cp", Path.Combine(fixture, "bpq32.cfg"), $"{id}:/data/bpq32.cfg");
+            await Docker(timeout.Token, "cp", Path.Combine(fixture, "linmail.cfg"), $"{id}:/data/linmail.cfg");
+            await Docker(timeout.Token, "start", id);
+            int fbbPort = await Port(id, 8011, timeout.Token);
+            int telnetPort = await Port(id, 8010, timeout.Token);
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            using var sysop = await Sysop.LogInAsync(telnetPort, timeout.Token);
+            await sysop.PostAsync("SB MCAST @ GB7TST.#42.GBR.EURO", $"MCR G4TST {today.AddDays(-1):yyyy-MM-dd}", "MCR1 0.16.0 IO91lk sc 3/3 0 0 0", timeout.Token);
+            // Someone else's callsign in the title: not the sender's, so not counted.
+            await sysop.PostAsync("SB MCAST @ GB7TST.#42.GBR.EURO", $"MCR G8BPQ {today.AddDays(-1):yyyy-MM-dd}", "MCR1 0.16.0 IO91lk sc 3/3 0 0 0", timeout.Token);
+            await sysop.PostAsync("SB ALL @ WW", "Not a report", "hello", timeout.Token);
+
+            using var state = new TempDirectory();
+            var journal = new MemoryJournal();
+            var log = new ReportLog(state.Path, journal);
+            var config = new ReportsReaderConfig { Host = "127.0.0.1", Port = fbbPort, User = "Q0CAST", Password = "cast-test" };
+            using var reader = new ReportReader(config, log, journal, TimeProvider.System);
+            var result = await reader.CollectAsync(today, timeout.Token);
+
+            Assert.True(result.Problem is null, $"{result.Problem}\n{string.Join('\n', journal.Lines)}");
+            var heard = Assert.Single(log.All);
+            Assert.Equal(("G4TST", today.AddDays(-1)), (heard.Key, heard.Value.Day));
+            Assert.Equal($"reports={today.AddDays(-1):yyyy-MM-dd}:G4TST", log.For(today)!.ToField());
+            Assert.Contains(journal.Lines, l => l.StartsWith("reports: 1 new of 1 listed", StringComparison.Ordinal));
+            Assert.DoesNotContain(journal.Lines, l => l.Contains("cast-test", StringComparison.Ordinal));
+
+            // Still on the BBS for anyone to read.
+            Assert.Contains("MCR G4TST", await sysop.CommandAsync("L> MCAST", timeout.Token), StringComparison.Ordinal);
+
+            // A wrong password is a problem in the journal, which never gives the password.
+            using var wrong = new ReportReader(config with { Password = "not-it" }, new ReportLog(state.Path, journal, readOnly: true), journal, TimeProvider.System);
+            var refused = await wrong.CollectAsync(today, timeout.Token);
+            Assert.NotNull(refused.Problem);
+            Assert.Contains("password", refused.Problem, StringComparison.Ordinal);
+            Assert.DoesNotContain("not-it", refused.Problem, StringComparison.Ordinal);
         }
         finally
         {

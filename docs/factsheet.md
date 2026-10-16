@@ -52,7 +52,7 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from G
 | | |
 |---|---|
 | Software | pdn-mailcast head end 0.3.0 beside pdn-soundmodem 0.85.0 on the node that drives the Flex |
-| Intake | Forwarding partner Q0HEAD on GB7RDG's LinBPQ (FBB B1F over the FBBPORT, bulletins only, flood routes WW, GBR, EURO); bulletins over 32 KB are refused, and personal mail and NTS are left queued in LinBPQ. Listeners' daily reports (to MCAST, or an MCR title with an MCR1 body) are never sent; from 0.16.0, with Q0HEAD's TO route set to MCAST, the head end notes whose reached GB7RDG, and for which day |
+| Intake | Forwarding partner Q0HEAD on GB7RDG's LinBPQ (FBB B1F over the FBBPORT, bulletins only, flood routes WW, GBR, EURO); bulletins over 32 KB are refused, and personal mail and NTS are left queued in LinBPQ. Listeners' daily reports (to MCAST, or an MCR title with an MCR1 body) are never sent; from 0.16.0 the head end also logs in as an ordinary reader (Q0CAST), lists them (`L> MCAST`) before each slot, at most every 15 minutes, and notes whose reached GB7RDG, and for which day, from the titles |
 | Coexistence | A transmit lease in pdn-soundmodem holds LinBPQ's packet traffic off for the slot only; frames waiting when the lease ends are dropped, never sent late |
 | Safety | Refuses to key unless the system clock is synchronised; stops the slot if the PA passes 70 C (read-only Flex meter connection); one-off slots by `pdn-mailcast-headend --run-now` |
 
