@@ -800,6 +800,8 @@ public sealed class StatusPage : IAsyncDisposable
                 started = slot.Started,
                 scheduled = slot.Scheduled,
                 framesHeard = slot.FramesHeard,
+                // Issue #133: bytes decoded from those frames, not the bulletins rebuilt from them.
+                bytesDecoded = slot.BytesDecoded,
                 lastFrame = slot.LastFrame,
                 waveform = slot.Waveform,
                 frameCounts = slot.FrameCounts,
