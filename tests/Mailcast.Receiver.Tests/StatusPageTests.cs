@@ -76,11 +76,20 @@ public class StatusPageTests
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
         var saved = ReceiverConfig.Load(path);
         Assert.Equal(8011, saved.Bbs.Port);
-        Assert.Equal("Q0CAST", saved.Bbs.Login);
+        // Issue #134: LinBPQ's USER= logins are case-sensitive, so the login is saved as typed.
+        Assert.Equal("q0cast", saved.Bbs.Login);
         Assert.Equal("secret", saved.Bbs.Password);
         Assert.Equal("ubersdr:wessex.zapto.org", saved.Audio);
         Assert.Equal(saved, host.Config);
     }
+
+    /// <summary>Issue #134: LinBPQ's USER= logins are case-sensitive, so its login is kept as typed; FBB's is upper-cased.</summary>
+    [Theory]
+    [InlineData(BbsKind.LinBpq, " m7taw ", "m7taw")]
+    [InlineData(BbsKind.LinBpq, "M7TAW", "M7TAW")]
+    [InlineData(BbsKind.Fbb, "q0cast", "Q0CAST")]
+    public void BbsLogin_KeepsLinBpqsCase_UpperCasesFbbs(BbsKind kind, string typed, string saved) =>
+        Assert.Equal(saved, StatusPage.BbsLogin(kind, typed));
 
     /// <summary>Issue #48: the status page's slim list of recent slots, and the full drill-down for one of them.</summary>
     [Fact]

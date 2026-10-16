@@ -36,5 +36,43 @@ public class BbsLoginTestLinBpqTests(ITestOutputHelper output)
         var result = await client.TestLoginAsync(deadline.Token);
 
         Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
+        Assert.Equal("password:", result.Detail);
+    }
+
+    /// <summary>
+    /// Issue #134: LinBPQ compares the login with its USER= lines case-sensitively (strcmp in
+    /// TelnetV6.c), and answers one it has no line for with "user:" again, not "password:".
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_LoginInTheWrongCase_SaysTheLoginWasNotRecognisedForReal()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await using var bpq = await LinBpqContainer.StartAsync(deadline.Token);
+        var client = new BbsClient(new BbsSettings { Host = "127.0.0.1", Port = bpq.FbbPort, Login = LinBpqContainer.Login.ToLowerInvariant(), Password = LinBpqContainer.Password },
+            TimeProvider.System, output.WriteLine);
+
+        var result = await client.TestLoginAsync(deadline.Token);
+
+        Assert.Equal(BbsLoginTestOutcome.LoginNotRecognised, result.Outcome);
+        Assert.Equal("user:", result.Detail);
+    }
+
+    /// <summary>
+    /// Issue #134: the right login and password on LinBPQ's ordinary telnet port (TCPPORT) come
+    /// back "user:password:", because that port takes one line at a time. It must say it is the
+    /// wrong port, not that the password is wrong.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_OrdinaryTelnetPort_SaysItIsNotTheFbbPortForReal()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await using var bpq = await LinBpqContainer.StartAsync(deadline.Token);
+        var client = new BbsClient(new BbsSettings { Host = "127.0.0.1", Port = bpq.TelnetPort, Login = LinBpqContainer.Login, Password = LinBpqContainer.Password },
+            TimeProvider.System, output.WriteLine);
+
+        var result = await client.TestLoginAsync(deadline.Token);
+
+        Assert.Equal(BbsLoginTestOutcome.NotFbbPort, result.Outcome);
+        Assert.Contains("user:", result.Detail, StringComparison.Ordinal);
     }
 }

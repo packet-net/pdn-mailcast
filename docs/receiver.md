@@ -265,7 +265,7 @@ Tested against LinBPQ 6.0.25.41.
     USER=Q0CAST,pick-one,Q0CAST,,
    ```
 
-   The receiver must use the FBBPORT, not the ordinary telnet port, because forwarding is binary. Leave the fourth field (the command run at login) empty: the receiver sends `BBS` itself. Restart LinBPQ.
+   The receiver must use the FBBPORT, not the ordinary telnet port, because forwarding is binary. LinBPQ matches the login against the first field case-sensitively, so give the receiver the login exactly as it is written there (`m7taw` is not `M7TAW`). Leave the fourth field (the command run at login) empty: the receiver sends `BBS` itself. Restart LinBPQ.
 
 2. In the mail configuration (the web page's Mail Mgmt, or BPQMail's configuration), add a user **Q0CAST** and tick **BBS**, so it's a forwarding partner rather than an ordinary terminal user. Also give it a **Name** (Web Mgmt, BBS Users): a BBS user with no Name gets LinBPQ's new-user prompt instead of the forwarding prompt, and the receiver reports that as needing a Name rather than logging in.
 
@@ -302,13 +302,27 @@ FBB answers "already have" for a bulletin it already holds, so a second receiver
 The settings page's **Test BBS login** button tries the host, port, login and password shown (or typed in but not yet saved), the same way the receiver logs in to send mail, but exchanges no mail: it connects, logs in, enters the BBS command, and stops once it knows how far it got. It says plainly:
 
 - logged in as a forwarding partner: the login works;
-- the password is wrong;
+- the password is wrong: LinBPQ asked for the password again after it was sent, or FBB said so;
+- the login was not recognised: LinBPQ asked for the login again, because no `USER=` line on that port has it. LinBPQ's logins are case-sensitive, so check the case too;
+- the port is LinBPQ's ordinary telnet port (`TCPPORT`), not its `FBBPORT`. The ordinary port asks for the login and password one at a time, so the receiver can't use it;
 - the login works but is not set up as a BBS forwarding partner, such as Q0CAST added to the Telnet port but not to the mail configuration's Users;
 - the login works but LinBPQ is asking for a name, because the BBS user has none: give it a Name in LinBPQ's BBS user settings (Web Mgmt, BBS Users), then test again. A real delivery session that meets the same prompt fails the same way, rather than hanging or giving a generic error;
 - the BBS could not be reached, because the host or port refused the connection or never answered;
 - something else, with the BBS's own first line of reply.
 
-Leave the password field empty to test with the one already saved. The button never saves anything, and the password is never shown back, logged, or sent anywhere other than the BBS you asked it to try.
+When the login is refused, it also shows what the BBS actually said, and what the receiver sent: the login, the command, and that a password was sent.
+
+Leave the password field empty to test with the one already saved. The button never saves anything, and the password is never shown back, logged, or sent anywhere other than the BBS you asked it to try. Nothing about it is logged, not even its length, and if the BBS echoes it back it is replaced with `***`.
+
+Each test also goes to the journal (or `receiver.log` on Windows), so you can see the exchange there:
+
+```
+bbs: login test: sent LinBPQ at 192.168.1.127:8011 the login "M7TAW", a password and the command "BBS", each line ending in CR, all at once
+bbs: login test: the BBS answered 5 bytes, "user:"
+bbs: login test: LinBPQ asked for the login again, so no USER= line on this port has the login "M7TAW"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly.
+```
+
+In what the BBS answered, a line end shows as `<CR>` or `<LF>`, and any other byte that isn't printable shows in hex, such as `<FF>` (the start of telnet's own negotiation, which only the ordinary telnet port sends).
 
 ## The status page
 
@@ -437,7 +451,7 @@ On disk they are in the state directory: waiting ones in `store/outbox/`, archiv
 
 ## What it logs
 
-Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`; on Windows the service writes `receiver.log` beside its config file instead), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, each directory with whether it is signed (`directory for 2026-10-15: 21 bulletins in rotation, sent on 1200 bps (WN4), signed by GB7RDG`) or why it is not used, a bulletin held or not delivered because of a directory's signature, a part-received one when GB7RDG has stopped sending it and again when it is cleared, each ionosonde reading as it arrives (one line a slot), what the BBS said about it, each one sent again from the page, a newer version once when it is first seen (`update: version 0.7.0 is available (you have 0.6.0); the status page says how to upgrade`), and with the daily report on, what your BBS said about it (`feedback: the report for 2026-10-06 (MCR G4ABC 2026-10-06, 458 bytes) was accepted by the BBS`). The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
+Everything goes to the journal (`journalctl -u pdn-mailcast-receiver`; on Windows the service writes `receiver.log` beside its config file instead), one plain line each: the audio source, GB7RDG's slots and where they come from (the config, or GB7RDG's directory once heard), which slots a web SDR listens to each day, the tone (`tone: 1801.3 Hz, +1.3 Hz from 1800 Hz, SNR 14.2 dB in 3 kHz, 10 s`; it reads 8 to 11 s for the 10 s tone, and the CW ident that follows on the same frequency is not counted), the speed of the first frame of each slot (`slot: 1 frame heard on 1200 bps (WN4)`) and of any frame that came at another speed, each bulletin as it completes, each directory with whether it is signed (`directory for 2026-10-15: 21 bulletins in rotation, sent on 1200 bps (WN4), signed by GB7RDG`) or why it is not used, a bulletin held or not delivered because of a directory's signature, a part-received one when GB7RDG has stopped sending it and again when it is cleared, each ionosonde reading as it arrives (one line a slot), what the BBS said about it, each one sent again from the page, the login exchange when a delivery session fails at login (`bbs: delivery login: sent ...` and `bbs: delivery login: the BBS answered ...`, as for [Testing the login](#testing-the-login), with nothing about the password), a newer version once when it is first seen (`update: version 0.7.0 is available (you have 0.6.0); the status page says how to upgrade`), and with the daily report on, what your BBS said about it (`feedback: the report for 2026-10-06 (MCR G4ABC 2026-10-06, 458 bytes) was accepted by the BBS`). The record of deliveries is also kept in `deliveries.jsonl` in the state directory.
 
 ## Building from source
 

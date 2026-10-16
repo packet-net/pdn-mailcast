@@ -49,6 +49,16 @@ internal sealed class FakeBbs : IAsyncDisposable
     /// <summary>The password the BBS accepts.</summary>
     public string Password { get; init; } = "secret";
 
+    /// <summary>The login the BBS accepts, compared case-sensitively, as LinBPQ compares USER= lines.</summary>
+    public string Login { get; init; } = "Q0CAST";
+
+    /// <summary>
+    /// Behave as LinBPQ's ordinary telnet port (TCPPORT) rather than its FBBPORT: open with its
+    /// telnet option negotiation and "user:", then answer the first line with "password:", as a
+    /// real LinBPQ 6.0.25.41 does to all three lines sent at once (issue #134).
+    /// </summary>
+    public bool TelnetPort { get; init; }
+
     /// <summary>Drop the connection straight after the first transfer, before answering it.</summary>
     public bool HangUpAfterTransfer { get; set; }
 
@@ -96,6 +106,10 @@ internal sealed class FakeBbs : IAsyncDisposable
             var lines = new List<string>();
             try
             {
+                if (TelnetPort)
+                {
+                    await stream.WriteAsync(Encoding.Latin1.GetBytes("\xFF\xFB\x03\xFF\xFB\x01user:"), _stop.Token);
+                }
                 while (lines.Count < 3)
                 {
                     int read = await stream.ReadAsync(buffer, _stop.Token);
@@ -112,6 +126,16 @@ internal sealed class FakeBbs : IAsyncDisposable
                     }
                 }
                 Logins.Enqueue([.. lines]);
+                if (TelnetPort)
+                {
+                    await stream.WriteAsync(Encoding.Latin1.GetBytes("password:"), _stop.Token);
+                    return;
+                }
+                if (lines[0] != Login)
+                {
+                    await stream.WriteAsync(Encoding.Latin1.GetBytes("user:"), _stop.Token);
+                    return;
+                }
                 if (lines[1] != Password)
                 {
                     await stream.WriteAsync(Encoding.Latin1.GetBytes("password:"), _stop.Token);

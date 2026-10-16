@@ -1596,7 +1596,8 @@ $("testBbs").addEventListener("click", async () => {
   $("testBbs").disabled = false;
   if (!r.ok) { $("testBbsResult").innerHTML = `<span class="bad">${esc(r.error)}</span>`; return; }
   const said = r.body.detail ? `${r.body.said} The BBS said: "${r.body.detail}"` : r.body.said;
-  $("testBbsResult").innerHTML = `<span class="${r.body.outcome === "ok" ? "good" : "bad"}">${esc(said)}</span>`;
+  $("testBbsResult").innerHTML = `<span class="${r.body.outcome === "ok" ? "good" : "bad"}">${esc(said)}</span>`
+    + (r.body.sent ? `<div class="muted">The receiver sent ${esc(r.body.sent)}.</div>` : "");
 });
 $("settings").addEventListener("submit", async e => {
   e.preventDefault();

@@ -7,8 +7,8 @@ namespace Mailcast.Receiver.Tests;
 
 public class BbsClientTests
 {
-    private static BbsClient Client(int port, string password = "secret") =>
-        new(new BbsSettings { Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, _ => { });
+    private static BbsClient Client(int port, string password = "secret", Action<string>? log = null) =>
+        new(new BbsSettings { Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, log ?? (_ => { }));
 
     private static BbsClient FbbClient(int port, string password = "mailcast12") =>
         new(new BbsSettings { Type = BbsKind.Fbb, Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, _ => { });
@@ -212,14 +212,124 @@ public class BbsClientTests
     }
 
     [Fact]
-    public async Task TestLogin_WrongPassword_SaysSo()
+    public async Task TestLogin_WrongPassword_SaysSoWithTheBbsWordsAndWhatWasSent()
     {
         await using var bbs = new FakeBbs();
+        var log = new List<string>();
 
-        var result = await Client(bbs.Port, password: "wrong").TestLoginAsync(CancellationToken.None);
+        var result = await Client(bbs.Port, password: "wrong", log: log.Add).TestLoginAsync(CancellationToken.None);
 
         Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
-        Assert.Null(result.Detail);
+        Assert.StartsWith("LinBPQ asked for the password again", result.Said, StringComparison.Ordinal);
+        Assert.Equal("password:", result.Detail);
+        Assert.Equal("the login \"Q0CAST\", a password and the command \"BBS\", each line ending in CR, all at once", result.Sent);
+        Assert.Contains(log, l => l.StartsWith("bbs: login test: sent LinBPQ at 127.0.0.1:", StringComparison.Ordinal) && l.Contains("a password and the command", StringComparison.Ordinal));
+        // Whether the close is seen too depends on timing: the reply is settled at "password:".
+        Assert.Contains(log, l => l.StartsWith("bbs: login test: the BBS answered 9 bytes, \"password:\"", StringComparison.Ordinal));
+        Assert.All(log, l => Assert.DoesNotContain("wrong", l, StringComparison.Ordinal));
+        Assert.All(log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
+    }
+
+    /// <summary>
+    /// Issue #134: LinBPQ compares a login with its USER= lines case-sensitively and answers one
+    /// it has no line for with "user:" again. That used to read as "That password is not right.",
+    /// and the settings page used to upper-case the login, so a working "m7taw" went as "M7TAW".
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_LoginInTheWrongCase_SaysTheLoginWasNotRecognised()
+    {
+        await using var bbs = new FakeBbs { Login = "m7taw" };
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.LoginNotRecognised, result.Outcome);
+        Assert.Contains("\"Q0CAST\"", result.Said, StringComparison.Ordinal);
+        Assert.Contains("case-sensitive", result.Said, StringComparison.Ordinal);
+        Assert.DoesNotContain("password", result.Said, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("user:", result.Detail);
+    }
+
+    /// <summary>
+    /// Issue #134: LinBPQ's ordinary telnet port opens with telnet negotiation and "user:", then
+    /// takes one line at a time, so all three lines at once always come back "user:password:",
+    /// right password or not. That is the wrong port, not a refused login.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_LinBpqOrdinaryTelnetPort_SaysItIsNotTheFbbPort()
+    {
+        await using var bbs = new FakeBbs { TelnetPort = true };
+
+        var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.NotFbbPort, result.Outcome);
+        Assert.Contains("TCPPORT", result.Said, StringComparison.Ordinal);
+        Assert.Contains("FBBPORT", result.Said, StringComparison.Ordinal);
+        Assert.StartsWith("<FF><FB><03><FF><FB><01>user:", result.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Deliver_LoginNotRecognised_LogsTheExchangeWithThePasswordMasked()
+    {
+        await using var bbs = new FakeBbs { Login = "m7taw" };
+        var log = new List<string>();
+
+        var report = await Client(bbs.Port, log: log.Add).DeliverAsync([Samples.Bulletin(404)], CancellationToken.None);
+
+        Assert.False(report.Graceful);
+        Assert.StartsWith("LinBPQ asked for the login again", report.Failure, StringComparison.Ordinal);
+        Assert.Contains("it said \"user:\"", report.Failure, StringComparison.Ordinal);
+        Assert.Contains(log, l => l.StartsWith("bbs: delivery login: sent LinBPQ at 127.0.0.1:", StringComparison.Ordinal)
+            && l.Contains("the login \"Q0CAST\", a password and the command", StringComparison.Ordinal));
+        Assert.Contains(log, l => l.StartsWith("bbs: delivery login: the BBS answered 5 bytes, \"user:\"", StringComparison.Ordinal));
+        Assert.All(log, l => Assert.DoesNotContain("secret", l, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Issue #134: the login exchange is logged, but nothing about the password ever is, not
+    /// even its length, including when the BBS echoes it back, for a login test and a delivery
+    /// alike, and for every way a login can go wrong.
+    /// </summary>
+    [Theory]
+    [InlineData("echo")]
+    [InlineData("wrong-password")]
+    [InlineData("wrong-login")]
+    [InlineData("telnet-port")]
+    public async Task LoginExchange_LogLinesNeverContainThePassword(string how)
+    {
+        const string Password = "s3cr3t-Pa55";
+        await using var bbs = how switch
+        {
+            "echo" => new FakeBbs { Password = Password, Garbled = $"you said {Password}, which is wrong\r\n{Password}\r\n" },
+            "wrong-login" => new FakeBbs { Password = Password, Login = "m7taw" },
+            "telnet-port" => new FakeBbs { Password = Password, TelnetPort = true },
+            _ => new FakeBbs(),
+        };
+        var log = new List<string>();
+        var client = Client(bbs.Port, password: Password, log: log.Add);
+
+        var result = await client.TestLoginAsync(CancellationToken.None);
+        var report = await client.DeliverAsync([Samples.Bulletin(406)], CancellationToken.None);
+
+        Assert.Contains(log, l => l.StartsWith("bbs: login test: sent ", StringComparison.Ordinal));
+        Assert.Contains(log, l => l.StartsWith("bbs: delivery login: sent ", StringComparison.Ordinal));
+        Assert.Contains(log, l => l.StartsWith("bbs: delivery login: the BBS answered ", StringComparison.Ordinal));
+        foreach (string shown in log.Append(result.Said).Append(result.Detail ?? "").Append(result.Sent ?? "").Append(report.Failure ?? ""))
+        {
+            Assert.DoesNotContain(Password, shown, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("character", shown, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Deliver_GoodLogin_LogsNoLoginExchange()
+    {
+        await using var bbs = new FakeBbs();
+        var log = new List<string>();
+
+        var report = await Client(bbs.Port, log: log.Add).DeliverAsync([Samples.Bulletin(405)], CancellationToken.None);
+
+        Assert.True(report.Graceful, report.Failure);
+        Assert.DoesNotContain(log, l => l.Contains("login", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -356,6 +466,8 @@ public class BbsClientTests
         var result = await FbbClient(fbb.Port).TestLoginAsync(CancellationToken.None);
 
         Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
+        Assert.StartsWith("FBB did not take the password", result.Said, StringComparison.Ordinal);
+        Assert.Contains("Password error !", result.Detail, StringComparison.Ordinal);
     }
 
     [Fact]
