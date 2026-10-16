@@ -928,7 +928,7 @@ async function refresh() {
          ${Math.abs(t.offsetHz) <= 50 ? "That is close enough." : "That is well off: check the dial."}</div>`
       : `<div class="muted">No tone heard at the start of this slot, but frames were.</div>`)
       + `<dl style="margin-top:10px">${s.slot.scheduled ? `<dt>Slot</dt><dd>${utc(s.slot.scheduled)}</dd>` : ""}<dt>Started</dt><dd>${when(s.slot.started)}</dd>
-         <dt>Frames heard</dt><dd>${s.slot.framesHeard}${s.slot.lastFrame ? ", last at " + new Date(s.slot.lastFrame).toLocaleTimeString() : ""}</dd></dl>`;
+         <dt>Frames heard</dt><dd>${s.slot.framesHeard}${s.slot.bytesDecoded ? ", " + (s.slot.bytesDecoded < 1000 ? s.slot.bytesDecoded + " bytes" : (s.slot.bytesDecoded / 1000).toFixed(1) + " KB") + " decoded" : ""}${s.slot.lastFrame ? ", last at " + new Date(s.slot.lastFrame).toLocaleTimeString() : ""}</dd></dl>`;
   }
 
   speed(s);
@@ -1081,7 +1081,10 @@ function speed(s) {
   if (!b && !heard.length) { $("speed").className = "muted"; $("speed").textContent = "Not heard yet."; return; }
   let html = "";
   if (b) {
-    html += `<div class="big">${esc(b.words)}</div>
+    /* no speed until a frame decodes on the burst: a lock alone can be the tone or probe (#135) */
+    html += b.words == null ? `<div class="big">Hearing a burst</div>
+      <div class="muted">Its speed shows once a frame decodes.</div>`
+      : `<div class="big">${esc(b.words)}</div>
       <div class="muted">${b.live ? "Hearing a burst at this speed now."
         : `Last burst at ${new Date(b.ended).toLocaleTimeString()}, ${b.frames} frame${b.frames === 1 ? "" : "s"}.`}</div>`;
   }
