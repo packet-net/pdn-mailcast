@@ -1224,6 +1224,15 @@ public sealed class StatusPage : IAsyncDisposable
         return new FeedbackSettings { Enabled = form.Enabled, Callsign = callsign.Length == 0 ? null : callsign };
     }
 
+    /// <summary>
+    /// The BBS login as typed, trimmed. For LinBPQ it is kept in the case typed: LinBPQ compares
+    /// a login with its USER= lines case-sensitively, so upper-casing it, as this once did, turned
+    /// a working "m7taw" into a refused "M7TAW" (issue #134). FBB ignores the case, and its
+    /// callsigns are upper case, so for FBB it is upper-cased as before.
+    /// </summary>
+    internal static string BbsLogin(BbsKind kind, string login) =>
+        kind == BbsKind.Fbb ? login.Trim().ToUpperInvariant() : login.Trim();
+
     /// <summary>Applies a settings form to <paramref name="current"/>; throws <see cref="ConfigException"/> for one that cannot work.</summary>
     internal static ReceiverConfig Apply(ReceiverConfig current, SettingsForm form)
     {
@@ -1254,7 +1263,7 @@ public sealed class StatusPage : IAsyncDisposable
                 Type = kind,
                 Host = form.Host.Trim(),
                 Port = form.Port,
-                Login = form.Login.Trim().ToUpperInvariant(),
+                Login = BbsLogin(kind, form.Login),
                 Password = string.IsNullOrEmpty(form.Password) ? current.Bbs.Password : form.Password,
                 Command = form.Command.Trim(),
             },
@@ -1804,13 +1813,13 @@ public sealed class StatusPage : IAsyncDisposable
             return;
         }
 
-        var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = login.ToUpperInvariant(), Password = password, Command = command };
+        var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = BbsLogin(kind, login), Password = password, Command = command };
         BbsLoginTestResult result;
         try
         {
             result = TestBbsLogin is { } hook
                 ? await hook(settings).ConfigureAwait(false)
-                : await new BbsClient(settings, _host.Time, _ => { }).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
+                : await new BbsClient(settings, _host.Time, _log).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -1824,6 +1833,7 @@ public sealed class StatusPage : IAsyncDisposable
                 outcome = BbsLoginTestOutcome.UnexpectedReply,
                 said = "Something went wrong testing the login.",
                 detail = (string?)null,
+                sent = (string?)null,
             }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
             return;
         }
@@ -1834,6 +1844,7 @@ public sealed class StatusPage : IAsyncDisposable
             outcome = result.Outcome,
             said = result.Said,
             detail = result.Detail,
+            sent = result.Sent,
         }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 
