@@ -293,6 +293,104 @@ public class IntakeTests
         Assert.Equal(2, tries);
     }
 
+    /// <summary>
+    /// A BBS that answers the reader's lines as told: each line received (CR ended) gets the next
+    /// reply, the login's three lines the first.
+    /// </summary>
+    private static async Task<(int Port, Task<List<string>> Received)> ScriptedBbs(params string[] replies)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        async Task<List<string>> Serve()
+        {
+            var received = new List<string>();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                using var client = await listener.AcceptTcpClientAsync(timeout.Token);
+                var stream = client.GetStream();
+                var line = new StringBuilder();
+                int next = 0;
+                var one = new byte[1];
+                while (await stream.ReadAsync(one, timeout.Token) == 1)
+                {
+                    if (one[0] != '\r')
+                    {
+                        line.Append((char)one[0]);
+                        continue;
+                    }
+                    received.Add(line.ToString());
+                    line.Clear();
+                    if (received.Count >= 3 && next < replies.Length)
+                    {
+                        await stream.WriteAsync(Encoding.Latin1.GetBytes(replies[next++]), timeout.Token);
+                    }
+                }
+            }
+            catch (IOException)
+            {
+            }
+            finally
+            {
+                listener.Stop();
+            }
+            return received;
+        }
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        await Task.Yield();
+        return (port, Serve());
+    }
+
+    [Fact]
+    public async Task ReportReader_AnswersLinBpqsPagePrompt_AndTakesAnyPromptAsTheEnd()
+    {
+        // The welcome comes after the third login line (BBS); then the list in two pages, and a
+        // prompt with a time in it, unlike the one at login.
+        var (port, received) = await ScriptedBbs(
+            "Hello Mailcast receiver.\rde GB7RDG>\r",
+            "13414  16-Oct B$     480 MCAST  @GB7RDG G8BPQ  MCR G8BPQ 2026-10-15\r13413  16-Oct B$     480 MCAST  @GB7RDG G4ABC  MCR G4ABC 2026-10-15\r<A>bort, <CR> Continue..>",
+            "13410  15-Oct BF     512 MCAST  @GB7RDG GM8BPQ MCR GM8BPQ 2026-10-14>\r12:01 de GB7RDG>\r",
+            "Disconnected\r");
+        using var state = new TempDirectory();
+        var journal = new MemoryJournal();
+        var log = new ReportLog(state.Path, journal);
+        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, Password = "long-enough" }, log, journal,
+            new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero)));
+
+        var result = await reader.CollectAsync(Today, CancellationToken.None);
+
+        Assert.True(result.Problem is null, result.Problem);
+        Assert.Equal(["Q0CAST", "long-enough", "BBS", ReportReader.ListCommand, "", "B"], await received);
+        Assert.Equal(["G4ABC", "G8BPQ"], log.All.Select(p => p.Key));
+        Assert.Contains("reports: 2 new of 2 listed", Assert.Single(journal.Lines), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReportReader_Prompt_IsNeverAListingLine()
+    {
+        Assert.Equal("de GB7RDG>", ReportReader.Prompt("x\rde GB7RDG>\r"));
+        Assert.Equal("12:01 de GB7RDG>", ReportReader.Prompt("x\r12:01 de GB7RDG>\r"));
+        Assert.Null(ReportReader.Prompt("13410  15-Oct BF     512 MCAST  @GB7RDG GM8BPQ Look here>\r"));
+        Assert.True(ReportReader.IsPagePrompt(ReportReader.Prompt("x\r<A>bort, <CR> Continue..>")!));
+    }
+
+    [Theory]
+    [InlineData("pw7", false)]
+    [InlineData("long-enough", true)]
+    public async Task ReportReader_QuotesTheBbsOnlyWithAPasswordLongEnoughToTakeOut(string password, bool quoted)
+    {
+        var (port, _) = await ScriptedBbs("Hmm, " + password + " is wrong. password:");
+        using var state = new TempDirectory();
+        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, Password = password }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), TimeProvider.System);
+
+        string problem = (await reader.CollectAsync(Today, CancellationToken.None)).Problem!;
+
+        Assert.Contains("did not take the password", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain(password, problem, StringComparison.Ordinal);
+        Assert.Equal(!quoted, problem.Contains("(reply not shown)", StringComparison.Ordinal));
+        Assert.Equal(quoted, problem.Contains("<password> is wrong", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void ReportLog_HoldsAtMostAThousandCallsigns_AndListsTheHundredLatest()
     {
@@ -312,6 +410,10 @@ public class IntakeTests
         Assert.Contains("G1004X", listed.Newest.Keys); // the latest to arrive are listed
         Assert.DoesNotContain("G0500X", listed.Newest.Keys);
         Assert.Equal(ReportLog.MostRemembered, new ReportLog(state.Path, new MemoryJournal()).All.Count);
+
+        // Full of newer ones: an older day's report is let go at once, so it is not new.
+        Assert.False(log.Note("G9OLD", day.AddDays(-1), at.AddHours(1), "x"));
+        Assert.DoesNotContain(log.All, p => p.Key == "G9OLD");
     }
 
     [Fact]

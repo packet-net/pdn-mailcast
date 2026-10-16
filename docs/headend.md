@@ -211,7 +211,7 @@ It needs a login on the BBS, in `intake.reports`:
 }
 ```
 
-On GB7RDG that is the Q0CAST login receivers use, which already exists: a USER= line on the FBBPORT and a BBS user. LinBPQ logins are case-sensitive, so `user` must match the USER= line exactly. `login` is as for `intake.fbb`, and the default is LinBPQ's FBBPORT, as shown. Tested against a real LinBPQ 6.0.25.41 in docker with a login set up like Q0CAST (a BBS user with a forwarding record): it lists bulletins as any user would. Nothing about the password is ever logged. The journal says when new reports turn up, and why a reading failed:
+On GB7RDG that is the Q0CAST login receivers use, which already exists: a USER= line on the FBBPORT and a BBS user. LinBPQ logins are case-sensitive, so `user` must match the USER= line exactly. `login` is as for `intake.fbb`, and the default is LinBPQ's FBBPORT, as shown. Tested against a real LinBPQ 6.0.25.41 in docker with a login set up like Q0CAST (a BBS user with a forwarding record): it lists bulletins as any user would, and pages through the list if the login has paging on. Nothing about the password is ever logged: a reply quoted in the journal has it taken out, and with a password under 8 characters the reply is not quoted at all. The journal says when new reports turn up, and why a reading failed:
 
 ```
 reports: 2 new of 14 listed on the BBS, which the directory now lists: G4ABC for 2026-10-15, G8BPQ for 2026-10-15

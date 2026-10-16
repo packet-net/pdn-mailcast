@@ -47,7 +47,7 @@ internal sealed class FakeBbs : IAsyncDisposable
     public ConcurrentQueue<string> ReverseAnswers { get; } = new();
 
     /// <summary>The password the BBS accepts.</summary>
-    public string Password { get; init; } = "secret";
+    public string Password { get; init; } = "secret-pw";
 
     /// <summary>The login the BBS accepts, compared case-sensitively, as LinBPQ compares USER= lines.</summary>
     public string Login { get; init; } = "Q0CAST";

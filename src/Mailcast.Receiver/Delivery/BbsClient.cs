@@ -341,7 +341,7 @@ public sealed partial class BbsClient : IBbsSession
 
     /// <summary>Logs what the BBS answered a login with, as <see cref="Shown"/> gives it.</summary>
     private void LogHeard(string what, string text, bool closed) =>
-        _log($"bbs: {what}: the BBS answered {(text.Length == 0 ? "nothing" : $"\"{Shown(text)}\"")}{(closed ? ", then closed the connection" : "")}");
+        _log($"bbs: {what}: the BBS answered {(text.Length == 0 ? "nothing" : Quoted(text))}{(closed ? ", then closed the connection" : "")}");
 
     /// <summary>
     /// The BBS's whole reply, as one plain ASCII line for the log and the settings page: the
@@ -351,6 +351,10 @@ public sealed partial class BbsClient : IBbsSession
     /// </summary>
     internal string Shown(string text)
     {
+        if (HidesReplies)
+        {
+            return ReplyNotShown;
+        }
         const int Longest = 300;
         var shown = new StringBuilder();
         foreach (char c in Redact(text))
@@ -451,10 +455,30 @@ public sealed partial class BbsClient : IBbsSession
         {
             return null;
         }
+        if (HidesReplies)
+        {
+            return ReplyNotShown;
+        }
         int end = trimmed.IndexOfAny(['\r', '\n']);
         string line = Ascii.Clean(Redact(end < 0 ? trimmed : trimmed[..end])).Trim();
         return line.Length == 0 ? null : line;
     }
+
+    /// <summary>What stands for the BBS's reply when it is not shown.</summary>
+    internal const string ReplyNotShown = "reply not shown";
+
+    /// <summary>
+    /// The shortest password whose occurrences can be taken out of a quoted reply. With a shorter
+    /// one, where the marks fell would give away too much of it (a BBS echoing a few characters
+    /// that happen to match), so the reply is not quoted at all: nothing about the password, ever.
+    /// </summary>
+    internal const int ShortestRedactedPassword = 8;
+
+    /// <summary>Whether the BBS's replies are kept out of the log and the page: a password shorter than <see cref="ShortestRedactedPassword"/>.</summary>
+    private bool HidesReplies => _settings.Password.Length is > 0 and < ShortestRedactedPassword;
+
+    /// <summary>The BBS's reply in quotes, as <see cref="Shown"/> gives it, or <c>(reply not shown)</c>.</summary>
+    private string Quoted(string text) => HidesReplies ? $"({ReplyNotShown})" : $"\"{Shown(text)}\"";
 
     /// <summary>Replaces every occurrence of the password tested with asterisks.</summary>
     private string Redact(string text) =>
@@ -736,7 +760,7 @@ public sealed partial class BbsClient : IBbsSession
                 }
                 if (owner.Refusal(text) is { } refusal)
                 {
-                    throw new SessionFailedException($"{refusal.Clause}; it said \"{owner.Shown(text)}\"");
+                    throw new SessionFailedException($"{refusal.Clause}; it said {owner.Quoted(text)}");
                 }
 
                 int read;
@@ -787,7 +811,7 @@ public sealed partial class BbsClient : IBbsSession
                 {
                     if (owner._settings.Type == BbsKind.LinBpq && owner.Refusal(text) is { } refusal)
                     {
-                        throw new SessionFailedException($"{refusal.Clause}; it said \"{owner.Shown(text)}\"");
+                        throw new SessionFailedException($"{refusal.Clause}; it said {owner.Quoted(text)}");
                     }
                     if (text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase))
                     {

@@ -7,7 +7,7 @@ namespace Mailcast.Receiver.Tests;
 
 public class BbsClientTests
 {
-    private static BbsClient Client(int port, string password = "secret", Action<string>? log = null) =>
+    private static BbsClient Client(int port, string password = "secret-pw", Action<string>? log = null) =>
         new(new BbsSettings { Host = "127.0.0.1", Port = port, Login = "Q0CAST", Password = password }, TimeProvider.System, log ?? (_ => { }));
 
     private static BbsClient FbbClient(int port, string password = "mailcast12") =>
@@ -24,7 +24,7 @@ public class BbsClientTests
 
         Assert.True(report.Graceful, report.Failure);
         Assert.All(report.Outcomes, o => Assert.Equal(DeliveryVerdict.Accepted, o.Verdict));
-        Assert.Equal(["Q0CAST", "secret", "BBS"], Assert.Single(bbs.Logins));
+        Assert.Equal(["Q0CAST", "secret-pw", "BBS"], Assert.Single(bbs.Logins));
         var taken = bbs.Taken.ToArray();
         Assert.Equal(2, taken.Length);
 
@@ -206,7 +206,7 @@ public class BbsClientTests
 
         Assert.Equal(BbsLoginTestOutcome.Ok, result.Outcome);
         Assert.Null(result.Detail);
-        Assert.Equal(["Q0CAST", "secret", "BBS"], Assert.Single(bbs.Logins));
+        Assert.Equal(["Q0CAST", "secret-pw", "BBS"], Assert.Single(bbs.Logins));
         // No mail was exchanged: it never got the chance to offer or take anything.
         Assert.Empty(bbs.Taken);
     }
@@ -488,7 +488,7 @@ public class BbsClientTests
     [Fact]
     public async Task TestLogin_BbsEchoesThePasswordBack_IsRedactedFromTheReply()
     {
-        await using var bbs = new FakeBbs { Garbled = "you said secret, which is wrong\r\nmore after it" };
+        await using var bbs = new FakeBbs { Garbled = "you said secret-pw, which is wrong\r\nmore after it" };
 
         var result = await Client(bbs.Port).TestLoginAsync(CancellationToken.None);
 
@@ -496,6 +496,25 @@ public class BbsClientTests
         Assert.NotNull(result.Detail);
         Assert.DoesNotContain("secret", result.Detail, StringComparison.Ordinal);
         Assert.Contains("***", result.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// With a password under 8 characters, where the marks would fall in a redacted reply says too
+    /// much about it, so the BBS's reply is not quoted at all, in the result or the log.
+    /// </summary>
+    [Fact]
+    public async Task TestLogin_ShortPassword_TheReplyIsNotShownAtAll()
+    {
+        await using var bbs = new FakeBbs { Password = "pw7", Garbled = "you said pw7, which is wrong\r\nmore after it" };
+        var log = new List<string>();
+
+        var result = await Client(bbs.Port, "pw7", log.Add).TestLoginAsync(CancellationToken.None);
+
+        Assert.Equal(BbsLoginTestOutcome.UnexpectedReply, result.Outcome);
+        Assert.Equal(BbsClient.ReplyNotShown, result.Detail);
+        Assert.Contains(log, l => l.Contains("the BBS answered (reply not shown)", StringComparison.Ordinal));
+        Assert.All(log, l => Assert.DoesNotContain("which is wrong", l, StringComparison.Ordinal));
+        Assert.All(log, l => Assert.DoesNotContain("pw7", l, StringComparison.Ordinal));
     }
 
     [Fact]

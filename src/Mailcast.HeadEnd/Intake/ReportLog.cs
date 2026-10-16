@@ -78,7 +78,8 @@ public sealed class ReportLog
     /// Notes a report from <paramref name="callsign"/> for <paramref name="day"/>, saved at the next
     /// <see cref="MarkRead"/>. True when it
     /// is the newest yet from that callsign, so the directory will list it; false when one for
-    /// that day or a later one was already noted, the callsign cannot be listed, or the day is
+    /// that day or a later one was already noted, it was let go at once because the log is full
+    /// of newer ones, the callsign cannot be listed, or the day is
     /// after the day it arrived (a receiver with its clock wrong), which would otherwise hide
     /// that callsign's real reports until then.
     /// </summary>
@@ -94,7 +95,8 @@ public sealed class ReportLog
             {
                 return false;
             }
-            _heard[callsign] = new Heard(day, arrived, message);
+            var heard = new Heard(day, arrived, message);
+            _heard[callsign] = heard;
             foreach (var old in _heard.Where(p => p.Value.Day < day.AddDays(-RememberDays)).Select(p => p.Key).ToList())
             {
                 _heard.Remove(old);
@@ -103,7 +105,8 @@ public sealed class ReportLog
             {
                 _heard.Remove(old);
             }
-            return true;
+            // Full, and this was the oldest: let go at once, so not new.
+            return _heard.TryGetValue(callsign, out var kept) && ReferenceEquals(kept, heard);
         }
     }
 

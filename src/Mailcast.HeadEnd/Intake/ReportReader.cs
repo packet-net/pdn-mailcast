@@ -112,16 +112,43 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
         byte[] leftover = await BbsLogin.LogInAsync(stream, _config.Login, _config.User, _config.Password, _config.User, cancellation).ConfigureAwait(false);
         var reader = new PromptReader(stream, leftover);
 
-        string welcome = await reader.UntilAsync(text => Prompt(text) is not null || Refusal(text) is not null, cancellation).ConfigureAwait(false);
-        if (Refusal(welcome) is { } refusal)
+        for (int pages = 0; ; pages++)
         {
-            throw new InvalidOperationException($"{refusal}; it said \"{Shown(welcome)}\"");
+            string welcome = await reader.UntilAsync(text => Prompt(text) is not null || Refusal(text) is not null, cancellation).ConfigureAwait(false);
+            if (Refusal(welcome) is { } refusal)
+            {
+                throw new InvalidOperationException($"{refusal}; it said {Quoted(welcome)}");
+            }
+            if (!IsPagePrompt(Prompt(welcome)!) || pages >= MostPages)
+            {
+                break;
+            }
+            // A long welcome, paged.
+            await stream.WriteAsync("\r"u8.ToArray(), cancellation).ConfigureAwait(false);
+            await stream.FlushAsync(cancellation).ConfigureAwait(false);
         }
-        string prompt = Prompt(welcome)!;
 
         await stream.WriteAsync(Encoding.Latin1.GetBytes(ListCommand + "\r"), cancellation).ConfigureAwait(false);
         await stream.FlushAsync(cancellation).ConfigureAwait(false);
-        string listing = await reader.UntilAsync(text => text.TrimEnd().EndsWith(prompt, StringComparison.Ordinal), cancellation).ConfigureAwait(false);
+        // The listing ends at the next prompt, whatever it says (it may carry a time or a count).
+        // A user with paging on gets LinBPQ's page prompt every so many lines, answered with CR.
+        var listing = new StringBuilder();
+        for (int pages = 0; ; pages++)
+        {
+            string chunk = await reader.UntilAsync(text => Prompt(text) is not null, cancellation).ConfigureAwait(false);
+            if (!IsPagePrompt(Prompt(chunk)!))
+            {
+                listing.Append(chunk);
+                break;
+            }
+            if (pages >= MostPages)
+            {
+                throw new InvalidOperationException($"the list ran to more than {MostPages} pages");
+            }
+            listing.Append(chunk.AsSpan(0, chunk.TrimEnd().LastIndexOfAny(['\r', '\n']) + 1));
+            await stream.WriteAsync("\r"u8.ToArray(), cancellation).ConfigureAwait(false);
+            await stream.FlushAsync(cancellation).ConfigureAwait(false);
+        }
 
         try
         {
@@ -132,7 +159,7 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
         {
             // Gone already: the list is what matters.
         }
-        return listing;
+        return listing.ToString();
     }
 
     /// <summary>Notes each report the listing shows.</summary>
@@ -141,9 +168,18 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
         var now = _time.GetUtcNow();
         int listed = 0;
         var fresh = new List<string>();
+        // Each callsign's newest only, so one listener with many reports counts once.
+        var newest = new Dictionary<string, (string Message, DateOnly Day)>(StringComparer.Ordinal);
         foreach (var (message, callsign, day) in Reports(listing))
         {
             listed++;
+            if (!newest.TryGetValue(callsign, out var had) || day > had.Day)
+            {
+                newest[callsign] = (message, day);
+            }
+        }
+        foreach (var (callsign, (message, day)) in newest.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
             if (_log.Note(callsign, day, now, message))
             {
                 fresh.Add(string.Create(CultureInfo.InvariantCulture, $"{callsign} for {day:yyyy-MM-dd}"));
@@ -176,8 +212,16 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
         }
     }
 
-    /// <summary>The BBS's prompt at the end of <paramref name="text"/>, such as <c>de GB7RDG&gt;</c>, or null if it has not come.</summary>
-    private static string? Prompt(string text)
+    /// <summary>The most pages of a paged listing the reader goes through.</summary>
+    private const int MostPages = 1000;
+
+    /// <summary>
+    /// The prompt at the end of <paramref name="text"/>, or null if none has come: a last line
+    /// ending in <c>&gt;</c> that is not a listing line (those start with a message number and a
+    /// date), such as <c>de GB7RDG&gt;</c>, one with a time or a count in it, or LinBPQ's page
+    /// prompt (<see cref="IsPagePrompt"/>).
+    /// </summary>
+    internal static string? Prompt(string text)
     {
         string trimmed = text.TrimEnd();
         if (!trimmed.EndsWith('>'))
@@ -186,8 +230,12 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
         }
         int start = trimmed.LastIndexOfAny(['\r', '\n']);
         string line = trimmed[(start + 1)..].Trim();
-        return line.Length > 0 ? line : null;
+        return line.Length > 0 && !ListingStart().IsMatch(line) ? line : null;
     }
+
+    /// <summary>LinBPQ's prompt between pages for a user with paging on: <c>&lt;A&gt;bort, &lt;CR&gt; Continue..&gt;</c>.</summary>
+    internal static bool IsPagePrompt(string prompt) =>
+        prompt.Contains("Continue", StringComparison.OrdinalIgnoreCase) && prompt.Contains("<A>bort", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Why the BBS did not let the reader in, from what it said, or null if it did.</summary>
     private string? Refusal(string text)
@@ -208,6 +256,16 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
         return null;
     }
 
+    /// <summary>
+    /// The shortest password whose occurrences can be taken out of a quoted reply; with a shorter
+    /// one where the marks fell would say too much about it, so the reply is not quoted at all.
+    /// </summary>
+    internal const int ShortestRedactedPassword = 8;
+
+    /// <summary>The BBS's reply in quotes for the journal, as <see cref="Shown"/> gives it, or <c>(reply not shown)</c> with a short password.</summary>
+    private string Quoted(string text) =>
+        _config.Password.Length is > 0 and < ShortestRedactedPassword ? "(reply not shown)" : $"\"{Shown(text)}\"";
+
     /// <summary>The BBS's reply as one plain ASCII line for the journal, the password taken out, cut short past 200 characters.</summary>
     private string Shown(string text)
     {
@@ -221,6 +279,10 @@ public sealed partial class ReportReader : IBulletinIntake, IDisposable
     // LinBPQ: "13414  16-Oct B$     500 MCAST  @GB7RDG G4ABC  MCR G4ABC 2026-10-15".
     [GeneratedRegex(@"^(?<number>\d+)\s.*\s(?<from>[A-Za-z0-9]+)\s+MCR (?<call>[A-Z0-9]{1,12}) (?<day>\d{4}-\d{2}-\d{2})$")]
     private static partial Regex ListingLine();
+
+    // The start of any LinBPQ listing line: the message number, then its date ("13414  16-Oct").
+    [GeneratedRegex(@"^\d+\s+\d{1,2}-[A-Za-z]{3}\s")]
+    private static partial Regex ListingStart();
 
     /// <summary>Reads what the BBS sends, telnet negotiation dropped, until a test says enough has come.</summary>
     private sealed class PromptReader(Stream stream, byte[] already)

@@ -102,6 +102,13 @@ public sealed class LinBpqTests
             // Someone else's callsign in the title: not the sender's, so not counted.
             await sysop.PostAsync("SB MCAST @ GB7TST.#42.GBR.EURO", $"MCR G8BPQ {today.AddDays(-1):yyyy-MM-dd}", "MCR1 0.16.0 IO91lk sc 3/3 0 0 0", timeout.Token);
             await sysop.PostAsync("SB ALL @ WW", "Not a report", "hello", timeout.Token);
+            // Older reports, enough that the listing runs past a page.
+            for (int back = 2; back <= 12; back++)
+            {
+                await sysop.PostAsync("SB MCAST @ GB7TST.#42.GBR.EURO", $"MCR G4TST {today.AddDays(-back):yyyy-MM-dd}", "MCR1 0.16.0 IO91lk sc 3/3 0 0 0", timeout.Token);
+            }
+            // Q0CAST with paging on (10 lines a page, LinBPQ's least), as a user might have left it.
+            await SetPageLengthAsync(fbbPort, "Q0CAST", "cast-test", 10, timeout.Token);
 
             using var state = new TempDirectory();
             var journal = new MemoryJournal();
@@ -114,7 +121,7 @@ public sealed class LinBpqTests
             var heard = Assert.Single(log.All);
             Assert.Equal(("G4TST", today.AddDays(-1)), (heard.Key, heard.Value.Day));
             Assert.Equal($"reports={today.AddDays(-1):yyyy-MM-dd}:G4TST", log.For(today)!.ToField());
-            Assert.Contains(journal.Lines, l => l.StartsWith("reports: 1 new of 1 listed", StringComparison.Ordinal));
+            Assert.Contains(journal.Lines, l => l.StartsWith("reports: 1 new of 12 listed", StringComparison.Ordinal));
             Assert.DoesNotContain(journal.Lines, l => l.Contains("cast-test", StringComparison.Ordinal));
 
             // Still on the BBS for anyone to read.
@@ -131,6 +138,36 @@ public sealed class LinBpqTests
         {
             await Docker(CancellationToken.None, "rm", "-f", id);
         }
+    }
+
+    /// <summary>Logs in on the FBBPORT and sets the user's page length with LinBPQ's OP command.</summary>
+    private static async Task SetPageLengthAsync(int port, string user, string password, int lines, CancellationToken cancellation)
+    {
+        using var client = new TcpClient();
+        await client.ConnectAsync("127.0.0.1", port, cancellation);
+        var stream = client.GetStream();
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"{user}\r{password}\rBBS\r"), cancellation);
+        string said = await ReadUntilAsync(stream, "de GB7TST>", cancellation);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"OP {lines}\r"), cancellation);
+        said = await ReadUntilAsync(stream, "de GB7TST>", cancellation);
+        Assert.DoesNotContain("too short", said, StringComparison.Ordinal);
+        await stream.WriteAsync("B\r"u8.ToArray(), cancellation);
+    }
+
+    private static async Task<string> ReadUntilAsync(NetworkStream stream, string marker, CancellationToken cancellation)
+    {
+        var text = new StringBuilder();
+        var buffer = new byte[4096];
+        while (!text.ToString().Contains(marker, StringComparison.Ordinal))
+        {
+            int n = await stream.ReadAsync(buffer, cancellation);
+            if (n == 0)
+            {
+                break;
+            }
+            text.Append(Encoding.Latin1.GetString(buffer, 0, n));
+        }
+        return text.ToString();
     }
 
     /// <summary>The sysop on LinBPQ's ordinary telnet port, in the BBS.</summary>
