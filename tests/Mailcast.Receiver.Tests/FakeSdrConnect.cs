@@ -86,6 +86,18 @@ internal sealed class FakeSdrConnect : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// While set, a new connection is ended as soon as it is taken, before the WebSocket upgrade,
+    /// as SDRconnect closed (or its WebSocket Server off) would leave it.
+    /// </summary>
+    public bool Closed
+    {
+        get => Volatile.Read(ref _closed);
+        set => Volatile.Write(ref _closed, value);
+    }
+
+    private bool _closed;
+
     /// <summary>Ends every connection abruptly, as SDRconnect closing or a pulled cable would.</summary>
     public void DropAll()
     {
@@ -125,6 +137,11 @@ internal sealed class FakeSdrConnect : IAsyncDisposable
             catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException or SocketException)
             {
                 return;
+            }
+            if (Closed)
+            {
+                client.Dispose();
+                continue;
             }
             lock (_gate)
             {

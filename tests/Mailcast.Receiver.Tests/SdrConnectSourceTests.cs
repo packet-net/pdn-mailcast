@@ -439,4 +439,107 @@ public class SdrConnectSourceTests
         Assert.True(back, "the tone never came back");
         Assert.False(pipeline.Finished.IsCompleted);
     }
+
+    // ---------- while its own client reconnects ----------
+
+    [Fact]
+    public async Task DroppedConnection_StatusSaysReconnectingWithWhy_ThenListeningAgainOnceItIsBack()
+    {
+        // Eoin closed SDRconnect on his PC and the page still said "listening", the spectrogram
+        // simply stopped: pdn-soundmodem's client reconnects by itself for five minutes before
+        // the receiver hears anything of it. Now the page says it was lost, and why.
+        var page = new TcpListener(IPAddress.Loopback, 0);
+        page.Start();
+        int pagePort = ((IPEndPoint)page.LocalEndpoint).Port;
+        page.Stop();
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig
+        {
+            Audio = sdr.Audio,
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Web = new WebSettings { Port = pagePort },
+        };
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        await using var host = new ReceiverHost(config, TimeProvider.System, log.Enqueue);
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+        await PhaseAsync(conditions, AudioPhase.Listening, TimeSpan.FromSeconds(30));
+
+        sdr.Closed = true;
+        sdr.DropAll();
+        var lost = await PhaseAsync(conditions, AudioPhase.Reconnecting, TimeSpan.FromSeconds(30));
+
+        string where = $"SDRconnect at 127.0.0.1:{sdr.Port}";
+        Assert.StartsWith($"lost {where} (", lost.Words, StringComparison.Ordinal);
+        Assert.EndsWith("); reconnecting", lost.Words, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(lost.Problem));
+        Assert.Contains($"({lost.Problem})", lost.Words, StringComparison.Ordinal);
+        Assert.True(lost.Words.All(c => c is >= ' ' and <= '~'), lost.Words);
+        var audio = StatusAudio(host);
+        Assert.Equal("reconnecting", audio.GetProperty("phase").GetString());
+        Assert.False(audio.GetProperty("live").GetBoolean());
+        Assert.StartsWith($"lost {where} (", audio.GetProperty("state").GetString(), StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(audio.GetProperty("problem").GetString()));
+
+        sdr.Closed = false;
+        await PhaseAsync(conditions, AudioPhase.Listening, TimeSpan.FromSeconds(30));
+
+        audio = StatusAudio(host);
+        Assert.Equal("listening", audio.GetProperty("phase").GetString());
+        Assert.True(audio.GetProperty("live").GetBoolean());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, audio.GetProperty("problem").ValueKind);
+        Assert.Contains(log, l => l == $"audio: {sdr.Audio} is back; listening again");
+        Assert.All(log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
+
+        await stop.CancelAsync();
+        await run;
+    }
+
+    private static System.Text.Json.JsonElement StatusAudio(ReceiverHost host) =>
+        System.Text.Json.JsonSerializer.SerializeToElement(new StatusPage(host, null, _ => { }).Status(), ReceiverConfig.JsonLine).GetProperty("audio");
+
+    [Theory]
+    // As pdn-soundmodem 0.92.0's SdrConnectClient says them.
+    [InlineData("sdrconnect: 192.168.40.61:5454: SDRconnect closed the connection; reconnecting", "SDRconnect closed the connection")]
+    [InlineData("sdrconnect: 192.168.40.61:5454: the connection failed (The remote party closed the WebSocket connection without completing the close handshake.); reconnecting",
+        "the connection failed (The remote party closed the WebSocket connection without completing the close handshake.)")]
+    [InlineData("sdrconnect: cannot reach 192.168.40.61:5454 (no answer from ws://192.168.40.61:5454/ within 15 s); still trying", "no answer from ws://192.168.40.61:5454/ within 15 s")]
+    [InlineData("sdrconnect: cannot reach 192.168.40.61:5454 (Connection refused (192.168.40.61:5454)); still trying (3 more failed attempt(s) since the last line)", "Connection refused (192.168.40.61:5454)")]
+    public async Task ClientLine_ThatSaysItDropped_GivesTheWordsAndWhy(string line, string why)
+    {
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("sdrconnect:192.168.40.61"), Dial, _ => { });
+
+        var drop = pipeline.DropSaid(line);
+
+        Assert.NotNull(drop);
+        Assert.Equal(why, drop.Reason);
+        Assert.Equal($"lost SDRconnect at 192.168.40.61:5454 ({why}); reconnecting", drop.Words);
+    }
+
+    [Theory]
+    [InlineData("sdrconnect: 192.168.40.61:5454 is delivering at 250000 samples a second again")]
+    [InlineData("sdrconnect: set up: LO 7050000 Hz")]
+    [InlineData("sdrconnect: 10.0.0.9:5454: SDRconnect closed the connection; reconnecting")]
+    public async Task ClientLine_ThatSaysNoDrop_OrAnotherSdrConnects_IsNotOne(string line)
+    {
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("sdrconnect:192.168.40.61"), Dial, _ => { });
+
+        Assert.Null(pipeline.DropSaid(line));
+    }
+
+    [Fact]
+    public void Page_SaysReconnectingWithWhy_AndTheLastTryWhileOpeningAgain()
+    {
+        using var stream = typeof(ReceiverHost).Assembly.GetManifestResourceStream("Mailcast.Receiver.Web.index.html")!;
+        string html = new StreamReader(stream).ReadToEnd();
+
+        Assert.Contains("case \"reconnecting\":", html, StringComparison.Ordinal);
+        Assert.Contains("${a.state.charAt(0).toUpperCase()}${a.state.slice(1)}... The spectrogram comes back once its audio does.", html, StringComparison.Ordinal);
+        Assert.Contains("(a.problem ? ` Last try: ${a.problem}.` : \"\")", html, StringComparison.Ordinal);
+        Assert.True(html.All(c => c != '\u2013' && c != '\u2014'));
+    }
 }

@@ -648,4 +648,37 @@ public class WebSdrWindowTests
         Assert.Contains("No audio from the sound card", html, StringComparison.Ordinal);
         Assert.Contains("id=\"specNotice\"", html, StringComparison.Ordinal);
     }
+
+    [Theory]
+    // As pdn-soundmodem 0.92.0's UberSdrAudioInput says them, after the "ubersdr: " it puts in front.
+    [InlineData("ubersdr: stream from wessex.zapto.org ended (The remote party closed the WebSocket connection without completing the close handshake.)",
+        "lost the web SDR wessex.zapto.org (The remote party closed the WebSocket connection without completing the close handshake); reconnecting")]
+    [InlineData("ubersdr: reconnecting to wessex.zapto.org", "lost the web SDR wessex.zapto.org (the session ended); reconnecting")]
+    [InlineData("ubersdr: the session ended after 120 ms with only 0 ms of audio (the receiver closed the stream); backing off 10s before reconnecting to wessex.zapto.org",
+        "lost the web SDR wessex.zapto.org (it ended the session almost at once); reconnecting")]
+    [InlineData("ubersdr: wessex.zapto.org unreachable (Name or service not known (wessex.zapto.org:443)); retrying in 5s",
+        "lost the web SDR wessex.zapto.org (Name or service not known (wessex.zapto.org:443)); reconnecting")]
+    [InlineData("ubersdr: wessex.zapto.org is refusing us for now (daily limit reached); asking again in 15 min",
+        "the web SDR wessex.zapto.org is refusing us for now (daily limit reached); asking again later")]
+    [InlineData("ubersdr: wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today). The stream will be retried patiently; audio starts when the receiver lets us back in.",
+        "the web SDR wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today); asking again later")]
+    public async Task ClientLine_ThatSaysTheWebSdrDropped_GivesTheWordsAndWhy(string line, string words)
+    {
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
+
+        Assert.Equal(words, pipeline.DropSaid(line)?.Words);
+        Assert.Null(pipeline.DropSaid("ubersdr: reconnected to wessex.zapto.org"));
+    }
+
+    [Fact]
+    public async Task ClientLine_WebSdrReconnecting_SaysWhyItsLastStreamEnded()
+    {
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
+
+        pipeline.DropSaid("ubersdr: stream from wessex.zapto.org ended (Connection reset by peer)");
+        var drop = pipeline.DropSaid("ubersdr: reconnecting to wessex.zapto.org");
+
+        Assert.Equal("Connection reset by peer", drop?.Reason);
+        Assert.Equal("lost the web SDR wessex.zapto.org (Connection reset by peer); reconnecting", drop?.Words);
+    }
 }

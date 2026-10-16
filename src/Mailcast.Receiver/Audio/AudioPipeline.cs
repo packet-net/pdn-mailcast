@@ -20,7 +20,7 @@ namespace Mailcast.Receiver;
 /// <para>Built whole and thrown away whole: changing the audio source on the web page stops this
 /// pipeline and starts a new one. The store and the delivery side are outside it and carry on.</para>
 /// </remarks>
-public sealed class AudioPipeline : IAsyncDisposable
+public sealed partial class AudioPipeline : IAsyncDisposable
 {
     /// <summary>Samples read from the source at a time: 100 ms.</summary>
     private const int BlockSamples = OnAir.SampleRate / 10;
@@ -555,7 +555,11 @@ public sealed class AudioPipeline : IAsyncDisposable
     {
         var endpoint = _source.SdrConnectEndpoint;
         var (low, high) = SdrConnectFilter(DialHz);
-        void Journal(string line) => _log(Ascii.Clean(line));
+        void Journal(string line)
+        {
+            _log(Ascii.Clean(line));
+            NoteSourceLine(line);
+        }
         SdrConnectIqInput input;
         try
         {
@@ -689,7 +693,11 @@ public sealed class AudioPipeline : IAsyncDisposable
                 UberSdrAudioInput web;
                 try
                 {
-                    web = await UberSdrAudioInput.OpenAsync(endpoint, tuning, line => _log(Ascii.Clean(line)), cancellation).ConfigureAwait(false);
+                    web = await UberSdrAudioInput.OpenAsync(endpoint, tuning, line =>
+                    {
+                        _log(Ascii.Clean(line));
+                        NoteSourceLine(line);
+                    }, cancellation).ConfigureAwait(false);
                 }
                 catch (Exception e) when (e.GetType().Name == "UberSdrRefusedException")
                 {
@@ -728,6 +736,7 @@ public sealed class AudioPipeline : IAsyncDisposable
         }
 
         Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
+        Interlocked.Exchange(ref _lastRead, _time.GetTimestamp());
         _thread = new Thread(Pump) { IsBackground = true, Name = "mailcast audio" };
         _thread.Start();
         if (_source.Kind != AudioSourceKind.Wav && !_watchOff)
@@ -755,6 +764,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                 if (_webSdr is { SessionLive: false } || _sdrConnect is { SessionLive: false })
                 {
                     Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
+                    NoteQuietSession();
                     continue;
                 }
                 if (_time.GetElapsedTime(Interlocked.Read(ref _lastAudio)) >= StarvedAfter)
@@ -793,6 +803,7 @@ public sealed class AudioPipeline : IAsyncDisposable
                     continue;
                 }
                 Interlocked.Exchange(ref _lastAudio, _time.GetTimestamp());
+                NoteAudioRead(read);
                 if (_stream is not null)
                 {
                     // Placed after the read: a retune almost always lands while the read waits.
