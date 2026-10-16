@@ -172,6 +172,14 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             _journal.Write("intake: refused a B2F (FC) proposal; this partner speaks B1F only");
             return FsAnswer.AlreadyHave;
         }
+        if (char.ToUpperInvariant(fa.MessageType) != 'B' && DailyReport.IsReportAddressee(fa.To))
+        {
+            // The TO route that hands the head end listeners' reports hands it anything else to
+            // MCAST too. "-": the BBS counts it handed over, and it is never broadcast.
+            counts.Refused++;
+            RefusedReport(fa, $"type {fa.MessageType} to {DailyReport.BulletinTo}, where listeners' daily reports go, is never broadcast");
+            return FsAnswer.AlreadyHave;
+        }
         if (char.ToUpperInvariant(fa.MessageType) != 'B')
         {
             // A personal or NTS message routed here is a routing mistake on the BBS. "=" (later)

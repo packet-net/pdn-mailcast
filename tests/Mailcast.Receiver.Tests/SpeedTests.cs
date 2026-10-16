@@ -165,6 +165,46 @@ public class SpeedTests
     }
 
     [Fact]
+    public void BurstView_GivesNoSpeed_UntilAFrameDecodes()
+    {
+        // Issue #135: the autobaud locks briefly to WN0 (75 bps) on the tone or probe, which
+        // GB7RDG never sends. A lock alone is not a speed.
+        var time = new FakeTimeProvider(At(12, 2));
+        var watch = new BurstWatch(time);
+        watch.AfterBlock(4);
+        watch.OnFrame(4);
+        time.Advance(TimeSpan.FromSeconds(3));
+        watch.AfterBlock(null);
+
+        // The false lock: a live burst with no speed, frame count 0.
+        watch.AfterBlock(0);
+        var locked = JsonSerializer.SerializeToElement(StatusPage.BurstView(watch.Shown), ReceiverConfig.JsonLine);
+        Assert.True(locked.GetProperty("live").GetBoolean());
+        Assert.Equal(0, locked.GetProperty("frames").GetInt32());
+        Assert.Equal(JsonValueKind.Null, locked.GetProperty("waveform").ValueKind);
+        Assert.Equal(JsonValueKind.Null, locked.GetProperty("bps").ValueKind);
+        Assert.Equal(JsonValueKind.Null, locked.GetProperty("words").ValueKind);
+
+        // It ends with nothing decoded: the last real burst's speed and frames are back.
+        time.Advance(TimeSpan.FromSeconds(2));
+        watch.AfterBlock(null);
+        var last = JsonSerializer.SerializeToElement(StatusPage.BurstView(watch.Shown), ReceiverConfig.JsonLine);
+        Assert.False(last.GetProperty("live").GetBoolean());
+        Assert.Equal(Wn4, last.GetProperty("waveform").GetString());
+        Assert.Equal(1200, last.GetProperty("bps").GetInt32());
+        Assert.Equal(1, last.GetProperty("frames").GetInt32());
+
+        // A real burst: no speed on the lock, then its speed from its first frame.
+        watch.AfterBlock(3);
+        Assert.Equal(JsonValueKind.Null, JsonSerializer.SerializeToElement(StatusPage.BurstView(watch.Shown), ReceiverConfig.JsonLine).GetProperty("bps").ValueKind);
+        watch.OnFrame(3);
+        var live = JsonSerializer.SerializeToElement(StatusPage.BurstView(watch.Shown), ReceiverConfig.JsonLine);
+        Assert.True(live.GetProperty("live").GetBoolean());
+        Assert.Equal("600 bps (WN3)", live.GetProperty("words").GetString());
+        Assert.Equal(600, live.GetProperty("bps").GetInt32());
+    }
+
+    [Fact]
     public void ModemReceiver_IsReachable()
     {
         // Pins the one thing read from inside pdn-soundmodem: see BurstWatch.ReceiverOf.

@@ -54,8 +54,23 @@ public enum BbsLoginTestOutcome
     /// <summary>Connected, logged in, and reached the forwarding prompt, as a partner would.</summary>
     Ok,
 
-    /// <summary>The BBS said the password was wrong.</summary>
+    /// <summary>
+    /// The BBS asked for the password again after it was sent (LinBPQ's "password:"), or said in
+    /// so many words that it was wrong (FBB's "Password error").
+    /// </summary>
     WrongPassword,
+
+    /// <summary>
+    /// The BBS asked for the login again (LinBPQ's "user:"), or said it does not know the
+    /// callsign (FBB). LinBPQ matches a login against its USER= lines case-sensitively.
+    /// </summary>
+    LoginNotRecognised,
+
+    /// <summary>
+    /// The port is LinBPQ's ordinary telnet port (TCPPORT), which negotiates telnet options and
+    /// prompts for the login and password one at a time, not its FBBPORT.
+    /// </summary>
+    NotFbbPort,
 
     /// <summary>The login worked, but it is not set up as a BBS forwarding partner.</summary>
     NotForwardingPartner,
@@ -76,10 +91,12 @@ public enum BbsLoginTestOutcome
 
 /// <summary>
 /// What testing a BBS login found. <see cref="Said"/> is a short, friendly sentence for the
-/// settings page; <see cref="Detail"/> is the BBS's own first line of reply, given only for
-/// <see cref="BbsLoginTestOutcome.UnexpectedReply"/>.
+/// settings page; <see cref="Detail"/> is the BBS's own words: its first line of reply for
+/// <see cref="BbsLoginTestOutcome.UnexpectedReply"/>, and its whole reply (see
+/// <see cref="BbsClient.Shown"/>) for a refused login. <see cref="Sent"/> says what the receiver
+/// sent: the login, the command, and that a password went, never anything about the password.
 /// </summary>
-public sealed record BbsLoginTestResult(BbsLoginTestOutcome Outcome, string Said, string? Detail = null);
+public sealed record BbsLoginTestResult(BbsLoginTestOutcome Outcome, string Said, string? Detail = null, string? Sent = null);
 
 /// <summary>
 /// One FBB B1F forwarding session into the local BBS, as its calling partner: connect, log in,
@@ -136,6 +153,13 @@ public sealed partial class BbsClient : IBbsSession
     /// </summary>
     public async Task<BbsLoginTestResult> TestLoginAsync(CancellationToken cancellation)
     {
+        var result = await TestLoginOnceAsync(cancellation).ConfigureAwait(false);
+        _log($"bbs: login test: {Ascii.Clean(result.Said)}");
+        return result;
+    }
+
+    private async Task<BbsLoginTestResult> TestLoginOnceAsync(CancellationToken cancellation)
+    {
         using var whole = new Deadline(TestTimeout, _time, cancellation);
         using var client = new TcpClient();
         try
@@ -175,7 +199,9 @@ public sealed partial class BbsClient : IBbsSession
     {
         await stream.WriteAsync(Encoding.Latin1.GetBytes(_settings.Login + "\r" + _settings.Password + "\r"
             + (_settings.Command.Length > 0 ? _settings.Command + "\r" : "")), cancellation).ConfigureAwait(false);
+        LogSent("login test");
         var (text, closed) = await ReadTestReplyAsync(stream, Settled, cancellation).ConfigureAwait(false);
+        LogHeard("login test", text, closed);
         return Classify(text, closed);
     }
 
@@ -186,6 +212,7 @@ public sealed partial class BbsClient : IBbsSession
             t => t.Contains("allsign", StringComparison.OrdinalIgnoreCase) || Settled(t), cancellation).ConfigureAwait(false);
         if (closed1 || !first.Contains("allsign", StringComparison.OrdinalIgnoreCase))
         {
+            LogHeard("login test", first, closed1);
             return Classify(first, closed1);
         }
         await stream.WriteAsync(Encoding.Latin1.GetBytes("." + _settings.Login + "\r"), cancellation).ConfigureAwait(false);
@@ -193,10 +220,13 @@ public sealed partial class BbsClient : IBbsSession
             t => t.Contains("assword", StringComparison.OrdinalIgnoreCase) || Settled(t), cancellation).ConfigureAwait(false);
         if (closed2 || !second.Contains("assword", StringComparison.OrdinalIgnoreCase))
         {
+            LogHeard("login test", first + second, closed2);
             return Classify(second, closed2);
         }
         await stream.WriteAsync(Encoding.Latin1.GetBytes(_settings.Password + "\r"), cancellation).ConfigureAwait(false);
+        LogSent("login test");
         var (text, closed) = await ReadTestReplyAsync(stream, Settled, cancellation).ConfigureAwait(false);
+        LogHeard("login test", first + second + text, closed);
         return Classify(text, closed);
     }
 
@@ -229,18 +259,118 @@ public sealed partial class BbsClient : IBbsSession
         }
     }
 
-    /// <summary>The phrases a BBS refuses a login with: LinBPQ's FBBPORT re-sends its prompts; FBB says one of these.</summary>
-    private static readonly string[] FbbLoginRefusals = ["Invalid callsign", "Unregistered callsign", "Callsign error", "Password error", "Bad password"];
+    /// <summary>The phrases FBB refuses a callsign with.</summary>
+    private static readonly string[] FbbCallsignRefusals = ["Invalid callsign", "Unregistered callsign", "Callsign error"];
 
-    private static bool RefusalFound(string text) =>
-        text.Contains("user:", StringComparison.OrdinalIgnoreCase)
-        || text.Contains("password:", StringComparison.OrdinalIgnoreCase)
-        || FbbLoginRefusals.Any(r => text.Contains(r, StringComparison.OrdinalIgnoreCase));
+    /// <summary>The phrases FBB refuses a password with.</summary>
+    private static readonly string[] FbbPasswordRefusals = ["Password error", "Bad password"];
+
+    /// <summary>
+    /// Why the BBS refused the login, from its reply, as a clause for the settings page and the
+    /// log, or null if it did not. LinBPQ's FBBPORT sends nothing until it has the login, then
+    /// re-sends its prompt for whichever it did not take (TelnetV6.c): "user:" for a login no
+    /// USER= line on the port has (compared with strcmp, so case matters: a USER=m7taw line does
+    /// not take M7TAW), "password:" for a known login with the wrong password. Checked against a
+    /// real LinBPQ 6.0.25.41 in docker (issue #134). Its ordinary telnet port (TCPPORT) instead
+    /// opens with telnet option negotiation (IAC, 0xFF) and "user:" before anything is sent, and
+    /// takes one line at a time, so sending all three at once there always reads as "user:" then
+    /// "password:", whether the password is right or not: that is the wrong port, not a refusal.
+    /// FBB says one of <see cref="FbbCallsignRefusals"/> or <see cref="FbbPasswordRefusals"/>.
+    /// </summary>
+    /// <remarks>
+    /// LinBPQ's prompts can be changed (LOGINPROMPT and PASSWORDPROMPT in the Telnet port's
+    /// CONFIG); with others, a refusal reads as an unexpected reply, with the BBS's own words.
+    /// </remarks>
+    private (BbsLoginTestOutcome Outcome, string Clause)? Refusal(string text)
+    {
+        string login = Ascii.Clean(_settings.Login);
+        if (_settings.Type == BbsKind.LinBpq)
+        {
+            if (text.Contains('\xFF', StringComparison.Ordinal))
+            {
+                return (BbsLoginTestOutcome.NotFbbPort,
+                    $"{_settings.Host}:{_settings.Port} is LinBPQ's ordinary telnet port (TCPPORT), which asks for the login and the password one at a time; "
+                    + "the receiver needs the port set as FBBPORT in the same Telnet port's CONFIG");
+            }
+            if (text.Contains("user:", StringComparison.OrdinalIgnoreCase))
+            {
+                return (BbsLoginTestOutcome.LoginNotRecognised,
+                    $"LinBPQ asked for the login again, so no USER= line on this port has the login \"{login}\"; "
+                    + "LinBPQ logins are case-sensitive, so it must match the USER= line exactly");
+            }
+            if (text.Contains("password:", StringComparison.OrdinalIgnoreCase))
+            {
+                return (BbsLoginTestOutcome.WrongPassword,
+                    $"LinBPQ asked for the password again, so it did not take the password for \"{login}\"; check it against the USER= line for \"{login}\"");
+            }
+            return null;
+        }
+        if (FbbPasswordRefusals.Any(r => text.Contains(r, StringComparison.OrdinalIgnoreCase)))
+        {
+            return (BbsLoginTestOutcome.WrongPassword,
+                $"FBB did not take the password for \"{login}\"; check it is {login}'s password on FBB, which keeps only its first 12 characters");
+        }
+        if (FbbCallsignRefusals.Any(r => text.Contains(r, StringComparison.OrdinalIgnoreCase)))
+        {
+            return (BbsLoginTestOutcome.LoginNotRecognised,
+                $"FBB does not know the login \"{login}\"; add it as a user with the BBS flag on FBB's console");
+        }
+        return null;
+    }
 
     /// <summary>The reply has said enough to classify: a refusal, an unknown command, or a prompt at the end.</summary>
-    private static bool Settled(string text) =>
-        RefusalFound(text) || text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase)
+    private bool Settled(string text) =>
+        Refusal(text) is not null || text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase)
         || text.TrimEnd().EndsWith('>') || AsksForFirstName(text);
+
+    /// <summary>
+    /// What the receiver sends to log in, in words, for the log and the settings page: the login
+    /// and the command, and only that a password was sent. Nothing about the password itself, not
+    /// even its length, ever goes into a log, the page or the API. Every line goes with a bare CR,
+    /// as Latin-1, on every platform, Windows included.
+    /// </summary>
+    internal string SentDescription() => _settings.Type == BbsKind.LinBpq
+        ? $"the login \"{Ascii.Clean(_settings.Login)}\", a password"
+            + (_settings.Command.Length > 0 ? $" and the command \"{Ascii.Clean(_settings.Command)}\"" : " and no command")
+            + ", each line ending in CR, all at once"
+        : $"the login \".{Ascii.Clean(_settings.Login)}\" at FBB's callsign prompt and a password at its password prompt, each line ending in CR";
+
+    /// <summary>Logs what was sent to log in, as <see cref="SentDescription"/> gives it.</summary>
+    private void LogSent(string what) =>
+        _log($"bbs: {what}: sent {(_settings.Type == BbsKind.LinBpq ? "LinBPQ" : "FBB")} at {Ascii.Clean(_settings.Host)}:{_settings.Port} {SentDescription()}");
+
+    /// <summary>Logs what the BBS answered a login with, as <see cref="Shown"/> gives it.</summary>
+    private void LogHeard(string what, string text, bool closed) =>
+        _log($"bbs: {what}: the BBS answered {(text.Length == 0 ? "nothing" : $"\"{Shown(text)}\"")}{(closed ? ", then closed the connection" : "")}");
+
+    /// <summary>
+    /// The BBS's whole reply, as one plain ASCII line for the log and the settings page: the
+    /// password tested redacted, CR and LF shown as &lt;CR&gt; and &lt;LF&gt;, and any other octet
+    /// outside printable ASCII in hex, such as &lt;FF&gt; for telnet's IAC; cut short past 300
+    /// characters.
+    /// </summary>
+    internal string Shown(string text)
+    {
+        const int Longest = 300;
+        var shown = new StringBuilder();
+        foreach (char c in Redact(text))
+        {
+            if (shown.Length >= Longest)
+            {
+                shown.Append("...");
+                break;
+            }
+            shown.Append(c switch
+            {
+                '\r' => "<CR>",
+                '\n' => "<LF>",
+                '"' => "'",
+                >= ' ' and <= '~' => c.ToString(),
+                _ => $"<{(int)c:X2}>",
+            });
+        }
+        return shown.ToString();
+    }
 
     /// <summary>
     /// What a login test's reply means. <see cref="PromptCall"/> matching means the BBS sent its
@@ -265,9 +395,9 @@ public sealed partial class BbsClient : IBbsSession
     /// </remarks>
     private BbsLoginTestResult Classify(string text, bool closed)
     {
-        if (RefusalFound(text))
+        if (Refusal(text) is { } refusal)
         {
-            return new BbsLoginTestResult(BbsLoginTestOutcome.WrongPassword, "That password is not right.");
+            return new BbsLoginTestResult(refusal.Outcome, refusal.Clause + ".", Shown(text), SentDescription());
         }
         if (text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase))
         {
@@ -305,7 +435,7 @@ public sealed partial class BbsClient : IBbsSession
             line is null
                 ? (closed ? "The BBS closed the connection without answering." : "The BBS did not answer in time.")
                 : "The BBS said something unexpected.",
-            line);
+            line, SentDescription());
     }
 
     /// <summary>
@@ -429,6 +559,13 @@ public sealed partial class BbsClient : IBbsSession
         {
             failure = run.Failure ?? "the session ended early";
         }
+        if (failure is not null && run.FailedAtLogin)
+        {
+            // Issue #134: what was sent and what came back, so a refused login can be told
+            // apart from a wrong port or a login in the wrong case from the log alone.
+            LogSent("delivery login");
+            LogHeard("delivery login", Encoding.Latin1.GetString([.. run.HeardAtLogin]), run.ClosedAtLogin);
+        }
 
         return new SessionReport(graceful, failure, [.. bulletins.Select(b => outcomes[b.Bid])], run.ReverseOffered);
     }
@@ -481,6 +618,7 @@ public sealed partial class BbsClient : IBbsSession
     private sealed class Run(BbsClient owner, IReadOnlyList<Bulletin> bulletins)
     {
         private readonly List<byte> _beforeSession = [];
+        private bool _connected;
         private FbbSession? _session;
         private Dictionary<FbbOutboundMessage, string> _bids = new(ReferenceEqualityComparer.Instance);
         private NetworkStream? _stream;
@@ -495,6 +633,23 @@ public sealed partial class BbsClient : IBbsSession
         public int ReverseOffered { get; private set; }
 
         private bool Over { get; set; }
+
+        /// <summary>Everything the BBS sent before the FBB session began, as received, for the log.</summary>
+        public List<byte> HeardAtLogin { get; } = [];
+
+        /// <summary>The BBS closed the connection before the FBB session began.</summary>
+        public bool ClosedAtLogin { get; private set; }
+
+        /// <summary>The connection opened, but the session ended before the FBB session began.</summary>
+        public bool FailedAtLogin => _connected && _session is null;
+
+        private void Heard(ReadOnlySpan<byte> data)
+        {
+            if (_session is null && HeardAtLogin.Count < 4096)
+            {
+                HeardAtLogin.AddRange(data[..Math.Min(data.Length, 4096 - HeardAtLogin.Count)].ToArray());
+            }
+        }
 
         public async Task ExecuteAsync(CancellationToken cancellation)
         {
@@ -513,6 +668,7 @@ public sealed partial class BbsClient : IBbsSession
             }
             client.NoDelay = true;
             _stream = client.GetStream();
+            _connected = true;
 
             byte[] early = await LogInAsync(cancellation).ConfigureAwait(false);
             await FeedAsync(early, cancellation).ConfigureAwait(false);
@@ -525,8 +681,10 @@ public sealed partial class BbsClient : IBbsSession
                 {
                     read = await _stream.ReadAsync(buffer, idle.Token).ConfigureAwait(false);
                 }
+                Heard(buffer.AsSpan(0, read));
                 if (read == 0)
                 {
+                    ClosedAtLogin = _session is null;
                     Failure ??= _session is null
                         ? "the BBS closed the connection before it offered a forwarding session; " + LoginHint()
                         : "the BBS closed the connection";
@@ -576,12 +734,9 @@ public sealed partial class BbsClient : IBbsSession
                 {
                     return [.. seen.Skip(colon + 1)];
                 }
-                foreach (string refusal in new[] { "Invalid callsign", "Unregistered callsign", "Callsign error", "Password error", "Bad password" })
+                if (owner.Refusal(text) is { } refusal)
                 {
-                    if (text.Contains(refusal, StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new SessionFailedException($"FBB refused the login ({refusal}); " + LoginHint());
-                    }
+                    throw new SessionFailedException($"{refusal.Clause}; it said \"{owner.Shown(text)}\"");
                 }
 
                 int read;
@@ -589,8 +744,10 @@ public sealed partial class BbsClient : IBbsSession
                 {
                     read = await _stream!.ReadAsync(buffer, idle.Token).ConfigureAwait(false);
                 }
+                Heard(buffer.AsSpan(0, read));
                 if (read == 0)
                 {
+                    ClosedAtLogin = true;
                     throw new SessionFailedException($"FBB closed the connection while the receiver waited for \"{prompt}\"; " + LoginHint());
                 }
                 seen.AddRange(buffer.AsSpan(0, read).ToArray());
@@ -628,10 +785,9 @@ public sealed partial class BbsClient : IBbsSession
                 int sid = text.IndexOf('[', StringComparison.Ordinal);
                 if (sid < 0 || !text.AsSpan(sid).TrimEnd().EndsWith(">", StringComparison.Ordinal))
                 {
-                    if (owner._settings.Type == BbsKind.LinBpq
-                        && (text.Contains("user:", StringComparison.OrdinalIgnoreCase) || text.Contains("password:", StringComparison.OrdinalIgnoreCase)))
+                    if (owner._settings.Type == BbsKind.LinBpq && owner.Refusal(text) is { } refusal)
                     {
-                        throw new SessionFailedException("LinBPQ refused the login; " + LoginHint());
+                        throw new SessionFailedException($"{refusal.Clause}; it said \"{owner.Shown(text)}\"");
                     }
                     if (text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase))
                     {

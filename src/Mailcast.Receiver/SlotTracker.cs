@@ -38,6 +38,28 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
     /// <summary>Issue #49: whether this slot's PSK Reporter reading has been received.</summary>
     public bool PskReporterHeard { get; init; }
 
+    /// <summary>
+    /// Issue #133: bytes decoded from the slot's frames, counting each broadcast frame's
+    /// information field (the AX.25 header is not counted), new pieces and repeats alike. Not the
+    /// same as the size of the bulletins rebuilt from them.
+    /// </summary>
+    public long BytesDecoded { get; init; }
+
+    /// <summary>Issue #133: bulletins rebuilt while this slot was the one tracked.</summary>
+    public int BulletinsCompleted { get; init; }
+
+    /// <summary>Issue #133: bulletins the BBS accepted while this slot was the one tracked.</summary>
+    public int Delivered { get; init; }
+
+    /// <summary>Issue #133: bulletins the BBS already had, while this slot was the one tracked.</summary>
+    public int AlreadyHad { get; init; }
+
+    /// <summary>Issue #133: part-received bulletins given up while this slot was the one tracked.</summary>
+    public int GivenUp { get; init; }
+
+    /// <summary>Issue #133: whether the journal has had this slot's summary line.</summary>
+    public bool Ended { get; init; }
+
     /// <summary>The waveform most of the slot's frames came on, <c>mixed</c> if two or more tie for most, or null if none is known.</summary>
     public string? Waveform
     {
@@ -85,6 +107,8 @@ public sealed class SlotTracker
     private readonly object _gate = new();
     private SlotSummary? _current;
     private SlotSchedule? _schedule;
+    private DateTimeOffset? _listening;
+    private DateTimeOffset? _lastEnded;
 
     /// <summary>Creates a tracker.</summary>
     public SlotTracker(TimeProvider time, Action<string> log, SlotSchedule? schedule = null)
@@ -131,6 +155,7 @@ public sealed class SlotTracker
         var began = _time.GetUtcNow() - tone.Duration;
         string measured = string.Create(CultureInfo.InvariantCulture,
             $"{tone.FrequencyHz:F1} Hz, {tone.OffsetHz:+0.0;-0.0;0.0} Hz from {tone.FrequencyHz - tone.OffsetHz:F0} Hz, SNR {tone.SnrDb:F1} dB in 3 kHz, {tone.Duration.TotalSeconds:F0} s");
+        string? ended = null;
         lock (_gate)
         {
             DateTimeOffset? slot = null;
@@ -146,19 +171,32 @@ public sealed class SlotTracker
                 }
                 slot = nearest;
             }
-            _current = _current is { Scheduled: not null } current && current.Scheduled == slot
-                ? current with { Started = began, Tone = tone }
-                : new SlotSummary(began, tone, 0, null, slot);
+            if (_current is { Scheduled: not null } current && current.Scheduled == slot)
+            {
+                _current = current with { Started = began, Tone = tone };
+            }
+            else
+            {
+                ended = Replace(new SlotSummary(began, tone, 0, null, slot));
+            }
+        }
+        if (ended is not null)
+        {
+            _log(ended);
         }
         _log($"tone: {measured}");
     }
 
-    /// <summary>A frame was heard, on <paramref name="waveform"/> by the modem's autobaud (null if it cannot say).</summary>
-    public void OnFrame(string? waveform = null)
+    /// <summary>
+    /// A frame was heard, on <paramref name="waveform"/> by the modem's autobaud (null if it
+    /// cannot say), with <paramref name="bytes"/> in its information field.
+    /// </summary>
+    public void OnFrame(string? waveform = null, int bytes = 0)
     {
         var now = _time.GetUtcNow();
         int frames;
         bool newWaveform = false;
+        string? ended = null;
         lock (_gate)
         {
             if (_schedule is { } schedule)
@@ -166,20 +204,24 @@ public sealed class SlotTracker
                 var slot = schedule.LatestStart(now + ClockAllowance);
                 if (_current?.Scheduled != slot)
                 {
-                    _current = new SlotSummary(now, null, 0, null, slot);
+                    ended = Replace(new SlotSummary(now, null, 0, null, slot));
                 }
             }
             else if (_current is null || now - (_current.LastFrame ?? _current.Started) > Gap)
             {
-                _current = new SlotSummary(now, null, 0, null);
+                ended = Replace(new SlotSummary(now, null, 0, null));
             }
-            _current = _current with { FramesHeard = _current.FramesHeard + 1, LastFrame = now };
+            _current = _current! with { FramesHeard = _current.FramesHeard + 1, LastFrame = now, BytesDecoded = _current.BytesDecoded + bytes };
             if (waveform is not null)
             {
                 newWaveform = !_current.FrameCounts.TryGetValue(waveform, out int had);
                 _current = _current with { FrameCounts = _current.FrameCounts.SetItem(waveform, had + 1) };
             }
             frames = _current.FramesHeard;
+        }
+        if (ended is not null)
+        {
+            _log(ended);
         }
         string on = waveform is null ? "" : $" on {Mailcast.Receiver.Waveform.Words(waveform)}";
         if (frames == 1)
@@ -272,4 +314,192 @@ public sealed class SlotTracker
             }
         }
     }
+
+    /// <summary>Issue #133: a bulletin was rebuilt.</summary>
+    public void OnBulletinCompleted() => Change(s => s with { BulletinsCompleted = s.BulletinsCompleted + 1 });
+
+    /// <summary>Issue #133: a BBS session accepted <paramref name="accepted"/> bulletins and already had <paramref name="alreadyHad"/>.</summary>
+    public void OnDelivered(int accepted, int alreadyHad)
+    {
+        if (accepted > 0 || alreadyHad > 0)
+        {
+            Change(s => s with { Delivered = s.Delivered + accepted, AlreadyHad = s.AlreadyHad + alreadyHad });
+        }
+    }
+
+    /// <summary>Issue #133: <paramref name="count"/> part-received bulletins were given up.</summary>
+    public void OnGivenUp(int count)
+    {
+        if (count > 0)
+        {
+            Change(s => s with { GivenUp = s.GivenUp + count });
+        }
+    }
+
+    private void Change(Func<SlotSummary, SlotSummary> change)
+    {
+        lock (_gate)
+        {
+            if (_current is not null)
+            {
+                _current = change(_current);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Issue #133: writes the slot's summary line once its listening window is over: when the
+    /// window closes (<see cref="ReceiverConfig.WebSdrAfter"/> after its start, which is after
+    /// the closing CW ident), or as soon as <paramref name="endedEarly"/> names it, the slot
+    /// whose window was ended early. Once a slot; nothing without a schedule (see <see cref="Finish"/>).
+    /// </summary>
+    public void EndIfOver(DateTimeOffset? endedEarly)
+    {
+        var now = _time.GetUtcNow();
+        string? line = null;
+        lock (_gate)
+        {
+            if (_current is { Scheduled: { } slot, Ended: false } current && (endedEarly == slot || now >= slot + ReceiverConfig.WebSdrAfter))
+            {
+                _current = current with { Ended = true };
+                line = SummaryLine(_current, endedEarly == slot);
+                _lastEnded = slot;
+                if (_listening == slot)
+                {
+                    _listening = null;
+                }
+            }
+            else if (_listening is { } listened && (endedEarly == listened || now >= listened + ReceiverConfig.WebSdrAfter))
+            {
+                // A slot listened to that nothing at all was heard in.
+                _listening = null;
+                _lastEnded = listened;
+                if (_current?.Scheduled != listened)
+                {
+                    line = $"slot: the {listened.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)} UTC slot ended: nothing heard"
+                        + (endedEarly == listened ? "; window ended early, nothing left to wait for" : "");
+                }
+            }
+        }
+        if (line is not null)
+        {
+            _log(line);
+        }
+    }
+
+    /// <summary>
+    /// Issue #133: the receiver is listening to <paramref name="slot"/> now (its window is
+    /// open), so it gets a line when it ends even if nothing at all is heard in it. A slot
+    /// already ended is ignored, as is one never noted (not listened to: no line).
+    /// </summary>
+    public void OnListening(DateTimeOffset slot)
+    {
+        lock (_gate)
+        {
+            if (_lastEnded is not { } ended || slot > ended)
+            {
+                _listening = slot;
+            }
+        }
+    }
+
+    /// <summary>Issue #133: writes the summary line for the slot tracked, if it has not had one: for the end of a recording.</summary>
+    public void Finish()
+    {
+        string? line = null;
+        lock (_gate)
+        {
+            if (_current is { Ended: false } current)
+            {
+                _current = current with { Ended = true };
+                line = SummaryLine(_current, endedEarly: false);
+            }
+        }
+        if (line is not null)
+        {
+            _log(line);
+        }
+    }
+
+    /// <summary>
+    /// Makes <paramref name="next"/> the slot tracked. Returns the summary line of the one it
+    /// replaces if that never had one (a check that came too late, or a recording), so no slot
+    /// goes without; under <see cref="_gate"/>, logged by the caller outside it.
+    /// </summary>
+    private string? Replace(SlotSummary next)
+    {
+        string? line = _current is { Ended: false } old ? SummaryLine(old with { Ended = true }, endedEarly: false) : null;
+        if (line is not null && _current!.Scheduled is { } slot)
+        {
+            // It has had its line now: not "nothing heard" for it later as well.
+            _lastEnded = slot;
+            if (_listening == slot)
+            {
+                _listening = null;
+            }
+        }
+        _current = next;
+        return line;
+    }
+
+    /// <summary>
+    /// Issue #133: one plain ASCII line summing a slot up, for the journal: frames by waveform,
+    /// bytes decoded from them, the tone, the bulletins, the directory, and whether the window
+    /// ended early.
+    /// </summary>
+    internal static string SummaryLine(SlotSummary slot, bool endedEarly)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        var c = CultureInfo.InvariantCulture;
+        var parts = new List<string>();
+        string which = slot.Scheduled is { } scheduled
+            ? $"the {scheduled.UtcDateTime.ToString("HH:mm", c)} UTC slot"
+            : $"the slot that began at {slot.Started.UtcDateTime.ToString("HH:mm:ss", c)} UTC";
+        string frames = Count(slot.FramesHeard, "frame");
+        int known = slot.FrameCounts.Values.Sum();
+        var on = slot.FrameCounts.OrderByDescending(f => f.Value).ThenBy(f => f.Key, StringComparer.Ordinal)
+            .Select(f => string.Create(c, $"{f.Value} on {Mailcast.Receiver.Waveform.Words(f.Key)}")).ToList();
+        if (slot.FramesHeard > known)
+        {
+            on.Add(string.Create(c, $"{slot.FramesHeard - known} on a waveform not known"));
+        }
+        if (on.Count == 1 && known == slot.FramesHeard)
+        {
+            frames += " on " + Mailcast.Receiver.Waveform.Words(slot.FrameCounts.Keys.First());
+        }
+        else if (on.Count > 1)
+        {
+            frames += ", " + string.Join(" and ", on);
+        }
+        parts.Add(frames);
+        parts.Add(Bytes(slot.BytesDecoded) + " decoded from them");
+        parts.Add(slot.Tone is { } tone
+            ? string.Create(c, $"tone SNR {tone.SnrDb:F0} dB, {tone.OffsetHz:+0.0;-0.0;0.0} Hz off")
+            : "no tone");
+        string bulletins = string.Create(c, $"bulletins {slot.BulletinsCompleted} completed, {slot.Delivered} delivered");
+        if (slot.AlreadyHad > 0)
+        {
+            bulletins += string.Create(c, $", {slot.AlreadyHad} already had");
+        }
+        if (slot.GivenUp > 0)
+        {
+            bulletins += string.Create(c, $", {slot.GivenUp} given up");
+        }
+        parts.Add(bulletins);
+        parts.Add(slot.HeardDirectory is { } directory
+            ? directory.IsSigned ? "directory heard, signed" : "directory heard, not signed"
+            : "no directory");
+        if (endedEarly)
+        {
+            parts.Add("window ended early, nothing left to wait for");
+        }
+        return $"slot: {which} ended: {string.Join("; ", parts)}";
+    }
+
+    private static string Count(int n, string what) => string.Create(CultureInfo.InvariantCulture, $"{n} {what}{(n == 1 ? "" : "s")}");
+
+    /// <summary>A byte count for a person: <c>850 bytes</c>, or <c>29.4 KB</c> (1 KB is 1000 bytes) from 1000 up.</summary>
+    internal static string Bytes(long bytes) => bytes < 1000
+        ? Count((int)bytes, "byte")
+        : string.Create(CultureInfo.InvariantCulture, $"{bytes / 1000.0:F1} KB");
 }

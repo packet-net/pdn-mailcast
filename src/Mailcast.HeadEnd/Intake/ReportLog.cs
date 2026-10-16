@@ -19,6 +19,9 @@ public sealed class ReportLog
     /// <summary>How many days a callsign is remembered after its newest report.</summary>
     public const int RememberDays = 14;
 
+    /// <summary>The most callsigns remembered; past it the oldest reports are let go, so the file stays small.</summary>
+    public const int MostRemembered = 1000;
+
     private readonly string? _path;
     private readonly IJournal _journal;
     private readonly Lock _gate = new();
@@ -96,6 +99,10 @@ public sealed class ReportLog
             {
                 _heard.Remove(old);
             }
+            foreach (var old in _heard.OrderBy(p => p.Value.Day).ThenBy(p => p.Value.Arrived).Take(Math.Max(0, _heard.Count - MostRemembered)).Select(p => p.Key).ToList())
+            {
+                _heard.Remove(old);
+            }
             Save();
             return true;
         }
@@ -115,7 +122,10 @@ public sealed class ReportLog
             {
                 return null;
             }
-            return ReportReceipts.ForDay(today, _heard.Select(p => new KeyValuePair<string, DateOnly>(p.Key, p.Value.Day)));
+            // The latest to arrive first, so that when there are too many to list, those go.
+            return ReportReceipts.ForDay(today, _heard
+                .OrderByDescending(p => p.Value.Arrived)
+                .Select(p => new KeyValuePair<string, DateOnly>(p.Key, p.Value.Day)));
         }
     }
 

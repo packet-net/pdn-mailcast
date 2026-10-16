@@ -45,6 +45,12 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.DirectoryHeard += Slots.OnDirectory;
         Intake.IonosphereHeard += _ => Slots.OnIonosphereHeard();
         Intake.PskReporterHeard += _ => Slots.OnPskReporterHeard();
+        // Issue #133: the bulletins of the slot now on, for its summary line.
+        Intake.BulletinCompleted += _ => Slots.OnBulletinCompleted();
+        Intake.GivenUp += ids => Slots.OnGivenUp(ids.Count);
+        Delivery.SessionFinished += report => Slots.OnDelivered(
+            report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted),
+            report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.AlreadyHad));
         Intake.ScheduleHeard += OnScheduleHeard;
         // Issue #48: after Slots.OnFrame above, so the slot this piece belongs to is already
         // the one Slots.Last knows about.
@@ -165,6 +171,10 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The daily report to the broadcast's author, when the config's <c>feedback</c> turns it on.</summary>
     public FeedbackService Feedback { get; }
 
+    /// <summary>The slots the receiver listens to on a UTC day: a web SDR's own, or every one that runs.</summary>
+    private IReadOnlyList<DateTimeOffset> ListenedOn(DateOnly day) =>
+        AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day);
+
     private FeedbackService CreateFeedback()
     {
         AudioSourceKind Kind() => AudioSource.Parse(Config.Audio).Kind;
@@ -172,7 +182,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Settings = () => Config.Feedback,
             Schedule = () => Kind() == AudioSourceKind.Wav ? null : Schedule,
-            Listened = day => Kind() == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day),
+            Listened = ListenedOn,
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
             PskReporter = () => Intake.PskReporter,
@@ -617,6 +627,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         Task hookLoop = Hooks.RunAsync(() => RetunerRunsHooks, HookWindowAt, stopOthers.Token);
         // The daily report catches and logs its own problems, and ends only when the others do.
         Task feedback = Feedback.RunAsync(stopOthers.Token);
+        // Issue #133: the summary line as each slot ends. Never fails, so not one the others stop for.
+        Task slotEnds = WatchSlotEndsAsync(stopOthers.Token);
         Task first;
         try
         {
@@ -634,6 +646,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             // "after" always runs once "before" has, whatever stopped the receiver.
             await Hooks.FinishAsync().ConfigureAwait(false);
+            await slotEnds.ConfigureAwait(false);
         }
         if ((first == retune || first == hookLoop || first == feedback) && !cancellation.IsCancellationRequested && !first.IsFaulted)
         {
@@ -667,6 +680,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         _log($"decode: {Intake.FramesHeard} frames heard, {Intake.Pending().Count} bulletins to deliver");
         // Delivered first: the measurement is a nicety, and must not hold the mail up.
         string? delivered = await Delivery.DeliverPendingAsync(cancellation).ConfigureAwait(false);
+        Slots.Finish();
         ChannelWatch.SlotOver();
         try
         {
@@ -683,6 +697,43 @@ public sealed class ReceiverHost : IAsyncDisposable
     internal static string SourcesLine(ReceiverConfig config) => config.Sources is null
         ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default; add \"sources\" to choose"
         : $"config: frames are accepted from {config.Sources}, as \"sources\" says";
+
+    /// <summary>
+    /// Issue #133: every <see cref="EarlyEndPoll"/>, writes the summary line of the slot tracked
+    /// once its window is over (<see cref="SlotTracker.EndIfOver"/>), until
+    /// <paramref name="cancellation"/> is cancelled. Catches and logs its own problems.
+    /// </summary>
+    private async Task WatchSlotEndsAsync(CancellationToken cancellation)
+    {
+        while (!cancellation.IsCancellationRequested)
+        {
+            try
+            {
+                // A slot whose window is open now gets a line even if nothing is heard in it.
+                var now = _time.GetUtcNow();
+                var today = DateOnly.FromDateTime(now.UtcDateTime);
+                if (Slots.Schedule is not null && AudioSource.Parse(Config.Audio).Kind != AudioSourceKind.Wav
+                    && ListenedOn(today.AddDays(-1)).Concat(ListenedOn(today)).LastOrDefault(s => s <= now && now < s + ReceiverConfig.WebSdrAfter) is { } open
+                    && open != default && open != LastEarlyEnd?.Slot)
+                {
+                    Slots.OnListening(open);
+                }
+                Slots.EndIfOver(LastEarlyEnd?.Slot);
+            }
+            catch (Exception e)
+            {
+                _log($"slot: unexpected failure writing a slot's summary: {Ascii.Clean(e.Message)}");
+            }
+            try
+            {
+                await Task.Delay(EarlyEndPoll, _time, cancellation).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
 
     /// <summary>The longest --decode waits for the channel measurement once the mail is delivered.</summary>
     internal static readonly TimeSpan DecodeMeasureWait = TimeSpan.FromMinutes(2);

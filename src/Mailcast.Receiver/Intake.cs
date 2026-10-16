@@ -132,8 +132,11 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>A bulletin has been rebuilt and is waiting in the outbox.</summary>
     public event Action<Bulletin>? BulletinCompleted;
 
-    /// <summary>A broadcast frame was heard, with the waveform it came on if the modem said (raised on the worker).</summary>
-    public event Action<string?>? FrameHeard;
+    /// <summary>
+    /// A broadcast frame was heard, with the waveform it came on if the modem said, and how many
+    /// bytes its information field held (raised on the worker).
+    /// </summary>
+    public event Action<string?, int>? FrameHeard;
 
     /// <summary>
     /// Issue #48: a piece was handled, new or not, whatever became of it, raised on the worker
@@ -518,7 +521,7 @@ public sealed class Intake : IAsyncDisposable
 
         try
         {
-            FrameHeard?.Invoke(waveform);
+            FrameHeard?.Invoke(waveform, payload.Length);
             Report(result);
             if (Piece is { } piece)
             {

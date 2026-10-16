@@ -32,6 +32,12 @@ public sealed partial class ReportReceipts
     /// </summary>
     public const int DaysListed = 2;
 
+    /// <summary>
+    /// The most callsigns a directory lists, so that a flood of made-up reports cannot grow the
+    /// directory without limit: 100 is about 650 octets before compression.
+    /// </summary>
+    public const int MostListed = 100;
+
     private readonly SortedDictionary<string, DateOnly> _newest;
 
     /// <summary>Lists each callsign with the day of its newest report. Throws <see cref="ArgumentException"/> for a callsign that is not 1 to 12 capital letters and digits.</summary>
@@ -117,12 +123,17 @@ public sealed partial class ReportReceipts
 
     /// <summary>
     /// The reports to list in a directory dated <paramref name="today"/>: of <paramref name="newest"/>,
-    /// those from <see cref="DaysListed"/> days before it up to it.
+    /// those from <see cref="DaysListed"/> days before it up to it, at most <see cref="MostListed"/>
+    /// of them, the newest days first. Within a day the order given decides, so give the
+    /// latest to arrive first.
     /// </summary>
     public static ReportReceipts ForDay(DateOnly today, IEnumerable<KeyValuePair<string, DateOnly>> newest)
     {
         ArgumentNullException.ThrowIfNull(newest);
-        return new ReportReceipts(newest.Where(p => p.Value >= today.AddDays(-DaysListed) && p.Value <= today));
+        return new ReportReceipts(newest
+            .Where(p => p.Value >= today.AddDays(-DaysListed) && p.Value <= today)
+            .OrderByDescending(p => p.Value) // stable, so within a day the order given stays
+            .Take(MostListed));
     }
 
     [GeneratedRegex("^[A-Z0-9]{1,12}$")]

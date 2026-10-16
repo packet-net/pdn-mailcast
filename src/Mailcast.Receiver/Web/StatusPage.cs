@@ -800,6 +800,8 @@ public sealed class StatusPage : IAsyncDisposable
                 started = slot.Started,
                 scheduled = slot.Scheduled,
                 framesHeard = slot.FramesHeard,
+                // Issue #133: bytes decoded from those frames, not the bulletins rebuilt from them.
+                bytesDecoded = slot.BytesDecoded,
                 lastFrame = slot.LastFrame,
                 waveform = slot.Waveform,
                 frameCounts = slot.FrameCounts,
@@ -1011,11 +1013,16 @@ public sealed class StatusPage : IAsyncDisposable
     /// The burst for the speed tile: the waveform the modem's autobaud locked to, its rate, and
     /// whether the modem is on it now (else it is the last burst any frames came from).
     /// </summary>
+    /// <remarks>
+    /// Issue #135: the waveform, rate and words stay null until a frame has decoded on the burst.
+    /// The autobaud can lock briefly on the tone or the channel probe, to a waveform GB7RDG never
+    /// sends (75 bps, WN0), before a later layer throws it away as noise; a lock alone is not a speed.
+    /// </remarks>
     internal static object? BurstView(HeardBurst? burst) => burst is null ? null : new
     {
-        waveform = burst.Waveform,
-        bps = Waveform.Bps(burst.Waveform),
-        words = Waveform.Words(burst.Waveform),
+        waveform = burst.Frames > 0 ? burst.Waveform : null,
+        bps = burst.Frames > 0 ? Waveform.Bps(burst.Waveform) : null,
+        words = burst.Frames > 0 ? Waveform.Words(burst.Waveform) : null,
         live = burst.Live,
         frames = burst.Frames,
         started = burst.Started,
@@ -1217,6 +1224,15 @@ public sealed class StatusPage : IAsyncDisposable
         return new FeedbackSettings { Enabled = form.Enabled, Callsign = callsign.Length == 0 ? null : callsign };
     }
 
+    /// <summary>
+    /// The BBS login as typed, trimmed. For LinBPQ it is kept in the case typed: LinBPQ compares
+    /// a login with its USER= lines case-sensitively, so upper-casing it, as this once did, turned
+    /// a working "m7taw" into a refused "M7TAW" (issue #134). FBB ignores the case, and its
+    /// callsigns are upper case, so for FBB it is upper-cased as before.
+    /// </summary>
+    internal static string BbsLogin(BbsKind kind, string login) =>
+        kind == BbsKind.Fbb ? login.Trim().ToUpperInvariant() : login.Trim();
+
     /// <summary>Applies a settings form to <paramref name="current"/>; throws <see cref="ConfigException"/> for one that cannot work.</summary>
     internal static ReceiverConfig Apply(ReceiverConfig current, SettingsForm form)
     {
@@ -1247,7 +1263,7 @@ public sealed class StatusPage : IAsyncDisposable
                 Type = kind,
                 Host = form.Host.Trim(),
                 Port = form.Port,
-                Login = form.Login.Trim().ToUpperInvariant(),
+                Login = BbsLogin(kind, form.Login),
                 Password = string.IsNullOrEmpty(form.Password) ? current.Bbs.Password : form.Password,
                 Command = form.Command.Trim(),
             },
@@ -1797,13 +1813,13 @@ public sealed class StatusPage : IAsyncDisposable
             return;
         }
 
-        var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = login.ToUpperInvariant(), Password = password, Command = command };
+        var settings = new BbsSettings { Type = kind, Host = host, Port = port, Login = BbsLogin(kind, login), Password = password, Command = command };
         BbsLoginTestResult result;
         try
         {
             result = TestBbsLogin is { } hook
                 ? await hook(settings).ConfigureAwait(false)
-                : await new BbsClient(settings, _host.Time, _ => { }).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
+                : await new BbsClient(settings, _host.Time, _log).TestLoginAsync(CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -1817,6 +1833,7 @@ public sealed class StatusPage : IAsyncDisposable
                 outcome = BbsLoginTestOutcome.UnexpectedReply,
                 said = "Something went wrong testing the login.",
                 detail = (string?)null,
+                sent = (string?)null,
             }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
             return;
         }
@@ -1827,6 +1844,7 @@ public sealed class StatusPage : IAsyncDisposable
             outcome = result.Outcome,
             said = result.Said,
             detail = result.Detail,
+            sent = result.Sent,
         }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 
