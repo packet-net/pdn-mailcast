@@ -217,7 +217,7 @@ public class BbsClientTests
         await using var bbs = new FakeBbs();
         var log = new List<string>();
 
-        var result = await Client(bbs.Port, password: "wrong", log: log.Add).TestLoginAsync(CancellationToken.None);
+        var result = await Client(bbs.Port, password: "wrong-password", log: log.Add).TestLoginAsync(CancellationToken.None);
 
         Assert.Equal(BbsLoginTestOutcome.WrongPassword, result.Outcome);
         Assert.StartsWith("LinBPQ asked for the password again", result.Said, StringComparison.Ordinal);
@@ -226,7 +226,7 @@ public class BbsClientTests
         Assert.Contains(log, l => l.StartsWith("bbs: login test: sent LinBPQ at 127.0.0.1:", StringComparison.Ordinal) && l.Contains("a password and the command", StringComparison.Ordinal));
         // Whether the close is seen too depends on timing: the reply is settled at "password:".
         Assert.Contains(log, l => l.StartsWith("bbs: login test: the BBS answered \"password:\"", StringComparison.Ordinal));
-        Assert.All(log, l => Assert.DoesNotContain("wrong", l, StringComparison.Ordinal));
+        Assert.All(log, l => Assert.DoesNotContain("wrong-password", l, StringComparison.Ordinal));
         Assert.All(log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
     }
 
