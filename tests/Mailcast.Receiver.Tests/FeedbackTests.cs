@@ -276,6 +276,68 @@ public class FeedbackTests
         Assert.EndsWith(" 0 3", mail.Body.Split("\r\n")[0], StringComparison.Ordinal);
     }
 
+    /// <summary>A directory for <paramref name="date"/> with one bulletin, listing <paramref name="reports"/> (null: a head end before v0.16.0).</summary>
+    private static BroadcastDirectory Directory(DateOnly date, ReportReceipts? reports) =>
+        new(date, [new DirectoryEntry(1, 1, 100, "1_GB7XYZ", "Test")], reports: reports);
+
+    private static ReportReceipts Listing(params (string Call, DateOnly Day)[] reports) =>
+        new(reports.Select(r => new KeyValuePair<string, DateOnly>(r.Call, r.Day)));
+
+    /// <summary>
+    /// Issue #136: the directory says whose reports reached GB7RDG; the page says whether this
+    /// listener's latest did, and the log says so once when it first does.
+    /// </summary>
+    [Fact]
+    public async Task Receipt_SaysWhetherGb7rdgGotTheLatestReport()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        JsonElement Receipt() => JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("receipt");
+
+        // A head end that does not list reports says nothing either way.
+        service.NoteDirectory(Directory(Day, null));
+        Assert.Equal(JsonValueKind.Null, Receipt().ValueKind);
+
+        // The day before's report reached it.
+        service.NoteDirectory(Directory(Day, Listing(("G8BPQ", Day.AddDays(-1)), ("G4ABC", Day.AddDays(-1)))));
+        Assert.Equal("GB7RDG got your report for 2026-10-05", Receipt().GetProperty("text").GetString());
+        Assert.True(Receipt().GetProperty("gotLatest").GetBoolean());
+        Assert.Single(rig.Log, l => l == "feedback: GB7RDG got the daily report from G4ABC for 2026-10-05, as its directory for 2026-10-06 says");
+
+        // Today's goes; the next morning's directory does not list it yet.
+        await rig.ListenAsync(service, Day, only: 1);
+        await rig.AtAsync(service, ReportAt);
+        Assert.Equal(Day, service.Last!.Day);
+        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day.AddDays(-1)))));
+        Assert.Equal("GB7RDG has not had your report for 2026-10-06 yet. It has not had a report from you since the one for 2026-10-05", Receipt().GetProperty("text").GetString());
+        Assert.False(Receipt().GetProperty("gotLatest").GetBoolean());
+
+        // Then one does: said once, however often it is heard, and kept across a restart.
+        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day))));
+        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day))));
+        service = rig.Start();
+        Assert.Equal("GB7RDG got your report for 2026-10-06", Receipt().GetProperty("text").GetString());
+        Assert.Equal(Day.AddDays(1), DateOnly.Parse(Receipt().GetProperty("listedOn").GetString()!, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Single(rig.Log, l => l.Contains("for 2026-10-06, as its directory", StringComparison.Ordinal));
+        Assert.All(rig.Log, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
+
+        // Another callsign's receipt is not this one's.
+        rig.Settings = new FeedbackSettings { Enabled = true, Callsign = "G4XYZ" };
+        Assert.Equal(JsonValueKind.Null, Receipt().ValueKind);
+    }
+
+    [Fact]
+    public void Receipt_InWords_WhenGb7rdgHasHadNoneLately()
+    {
+        var never = new FeedbackService.ReceiptRecord { Callsign = "G4ABC", ListedOn = Day.AddDays(1) };
+        var sent = new SentReport { Day = Day, Answer = FeedbackAnswer.Accepted };
+        Assert.Equal("GB7RDG has not had your report for 2026-10-06 yet, nor any other from you lately", FeedbackService.DescribeReceipt(never, sent));
+        // Before a directory later than the report's day, nothing is said about it.
+        Assert.Null(FeedbackService.DescribeReceipt(new FeedbackService.ReceiptRecord { Callsign = "G4ABC", ListedOn = Day }, sent));
+        Assert.Null(FeedbackService.DescribeReceipt(new FeedbackService.ReceiptRecord { Callsign = "G4ABC" }, sent));
+    }
+
     [Fact]
     public async Task Refused_IsNotSentAgain_ButShownOnThePage()
     {

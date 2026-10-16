@@ -375,6 +375,17 @@ public sealed record HeadEndConfig
                 problems.Add("\"intake\".\"fbb\".\"pollMinutes\" must be above 0");
             }
         }
+        if (Intake.Reports is { } reports)
+        {
+            if (string.IsNullOrWhiteSpace(reports.Host) || reports.Port is <= 0 or > 65535)
+            {
+                problems.Add("\"intake\".\"reports\" needs a \"host\" and a \"port\"");
+            }
+            if (string.IsNullOrWhiteSpace(reports.User))
+            {
+                problems.Add("\"intake\".\"reports\" needs a \"user\"");
+            }
+        }
         Ionosphere.Validate(problems);
         PskReporter.Validate(problems);
         if (problems.Count > 0)
@@ -730,6 +741,33 @@ public sealed record IntakeConfig
 
     /// <summary>Forwarding from the BBS. Left out, the file drop is the only source.</summary>
     public FbbIntakeConfig? Fbb { get; init; }
+
+    /// <summary>
+    /// Reading the BBS's list of listeners' daily reports, so the directory can say whose reached
+    /// it (issue #136). Left out, nothing is read and the directory says nothing about reports.
+    /// </summary>
+    public ReportsReaderConfig? Reports { get; init; }
+}
+
+/// <summary>
+/// The head end's login as an ordinary reader on the BBS, to list the bulletins to MCAST (the
+/// listeners' daily reports) and note whose reached it. It reads the list only, never a report,
+/// and never changes anything on the BBS.
+/// </summary>
+public sealed record ReportsReaderConfig
+{
+    public string Host { get; init; } = "127.0.0.1";
+
+    /// <summary>The port to log in on: LinBPQ's FBBPORT, as for forwarding.</summary>
+    public int Port { get; init; } = 8011;
+
+    /// <summary>The login, as for <see cref="FbbIntakeConfig.Login"/>. The default is LinBPQ's FBBPORT: user, password, <c>BBS</c>.</summary>
+    public IReadOnlyList<LoginStep> Login { get; init; } = FbbIntakeConfig.LinBpqFbbPort;
+
+    /// <summary>The user to log in as. LinBPQ logins are case-sensitive: it must match the USER= line exactly.</summary>
+    public string User { get; init; } = "Q0CAST";
+
+    public string Password { get; init; } = "";
 }
 
 /// <summary>One step of logging in to the BBS: wait for some text, then send a line.</summary>

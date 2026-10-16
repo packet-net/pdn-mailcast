@@ -194,7 +194,7 @@ public sealed class StatusStore
         }
     }
 
-    private static void WriteAtomically(string path, byte[] content)
+    internal static void WriteAtomically(string path, byte[] content)
     {
         string temporary = path + ".tmp";
         using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))

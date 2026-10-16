@@ -249,7 +249,102 @@ public sealed class FeedbackService
             answer = last?.Answer,
             next = Next(_time.GetUtcNow()),
             text = last is null ? null : last.Title + "\n" + last.Body.Replace("\r\n", "\n", StringComparison.Ordinal),
+            receipt = ReceiptView(),
         };
+    }
+
+    /// <summary>
+    /// Whether GB7RDG got the listener's reports, as its directory says (issue #136): null when no
+    /// directory heard has said, as from a head end before v0.16.0.
+    /// </summary>
+    private object? ReceiptView()
+    {
+        ReceiptRecord? receipt;
+        SentReport? last;
+        lock (_gate)
+        {
+            receipt = CurrentReceipt();
+            last = _state.Last;
+        }
+        if (receipt?.ListedOn is not { } listedOn)
+        {
+            return null;
+        }
+        return new
+        {
+            got = receipt.Got,
+            gotSeen = receipt.GotSeen,
+            listedOn,
+            gotLatest = receipt.Got is { } got && (last is null || got >= last.Day),
+            text = DescribeReceipt(receipt, last),
+        };
+    }
+
+    /// <summary>The receipt kept for the callsign the report goes from now, if any.</summary>
+    private ReceiptRecord? CurrentReceipt() =>
+        _state.Receipt is { } r && _sources.Settings() is { } settings && r.Callsign == settings.From ? r : null;
+
+    /// <summary>
+    /// In words, for the page: GB7RDG got the latest report, or has not had it yet and which it
+    /// last got. Null when there is nothing to say.
+    /// </summary>
+    internal static string? DescribeReceipt(ReceiptRecord receipt, SentReport? last)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        var c = CultureInfo.InvariantCulture;
+        if (receipt.ListedOn is not { } listedOn)
+        {
+            return null;
+        }
+        if (receipt.Got is { } got && (last is null || got >= last.Day))
+        {
+            return string.Create(c, $"GB7RDG got your report for {got:yyyy-MM-dd}");
+        }
+        if (last is not null && listedOn > last.Day)
+        {
+            return receipt.Got is { } before
+                ? string.Create(c, $"GB7RDG has not had your report for {last.Day:yyyy-MM-dd} yet. It has not had a report from you since the one for {before:yyyy-MM-dd}")
+                : string.Create(c, $"GB7RDG has not had your report for {last.Day:yyyy-MM-dd} yet, nor any other from you lately");
+        }
+        return receipt.Got is { } older ? string.Create(c, $"GB7RDG got your report for {older:yyyy-MM-dd}") : null;
+    }
+
+    /// <summary>
+    /// A directory was heard (one that may be used): notes whether its list of the reports that
+    /// reached GB7RDG has this listener's, and says so in the log the first time it lists a day's.
+    /// A directory without the list, from a head end before v0.16.0, says nothing either way.
+    /// </summary>
+    public void NoteDirectory(BroadcastDirectory directory)
+    {
+        ArgumentNullException.ThrowIfNull(directory);
+        if (directory.Reports is not { } reports || !Enabled || _sources.Settings() is not { } settings)
+        {
+            return;
+        }
+        string call = settings.From;
+        lock (_gate)
+        {
+            var receipt = _state.Receipt is { } had && had.Callsign == call ? had : new ReceiptRecord { Callsign = call };
+            bool changed = !ReferenceEquals(receipt, _state.Receipt);
+            if (receipt.ListedOn is null || directory.Date > receipt.ListedOn)
+            {
+                receipt.ListedOn = directory.Date;
+                changed = true;
+            }
+            if (reports.For(call) is { } day && (receipt.Got is null || day > receipt.Got))
+            {
+                receipt.Got = day;
+                receipt.GotSeen = _time.GetUtcNow();
+                changed = true;
+                _log(string.Create(CultureInfo.InvariantCulture,
+                    $"feedback: GB7RDG got the daily report from {call} for {day:yyyy-MM-dd}, as its directory for {directory.Date:yyyy-MM-dd} says"));
+            }
+            if (changed)
+            {
+                _state.Receipt = receipt;
+                Save();
+            }
+        }
     }
 
     /// <summary>When the next report goes, or the last is offered again; null when off or with no slot ahead.</summary>
@@ -691,6 +786,25 @@ public sealed class FeedbackService
         public SentReport? Last { get; set; }
 
         public string? ReceiverId { get; set; }
+
+        /// <summary>What GB7RDG's directories have said about this listener's reports (issue #136).</summary>
+        public ReceiptRecord? Receipt { get; set; }
+    }
+
+    /// <summary>What GB7RDG's directories have said about one callsign's reports.</summary>
+    internal sealed class ReceiptRecord
+    {
+        /// <summary>The callsign, as the reports go from.</summary>
+        public string Callsign { get; set; } = "";
+
+        /// <summary>The day of the newest report a directory has listed as reaching GB7RDG.</summary>
+        public DateOnly? Got { get; set; }
+
+        /// <summary>When that was first heard.</summary>
+        public DateTimeOffset? GotSeen { get; set; }
+
+        /// <summary>The date of the newest directory heard that lists reports at all.</summary>
+        public DateOnly? ListedOn { get; set; }
     }
 
     /// <summary>One UTC day's slots and counts.</summary>

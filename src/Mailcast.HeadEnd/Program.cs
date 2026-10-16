@@ -181,7 +181,10 @@ public static partial class Program
             var store = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
             SlotSettings settings = config.ToSlotSettings();
             Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
-            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter);
+            // The head end's own list of reports, read but never written, when it reads the BBS's.
+            ReportLog? reports = config.Intake.Reports is null ? null
+                : new ReportLog(Directory.Exists(config.StateDirectory) ? config.StateDirectory : scratch, journal, readOnly: true);
+            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, reports: reports);
 
             SlotPlan plan = planner.Plan(slot);
             SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
@@ -266,10 +269,12 @@ public static partial class Program
         Func<IonoReading>? reading = ionoSettings.Stations.Count == 0 ? null : () => ionosonde.Current;
         var pskReporter = config.PskReporter.Enabled ? new PskReporterMonitor(config.Callsign, time, journal.Write, host: config.PskReporter.Host, port: config.PskReporter.Port) : null;
         Func<PskReading>? spots = pskReporter is null ? null : () => pskReporter.Current;
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots);
+        ReportLog? reports = config.Intake.Reports is null ? null : new ReportLog(config.StateDirectory, journal);
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
+        ReportReader? reportReader = null;
         if (!string.IsNullOrWhiteSpace(config.Intake.DropDirectory))
         {
             Directory.CreateDirectory(config.Intake.DropDirectory);
@@ -281,6 +286,12 @@ public static partial class Program
             fbbIntake = new FbbIntake(fbb, store, policy, journal, time);
             intakes.Add(new ScheduledIntake(fbbIntake, TimeSpan.FromMinutes(fbb.PollMinutes)));
             journal.Write($"intake: FBB forwarding from {fbb.Host}:{fbb.Port} as {fbb.PartnerCallsign}, every {fbb.PollMinutes:0.#} min");
+        }
+        if (config.Intake.Reports is { } reader && reports is not null)
+        {
+            reportReader = new ReportReader(reader, reports, journal, time);
+            intakes.Add(new ScheduledIntake(reportReader, ReportReader.Every));
+            journal.Write($"reports: reading the list of daily reports ({ReportReader.ListCommand}) from {reader.Host}:{reader.Port} as {reader.User}, before each slot and at most every {ReportReader.Every.TotalMinutes:0} min");
         }
 
         IAirtime airtime = LinearAirtime.Measure(config.Station.Mode);
@@ -334,6 +345,7 @@ public static partial class Program
         await ionosondeLoop;
         await pskReporterLoop;
         fbbIntake?.Dispose();
+        reportReader?.Dispose();
         journal.Write("pdn-mailcast-headend stopped");
         return 0;
     }

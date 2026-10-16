@@ -48,7 +48,7 @@ public class MailTests
     {
         Audio = "wav:/nonexistent.wav",
         StateDirectory = dir,
-        Bbs = new BbsSettings { Host = "127.0.0.1", Port = bbsPort, Login = "Q0CAST", Password = "secret" },
+        Bbs = new BbsSettings { Host = "127.0.0.1", Port = bbsPort, Login = "Q0CAST", Password = "secret-pw" },
         Web = new WebSettings { Port = webPort, Password = password },
     };
 

@@ -192,6 +192,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
         Intake.GivenUp += feedback.NoteGivenUp;
+        Intake.DirectoryHeard += feedback.NoteDirectory;
         Delivery.SessionFinished += report =>
         {
             feedback.NoteDelivered(report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted));

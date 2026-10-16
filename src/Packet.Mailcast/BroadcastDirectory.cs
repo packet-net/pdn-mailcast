@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Packet.Mailcast.Feedback;
 
 namespace Packet.Mailcast;
 
@@ -61,6 +62,12 @@ public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Siz
 /// it goes out unsigned.
 /// </para>
 /// <para>
+/// From v0.16.0 the first entry's line may also list the listeners whose daily reports have
+/// reached the head end lately, <c>reports=2026-10-15:G4ABC,G8BPQ;2026-10-14:M9TWM</c> (see
+/// <see cref="ReportReceipts"/>), after the mode. Being on an entry line, it is inside what a
+/// signature covers. Earlier readers ignore it like any field after the title.
+/// </para>
+/// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
 /// different contents never share an ID, even on the same day. Ed25519 signatures are
 /// deterministic, so the same directory signed twice is the same object.
@@ -88,7 +95,7 @@ public sealed class BroadcastDirectory
     /// Creates a directory, signed by <paramref name="signer"/> when given and there is an entry
     /// to carry the signature. Each entry should then give its <see cref="DirectoryEntry.Hash"/>.
     /// </summary>
-    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null, string? mode = null, DirectorySigner? signer = null)
+    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null, string? mode = null, DirectorySigner? signer = null, ReportReceipts? reports = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         if (mode is not null && (mode.Length == 0 || mode.Any(c => c is <= ' ' or > '~')))
@@ -98,6 +105,7 @@ public sealed class BroadcastDirectory
         Date = date;
         Schedule = schedule;
         Mode = mode;
+        Reports = reports;
         Entries = entries.Select(e => e with { Title = e.Title.Replace('\t', ' ') }).ToArray();
         foreach (var e in Entries)
         {
@@ -113,8 +121,8 @@ public sealed class BroadcastDirectory
         _signer = Entries.Count > 0 ? signer : null;
     }
 
-    private BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule, string? mode, byte[] serialized, string? keyText, string? signatureText, int signedLength)
-        : this(date, entries, schedule, mode)
+    private BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule, string? mode, ReportReceipts? reports, byte[] serialized, string? keyText, string? signatureText, int signedLength)
+        : this(date, entries, schedule, mode, reports: reports)
     {
         _serialized = serialized;
         _keyText = keyText;
@@ -142,6 +150,13 @@ public sealed class BroadcastDirectory
     /// head end said and there is an entry to carry it; null otherwise.
     /// </summary>
     public string? Mode { get; }
+
+    /// <summary>
+    /// The listeners whose daily reports have reached the head end lately, when it said and there
+    /// is an entry to carry them; null when the directory does not say, as from a head end before
+    /// v0.16.0.
+    /// </summary>
+    public ReportReceipts? Reports { get; }
 
     /// <summary>The objects in rotation.</summary>
     public IReadOnlyList<DirectoryEntry> Entries { get; }
@@ -174,6 +189,10 @@ public sealed class BroadcastDirectory
             if (i == 0 && Mode is { } mode)
             {
                 text.Append("\tmode=").Append(mode);
+            }
+            if (i == 0 && Reports is { } reports)
+            {
+                text.Append('\t').Append(reports.ToField());
             }
             if (e.Hash is { } hash)
             {
@@ -262,6 +281,7 @@ public sealed class BroadcastDirectory
         var entries = new List<DirectoryEntry>();
         SlotTimetable? schedule = null;
         string? mode = null;
+        ReportReceipts? reports = null;
         string? keyText = null;
         string? signatureText = null;
         int signedLength = 0;
@@ -302,11 +322,12 @@ public sealed class BroadcastDirectory
             {
                 schedule = SlotTimetable.FromFields(parts[5..]);
                 mode = parts[5..].FirstOrDefault(f => f.StartsWith("mode=", StringComparison.Ordinal) && f.Length > 5)?[5..];
+                reports = ReportReceipts.FromFields(parts[5..]);
             }
         }
         try
         {
-            return new BroadcastDirectory(date, entries, schedule, mode, serialized.ToArray(), keyText, signatureText, signedLength);
+            return new BroadcastDirectory(date, entries, schedule, mode, reports, serialized.ToArray(), keyText, signatureText, signedLength);
         }
         catch (ArgumentException e)
         {

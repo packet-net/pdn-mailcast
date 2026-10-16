@@ -14,7 +14,7 @@ public class StatusPageTests
     {
         Audio = "wav:/nonexistent.wav",
         StateDirectory = dir,
-        Bbs = new BbsSettings { Port = 8011, Login = "Q0CAST", Password = "secret" },
+        Bbs = new BbsSettings { Port = 8011, Login = "Q0CAST", Password = "secret-pw" },
         Web = new WebSettings { Port = port, Lan = lan, Password = password },
     };
 
@@ -64,7 +64,7 @@ public class StatusPageTests
 
         var shown = await http.GetFromJsonAsync<JsonElement>("api/settings");
         Assert.True(shown.GetProperty("bbs").GetProperty("passwordSet").GetBoolean());
-        Assert.DoesNotContain("secret", shown.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-pw", shown.GetRawText(), StringComparison.Ordinal);
 
         // A new port is a different BBS: the password has to be given again.
         var refused = await http.PostAsJsonAsync("api/settings", Form(port: 8012));
@@ -78,7 +78,7 @@ public class StatusPageTests
         Assert.Equal(8011, saved.Bbs.Port);
         // Issue #134: LinBPQ's USER= logins are case-sensitive, so the login is saved as typed.
         Assert.Equal("q0cast", saved.Bbs.Login);
-        Assert.Equal("secret", saved.Bbs.Password);
+        Assert.Equal("secret-pw", saved.Bbs.Password);
         Assert.Equal("ubersdr:wessex.zapto.org", saved.Audio);
         Assert.Equal(saved, host.Config);
     }
@@ -243,7 +243,7 @@ public class StatusPageTests
         Assert.True(shown.GetProperty("feedback").GetProperty("enabled").GetBoolean());
         Assert.Equal("G4ABC", shown.GetProperty("feedback").GetProperty("callsign").GetString());
         // The other settings are as they were.
-        Assert.Equal("secret", ReceiverConfig.Load(path).Bbs.Password);
+        Assert.Equal("secret-pw", ReceiverConfig.Load(path).Bbs.Password);
 
         // Off in one click: no callsign given, the one set is kept for next time.
         var off = await http.PostAsJsonAsync("api/settings", FeedbackForm(false, ""));
@@ -562,7 +562,7 @@ public class StatusPageTests
         await using var _h = host;
         await using var _p = page;
         using var _c = http;
-        await using var bbs = new FakeBbs(); // default password "secret", matching Config()'s saved Bbs.Password
+        await using var bbs = new FakeBbs(); // default password "secret-pw", matching Config()'s saved Bbs.Password
 
         // Issue #99: not known yet, before the login is tested.
         var before = await http.GetFromJsonAsync<JsonElement>("api/status");
@@ -572,7 +572,7 @@ public class StatusPageTests
         string body = await answer.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
-        Assert.DoesNotContain("secret", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-pw", body, StringComparison.Ordinal);
         // Issue #99: a successful "Test BBS login" counts as having tried, so the daily report's opt-in can show.
         var after = await http.GetFromJsonAsync<JsonElement>("api/status");
         Assert.True(after.GetProperty("bbs").GetProperty("reachable").GetBoolean());
@@ -629,7 +629,7 @@ public class StatusPageTests
         int closedPort = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
 
-        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = closedPort, password = "secret" });
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = closedPort, password = "secret-pw" });
 
         var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("unreachable", json.GetProperty("outcome").GetString());
@@ -698,7 +698,7 @@ public class StatusPageTests
         await using var _p = page;
         using var _c = http;
 
-        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port, password = "secret" });
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port, password = "secret-pw" });
 
         Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
         var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
@@ -716,7 +716,7 @@ public class StatusPageTests
         await using var _p = page;
         using var _c = http;
 
-        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host, port = 8011, password = "secret" });
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host, port = 8011, password = "secret-pw" });
 
         Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
     }
@@ -730,7 +730,7 @@ public class StatusPageTests
         await using var _p = page;
         using var _c = http;
 
-        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = new string('a', 300), port = 8011, password = "secret" });
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = new string('a', 300), port = 8011, password = "secret-pw" });
 
         Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
     }
@@ -746,9 +746,9 @@ public class StatusPageTests
         await using var _h = hostApp;
         await using var _p = page;
         using var _c = http;
-        await using var bbs = new FakeBbs(); // the saved host (127.0.0.1) and password (secret) reach it fine
+        await using var bbs = new FakeBbs(); // the saved host (127.0.0.1) and password (secret-pw) reach it fine
 
-        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host, port = bbs.Port, password = "secret" });
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host, port = bbs.Port, password = "secret-pw" });
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
         var json = await answer.Content.ReadFromJsonAsync<JsonElement>();
@@ -764,13 +764,13 @@ public class StatusPageTests
         await using var _p = page;
         using var _c = http;
 
-        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = 8011, password = "secret" });
+        var answer = await http.PostAsJsonAsync("api/bbs/test", new { host = "127.0.0.1", port = 8011, password = "secret-pw" });
         string body = await answer.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
         Assert.DoesNotContain("s3cr3t", body, StringComparison.Ordinal);
         Assert.DoesNotContain("boom", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("secret", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-pw", body, StringComparison.Ordinal);
         var json = JsonSerializer.Deserialize<JsonElement>(body);
         Assert.Equal("unexpectedReply", json.GetProperty("outcome").GetString());
         Assert.Equal(JsonValueKind.Null, json.GetProperty("detail").ValueKind);

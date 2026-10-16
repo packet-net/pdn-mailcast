@@ -377,6 +377,23 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         return false;
     }
 
+    /// <summary>
+    /// Reads a report's title, <c>MCR G4ABC 2026-10-06</c>: the callsign and the day it is
+    /// about. False for anything else.
+    /// </summary>
+    public static bool TryParseTitle(string? title, out string callsign, out DateOnly day)
+    {
+        callsign = "";
+        day = default;
+        var t = title is null ? null : TitlePattern().Match(title.Trim());
+        if (t is not { Success: true } || !DateOnly.TryParseExact(t.Groups[2].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out day))
+        {
+            return false;
+        }
+        callsign = t.Groups[1].Value;
+        return true;
+    }
+
     /// <summary>Whether <paramref name="to"/> is the report's addressee, <see cref="BulletinTo"/>, in any case.</summary>
     public static bool IsReportAddressee(string? to) =>
         to is not null && to.Trim().Equals(BulletinTo, StringComparison.OrdinalIgnoreCase);

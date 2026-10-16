@@ -1,0 +1,163 @@
+using System.Text.Json;
+using Packet.Mailcast;
+using Packet.Mailcast.Feedback;
+
+namespace Mailcast.HeadEnd.Intake;
+
+/// <summary>
+/// The listeners' daily reports that have reached the BBS (issue #136), as <see cref="ReportReader"/>
+/// learns them from its list: for each callsign, the day of its newest report and when the head
+/// end first saw it, kept in <see cref="FileName"/> in the state directory. The directory lists
+/// the recent ones (<see cref="ReportReceipts"/>), so a listener's receiver can say whether GB7RDG
+/// got its report. The reports themselves are never read, kept or broadcast.
+/// </summary>
+public sealed class ReportLog
+{
+    /// <summary>The state file.</summary>
+    public const string FileName = "reports.json";
+
+    /// <summary>How many days a callsign is remembered after its newest report.</summary>
+    public const int RememberDays = 14;
+
+    /// <summary>The most callsigns remembered; past it the oldest reports are let go, so the file stays small.</summary>
+    public const int MostRemembered = 1000;
+
+    private readonly string? _path;
+    private readonly IJournal _journal;
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, Heard> _heard = new(StringComparer.Ordinal);
+    private bool _active;
+
+    /// <summary>
+    /// Reads what is kept in <paramref name="stateDirectory"/>. With <paramref name="readOnly"/>
+    /// (offline work) nothing is ever written back.
+    /// </summary>
+    public ReportLog(string stateDirectory, IJournal journal, bool readOnly = false)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(stateDirectory);
+        _journal = journal ?? throw new ArgumentNullException(nameof(journal));
+        string path = Path.Combine(stateDirectory, FileName);
+        _path = readOnly ? null : path;
+        if (!File.Exists(path))
+        {
+            return;
+        }
+        _active = true;
+        try
+        {
+            foreach (var (call, heard) in JsonSerializer.Deserialize<Dictionary<string, Heard>>(File.ReadAllBytes(path), Json) ?? [])
+            {
+                if (ReportReceipts.IsListable(call))
+                {
+                    _heard[call] = heard;
+                }
+            }
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            journal.Write($"reports: {path} cannot be read ({Ascii.Plain(e.Message)}); starting afresh");
+        }
+    }
+
+    /// <summary>One callsign's newest report: its day, when the head end first saw it, and its message number on the BBS.</summary>
+    public sealed record Heard(DateOnly Day, DateTimeOffset Arrived, string Message);
+
+    /// <summary>Each callsign's newest report, in callsign order.</summary>
+    public IReadOnlyList<KeyValuePair<string, Heard>> All
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _heard.OrderBy(p => p.Key, StringComparer.Ordinal)];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Notes a report from <paramref name="callsign"/> for <paramref name="day"/>, saved at the next
+    /// <see cref="MarkRead"/>. True when it
+    /// is the newest yet from that callsign, so the directory will list it; false when one for
+    /// that day or a later one was already noted, it was let go at once because the log is full
+    /// of newer ones, the callsign cannot be listed, or the day is
+    /// after the day it arrived (a receiver with its clock wrong), which would otherwise hide
+    /// that callsign's real reports until then.
+    /// </summary>
+    public bool Note(string callsign, DateOnly day, DateTimeOffset arrived, string message)
+    {
+        if (!ReportReceipts.IsListable(callsign) || day > DateOnly.FromDateTime(arrived.UtcDateTime))
+        {
+            return false;
+        }
+        lock (_gate)
+        {
+            if (_heard.TryGetValue(callsign, out var had) && had.Day >= day)
+            {
+                return false;
+            }
+            var heard = new Heard(day, arrived, message);
+            _heard[callsign] = heard;
+            foreach (var old in _heard.Where(p => p.Value.Day < day.AddDays(-RememberDays)).Select(p => p.Key).ToList())
+            {
+                _heard.Remove(old);
+            }
+            foreach (var old in _heard.OrderBy(p => p.Value.Day).ThenBy(p => p.Value.Arrived).Take(Math.Max(0, _heard.Count - MostRemembered)).Select(p => p.Key).ToList())
+            {
+                _heard.Remove(old);
+            }
+            // Full, and this was the oldest: let go at once, so not new.
+            return _heard.TryGetValue(callsign, out var kept) && ReferenceEquals(kept, heard);
+        }
+    }
+
+    /// <summary>
+    /// The BBS's list has been read, whether or not it held anything new: what was noted is saved,
+    /// and from now on the directory says which reports there are, even if none.
+    /// </summary>
+    public void MarkRead()
+    {
+        lock (_gate)
+        {
+            _active = true;
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// What a directory dated <paramref name="today"/> lists (<see cref="ReportReceipts.ForDay"/>):
+    /// null, so the directory says nothing, until the BBS's list has been read once. A head end
+    /// that cannot read it would otherwise tell every listener that GB7RDG has had none.
+    /// </summary>
+    public ReportReceipts? For(DateOnly today)
+    {
+        lock (_gate)
+        {
+            if (!_active)
+            {
+                return null;
+            }
+            // The latest to arrive first, so that when there are too many to list, those go.
+            return ReportReceipts.ForDay(today, _heard
+                .OrderByDescending(p => p.Value.Arrived)
+                .Select(p => new KeyValuePair<string, DateOnly>(p.Key, p.Value.Day)));
+        }
+    }
+
+    private void Save()
+    {
+        if (_path is null)
+        {
+            return;
+        }
+        try
+        {
+            Status.StatusStore.WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(_heard, Json));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _journal.Write($"reports: cannot save {_path}: {Ascii.Plain(e.Message)}");
+        }
+    }
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+}

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using Packet.Fbb;
 using Packet.Mailcast;
+using Packet.Mailcast.Feedback;
 using Mailcast.HeadEnd.Intake;
 
 namespace Mailcast.HeadEnd.Tests;
@@ -261,6 +262,190 @@ public class IntakeTests
         said = Assert.Single(journal.Lines, l => l.Contains(lookalike.Bid, StringComparison.Ordinal));
         Assert.Contains("daily report", said, StringComparison.Ordinal);
         Assert.All(journal.Lines, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
+    }
+
+    [Fact]
+    public void ReportReader_TakesEachReportFromTheListing_WhenItsSenderIsItsCallsign()
+    {
+        const string Listing = "13414  16-Oct B$     480 MCAST  @GB7RDG G8BPQ  MCR G8BPQ 2026-10-15\r"
+            + "13410  15-Oct BF     512 MCAST  @GB7RDG GM8BPQ MCR GM8BPQ 2026-10-14\r"
+            + "13409  15-Oct B$     300 MCAST  @GB7RDG G4XYZ  MCR G8BPQ 2026-10-16\r" // not the sender's
+            + "13400  14-Oct B$     100 MCAST  @GB7RDG G4ABC  Hello GB7RDG\r"
+            + "de GB7RDG>\r";
+        Assert.Equal(
+            [("13414", "G8BPQ", new DateOnly(2026, 10, 15)), ("13410", "GM8BPQ", new DateOnly(2026, 10, 14))],
+            ReportReader.Reports(Listing));
+    }
+
+    [Fact]
+    public async Task ReportReader_ReadsAtMostEveryFifteenMinutes()
+    {
+        using var state = new TempDirectory();
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 8, 59, 0, TimeSpan.Zero));
+        int tries = 0;
+        using var reader = new ReportReader(new ReportsReaderConfig { Password = "secret" }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), time,
+            _ => { tries++; throw new IOException("refused secret"); });
+        Assert.Contains("<password>", (await reader.CollectAsync(Today, CancellationToken.None)).Problem, StringComparison.Ordinal);
+        time.Advance(TimeSpan.FromMinutes(14));
+        Assert.Equal(IntakeResult.Nothing, await reader.CollectAsync(Today, CancellationToken.None));
+        time.Advance(TimeSpan.FromMinutes(1));
+        Assert.NotNull((await reader.CollectAsync(Today, CancellationToken.None)).Problem);
+        Assert.Equal(2, tries);
+    }
+
+    /// <summary>
+    /// A BBS that answers the reader's lines as told: each line received (CR ended) gets the next
+    /// reply, the login's three lines the first.
+    /// </summary>
+    private static async Task<(int Port, Task<List<string>> Received)> ScriptedBbs(params string[] replies)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        async Task<List<string>> Serve()
+        {
+            var received = new List<string>();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                using var client = await listener.AcceptTcpClientAsync(timeout.Token);
+                var stream = client.GetStream();
+                var line = new StringBuilder();
+                int next = 0;
+                var one = new byte[1];
+                while (await stream.ReadAsync(one, timeout.Token) == 1)
+                {
+                    if (one[0] != '\r')
+                    {
+                        line.Append((char)one[0]);
+                        continue;
+                    }
+                    received.Add(line.ToString());
+                    line.Clear();
+                    if (received.Count >= 3 && next < replies.Length)
+                    {
+                        await stream.WriteAsync(Encoding.Latin1.GetBytes(replies[next++]), timeout.Token);
+                    }
+                }
+            }
+            catch (IOException)
+            {
+            }
+            finally
+            {
+                listener.Stop();
+            }
+            return received;
+        }
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        await Task.Yield();
+        return (port, Serve());
+    }
+
+    [Fact]
+    public async Task ReportReader_AnswersLinBpqsPagePrompt_AndTakesAnyPromptAsTheEnd()
+    {
+        // The welcome comes after the third login line (BBS); then the list in two pages, and a
+        // prompt with a time in it, unlike the one at login.
+        var (port, received) = await ScriptedBbs(
+            "Hello Mailcast receiver.\rde GB7RDG>\r",
+            "13414  16-Oct B$     480 MCAST  @GB7RDG G8BPQ  MCR G8BPQ 2026-10-15\r13413  16-Oct B$     480 MCAST  @GB7RDG G4ABC  MCR G4ABC 2026-10-15\r<A>bort, <CR> Continue..>",
+            "13410  15-Oct BF     512 MCAST  @GB7RDG GM8BPQ MCR GM8BPQ 2026-10-14>\r12:01 de GB7RDG>\r",
+            "Disconnected\r");
+        using var state = new TempDirectory();
+        var journal = new MemoryJournal();
+        var log = new ReportLog(state.Path, journal);
+        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, Password = "long-enough" }, log, journal,
+            new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero)));
+
+        var result = await reader.CollectAsync(Today, CancellationToken.None);
+
+        Assert.True(result.Problem is null, result.Problem);
+        Assert.Equal(["Q0CAST", "long-enough", "BBS", ReportReader.ListCommand, "", "B"], await received);
+        Assert.Equal(["G4ABC", "G8BPQ"], log.All.Select(p => p.Key));
+        Assert.Contains("reports: 2 new of 2 listed", Assert.Single(journal.Lines), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReportReader_Prompt_IsNeverAListingLine()
+    {
+        Assert.Equal("de GB7RDG>", ReportReader.Prompt("x\rde GB7RDG>\r"));
+        Assert.Equal("12:01 de GB7RDG>", ReportReader.Prompt("x\r12:01 de GB7RDG>\r"));
+        Assert.Null(ReportReader.Prompt("13410  15-Oct BF     512 MCAST  @GB7RDG GM8BPQ Look here>\r"));
+        Assert.True(ReportReader.IsPagePrompt(ReportReader.Prompt("x\r<A>bort, <CR> Continue..>")!));
+    }
+
+    [Theory]
+    [InlineData("pw7", false)]
+    [InlineData("long-enough", true)]
+    public async Task ReportReader_QuotesTheBbsOnlyWithAPasswordLongEnoughToTakeOut(string password, bool quoted)
+    {
+        var (port, _) = await ScriptedBbs("Hmm, " + password + " is wrong. password:");
+        using var state = new TempDirectory();
+        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, Password = password }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), TimeProvider.System);
+
+        string problem = (await reader.CollectAsync(Today, CancellationToken.None)).Problem!;
+
+        Assert.Contains("did not take the password", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain(password, problem, StringComparison.Ordinal);
+        Assert.Equal(!quoted, problem.Contains("(reply not shown)", StringComparison.Ordinal));
+        Assert.Equal(quoted, problem.Contains("<password> is wrong", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ReportLog_HoldsAtMostAThousandCallsigns_AndListsTheHundredLatest()
+    {
+        using var state = new TempDirectory();
+        var log = new ReportLog(state.Path, new MemoryJournal());
+        var day = new DateOnly(2026, 10, 15);
+        var at = new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero);
+        for (int i = 0; i < ReportLog.MostRemembered + 5; i++)
+        {
+            log.Note($"G{i:D4}X", day, at.AddSeconds(i), i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        log.MarkRead();
+        Assert.Equal(ReportLog.MostRemembered, log.All.Count);
+        Assert.DoesNotContain(log.All, p => p.Key == "G0000X"); // the first to arrive went first
+        var listed = log.For(new DateOnly(2026, 10, 16))!;
+        Assert.Equal(ReportReceipts.MostListed, listed.Newest.Count);
+        Assert.Contains("G1004X", listed.Newest.Keys); // the latest to arrive are listed
+        Assert.DoesNotContain("G0500X", listed.Newest.Keys);
+        Assert.Equal(ReportLog.MostRemembered, new ReportLog(state.Path, new MemoryJournal()).All.Count);
+
+        // Full of newer ones: an older day's report is let go at once, so it is not new.
+        Assert.False(log.Note("G9OLD", day.AddDays(-1), at.AddHours(1), "x"));
+        Assert.DoesNotContain(log.All, p => p.Key == "G9OLD");
+    }
+
+    [Fact]
+    public void ReportLog_KeepsEachCallsignsNewest_AndIgnoresAFutureDay()
+    {
+        using var state = new TempDirectory();
+        var journal = new MemoryJournal();
+        var log = new ReportLog(state.Path, journal);
+        // Nothing listed, not even "none", until the BBS's list has been read.
+        Assert.Null(log.For(new DateOnly(2026, 10, 16)));
+        var at = new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero);
+        Assert.True(log.Note("G4ABC", new DateOnly(2026, 10, 14), at, "A"));
+        Assert.True(log.Note("G4ABC", new DateOnly(2026, 10, 15), at, "B"));
+        Assert.False(log.Note("G4ABC", new DateOnly(2026, 10, 15), at, "B"));
+        Assert.False(log.Note("G4ABC", new DateOnly(2026, 10, 13), at, "C"));
+        Assert.False(log.Note("G4XYZ", new DateOnly(2026, 10, 17), at, "D")); // a receiver with its clock wrong
+        Assert.False(log.Note("G4-XYZ", new DateOnly(2026, 10, 15), at, "E"));
+        Assert.Null(log.For(new DateOnly(2026, 10, 16)));
+        log.MarkRead();
+        Assert.Equal("reports=2026-10-15:G4ABC", log.For(new DateOnly(2026, 10, 16))!.ToField());
+        Assert.Equal("reports=", log.For(new DateOnly(2026, 10, 18))!.ToField());
+        Assert.Equal("reports=", new ReportLog(state.Path, journal).For(new DateOnly(2026, 10, 18))!.ToField());
+
+        // Offline work reads it and never writes.
+        var offline = new ReportLog(state.Path, journal, readOnly: true);
+        Assert.True(offline.Note("G4DEF", new DateOnly(2026, 10, 15), at, "F"));
+        offline.MarkRead();
+        Assert.DoesNotContain("G4DEF", File.ReadAllText(Path.Combine(state.Path, ReportLog.FileName)), StringComparison.Ordinal);
+
+        File.WriteAllText(Path.Combine(state.Path, ReportLog.FileName), "not json");
+        Assert.Empty(new ReportLog(state.Path, journal).All);
+        Assert.Contains(journal.Lines, l => l.Contains("starting afresh", StringComparison.Ordinal));
     }
 
     [Fact]
