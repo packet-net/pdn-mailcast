@@ -263,6 +263,106 @@ public class IntakeTests
         Assert.All(journal.Lines, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
     }
 
+    /// <summary>
+    /// Issue #136: with a report log, a bulletin to MCAST is asked for, so its title says whose
+    /// report it is and for which day; that is noted for the directory's list, and the report is
+    /// still never kept or broadcast. Something else to MCAST is dropped as before.
+    /// </summary>
+    [Fact]
+    public async Task Fbb_NotesADailyReportForTheDirectory_AndStillNeverKeepsIt()
+    {
+        var toMcast = Report("G4ABC");
+        var lookalike = Report("G4XYZ", to: "ALL", at: "GBR");
+        var notReport = Bulletin.FromMessageText('B', "G4DEF", "MCAST", "GB7RDG.#42.GBR.EURO", "3001_GB7XYZ", "Hello GB7RDG",
+            new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero), "R:261006/0900Z 3001@GB7XYZ.#42.GBR.EURO BPQ6.0.25\r\n\r\nJust saying hello.\r\n");
+
+        using var state = new TempDirectory();
+        var journal = new MemoryJournal();
+        var store = Store(state, journal, cap: 6000);
+        var reports = new ReportLog(state.Path, journal);
+        int port = 0;
+        var config = new FbbIntakeConfig
+        {
+            Host = "127.0.0.1",
+            Port = 1,
+            User = "Q0HEAD",
+            Password = "pw",
+            Login = [new("user:", "{user}"), new("password:", "{password}")],
+            SessionTimeoutSeconds = 60,
+        };
+        using var intake = new FbbIntake(config, store, new IntakePolicy(6000), journal, TimeProvider.System, async cancellation =>
+        {
+            var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port, cancellation);
+            return client.GetStream();
+        }, reports);
+
+        for (int session = 0; session < 2; session++)
+        {
+            await using var bbs = new FakeBbs([Queued(toMcast), Queued(lookalike), Queued(notReport)]);
+            port = bbs.Port;
+
+            var result = await intake.CollectAsync(Today, CancellationToken.None);
+            await bbs.DisposeAsync();
+
+            Assert.Null(result.Problem);
+            Assert.Equal(FsAnswerKind.Accept, bbs.Answers[toMcast.Bid]);
+            Assert.Equal(FsAnswerKind.Accept, bbs.Answers[lookalike.Bid]);
+            Assert.Equal(FsAnswerKind.Accept, bbs.Answers[notReport.Bid]);
+            Assert.Equal(0, result.Accepted);
+            Assert.Equal(3, result.Refused);
+            Assert.Equal(2, result.Reports);
+        }
+
+        Assert.Equal(0, store.Count);
+        Assert.Equal(["G4ABC", "G4XYZ"], reports.All.Select(p => p.Key));
+        Assert.All(reports.All, p => Assert.Equal(new DateOnly(2026, 10, 6), p.Value.Day));
+
+        // Said once for each BID, in plain ASCII.
+        var said = Assert.Single(journal.Lines, l => l.Contains(toMcast.Bid, StringComparison.Ordinal));
+        Assert.Contains("G4ABC for 2026-10-06: noted", said, StringComparison.Ordinal);
+        Assert.Contains("never broadcast", said, StringComparison.Ordinal);
+        said = Assert.Single(journal.Lines, l => l.Contains(notReport.Bid, StringComparison.Ordinal));
+        Assert.Contains("addressed to MCAST", said, StringComparison.Ordinal);
+        Assert.All(journal.Lines, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
+
+        // Kept across a restart, and listed by the next day's directory, which has no report in it.
+        var again = new ReportLog(state.Path, journal);
+        store.Offer(Bulletins.Make(21, 1000), new DateOnly(2026, 10, 7));
+        var plan = store.Plan(BroadcastScheduler.Midnight(new DateOnly(2026, 10, 7)).AddHours(12), 1, Compression.Default, new ScheduleOptions(), reports: again.For(new DateOnly(2026, 10, 7)));
+        Assert.Equal(new DateOnly(2026, 10, 6), plan.Directory.Reports!.For("G4ABC"));
+        Assert.DoesNotContain(plan.Directory.Entries, e => e.Title.StartsWith("MCR ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ReportLog_KeepsEachCallsignsNewest_AndIgnoresAFutureDay()
+    {
+        using var state = new TempDirectory();
+        var journal = new MemoryJournal();
+        var log = new ReportLog(state.Path, journal);
+        // Nothing listed, not even "none", until a report has ever arrived.
+        Assert.Null(log.For(new DateOnly(2026, 10, 16)));
+        var at = new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero);
+        Assert.True(log.Note("G4ABC", new DateOnly(2026, 10, 14), at, "A"));
+        Assert.True(log.Note("G4ABC", new DateOnly(2026, 10, 15), at, "B"));
+        Assert.False(log.Note("G4ABC", new DateOnly(2026, 10, 15), at, "B"));
+        Assert.False(log.Note("G4ABC", new DateOnly(2026, 10, 13), at, "C"));
+        Assert.False(log.Note("G4XYZ", new DateOnly(2026, 10, 17), at, "D")); // a receiver with its clock wrong
+        Assert.False(log.Note("G4-XYZ", new DateOnly(2026, 10, 15), at, "E"));
+        Assert.Equal("reports=2026-10-15:G4ABC", log.For(new DateOnly(2026, 10, 16))!.ToField());
+        Assert.Equal("reports=", log.For(new DateOnly(2026, 10, 18))!.ToField());
+        Assert.Equal("reports=", new ReportLog(state.Path, journal).For(new DateOnly(2026, 10, 18))!.ToField());
+
+        // Offline work reads it and never writes.
+        var offline = new ReportLog(state.Path, journal, readOnly: true);
+        Assert.True(offline.Note("G4DEF", new DateOnly(2026, 10, 15), at, "F"));
+        Assert.DoesNotContain("G4DEF", File.ReadAllText(Path.Combine(state.Path, ReportLog.FileName)), StringComparison.Ordinal);
+
+        File.WriteAllText(Path.Combine(state.Path, ReportLog.FileName), "not json");
+        Assert.Empty(new ReportLog(state.Path, journal).All);
+        Assert.Contains(journal.Lines, l => l.Contains("starting afresh", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task FileDrop_NeverTakesADailyReport()
     {

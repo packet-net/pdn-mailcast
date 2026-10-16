@@ -4,7 +4,11 @@ using Packet.Mailcast.Feedback;
 namespace Mailcast.HeadEnd.Intake;
 
 /// <summary>What one intake pass did.</summary>
-public sealed record IntakeResult(int Accepted, int Refused, string? Problem)
+/// <param name="Accepted">Bulletins taken for the broadcast.</param>
+/// <param name="Refused">Messages refused, or taken and not kept.</param>
+/// <param name="Problem">What went wrong, if anything did.</param>
+/// <param name="Reports">Of <paramref name="Refused"/>, listeners' daily reports noted for the directory's list (<see cref="ReportLog"/>).</param>
+public sealed record IntakeResult(int Accepted, int Refused, string? Problem, int Reports = 0)
 {
     /// <summary>Nothing happened.</summary>
     public static IntakeResult Nothing { get; } = new(0, 0, null);

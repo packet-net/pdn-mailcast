@@ -181,7 +181,9 @@ public static partial class Program
             var store = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
             SlotSettings settings = config.ToSlotSettings();
             Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
-            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter);
+            // The head end's own list of reports, read but never written.
+            var reports = new ReportLog(Directory.Exists(config.StateDirectory) ? config.StateDirectory : scratch, journal, readOnly: true);
+            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, reports: reports);
 
             SlotPlan plan = planner.Plan(slot);
             SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
@@ -266,7 +268,8 @@ public static partial class Program
         Func<IonoReading>? reading = ionoSettings.Stations.Count == 0 ? null : () => ionosonde.Current;
         var pskReporter = config.PskReporter.Enabled ? new PskReporterMonitor(config.Callsign, time, journal.Write, host: config.PskReporter.Host, port: config.PskReporter.Port) : null;
         Func<PskReading>? spots = pskReporter is null ? null : () => pskReporter.Current;
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots);
+        var reports = new ReportLog(config.StateDirectory, journal);
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -278,7 +281,7 @@ public static partial class Program
         }
         if (config.Intake.Fbb is FbbIntakeConfig fbb)
         {
-            fbbIntake = new FbbIntake(fbb, store, policy, journal, time);
+            fbbIntake = new FbbIntake(fbb, store, policy, journal, time, reports: reports);
             intakes.Add(new ScheduledIntake(fbbIntake, TimeSpan.FromMinutes(fbb.PollMinutes)));
             journal.Write($"intake: FBB forwarding from {fbb.Host}:{fbb.Port} as {fbb.PartnerCallsign}, every {fbb.PollMinutes:0.#} min");
         }

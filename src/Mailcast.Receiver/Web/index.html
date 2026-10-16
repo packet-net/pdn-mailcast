@@ -1004,6 +1004,7 @@ function feedback(s) {
   $("feedback").innerHTML = `<dt>Goes to</dt><dd>${esc(f.to)}, a public bulletin, through your BBS, every day half an hour after the last slot</dd>
     ${f.lastSent ? `<dt>Last sent</dt><dd>${when(f.lastSent)}</dd>` : ""}
     ${f.lastAnswer ? `<dt>The BBS said</dt><dd class="${tone}">${esc(f.lastAnswer)}</dd>` : ""}
+    ${f.receipt && f.receipt.text ? `<dt>GB7RDG</dt><dd class="${f.receipt.gotLatest ? "good" : "warn"}">${esc(f.receipt.text)}</dd>` : ""}
     ${f.next ? `<dt>Next</dt><dd>${when(f.next)}</dd>` : ""}`;
   $("feedbackText").hidden = !f.text;
   if (f.text && $("feedbackText").textContent !== f.text) $("feedbackText").textContent = f.text;

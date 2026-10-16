@@ -1,3 +1,5 @@
+using Packet.Mailcast.Feedback;
+
 namespace Packet.Mailcast;
 
 /// <summary>A bulletin offered for broadcast, with the day the head end first saw it.</summary>
@@ -618,24 +620,25 @@ public static class BroadcastScheduler
     /// take the place of bulletin frames; they never make a slot key on their own, and if with
     /// them no bulletin frame would fit where some would without, they are left out.
     /// </param>
-    public static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options, Func<ulong, uint>? directoryNextEsi, SlotBudget? budget, string? mode, IReadOnlyList<MailcastFrame>? extras)
+    /// <param name="reports">The listeners whose daily reports reached the head end lately, which the directory lists; null lists none and says nothing.</param>
+    public static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options, Func<ulong, uint>? directoryNextEsi, SlotBudget? budget, string? mode, IReadOnlyList<MailcastFrame>? extras, ReportReceipts? reports = null)
     {
-        var plan = Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, extras ?? [], out bool anyRoom);
+        var plan = Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, extras ?? [], reports, out bool anyRoom);
         if (extras is { Count: > 0 } && plan.BulletinFrames == 0 && anyRoom)
         {
-            return Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, [], out _);
+            return Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, [], reports, out _);
         }
         return plan;
     }
 
     /// <summary>
     /// Plans a slot from the bulletins in rotation: the same with no extra frames
-    /// (<see cref="Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?, IReadOnlyList{MailcastFrame}?)"/>).
+    /// (<see cref="Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?, IReadOnlyList{MailcastFrame}?, ReportReceipts?)"/>).
     /// </summary>
     public static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options = null, Func<ulong, uint>? directoryNextEsi = null, SlotBudget? budget = null, string? mode = null) =>
         Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, null);
 
-    private static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options, Func<ulong, uint>? directoryNextEsi, SlotBudget? budget, string? mode, IReadOnlyList<MailcastFrame> extras, out bool anyRoom)
+    private static SlotBroadcast Plan(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options, Func<ulong, uint>? directoryNextEsi, SlotBudget? budget, string? mode, IReadOnlyList<MailcastFrame> extras, ReportReceipts? reports, out bool anyRoom)
     {
         ArgumentNullException.ThrowIfNull(carried);
         ArgumentNullException.ThrowIfNull(compression);
@@ -673,7 +676,7 @@ public static class BroadcastScheduler
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
-        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer);
+        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports);
         var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 

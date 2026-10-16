@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using Packet.Fbb;
 using Packet.Mailcast;
+using Packet.Mailcast.Feedback;
 
 namespace Mailcast.HeadEnd.Intake;
 
@@ -11,10 +12,12 @@ namespace Mailcast.HeadEnd.Intake;
 /// takes what the BBS proposes. Bulletins up to the size cap are accepted; bulletins over the cap
 /// or already held are answered <c>-</c>; personal mail and NTS traffic, which should never be
 /// routed here, are answered <c>=</c> (later) so the BBS keeps them, with a warning. A listener's
-/// daily report is never taken: a bulletin to MCAST is answered <c>-</c>, and one that turns out
-/// to be a report once its title and body arrive is not kept (see <see cref="IntakePolicy.DailyReportRefusal"/>).
-/// Either way the BBS counts it handed over and does not offer it again, and the journal says so
-/// once for each BID.
+/// daily report is never kept for the broadcast (see <see cref="IntakePolicy.DailyReportRefusal"/>).
+/// With a <see cref="ReportLog"/>, a bulletin to MCAST is asked for, so that a report's callsign
+/// and day can be noted for the directory's list (issue #136), and then dropped; without one it
+/// is answered <c>-</c>. One addressed anywhere else that turns out to be a report once its title
+/// and body arrive is noted the same way and not kept. Either way the BBS counts it handed over
+/// and does not offer it again, and the journal says so once for each BID.
 /// </summary>
 /// <remarks>
 /// <para>The head end always calls, on its own timer and just before each slot, so the BBS needs
@@ -29,6 +32,7 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     private readonly RotationStore _store;
     private readonly IntakePolicy _policy;
     private readonly IJournal _journal;
+    private readonly ReportLog? _reports;
     private readonly TimeProvider _time;
     private readonly Func<CancellationToken, Task<Stream>> _connect;
     private readonly SemaphoreSlim _one = new(1, 1);
@@ -37,12 +41,13 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     /// <summary>The most report BIDs remembered for saying once; past it the record starts again.</summary>
     private const int MostReportsRemembered = 10_000;
 
-    public FbbIntake(FbbIntakeConfig config, RotationStore store, IntakePolicy policy, IJournal journal, TimeProvider time, Func<CancellationToken, Task<Stream>>? connect = null)
+    public FbbIntake(FbbIntakeConfig config, RotationStore store, IntakePolicy policy, IJournal journal, TimeProvider time, Func<CancellationToken, Task<Stream>>? connect = null, ReportLog? reports = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _journal = journal ?? throw new ArgumentNullException(nameof(journal));
+        _reports = reports;
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _connect = connect ?? ConnectTcpAsync;
     }
@@ -123,7 +128,7 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
             }
             over = await ApplyAsync(stream, session, session.Advance(new FbbPeerData(buffer.AsMemory(0, n))), today, counts, cancellation).ConfigureAwait(false);
         }
-        return new IntakeResult(counts.Accepted, counts.Refused, counts.Problem);
+        return new IntakeResult(counts.Accepted, counts.Refused, counts.Problem, counts.Reports);
     }
 
     /// <summary>Carries out the session's actions. True once the session is over.</summary>
@@ -177,6 +182,12 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         }
         if (IntakePolicy.DailyReportRefusal(fa.To) is { } report)
         {
+            if (_reports is not null && _policy.Refusal(fa.MessageType, fa.Bid, fa.Size) is null)
+            {
+                // Asked for, so its title says whose report it is and for which day; it is never
+                // kept, so never sent (see Take).
+                return FsAnswer.Accept;
+            }
             // "-": the BBS counts it handed over and does not offer it again.
             counts.Refused++;
             RefusedReport(fa, report);
@@ -204,6 +215,17 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         {
             // Taken, so the BBS does not offer it again, but never kept, so never sent.
             counts.Refused++;
+            if (_reports is not null && DailyReport.LooksLikeReport(delivered.Title, text)
+                && DailyReport.TryParseTitle(delivered.Title, out string callsign, out DateOnly day)
+                && ReportReceipts.IsListable(callsign))
+            {
+                counts.Reports++;
+                bool newest = _reports.Note(callsign, day, _time.GetUtcNow(), fa.Bid);
+                Say(fa, newest
+                    ? $"intake: daily report {fa.Bid} from {fa.From}, {callsign} for {day:yyyy-MM-dd}: noted, so the directory lists {callsign}'s report for {day:yyyy-MM-dd}; the report itself is never broadcast"
+                    : $"intake: daily report {fa.Bid} from {fa.From}, {callsign} for {day:yyyy-MM-dd}: one for that day or later was already noted; the report itself is never broadcast");
+                return;
+            }
             RefusedReport(fa, report);
             return;
         }
@@ -236,7 +258,11 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
     }
 
     /// <summary>Says once for each BID that a daily report was refused.</summary>
-    private void RefusedReport(FaProposal fa, string why)
+    private void RefusedReport(FaProposal fa, string why) =>
+        Say(fa, $"intake: refused {fa.Bid} from {fa.From} to {fa.To}@{fa.AtBbs}: {why}");
+
+    /// <summary>Writes <paramref name="line"/> about a daily report, once for each BID.</summary>
+    private void Say(FaProposal fa, string line)
     {
         if (_reportsSaid.Count >= MostReportsRemembered)
         {
@@ -244,7 +270,7 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         }
         if (_reportsSaid.Add(fa.Bid))
         {
-            _journal.Write($"intake: refused {fa.Bid} from {fa.From} to {fa.To}@{fa.AtBbs}: {why}");
+            _journal.Write(line);
         }
     }
 
@@ -322,6 +348,8 @@ public sealed class FbbIntake : IBulletinIntake, IDisposable
         public int Accepted { get; set; }
 
         public int Refused { get; set; }
+
+        public int Reports { get; set; }
 
         public string? Problem { get; set; }
     }

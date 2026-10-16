@@ -456,7 +456,8 @@ public sealed class HeadEndService(
         }
         else if (result.Accepted + result.Refused > 0)
         {
-            journal.Write($"intake ({intake.Name}): {result.Accepted} taken, {result.Refused} refused; {store.Count} held");
+            string reports = result.Reports > 0 ? $" ({result.Reports} of them daily reports, noted for the directory)" : "";
+            journal.Write($"intake ({intake.Name}): {result.Accepted} taken, {result.Refused} refused{reports}; {store.Count} held");
         }
         status.RecordIntake(intake.Name, result);
         status.SetBulletinsHeld(store.Count);

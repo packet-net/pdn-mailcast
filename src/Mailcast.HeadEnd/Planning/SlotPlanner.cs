@@ -1,4 +1,5 @@
 using Packet.Mailcast;
+using Packet.Mailcast.Feedback;
 using Packet.Mailcast.Propagation;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Slot;
@@ -73,7 +74,11 @@ public interface ISlotPlanner
 /// <see cref="PskReporterFrames"/> more frames. When the two readings together would leave no
 /// room for any bulletin frame, this one is dropped first.
 /// </param>
-public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null) : ISlotPlanner
+/// <param name="reports">
+/// The listeners' daily reports that reached the head end (<see cref="ReportLog"/>); the
+/// directory lists the recent ones. Null lists none, and the directory says nothing about them.
+/// </param>
+public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null, ReportLog? reports = null) : ISlotPlanner
 {
     /// <summary>Frames of the reading in each slot, either of which rebuilds it alone.</summary>
     public const int IonosphereFrames = 2;
@@ -97,12 +102,13 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         IReadOnlyList<MailcastFrame> ionoFrames = Sendable(reading) ? ReadingFrames(reading!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
-        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras);
+        ReportReceipts? listed = reports?.For(DateOnly.FromDateTime(slot.UtcDateTime));
+        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras, listed);
         if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
         {
             // Both readings would crowd out every bulletin frame: PSK Reporter's go first, and the
             // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
-            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames);
+            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames, listed);
         }
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {

@@ -9,7 +9,8 @@ namespace Mailcast.HeadEnd.Tests;
 
 /// <summary>
 /// The intake against a real LinBPQ in docker, configured as docs/headend.md says: bulletins
-/// posted on the BBS reach the head end, personal mail and local bulletins do not.
+/// posted on the BBS reach the head end, personal mail and local bulletins do not, and a
+/// listener's daily report, to MCAST at the BBS itself, reaches it to be noted but never kept.
 /// </summary>
 [Trait("Category", "Docker")]
 public sealed class LinBpqTests
@@ -37,7 +38,9 @@ public sealed class LinBpqTests
             string euro = await sysop.PostAsync("SB RSGB @ EURO", "Mailcast EURO test", "to Europe", timeout.Token);
             string local = await sysop.PostAsync("SB LOCAL @ GB7TST", "Local notice", "stays here", timeout.Token);
             string personal = await sysop.PostAsync("SP G4XYZ @ GB7XYZ.#12.GBR.EURO", "Personal", "for one person", timeout.Token);
-            Assert.Contains("Q0HEAD 3 Msgs", await sysop.CommandAsync("FWD QUEUE", timeout.Token), StringComparison.Ordinal);
+            var reportDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+            string report = await sysop.PostAsync("SB MCAST @ GB7TST.#42.GBR.EURO", $"MCR G4TST {reportDay:yyyy-MM-dd}", "MCR1 0.16.0 IO91lk sc 3/3 0 0 0\r\n10 W4 212 18 +1.2 IG", timeout.Token);
+            Assert.Contains("Q0HEAD 4 Msgs", await sysop.CommandAsync("FWD QUEUE", timeout.Token), StringComparison.Ordinal);
 
             using var state = new TempDirectory();
             var journal = new MemoryJournal();
@@ -52,13 +55,17 @@ public sealed class LinBpqTests
                 Login = FbbIntakeConfig.LinBpqFbbPort,
                 SessionTimeoutSeconds = 60,
             };
-            using var intake = new FbbIntake(config, store, new IntakePolicy(32 * 1024), journal, TimeProvider.System);
+            var reports = new ReportLog(state.Path, journal);
+            using var intake = new FbbIntake(config, store, new IntakePolicy(32 * 1024), journal, TimeProvider.System, reports: reports);
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var result = await intake.CollectAsync(today, timeout.Token);
 
             Assert.True(result.Problem is null, $"{result.Problem}\n{string.Join('\n', journal.Lines)}");
             Assert.Equal(3, result.Accepted);
-            Assert.Equal(0, result.Refused);
+            Assert.Equal(1, result.Refused);
+            Assert.Equal(1, result.Reports);
+            Assert.Equal(reportDay, reports.For(today)!.For("G4TST"));
+            Assert.False(store.Holds(report));
             var directory = store.Plan(BroadcastScheduler.Midnight(today).AddHours(12), 1, Compression.Default, new ScheduleOptions()).Directory;
             Assert.Equal(new[] { ww, gbr, euro }.Order(), directory.Entries.Select(e => e.Bid).Order());
             Assert.DoesNotContain(local, directory.Entries.Select(e => e.Bid));
