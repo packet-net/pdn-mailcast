@@ -171,6 +171,10 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The daily report to the broadcast's author, when the config's <c>feedback</c> turns it on.</summary>
     public FeedbackService Feedback { get; }
 
+    /// <summary>The slots the receiver listens to on a UTC day: a web SDR's own, or every one that runs.</summary>
+    private IReadOnlyList<DateTimeOffset> ListenedOn(DateOnly day) =>
+        AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day);
+
     private FeedbackService CreateFeedback()
     {
         AudioSourceKind Kind() => AudioSource.Parse(Config.Audio).Kind;
@@ -178,7 +182,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Settings = () => Config.Feedback,
             Schedule = () => Kind() == AudioSourceKind.Wav ? null : Schedule,
-            Listened = day => Kind() == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day),
+            Listened = ListenedOn,
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
             PskReporter = () => Intake.PskReporter,
@@ -704,6 +708,15 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             try
             {
+                // A slot whose window is open now gets a line even if nothing is heard in it.
+                var now = _time.GetUtcNow();
+                var today = DateOnly.FromDateTime(now.UtcDateTime);
+                if (Slots.Schedule is not null && AudioSource.Parse(Config.Audio).Kind != AudioSourceKind.Wav
+                    && ListenedOn(today.AddDays(-1)).Concat(ListenedOn(today)).LastOrDefault(s => s <= now && now < s + ReceiverConfig.WebSdrAfter) is { } open
+                    && open != default && open != LastEarlyEnd?.Slot)
+                {
+                    Slots.OnListening(open);
+                }
                 Slots.EndIfOver(LastEarlyEnd?.Slot);
             }
             catch (Exception e)

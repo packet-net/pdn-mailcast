@@ -367,6 +367,7 @@ public class SlotTrackerTests
         var lines = new List<string>();
         var time = new FakeTimeProvider(At(11, 3));
         var slots = new SlotTracker(time, lines.Add, Hourly);
+        slots.OnListening(At(11, 0));
         slots.OnFrame(null, 50);
 
         time.SetUtcNow(At(12, 0, 30));
@@ -374,6 +375,8 @@ public class SlotTrackerTests
 
         Assert.Equal("slot: the 11:00 UTC slot ended: 1 frame; 50 bytes decoded from them; no tone; bulletins 0 completed, 0 delivered; no directory", lines[^2]);
         Assert.Equal("slot: 1 frame heard on 1200 bps (WN4)", lines[^1]);
+        slots.EndIfOver(null);
+        Assert.DoesNotContain(lines, l => l.Contains("nothing heard", StringComparison.Ordinal));
     }
 
     /// <summary>Issue #133: without a schedule (a recording) the line comes from <see cref="SlotTracker.Finish"/>, once.</summary>
@@ -404,4 +407,46 @@ public class SlotTrackerTests
     [InlineData(1000, "1.0 KB")]
     [InlineData(29_449, "29.4 KB")]
     public void Bytes_ReadsPlainly(long bytes, string words) => Assert.Equal(words, SlotTracker.Bytes(bytes));
+
+    /// <summary>Issue #133: a slot listened to with nothing heard still gets a line, once; one not listened to gets none.</summary>
+    [Fact]
+    public void SlotListenedTo_WithNothingHeard_SaysSo()
+    {
+        var lines = new List<string>();
+        var time = new FakeTimeProvider(At(11, 0, 15));
+        var slots = new SlotTracker(time, lines.Add, Hourly);
+        slots.OnListening(At(11, 0));
+        slots.EndIfOver(null);
+        Assert.Empty(lines);
+
+        time.SetUtcNow(At(11, 12));
+        slots.EndIfOver(null);
+        slots.OnListening(At(11, 0)); // a late look at the same window does not bring it back
+        slots.EndIfOver(null);
+
+        Assert.Equal("slot: the 11:00 UTC slot ended: nothing heard", Assert.Single(lines));
+
+        // 12:00 is not listened to (never noted): no line for it.
+        time.SetUtcNow(At(12, 30));
+        slots.EndIfOver(null);
+        Assert.Single(lines);
+    }
+
+    /// <summary>Issue #133: a slot listened to that frames were heard in gets its summary, not "nothing heard" as well.</summary>
+    [Fact]
+    public void SlotListenedTo_WithFramesHeard_GetsOnlyItsSummary()
+    {
+        var lines = new List<string>();
+        var time = new FakeTimeProvider(At(11, 1));
+        var slots = new SlotTracker(time, lines.Add, Hourly);
+        slots.OnListening(At(11, 0));
+        slots.OnFrame(Wn4, 100);
+
+        time.SetUtcNow(At(11, 12));
+        slots.EndIfOver(null);
+        slots.EndIfOver(null);
+
+        Assert.Single(lines, l => l.Contains("ended", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.Contains("nothing heard", StringComparison.Ordinal));
+    }
 }

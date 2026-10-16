@@ -107,6 +107,8 @@ public sealed class SlotTracker
     private readonly object _gate = new();
     private SlotSummary? _current;
     private SlotSchedule? _schedule;
+    private DateTimeOffset? _listening;
+    private DateTimeOffset? _lastEnded;
 
     /// <summary>Creates a tracker.</summary>
     public SlotTracker(TimeProvider time, Action<string> log, SlotSchedule? schedule = null)
@@ -361,11 +363,43 @@ public sealed class SlotTracker
             {
                 _current = current with { Ended = true };
                 line = SummaryLine(_current, endedEarly == slot);
+                _lastEnded = slot;
+                if (_listening == slot)
+                {
+                    _listening = null;
+                }
+            }
+            else if (_listening is { } listened && (endedEarly == listened || now >= listened + ReceiverConfig.WebSdrAfter))
+            {
+                // A slot listened to that nothing at all was heard in.
+                _listening = null;
+                _lastEnded = listened;
+                if (_current?.Scheduled != listened)
+                {
+                    line = $"slot: the {listened.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)} UTC slot ended: nothing heard"
+                        + (endedEarly == listened ? "; window ended early, nothing left to wait for" : "");
+                }
             }
         }
         if (line is not null)
         {
             _log(line);
+        }
+    }
+
+    /// <summary>
+    /// Issue #133: the receiver is listening to <paramref name="slot"/> now (its window is
+    /// open), so it gets a line when it ends even if nothing at all is heard in it. A slot
+    /// already ended is ignored, as is one never noted (not listened to: no line).
+    /// </summary>
+    public void OnListening(DateTimeOffset slot)
+    {
+        lock (_gate)
+        {
+            if (_lastEnded is not { } ended || slot > ended)
+            {
+                _listening = slot;
+            }
         }
     }
 
@@ -395,6 +429,15 @@ public sealed class SlotTracker
     private string? Replace(SlotSummary next)
     {
         string? line = _current is { Ended: false } old ? SummaryLine(old with { Ended = true }, endedEarly: false) : null;
+        if (line is not null && _current!.Scheduled is { } slot)
+        {
+            // It has had its line now: not "nothing heard" for it later as well.
+            _lastEnded = slot;
+            if (_listening == slot)
+            {
+                _listening = null;
+            }
+        }
         _current = next;
         return line;
     }
