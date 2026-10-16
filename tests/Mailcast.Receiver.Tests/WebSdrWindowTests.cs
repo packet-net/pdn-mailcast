@@ -632,6 +632,73 @@ public class WebSdrWindowTests
         Assert.Equal(System.Text.Json.JsonValueKind.Null, listenNow.GetProperty("problem").ValueKind);
     }
 
+    /// <summary>Fails at its first read, as a web SDR's stream that broke would.</summary>
+    private sealed class FailingInput : IAudioInput
+    {
+        public int SampleRate => OnAir.SampleRate;
+
+        public int Read(Span<float> destination) => throw new IOException("the stream broke");
+    }
+
+    [Fact]
+    public async Task Opening_AtTheNextWindow_DoesNotSayTheLastWindowsFailure()
+    {
+        // The web SDR failed near the end of the 12:00 window and was closed until 13:58: when it
+        // opens for the 14:00 slot, a "Last try" about a failure two hours old would be stale.
+        using var dir = new TempDirectory();
+        var clock = new SteppableClock(new DateTimeOffset(2026, 10, 5, 12, 5, 0, TimeSpan.Zero));
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        await using var host = new ReceiverHost(config, clock, _ => { });
+        int opened = 0;
+        host.PipelineFactory = source => AudioPipeline.ForInput(
+            Interlocked.Increment(ref opened) == 1 ? new FailingInput() : new QuietInput(), _ => { }, clock, source, watch: false);
+        var conditions = System.Threading.Channels.Channel.CreateUnbounded<AudioCondition>();
+        host.AudioChanged += c => conditions.Writer.TryWrite(c);
+        using var stop = new CancellationTokenSource();
+        var run = host.RunAsync(stop.Token);
+
+        async Task<AudioCondition> Phase(AudioPhase phase)
+        {
+            while (true)
+            {
+                var c = await conditions.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+                if (c.Phase == phase)
+                {
+                    return c;
+                }
+            }
+        }
+
+        var failed = await Phase(AudioPhase.Failed);
+        Assert.Contains("the stream broke", failed.Problem, StringComparison.Ordinal);
+
+        // The window ends (12:12) while it waits to try again: closed until 13:58.
+        clock.Step = TimeSpan.FromMinutes(10);
+        var closedTask = Phase(AudioPhase.Closed);
+        while (!closedTask.IsCompleted)
+        {
+            clock.Advance(TimeSpan.FromSeconds(5));
+            await Task.WhenAny(closedTask, Task.Delay(20));
+        }
+        await closedTask;
+
+        // The clock reaches 13:58: the web SDR is opened for the 14:00 slot.
+        clock.Step = new DateTimeOffset(2026, 10, 5, 13, 58, 0, TimeSpan.Zero) - (clock.GetUtcNow() - clock.Step);
+        var openingTask = Phase(AudioPhase.Opening);
+        while (!openingTask.IsCompleted)
+        {
+            clock.Advance(TimeSpan.FromSeconds(5));
+            await Task.WhenAny(openingTask, Task.Delay(20));
+        }
+        var opening = await openingTask;
+
+        Assert.Null(opening.Problem);
+        await Phase(AudioPhase.Listening);
+
+        await stop.CancelAsync();
+        await run;
+    }
+
     [Fact]
     public void Page_AsksForTheSpectrogramOnlyWhileTheAudioIsLive_AndExplainsOtherwise()
     {

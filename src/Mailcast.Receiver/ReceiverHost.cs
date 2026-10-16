@@ -800,6 +800,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 if (opens > _time.GetUtcNow())
                 {
+                    // A failure in a window gone by is not the last try before the next opening.
+                    lastFailure = null;
                     Audio = new($"the web SDR {WebSdrHost(source)} is closed until {opens:HH:mm} UTC, ready for the {slot:HH:mm} UTC slot", AudioPhase.Closed, Reopens: opens, ForSlot: slot);
                     if (AudioState != closedSaid)
                     {
