@@ -1011,11 +1011,16 @@ public sealed class StatusPage : IAsyncDisposable
     /// The burst for the speed tile: the waveform the modem's autobaud locked to, its rate, and
     /// whether the modem is on it now (else it is the last burst any frames came from).
     /// </summary>
+    /// <remarks>
+    /// Issue #135: the waveform, rate and words stay null until a frame has decoded on the burst.
+    /// The autobaud can lock briefly on the tone or the channel probe, to a waveform GB7RDG never
+    /// sends (75 bps, WN0), before a later layer throws it away as noise; a lock alone is not a speed.
+    /// </remarks>
     internal static object? BurstView(HeardBurst? burst) => burst is null ? null : new
     {
-        waveform = burst.Waveform,
-        bps = Waveform.Bps(burst.Waveform),
-        words = Waveform.Words(burst.Waveform),
+        waveform = burst.Frames > 0 ? burst.Waveform : null,
+        bps = burst.Frames > 0 ? Waveform.Bps(burst.Waveform) : null,
+        words = burst.Frames > 0 ? Waveform.Words(burst.Waveform) : null,
         live = burst.Live,
         frames = burst.Frames,
         started = burst.Started,
