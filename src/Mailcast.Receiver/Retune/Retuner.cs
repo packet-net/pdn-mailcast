@@ -418,10 +418,10 @@ public sealed class Retuner : IAsyncDisposable
         if (id != _portSaid)
         {
             _portSaid = id;
-            _log($"retune: LinBPQ port {port} is \"{id}\"");
+            _log($"retune: LinBPQ port {port} is {Node!.Quoted(id)}");
         }
         return _bpq.ExpectedPortId is { } expected && !string.Equals(expected.Trim(), id.Trim(), StringComparison.OrdinalIgnoreCase)
-            ? $"LinBPQ port {port} is \"{id}\", not \"{expected.Trim()}\" as \"bpq\".\"expectedPortId\" says"
+            ? $"LinBPQ port {port} is {Node!.Quoted(id)}, not \"{expected.Trim()}\" as \"bpq\".\"expectedPortId\" says"
             : null;
     }
 

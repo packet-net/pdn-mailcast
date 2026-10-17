@@ -59,6 +59,12 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
     /// <summary>A command that, once, is carried out and answered with something that is not LinBPQ's answer.</summary>
     public string? GarbleAfter { get; set; }
 
+    /// <summary>What <see cref="GarbleAfter"/> answers with.</summary>
+    public string Garble { get; set; } = "Eh?";
+
+    /// <summary>The sysop's password, as its USER= line has it.</summary>
+    public string LoginPassword { get; set; } = Password;
+
     /// <summary>
     /// The Telnet port's CTEXT, sent after the password as LinBPQ sends one from its config: with
     /// a bare CR at the end. Null for LinBPQ's own "Connected to ..." welcome.
@@ -283,7 +289,7 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                             break;
                         case 1:
                             session.Send("\r\n");
-                            if (input == Password)
+                            if (input == LoginPassword)
                             {
                                 session.State = 2;
                                 if (WelcomeDelay > TimeSpan.Zero)
@@ -334,7 +340,7 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                             if (input == GarbleAfter)
                             {
                                 GarbleAfter = null;
-                                reply = "Eh?";
+                                reply = Garble;
                             }
                             session.Send("TST:GB7TST} " + reply + "\r\n");
                             break;

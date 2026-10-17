@@ -53,8 +53,8 @@ public sealed class BpqNodeException(string message, bool maybeApplied = false) 
 /// Stream 1"), so until the login is done those lines are passed over.</para>
 /// <para>Real I/O on a real socket, so real timeouts: a node that accepts and never answers is
 /// given up on after <see cref="ReplyTimeout"/>.</para>
-/// <para>Never puts the password in a message: nothing LinBPQ sends back is quoted without it
-/// being taken out first.</para>
+/// <para>Never puts the password in a message, nor anything about it: text LinBPQ sends back
+/// that holds it is not quoted at all, nor is any while the password is under 8 characters.</para>
 /// </remarks>
 public sealed partial class BpqNode : IAsyncDisposable
 {
@@ -113,11 +113,11 @@ public sealed partial class BpqNode : IAsyncDisposable
         {
             throw KnownRefusal(reply) is { } refused
                 ? new BpqNodeException(refused, lostAfterSending)
-                : new BpqNodeException($"LinBPQ answered \"{command}\" with \"{Clean(reply)}\", which says neither yes nor no", maybeApplied: true);
+                : new BpqNodeException($"LinBPQ answered \"{command}\" with {Quoted(reply)}, which says neither yes nor no", maybeApplied: true);
         }
         if ((match.Groups[2].Value != "0") != off)
         {
-            throw new BpqNodeException($"LinBPQ answered \"{command}\" with \"{Clean(reply)}\", which leaves it the wrong way round", maybeApplied: true);
+            throw new BpqNodeException($"LinBPQ answered \"{command}\" with {Quoted(reply)}, which leaves it the wrong way round", maybeApplied: true);
         }
         return match.Groups[1].Value != "0";
     }
@@ -131,7 +131,7 @@ public sealed partial class BpqNode : IAsyncDisposable
         var match = Value().Match(reply);
         return match.Success
             ? match.Groups[1].Value != "0"
-            : throw new BpqNodeException(KnownRefusal(reply) ?? $"LinBPQ answered \"{command}\" with \"{Clean(reply)}\"");
+            : throw new BpqNodeException(KnownRefusal(reply) ?? $"LinBPQ answered \"{command}\" with {Quoted(reply)}");
     }
 
     /// <summary>The ID LinBPQ's <c>PORTS</c> gives <paramref name="port"/>, or null when it lists no such port.</summary>
@@ -146,7 +146,8 @@ public sealed partial class BpqNode : IAsyncDisposable
             var match = PortLine().Match(line);
             if (match.Success && int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) == port)
             {
-                return Clean(match.Groups[2].Value);
+                // As LinBPQ has it, for comparing; the log shows it through Quoted.
+                return OneLine(match.Groups[2].Value);
             }
         }
         return null;
@@ -304,8 +305,8 @@ public sealed partial class BpqNode : IAsyncDisposable
                 {
                     if (sent == 2)
                     {
-                        string since = Clean(welcome + session.Text());
-                        throw new BpqNodeException($"LinBPQ did not answer PASSWORD, sent twice {ReplyTimeout.TotalSeconds / 2:F0} s apart; after the login it sent {(since.Length == 0 ? "nothing" : $"\"{Shorten(since)}\"")}");
+                        string since = welcome + session.Text();
+                        throw new BpqNodeException($"LinBPQ did not answer PASSWORD, sent twice {ReplyTimeout.TotalSeconds / 2:F0} s apart; after the login it sent {(OneLine(since).Length == 0 ? "nothing" : Quoted(since))}");
                     }
                     resent = true;
                 }
@@ -324,7 +325,7 @@ public sealed partial class BpqNode : IAsyncDisposable
             {
                 throw new BpqNodeException(Digits().IsMatch(answer)
                     ? $"LinBPQ did not give {_settings.User} sysop status: its USER= line in the Telnet port needs SYSOP as the fifth field, as in USER={_settings.User},password,CALL,,SYSOP"
-                    : $"LinBPQ answered PASSWORD with \"{Clean(answer)}\" rather than Ok");
+                    : $"LinBPQ answered PASSWORD with {Quoted(answer)} rather than Ok");
             }
             session.LogInDone();
             return session;
@@ -346,12 +347,38 @@ public sealed partial class BpqNode : IAsyncDisposable
 
     private static string Shorten(string text) => text.Length <= 200 ? text : text[..200] + "...";
 
-    /// <summary>Text from LinBPQ fit for the log: one line, ASCII, and never the password.</summary>
+    /// <summary>What stands for LinBPQ's text when it is not shown.</summary>
+    public const string ReplyNotShown = "(reply not shown)";
+
+    /// <summary>
+    /// The shortest password with which LinBPQ's text is quoted at all, as for the BBS: with a
+    /// shorter one, too much of what LinBPQ sends could happen to match it.
+    /// </summary>
+    internal const int ShortestQuotingPassword = 8;
+
+    /// <summary>
+    /// Text from LinBPQ for the log, in quotes, one line of ASCII; or <see cref="ReplyNotShown"/>
+    /// when it holds the password, or the password is shorter than <see cref="ShortestQuotingPassword"/>.
+    /// Nothing about the password is ever given away, not even where in the text it was.
+    /// </summary>
+    public string Quoted(string text)
+    {
+        string line = OneLine(text);
+        return _settings.Password.Length is > 0 and < ShortestQuotingPassword || Holds(text) || Holds(line)
+            ? ReplyNotShown
+            : $"\"{Shorten(line)}\"";
+    }
+
+    /// <summary>Other text for the log (a socket's error, say): one line of ASCII, or not shown at all if it holds the password.</summary>
     private string Clean(string text)
     {
-        string cleaned = Ascii.Clean(text.Replace('\r', ' ').Replace('\n', ' ').Trim());
-        return _settings.Password.Length > 0 ? cleaned.Replace(_settings.Password, "****", StringComparison.Ordinal) : cleaned;
+        string line = OneLine(text);
+        return Holds(text) || Holds(line) ? "(not shown)" : line;
     }
+
+    private bool Holds(string text) => _settings.Password.Length > 0 && text.Contains(_settings.Password, StringComparison.Ordinal);
+
+    private static string OneLine(string text) => Ascii.Clean(text.Replace('\r', ' ').Replace('\n', ' ').Trim());
 
     /// <summary>Closes the session, quietly; the next command logs in again.</summary>
     public void Drop()
