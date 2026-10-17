@@ -37,6 +37,73 @@ public sealed class BpqNodeTests
         Assert.Equal(["PASSWORD", "XMITOFF 2 1"], fake.Commands);
     }
 
+    /// <summary>
+    /// LinBPQ's FBBPORT sends no prompts and nothing for a login it takes (issue #158): the
+    /// user and password go without waiting for prompts, and the commands work as on the TCPPORT.
+    /// </summary>
+    [Fact]
+    public async Task FbbPort_LogsInWithoutPromptsAndSetsReadsAndNames()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { Fbb = true };
+        await using var node = new BpqNode(fake.Settings());
+        Assert.Null(node.PortKind);
+
+        Assert.False(await node.SetTransmitOffAsync(2, true, CancellationToken.None));
+        Assert.True(await node.TransmitOffAsync(2, CancellationToken.None));
+        Assert.Equal("HF through QtSoundModem 2", await node.PortIdAsync(2, CancellationToken.None));
+        Assert.True(await node.SetTransmitOffAsync(2, false, CancellationToken.None));
+
+        Assert.Equal(BpqPortKind.Fbb, node.PortKind);
+        Assert.Equal(1, fake.Connections);
+        Assert.Equal(["PASSWORD", "XMITOFF 2 1", "XMITOFF 2", "PORTS", "XMITOFF 2", "XMITOFF 2 0"], fake.Commands);
+        Assert.Equal(0, fake.XmitOff(2));
+    }
+
+    [Fact]
+    public async Task TelnetPort_IsToldApartByItsUserPrompt()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2);
+        await using var node = new BpqNode(fake.Settings());
+
+        Assert.False(await node.TransmitOffAsync(2, CancellationToken.None));
+
+        Assert.Equal(BpqPortKind.Telnet, node.PortKind);
+    }
+
+    [Theory]
+    [InlineData("nobody", FakeLinBpqNode.Password, true, "LinBPQ does not know the user nobody on its Telnet port (user names are case-sensitive)")]
+    [InlineData(FakeLinBpqNode.User, "not-it-at-all", true, "LinBPQ refused the password for sysop")]
+    [InlineData(FakeLinBpqNode.User, FakeLinBpqNode.Password, false, "LinBPQ did not give sysop sysop status")]
+    public async Task FbbPort_RefusedLogins_SayWhyAndNeverThePassword(string user, string password, bool sysop, string said)
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { Fbb = true, Sysop = sysop };
+        await using var node = new BpqNode(fake.Settings(user: user, password: password));
+
+        var e = await Assert.ThrowsAsync<BpqNodeException>(() => node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.StartsWith(said, e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(password, e.Message, StringComparison.Ordinal);
+        Assert.False(e.MaybeApplied);
+        Assert.DoesNotContain("XMITOFF 2 1", fake.Commands);
+        Assert.Equal(0, fake.XmitOff(2));
+    }
+
+    [Fact]
+    public async Task FbbPort_IdleTimeout_IsNoticedAndTheNextCommandLogsInAgain()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { Fbb = true };
+        await using var node = new BpqNode(fake.Settings());
+        var lost = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        node.SessionLost += why => lost.TrySetResult(why);
+        Assert.False(await node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        fake.IdleOut();
+
+        Assert.Contains("ended the node session", await lost.Task.WaitAsync(TimeSpan.FromSeconds(10)), StringComparison.Ordinal);
+        Assert.True(await node.TransmitOffAsync(2, CancellationToken.None));
+        Assert.Equal(["PASSWORD", "XMITOFF 2 1", "PASSWORD", "XMITOFF 2"], fake.Commands);
+    }
+
     [Fact]
     public async Task SlowWelcome_IsWaitedForBeforePassword()
     {

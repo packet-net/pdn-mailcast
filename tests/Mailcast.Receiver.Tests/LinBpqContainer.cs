@@ -57,16 +57,17 @@ internal sealed partial class LinBpqContainer : IAsyncDisposable
 
     /// <summary>
     /// A LinBPQ node with no mail, from <paramref name="config"/> in LinBpq/, reached on its
-    /// telnet port (8010 inside), once that answers with its user prompt.
+    /// telnet port (8010 inside) and its FBBPORT (8011 inside), once the telnet port answers with
+    /// its user prompt.
     /// </summary>
     public static async Task<LinBpqContainer> StartNodeAsync(string config, CancellationToken cancellation)
     {
-        string id = (await DockerAsync(cancellation, "create", "-p", "127.0.0.1::8010", Image)).Trim();
+        string id = (await DockerAsync(cancellation, "create", "-p", "127.0.0.1::8010", "-p", "127.0.0.1::8011", Image)).Trim();
         try
         {
             await DockerAsync(cancellation, "cp", Path.Combine(AppContext.BaseDirectory, "LinBpq", config), $"{id}:/data/bpq32.cfg");
             await DockerAsync(cancellation, "start", id);
-            var container = new LinBpqContainer(id, 0, await PortAsync(id, 8010, cancellation));
+            var container = new LinBpqContainer(id, await PortAsync(id, 8011, cancellation), await PortAsync(id, 8010, cancellation));
             string lastSeen = "";
             while (true)
             {

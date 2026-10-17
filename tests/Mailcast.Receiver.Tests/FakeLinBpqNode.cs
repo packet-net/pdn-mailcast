@@ -8,7 +8,7 @@ namespace Mailcast.Receiver.Tests;
 /// <summary>
 /// An in-process LinBPQ node telnet port, as LinBPQ 6.0.25 answers it (checked against the real
 /// one in <c>LinBpqNodeTests</c>): the user and password prompts, the welcome, PASSWORD for sysop
-/// status, and XMITOFF for the ports it has.
+/// status, and XMITOFF for the ports it has. With <see cref="Fbb"/>, its FBBPORT instead.
 /// </summary>
 /// <remarks>
 /// <see cref="Kill"/> closes every session, keeping each port's XMITOFF, as a dropped telnet
@@ -62,6 +62,12 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
     /// <summary>What <see cref="GarbleAfter"/> answers with.</summary>
     public string Garble { get; set; } = "Eh?";
 
+    /// <summary>
+    /// As the Telnet port's FBBPORT: no negotiation, no prompt, nothing at all for a user or
+    /// password it takes and no welcome; the prompt again only for one it does not.
+    /// </summary>
+    public bool Fbb { get; init; }
+
     /// <summary>The sysop's password, as its USER= line has it.</summary>
     public string LoginPassword { get; set; } = Password;
 
@@ -97,7 +103,7 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
         foreach (var session in sessions.Where(x => x.State == 2))
         {
             session.Authorised = false;
-            session.Send("*** Disconnected from Stream 1\r\nDisconnected from Node - Telnet Session kept\r\n");
+            session.Send((Fbb ? "" : "*** Disconnected from Stream 1\r\n") + "Disconnected from Node - Telnet Session kept\r\n");
         }
     }
 
@@ -249,8 +255,11 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
             {
                 _sessions.Add(session);
             }
-            stream.Write([0xFF, 0xFB, 0x03, 0xFF, 0xFB, 0x01]);
-            session.Send("user:");
+            if (!Fbb)
+            {
+                stream.Write([0xFF, 0xFB, 0x03, 0xFF, 0xFB, 0x01]);
+                session.Send("user:");
+            }
             var line = new StringBuilder();
             var buffer = new byte[256];
             while (true)
@@ -280,7 +289,10 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                             if (input == User)
                             {
                                 session.State = 1;
-                                session.Send("password:");
+                                if (!Fbb)
+                                {
+                                    session.Send("password:");
+                                }
                             }
                             else
                             {
@@ -288,10 +300,17 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                             }
                             break;
                         case 1:
-                            session.Send("\r\n");
+                            if (!Fbb)
+                            {
+                                session.Send("\r\n");
+                            }
                             if (input == LoginPassword)
                             {
                                 session.State = 2;
+                                if (Fbb)
+                                {
+                                    break;
+                                }
                                 if (WelcomeDelay > TimeSpan.Zero)
                                 {
                                     await Task.Delay(WelcomeDelay, _stop.Token);
@@ -342,7 +361,7 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                                 GarbleAfter = null;
                                 reply = Garble;
                             }
-                            session.Send("TST:GB7TST} " + reply + "\r\n");
+                            session.Send("TST:GB7TST} " + (Fbb ? reply.Replace("\r\n", "\r", StringComparison.Ordinal) + "\r" : reply + "\r\n"));
                             break;
                     }
                 }
