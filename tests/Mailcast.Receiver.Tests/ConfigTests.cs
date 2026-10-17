@@ -349,10 +349,23 @@ public class RetuneConfigTests
         var e = Assert.Throws<ConfigException>(() => Load("""{ "rig": { "rigctld": "127.0.0.1:4532" } }"""));
         Assert.Contains("\"bpq\"", e.Message, StringComparison.Ordinal);
         Assert.Contains("\"dedicatedRadio\": true", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"hooks\".\"before\"", e.Message, StringComparison.Ordinal);
 
         var dedicated = Load("""{ "rig": { "rigctld": "127.0.0.1:4532", "dedicatedRadio": true } }""");
         Assert.True(dedicated.Rig!.DedicatedRadio);
         Assert.Null(dedicated.Bpq);
+    }
+
+    [Fact]
+    public void RigWithHooksBefore_NeedsNoBpq_ButAnAfterAloneIsNotEnough()
+    {
+        var hooked = Load("""{ "rig": { "rigctld": "127.0.0.1:4532" }, "hooks": { "before": { "command": "/bin/true" } } }""");
+        Assert.False(hooked.Rig!.DedicatedRadio);
+        Assert.Null(hooked.Bpq);
+        Assert.Equal("config: rig retuning on, with the radio kept quiet by \"hooks\".\"before\", hooks on, daily report off (no \"feedback\")", ConfigFile.PartsLine(hooked));
+
+        var e = Assert.Throws<ConfigException>(() => Load("""{ "rig": { "rigctld": "127.0.0.1:4532" }, "hooks": { "after": { "command": "/bin/true" } } }"""));
+        Assert.Contains("\"hooks\".\"before\"", e.Message, StringComparison.Ordinal);
     }
 
     [Fact]

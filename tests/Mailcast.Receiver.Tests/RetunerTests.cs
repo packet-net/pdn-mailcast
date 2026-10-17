@@ -58,11 +58,12 @@ public sealed partial class RetunerTests
             Func<BpqNodeSettings, BpqNodeSettings>? adjust = null,
             SlotSchedule? schedule = null,
             HooksSettings? hooks = null,
-            Func<DateTimeOffset, string?>? earlyEnd = null)
+            Func<DateTimeOffset, string?>? earlyEnd = null,
+            bool noBpq = false)
         {
             _ownFakes = rig is null;
             Rig = rig ?? new FakeRigctld(PacketDialHz, "USB", 2400);
-            Node = dedicated ? null : node ?? new FakeLinBpqNode(1, 2);
+            Node = dedicated || noBpq ? null : node ?? new FakeLinBpqNode(1, 2);
             Rig.Recorded = Events.Enqueue;
             if (Node is not null)
             {

@@ -75,6 +75,46 @@ public sealed partial class RetunerTests
         Assert.False(File.Exists(s.Hooks!.NotePath));
     }
 
+    /// <summary>With no "bpq" and no "dedicatedRadio", "before" alone is trusted to keep the radio quiet (issue #156).</summary>
+    [Fact]
+    public async Task HooksWithoutBpq_BeforeIsTrustedToKeepTheRadioQuiet()
+    {
+        using var scripts = new TempDirectory();
+        string record = Path.Combine(scripts.Path, "runs");
+        await using var s = new Station(At(11, 57, 30), hooks: Scripts(scripts.Path, record), noBpq: true);
+        s.Start();
+
+        await s.StepUntil(() => s.Retuner.Stage == RetuneStage.Tuned, "tuned for 12:00");
+        Assert.Equal(BulletinDialHz, s.Rig.DialHz);
+        Assert.Contains(s.Log, l => l.StartsWith("retune: the radio is retuned through rigctld at ", StringComparison.Ordinal)
+            && l.EndsWith("for each slot; there is no \"bpq\", so the \"hooks\" are trusted to keep the radio quiet while it is retuned (it is not retuned for a slot whose \"before\" fails)", StringComparison.Ordinal));
+        Assert.False(File.Exists(s.NotePath));
+
+        await s.RunTo(At(12, 13));
+        Assert.Equal(PacketDialHz, s.Rig.DialHz);
+        Assert.Equal(["before 2026-10-05T12:00:00Z 7052.0 7053.8 none", "after 2026-10-05T12:00:00Z 7052.0 7053.8 1"], HookScript.Runs(record));
+        int before = s.IndexStarting("hooks: running \"before\"");
+        int tuned = s.Index($"rig: F {BulletinDialHz}");
+        int restored = s.Index($"rig: F {PacketDialHz}");
+        int after = s.IndexStarting("hooks: running \"after\"");
+        Assert.True(before >= 0 && before < tuned && tuned < restored && restored < after, string.Join(" | ", s.Events));
+        Assert.Null(s.Retuner.LastProblem);
+    }
+
+    [Fact]
+    public async Task HooksWithoutBpq_BeforeFails_TheRigIsNotTuned()
+    {
+        using var scripts = new TempDirectory();
+        string record = Path.Combine(scripts.Path, "runs");
+        await using var s = new Station(At(11, 57, 30), hooks: Scripts(scripts.Path, record, beforeExit: 1), noBpq: true);
+        s.Start();
+
+        await s.RunTo(At(12, 13));
+        Assert.Empty(s.Rig.Sets);
+        Assert.Equal(PacketDialHz, s.Rig.DialHz);
+        Assert.Equal("after 2026-10-05T12:00:00Z 7052.0 7053.8 0", HookScript.Runs(record)[^1]);
+    }
+
     [Fact]
     public async Task Hooks_StoppedMidSlot_AfterRunsOnceTheRigIsBackAndLinBpqOn()
     {

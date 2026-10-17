@@ -280,7 +280,8 @@ public sealed record ReceiverConfig
     /// <summary>
     /// LinBPQ's node telnet port, so the receiver can stop LinBPQ transmitting on the radio while
     /// it is on the bulletin frequency. Needed with <see cref="Rig"/> unless the radio is
-    /// <see cref="RigSettings.DedicatedRadio"/>.
+    /// <see cref="RigSettings.DedicatedRadio"/> or <see cref="Hooks"/> has a "before" command,
+    /// which is then trusted to keep the radio quiet.
     /// </summary>
     public BpqNodeSettings? Bpq { get; init; }
 
@@ -577,12 +578,12 @@ public sealed record ReceiverConfig
         Hooks?.Validate();
         Feedback?.Validate();
         _ = AllTrustedKeys;
-        if (Rig is { DedicatedRadio: false } && Bpq is null)
+        if (Rig is { DedicatedRadio: false } && Bpq is null && Hooks?.Before is null)
         {
             throw new ConfigException(
-                "\"rig\" is set, so the receiver retunes your radio for each slot, but there is no \"bpq\" to stop LinBPQ transmitting while it is on "
-                + "the bulletin frequency. Add \"bpq\" (LinBPQ's node telnet port and a SYSOP user), or, if nothing else ever transmits on this radio, "
-                + "set \"rig\": { ..., \"dedicatedRadio\": true }");
+                "\"rig\" is set, so the receiver retunes your radio for each slot, but nothing keeps the radio quiet while it is on "
+                + "the bulletin frequency. Add \"bpq\" (LinBPQ's node telnet port and a SYSOP user) to stop LinBPQ transmitting, or a \"hooks\".\"before\" "
+                + "command that stops whatever else transmits on it, or, if nothing else ever transmits on this radio, set \"rig\": { ..., \"dedicatedRadio\": true }");
         }
         if (Rig is null && Bpq is not null)
         {

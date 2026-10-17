@@ -60,6 +60,24 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
     public string? GarbleAfter { get; set; }
 
     /// <summary>
+    /// The Telnet port's CTEXT, sent after the password as LinBPQ sends one from its config: with
+    /// a bare CR at the end. Null for LinBPQ's own "Connected to ..." welcome.
+    /// </summary>
+    public string? Ctext { get; set; }
+
+    /// <summary>
+    /// How long a busy LinBPQ takes to send the welcome after the password's new line. Whatever
+    /// comes in meanwhile is thrown away, as LinBPQ does with input that came with the password.
+    /// </summary>
+    public TimeSpan WelcomeDelay { get; set; }
+
+    /// <summary>How many PASSWORD commands go unanswered, as lost ones do.</summary>
+    public int PasswordsLost { get; set; }
+
+    /// <summary>How long the first PASSWORD takes to be answered, holding up everything after it.</summary>
+    public TimeSpan FirstPasswordDelay { get; set; }
+
+    /// <summary>
     /// As LinBPQ's IDLETIME running out: each logged-in session is told "Disconnected from Node -
     /// Telnet Session kept" and keeps its socket, but loses sysop status.
     /// </summary>
@@ -268,7 +286,16 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                             if (input == Password)
                             {
                                 session.State = 2;
-                                session.Send("Connected to GB7TST's Telnet Server\r\n\r\n");
+                                if (WelcomeDelay > TimeSpan.Zero)
+                                {
+                                    await Task.Delay(WelcomeDelay, _stop.Token);
+                                    while (stream.DataAvailable)
+                                    {
+                                        _ = await stream.ReadAsync(new byte[256], _stop.Token);
+                                    }
+                                    i = read;
+                                }
+                                session.Send(Ctext is null ? "Connected to GB7TST's Telnet Server\r\n\r\n" : Ctext + "\r");
                             }
                             else
                             {
@@ -280,6 +307,19 @@ internal sealed class FakeLinBpqNode : IAsyncDisposable
                             lock (_gate)
                             {
                                 _commands.Add(input);
+                            }
+                            if (input == "PASSWORD")
+                            {
+                                if (PasswordsLost > 0)
+                                {
+                                    PasswordsLost--;
+                                    break;
+                                }
+                                if (FirstPasswordDelay > TimeSpan.Zero)
+                                {
+                                    await Task.Delay(FirstPasswordDelay, _stop.Token);
+                                    FirstPasswordDelay = TimeSpan.Zero;
+                                }
                             }
                             bool authorised = session.Authorised;
                             string reply = Answer(input, ref authorised);
