@@ -48,7 +48,7 @@ To decode a recording once and deliver what it completes, run `pdn-mailcast-rece
 
 The receiver reads its config file once, when it starts. After editing it by hand, restart the receiver (`sudo systemctl restart pdn-mailcast-receiver`) for the change to take effect.
 
-Until you do, the receiver won't overwrite your edit. Within a minute it logs `config: the config file was changed by hand; restart the receiver to use it`, and the status page shows the same as a notice at the top. Saving anything from the page in the meantime (the settings, the daily report, a measured dial) is refused with "The config file was edited by hand since the receiver started; restart the receiver to use it, then make this change again", so nothing you added by hand is lost.
+Until you do, the receiver won't overwrite your edit. Within a minute it logs `config: the config file was changed by hand; restart the receiver to use it`, and the status page shows the same as a notice at the top. Saving anything from the page in the meantime (the settings, the daily report, a measured dial) is refused with "The config file was edited by hand since the receiver started; restart the receiver to use it, then make this change again", so nothing you added by hand is lost. If the file can't be read at that moment (an editor on Windows can hold it open), the save is refused with "Couldn't read the config file to check it hasn't been edited by hand; try again in a moment".
 
 At start-up the log says which file it read, any key it didn't recognise, and which optional parts are in force:
 

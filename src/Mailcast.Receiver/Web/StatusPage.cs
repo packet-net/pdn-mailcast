@@ -1387,10 +1387,14 @@ public sealed class StatusPage : IAsyncDisposable
             try
             {
                 // Issue #154: never over a hand edit, which would be lost without a word.
-                if (!_configFile.TrySave(next, _log))
+                switch (_configFile.TrySave(next, _log))
                 {
-                    await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.EditedByHand + "." })).ConfigureAwait(false);
-                    return;
+                    case ConfigFile.SaveOutcome.EditedByHand:
+                        await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.EditedByHand + "." })).ConfigureAwait(false);
+                        return;
+                    case ConfigFile.SaveOutcome.Unreadable:
+                        await RespondAsync(context, 503, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.Unreadable + "." })).ConfigureAwait(false);
+                        return;
                 }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -1400,14 +1404,8 @@ public sealed class StatusPage : IAsyncDisposable
             }
         }
         _log(ConfigFile.Changes(current, next) is { } changes ? $"config: saved from the page: {changes}" : "config: saved from the page, with nothing changed");
+        // The line above says the daily report going on or off, and from which callsign.
         _host.Reconfigure(next);
-        bool wasOn = current.Feedback?.Enabled ?? false, isOn = next.Feedback?.Enabled ?? false;
-        if (wasOn != isOn || (isOn && next.Feedback!.From != current.Feedback!.From))
-        {
-            _log(isOn
-                ? $"web: the daily report (a public bulletin to {FeedbackSettings.To}) was turned on from the page, sent from {next.Feedback!.From}"
-                : $"web: the daily report (a public bulletin to {FeedbackSettings.To}) was turned off from the page");
-        }
         if (!string.Equals(next.Web.Password, pagePassword, StringComparison.Ordinal))
         {
             _sessions.NoticePasswordChange(); // signs every browser out

@@ -26,10 +26,10 @@ public class ConfigFileTests
         var file = ConfigFile.Load(path);
         var log = new List<string>();
 
-        Assert.True(file.TrySave(file.Config with { DialKHz = 7052.3 }, log.Add));
+        Assert.Equal(ConfigFile.SaveOutcome.Saved, file.TrySave(file.Config with { DialKHz = 7052.3 }, log.Add));
         Assert.Equal(7052.3, ReceiverConfig.Load(path).DialKHz);
         // Its own save is not a hand edit: the next save goes ahead, and nothing is noticed.
-        Assert.True(file.TrySave(file.Config with { DialKHz = 7052.0 }, log.Add));
+        Assert.Equal(ConfigFile.SaveOutcome.Saved, file.TrySave(file.Config with { DialKHz = 7052.0 }, log.Add));
         Assert.False(file.Check(log.Add));
         Assert.False(file.ChangedByHand);
         Assert.Empty(log);
@@ -45,7 +45,7 @@ public class ConfigFileTests
         File.WriteAllText(path, edited);
         var log = new List<string>();
 
-        Assert.False(file.TrySave(file.Config with { DialKHz = 7052.3 }, log.Add));
+        Assert.Equal(ConfigFile.SaveOutcome.EditedByHand, file.TrySave(file.Config with { DialKHz = 7052.3 }, log.Add));
 
         Assert.Equal(edited, File.ReadAllText(path));
         Assert.Equal(["config: not saved from the page: the config file was changed by hand since the receiver started; restart the receiver to use it"], log);
@@ -65,7 +65,7 @@ public class ConfigFileTests
         File.WriteAllText(path, Plain.Replace("secret-pw", "secret-px", StringComparison.Ordinal));
         File.SetLastWriteTimeUtc(path, when);
 
-        Assert.False(file.TrySave(file.Config, _ => { }));
+        Assert.Equal(ConfigFile.SaveOutcome.EditedByHand, file.TrySave(file.Config, _ => { }));
     }
 
     [Fact]
@@ -98,18 +98,44 @@ public class ConfigFileTests
     }
 
     [Fact]
-    public void Check_TakesAFileGoneAsChanged()
+    public void Check_PassesOverAFileItCannotRead()
     {
         using var dir = new TempDirectory();
         string path = Write(dir, Plain);
         var file = ConfigFile.Load(path);
-        File.Delete(path);
         var log = new List<string>();
+        File.Delete(path); // unreadable, as a file an editor on Windows holds open is
 
-        Assert.True(file.Check(log.Add));
-        Assert.Single(log);
-        Assert.False(file.TrySave(file.Config, log.Add));
+        Assert.False(file.Check(log.Add));
+        Assert.False(file.ChangedByHand);
+        Assert.Empty(log);
+
+        // Readable again as it was: still nothing to say.
+        File.WriteAllText(path, Plain);
+        Assert.False(file.Check(log.Add));
+        Assert.Empty(log);
+    }
+
+    [Fact]
+    public void TrySave_OfAFileItCannotRead_WritesNothing_AndAsksToTryAgain()
+    {
+        using var dir = new TempDirectory();
+        string path = Write(dir, Plain);
+        var file = ConfigFile.Load(path);
+        var log = new List<string>();
+        File.Delete(path);
+
+        Assert.Equal(ConfigFile.SaveOutcome.Unreadable, file.TrySave(file.Config with { DialKHz = 7052.3 }, log.Add));
+
         Assert.False(File.Exists(path));
+        Assert.Equal(["config: not saved from the page: the config file could not be read to check it has not been edited by hand; try again in a moment"], log);
+        Assert.False(file.ChangedByHand);
+        Assert.Equal("Couldn't read the config file to check it hasn't been edited by hand; try again in a moment", ConfigFile.Unreadable);
+
+        // Once it can be read again, unchanged, the save goes through.
+        File.WriteAllText(path, Plain);
+        Assert.Equal(ConfigFile.SaveOutcome.Saved, file.TrySave(file.Config with { DialKHz = 7052.3 }, log.Add));
+        Assert.Single(log);
     }
 
     [Fact]

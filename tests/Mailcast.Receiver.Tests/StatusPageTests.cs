@@ -94,6 +94,15 @@ public class StatusPageTests
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
         Assert.Contains("config: saved from the page: audio wav:/nonexistent.wav -> ubersdr:other.example, BBS login Q0CAST -> q0cast, BBS password changed", log);
         Assert.DoesNotContain(log, l => l.Contains("pw", StringComparison.Ordinal));
+
+        // The daily report turned on is said once, in that same kind of line.
+        var on = await http.PostAsJsonAsync("api/settings", new
+        {
+            audio = "ubersdr:other.example", type = "linBpq", host = "127.0.0.1", port = 8011, login = "q0cast", password = "", command = "BBS",
+            feedback = new { enabled = true, callsign = "g4abc" },
+        });
+        Assert.Equal(HttpStatusCode.OK, on.StatusCode);
+        Assert.Equal(["config: saved from the page: daily report on as G4ABC"], log.Where(l => l.Contains("daily report", StringComparison.Ordinal)));
     }
 
     [Fact]

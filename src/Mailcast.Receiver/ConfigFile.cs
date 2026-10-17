@@ -23,6 +23,25 @@ public sealed class ConfigFile
     public const string EditedByHand =
         "The config file was edited by hand since the receiver started; restart the receiver to use it, then make this change again";
 
+    /// <summary>
+    /// What the page says when the file could not be read to check it, say while an editor on
+    /// Windows holds it open: a moment later the save will most likely go through.
+    /// </summary>
+    public const string Unreadable = "Couldn't read the config file to check it hasn't been edited by hand; try again in a moment";
+
+    /// <summary>What <see cref="TrySave"/> did.</summary>
+    public enum SaveOutcome
+    {
+        /// <summary>Written.</summary>
+        Saved,
+
+        /// <summary>Not written: the file has been changed by hand since it was read.</summary>
+        EditedByHand,
+
+        /// <summary>Not written: the file could not be read to check it.</summary>
+        Unreadable,
+    }
+
     /// <summary>The line the log gets, once for each hand edit noticed.</summary>
     public const string ChangedLine = "config: the config file was changed by hand; restart the receiver to use it";
 
@@ -88,7 +107,10 @@ public sealed class ConfigFile
         return new ConfigFile(path, config, bytes, ReceiverConfig.UnknownKeys(text));
     }
 
-    /// <summary>The hash of what is in the file now, or null if it cannot be read (gone, say).</summary>
+    /// <summary>
+    /// The hash of what is in the file now, or null if it cannot be read just now: an editor
+    /// holding it open on Windows, or one that replaces it caught between its steps.
+    /// </summary>
     private byte[]? HashNow()
     {
         try
@@ -104,6 +126,7 @@ public sealed class ConfigFile
     /// <summary>
     /// Looks at the file once: if it has been changed by hand since it was read, and this change
     /// has not been logged yet, logs <see cref="ChangedLine"/>. Returns whether it is changed.
+    /// A file that cannot be read just now is passed over without a word, as it was.
     /// </summary>
     public bool Check(Action<string> log)
     {
@@ -111,12 +134,15 @@ public sealed class ConfigFile
         lock (_gate)
         {
             var now = HashNow();
-            if (now is not null && now.AsSpan().SequenceEqual(_hash))
+            if (now is null)
+            {
+                return _noticed is not null;
+            }
+            if (now.AsSpan().SequenceEqual(_hash))
             {
                 _noticed = null;
                 return false;
             }
-            now ??= [];
             say = _noticed is null || !now.AsSpan().SequenceEqual(_noticed);
             _noticed = now;
         }
@@ -146,25 +172,30 @@ public sealed class ConfigFile
 
     /// <summary>
     /// Writes <paramref name="next"/> over the file, unless the file has been changed by hand
-    /// since it was read or last saved: then nothing is written, the log gets one line, and this
-    /// returns false, for the page to say <see cref="EditedByHand"/>. Throws as
-    /// <see cref="ReceiverConfig.Save"/> does when the file cannot be written.
+    /// since it was read or last saved, or cannot be read to check: then nothing is written, the
+    /// log gets one line, and the page says <see cref="EditedByHand"/> or <see cref="Unreadable"/>.
+    /// Throws as <see cref="ReceiverConfig.Save"/> does when the file cannot be written.
     /// </summary>
-    public bool TrySave(ReceiverConfig next, Action<string> log)
+    public SaveOutcome TrySave(ReceiverConfig next, Action<string> log)
     {
         lock (_gate)
         {
             var now = HashNow();
-            if (now is null || !now.AsSpan().SequenceEqual(_hash))
+            if (now is null)
             {
-                _noticed = now ?? [];
+                log("config: not saved from the page: the config file could not be read to check it has not been edited by hand; try again in a moment");
+                return SaveOutcome.Unreadable;
+            }
+            if (!now.AsSpan().SequenceEqual(_hash))
+            {
+                _noticed = now;
                 log("config: not saved from the page: the config file was changed by hand since the receiver started; restart the receiver to use it");
-                return false;
+                return SaveOutcome.EditedByHand;
             }
             next.Save(Path);
             _hash = SHA256.HashData(next.ToFile());
             _noticed = null;
-            return true;
+            return SaveOutcome.Saved;
         }
     }
 
