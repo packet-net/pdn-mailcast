@@ -95,6 +95,9 @@
   a { color: var(--accent); }
   #update { margin: 10px 24px 0; padding: 12px 16px; background: #eaf2fb; border: 1px solid #b9d2ee; border-radius: 10px; }
   #update[hidden] { display: none; }
+  #configChanged { margin: 10px 24px 0; padding: 12px 16px; background: #fdf4e3; border: 1px solid #ecd29c; border-radius: 10px; }
+  #configChanged[hidden] { display: none; }
+  #configChanged p { margin: 4px 0; }
   #update strong { font-size: 16px; }
   #update p { margin: 4px 0; }
   #update .cmd[hidden] { display: none; }
@@ -140,7 +143,7 @@
     #signOut { position: static; display: inline-block; margin-top: 8px; }
     main { grid-template-columns: 1fr; padding: 10px 14px 28px; gap: 12px; }
     section { padding: 12px 14px; }
-    #update, #optIn { margin-left: 14px; margin-right: 14px; }
+    #update, #configChanged, #optIn { margin-left: 14px; margin-right: 14px; }
     .row { grid-template-columns: 1fr; }
     input, select { width: 100%; }
     button { min-height: 44px; padding: 10px 16px; }
@@ -185,6 +188,9 @@
   <p id="updateWhat"></p>
   <div class="cmd" id="updateCmdBox"><pre id="updateCmd"></pre><button type="button" class="plain" id="updateCopy">Copy</button></div>
   <p class="muted">Best done between slots: in daylight, after :13 and before :58 past the hour. At night, any time.</p>
+</div>
+<div id="configChanged" hidden>
+  <p><strong>The config file was changed by hand.</strong> Restart the receiver to use it. Until then, settings saved here are refused, so the change is not lost.</p>
 </div>
 <div id="optIn" hidden>
   <div id="optInAsk">
@@ -935,6 +941,7 @@ async function refresh() {
   iono(s);
   pskr(s);
   update(s);
+  $("configChanged").hidden = !s.configChanged;
   feedback(s);
   optIn(s);
 

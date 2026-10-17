@@ -85,7 +85,7 @@ public class SignInTests
             var config = Config(dir, port, password);
             config.Save(path);
             var host = new ReceiverHost(config, time, Log);
-            var page = new StatusPage(host, path, Log) { FailureDelay = pause is null ? TimeSpan.Zero : SignInThrottle.FailureDelay, Pause = pause };
+            var page = new StatusPage(host, ConfigFile.Load(path), Log) { FailureDelay = pause is null ? TimeSpan.Zero : SignInThrottle.FailureDelay, Pause = pause };
             try
             {
                 page.Start();
