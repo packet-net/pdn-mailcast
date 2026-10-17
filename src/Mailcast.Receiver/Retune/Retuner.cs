@@ -415,10 +415,13 @@ public sealed class Retuner : IAsyncDisposable
         {
             return $"LinBPQ's PORTS lists no port {port}: set \"bpq\".\"hfPort\" to the number of the port on the shared radio";
         }
-        if (id != _portSaid)
+        string said = $"retune: LinBPQ port {port} is {Node!.Quoted(id)}, asked on " + (Node.PortKind == BpqPortKind.Telnet
+            ? $"LinBPQ's telnet port (TCPPORT) at {_bpq.Host}:{_bpq.Port}; its FBBPORT suits the receiver better"
+            : $"LinBPQ's FBBPORT at {_bpq.Host}:{_bpq.Port}");
+        if (said != _portSaid)
         {
-            _portSaid = id;
-            _log($"retune: LinBPQ port {port} is {Node!.Quoted(id)}");
+            _portSaid = said;
+            _log(said);
         }
         return _bpq.ExpectedPortId is { } expected && !string.Equals(expected.Trim(), id.Trim(), StringComparison.OrdinalIgnoreCase)
             ? $"LinBPQ port {port} is {Node!.Quoted(id)}, not \"{expected.Trim()}\" as \"bpq\".\"expectedPortId\" says"

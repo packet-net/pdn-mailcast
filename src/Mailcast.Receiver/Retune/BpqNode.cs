@@ -16,12 +16,37 @@ public sealed class BpqNodeException(string message, bool maybeApplied = false) 
     public bool MaybeApplied { get; } = maybeApplied;
 }
 
+/// <summary>Which of the LinBPQ Telnet port's TCP ports the node session is on.</summary>
+public enum BpqPortKind
+{
+    /// <summary>Its <c>FBBPORT</c>, for automated connections: no telnet negotiation and no prompts.</summary>
+    Fbb,
+
+    /// <summary>Its <c>TCPPORT</c>, for people with a telnet client: negotiation, prompts and a welcome.</summary>
+    Telnet,
+}
+
 /// <summary>
-/// A sysop session on LinBPQ's node telnet port, for its <c>XMITOFF</c> command: turning a
-/// port's transmit off and on, reading it back, and reading the port's name from <c>PORTS</c>.
+/// A sysop session on LinBPQ's node, through its Telnet port's FBBPORT or TCPPORT, for its
+/// <c>XMITOFF</c> command: turning a port's transmit off and on, reading it back, and reading the
+/// port's name from <c>PORTS</c>.
 /// </summary>
 /// <remarks>
-/// <para>The exchange, as LinBPQ 6.0.25 has it (TelnetV6.c and Cmd.c):</para>
+/// <para>Which of the two it is, is told by whether a user prompt comes within
+/// <see cref="TelnetPromptWait"/> of connecting: the TCPPORT sends one at once, the FBBPORT says
+/// nothing until it has a login.</para>
+/// <para>On the FBBPORT, as LinBPQ 6.0.25 has it (TelnetV6.c, DataSocket_ReadFBB, and Cmd.c), a
+/// login that works is answered with nothing at all, and one that does not with the prompt it
+/// would have sent on the TCPPORT. Each line is sent once the one before has been dealt with:</para>
+/// <code>
+/// -&gt; USER                              (then a second with nothing back; "user:" if not known)
+/// -&gt; PASSWORD-OF-USER                  (then a second with nothing back; "password:" if wrong)
+/// -&gt; PASSWORD
+/// &lt;- TST:GB7TST} Ok
+/// -&gt; XMITOFF 2 1
+/// &lt;- TST:GB7TST} XMITOFF was 0 now 1
+/// </code>
+/// <para>Node replies there end in a bare CR. The TCPPORT's exchange, as LinBPQ 6.0.25 has it:</para>
 /// <code>
 /// &lt;- user:
 /// -&gt; USER
@@ -61,6 +86,18 @@ public sealed partial class BpqNode : IAsyncDisposable
     /// <summary>How long one answer from LinBPQ may take.</summary>
     public static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// How long after connecting a user prompt may take for the port to count as LinBPQ's TCPPORT
+    /// rather than its FBBPORT: LinBPQ sends it as it accepts the connection.
+    /// </summary>
+    public static readonly TimeSpan TelnetPromptWait = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// On the FBBPORT, how long LinBPQ is given to answer the user or password line before it is
+    /// taken as accepted: it answers only a wrong one, at once.
+    /// </summary>
+    private static readonly TimeSpan FbbLoginLineWait = TimeSpan.FromSeconds(1);
+
     /// <summary>How long the welcome after the password may take to start.</summary>
     private static readonly TimeSpan WelcomeWait = TimeSpan.FromSeconds(2);
 
@@ -83,6 +120,20 @@ public sealed partial class BpqNode : IAsyncDisposable
     /// that this did not end itself. The next command logs in again.
     /// </summary>
     public event Action<string>? SessionLost;
+
+    /// <summary>Which kind of port the node is on, once a connection has told; null before.</summary>
+    public BpqPortKind? PortKind
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _portKind;
+            }
+        }
+    }
+
+    private BpqPortKind? _portKind;
 
     /// <summary>Whether a logged-in session is open now.</summary>
     public bool Connected
@@ -199,15 +250,16 @@ public sealed partial class BpqNode : IAsyncDisposable
                 bool sent = false;
                 try
                 {
+                    // One line at a time: LinBPQ can lose a line that comes while it is busy with the last.
                     session.Clear();
                     await session.SendAsync(command, cancellation).ConfigureAwait(false);
+                    sent = true;
+                    var replies = await session.ReadUntilAsync(() => session.Replies() is { Count: > 0 } r ? r : null, $"its answer to \"{command}\"", cancellation).ConfigureAwait(false);
                     if (sentinel is not null)
                     {
                         await session.SendAsync(sentinel, cancellation).ConfigureAwait(false);
+                        replies = await session.ReadUntilAsync(() => session.Replies() is { Count: > 1 } r ? r : null, $"its answer to \"{command}\"", cancellation).ConfigureAwait(false);
                     }
-                    sent = true;
-                    int wanted = sentinel is null ? 1 : 2;
-                    var replies = await session.ReadUntilAsync(() => session.Replies() is { Count: var n } r && n >= wanted ? r : null, $"its answer to \"{command}\"", cancellation).ConfigureAwait(false);
                     string reply = sentinel is null ? replies[0].Text : session.Between(replies[0], replies[1]);
                     if (!fresh && attempt == 0 && KnownRefusal(reply) is not null && reply.Contains("SYSOP", StringComparison.OrdinalIgnoreCase))
                     {
@@ -262,26 +314,60 @@ public sealed partial class BpqNode : IAsyncDisposable
             }
             session.Start();
 
-            string userPrompt = await session.ReadUntilAsync(session.Prompt, "its user prompt", cancellation).ConfigureAwait(false);
-            session.Clear();
-            await session.SendAsync(_settings.User, cancellation).ConfigureAwait(false);
-            string passwordPrompt = await session.ReadUntilAsync(session.Prompt, "its password prompt", cancellation).ConfigureAwait(false);
-            if (passwordPrompt.Equals(userPrompt, StringComparison.OrdinalIgnoreCase))
+            // The TCPPORT sends its user prompt as it accepts; the FBBPORT sends nothing at all.
+            string? userPrompt = await UserPromptAsync(session, cancellation).ConfigureAwait(false);
+            var kind = userPrompt is null ? BpqPortKind.Fbb : BpqPortKind.Telnet;
+            lock (_gate)
             {
-                throw new BpqNodeException($"LinBPQ does not know the user {_settings.User} on its Telnet port (user names are case-sensitive)");
+                _portKind = kind;
             }
 
-            // LinBPQ answers the password line with a new line straight away, right or wrong, then
-            // either the prompt again or the login's welcome: the Telnet port's CTEXT, or its own
-            // "Connected to ..." when none is set. It throws away whatever came in with the password
-            // line, so nothing is sent until the welcome has come and gone quiet.
-            session.Clear();
-            await session.SendAsync(_settings.Password, cancellation).ConfigureAwait(false);
-            await session.ReadUntilAsync(() => session.DropThroughNewLine() ? "" : null, "an answer to the password", cancellation).ConfigureAwait(false);
-            await session.SettleAsync(WelcomeWait, SettleQuiet, cancellation).ConfigureAwait(false);
-            if (session.Prompt() is { } again && again.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase))
+            Func<string, bool> isPasswordPrompt;
+            if (userPrompt is null)
             {
-                throw new BpqNodeException($"LinBPQ refused the password for {_settings.User}");
+                // Nothing comes back for a user or a password LinBPQ takes, only the prompt again
+                // for one it does not; and it may lose a line sent while it is busy with the last.
+                session.Clear();
+                await session.SendAsync(_settings.User, cancellation).ConfigureAwait(false);
+                await session.SettleAsync(FbbLoginLineWait, SettleQuiet, cancellation).ConfigureAwait(false);
+                FbbLoginLineDealtWith(session, "the user name");
+                if (session.Prompt() is not null)
+                {
+                    throw new BpqNodeException($"LinBPQ does not know the user {_settings.User} on its Telnet port (user names are case-sensitive)");
+                }
+                session.Clear();
+                await session.SendAsync(_settings.Password, cancellation).ConfigureAwait(false);
+                await session.SettleAsync(FbbLoginLineWait, SettleQuiet, cancellation).ConfigureAwait(false);
+                FbbLoginLineDealtWith(session, "the password");
+                if (session.Prompt() is not null)
+                {
+                    throw new BpqNodeException($"LinBPQ refused the password for {_settings.User}");
+                }
+                isPasswordPrompt = _ => true;
+            }
+            else
+            {
+                session.Clear();
+                await session.SendAsync(_settings.User, cancellation).ConfigureAwait(false);
+                string passwordPrompt = await session.ReadUntilAsync(session.Prompt, "its password prompt", cancellation).ConfigureAwait(false);
+                if (passwordPrompt.Equals(userPrompt, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BpqNodeException($"LinBPQ does not know the user {_settings.User} on its Telnet port (user names are case-sensitive)");
+                }
+
+                // LinBPQ answers the password line with a new line straight away, right or wrong, then
+                // either the prompt again or the login's welcome: the Telnet port's CTEXT, or its own
+                // "Connected to ..." when none is set. It throws away whatever came in with the password
+                // line, so nothing is sent until the welcome has come and gone quiet.
+                session.Clear();
+                await session.SendAsync(_settings.Password, cancellation).ConfigureAwait(false);
+                await session.ReadUntilAsync(() => session.DropThroughNewLine() ? "" : null, "an answer to the password", cancellation).ConfigureAwait(false);
+                await session.SettleAsync(WelcomeWait, SettleQuiet, cancellation).ConfigureAwait(false);
+                if (session.Prompt() is { } again && again.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BpqNodeException($"LinBPQ refused the password for {_settings.User}");
+                }
+                isPasswordPrompt = prompt => prompt.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase);
             }
 
             // A configured CTEXT ends in a bare CR, so the answer can share its line; and a
@@ -297,7 +383,7 @@ public sealed partial class BpqNode : IAsyncDisposable
                 {
                     box = await session.ReadUntilAsync(
                         () => session.Replies() is [var first, ..] ? new Box(first.Text)
-                            : session.Prompt() is { } prompt && prompt.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase) ? new Box(null)
+                            : session.Prompt() is { } prompt && isPasswordPrompt(prompt) ? new Box(null)
                             : null,
                         "an answer to PASSWORD", cancellation, ReplyTimeout / 2).ConfigureAwait(false);
                 }
@@ -340,6 +426,37 @@ public sealed partial class BpqNode : IAsyncDisposable
                 IOException or SocketException or ObjectDisposedException => new BpqNodeException($"cannot log in to LinBPQ's node at {_settings.Host}:{_settings.Port} ({Clean(e.Message)})"),
                 _ => e,
             };
+        }
+    }
+
+    /// <summary>
+    /// The user prompt, if one comes within <see cref="TelnetPromptWait"/> (the TCPPORT), or null
+    /// if nothing at all comes (the FBBPORT). Something that is not a prompt is waited past, for
+    /// the prompt, as long as an answer may take.
+    /// </summary>
+    private static async Task<string?> UserPromptAsync(Session session, CancellationToken cancellation)
+    {
+        try
+        {
+            return await session.ReadUntilAsync(session.Prompt, "its user prompt", cancellation, TelnetPromptWait).ConfigureAwait(false);
+        }
+        catch (BpqNodeException) when (session.LostWhy is null && OneLine(session.Text()).Length == 0)
+        {
+            return null;
+        }
+        catch (BpqNodeException) when (session.LostWhy is null)
+        {
+            return await session.ReadUntilAsync(session.Prompt, "its user prompt", cancellation, ReplyTimeout - TelnetPromptWait).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>On the FBBPORT, throws if LinBPQ closed the connection on a login line (after too many tries, say).</summary>
+    private void FbbLoginLineDealtWith(Session session, string what)
+    {
+        if (session.LostWhy is { } why)
+        {
+            string said = session.Text();
+            throw new BpqNodeException($"{why} after {what}{(OneLine(said).Length == 0 ? "" : $"; it sent {Quoted(said)}")}");
         }
     }
 

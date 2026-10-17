@@ -272,7 +272,7 @@ public sealed partial class RetunerTests
         await s.NextWait();
         Assert.Equal(RetuneStage.Idle, s.Retuner.Stage);
         Assert.Contains("idle until 11:59 UTC, ready for the 12:00 UTC slot", s.Retuner.State, StringComparison.Ordinal);
-        Assert.Contains(s.Log, l => l == "retune: LinBPQ port 2 is \"HF through QtSoundModem 2\"");
+        Assert.Contains(s.Log, l => l == $"retune: LinBPQ port 2 is \"HF through QtSoundModem 2\", asked on LinBPQ's telnet port (TCPPORT) at 127.0.0.1:{s.Node!.Port}; its FBBPORT suits the receiver better");
         Assert.Equal(0, s.Node!.XmitOff(2));
 
         // 11:59: LinBPQ's port 2 is off and the note says so, but the rig waits out the drain.
@@ -833,7 +833,7 @@ public sealed partial class RetunerTests
     {
         using var limit = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await using var bpq = await LinBpqContainer.StartNodeAsync("bpq32-node.cfg", limit.Token);
-        var settings = new BpqNodeSettings { Host = "127.0.0.1", Port = bpq.TelnetPort, User = "sysop", Password = "s3cret-sysop", HfPort = 2, ExpectedPortId = "HF through QtSoundModem" };
+        var settings = new BpqNodeSettings { Host = "127.0.0.1", Port = bpq.FbbPort, User = "sysop", Password = "s3cret-sysop", HfPort = 2, ExpectedPortId = "HF through QtSoundModem" };
         await using var look = new BpqNode(settings);
 
         await using var s = await TunedForNoon(new Station(At(11, 58, 30), bpq: settings));
@@ -846,6 +846,6 @@ public sealed partial class RetunerTests
         Assert.False(await look.TransmitOffAsync(2, limit.Token));
         Assert.Equal(RetuneStage.Idle, s.Retuner.Stage);
         Assert.False(File.Exists(s.NotePath));
-        Assert.Contains(s.Log, l => l == "retune: LinBPQ port 2 is \"HF through QtSoundModem\"");
+        Assert.Contains(s.Log, l => l == $"retune: LinBPQ port 2 is \"HF through QtSoundModem\", asked on LinBPQ's FBBPORT at 127.0.0.1:{bpq.FbbPort}");
     }
 }

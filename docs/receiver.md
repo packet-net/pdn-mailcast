@@ -118,11 +118,11 @@ Add this to the config:
 
 ```json
 "rig": { "rigctld": "127.0.0.1:4532" },
-"bpq": { "host": "127.0.0.1", "port": 8010, "user": "sysop", "password": "your-sysop-password", "hfPort": 2 }
+"bpq": { "host": "127.0.0.1", "port": 8011, "user": "sysop", "password": "your-sysop-password", "hfPort": 2 }
 ```
 
 - `rig`: Hamlib's rigctld for the radio. With flrig, run `rigctld -m 4` beside it: that is Hamlib's flrig backend, so flrig stays in charge of the rig.
-- `bpq`: LinBPQ's node telnet port (the Telnet port's `TCPPORT`, not the `FBBPORT`) and a user whose `USER=` line ends in `SYSOP`, such as `USER=sysop,your-sysop-password,G4ABC,,SYSOP`. `hfPort` is the number of LinBPQ's port on the shared radio, as its `PORTS` command lists it. The log says which port that is at start-up; add `"expectedPortId": "..."` with the name `PORTS` gives it, and the receiver won't retune if the number ever points at another port.
+- `bpq`: LinBPQ's node, on the Telnet port's `FBBPORT` (the same one the receiver delivers mail to is fine), and a user whose `USER=` line ends in `SYSOP`, such as `USER=sysop,your-sysop-password,G4ABC,,SYSOP`. Use the `FBBPORT` rather than the `TCPPORT`: as John G8BPQ puts it, the `TCPPORT` starts a telnet options negotiation and is meant for real telnet users, while the `FBBPORT` is for automated connections like this one. A config that already gives the `TCPPORT` (`"port"` is 8010 unless set) still works; the receiver tells the two apart by whether LinBPQ asks for a user name. `hfPort` is the number of LinBPQ's port on the shared radio, as its `PORTS` command lists it. The log says which port that is at start-up, and whether it asked on the `FBBPORT` or the `TCPPORT`; add `"expectedPortId": "..."` with the name `PORTS` gives it, and the receiver won't retune if the number ever points at another port.
 - `drainSeconds` in `bpq` (15 unless set, at most 40): how long to wait after LinBPQ stops before tuning, so that anything LinBPQ had already handed to the TNC goes out first.
 - If nothing else ever transmits on the radio, leave out `bpq` and say so instead: `"rig": { "rigctld": "127.0.0.1:4532", "dedicatedRadio": true }`.
 - If your own commands stop whatever else transmits on the radio (your modems, say), you can leave out `bpq` and use a `hooks` "before" command instead (see [Running your own commands around each slot](#running-your-own-commands-around-each-slot)). The receiver trusts it to keep the radio quiet while it is retuned, and doesn't retune for a slot whose "before" fails. The log says so at start-up.

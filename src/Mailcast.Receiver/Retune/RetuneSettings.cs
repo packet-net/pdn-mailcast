@@ -33,7 +33,7 @@ public sealed record RigSettings
 }
 
 /// <summary>
-/// The config's <c>bpq</c>: LinBPQ's node telnet port and a SYSOP user, with which the receiver
+/// The config's <c>bpq</c>: LinBPQ's node, on its Telnet port's FBBPORT (or TCPPORT), and a SYSOP user, with which the receiver
 /// turns transmit off on <see cref="HfPort"/> (<c>XMITOFF</c>) while the radio is on the bulletin
 /// frequency.
 /// </summary>
@@ -42,7 +42,10 @@ public sealed record BpqNodeSettings
     /// <summary>LinBPQ's host.</summary>
     public string Host { get; init; } = "127.0.0.1";
 
-    /// <summary>The Telnet port's TCPPORT, the node's own telnet port (not the FBBPORT).</summary>
+    /// <summary>
+    /// The Telnet port's FBBPORT, for automated connections, or its TCPPORT, the telnet port for
+    /// people; told apart by whether a user prompt comes. 8010, the usual TCPPORT, unless set.
+    /// </summary>
     public int Port { get; init; } = 8010;
 
     /// <summary>The user name of a <c>USER=</c> line in the Telnet port with SYSOP as its fifth field.</summary>
@@ -87,7 +90,7 @@ public sealed record BpqNodeSettings
         }
         if (Port is < 1 or > 65535)
         {
-            throw new ConfigException($"\"bpq\".\"port\" {Port} is not a TCP port; it is the TCPPORT in LinBPQ's Telnet port, often 8010");
+            throw new ConfigException($"\"bpq\".\"port\" {Port} is not a TCP port; it is the FBBPORT in LinBPQ's Telnet port, often 8011");
         }
         if (string.IsNullOrWhiteSpace(User) || User.Any(c => c is ' ' or '\r' or '\n'))
         {
