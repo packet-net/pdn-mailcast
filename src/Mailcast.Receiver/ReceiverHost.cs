@@ -461,6 +461,9 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The clock the receiver runs on.</summary>
     internal TimeProvider Time => _time;
 
+    /// <summary>The config file this receiver was started from, for the start-up lines; null when there is none (tests).</summary>
+    public ConfigFile? ConfigFile { get; init; }
+
     /// <summary>The configuration in force.</summary>
     public ReceiverConfig Config
     {
@@ -585,6 +588,15 @@ public sealed class ReceiverHost : IAsyncDisposable
             ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's)"
             : $"slots: GB7RDG's slots are {Schedule.Describe()}");
         _log(SourcesLine(Config));
+        if (ConfigFile is { } file)
+        {
+            // Issue #154: which file, and what in it was not read, so nothing is ignored unseen.
+            _log($"config: read {file.Path}");
+            foreach (string key in file.UnknownKeys)
+            {
+                _log($"config: \"{key}\" is not a setting and is ignored");
+            }
+        }
         if (Config.SlotUtcWithoutEveryMinutes)
         {
             _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
@@ -593,6 +605,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             _log("config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every daylight slot that fits in its allowance");
         }
+        _log(ConfigFile.PartsLine(Config));
         int pending = Intake.Pending().Count;
         if (pending > 0)
         {

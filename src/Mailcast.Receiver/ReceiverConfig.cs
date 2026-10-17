@@ -363,7 +363,15 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException($"cannot read the config file {path}: {e.Message}");
         }
+        return Parse(text, path);
+    }
 
+    /// <summary>
+    /// Reads a config file's <paramref name="text"/>; <paramref name="path"/> is only for the
+    /// messages. Throws <see cref="ConfigException"/> with a sentence for the operator.
+    /// </summary>
+    internal static ReceiverConfig Parse(string text, string path)
+    {
         ReceiverConfig? config;
         try
         {
@@ -422,6 +430,36 @@ public sealed record ReceiverConfig
             && !document.RootElement.TryGetProperty("everyMinutes", out _);
     }
 
+    /// <summary>
+    /// Top-level keys that are no longer settings but are still read without a word of their
+    /// own here: the receiver says something else about each (see <see cref="WebSdrSlotsPerDayIgnored"/>).
+    /// </summary>
+    private static readonly string[] RetiredKeys = ["webSdrSlotsPerDay"];
+
+    /// <summary>The top-level keys a config file may give: each setting's name as the file spells it.</summary>
+    private static readonly HashSet<string> KnownKeys = typeof(ReceiverConfig)
+        .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+        .Where(p => p.SetMethod is not null
+            && p.GetCustomAttributes(typeof(JsonIgnoreAttribute), false) is not [JsonIgnoreAttribute { Condition: JsonIgnoreCondition.Always }])
+        .Select(p => JsonNamingPolicy.CamelCase.ConvertName(p.Name))
+        .Concat(RetiredKeys)
+        .ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Issue #154: the top-level keys in a config file's <paramref name="text"/> that are not
+    /// settings, in the order given, such as a misspelt <c>"rgi"</c> or a <c>"Rig"</c> (the names
+    /// are read case-sensitively). They are ignored, not refused, so a file with a key from
+    /// another version still works; the receiver names each in its log. Retired keys with a
+    /// message of their own are not among them.
+    /// </summary>
+    internal static IReadOnlyList<string> UnknownKeys(string text)
+    {
+        using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        return document.RootElement.ValueKind != JsonValueKind.Object
+            ? []
+            : document.RootElement.EnumerateObject().Select(p => p.Name).Where(name => !KnownKeys.Contains(name)).Distinct().ToList();
+    }
+
     /// <summary>Whether a config file gives <paramref name="key"/> at the top level, whatever its value.</summary>
     private static bool Has(string text, string key)
     {
@@ -450,11 +488,14 @@ public sealed record ReceiverConfig
                 // The create mode is masked by the umask; this is the mode it should have.
                 File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
             }
-            stream.Write(System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n"));
+            stream.Write(ToFile());
             stream.Flush(flushToDisk: true);
         }
         File.Move(tmp, path, overwrite: true);
     }
+
+    /// <summary>The file <see cref="Save"/> writes, byte for byte.</summary>
+    internal byte[] ToFile() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n");
 
     /// <summary>Throws <see cref="ConfigException"/> if a setting cannot work.</summary>
     public void Validate()

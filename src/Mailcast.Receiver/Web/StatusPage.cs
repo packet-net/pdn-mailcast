@@ -69,7 +69,7 @@ public sealed class StatusPage : IAsyncDisposable
     private readonly SignInThrottle _throttle;
 
     private readonly ReceiverHost _host;
-    private readonly string? _configPath;
+    private readonly ConfigFile? _configFile;
     private readonly Action<string> _log;
     private HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
@@ -77,11 +77,14 @@ public sealed class StatusPage : IAsyncDisposable
     private WaterfallWebServer? _waterfall;
     private Task? _accept;
 
-    /// <summary>Creates the page for <paramref name="host"/>; settings are saved to <paramref name="configPath"/>.</summary>
-    public StatusPage(ReceiverHost host, string? configPath, Action<string> log)
+    /// <summary>
+    /// Creates the page for <paramref name="host"/>; settings are saved to <paramref name="configFile"/>,
+    /// unless it has been changed by hand since it was read. Null saves nothing (tests).
+    /// </summary>
+    public StatusPage(ReceiverHost host, ConfigFile? configFile, Action<string> log)
     {
         _host = host;
-        _configPath = configPath;
+        _configFile = configFile;
         _log = log;
         var web = host.Config.Web;
         if (web.Lan)
@@ -738,6 +741,9 @@ public sealed class StatusPage : IAsyncDisposable
             version = ReceiverHost.Version,
             // Whether the apt repository has a newer receiver; null when nothing checks (tests).
             update = Updates?.View(),
+            // Issue #154: the config file has been changed by hand since the receiver read it,
+            // so the page will not save over it until the receiver is restarted.
+            configChanged = _configFile?.ChangedByHand ?? false,
             audio = new
             {
                 source = config.Audio,
@@ -1376,18 +1382,24 @@ public sealed class StatusPage : IAsyncDisposable
             return;
         }
 
-        if (_configPath is not null)
+        if (_configFile is not null)
         {
             try
             {
-                next.Save(_configPath);
+                // Issue #154: never over a hand edit, which would be lost without a word.
+                if (!_configFile.TrySave(next, _log))
+                {
+                    await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.EditedByHand + "." })).ConfigureAwait(false);
+                    return;
+                }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                await RespondAsync(context, 500, "application/json", JsonSerializer.Serialize(new { error = $"Cannot write {_configPath}: {Ascii.Clean(e.Message)}" })).ConfigureAwait(false);
+                await RespondAsync(context, 500, "application/json", JsonSerializer.Serialize(new { error = $"Cannot write {_configFile.Path}: {Ascii.Clean(e.Message)}" })).ConfigureAwait(false);
                 return;
             }
         }
+        _log(ConfigFile.Changes(current, next) is { } changes ? $"config: saved from the page: {changes}" : "config: saved from the page, with nothing changed");
         _host.Reconfigure(next);
         bool wasOn = current.Feedback?.Enabled ?? false, isOn = next.Feedback?.Enabled ?? false;
         if (wasOn != isOn || (isOn && next.Feedback!.From != current.Feedback!.From))

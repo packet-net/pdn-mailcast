@@ -64,10 +64,10 @@ return await ReceiveAsync(configPath, decode, stop.Token);
 // Everything but the arguments: from the console, or as the Windows service.
 static async Task<int> ReceiveAsync(string configPath, string? decode, CancellationToken stop)
 {
-    ReceiverConfig config;
+    ConfigFile file;
     try
     {
-        config = ReceiverConfig.Load(configPath);
+        file = ConfigFile.Load(configPath);
     }
     catch (ConfigException e)
     {
@@ -77,7 +77,8 @@ static async Task<int> ReceiveAsync(string configPath, string? decode, Cancellat
 
     static void Log(string line) => Console.WriteLine(Ascii.Clean(line));
 
-    await using var host = new ReceiverHost(config, TimeProvider.System, Log);
+    var config = file.Config;
+    await using var host = new ReceiverHost(config, TimeProvider.System, Log) { ConfigFile = file };
     try
     {
         if (decode is not null)
@@ -96,8 +97,10 @@ static async Task<int> ReceiveAsync(string configPath, string? decode, Cancellat
         // never holds up anything else.
         using var updates = new UpdateCheck(TimeProvider.System, Log);
         _ = updates.RunAsync(stop);
+        // Issue #154: a hand edit is read only at the next start; say so when one is made.
+        _ = file.RunAsync(TimeProvider.System, Log, stop);
 
-        await using var page = new StatusPage(host, configPath, Log) { Updates = updates };
+        await using var page = new StatusPage(host, file, Log) { Updates = updates };
         try
         {
             page.Start();

@@ -24,7 +24,7 @@ public class StatusPageTests
     /// free port and, in the rare case another process takes it first, asks again.
     /// </summary>
     private static async Task<(ReceiverHost Host, StatusPage Page, HttpClient Http, string Path)> StartAsync(
-        string dir, bool lan = false, string password = "", Func<BbsSettings, Task<BbsLoginTestResult>>? testBbsLogin = null)
+        string dir, bool lan = false, string password = "", Func<BbsSettings, Task<BbsLoginTestResult>>? testBbsLogin = null, Action<string>? log = null)
     {
         string path = System.IO.Path.Combine(dir, "receiver.json");
         for (int attempt = 0; ; attempt++)
@@ -36,7 +36,7 @@ public class StatusPageTests
             var config = Config(dir, port, lan, password);
             config.Save(path);
             var host = new ReceiverHost(config, TimeProvider.System, _ => { });
-            var page = new StatusPage(host, path, _ => { }) { TestBbsLogin = testBbsLogin };
+            var page = new StatusPage(host, ConfigFile.Load(path), log ?? (_ => { })) { TestBbsLogin = testBbsLogin };
             try
             {
                 page.Start();
@@ -52,6 +52,49 @@ public class StatusPageTests
 
     private static object Form(string host = "127.0.0.1", int port = 8011, string password = "", string audio = "ubersdr:wessex.zapto.org") =>
         new { audio, type = "linBpq", host, port, login = "q0cast", password, command = "BBS" };
+
+    [Fact]
+    public async Task Settings_AfterAHandEdit_AreNotSaved_AndThePageSaysToRestart()
+    {
+        // Issue #154: a "rig" added by hand was lost at the next save from the page.
+        using var dir = new TempDirectory();
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var (host, page, http, path) = await StartAsync(dir.Path, log: log.Enqueue);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        Assert.False((await http.GetFromJsonAsync<JsonElement>("api/status")).GetProperty("configChanged").GetBoolean());
+        string edited = File.ReadAllText(path).Replace("\"audio\"", "\"rig\": { \"rigctld\": \"127.0.0.1:4532\", \"dedicatedRadio\": true },\n  \"audio\"", StringComparison.Ordinal);
+        File.WriteAllText(path, edited);
+
+        var answer = await http.PostAsJsonAsync("api/settings", Form(audio: "ubersdr:other.example"));
+
+        Assert.Equal(HttpStatusCode.Conflict, answer.StatusCode);
+        var error = (await answer.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString();
+        Assert.Equal("The config file was edited by hand since the receiver started; restart the receiver to use it, then make this change again.", error);
+        Assert.Equal(edited, File.ReadAllText(path));
+        Assert.Equal("wav:/nonexistent.wav", host.Config.Audio);
+        Assert.Single(log, l => l.StartsWith("config: not saved from the page:", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, l => l.StartsWith("config: saved from the page", StringComparison.Ordinal));
+        Assert.True((await http.GetFromJsonAsync<JsonElement>("api/status")).GetProperty("configChanged").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Settings_SavedFromThePage_SayWhatChanged_WithNoPassword()
+    {
+        using var dir = new TempDirectory();
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var (host, page, http, _) = await StartAsync(dir.Path, log: log.Enqueue);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+
+        var answer = await http.PostAsJsonAsync("api/settings", Form(audio: "ubersdr:other.example", password: "another-pw"));
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("config: saved from the page: audio wav:/nonexistent.wav -> ubersdr:other.example, BBS login Q0CAST -> q0cast, BBS password changed", log);
+        Assert.DoesNotContain(log, l => l.Contains("pw", StringComparison.Ordinal));
+    }
 
     [Fact]
     public async Task Settings_SavedFromThePage_AreWrittenBackAndPutInForce()
