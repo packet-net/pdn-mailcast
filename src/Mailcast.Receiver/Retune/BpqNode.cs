@@ -27,8 +27,9 @@ public sealed class BpqNodeException(string message, bool maybeApplied = false) 
 /// -&gt; USER
 /// &lt;- password:
 /// -&gt; PASSWORD-OF-USER
-/// &lt;- (a new line, then the Telnet port's CTEXT, if any)
-/// -&gt; PASSWORD
+/// &lt;- (a new line, then the Telnet port's CTEXT, ending in a bare CR, or "Connected to
+///     GB7TST's Telnet Server" when it has none; input that came with the password is lost)
+/// -&gt; PASSWORD                          (once the welcome has gone quiet; once more if no answer)
 /// &lt;- TST:GB7TST} Ok                     (a USER= line with SYSOP gets sysop status this way)
 /// -&gt; XMITOFF 2
 /// &lt;- TST:GB7TST} XMITOFF 0
@@ -52,13 +53,22 @@ public sealed class BpqNodeException(string message, bool maybeApplied = false) 
 /// Stream 1"), so until the login is done those lines are passed over.</para>
 /// <para>Real I/O on a real socket, so real timeouts: a node that accepts and never answers is
 /// given up on after <see cref="ReplyTimeout"/>.</para>
-/// <para>Never puts the password in a message: nothing LinBPQ sends back is quoted without it
-/// being taken out first.</para>
+/// <para>Never puts the password in a message, nor anything about it: text LinBPQ sends back
+/// that holds it is not quoted at all, nor is any while the password is under 8 characters.</para>
 /// </remarks>
 public sealed partial class BpqNode : IAsyncDisposable
 {
     /// <summary>How long one answer from LinBPQ may take.</summary>
     public static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(10);
+
+    /// <summary>How long the welcome after the password may take to start.</summary>
+    private static readonly TimeSpan WelcomeWait = TimeSpan.FromSeconds(2);
+
+    /// <summary>How long LinBPQ must have said nothing for its welcome to count as finished.</summary>
+    private static readonly TimeSpan SettleQuiet = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>After PASSWORD was sent twice, how long to wait for a second answer to it.</summary>
+    private static readonly TimeSpan ResentQuiet = TimeSpan.FromSeconds(1);
 
     private readonly BpqNodeSettings _settings;
     private readonly SemaphoreSlim _one = new(1, 1);
@@ -103,11 +113,11 @@ public sealed partial class BpqNode : IAsyncDisposable
         {
             throw KnownRefusal(reply) is { } refused
                 ? new BpqNodeException(refused, lostAfterSending)
-                : new BpqNodeException($"LinBPQ answered \"{command}\" with \"{Clean(reply)}\", which says neither yes nor no", maybeApplied: true);
+                : new BpqNodeException($"LinBPQ answered \"{command}\" with {Quoted(reply)}, which says neither yes nor no", maybeApplied: true);
         }
         if ((match.Groups[2].Value != "0") != off)
         {
-            throw new BpqNodeException($"LinBPQ answered \"{command}\" with \"{Clean(reply)}\", which leaves it the wrong way round", maybeApplied: true);
+            throw new BpqNodeException($"LinBPQ answered \"{command}\" with {Quoted(reply)}, which leaves it the wrong way round", maybeApplied: true);
         }
         return match.Groups[1].Value != "0";
     }
@@ -121,7 +131,7 @@ public sealed partial class BpqNode : IAsyncDisposable
         var match = Value().Match(reply);
         return match.Success
             ? match.Groups[1].Value != "0"
-            : throw new BpqNodeException(KnownRefusal(reply) ?? $"LinBPQ answered \"{command}\" with \"{Clean(reply)}\"");
+            : throw new BpqNodeException(KnownRefusal(reply) ?? $"LinBPQ answered \"{command}\" with {Quoted(reply)}");
     }
 
     /// <summary>The ID LinBPQ's <c>PORTS</c> gives <paramref name="port"/>, or null when it lists no such port.</summary>
@@ -136,7 +146,8 @@ public sealed partial class BpqNode : IAsyncDisposable
             var match = PortLine().Match(line);
             if (match.Success && int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) == port)
             {
-                return Clean(match.Groups[2].Value);
+                // As LinBPQ has it, for comparing; the log shows it through Quoted.
+                return OneLine(match.Groups[2].Value);
             }
         }
         return null;
@@ -261,18 +272,51 @@ public sealed partial class BpqNode : IAsyncDisposable
             }
 
             // LinBPQ answers the password line with a new line straight away, right or wrong, then
-            // either the prompt again or the login's welcome. Waiting for that new line means the
-            // password has been dealt with before anything else is sent.
+            // either the prompt again or the login's welcome: the Telnet port's CTEXT, or its own
+            // "Connected to ..." when none is set. It throws away whatever came in with the password
+            // line, so nothing is sent until the welcome has come and gone quiet.
             session.Clear();
             await session.SendAsync(_settings.Password, cancellation).ConfigureAwait(false);
             await session.ReadUntilAsync(() => session.DropThroughNewLine() ? "" : null, "an answer to the password", cancellation).ConfigureAwait(false);
+            await session.SettleAsync(WelcomeWait, SettleQuiet, cancellation).ConfigureAwait(false);
+            if (session.Prompt() is { } again && again.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BpqNodeException($"LinBPQ refused the password for {_settings.User}");
+            }
 
-            await session.SendAsync("PASSWORD", cancellation).ConfigureAwait(false);
-            string? answer = await session.ReadUntilAsync(
-                () => session.Replies() is [var first, ..] ? new Box(first.Text)
-                    : session.Prompt() is { } prompt && prompt.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase) ? new Box(null)
-                    : null,
-                "an answer to PASSWORD", cancellation).ConfigureAwait(false) is { } box ? box.Text : null;
+            // A configured CTEXT ends in a bare CR, so the answer can share its line; and a
+            // PASSWORD LinBPQ was not ready for is lost without a word, so it is sent once more.
+            string welcome = session.Text();
+            session.Clear();
+            Box? box = null;
+            bool resent = false;
+            for (int sent = 1; box is null; sent++)
+            {
+                await session.SendAsync("PASSWORD", cancellation).ConfigureAwait(false);
+                try
+                {
+                    box = await session.ReadUntilAsync(
+                        () => session.Replies() is [var first, ..] ? new Box(first.Text)
+                            : session.Prompt() is { } prompt && prompt.Equals(passwordPrompt, StringComparison.OrdinalIgnoreCase) ? new Box(null)
+                            : null,
+                        "an answer to PASSWORD", cancellation, ReplyTimeout / 2).ConfigureAwait(false);
+                }
+                catch (BpqNodeException) when (session.LostWhy is null)
+                {
+                    if (sent == 2)
+                    {
+                        string since = welcome + session.Text();
+                        throw new BpqNodeException($"LinBPQ did not answer PASSWORD, sent twice {ReplyTimeout.TotalSeconds / 2:F0} s apart; after the login it sent {(OneLine(since).Length == 0 ? "nothing" : Quoted(since))}");
+                    }
+                    resent = true;
+                }
+            }
+            if (resent)
+            {
+                // Both may have been taken: let a second answer come before the first command.
+                await session.SettleAsync(TimeSpan.Zero, ResentQuiet, cancellation).ConfigureAwait(false);
+            }
+            string? answer = box.Text;
             if (answer is null)
             {
                 throw new BpqNodeException($"LinBPQ refused the password for {_settings.User}");
@@ -281,7 +325,7 @@ public sealed partial class BpqNode : IAsyncDisposable
             {
                 throw new BpqNodeException(Digits().IsMatch(answer)
                     ? $"LinBPQ did not give {_settings.User} sysop status: its USER= line in the Telnet port needs SYSOP as the fifth field, as in USER={_settings.User},password,CALL,,SYSOP"
-                    : $"LinBPQ answered PASSWORD with \"{Clean(answer)}\" rather than Ok");
+                    : $"LinBPQ answered PASSWORD with {Quoted(answer)} rather than Ok");
             }
             session.LogInDone();
             return session;
@@ -301,12 +345,40 @@ public sealed partial class BpqNode : IAsyncDisposable
 
     private sealed record Box(string? Text);
 
-    /// <summary>Text from LinBPQ fit for the log: one line, ASCII, and never the password.</summary>
+    private static string Shorten(string text) => text.Length <= 200 ? text : text[..200] + "...";
+
+    /// <summary>What stands for LinBPQ's text when it is not shown.</summary>
+    public const string ReplyNotShown = "(reply not shown)";
+
+    /// <summary>
+    /// The shortest password with which LinBPQ's text is quoted at all, as for the BBS: with a
+    /// shorter one, too much of what LinBPQ sends could happen to match it.
+    /// </summary>
+    internal const int ShortestQuotingPassword = 8;
+
+    /// <summary>
+    /// Text from LinBPQ for the log, in quotes, one line of ASCII; or <see cref="ReplyNotShown"/>
+    /// when it holds the password, or the password is shorter than <see cref="ShortestQuotingPassword"/>.
+    /// Nothing about the password is ever given away, not even where in the text it was.
+    /// </summary>
+    public string Quoted(string text)
+    {
+        string line = OneLine(text);
+        return _settings.Password.Length is > 0 and < ShortestQuotingPassword || Holds(text) || Holds(line)
+            ? ReplyNotShown
+            : $"\"{Shorten(line)}\"";
+    }
+
+    /// <summary>Other text for the log (a socket's error, say): one line of ASCII, or not shown at all if it holds the password.</summary>
     private string Clean(string text)
     {
-        string cleaned = Ascii.Clean(text.Replace('\r', ' ').Replace('\n', ' ').Trim());
-        return _settings.Password.Length > 0 ? cleaned.Replace(_settings.Password, "****", StringComparison.Ordinal) : cleaned;
+        string line = OneLine(text);
+        return Holds(text) || Holds(line) ? "(not shown)" : line;
     }
+
+    private bool Holds(string text) => _settings.Password.Length > 0 && text.Contains(_settings.Password, StringComparison.Ordinal);
+
+    private static string OneLine(string text) => Ascii.Clean(text.Replace('\r', ' ').Replace('\n', ' ').Trim());
 
     /// <summary>Closes the session, quietly; the next command logs in again.</summary>
     public void Drop()
@@ -450,6 +522,63 @@ public sealed partial class BpqNode : IAsyncDisposable
             }
         }
 
+        /// <summary>The text received since it was last cleared.</summary>
+        public string Text()
+        {
+            lock (_gate)
+            {
+                return _text;
+            }
+        }
+
+        /// <summary>
+        /// Waits, never longer than <see cref="ReplyTimeout"/>, until something has come (giving up
+        /// on that after <paramref name="start"/>) and then nothing more for <paramref name="quiet"/>.
+        /// </summary>
+        public async Task SettleAsync(TimeSpan start, TimeSpan quiet, CancellationToken cancellation)
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            limit.CancelAfter(ReplyTimeout);
+            var startBy = DateTime.UtcNow + start;
+            try
+            {
+                while (true)
+                {
+                    Task changed;
+                    bool any;
+                    lock (_gate)
+                    {
+                        if (_changed.Task.IsCompleted)
+                        {
+                            _changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                        }
+                        changed = _changed.Task;
+                        any = _text.Length > 0;
+                    }
+                    if (LostWhy is not null)
+                    {
+                        return;
+                    }
+                    var wait = any ? quiet : startBy - DateTime.UtcNow;
+                    if (wait <= TimeSpan.Zero)
+                    {
+                        return;
+                    }
+                    if (await Task.WhenAny(changed, Task.Delay(wait, limit.Token)).ConfigureAwait(false) != changed)
+                    {
+                        if (any)
+                        {
+                            return;
+                        }
+                        startBy = DateTime.MinValue;
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+            {
+            }
+        }
+
         /// <summary>Drops the text up to and including its first new line; false while there is none.</summary>
         public bool DropThroughNewLine()
         {
@@ -488,11 +617,11 @@ public sealed partial class BpqNode : IAsyncDisposable
         {
             lock (_gate)
             {
-                string[] lines = _text.Split('\n');
+                string[] lines = Lines();
                 var replies = new List<Reply>();
                 for (int i = 0; i < lines.Length - 1; i++)
                 {
-                    var match = ReplyLine().Match(lines[i].TrimEnd('\r'));
+                    var match = ReplyLine().Match(lines[i]);
                     if (match.Success)
                     {
                         replies.Add(new Reply(i, match.Groups[1].Value.Trim()));
@@ -507,16 +636,23 @@ public sealed partial class BpqNode : IAsyncDisposable
         {
             lock (_gate)
             {
-                string[] lines = _text.Split('\n');
-                return string.Join('\n', [first.Text, .. lines[(first.Line + 1)..next.Line].Select(l => l.TrimEnd('\r'))]);
+                string[] lines = Lines();
+                return string.Join('\n', [first.Text, .. lines[(first.Line + 1)..next.Line]]);
             }
         }
 
-        public async Task<T> ReadUntilAsync<T>(Func<T?> found, string what, CancellationToken cancellation)
+        /// <summary>
+        /// The text's lines, the last one unfinished. CR LF, a bare LF and a bare CR each end a
+        /// line: LinBPQ ends a configured CTEXT with a bare CR, and the next line follows it.
+        /// </summary>
+        private string[] Lines() => LineEnd().Split(_text);
+
+        public async Task<T> ReadUntilAsync<T>(Func<T?> found, string what, CancellationToken cancellation, TimeSpan? timeout = null)
             where T : class
         {
+            TimeSpan within = timeout ?? ReplyTimeout;
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            limit.CancelAfter(ReplyTimeout);
+            limit.CancelAfter(within);
             while (true)
             {
                 Task changed;
@@ -542,7 +678,7 @@ public sealed partial class BpqNode : IAsyncDisposable
                 }
                 catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
                 {
-                    throw new BpqNodeException($"LinBPQ did not send {what} within {ReplyTimeout.TotalSeconds:F0} s");
+                    throw new BpqNodeException($"LinBPQ did not send {what} within {within.TotalSeconds:F0} s");
                 }
             }
         }
@@ -598,6 +734,9 @@ public sealed partial class BpqNode : IAsyncDisposable
             return text.ToString();
         }
     }
+
+    [GeneratedRegex("\r\n|\r|\n")]
+    private static partial Regex LineEnd();
 
     /// <summary>A node reply line: <c>TST:GB7TST} text</c>.</summary>
     [GeneratedRegex(@"^\S*\}\s(.*)$")]

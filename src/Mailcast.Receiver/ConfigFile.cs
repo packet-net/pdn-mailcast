@@ -208,7 +208,9 @@ public sealed class ConfigFile
         string retuning = config.Retune && AudioSource.Parse(config.Audio).Kind == AudioSourceKind.SoundModem
             ? "retuning through pdn-soundmodem's receive window on (\"retune\")"
             : config.Rig is { } rig
-                ? rig.DedicatedRadio ? "rig retuning on (a dedicated radio)" : "rig retuning on, with LinBPQ held off the air through \"bpq\""
+                ? config.Bpq is not null ? "rig retuning on, with LinBPQ held off the air through \"bpq\""
+                    : rig.DedicatedRadio ? "rig retuning on (a dedicated radio)"
+                    : "rig retuning on, with the radio kept quiet by \"hooks\".\"before\""
                 : "rig retuning off (no \"rig\")";
         string hooks = config.Hooks switch
         {

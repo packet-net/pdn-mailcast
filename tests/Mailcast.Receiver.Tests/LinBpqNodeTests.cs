@@ -59,6 +59,37 @@ public sealed class LinBpqNodeTests
         }
     }
 
+    /// <summary>
+    /// A Telnet port with a CTEXT (issue #156): LinBPQ ends it with a bare CR, so the answer to
+    /// PASSWORD shares its line. Logged in as soon as LinBPQ first gives its user prompt.
+    /// </summary>
+    [Fact]
+    public async Task RealLinBpq_WithCtext_LogsInAndSaysNoWhereItShould()
+    {
+        using var limit = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await using var bpq = await LinBpqContainer.StartNodeAsync("bpq32-node-ctext.cfg", limit.Token);
+
+        await using (var node = new BpqNode(Settings(bpq)))
+        {
+            Assert.False(await node.SetTransmitOffAsync(2, true, limit.Token));
+            Assert.True(await node.TransmitOffAsync(2, limit.Token));
+            Assert.Equal("HF through QtSoundModem", await node.PortIdAsync(2, limit.Token));
+            Assert.True(await node.SetTransmitOffAsync(2, false, limit.Token));
+        }
+
+        foreach (var (settings, said) in new[]
+        {
+            (Settings(bpq, user: "plain", password: "plain-pw"), "did not give plain sysop status"),
+            (Settings(bpq, password: "not-it"), "refused the password for sysop"),
+        })
+        {
+            await using var node = new BpqNode(settings);
+            var e = await Assert.ThrowsAsync<BpqNodeException>(() => node.SetTransmitOffAsync(2, true, limit.Token));
+            Assert.Contains(said, e.Message, StringComparison.Ordinal);
+            Assert.False(e.MaybeApplied);
+        }
+    }
+
     [Fact]
     public async Task RealLinBpq_NamesItsPorts()
     {

@@ -22,6 +22,105 @@ public sealed class BpqNodeTests
         Assert.Equal(0, fake.XmitOff(2));
     }
 
+    /// <summary>
+    /// LinBPQ ends a configured CTEXT with a bare CR, so the answer to PASSWORD shares the
+    /// CTEXT's line; it is still read as the answer (issue #156).
+    /// </summary>
+    [Fact]
+    public async Task Ctext_EndingInABareCr_StillLetsTheAnswerToPasswordBeRead()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { Ctext = "Welcome to GB7TST\r\nPlease behave" };
+        await using var node = new BpqNode(fake.Settings());
+
+        Assert.False(await node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.Equal(["PASSWORD", "XMITOFF 2 1"], fake.Commands);
+    }
+
+    [Fact]
+    public async Task SlowWelcome_IsWaitedForBeforePassword()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { WelcomeDelay = TimeSpan.FromSeconds(1) };
+        await using var node = new BpqNode(fake.Settings());
+
+        Assert.False(await node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.Equal(["PASSWORD", "XMITOFF 2 1"], fake.Commands);
+    }
+
+    [Fact]
+    public async Task PasswordLost_IsSentOnceMore()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { PasswordsLost = 1 };
+        await using var node = new BpqNode(fake.Settings());
+
+        Assert.False(await node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.Equal(["PASSWORD", "PASSWORD", "XMITOFF 2 1"], fake.Commands);
+        Assert.Equal(1, fake.XmitOff(2));
+    }
+
+    /// <summary>Both answered, late: the second Ok must not be taken for the answer to XMITOFF.</summary>
+    [Fact]
+    public async Task PasswordAnsweredLate_BothAnswersAreLetPastBeforeTheFirstCommand()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { FirstPasswordDelay = TimeSpan.FromSeconds(6) };
+        await using var node = new BpqNode(fake.Settings());
+
+        Assert.False(await node.SetTransmitOffAsync(2, true, CancellationToken.None));
+        Assert.True(await node.TransmitOffAsync(2, CancellationToken.None));
+
+        Assert.Equal(["PASSWORD", "PASSWORD", "XMITOFF 2 1", "XMITOFF 2"], fake.Commands);
+    }
+
+    [Fact]
+    public async Task PasswordNeverAnswered_QuotesWhatLinBpqSent()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { PasswordsLost = 2, Ctext = "Welcome to GB7TST" };
+        await using var node = new BpqNode(fake.Settings());
+
+        var e = await Assert.ThrowsAsync<BpqNodeException>(() => node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.Contains("after the login it sent \"Welcome to GB7TST\"", e.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A reply holding the password is not quoted at all, so where it fell gives nothing away;
+    /// nor is any reply while the password is under 8 characters. Others are quoted.
+    /// </summary>
+    [Theory]
+    [InlineData("longer-pw-123", "Eh? G4TST longer-pw-123", "(reply not shown)")]
+    [InlineData("s3cret-sysop", "Eh?", "\"Eh?\"")]
+    [InlineData("pw7", "Eh?", "(reply not shown)")]
+    [InlineData("pw7", "Hello pw7 there", "(reply not shown)")]
+    public async Task Replies_HoldingThePasswordOrWithAShortOne_AreNotQuoted(string password, string garble, string said)
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { LoginPassword = password, GarbleAfter = "XMITOFF 2 1", Garble = garble };
+        await using var node = new BpqNode(fake.Settings(password: password));
+
+        var e = await Assert.ThrowsAsync<BpqNodeException>(() => node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.Equal($"LinBPQ answered \"XMITOFF 2 1\" with {said}, which says neither yes nor no", e.Message);
+        Assert.DoesNotContain(password, e.Message, StringComparison.Ordinal);
+        Assert.True(e.MaybeApplied);
+    }
+
+    [Fact]
+    public async Task PasswordNeverAnswered_SaysWhatLinBpqSentAndNeverThePassword()
+    {
+        await using var fake = new FakeLinBpqNode(1, 2) { PasswordsLost = 2, Ctext = $"Hello, the password is {FakeLinBpqNode.Password}" };
+        await using var node = new BpqNode(fake.Settings());
+
+        var e = await Assert.ThrowsAsync<BpqNodeException>(() => node.SetTransmitOffAsync(2, true, CancellationToken.None));
+
+        Assert.Contains("did not answer PASSWORD, sent twice", e.Message, StringComparison.Ordinal);
+        Assert.Contains("after the login it sent (reply not shown)", e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Hello", e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(FakeLinBpqNode.Password, e.Message, StringComparison.Ordinal);
+        Assert.False(e.MaybeApplied);
+        Assert.Equal(["PASSWORD", "PASSWORD"], fake.Commands);
+    }
+
     [Fact]
     public async Task SessionDropped_SaysSoAtOnceAndTheNextCommandLogsInAgain()
     {
@@ -79,6 +178,17 @@ public sealed class BpqNodeTests
 
         Assert.True(e.MaybeApplied);
         Assert.Contains("neither yes nor no", e.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("s3cret-sysop", "HF through QtSoundModem", "\"HF through QtSoundModem\"")]
+    [InlineData("s3cret-sysop", "HF s3cret-sysop", "(reply not shown)")]
+    [InlineData("pw7", "HF through QtSoundModem", "(reply not shown)")]
+    public async Task Quoted_ShowsAPortNameOnlyWhenItGivesNothingAway(string password, string text, string shown)
+    {
+        await using var node = new BpqNode(new BpqNodeSettings { Host = "127.0.0.1", Port = 1, User = "sysop", Password = password, HfPort = 2 });
+
+        Assert.Equal(shown, node.Quoted(text));
     }
 
     [Fact]
