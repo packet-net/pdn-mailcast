@@ -724,7 +724,6 @@ public sealed class StatusPage : IAsyncDisposable
     private static string MediaType(HttpListenerRequest request) =>
         (request.ContentType ?? "").Split(';')[0].Trim().ToLowerInvariant();
 
-    /// <summary>What the page shows, in one object.</summary>
     private readonly object _mailVersionGate = new();
     private Packet.Mailcast.MailSnapshot? _lastMailSnapshot;
     private int _mailSnapshots;
@@ -732,11 +731,11 @@ public sealed class StatusPage : IAsyncDisposable
     /// <summary>
     /// A number that differs whenever anything <see cref="MailList"/> shows does: a new snapshot of
     /// the bulletins held (one is made at each change), a delivery answer, the BBS's last failure or
-    /// next try, a part-received bulletin's progress, the directory's signature, or the archive
-    /// settings. Only for comparing with the last one, in the same run of the receiver.
+    /// next try, a part-received bulletin's progress, the directory's signature, the newest
+    /// directory going stale at UTC midnight (the list's summary says so), or the archive settings. Only for comparing with the last one, in the same run of the receiver.
     /// </summary>
     internal int MailVersion(Packet.Mailcast.MailSnapshot mail, IReadOnlyList<Packet.Mailcast.HeldBulletin> held,
-        Packet.Mailcast.DirectoryCheck? newestCheck, Packet.Mailcast.HeardDirectoryCheck? lastHeard)
+        Packet.Mailcast.DirectoryCheck? newestCheck, Packet.Mailcast.HeardDirectoryCheck? lastHeard, DateOnly? staleDirectory)
     {
         int snapshots;
         lock (_mailVersionGate)
@@ -758,12 +757,14 @@ public sealed class StatusPage : IAsyncDisposable
             hash.Add(h);
         }
         hash.Add(newestCheck?.Describe());
+        hash.Add(staleDirectory);
         hash.Add(lastHeard is { Check.Usable: false } ? lastHeard.Check.Reason : null);
         hash.Add(_host.Config.Archive.Days);
         hash.Add(_host.Config.Archive.MaxMegabytes);
         return hash.ToHashCode();
     }
 
+    /// <summary>What the page shows, in one object.</summary>
     internal object Status()
     {
         var config = _host.Config;
@@ -867,7 +868,8 @@ public sealed class StatusPage : IAsyncDisposable
             framesHeard = _host.Intake.FramesHeard,
             // Changes whenever anything the Bulletins list shows does, so the page fetches the
             // list only then, not every few seconds whatever happened.
-            mailVersion = MailVersion(mail, held, newestCheck, lastHeard),
+            mailVersion = MailVersion(mail, held, newestCheck, lastHeard,
+                directory is not null && directory.Date != DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime) ? directory.Date : null),
             // Issue #48: a slim list of the slots "what was heard" can show; the full drill-down
             // for one of them is GET /api/slots/{slotTicks}/frames, fetched when the page opens
             // it. slotTicks is the slot's UTC instant in .NET ticks, sent as a string of digits:

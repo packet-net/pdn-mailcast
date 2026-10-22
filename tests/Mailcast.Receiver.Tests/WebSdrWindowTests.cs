@@ -709,8 +709,8 @@ public class WebSdrWindowTests
         Assert.DoesNotContain("setTimeout(connect", html, StringComparison.Ordinal);
         Assert.DoesNotContain("\nconnect();", html, StringComparison.Ordinal);
         Assert.Contains("if (live && !ws) connect();", html, StringComparison.Ordinal);
-        // Turned off on the page, nothing is streamed: "live" is the switch and the audio both.
-        Assert.Contains("const on = spectroOn(), live = on && s.audio.live;", html, StringComparison.Ordinal);
+        // Turned off on the page, or the tab hidden, nothing is streamed: "live" is the switch, the audio and the tab.
+        Assert.Contains("const on = spectroOn(), live = on && s.audio.live && !document.hidden;", html, StringComparison.Ordinal);
         Assert.Contains("The web SDR ${sdr(s)} is closed between slots. The spectrogram comes back at", html, StringComparison.Ordinal);
         Assert.Contains("The web SDR ${esc(sdr(s))} is tuned for it", html, StringComparison.Ordinal);
         Assert.Contains("${w.about ? ` (${esc(w.about)})` : \"\"}", html, StringComparison.Ordinal);
