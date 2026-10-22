@@ -135,8 +135,14 @@ public sealed class DeliveryLedger
         }
     }
 
+    /// <summary>How many answers have been recorded since this was opened: the status page's bulletin list is fetched again when it moves.</summary>
+    public int Changes => Volatile.Read(ref _changes);
+
+    private int _changes;
+
     private void Remember(DeliveryRecord record)
     {
+        Interlocked.Increment(ref _changes);
         _latest[record.Bid] = record;
         _recent.Add(record);
         if (_recent.Count > RecentKept)

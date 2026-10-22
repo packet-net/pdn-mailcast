@@ -221,6 +221,48 @@ public class MailTests
     /// fields, and the keys on each of their entries, are still there.
     /// </summary>
     [Fact]
+    public async Task MailVersion_StaysPutWhileNothingChanges_AndMovesWithEachChange()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        async Task<int> VersionAsync() => (await http.GetFromJsonAsync<JsonElement>("api/status")).GetProperty("mailVersion").GetInt32();
+
+        int empty = await VersionAsync();
+        Assert.Equal(empty, await VersionAsync());
+
+        // A new bulletin.
+        await RebuildAsync(host.Intake, Samples.Bulletin(81), Samples.Bulletin(82));
+        int rebuilt = await VersionAsync();
+        Assert.NotEqual(empty, rebuilt);
+        time.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(rebuilt, await VersionAsync());
+
+        // A delivery: one accepted, one only deferred, so still waiting.
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "81_GB7RDG"
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred)), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+        int delivered = await VersionAsync();
+        Assert.NotEqual(rebuilt, delivered);
+
+        // A part-received bulletin's progress.
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(980, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
+        int partial = await VersionAsync();
+        Assert.NotEqual(delivered, partial);
+
+        // A resend from the page.
+        string id = (await MailAsync(http)).Single(m => m.GetProperty("bid").GetString() == "81_GB7RDG").GetProperty("id").GetString()!;
+        time.Advance(StatusPage.ResendCooldown);
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Resend(id))).StatusCode);
+        Assert.NotEqual(partial, await VersionAsync());
+    }
+
+    [Fact]
     public async Task Status_KeepsBulletinsAndDeliveriesFields_InTheirOldShape_ForScripts()
     {
         using var dir = new TempDirectory();
