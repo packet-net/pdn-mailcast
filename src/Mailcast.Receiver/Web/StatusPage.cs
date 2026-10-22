@@ -179,6 +179,7 @@ public sealed class StatusPage : IAsyncDisposable
         });
         waterfall.Start();
         pipeline.SourceBlock += waterfall.MeterInputClipping;
+        pipeline.Watched = () => waterfall.Viewers > 0;
         WaterfallWebServer? old;
         lock (_gate)
         {

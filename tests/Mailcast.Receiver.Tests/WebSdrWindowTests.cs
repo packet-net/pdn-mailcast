@@ -588,6 +588,57 @@ public class WebSdrWindowTests
     }
 
     [Fact]
+    public async Task EarlyEnd_SoundCardWithHooks_RunsAfterSoonerThanTheUsualClose()
+    {
+        using var scripts = new TempDirectory();
+        string record = Path.Combine(scripts.Path, "runs");
+        var checks = System.Threading.Channels.Channel.CreateUnbounded<bool>();
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero), c => c with
+        {
+            Audio = Samples.SoundCard,
+            Hooks = new HooksSettings
+            {
+                Before = HookScript.Write(scripts.Path, "before.sh", record),
+                After = HookScript.Write(scripts.Path, "after.sh", record),
+            },
+        });
+        rig.Host.SlotWindowChecked += () => checks.Writer.TryWrite(true);
+        await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.HookWaits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Contains(HookScript.Runs(record), l => l.StartsWith("before ", StringComparison.Ordinal));
+
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            rig.Host.Intake.Offer(frame);
+        }
+        await rig.Host.Intake.DrainAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        rig.Host.Slots.OnProbeCaptured();
+
+        for (int i = 0; i < 8 && !rig.Log.Any(l => l.StartsWith("audio: the 12:00 UTC slot is over early", StringComparison.Ordinal)); i++)
+        {
+            rig.Clock.Advance(ReceiverHost.EarlyEndPoll);
+            await checks.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.Contains(rig.Log, l => l.StartsWith("audio: the 12:00 UTC slot is over early", StringComparison.Ordinal));
+        Assert.Contains("between slots until 12:58 UTC", rig.Host.AudioState, StringComparison.Ordinal);
+
+        // As with a web SDR: the hooks loop notices at its next look, and runs "after" then.
+        for (int i = 0; i < 15 && !HookScript.Runs(record).Any(l => l.StartsWith("after ", StringComparison.Ordinal)); i++)
+        {
+            var startedBy = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (AfterRunning(rig.Log) && DateTime.UtcNow < startedBy)
+            {
+                await Task.Delay(10);
+            }
+            rig.Clock.Advance(SlotHooks.Check);
+            await rig.HookWaits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.Contains(HookScript.Runs(record), l => l.StartsWith("after ", StringComparison.Ordinal));
+        Assert.True(rig.Clock.GetUtcNow() < new DateTimeOffset(2026, 10, 5, 12, 12, 0, TimeSpan.Zero),
+            $"\"after\" should have run well before the usual 12:12 close; it is now {rig.Clock.GetUtcNow():HH:mm:ss}");
+    }
+
+    [Fact]
     public async Task ListenNow_AfterAnEarlyEnd_OpensRatherThanRefusingWithTheWrongReason()
     {
         // Issue #80: open at 12:01, in the 12:00 slot's window (opens 11:58, closes 12:12), and
