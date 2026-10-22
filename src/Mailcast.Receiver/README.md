@@ -49,7 +49,7 @@ Open http://127.0.0.1:8130/ on that machine to see what it hears. Bulletins appe
 
 ## Using your own radio instead
 
-Set your radio to USB on **7.052 MHz** (the signal is centred on 7.0538 MHz), with its receive audio into a sound card. It then hears every slot, not just some. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page.
+Set your radio to USB on **7.052 MHz** (the signal is centred on 7.0538 MHz), with its receive audio into a sound card. It then hears every slot, not just some. Find the card's name with `arecord -L`, then in `/etc/pdn-mailcast/receiver.json` change `"audio"` to it, for example `"plughw:CARD=Device,DEV=0"`. Restart the receiver and set the level so peaks sit between -18 and -9 dBFS on the status page. If another program, Ardopcf say, listens to the same card, the two can share it: see [Sharing a sound card with another program](../../docs/receiver.md#sharing-a-sound-card-with-another-program).
 
 SDR users: nothing else to do. If your radio's own receive filter is narrower, especially 2.4 kHz or less, the right dial is 7.0538 MHz minus the middle of that filter, and the settings page works it out for you: either **Measure my filter** (it listens to about 10 s of band noise with nothing tuned in and reports the filter and the dial), or type the filter's low and high edge in Hz yourself. A worked example: a filter from 367 to 2190 Hz (an FT-450D's narrow setting) gives a dial of 7.05252 MHz. Either way a button writes the dial for you; `"dialKHz"` in `receiver.json` takes it too.
 
