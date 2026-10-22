@@ -414,8 +414,19 @@ public sealed class ReceiverHost : IAsyncDisposable
                     }
                     return new HookWindow(opens, closes, slot);
                 case AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect:
-                    // pdn-soundmodem's radio and SDRconnect's, like a sound card's, are heard all the time.
-                    return ListeningWindow.SoundCard(at, Schedule) is { } window ? new HookWindow(window.Opens, window.Closes, window.Slot) : null;
+                    // pdn-soundmodem's radio and SDRconnect's, like a sound card's, are heard all the
+                    // time. A slot heard in full closes its window then (WatchSlotWindowsAsync), the
+                    // same as a web SDR's, so "after" runs then too.
+                    if (ListeningWindow.SoundCard(at, Schedule) is not { } window)
+                    {
+                        return null;
+                    }
+                    var heardBy = window.Closes;
+                    if (EarlyEndFinished is { } done && done.Slot == window.Slot && done.At < heardBy)
+                    {
+                        heardBy = done.At;
+                    }
+                    return new HookWindow(window.Opens, heardBy, window.Slot);
                 default:
                     return null;
             }
@@ -531,7 +542,97 @@ public sealed class ReceiverHost : IAsyncDisposable
     }
 
     /// <summary>A sentence on what the audio is doing, for the page and the log.</summary>
-    public string AudioState => Audio.Words;
+    public string AudioState => Audio.Phase == AudioPhase.Listening && BetweenSlots is { } next
+        ? $"{Audio.Words}; between slots until {next.Opens:HH:mm} UTC, so it only decodes while the waterfall is open"
+        : Audio.Words;
+
+    /// <summary>
+    /// For a sound card between slots: when decoding starts again, and for which slot; null
+    /// while a slot's window is open, and for any other source. See <see cref="AudioPipeline.BetweenSlots"/>.
+    /// </summary>
+    public (DateTimeOffset Opens, DateTimeOffset Slot)? BetweenSlots
+    {
+        get { lock (_gate) { return _betweenSlots; } }
+        private set { lock (_gate) { _betweenSlots = value; } }
+    }
+
+    private (DateTimeOffset Opens, DateTimeOffset Slot)? _betweenSlots;
+
+    /// <summary>
+    /// For a source heard all the time (a sound card, pdn-soundmodem, SDRconnect): ends the
+    /// window of a slot heard in full (<see cref="EarlyEndReason"/>), so "after" runs then, and
+    /// for a sound card works out whether it is between slots, and tells the pipeline. Called
+    /// every <see cref="EarlyEndPoll"/>; a web SDR and a recording are left alone.
+    /// </summary>
+    internal void CheckSlotWindow()
+    {
+        var source = AudioSource.Parse(Config.Audio);
+        var now = _time.GetUtcNow();
+        (DateTimeOffset Opens, DateTimeOffset Slot)? between = null;
+        if (source.Kind is AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect
+            && ListeningWindow.SoundCard(now, Schedule) is { } window)
+        {
+            var (opens, closes, slot) = window;
+            if (now >= opens && slot != EarlyEndFinished?.Slot && EarlyEndReason(slot) is { } why)
+            {
+                _log($"audio: the {slot.UtcDateTime:HH:mm} UTC slot is over early: {why}");
+                EarlyEndFinished = (slot, now);
+            }
+            if (slot == EarlyEndFinished?.Slot && ListeningWindow.SoundCard(closes, Schedule) is { } next)
+            {
+                // Heard in full: the rest of its window is between slots, the same as after it.
+                (opens, _, slot) = next;
+            }
+            if (source.IsSoundCard && now < opens)
+            {
+                between = (opens, slot);
+            }
+        }
+
+        var was = BetweenSlots;
+        BetweenSlots = between;
+        if (Pipeline is { } pipeline)
+        {
+            pipeline.BetweenSlots = between is not null;
+        }
+        if (between is { } b && b != was)
+        {
+            _log($"audio: between slots until {b.Opens.UtcDateTime:HH:mm} UTC, ready for the {b.Slot.UtcDateTime:HH:mm} UTC slot; "
+                + "the sound card stays open, but it only decodes while the status page's waterfall is open");
+        }
+        else if (between is null && was is { } w)
+        {
+            _log($"audio: decoding for the {w.Slot.UtcDateTime:HH:mm} UTC slot");
+        }
+    }
+
+    /// <summary>Raised after each look <see cref="WatchSlotWindowsAsync"/> takes, for tests.</summary>
+    internal event Action? SlotWindowChecked;
+
+    /// <summary>Runs <see cref="CheckSlotWindow"/> every <see cref="EarlyEndPoll"/> until <paramref name="cancellation"/> is cancelled. Catches and logs its own problems.</summary>
+    private async Task WatchSlotWindowsAsync(CancellationToken cancellation)
+    {
+        while (!cancellation.IsCancellationRequested)
+        {
+            try
+            {
+                CheckSlotWindow();
+            }
+            catch (Exception e)
+            {
+                _log($"audio: unexpected failure checking the slot's window: {Ascii.Clean(e.Message)}");
+            }
+            SlotWindowChecked?.Invoke();
+            try
+            {
+                await Task.Delay(EarlyEndPoll, _time, cancellation).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
 
     /// <summary>What the audio is doing, for the page: in words, and the parts the page needs to explain it.</summary>
     public AudioCondition Audio
@@ -642,6 +743,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         Task feedback = Feedback.RunAsync(stopOthers.Token);
         // Issue #133: the summary line as each slot ends. Never fails, so not one the others stop for.
         Task slotEnds = WatchSlotEndsAsync(stopOthers.Token);
+        // A slot heard in full ends early, and a sound card rests between slots. Never fails either.
+        Task slotWindows = WatchSlotWindowsAsync(stopOthers.Token);
         Task first;
         try
         {
@@ -660,6 +763,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             // "after" always runs once "before" has, whatever stopped the receiver.
             await Hooks.FinishAsync().ConfigureAwait(false);
             await slotEnds.ConfigureAwait(false);
+            await slotWindows.ConfigureAwait(false);
         }
         if ((first == retune || first == hookLoop || first == feedback) && !cancellation.IsCancellationRequested && !first.IsFaulted)
         {
@@ -903,6 +1007,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             using var running = window is null ? null : CancellationTokenSource.CreateLinkedTokenSource(restart.Token, window.Token);
             CancellationToken token = running?.Token ?? restart.Token;
             var pipeline = PipelineFactory?.Invoke(source) ?? CreatePipeline(source, config);
+            pipeline.BetweenSlots = source.IsSoundCard && BetweenSlots is not null;
             pipeline.SdrConnectAnsweredBefore = source.Kind == AudioSourceKind.SdrConnect
                 && string.Equals(sdrConnectAnswered, config.Audio, StringComparison.OrdinalIgnoreCase);
             Slots.Schedule = source.Kind == AudioSourceKind.Wav ? null : Schedule;
@@ -1124,8 +1229,9 @@ public sealed class ReceiverHost : IAsyncDisposable
     private (DateTimeOffset Slot, DateTimeOffset At)? _earlyEndFinished;
 
     /// <summary>
-    /// Issue #49: the most recent web SDR slot whose window was closed early, before its usual
-    /// end, and when; it is not reopened for the rest of that window, the same as one that ran to
+    /// Issue #49: the most recent slot whose window was closed early, before its usual end, and
+    /// when (a web SDR's by <see cref="CloseAtAsync"/>, any source heard all the time's by
+    /// <see cref="CheckSlotWindow"/>); it is not reopened for the rest of that window, the same as one that ran to
     /// its usual close, and <see cref="HookWindowAt"/> says its window closed then, not at its
     /// usual time, so "after" does not wait for that either.
     /// </summary>

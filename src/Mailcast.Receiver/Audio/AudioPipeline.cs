@@ -942,6 +942,27 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         _gapsUnsaid = 0;
     }
 
+    /// <summary>
+    /// Set between slots for a sound card, which is otherwise decoded all the time: its audio
+    /// then reaches only <see cref="SourceBlock"/> (the level meter and "Measure my filter"), not
+    /// the modem, the tone detector or the waterfall, so a small machine does almost nothing
+    /// between slots. Unless <see cref="Watched"/> says someone has the waterfall open: then
+    /// everything runs as in a slot, so the page still shows the band.
+    /// </summary>
+    public bool BetweenSlots
+    {
+        get => Volatile.Read(ref _betweenSlots);
+        set => Volatile.Write(ref _betweenSlots, value);
+    }
+
+    private bool _betweenSlots;
+
+    /// <summary>Whether the last block was skipped for <see cref="BetweenSlots"/>; audio thread only.</summary>
+    private bool _idled;
+
+    /// <summary>Whether the page's waterfall is open now; null counts as not. Asked on the audio thread, only <see cref="BetweenSlots"/>.</summary>
+    internal Func<bool>? Watched { get; set; }
+
     /// <summary>One block through the modem and everything beside it, on the audio thread (or a test's).</summary>
     /// <param name="samples">The block.</param>
     /// <param name="soundCard">Whether it came from a sound card, whose clipping the channel notes.</param>
@@ -955,6 +976,17 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         if (soundCard)
         {
             Channel.NoteCardClipping(samples);
+        }
+        if (BetweenSlots && Watched?.Invoke() != true)
+        {
+            _idled = true;
+            return;
+        }
+        if (_idled)
+        {
+            // The modem last heard audio from before the pause: it starts afresh, as after a gap.
+            ResetModem();
+            _idled = false;
         }
         Capture.Write(samples);
         Tone.Process(samples);
