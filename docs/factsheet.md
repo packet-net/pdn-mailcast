@@ -9,7 +9,7 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from G
 | Frequency | Centre 7.0538 MHz; receivers tune a USB dial of **7.052 MHz**, which puts the centre at 1800 Hz audio |
 | Occupied bandwidth | 3.24 kHz edge to edge (7.0522 to 7.0554 MHz); 99% of the power within 2.89 kHz (7.0524 to 7.0553 MHz) |
 | Clear of | The UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz |
-| Waveform | MIL-STD-188-110D Appendix D, 3 kHz serial tone, waveform number 4 (`ms110d-wn4` in pdn-soundmodem). The head end can alternate slots with WN3 (600 bps, rate 1/3) to compare them; receivers follow by autobaud, and the slot report and directory name each slot's waveform |
+| Waveform | MIL-STD-188-110D Appendix D, 3 kHz serial tone, waveform number 4 ([`ms110d-wn4`](https://github.com/packet-net/pdn-soundmodem/blob/main/docs/dev/ms110d/waveforms.md#wn4) in pdn-soundmodem). The head end can alternate slots with WN3 ([`ms110d-wn3`](https://github.com/packet-net/pdn-soundmodem/blob/main/docs/dev/ms110d/waveforms.md#wn3), 600 bps, rate 1/3) to compare them; receivers follow by autobaud, and the slot report and directory name each slot's waveform |
 | Modulation | BPSK at 2400 baud on an 1800 Hz subcarrier, root-raised-cosine pulse shaping, roll-off 0.35 |
 | User data rate | 1200 bps (rate 2/3 convolutional code, mini-probes of 32 symbols every 96 data symbols) |
 | Interleaver | Short; 3-superframe preamble per burst; receiver is autobaud |
