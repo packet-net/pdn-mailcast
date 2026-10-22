@@ -589,20 +589,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             }
             if (source.IsSoundCard && now < opens)
             {
-                bool heard = LastSlotHeardInItsWindow();
-                if (heard)
-                {
-                    between = (opens, slot);
-                }
-                if (heard != _restingEarned)
-                {
-                    _restingEarned = heard;
-                    if (!heard)
-                    {
-                        _log("audio: the last slot was not heard in its window (poor conditions, a clock that is out, or slots that have moved), "
-                            + "so the sound card is decoded all the time, until a slot is heard in its window again");
-                    }
-                }
+                between = (opens, slot);
             }
         }
 
@@ -622,19 +609,6 @@ public sealed class ReceiverHost : IAsyncDisposable
             _log($"audio: decoding for the {w.Slot.UtcDateTime:HH:mm} UTC slot");
         }
     }
-
-    /// <summary>Whether the sound card last rested between slots; for saying when that changes, not at every look.</summary>
-    private bool _restingEarned = true;
-
-    /// <summary>
-    /// Whether the latest slot tracked heard a frame inside its own window. A sound card only
-    /// rests between slots while this holds: a receiver whose clock is out, or that has not yet
-    /// heard slots the head end moved, hears its frames outside the windows it expects, and
-    /// resting would lose them. Decoding all the time, as before, it hears them, and rests again
-    /// once a slot is heard where it is expected.
-    /// </summary>
-    private bool LastSlotHeardInItsWindow() => Slots.Last is { Scheduled: { } slot, LastFrame: { } heard }
-        && heard >= slot - ReceiverConfig.WebSdrBefore && heard <= slot + ReceiverConfig.WebSdrAfter;
 
     /// <summary>Raised after each look <see cref="WatchSlotWindowsAsync"/> takes, for tests.</summary>
     internal event Action? SlotWindowChecked;

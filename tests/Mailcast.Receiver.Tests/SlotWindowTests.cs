@@ -117,48 +117,6 @@ public class SlotWindowTests
     }
 
     [Fact]
-    public async Task SoundCard_ASlotNotHeard_DecodesAllTheTime_AndSaysWhy()
-    {
-        // Poor conditions, a clock that is out, or slots that moved: nothing heard in the window.
-        await using var f = new Fixture(SlotStart.AddMinutes(30), Samples.SoundCard);
-
-        f.Host.CheckSlotWindow();
-
-        Assert.Null(f.Host.BetweenSlots);
-        Assert.Contains(f.Log, line => line.StartsWith("audio: the last slot was not heard in its window", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task SoundCard_HeardOnlyOutsideItsWindow_DecodesAllTheTime()
-    {
-        // A clock 20 minutes out: GB7RDG's frames land at what this receiver thinks is 12:20,
-        // outside the 12:00 slot's window, so resting would lose the next slot too.
-        await using var f = new Fixture(SlotStart.AddMinutes(20), Samples.SoundCard);
-        await f.HearAsync(Samples.Frames([Samples.Bulletin(1)])[0]);
-        f.Time.Advance(TimeSpan.FromMinutes(10));
-
-        f.Host.CheckSlotWindow();
-
-        Assert.Null(f.Host.BetweenSlots);
-    }
-
-    [Fact]
-    public async Task SoundCard_RestsAgain_OnceASlotIsHeardInItsWindow()
-    {
-        await using var f = new Fixture(SlotStart.AddMinutes(30), Samples.SoundCard);
-        f.Host.CheckSlotWindow();
-        Assert.Null(f.Host.BetweenSlots);
-
-        f.Time.Advance(TimeSpan.FromMinutes(35)); // 13:05, in the 13:00 slot's window
-        f.Host.CheckSlotWindow();
-        await f.HearAsync(Samples.Frames([Samples.Bulletin(1)])[0]);
-        f.Time.Advance(TimeSpan.FromMinutes(10)); // 13:15, after it
-        f.Host.CheckSlotWindow();
-
-        Assert.Equal((SlotStart.AddMinutes(118), SlotStart.AddHours(2)), f.Host.BetweenSlots);
-    }
-
-    [Fact]
     public async Task WebSdrAndRecording_AreLeftAlone()
     {
         await using var webSdr = new Fixture(SlotStart.AddMinutes(30), "ubersdr:wessex.zapto.org");
