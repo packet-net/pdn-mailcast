@@ -212,6 +212,63 @@ public class MailTests
         Assert.Equal("deferred", deferredAttempt.GetProperty("saidShort").GetString());
     }
 
+    [Fact]
+    public async Task MailVersion_StaysPutWhileNothingChanges_AndMovesWithEachChange()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, _) = await StartAsync(dir.Path, time);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        async Task<int> VersionAsync() => (await http.GetFromJsonAsync<JsonElement>("api/status")).GetProperty("mailVersion").GetInt32();
+
+        int empty = await VersionAsync();
+        Assert.Equal(empty, await VersionAsync());
+
+        // A new bulletin.
+        await RebuildAsync(host.Intake, Samples.Bulletin(81), Samples.Bulletin(82));
+        int rebuilt = await VersionAsync();
+        Assert.NotEqual(empty, rebuilt);
+        time.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(rebuilt, await VersionAsync());
+
+        // A delivery: one accepted, one only deferred, so still waiting.
+        var service = new DeliveryService(host.Intake, new AnsweringBbs(b => b.Bid == "81_GB7RDG"
+            ? new DeliveryOutcome(b.Bid, DeliveryVerdict.Accepted)
+            : new DeliveryOutcome(b.Bid, DeliveryVerdict.Deferred)), host.Ledger, time, _ => { });
+        await service.DeliverPendingAsync(CancellationToken.None);
+        int delivered = await VersionAsync();
+        Assert.NotEqual(rebuilt, delivered);
+        Assert.Equal(delivered, await VersionAsync());
+
+        // A part-received bulletin's progress.
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(980, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
+        int partial = await VersionAsync();
+        Assert.NotEqual(delivered, partial);
+        Assert.Equal(partial, await VersionAsync());
+
+        // A resend from the page.
+        string id = (await MailAsync(http)).Single(m => m.GetProperty("bid").GetString() == "81_GB7RDG").GetProperty("id").GetString()!;
+        time.Advance(StatusPage.ResendCooldown);
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Resend(id))).StatusCode);
+        int resent = await VersionAsync();
+        Assert.NotEqual(partial, resent);
+        Assert.Equal(resent, await VersionAsync());
+
+        // The archive pruned: 81 delivered again, then kept past its 30 days. The store prunes as
+        // frames arrive, so one more piece of the part-received bulletin brings it on.
+        await service.DeliverPendingAsync(CancellationToken.None);
+        Assert.Contains(await MailAsync(http), m => m.GetProperty("bid").GetString() == "81_GB7RDG");
+        int kept = await VersionAsync();
+        time.Advance(TimeSpan.FromDays(31));
+        host.Intake.Offer(FirstPieceOf(Samples.Bulletin(980, bodyLines: 200)));
+        await host.Intake.DrainAsync(CancellationToken.None);
+        Assert.DoesNotContain(await MailAsync(http), m => m.GetProperty("bid").GetString() == "81_GB7RDG");
+        Assert.NotEqual(kept, await VersionAsync());
+    }
+
     /// <summary>
     /// Issue #73 review: the CT 150 survey script (root@10.45.0.235's
     /// /usr/local/bin/mailcast-survey) reads <c>bulletins</c> from <c>GET /api/status</c> for its

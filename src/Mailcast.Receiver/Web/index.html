@@ -309,6 +309,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
       <span><i style="background:#ffd23f"></i>tone as heard</span>
       <span id="specnote">0 to 4 kHz of audio, newest at the top.</span>
       <a href="waterfall/" target="_blank">Full waterfall</a>
+      <button type="button" class="plain" id="waterfallSwitch">Turn the spectrogram off</button>
     </div>
     <h2 style="margin-top:14px">Input level</h2>
     <div class="meter"><div class="band" id="band"></div><div class="peak" id="peak"></div></div>
@@ -913,11 +914,31 @@ function heardPieceHtml(p) {
 }
 
 /* ---------- status ---------- */
+/* The receiver not answering at all (its service stopped, say, or a proxy in front of it saying
+   it is gone), or not within 10 s, is said once, plainly, and the page asks again every half
+   minute instead of every 3 s until it answers. Nothing else on the page asks meanwhile: the
+   bulletin list follows the status, and the spectrogram is closed and cleared. */
+let down = false;
 async function refresh() {
-  const r = await api("api/status");
+  const r = await api("api/status", { signal: AbortSignal.timeout(10000) });
+  const wasDown = down;
+  down = !r.ok && [0, 502, 503, 504].includes(r.status);
+  if (down) {
+    $("summary").innerHTML = '<span class="bad">The receiver isn\'t running, or can\'t be reached. Trying again every half minute.</span>';
+    if (ws) { const old = ws; ws = null; old.close(); }
+    ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    audioLive = false;
+    $("specNotice").hidden = false;
+    $("specNotice").textContent = "No spectrogram while the receiver can't be reached.";
+    return;
+  }
   if (!r.ok) { $("summary").textContent = r.error; return; }
   status = r.body;
   const s = status;
+  // The settings could not be loaded while it was down.
+  if (wasDown && !settings) loadSettings();
+  // The bulletin list is fetched again only when something in it has changed.
+  if (s.mailVersion !== mailVersion) refreshMail(s.mailVersion);
   $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
   schedule(s);
   spectrogram(s);
@@ -966,7 +987,7 @@ async function refresh() {
   const lvl = s.level, target = lvl.advice === "target";
   $("band").hidden = !target;
   $("levelNote").hidden = !target;
-  if (!levelSeen) $("levelText").textContent = target ? `Peaks between ${lvl.lowDbFs} and ${lvl.highDbFs} dBFS are best.`
+  if (!levelSeen && spectroOn()) $("levelText").textContent = target ? `Peaks between ${lvl.lowDbFs} and ${lvl.highDbFs} dBFS are best.`
     : `The level is ${whose(s)} own. Any level is fine short of clipping.`;
   $("band").style.left = pct(lvl.lowDbFs) + "%";
   $("band").style.width = (pct(lvl.highDbFs) - pct(lvl.lowDbFs)) + "%";
@@ -1175,8 +1196,11 @@ $("listenNowBtn").addEventListener("click", async () => {
 });
 
 const pct = db => Math.max(0, Math.min(100, (db + 60) / 60 * 100));
-setInterval(refresh, 3000);
-refresh();
+async function poll() {
+  try { await refresh(); }
+  finally { setTimeout(poll, down ? 30000 : 3000); }
+}
+poll();
 
 /* Channel detail starts open on wide screens (there is room) and closed on phones; a <details>
    element's own box gives its content no room unless it is actually open, so this has to set the
@@ -1192,7 +1216,7 @@ wideScreen.addEventListener("change", e => { if (!detailTouched) $("channelDetai
 // Bulletins are whatever came over the air, so nothing from one is ever put in as HTML: every
 // field goes in with textContent, through el() below.
 const PAGE = 25;
-let mailOffset = 0, mail = null, viewing = null;
+let mailOffset = 0, mail = null, viewing = null, mailVersion = null;
 const size = n => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} kB`;
 function el(tag, text, cls) {
   const e = document.createElement(tag);
@@ -1290,9 +1314,12 @@ function mailSummary(m) {
   if (m.rejected) note += ` The last list heard was not used: ${m.rejected}.`;
   return note;
 }
-async function refreshMail() {
+/* version: the status's mailVersion this fetch is for, kept only once the list has come, so a
+   fetch that failed is tried again at the next status. */
+async function refreshMail(version) {
   const r = await api(`api/mail?offset=${mailOffset}&limit=${PAGE}`);
   if (!r.ok) { $("mailNote").textContent = r.error; $("mailNote").className = "bad"; return; }
+  if (version !== undefined) mailVersion = version;
   mail = r.body;
   $("mailNote").className = "muted";
   if (mail.total > 0 && mailOffset >= mail.total) { mailOffset = Math.max(0, mailOffset - PAGE); return refreshMail(); }
@@ -1363,8 +1390,6 @@ $("resend").addEventListener("click", async () => {
   if (r.ok) said("Back in the outbox: it goes to the BBS at the next session.", "good"); else said(r.error, "bad");
   if (r.ok) { $("resend").hidden = true; mailOffset = 0; refreshMail(); refresh(); }
 });
-setInterval(refreshMail, 5000);
-refreshMail();
 
 /* ---------- spectrogram ---------- */
 const canvas = $("spectro"), ctx = canvas.getContext("2d");
@@ -1476,18 +1501,50 @@ function audioNote(s) {
       return "Waiting for audio...";
   }
 }
+/* The spectrogram can be turned off on this page, remembered by this browser. Off, nothing is
+   streamed to it: the page asks for no spectrogram and no level, and says so. It is closed too
+   while the tab is hidden, and opened again when it is shown, so a tab left in the background
+   doesn't keep the receiver working for it. */
 let audioLive = false;
+const spectroOn = () => localStorage.getItem("mailcast.spectrogram") !== "off";
 function spectrogram(s) {
-  const note = audioNote(s), box = $("specNotice");
+  const on = spectroOn(), live = on && s.audio.live && !document.hidden;
+  const note = on ? audioNote(s) : "The spectrogram is off. Turn it on with the button below to see it and the input level.";
+  const box = $("specNotice");
   box.hidden = !note;
   box.textContent = note || "";
-  if (s.audio.live && !ws) connect();
-  if (!s.audio.live && ws) { const old = ws; ws = null; old.close(); }
-  if (!s.audio.live && audioLive) { ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-  audioLive = s.audio.live;
+  if (live && !ws) connect();
+  if (!live && ws) { const old = ws; ws = null; old.close(); }
+  if (!live && audioLive) { ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  audioLive = live;
 }
+function showSwitch() {
+  const on = spectroOn();
+  $("waterfallSwitch").textContent = on ? "Turn the spectrogram off" : "Turn the spectrogram on";
+  if (!on) {
+    clearTimeout(levelTimer);
+    $("peak").style.width = "0";
+    $("levelText").textContent = "The input level shows while the spectrogram is on.";
+  } else if ($("levelText").textContent.startsWith("The input level shows while")) {
+    levelSeen = false;
+    $("levelText").textContent = "Waiting for the input level...";
+  }
+}
+$("waterfallSwitch").addEventListener("click", () => {
+  localStorage.setItem("mailcast.spectrogram", spectroOn() ? "off" : "on");
+  showSwitch();
+  if (status) spectrogram(status);
+});
+/* The same switch pressed in another tab of this page. */
+window.addEventListener("storage", e => {
+  if (e.key !== "mailcast.spectrogram") return;
+  showSwitch();
+  if (status && !down) spectrogram(status);
+});
+document.addEventListener("visibilitychange", () => { if (status && !down) spectrogram(status); });
 
 let levelTimer = null;
+showSwitch();
 function level(msg) {
   const peak = $("peak");
   peak.style.width = pct(msg.peak) + "%";
