@@ -159,40 +159,45 @@ Once the day's directory and everything in it are heard, the probe or channel me
 
 If Ardopcf, QtSoundModem or another program already listens to your radio's sound card, the receiver can listen to the same card at the same time. Nothing has to stop for the slots, and there is no audio to pipe between programs.
 
-You do this with a shared device, which ALSA calls `dsnoop`. Put this in `/etc/asound.conf`, with your card's name in place of `Device` (`arecord -l` lists the names):
+You do this with a shared device, which ALSA (Linux's sound system) calls `dsnoop`.
 
-```
-pcm.shared {
-    type dsnoop
-    ipc_key 5678
-    ipc_key_add_uid false
-    ipc_perm 0666
-    slave {
-        pcm "hw:CARD=Device,DEV=0"
-        channels 1
-        rate 48000
-    }
-}
-```
+1. Find your card's name. Run `arecord -L` and look for the line starting `hw:CARD=` for your radio's sound card, such as `hw:CARD=Device,DEV=0`.
+2. Open the ALSA settings file with `sudo nano /etc/asound.conf`. If it already has something in it, add this at the end. Put your card's name from step 1 in place of `hw:CARD=Device,DEV=0`:
 
-Then point every program that listens to the card at it. In `/etc/pdn-mailcast/receiver.json`, set `"audio": "shared"`. In the other programs, use `plug:shared`, so each one can still have the sample rate it wants. Restart them all.
+   ```
+   pcm.shared {
+       type dsnoop
+       ipc_key 5678
+       ipc_key_add_uid false
+       ipc_perm 0666
+       slave {
+           pcm "hw:CARD=Device,DEV=0"
+           channels 1
+           rate 48000
+       }
+   }
+   ```
 
-Each part matters:
+3. In `/etc/pdn-mailcast/receiver.json`, set `"audio": "shared"`.
+4. In the other program, set its input (capture) device to `plug:shared`. The `plug:` part lets it keep the sample rate it wants. Leave its output (playback) device as it was: the shared device can only listen, so the program still transmits through the card as before.
+5. Restart the other program and the receiver.
+
+Each part of the settings matters:
 
 - **`/etc/asound.conf`, not `~/.asoundrc`.** The receiver runs as its own user, `pdn-mailcast`, and can't see your home folder. If the device is in `~/.asoundrc`, the receiver says `No such file or directory`.
-- **`ipc_key`.** Any number will do. Programs use it to find the shared device, and ALSA won't make one without it.
+- **`ipc_key`.** Programs use this number to find the shared device, and ALSA won't make one without it. Any number will do, as long as no other shared device in the file uses the same one.
 - **`ipc_perm 0666` and `ipc_key_add_uid false`.** These let programs running as different users share the device. Without them, the receiver says `Permission denied` if the other program opened the device first.
-- **`rate 48000`.** The receiver only listens at 48000 Hz. At any other rate it won't open the device.
+- **`channels 1` and `rate 48000`.** The receiver only listens in mono at 48000 Hz. With anything else here, it won't open the device.
 
 To check, start the other program, then record 5 seconds as the receiver's user:
 
 ```
-sudo -u pdn-mailcast arecord -D shared -r 48000 -c 1 -f S16_LE -d 5 /tmp/test.wav
+sudo -u pdn-mailcast -g audio arecord -D shared -r 48000 -c 1 -f S16_LE -d 5 /tmp/test.wav
 ```
 
 If that works, the receiver will too.
 
-This shares listening only. The radio still has to be on the bulletin frequency for each slot, and the other program must not transmit while it is. If either needs taking care of, see [Sharing a radio with LinBPQ](#sharing-a-radio-with-linbpq) or the next section.
+This only shares the listening. The radio still has to be on the bulletin frequency for each slot, and the other program must not transmit during one. If the radio needs retuning for the slots, or the other program needs to stay quiet during them, see [Sharing a radio with LinBPQ](#sharing-a-radio-with-linbpq) or the next section.
 
 ## Running your own commands around each slot
 

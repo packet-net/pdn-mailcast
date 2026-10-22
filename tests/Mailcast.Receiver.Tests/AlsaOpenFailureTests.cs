@@ -31,6 +31,7 @@ public class AlsaOpenFailureTests
     {
         string said = AudioPipeline.AlsaOpenFailure("snoop03", "snd_pcm_set_params(snoop03, 48000 Hz, 1 ch): Invalid argument");
 
+        Assert.Contains("channels 1", said);
         Assert.Contains("rate 48000", said);
     }
 
@@ -42,10 +43,22 @@ public class AlsaOpenFailureTests
         Assert.Contains("If you made snoop03 yourself", said);
     }
 
+    [Fact]
+    public void PlugInFront_StillGetsTheSharingHint()
+    {
+        string said = AudioPipeline.AlsaOpenFailure("plug:snoop03", "snd_pcm_open(plug:snoop03): Permission denied");
+
+        Assert.Contains("ipc_perm 0666", said);
+    }
+
     [Theory]
     [InlineData("plughw:CARD=Device,DEV=0", "snd_pcm_open(plughw:CARD=Device,DEV=0): No such file or directory")]
     [InlineData("hw:1,0", "snd_pcm_open(hw:1,0): Permission denied")]
+    [InlineData("plug:hw:1,0", "snd_pcm_open(plug:hw:1,0): No such file or directory")]
     [InlineData("default", "snd_pcm_open(default): No such file or directory")]
+    [InlineData("sysdefault", "snd_pcm_open(sysdefault): No such file or directory")]
+    [InlineData("pulse", "snd_pcm_open(pulse): No such file or directory")]
+    [InlineData("dsnoop", "snd_pcm_open(dsnoop): Permission denied")]
     [InlineData("snoop03", "snd_pcm_open(snoop03): Device or resource busy")]
     public void AnythingElse_IsTheErrorAlone(string device, string error)
     {

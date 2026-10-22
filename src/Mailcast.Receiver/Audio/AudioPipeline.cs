@@ -658,13 +658,17 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     /// Why an ALSA device would not open, with a hint for the three ways a device someone defined
     /// themselves (a shared dsnoop device, say) goes wrong: defined in their own ~/.asoundrc,
     /// which the receiver's user can't see; opened first by another user's program without
-    /// ipc_perm; or not at 48 kHz. A plain card name ("plughw:...") gets the error alone.
+    /// ipc_perm; or not mono at 48 kHz. A plain card name ("plughw:...") or one of ALSA's own
+    /// (pulse, dsnoop and so on) gets the error alone.
     /// </summary>
+    private static readonly HashSet<string> BuiltInNames =
+        ["default", "sysdefault", "hw", "plughw", "plug", "dsnoop", "dmix", "pulse", "pipewire", "jack", "null"];
+
     internal static string AlsaOpenFailure(string device, string error)
     {
         string said = $"cannot open the sound card {device}: {error}";
         string name = device.StartsWith("plug:", StringComparison.Ordinal) ? device["plug:".Length..] : device;
-        if (name.Contains(':') || name is "default" or "sysdefault")
+        if (name.Contains(':') || BuiltInNames.Contains(name))
         {
             return said;
         }
@@ -672,8 +676,8 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         const string See = "See \"Sharing a sound card with another program\" in docs/receiver.md";
         if (error.StartsWith("snd_pcm_open(", StringComparison.Ordinal) && error.EndsWith("No such file or directory", StringComparison.Ordinal))
         {
-            return $"{said}. If you made {name} yourself in ~/.asoundrc, the receiver can't see it there, "
-                + $"because it runs as its own user, pdn-mailcast. Move it to /etc/asound.conf. {See}";
+            return $"{said}. Check the name is spelt right. If you made {name} yourself in ~/.asoundrc, the receiver "
+                + $"can't see it there, because it runs as its own user, pdn-mailcast. Move it to /etc/asound.conf. {See}";
         }
 
         if (error.StartsWith("snd_pcm_open(", StringComparison.Ordinal) && error.EndsWith("Permission denied", StringComparison.Ordinal))
@@ -684,8 +688,8 @@ public sealed partial class AudioPipeline : IAsyncDisposable
 
         if (error.StartsWith("snd_pcm_set_params(", StringComparison.Ordinal) && error.EndsWith("Invalid argument", StringComparison.Ordinal))
         {
-            return $"{said}. The receiver needs {OnAir.SampleRate} Hz, and {name} runs at another rate. "
-                + $"Set \"rate {OnAir.SampleRate}\" for it in /etc/asound.conf. {See}";
+            return $"{said}. The receiver needs mono at {OnAir.SampleRate} Hz, and {name} gives something else. "
+                + $"Set \"channels 1\" and \"rate {OnAir.SampleRate}\" for it in /etc/asound.conf. {See}";
         }
 
         return said;
