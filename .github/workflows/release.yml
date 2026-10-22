@@ -210,6 +210,11 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Self-contained, so the runtime in the package is the runner's SDK's, and a stale runner
+      # ships old security fixes (0.17.0's armhf did). Fail the release instead.
+      - name: Check the bundled .NET runtime is the latest patch
+        run: python3 scripts/check-bundled-runtime.py artifacts/pdn-mailcast-*_"${VERSION}"_"${ARCH}".deb
+
       - name: Install both in a clean Debian and run them
         if: matrix.install_test
         timeout-minutes: 10
@@ -282,6 +287,9 @@ jobs:
               head = z.open("pdn-mailcast-receiver/pdn-mailcast-receiver.exe").read(2)
           sys.exit(0 if head == b"MZ" else "pdn-mailcast-receiver.exe is not a Windows executable")
           PY
+
+      - name: Check the bundled .NET runtime is the latest patch
+        run: python3 scripts/check-bundled-runtime.py "artifacts/pdn-mailcast-receiver_${VERSION}_win-x64.zip"
 
       - uses: actions/upload-artifact@v4
         with:
