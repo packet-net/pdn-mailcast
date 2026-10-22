@@ -944,10 +944,11 @@ public sealed partial class AudioPipeline : IAsyncDisposable
 
     /// <summary>
     /// Set between slots for a sound card, which is otherwise decoded all the time: its audio
-    /// then reaches only <see cref="SourceBlock"/> (the level meter and "Measure my filter"), not
-    /// the modem, the tone detector or the waterfall, so a small machine does almost nothing
-    /// between slots. Unless <see cref="Watched"/> says someone has the waterfall open: then
-    /// everything runs as in a slot, so the page still shows the band.
+    /// then reaches only <see cref="SourceBlock"/> ("Measure my filter" and the clipping count),
+    /// not the channel (the modem, the waterfall and its level meter) or the tone detector, so a
+    /// small machine does almost nothing between slots. Unless <see cref="Watched"/> says a page
+    /// shows the waterfall: then everything runs as in a slot, so the page still shows the band
+    /// and the level.
     /// </summary>
     public bool BetweenSlots
     {

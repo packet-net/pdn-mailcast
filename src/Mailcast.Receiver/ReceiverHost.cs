@@ -120,7 +120,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         var now = _time.GetUtcNow();
         var window = ListeningWindow.SoundCard(now, Schedule);
-        if (window is { } w && now >= w.Opens && now < w.Closes)
+        if (window is { } w && now >= w.Opens && now < w.Closes && EarlyEndFinished?.Slot != w.Slot)
         {
             return (null, "A slot's window is open now: wait until it closes and try again.");
         }
@@ -543,7 +543,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>A sentence on what the audio is doing, for the page and the log.</summary>
     public string AudioState => Audio.Phase == AudioPhase.Listening && BetweenSlots is { } next
-        ? $"{Audio.Words}; between slots until {next.Opens:HH:mm} UTC, so it only decodes while the waterfall is open"
+        ? $"{Audio.Words}; between slots until {next.Opens:HH:mm} UTC, so it only decodes while a status page shows the spectrogram"
         : Audio.Words;
 
     /// <summary>
@@ -575,7 +575,11 @@ public sealed class ReceiverHost : IAsyncDisposable
             var (opens, closes, slot) = window;
             if (now >= opens && slot != EarlyEndFinished?.Slot && EarlyEndReason(slot) is { } why)
             {
-                _log($"audio: the {slot.UtcDateTime:HH:mm} UTC slot is over early: {why}");
+                if (!RetunerRunsHooks)
+                {
+                    // With a rig, the retuner says it, as it gives the radio back.
+                    _log($"audio: the {slot.UtcDateTime:HH:mm} UTC slot is over early: {why}");
+                }
                 EarlyEndFinished = (slot, now);
             }
             if (slot == EarlyEndFinished?.Slot && ListeningWindow.SoundCard(closes, Schedule) is { } next)
@@ -585,7 +589,20 @@ public sealed class ReceiverHost : IAsyncDisposable
             }
             if (source.IsSoundCard && now < opens)
             {
-                between = (opens, slot);
+                bool heard = LastSlotHeardInItsWindow();
+                if (heard)
+                {
+                    between = (opens, slot);
+                }
+                if (heard != _restingEarned)
+                {
+                    _restingEarned = heard;
+                    if (!heard)
+                    {
+                        _log("audio: the last slot was not heard in its window (poor conditions, a clock that is out, or slots that have moved), "
+                            + "so the sound card is decoded all the time, until a slot is heard in its window again");
+                    }
+                }
             }
         }
 
@@ -598,13 +615,26 @@ public sealed class ReceiverHost : IAsyncDisposable
         if (between is { } b && b != was)
         {
             _log($"audio: between slots until {b.Opens.UtcDateTime:HH:mm} UTC, ready for the {b.Slot.UtcDateTime:HH:mm} UTC slot; "
-                + "the sound card stays open, but it only decodes while the status page's waterfall is open");
+                + "the sound card stays open, but it only decodes while a status page shows the spectrogram");
         }
         else if (between is null && was is { } w)
         {
             _log($"audio: decoding for the {w.Slot.UtcDateTime:HH:mm} UTC slot");
         }
     }
+
+    /// <summary>Whether the sound card last rested between slots; for saying when that changes, not at every look.</summary>
+    private bool _restingEarned = true;
+
+    /// <summary>
+    /// Whether the latest slot tracked heard a frame inside its own window. A sound card only
+    /// rests between slots while this holds: a receiver whose clock is out, or that has not yet
+    /// heard slots the head end moved, hears its frames outside the windows it expects, and
+    /// resting would lose them. Decoding all the time, as before, it hears them, and rests again
+    /// once a slot is heard where it is expected.
+    /// </summary>
+    private bool LastSlotHeardInItsWindow() => Slots.Last is { Scheduled: { } slot, LastFrame: { } heard }
+        && heard >= slot - ReceiverConfig.WebSdrBefore && heard <= slot + ReceiverConfig.WebSdrAfter;
 
     /// <summary>Raised after each look <see cref="WatchSlotWindowsAsync"/> takes, for tests.</summary>
     internal event Action? SlotWindowChecked;

@@ -34,6 +34,13 @@ public class SlotWindowTests
             Host = new ReceiverHost(config, Time, Log.Enqueue);
         }
 
+        /// <summary>Hears one frame, as the modem would, and waits for it to settle.</summary>
+        public async Task HearAsync(byte[] frame)
+        {
+            Host.Intake.Offer(frame);
+            await Host.Intake.DrainAsync(CancellationToken.None);
+        }
+
         /// <summary>Hears the directory and the one bulletin in it, and the probe, then a quiet minute: the slot is heard in full.</summary>
         public async Task HearTheWholeSlotAsync()
         {
@@ -95,7 +102,9 @@ public class SlotWindowTests
     [Fact]
     public async Task SoundCard_RestsBetweenSlots_AndDecodesFromTwoMinutesBefore()
     {
-        await using var f = new Fixture(SlotStart.AddMinutes(30), Samples.SoundCard);
+        await using var f = new Fixture(SlotStart.AddMinutes(5), Samples.SoundCard);
+        await f.HearAsync(Samples.Frames([Samples.Bulletin(1)])[0]);
+        f.Time.Advance(TimeSpan.FromMinutes(25));
 
         f.Host.CheckSlotWindow();
         Assert.Equal((SlotStart.AddMinutes(58), SlotStart.AddHours(1)), f.Host.BetweenSlots);
@@ -105,6 +114,48 @@ public class SlotWindowTests
         f.Host.CheckSlotWindow();
         Assert.Null(f.Host.BetweenSlots);
         Assert.Contains("audio: decoding for the 13:00 UTC slot", f.Log);
+    }
+
+    [Fact]
+    public async Task SoundCard_ASlotNotHeard_DecodesAllTheTime_AndSaysWhy()
+    {
+        // Poor conditions, a clock that is out, or slots that moved: nothing heard in the window.
+        await using var f = new Fixture(SlotStart.AddMinutes(30), Samples.SoundCard);
+
+        f.Host.CheckSlotWindow();
+
+        Assert.Null(f.Host.BetweenSlots);
+        Assert.Contains(f.Log, line => line.StartsWith("audio: the last slot was not heard in its window", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SoundCard_HeardOnlyOutsideItsWindow_DecodesAllTheTime()
+    {
+        // A clock 20 minutes out: GB7RDG's frames land at what this receiver thinks is 12:20,
+        // outside the 12:00 slot's window, so resting would lose the next slot too.
+        await using var f = new Fixture(SlotStart.AddMinutes(20), Samples.SoundCard);
+        await f.HearAsync(Samples.Frames([Samples.Bulletin(1)])[0]);
+        f.Time.Advance(TimeSpan.FromMinutes(10));
+
+        f.Host.CheckSlotWindow();
+
+        Assert.Null(f.Host.BetweenSlots);
+    }
+
+    [Fact]
+    public async Task SoundCard_RestsAgain_OnceASlotIsHeardInItsWindow()
+    {
+        await using var f = new Fixture(SlotStart.AddMinutes(30), Samples.SoundCard);
+        f.Host.CheckSlotWindow();
+        Assert.Null(f.Host.BetweenSlots);
+
+        f.Time.Advance(TimeSpan.FromMinutes(35)); // 13:05, in the 13:00 slot's window
+        f.Host.CheckSlotWindow();
+        await f.HearAsync(Samples.Frames([Samples.Bulletin(1)])[0]);
+        f.Time.Advance(TimeSpan.FromMinutes(10)); // 13:15, after it
+        f.Host.CheckSlotWindow();
+
+        Assert.Equal((SlotStart.AddMinutes(118), SlotStart.AddHours(2)), f.Host.BetweenSlots);
     }
 
     [Fact]
@@ -157,7 +208,7 @@ public class SlotWindowTests
     }
 
     [Fact]
-    public async Task Pipeline_BetweenSlots_StillFeedsTheLevelMeterAndFilterMeasurement()
+    public async Task Pipeline_BetweenSlots_StillFeedsSourceBlock_ForMeasureMyFilter()
     {
         var pipeline = AudioPipeline.ForInput(new NoInput(), _ => { }, new FakeTimeProvider(SlotStart), watch: false);
         pipeline.BetweenSlots = true;
