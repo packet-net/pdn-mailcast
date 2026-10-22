@@ -654,6 +654,47 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         };
     }
 
+    /// <summary>
+    /// Why an ALSA device would not open, with a hint for the three ways a device someone defined
+    /// themselves (a shared dsnoop device, say) goes wrong: defined in their own ~/.asoundrc,
+    /// which the receiver's user can't see; opened first by another user's program without
+    /// ipc_perm; or not mono at 48 kHz. A plain card name ("plughw:...") or one of ALSA's own
+    /// (pulse, dsnoop and so on) gets the error alone.
+    /// </summary>
+    private static readonly HashSet<string> BuiltInNames =
+        ["default", "sysdefault", "hw", "plughw", "plug", "dsnoop", "dmix", "pulse", "pipewire", "jack", "null"];
+
+    internal static string AlsaOpenFailure(string device, string error)
+    {
+        string said = $"cannot open the sound card {device}: {error}";
+        string name = device.StartsWith("plug:", StringComparison.Ordinal) ? device["plug:".Length..] : device;
+        if (name.Contains(':') || BuiltInNames.Contains(name))
+        {
+            return said;
+        }
+
+        const string See = "See \"Sharing a sound card with another program\" in docs/receiver.md";
+        if (error.StartsWith("snd_pcm_open(", StringComparison.Ordinal) && error.EndsWith("No such file or directory", StringComparison.Ordinal))
+        {
+            return $"{said}. Check the name is spelt right. If you made {name} yourself in ~/.asoundrc, the receiver "
+                + $"can't see it there, because it runs as its own user, pdn-mailcast. Move it to /etc/asound.conf. {See}";
+        }
+
+        if (error.StartsWith("snd_pcm_open(", StringComparison.Ordinal) && error.EndsWith("Permission denied", StringComparison.Ordinal))
+        {
+            return $"{said}. Another program opened {name} first and didn't let other users share it. "
+                + $"In /etc/asound.conf, give {name} the lines \"ipc_perm 0666\" and \"ipc_key_add_uid false\". {See}";
+        }
+
+        if (error.StartsWith("snd_pcm_set_params(", StringComparison.Ordinal) && error.EndsWith("Invalid argument", StringComparison.Ordinal))
+        {
+            return $"{said}. The receiver needs mono at {OnAir.SampleRate} Hz, and {name} gives something else. "
+                + $"Set \"channels 1\" and \"rate {OnAir.SampleRate}\" for it in /etc/asound.conf. {See}";
+        }
+
+        return said;
+    }
+
     /// <summary>Opens the source and starts the audio thread.</summary>
     /// <exception cref="AudioSourceException">The source could not be opened; the message says why.</exception>
     public async Task StartAsync(CancellationToken cancellation)
@@ -667,7 +708,7 @@ public sealed partial class AudioPipeline : IAsyncDisposable
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or DllNotFoundException)
                 {
-                    throw new AudioSourceException($"cannot open the sound card {_source.Target}: {Ascii.Clean(e.Message)}");
+                    throw new AudioSourceException(AlsaOpenFailure(_source.Target, Ascii.Clean(e.Message)));
                 }
                 _log($"audio: sound card {_source.Target} at {OnAir.SampleRate} Hz, the radio on USB dial {OnAir.Mhz(DialHz)} MHz");
                 break;
