@@ -55,6 +55,21 @@ public sealed record ToneAnswer(ToneOutcome Outcome, string Message)
 /// <param name="AudioHz">The probe's audio centre.</param>
 public sealed record ProbeRequest(string Kind, double GapSeconds, double AudioHz);
 
+/// <summary>What the station said to a request to keep a stretch of its receive audio.</summary>
+/// <param name="Kept">True when the station took the window.</param>
+/// <param name="Status">The HTTP status, or null when the request itself failed.</param>
+/// <param name="Directory">Where the station will write the window, when kept.</param>
+/// <param name="Problem">Why not, in the station's words or ours, when <paramref name="Kept"/> is false.</param>
+/// <param name="Note">Why the window starts later than asked (the station had not been listening that long), or null.</param>
+public sealed record KeepAudioAnswer(bool Kept, int? Status, string? Directory, string? Problem, string? Note = null)
+{
+    /// <summary>
+    /// True when the station does not offer the call at all: a pdn-soundmodem from before
+    /// <c>/api/keepaudio</c>, or one with no <c>api.key</c>, answers 404.
+    /// </summary>
+    public bool NotOffered => Status == 404;
+}
+
 /// <summary>The parts of pdn-soundmodem's HTTP API the head end uses.</summary>
 public interface IStationApi
 {
@@ -84,6 +99,15 @@ public interface IStationApi
     /// for a clear channel first, up to its own limit (60 s), and answers when the keyup is over.
     /// </summary>
     Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation);
+
+    /// <summary>
+    /// Asks the station to keep its receive audio from <paramref name="keepFrom"/> to <paramref name="keepTo"/>
+    /// (<c>POST /api/keepaudio</c>), with its carrier sense second by second and a waterfall, in a
+    /// directory named after <paramref name="label"/>. The station holds the last few minutes in
+    /// memory, so the window may start in the past. Answers once the request is taken or refused,
+    /// not when the window is written.
+    /// </summary>
+    Task<KeepAudioAnswer> KeepAudioAsync(DateTimeOffset keepFrom, DateTimeOffset keepTo, string label, CancellationToken cancellation);
 }
 
 /// <summary><see cref="IStationApi"/> over HTTP.</summary>
@@ -211,6 +235,39 @@ public sealed class StationApiClient : IStationApi, IDisposable
         ToneOutcome outcome = status == HttpStatusCode.Conflict || status == HttpStatusCode.NotFound ? ToneOutcome.Refused : ToneOutcome.Failed;
         return new ToneAnswer(outcome, $"HTTP {(int)status}: {why}") { Status = (int)status, KnowsProbe = knowsProbe };
     }
+
+    /// <inheritdoc />
+    public async Task<KeepAudioAnswer> KeepAudioAsync(DateTimeOffset keepFrom, DateTimeOffset keepTo, string label, CancellationToken cancellation)
+    {
+        var body = new JsonObject
+        {
+            ["from"] = Utc(keepFrom),
+            ["to"] = Utc(keepTo),
+            ["label"] = label,
+        };
+        HttpStatusCode status;
+        JsonNode? json;
+        string text;
+        try
+        {
+            (status, json, text) = await SendAsync(HttpMethod.Post, "api/keepaudio", body, cancellation).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancellation.IsCancellationRequested)
+        {
+            return new KeepAudioAnswer(false, null, null, e.Message);
+        }
+        if (status == HttpStatusCode.OK && Text(json, "directory") is string directory)
+        {
+            return new KeepAudioAnswer(true, (int)status, directory, null, Text(json, "note"));
+        }
+        return new KeepAudioAnswer(false, (int)status, null, $"HTTP {(int)status}: {Describe(json, text)}");
+    }
+
+    /// <summary>A time as the station's API writes them: UTC, to the second, with a Z.</summary>
+    internal static string Utc(DateTimeOffset t) => t.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string? Text(JsonNode? json, string key) =>
+        json?[key] is JsonNode value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
 
     private async Task<(HttpStatusCode Status, JsonNode? Json, string Text)> LeaseCallAsync(HttpMethod method, JsonObject? body, CancellationToken cancellation)
     {

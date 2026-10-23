@@ -47,7 +47,7 @@ At each slot the head end:
 2. Checks that the system clock is synchronised (the kernel's own flag, as timedatectl shows it), and keys nothing until it is (`slot.requireClockSync`); a slot it skips for this is retried. It never runs a slot earlier than the last one it ran, whatever the clock says.
 3. Reads the Flex's frequency reference and PA temperature, if configured, and logs whether it is GPS locked. It does not start with the PA already over the limit.
 4. Opens the bulletin modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and tells the station to send each burst anyway once it has waited 10 s for a clear channel (`station.maxCarrierWaitSeconds`).
-5. Waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the calibration tone at 1800 Hz (`slot.toneSeconds`, 10 s at GB7RDG) as the lease holder's transmitter test, with the channel probe after it in the same keyup (see below). If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up on the slot (`"skip"`).
+5. Asks pdn-soundmodem to keep the audio it hears around the channel check (see [Keeping the run-up audio](#keeping-the-run-up-audio)), then waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the calibration tone at 1800 Hz (`slot.toneSeconds`, 10 s at GB7RDG) as the lease holder's transmitter test, with the channel probe after it in the same keyup (see below). If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up on the slot (`"skip"`).
 6. Pauses 8 s so the modem's CW ident, which falls due with the first transmission, goes out before the first burst.
 7. Sends the frames a burst at a time (see below), checking the PA temperature every 5 s.
 8. Releases the lease, dropping anything of ours not yet on the air. The station sends its closing CW ident, keeping the lease `closing` for up to 60 s while it does, and normal packet service resumes.
@@ -61,6 +61,16 @@ There is no setting for it. It needs pdn-soundmodem 0.87.2 or later; an older st
 It stops early, cleanly, if a lease renewal fails, the PA passes `flex.paTemperatureLimitC`, the PA watch is lost and `flex.whenUnreachable` is `"skip"`, the KISS connection fails, the modem stops acknowledging frames, or the next burst could run past `slot.maxMinutes` from the slot's time (10 at GB7RDG). That check allows for the burst's gather, its longest carrier wait, the station's delay and the closing ident after it, so nothing keys past the hard stop however busy the channel. It then asks the station at once to drop whatever of ours is not yet keyed; a burst already on the air finishes inside the lease.
 
 Whatever was not sent is owed: the next slot sends it on top of its own share, with fresh ESIs. Each burst is recorded as queued before any of it is written to the modem, and nothing is written if that fails, so a crash or restart never repeats a piece, the directory's included. The price is that a burst cut off part way (a KISS failure, an abort) is under-sent: its unwritten pieces are spent, and the next slot makes the shortfall up with fresh ones. A slot cut short by the head end stopping carries on when it starts again within `slot.catchUpMinutes` (5 at GB7RDG); later than that, the next slot sends the rest. One skipped for a reason that may clear (an unsynchronised clock, no KISS port, no lease, no Flex when it is required, a hot PA) is tried again 5 minutes later (`slot.retryMinutes`), within the same window.
+
+### Keeping the run-up audio
+
+Most slots at GB7RDG start with "channel busy", and it helps to be able to check whether the channel really was busy. So as each slot's channel check begins, the head end asks pdn-soundmodem to keep what it heard from a minute before the slot until the longest channel check could be over: the 2 minute clear-channel wait, then up to a minute while the station itself waits to send the tone, the tone and the probe, and 10 s more. For a noon slot at GB7RDG that is 11:59:00 to about 12:03:30, labelled with the slot's time. A slot running late keeps as much of its run-up as the station still holds (4 minutes). pdn-soundmodem keeps the audio, its busy detector's verdict second by second and a waterfall for 30 days; the journal names the directory:
+
+```
+slot 2026-10-23 16:00Z: the station is keeping the receive audio from 15:59:00 to 16:03:33Z in /var/lib/pdn-soundmodem/kept-audio/20261023T155900Z-slot-2026-10-23-1600Z
+```
+
+There is no setting for it, and it never holds a slot up: if the station does not answer within 10 s, or says no, the slot carries on and the journal says why. It needs a pdn-soundmodem that offers `POST /api/keepaudio` (packet-net/pdn-soundmodem#723); an older one answers 404, and the head end says so once and stops asking until it restarts.
 
 ## How each bulletin is carried
 
