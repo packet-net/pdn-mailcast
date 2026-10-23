@@ -39,8 +39,9 @@ namespace Mailcast.HeadEnd.Slot;
 /// and the station sends its closing ident. Frames not sent are the planner's to carry
 /// forward.</para>
 /// <para><b>Keeping the run-up.</b> As the channel check begins, the station is asked to keep its
-/// receive audio from a minute before the slot to the end of the longest clear-channel wait and a
-/// margin (<see cref="KeepAudioWindow"/>), so a "channel busy" can be checked afterwards. The
+/// receive audio from a minute before the slot to the end of the longest channel check: the
+/// clear-channel wait, then the station's own wait before the tone, the tone and the probe
+/// (<see cref="KeepAudioWindow"/>), so a "channel busy" can be checked afterwards. The
 /// request goes off on its own with a short limit: it never delays, blocks or fails the slot. A
 /// station too old to offer it is noted once and not asked again.</para>
 /// <para><b>Write-ahead.</b> Every frame of a burst is reported as queued before the first is
@@ -62,15 +63,22 @@ public sealed class SlotRunner
     /// <summary>How far before the slot the kept audio starts.</summary>
     internal static readonly TimeSpan KeepAudioBefore = TimeSpan.FromSeconds(60);
 
-    /// <summary>How far past the longest clear-channel wait the kept audio runs.</summary>
-    internal static readonly TimeSpan KeepAudioMargin = TimeSpan.FromSeconds(30);
+    /// <summary>
+    /// How long the station itself waits for a clear channel before it sends a tone it was asked
+    /// for, at most (pdn-soundmodem's transmitter test; see <see cref="IStationApi.SendToneAsync"/>).
+    /// A tone asked for at the very end of the clear-channel wait can still be this late.
+    /// </summary>
+    internal static readonly TimeSpan StationToneWait = TimeSpan.FromSeconds(60);
+
+    /// <summary>How far past the end of the longest channel check, tone and probe included, the kept audio runs.</summary>
+    internal static readonly TimeSpan KeepAudioMargin = TimeSpan.FromSeconds(10);
 
     /// <summary>How long the request to keep audio may take before the slot stops caring.</summary>
     internal static readonly TimeSpan KeepAudioCallLimit = TimeSpan.FromSeconds(10);
 
     // The station's own limits on a window (pdn-soundmodem's /api/keepaudio): at most 10 minutes
     // long, starting no more than 5 minutes ago and ending no more than 15 minutes ahead. Kept
-    // inside them with room to spare.
+    // inside them with a minute to spare at each end, for latency and rounding.
     private static readonly TimeSpan KeepAudioLongest = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan KeepAudioFurthestBack = TimeSpan.FromMinutes(4);
     private static readonly TimeSpan KeepAudioFurthestAhead = TimeSpan.FromMinutes(14);
@@ -194,28 +202,32 @@ public sealed class SlotRunner
         answer.Status == 400 || (answer.Status == 409 && answer.Message.Contains("txTest.maxSeconds", StringComparison.Ordinal));
 
     /// <summary>
-    /// The receive audio to keep for a slot whose channel check begins at <paramref name="checkStart"/>:
-    /// from <see cref="KeepAudioBefore"/> before the slot's time (before the check instead, if that is
-    /// earlier or the slot is running minutes late) to the longest clear-channel wait and
-    /// <see cref="KeepAudioMargin"/> after the check begins. Kept inside the station's limits by
-    /// trimming the start, so the end, the channel check, is always covered.
+    /// The receive audio to keep for a slot whose channel check begins at <paramref name="checkStart"/>.
+    /// It starts <see cref="KeepAudioBefore"/> before the slot's time (or the check's, if that is
+    /// earlier), but no earlier than the station accepts, less a minute: a slot running late keeps
+    /// as much of its run-up as the station still holds. It ends when the longest channel check
+    /// could: the clear-channel wait, then <see cref="StationToneWait"/> for the station's own
+    /// wait before the tone, the tone, the probe and <see cref="KeepAudioMargin"/>. It always
+    /// starts at least <see cref="KeepAudioBefore"/> before the check; when the station's limits
+    /// will not take all of it (a clear-channel wait of many minutes), the end is cut, never the start.
     /// </summary>
-    internal static (DateTimeOffset From, DateTimeOffset To) KeepAudioWindow(DateTimeOffset slot, DateTimeOffset checkStart, TimeSpan channelWait)
+    internal static (DateTimeOffset From, DateTimeOffset To) KeepAudioWindow(DateTimeOffset slot, DateTimeOffset checkStart, TimeSpan channelWait, TimeSpan toneLength)
     {
-        DateTimeOffset to = checkStart + channelWait + KeepAudioMargin;
+        DateTimeOffset from = (slot < checkStart ? slot : checkStart) - KeepAudioBefore;
+        if (from < checkStart - KeepAudioFurthestBack)
+        {
+            // A late slot (a catch-up or a retry): as far back as the station keeps, with room to spare.
+            from = checkStart - KeepAudioFurthestBack;
+        }
+        TimeSpan tone = toneLength > TimeSpan.Zero ? StationToneWait + toneLength + ChannelProbe.Airtime : TimeSpan.Zero;
+        DateTimeOffset to = checkStart + channelWait + tone + KeepAudioMargin;
         if (to > checkStart + KeepAudioFurthestAhead)
         {
             to = checkStart + KeepAudioFurthestAhead;
         }
-        DateTimeOffset from = (slot < checkStart ? slot : checkStart) - KeepAudioBefore;
-        if (from < checkStart - KeepAudioFurthestBack)
-        {
-            // A late slot (a catch-up or a retry): the run-up to the check itself.
-            from = checkStart - KeepAudioBefore;
-        }
         if (to - from > KeepAudioLongest)
         {
-            from = to - KeepAudioLongest;
+            to = from + KeepAudioLongest;
         }
         return (from, to);
     }
@@ -235,7 +247,7 @@ public sealed class SlotRunner
         }
         try
         {
-            var (from, to) = KeepAudioWindow(slot, _time.GetUtcNow(), _settings.ChannelWait);
+            var (from, to) = KeepAudioWindow(slot, _time.GetUtcNow(), _settings.ChannelWait, _settings.ToneLength);
             using var limit = new CancellationTokenSource(KeepAudioCallLimit, _time);
             KeepAudioAnswer answer;
             try

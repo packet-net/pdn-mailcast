@@ -627,28 +627,48 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void KeepAudioWindow_RunsFromAMinuteBeforeTheSlot_ToTheLongestChannelWaitAndAMargin()
+    public void KeepAudioWindow_RunsFromAMinuteBeforeTheSlot_ToTheEndOfTheLongestChannelCheck()
     {
-        // On time, the check starting 5 s in: 60 s before the slot to 2 min 30 s after the check.
-        var (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon + TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(2));
+        TimeSpan wait = TimeSpan.FromMinutes(2);
+        TimeSpan tone = TimeSpan.FromSeconds(10);
+        // After the clear-channel wait: the station's own 60 s wait, the 10 s tone, the 8 s probe and 10 s, about 208 s in all.
+        TimeSpan check = wait + TimeSpan.FromSeconds(60) + tone + ChannelProbe.Airtime + TimeSpan.FromSeconds(10);
+
+        // On time, the check starting 5 s in (GB7RDG): 11:59:00 to 12:03:33.
+        DateTimeOffset at = Noon + TimeSpan.FromSeconds(5);
+        var (from, to) = SlotRunner.KeepAudioWindow(Noon, at, wait, tone);
         Assert.Equal(Noon - TimeSpan.FromSeconds(60), from);
-        Assert.Equal(Noon + TimeSpan.FromSeconds(155), to);
+        Assert.Equal(at + check, to);
 
-        // Started a little early: still a minute before the slot's own time, or the check's if earlier.
-        (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon - TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(2));
-        Assert.Equal(Noon - TimeSpan.FromSeconds(70), from);
-        Assert.Equal(Noon + TimeSpan.FromSeconds(140), to);
+        // Started a little early: a minute before the check, since that is earlier than the slot.
+        at = Noon - TimeSpan.FromSeconds(10);
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, at, wait, tone);
+        Assert.Equal(at - TimeSpan.FromSeconds(60), from);
+        Assert.Equal(at + check, to);
 
-        // Twenty minutes late (a catch-up): the station keeps nothing that old, so the run-up to the check.
-        DateTimeOffset late = Noon + TimeSpan.FromMinutes(20);
-        (from, to) = SlotRunner.KeepAudioWindow(Noon, late, TimeSpan.FromMinutes(2));
-        Assert.Equal(late - TimeSpan.FromSeconds(60), from);
-        Assert.Equal(late + TimeSpan.FromSeconds(150), to);
+        // Twenty minutes late (a catch-up): as far back as the station keeps, less a minute.
+        at = Noon + TimeSpan.FromMinutes(20);
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, at, wait, tone);
+        Assert.Equal(at - TimeSpan.FromMinutes(4), from);
+        Assert.Equal(at + check, to);
 
-        // A channel wait longer than the station keeps: the end held at 14 min ahead, the window at 10 min.
-        (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon, TimeSpan.FromMinutes(20));
-        Assert.Equal(Noon + TimeSpan.FromMinutes(14), to);
-        Assert.Equal(TimeSpan.FromMinutes(10), to - from);
+        // Two minutes late: the minute before the slot is still held.
+        at = Noon + TimeSpan.FromMinutes(2);
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, at, wait, tone);
+        Assert.Equal(Noon - TimeSpan.FromSeconds(60), from);
+
+        // No tone, so no station wait for one: the clear-channel wait and the margin.
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon, wait, TimeSpan.Zero);
+        Assert.Equal(Noon + wait + TimeSpan.FromSeconds(10), to);
+
+        // A clear-channel wait longer than the station keeps: the end is cut, never the start.
+        foreach (DateTimeOffset start in new[] { Noon, Noon + TimeSpan.FromMinutes(20) })
+        {
+            (from, to) = SlotRunner.KeepAudioWindow(Noon, start, TimeSpan.FromMinutes(20), tone);
+            Assert.True(from <= start - TimeSpan.FromSeconds(60), $"{from:HH:mm:ss} is not a minute before the check at {start:HH:mm:ss}");
+            Assert.Equal(TimeSpan.FromMinutes(10), to - from);
+            Assert.True(to <= start + TimeSpan.FromMinutes(14));
+        }
 
         Assert.Equal("slot 2026-10-05 1200Z", SlotRunner.KeepAudioLabel(Noon));
     }
@@ -661,7 +681,8 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         var asked = Assert.Single(rig.Station.KeepAudioRequests);
         Assert.Equal(Day - TimeSpan.FromSeconds(60), asked.From);
-        Assert.Equal(asked.At + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(30), asked.To);
+        // The default 30 s tone: the 2 min wait, the station's 60 s, the tone, the probe and 10 s.
+        Assert.Equal(asked.At + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(60 + 30 + 10) + ChannelProbe.Airtime, asked.To);
         Assert.Equal("slot 2026-10-05 1200Z", asked.Label);
         // Asked once the lease is ours, as the channel check begins.
         Assert.True(asked.At >= rig.Station.LeaseRequests[0].At);

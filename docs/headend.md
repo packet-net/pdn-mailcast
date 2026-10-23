@@ -64,10 +64,10 @@ Whatever was not sent is owed: the next slot sends it on top of its own share, w
 
 ### Keeping the run-up audio
 
-Most slots at GB7RDG start with "channel busy", and it helps to be able to check whether the channel really was busy. So as each slot's channel check begins, the head end asks pdn-soundmodem to keep what it heard from a minute before the slot until the longest clear-channel wait is over, plus 30 s (11:59:00 to about 12:02:30 for a noon slot at GB7RDG), labelled with the slot's time. pdn-soundmodem keeps the audio, its busy detector's verdict second by second and a waterfall for 30 days; the journal names the directory:
+Most slots at GB7RDG start with "channel busy", and it helps to be able to check whether the channel really was busy. So as each slot's channel check begins, the head end asks pdn-soundmodem to keep what it heard from a minute before the slot until the longest channel check could be over: the 2 minute clear-channel wait, then up to a minute while the station itself waits to send the tone, the tone and the probe, and 10 s more. For a noon slot at GB7RDG that is 11:59:00 to about 12:03:30, labelled with the slot's time. A slot running late keeps as much of its run-up as the station still holds (4 minutes). pdn-soundmodem keeps the audio, its busy detector's verdict second by second and a waterfall for 30 days; the journal names the directory:
 
 ```
-slot 2026-10-23 16:00Z: the station is keeping the receive audio from 15:59:00 to 16:02:33Z in /var/lib/pdn-soundmodem/kept-audio/20261023T155900Z-slot-2026-10-23-1600Z
+slot 2026-10-23 16:00Z: the station is keeping the receive audio from 15:59:00 to 16:03:33Z in /var/lib/pdn-soundmodem/kept-audio/20261023T155900Z-slot-2026-10-23-1600Z
 ```
 
 There is no setting for it, and it never holds a slot up: if the station does not answer within 10 s, or says no, the slot carries on and the journal says why. It needs a pdn-soundmodem that offers `POST /api/keepaudio` (packet-net/pdn-soundmodem#723); an older one answers 404, and the head end says so once and stops asking until it restarts.
