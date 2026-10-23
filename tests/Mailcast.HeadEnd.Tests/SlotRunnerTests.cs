@@ -627,6 +627,94 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void KeepAudioWindow_RunsFromAMinuteBeforeTheSlot_ToTheLongestChannelWaitAndAMargin()
+    {
+        // On time, the check starting 5 s in: 60 s before the slot to 2 min 30 s after the check.
+        var (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon + TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(2));
+        Assert.Equal(Noon - TimeSpan.FromSeconds(60), from);
+        Assert.Equal(Noon + TimeSpan.FromSeconds(155), to);
+
+        // Started a little early: still a minute before the slot's own time, or the check's if earlier.
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon - TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(2));
+        Assert.Equal(Noon - TimeSpan.FromSeconds(70), from);
+        Assert.Equal(Noon + TimeSpan.FromSeconds(140), to);
+
+        // Twenty minutes late (a catch-up): the station keeps nothing that old, so the run-up to the check.
+        DateTimeOffset late = Noon + TimeSpan.FromMinutes(20);
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, late, TimeSpan.FromMinutes(2));
+        Assert.Equal(late - TimeSpan.FromSeconds(60), from);
+        Assert.Equal(late + TimeSpan.FromSeconds(150), to);
+
+        // A channel wait longer than the station keeps: the end held at 14 min ahead, the window at 10 min.
+        (from, to) = SlotRunner.KeepAudioWindow(Noon, Noon, TimeSpan.FromMinutes(20));
+        Assert.Equal(Noon + TimeSpan.FromMinutes(14), to);
+        Assert.Equal(TimeSpan.FromMinutes(10), to - from);
+
+        Assert.Equal("slot 2026-10-05 1200Z", SlotRunner.KeepAudioLabel(Noon));
+    }
+
+    [Fact]
+    public void Run_AsksTheStationToKeepTheRunUp_AndNamesTheDirectory()
+    {
+        var rig = new Rig();
+        var report = rig.Run(10);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        var asked = Assert.Single(rig.Station.KeepAudioRequests);
+        Assert.Equal(Day - TimeSpan.FromSeconds(60), asked.From);
+        Assert.Equal(asked.At + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(30), asked.To);
+        Assert.Equal("slot 2026-10-05 1200Z", asked.Label);
+        // Asked once the lease is ours, as the channel check begins.
+        Assert.True(asked.At >= rig.Station.LeaseRequests[0].At);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("the station is keeping the receive audio from 11:59:00 to", StringComparison.Ordinal)
+            && l.Contains("/kept-audio/20261005T115900Z-slot-2026-10-05-1200Z", StringComparison.Ordinal));
+        Assert.All(rig.Journal.Lines, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
+    }
+
+    [Fact]
+    public void Run_AtAStationWithoutKeepAudio_SaysSoOnce_AndStopsAsking()
+    {
+        var rig = new Rig();
+        rig.Station.KeepAudioStatus = 404;
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+        Assert.Single(rig.Station.KeepAudioRequests);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("does not offer to keep receive audio", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("could not ask the station to keep", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_WhenKeepingAudioIsRefused_SaysSoEachSlot_AndKeepsAsking()
+    {
+        var rig = new Rig();
+        rig.Station.KeepAudioStatus = 409;
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+        Assert.Equal(2, rig.Station.KeepAudioRequests.Count);
+        Assert.Equal(2, rig.Journal.Lines.Count(l => l.Contains("could not ask the station to keep the receive audio: HTTP 409", StringComparison.Ordinal)));
+    }
+
+    [Theory]
+    [InlineData(true, false, "the station did not answer within 10 s")]
+    [InlineData(false, true, "the fake station's keep audio broke")]
+    public void Run_CarriesOnUnchanged_WhenKeepingAudioHangsOrThrows(bool hangs, bool throws, string said)
+    {
+        var plain = new Rig();
+        var expected = plain.Run(10);
+
+        var rig = new Rig();
+        rig.Station.KeepAudioHangs = hangs;
+        rig.Station.KeepAudioThrows = throws;
+        var report = rig.Run(10);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(expected.FramesSent, report.FramesSent);
+        Assert.Equal(expected.End, report.End);
+        Assert.Equal(plain.Station.Keyups.Select(k => (k.Start, k.End)), rig.Station.Keyups.Select(k => (k.Start, k.End)));
+        Assert.Single(rig.Journal.Lines, l => l.Contains($"could not ask the station to keep the receive audio: {said}", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Run_JournalIsPlainAscii()
     {
         var rig = new Rig();

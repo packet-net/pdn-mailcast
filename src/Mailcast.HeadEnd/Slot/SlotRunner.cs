@@ -38,6 +38,11 @@ namespace Mailcast.HeadEnd.Slot;
 /// keyed. A burst already on the air finishes inside the lease; the release drops anything left
 /// and the station sends its closing ident. Frames not sent are the planner's to carry
 /// forward.</para>
+/// <para><b>Keeping the run-up.</b> As the channel check begins, the station is asked to keep its
+/// receive audio from a minute before the slot to the end of the longest clear-channel wait and a
+/// margin (<see cref="KeepAudioWindow"/>), so a "channel busy" can be checked afterwards. The
+/// request goes off on its own with a short limit: it never delays, blocks or fails the slot. A
+/// station too old to offer it is noted once and not asked again.</para>
 /// <para><b>Write-ahead.</b> Every frame of a burst is reported as queued before the first is
 /// written, and nothing is written if that report fails, so a crash mid-burst can never lead to a
 /// piece being sent twice.</para>
@@ -52,6 +57,23 @@ public sealed class SlotRunner
     private readonly IJournal _journal;
     private readonly TimeProvider _time;
     private readonly IClockSync? _clock;
+    private int _keepAudioNotOffered;
+
+    /// <summary>How far before the slot the kept audio starts.</summary>
+    internal static readonly TimeSpan KeepAudioBefore = TimeSpan.FromSeconds(60);
+
+    /// <summary>How far past the longest clear-channel wait the kept audio runs.</summary>
+    internal static readonly TimeSpan KeepAudioMargin = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long the request to keep audio may take before the slot stops caring.</summary>
+    internal static readonly TimeSpan KeepAudioCallLimit = TimeSpan.FromSeconds(10);
+
+    // The station's own limits on a window (pdn-soundmodem's /api/keepaudio): at most 10 minutes
+    // long, starting no more than 5 minutes ago and ending no more than 15 minutes ahead. Kept
+    // inside them with room to spare.
+    private static readonly TimeSpan KeepAudioLongest = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan KeepAudioFurthestBack = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan KeepAudioFurthestAhead = TimeSpan.FromMinutes(14);
 
     public SlotRunner(SlotSettings settings, IStationApi station, IKissConnector kiss, IFlexMonitor? flex, IAirtime airtime, IJournal journal, TimeProvider time, IClockSync? clock = null)
     {
@@ -171,6 +193,82 @@ public sealed class SlotRunner
     internal static bool RefusedForTheProbe(ToneAnswer answer) =>
         answer.Status == 400 || (answer.Status == 409 && answer.Message.Contains("txTest.maxSeconds", StringComparison.Ordinal));
 
+    /// <summary>
+    /// The receive audio to keep for a slot whose channel check begins at <paramref name="checkStart"/>:
+    /// from <see cref="KeepAudioBefore"/> before the slot's time (before the check instead, if that is
+    /// earlier or the slot is running minutes late) to the longest clear-channel wait and
+    /// <see cref="KeepAudioMargin"/> after the check begins. Kept inside the station's limits by
+    /// trimming the start, so the end, the channel check, is always covered.
+    /// </summary>
+    internal static (DateTimeOffset From, DateTimeOffset To) KeepAudioWindow(DateTimeOffset slot, DateTimeOffset checkStart, TimeSpan channelWait)
+    {
+        DateTimeOffset to = checkStart + channelWait + KeepAudioMargin;
+        if (to > checkStart + KeepAudioFurthestAhead)
+        {
+            to = checkStart + KeepAudioFurthestAhead;
+        }
+        DateTimeOffset from = (slot < checkStart ? slot : checkStart) - KeepAudioBefore;
+        if (from < checkStart - KeepAudioFurthestBack)
+        {
+            // A late slot (a catch-up or a retry): the run-up to the check itself.
+            from = checkStart - KeepAudioBefore;
+        }
+        if (to - from > KeepAudioLongest)
+        {
+            from = to - KeepAudioLongest;
+        }
+        return (from, to);
+    }
+
+    /// <summary>The kept audio's label, which names its directory on the station: <c>slot 2026-10-23 1600Z</c>.</summary>
+    internal static string KeepAudioLabel(DateTimeOffset slot) => "slot " + slot.UtcDateTime.ToString("yyyy-MM-dd HHmm'Z'", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Asks the station to keep the slot's run-up audio. Never throws, and gives up after
+    /// <see cref="KeepAudioCallLimit"/>; the slot does not wait for it.
+    /// </summary>
+    private async Task KeepAudioAsync(DateTimeOffset slot, Action<string> say)
+    {
+        if (Volatile.Read(ref _keepAudioNotOffered) != 0)
+        {
+            return;
+        }
+        try
+        {
+            var (from, to) = KeepAudioWindow(slot, _time.GetUtcNow(), _settings.ChannelWait);
+            using var limit = new CancellationTokenSource(KeepAudioCallLimit, _time);
+            KeepAudioAnswer answer;
+            try
+            {
+                // WaitAsync as well as the token, so even a call that ignores its token is let go.
+                answer = await _station.KeepAudioAsync(from, to, KeepAudioLabel(slot), limit.Token).WaitAsync(limit.Token);
+            }
+            catch (OperationCanceledException) when (limit.IsCancellationRequested)
+            {
+                answer = new KeepAudioAnswer(false, null, null, $"the station did not answer within {KeepAudioCallLimit.TotalSeconds:0} s");
+            }
+            if (answer.Kept)
+            {
+                say($"the station is keeping the receive audio from {Clock(from)} to {Clock(to)}Z in {answer.Directory}{(answer.Note is null ? "" : $" ({answer.Note})")}");
+            }
+            else if (answer.NotOffered)
+            {
+                if (Interlocked.Exchange(ref _keepAudioNotOffered, 1) == 0)
+                {
+                    _journal.Write("station: its pdn-soundmodem does not offer to keep receive audio (POST /api/keepaudio answered 404: it is older than that, or has no api.key), so slots carry on without it and the head end will not ask again until it restarts");
+                }
+            }
+            else
+            {
+                say($"could not ask the station to keep the receive audio: {answer.Problem}");
+            }
+        }
+        catch (Exception e)
+        {
+            say($"could not ask the station to keep the receive audio: {e.Message}");
+        }
+    }
+
     /// <summary>How a slot is named in the journal: its start, UTC, to the minute.</summary>
     public static string Name(DateTimeOffset slot) => slot.UtcDateTime.ToString("yyyy-MM-dd HH:mm'Z'", CultureInfo.InvariantCulture);
 
@@ -231,6 +329,7 @@ public sealed class SlotRunner
 
         public async Task<SlotReport> ExecuteAsync(CancellationToken cancellation)
         {
+            DateTimeOffset slotTime = slot;
             _start = Now;
             // The hard stop counts from the slot's own start, so a late slot (a catch-up or a retry)
             // ends when an on-time one would, while a web SDR receiver is still listening.
@@ -314,6 +413,9 @@ public sealed class SlotRunner
                     _leaseTaken = true;
                     LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
                     Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames go anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel");
+
+                    // The channel check starts now: ask the station to keep the run-up to it, on the side.
+                    _ = owner.KeepAudioAsync(slotTime, Say);
 
                     using var slot = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
                     Task renewing = RenewLoopAsync(slot.Token);

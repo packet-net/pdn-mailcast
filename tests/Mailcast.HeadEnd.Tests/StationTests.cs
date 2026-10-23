@@ -136,6 +136,41 @@ public class StationTests
     }
 
     [Fact]
+    public async Task StationApiClient_AsksToKeepAudio_AndReadsTheDirectory()
+    {
+        using var handler = new Handler((_, _) => (HttpStatusCode.OK, """{"id": "20261023T155900Z-slot-2026-10-23-1600Z", "label": "slot 2026-10-23 1600Z", "from": "2026-10-23T15:59:00Z", "to": "2026-10-23T16:02:35Z", "clamped": true, "note": "listening only since 15:59:40Z", "readyAfter": "2026-10-23T16:02:37Z", "directory": "/var/lib/pdn-soundmodem/kept-audio/20261023T155900Z-slot-2026-10-23-1600Z"}"""));
+        using var api = Client(handler);
+        var from = new DateTimeOffset(2026, 10, 23, 16, 59, 0, TimeSpan.FromHours(1));
+        var answer = await api.KeepAudioAsync(from, from + TimeSpan.FromSeconds(215.4), "slot 2026-10-23 1600Z", CancellationToken.None);
+        Assert.True(answer.Kept);
+        Assert.Equal("/var/lib/pdn-soundmodem/kept-audio/20261023T155900Z-slot-2026-10-23-1600Z", answer.Directory);
+        Assert.Equal("listening only since 15:59:40Z", answer.Note);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("/api/keepaudio", request.Path);
+        Assert.Equal("secret", request.Key);
+        Assert.Equal("2026-10-23T15:59:00Z", request.Body!["from"]!.GetValue<string>());
+        Assert.Equal("2026-10-23T16:02:35Z", request.Body["to"]!.GetValue<string>());
+        Assert.Equal("slot 2026-10-23 1600Z", request.Body["label"]!.GetValue<string>());
+        Assert.Equal(3, request.Body.AsObject().Count);
+    }
+
+    [Theory]
+    [InlineData(404, "", true, "HTTP 404: no explanation")]
+    [InlineData(400, """{"refused": "a window is at most 10 minutes"}""", false, "HTTP 400: a window is at most 10 minutes")]
+    [InlineData(409, """{"refused": "16 windows are already waiting"}""", false, "HTTP 409: 16 windows are already waiting")]
+    public async Task StationApiClient_ReadsAKeepAudioRefusal(int status, string body, bool notOffered, string problem)
+    {
+        using var handler = new Handler((_, _) => ((HttpStatusCode)status, body));
+        using var api = Client(handler);
+        var answer = await api.KeepAudioAsync(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddMinutes(1), "slot", CancellationToken.None);
+        Assert.False(answer.Kept);
+        Assert.Equal(status, answer.Status);
+        Assert.Equal(notOffered, answer.NotOffered);
+        Assert.Equal(problem, answer.Problem);
+    }
+
+    [Fact]
     public async Task StationApiClient_ReportsAnotherHoldersLease()
     {
         using var handler = new Handler((_, _) => (HttpStatusCode.Conflict, """{"held": true, "subChannel": 2, "expires": "2026-10-05T12:01:00Z", "refused": "sub-channel 2 holds the transmit lease"}"""));

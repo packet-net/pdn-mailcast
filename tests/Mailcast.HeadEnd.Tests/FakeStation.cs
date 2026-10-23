@@ -167,6 +167,38 @@ public sealed class FakeStation : IStationApi, IKissConnector
         return true;
     }
 
+    /// <summary>Every request to keep receive audio: when it came, and the window and label it asked for.</summary>
+    public List<(DateTimeOffset At, DateTimeOffset From, DateTimeOffset To, string Label)> KeepAudioRequests { get; } = [];
+
+    /// <summary>How the station answers a request to keep audio: 200 keeps it, 404 is a station without the call, anything else a refusal.</summary>
+    public int KeepAudioStatus { get; set; } = 200;
+
+    /// <summary>A request to keep audio is never answered, and ignores its cancellation too.</summary>
+    public bool KeepAudioHangs { get; set; }
+
+    /// <summary>A request to keep audio throws, as a client with a bug in it might.</summary>
+    public bool KeepAudioThrows { get; set; }
+
+    public async Task<KeepAudioAnswer> KeepAudioAsync(DateTimeOffset keepFrom, DateTimeOffset keepTo, string label, CancellationToken cancellation)
+    {
+        KeepAudioRequests.Add((_time.GetUtcNow(), keepFrom, keepTo, label));
+        await Task.Yield();
+        if (KeepAudioThrows)
+        {
+            throw new InvalidOperationException("the fake station's keep audio broke");
+        }
+        if (KeepAudioHangs)
+        {
+            await new TaskCompletionSource().Task;
+        }
+        return KeepAudioStatus switch
+        {
+            200 => new KeepAudioAnswer(true, 200, $"/var/lib/pdn-soundmodem/kept-audio/{keepFrom.UtcDateTime:yyyyMMdd'T'HHmmss'Z'}-{label.Replace(' ', '-')}", null),
+            404 => new KeepAudioAnswer(false, 404, null, "HTTP 404: no explanation"),
+            int other => new KeepAudioAnswer(false, other, null, $"HTTP {other}: too many windows are waiting"),
+        };
+    }
+
     public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation)
     {
         ToneRequests.Add((_time.GetUtcNow(), seconds, probe));
