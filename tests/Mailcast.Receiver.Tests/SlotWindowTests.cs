@@ -2,7 +2,8 @@ using System.Collections.Concurrent;
 using M0LTE.Radio.Audio;
 using Mailcast.Receiver.Hooks;
 using Microsoft.Extensions.Time.Testing;
-using Packet.SoundModem.Ms110d;
+using M0LTE.Ms110d;
+using Packet.SoundModem.Modems;
 using Packet.SoundModem.Waterfall;
 
 namespace Mailcast.Receiver.Tests;

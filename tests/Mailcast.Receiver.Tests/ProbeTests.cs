@@ -196,7 +196,7 @@ public class ProbeTests(ITestOutputHelper output)
     public void NoProbe_IsNotFound(double snr)
     {
         // An older head end: the tone, then silence and its first burst 8 s after the tone.
-        var modem = new Packet.SoundModem.Ms110d.Ms110dModem(Rate, _ => { }, new Packet.SoundModem.Ms110d.Ms110dTxSettings { WaveformNumber = 4 });
+        var modem = new Packet.SoundModem.Modems.Ms110dModem(Rate, _ => { }, new M0LTE.Ms110d.Ms110dTxSettings { WaveformNumber = 4 });
         var burst = modem.Modulate(new byte[200], 0);
         for (int i = 0; i < burst.Length; i++)
         {

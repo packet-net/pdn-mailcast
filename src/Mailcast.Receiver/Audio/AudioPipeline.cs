@@ -3,7 +3,8 @@ using M0LTE.Radio.Audio;
 using Packet.SoundModem.Audio;
 using Packet.SoundModem.Channel;
 using Packet.SoundModem.Iq;
-using Packet.SoundModem.Ms110d;
+using M0LTE.Ms110d;
+using Packet.SoundModem.Modems;
 using Packet.SoundModem.SdrConnect;
 using Packet.SoundModem.UberSdr;
 

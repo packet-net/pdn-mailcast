@@ -1,5 +1,6 @@
 using Packet.SoundModem.Audio;
-using Packet.SoundModem.Ms110d;
+using M0LTE.Ms110d;
+using Packet.SoundModem.Modems;
 
 namespace Mailcast.Receiver.Tests;
 

@@ -1,8 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Reflection;
-using M0LTE.Ofdm;
-using Packet.SoundModem.Ms110d;
+using M0LTE.Ms110d;
 
 namespace Mailcast.Receiver;
 
@@ -12,14 +11,14 @@ namespace Mailcast.Receiver;
 /// the received audio can be measured against.
 /// </summary>
 /// <remarks>
-/// pdn-soundmodem (0.86.0) builds the symbol stream in <c>Ms110dModulator.BuildSymbols</c>, which
+/// pdn-soundmodem (0.86.0; Complex32 since M0LTE.Ms110d 0.2.0) builds the symbol stream in <c>Ms110dModulator.BuildSymbols</c>, which
 /// is internal: its public <c>Modulate</c> gives only the audio after the mixer. The method is
 /// called here by reflection, as burstdump in the passive analysis does, and a test pins it, so
 /// a pdn-soundmodem that renames it fails that test rather than quietly losing the measurement.
 /// </remarks>
 internal static class BurstReference
 {
-    private delegate Cf[] BuildFn(ReadOnlySpan<byte> bits);
+    private delegate Complex32[] BuildFn(ReadOnlySpan<byte> bits);
 
     private static readonly MethodInfo? BuildSymbols =
         typeof(Ms110dModulator).GetMethod("BuildSymbols", BindingFlags.NonPublic | BindingFlags.Instance, [typeof(ReadOnlySpan<byte>)]);
@@ -49,7 +48,7 @@ internal static class BurstReference
         };
         var modulator = new Ms110dModulator(settings);
         var build = (BuildSymbols ?? throw new InvalidOperationException("this pdn-soundmodem has no Ms110dModulator.BuildSymbols")).CreateDelegate<BuildFn>(modulator);
-        Cf[] syms = build(payloadBits);
+        Complex32[] syms = build(payloadBits);
         var result = new Complex[syms.Length];
         for (int i = 0; i < syms.Length; i++)
         {
