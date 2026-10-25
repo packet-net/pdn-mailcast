@@ -4,7 +4,7 @@ The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins
 
 ## When the slots are
 
-A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the clock. `everyMinutes` must divide a day (1440) and be at least 15. Left out it is 1440, one slot a day, which is how a head end configured before hourly slots carries on unchanged. GB7RDG uses `"timeUtc": "00:00"` and `"everyMinutes": 60`, a slot every hour on the hour, which is what receivers expect.
+A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the clock. `everyMinutes` must divide a day (1440) and be at least 15. Left out it is 1440, one slot a day, which is how a head end configured before hourly slots carries on unchanged. GB7RDG uses `"timeUtc": "00:00"` and `"everyMinutes": 60`, a slot every hour on the hour, which is also what a receiver assumes until it has heard a directory.
 
 ### Slots at another minute
 
@@ -15,6 +15,8 @@ A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the cl
 ```
 
 That gives 00:30, 01:30 and so on; `"12:30"` would give the same slots. Everything that counts slots counts from these: the daylight window picks from the half-hour slots, `slot.maxMinutes`, `slot.catchUpMinutes` and `slot.retryMinutes` count from each slot's own start, and `schedule.slotOffsets` and the budget rule count slots from a bulletin's first. The directory carries the timetable (`slots=00:30/60`), and the journal says it at start-up: `schedule: a slot every 60 min, counted from 00:30Z, so at :30 each hour`. Left at `"00:00"`, nothing changes.
+
+Receivers that listen all the time (a sound card, pdn-soundmodem or SDRconnect) pick up the new timetable from the first directory they hear. A web SDR receiver, or one sharing a radio through `rig`, only listens around the slots it already knows about, so it never hears a half-hour slot on its own: set its `slotUtc` to match, `"00:30"` here. Every receiver also needs the station's key among its trusted keys, or it will not accept that station's directory.
 
 ### Daylight only
 
