@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using Packet.SoundModem.Ms110d;
+using M0LTE.Ms110d;
 
 namespace Mailcast.Receiver;
 
