@@ -1,6 +1,6 @@
 # The head end
 
-The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins from the BBS as a forwarding partner, and sends them in slots through the station's own modem: every hour on the hour in daylight at GB7RDG, or once a day for a station configured that way. It never touches the radio directly: the frames go over KISS to a dedicated modem in pdn-soundmodem, and the lease and the calibration tone go through pdn-soundmodem's HTTP API.
+The head end runs beside a BBS and the station's pdn-soundmodem: GB7RDG's first, and any station's that sets one up (see [Run your own head end](run-your-own-headend.md)). It takes bulletins from the BBS as a forwarding partner, and sends them in slots through the station's own modem: every hour on the hour in daylight at GB7RDG, or once a day for a station configured that way. It never touches the radio directly: the frames go over KISS to a dedicated modem in pdn-soundmodem, and the lease and the calibration tone go through pdn-soundmodem's HTTP API.
 
 ## When the slots are
 
@@ -343,7 +343,7 @@ The published pdn-soundmodem package cannot pack frames yet, so offline every fr
 
 ## Configuration
 
-`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with GB7RDG's hourly daylight slot settings and the defaults for the rest. Only `station.apiKey` (the station's `api.key`) has no default, and the service does not start without it. The package does not start the service on a first install: set up the station and the BBS, fill in the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file, and says whether directories will be signed.
+`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with hourly daylight slot settings and the defaults for the rest. What names the station has no default, and the service does not start without it: `callsign`, `station.apiKey` (the station's `api.key`), `slot.daylight.locator` when `slot.daylight` is given, `intake.fbb.user` and `intake.fbb.partnerCallsign` when `intake.fbb` is given, and `intake.reports.user` when `intake.reports` is given. A file that leaves one out is refused with each missing key named, for example `"callsign" is required: the station's callsign, which every frame is sent from`. The package does not start the service on a first install: set up the station and the BBS, fill in the callsign, the locator, the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file, and says whether directories will be signed.
 
 `schedule.symbolSize` sets the frame size: the bytes of bulletin each frame carries, 64 to 940 in steps of 4 (940 if left out). Smaller frames survive fades and other stations' transmissions better, and since a bulletin rounds up to whole pieces they waste less on short bulletins too. On 2026-10-05 a busy 40 m band left almost nothing of 940-byte frames, and 240 is the size to try first. Receivers read the size from each frame, so nothing changes at their end. A bulletin keeps the size it was first encoded with.
 
