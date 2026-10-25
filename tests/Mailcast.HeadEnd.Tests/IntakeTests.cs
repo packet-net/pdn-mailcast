@@ -167,6 +167,7 @@ public class IntakeTests
         {
             Host = "127.0.0.1",
             Port = bbs.Port,
+            PartnerCallsign = "Q0HEAD",
             User = "Q0HEAD",
             Password = "pw",
             Login = [new("user:", "{user}"), new("password:", "{password}")],
@@ -218,6 +219,7 @@ public class IntakeTests
         {
             Host = "127.0.0.1",
             Port = 1,
+            PartnerCallsign = "Q0HEAD",
             User = "Q0HEAD",
             Password = "pw",
             Login = [new("user:", "{user}"), new("password:", "{password}")],
@@ -283,7 +285,7 @@ public class IntakeTests
         using var state = new TempDirectory();
         var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 8, 59, 0, TimeSpan.Zero));
         int tries = 0;
-        using var reader = new ReportReader(new ReportsReaderConfig { Password = "secret" }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), time,
+        using var reader = new ReportReader(new ReportsReaderConfig { User = "Q0CAST", Password = "secret" }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), time,
             _ => { tries++; throw new IOException("refused secret"); });
         Assert.Contains("<password>", (await reader.CollectAsync(Today, CancellationToken.None)).Problem, StringComparison.Ordinal);
         time.Advance(TimeSpan.FromMinutes(14));
@@ -354,7 +356,7 @@ public class IntakeTests
         using var state = new TempDirectory();
         var journal = new MemoryJournal();
         var log = new ReportLog(state.Path, journal);
-        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, Password = "long-enough" }, log, journal,
+        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, User = "Q0CAST", Password = "long-enough" }, log, journal,
             new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 16, 9, 0, 0, TimeSpan.Zero)));
 
         var result = await reader.CollectAsync(Today, CancellationToken.None);
@@ -381,7 +383,7 @@ public class IntakeTests
     {
         var (port, _) = await ScriptedBbs("Hmm, " + password + " is wrong. password:");
         using var state = new TempDirectory();
-        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, Password = password }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), TimeProvider.System);
+        using var reader = new ReportReader(new ReportsReaderConfig { Port = port, User = "Q0CAST", Password = password }, new ReportLog(state.Path, new MemoryJournal()), new MemoryJournal(), TimeProvider.System);
 
         string problem = (await reader.CollectAsync(Today, CancellationToken.None)).Problem!;
 
@@ -481,7 +483,7 @@ public class IntakeTests
             port = ((IPEndPoint)probe.LocalEndpoint).Port;
             probe.Stop();
         }
-        var config = new FbbIntakeConfig { Host = "127.0.0.1", Port = port, SessionTimeoutSeconds = 60 };
+        var config = new FbbIntakeConfig { Host = "127.0.0.1", Port = port, User = "Q0HEAD", PartnerCallsign = "Q0HEAD", SessionTimeoutSeconds = 60 };
         using var intake = new FbbIntake(config, Store(state, journal), new IntakePolicy(32 * 1024), journal, TimeProvider.System);
         var result = await intake.CollectAsync(Today, CancellationToken.None);
         Assert.NotNull(result.Problem);

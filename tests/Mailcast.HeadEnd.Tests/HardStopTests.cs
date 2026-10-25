@@ -21,7 +21,7 @@ public class HardStopTests
             // without, and every burst waits its 10 s carrier limit.
             station.ChannelBusyUntil = Slot.AddHours(1);
         }
-        var settings = new SlotSettings { SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), MaxSlotLength = TimeSpan.FromMinutes(10), MaxBurst = TimeSpan.FromSeconds(18) };
+        var settings = new SlotSettings { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), MaxSlotLength = TimeSpan.FromMinutes(10), MaxBurst = TimeSpan.FromSeconds(18) };
         var runner = new SlotRunner(settings, station, station, null, FakeAirtime.For(station), new MemoryJournal(), time, new FakeClockSync());
         var report = time.Run(() => runner.RunAsync(Slot, [.. Enumerable.Range(0, frames).Select(i => FakeAirtime.Frame(i))], 5, CancellationToken.None));
         return (report, station);
@@ -61,6 +61,7 @@ public class HardStopTests
         // GB7RDG's settings, a busy store, and a slot planned 5 minutes late.
         var config = HeadEndConfig.Parse("""
             {
+              "callsign": "M0LTE",
               "station": { "apiKey": "k", "mode": "ms110d-wn4", "maxBurstSeconds": 18 },
               "slot": { "timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120 },
               "schedule": { "symbolSize": 240 }

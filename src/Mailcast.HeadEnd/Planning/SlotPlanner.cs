@@ -59,7 +59,7 @@ public interface ISlotPlanner
 /// <param name="compression">Compresses the directory.</param>
 /// <param name="options">The scheduler's options.</param>
 /// <param name="waveforms">Each slot's waveform; null sends every slot on the modem's own, and needs the shares rule.</param>
-/// <param name="settings">How the slot runs, for the airtime estimate.</param>
+/// <param name="settings">How the slot runs, for the airtime estimate; the budget rule needs it, the shares rule does not.</param>
 /// <param name="fillLimit">What the budget rule fills a slot to, tone and idents included, for a slot that starts this late: <see cref="HeadEndConfig.FillLimitAfter"/>.</param>
 /// <param name="time">The clock, which says how late a slot is planned; null plans every slot as on time.</param>
 /// <param name="ionosphere">
@@ -88,8 +88,6 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
 
     /// <summary>A reading at least this old is not sent: it is UNKNOWN long before, and the record's age stops at 255.</summary>
     public const int OldestSentMinutes = 255;
-
-    private readonly SlotSettings _settings = settings ?? new SlotSettings();
 
     /// <inheritdoc />
     public SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false)
@@ -207,11 +205,11 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         {
             return null;
         }
-        if (waveform is null || fillLimit is null)
+        if (waveform is null || fillLimit is null || settings is null)
         {
-            throw new InvalidOperationException("The budget rule needs each slot's waveform and the fill limit.");
+            throw new InvalidOperationException("The budget rule needs each slot's waveform, the slot settings and the fill limit.");
         }
-        var model = new SlotAirtime(_settings, waveform.Airtime);
+        var model = new SlotAirtime(settings, waveform.Airtime);
         return new SlotBudget(fillLimit(late > TimeSpan.Zero ? late : TimeSpan.Zero), model.ForPayloads);
     }
 

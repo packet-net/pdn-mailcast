@@ -5,10 +5,10 @@ namespace Mailcast.HeadEnd.Tests;
 public class ConfigTests
 {
     [Fact]
-    public void Parse_TheSmallestConfigurationIsTheApiKey()
+    public void Parse_TheSmallestConfigurationIsTheCallsignAndTheApiKey()
     {
-        var config = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""");
-        Assert.Equal("GB7RDG", config.Callsign);
+        var config = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}}""");
+        Assert.Equal("M0LTE", config.Callsign);
         Assert.Equal(new TimeOnly(12, 0), config.SlotTime);
         var slot = config.ToSlotSettings();
         Assert.Equal(TimeSpan.FromMinutes(2), slot.ChannelWait);
@@ -21,36 +21,72 @@ public class ConfigTests
     {
         string example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "headend.example.json"));
 
-        // As shipped it has no API key, so the service refuses to start until one is set.
+        // As shipped it has no callsign, API key or locator, so the service refuses to start until they are set.
         var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(example));
         Assert.Contains("apiKey", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"callsign\" is required", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"locator\" is required", e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("GB7RDG", example, StringComparison.Ordinal);
 
-        var config = HeadEndConfig.Parse(example.Replace("\"apiKey\": \"\"", "\"apiKey\": \"k\"", StringComparison.Ordinal));
+        var config = HeadEndConfig.Parse(ExampleConfig.Filled(example));
         Assert.NotNull(config.Intake.Fbb);
         Assert.Equal(FbbIntakeConfig.LinBpqFbbPort, config.Intake.Fbb.Login);
     }
 
     [Fact]
-    public void Parse_TheReportReader_IsOffUnlessGiven_AndDefaultsToLinBpqsFbbPortAsQ0Cast()
+    public void Parse_TheReportReader_IsOffUnlessGiven_AndDefaultsToLinBpqsFbbPort()
     {
-        Assert.Null(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""").Intake.Reports);
-        var reports = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "intake": {"reports": {"password": "p"}}}""").Intake.Reports!;
+        Assert.Null(HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}}""").Intake.Reports);
+        var reports = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "intake": {"reports": {"user": "Q0CAST", "password": "p"}}}""").Intake.Reports!;
         Assert.Equal(("127.0.0.1", 8011, "Q0CAST", "p"), (reports.Host, reports.Port, reports.User, reports.Password));
         Assert.Equal(FbbIntakeConfig.LinBpqFbbPort, reports.Login);
-        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "intake": {"reports": {"user": ""}}}"""));
-        Assert.Contains("\"reports\" needs a \"user\"", e.Message, StringComparison.Ordinal);
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "intake": {"reports": {"password": "p"}}}"""));
+        Assert.Contains("\"intake\".\"reports\".\"user\" is required", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parse_RefusesAConfigurationThatDoesNotNameTheStation_SayingWhatIsMissing()
+    {
+        // Nothing of GB7RDG's is filled in for another station: each is named, all at once.
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""
+            {
+              "station": {"apiKey": "k"},
+              "slot": {"everyMinutes": 60, "daylight": {"afterSunriseMinutes": 120}},
+              "intake": {"fbb": {"password": "p"}, "reports": {"password": "p"}}
+            }
+            """));
+        Assert.Contains("\"callsign\" is required", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"slot\".\"daylight\".\"locator\" is required", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"intake\".\"fbb\".\"user\" is required", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"intake\".\"fbb\".\"partnerCallsign\" is required", e.Message, StringComparison.Ordinal);
+        Assert.Contains("\"intake\".\"reports\".\"user\" is required", e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("not an AX.25 callsign", e.Message, StringComparison.Ordinal);
+
+        // Stated, they are taken as given.
+        var config = HeadEndConfig.Parse("""
+            {
+              "callsign": "G8BPQ",
+              "station": {"apiKey": "k"},
+              "slot": {"everyMinutes": 60, "daylight": {"locator": "IO93ma"}},
+              "intake": {"fbb": {"user": "Q0HEAD", "partnerCallsign": "Q0HEAD"}, "reports": {"user": "Q0CAST"}}
+            }
+            """);
+        Assert.Equal("G8BPQ", config.ToSlotSettings().Callsign);
+        Assert.Equal("IO93ma", config.ToSlotSchedule().Daylight!.Locator);
+        Assert.Equal(120, config.ToSlotSchedule().Daylight!.AfterSunriseMinutes);
+        Assert.Equal(("Q0HEAD", "Q0HEAD"), (config.Intake.Fbb!.User, config.Intake.Fbb.PartnerCallsign));
     }
 
     [Theory]
     [InlineData("""{"station": {}}""", "apiKey")]
-    [InlineData("""{"station": {"apiKey": "k", "leaseSeconds": 60}}""", "leaseSeconds")]
-    [InlineData("""{"station": {"apiKey": "k"}, "slot": {"timeUtc": "noon"}}""", "timeUtc")]
-    [InlineData("""{"station": {"apiKey": "k"}, "colour": "blue"}""", "colour")]
-    [InlineData("""{"station": {"apiKey": "k"}, "callsign": "NOT A CALL"}""", "callsign")]
-    [InlineData("""{"station": {"apiKey": "k"}, "flex": {"enabled": true}}""", "flex")]
-    [InlineData("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 250}}""", "symbolSize")]
-    [InlineData("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 32}}""", "symbolSize")]
-    [InlineData("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 1000}}""", "symbolSize")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k", "leaseSeconds": 60}}""", "leaseSeconds")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"timeUtc": "noon"}}""", "timeUtc")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "colour": "blue"}""", "colour")]
+    [InlineData("""{"station": {"apiKey": "k"}, "callsign": "NOT A CALL"}""", "not an AX.25 callsign")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "flex": {"enabled": true}}""", "flex")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 250}}""", "symbolSize")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 32}}""", "symbolSize")]
+    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 1000}}""", "symbolSize")]
     public void Parse_RefusesWhatCannotWork(string json, string mentions)
     {
         var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(json));
@@ -61,7 +97,7 @@ public class ConfigTests
 public class SlotIntervalTests
 {
     private static HeadEndConfig Parse(string slot, string schedule = "{}") =>
-        HeadEndConfig.Parse($$"""{"station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
+        HeadEndConfig.Parse($$"""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
 
     private static void SameSchedule(ScheduleOptions expected, ScheduleOptions actual)
     {
@@ -78,7 +114,7 @@ public class SlotIntervalTests
     public void ADailyConfiguration_IsUnchanged()
     {
         // As every head end was configured before slots had an interval.
-        var config = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"timeUtc": "12:00"}}""");
+        var config = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"timeUtc": "12:00"}}""");
         Assert.Equal(1440, config.Slot.EveryMinutes);
         SameSchedule(new ScheduleOptions(), config.ToScheduleOptions());
         Assert.Equal([0, 1, 2], config.ToScheduleOptions().SlotOffsets);
@@ -172,7 +208,7 @@ public class SlotIntervalTests
 public class DaylightConfigTests
 {
     private static HeadEndConfig Parse(string slot, string schedule = "{}") =>
-        HeadEndConfig.Parse($$"""{"station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
+        HeadEndConfig.Parse($$"""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
 
     [Fact]
     public void Daylight_ReachesTheScheduleTheSchedulerAndTheDirectory_WithLighterCarrying()
@@ -187,7 +223,7 @@ public class DaylightConfigTests
         Assert.Equal(ScheduleOptions.HourlyDaylight.SlotOffsets, options.SlotOffsets);
 
         // Shares given in the file still win.
-        var set = Parse("""{"everyMinutes": 60, "daylight": {}}""", """{"slotShares": [1.5, 0.5, 0.5], "slotOffsets": [0, 5, 10]}""");
+        var set = Parse("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}}""", """{"slotShares": [1.5, 0.5, 0.5], "slotOffsets": [0, 5, 10]}""");
         Assert.Equal([1.5, 0.5, 0.5], set.ToScheduleOptions().SlotShares);
         Assert.Equal(DaylightRule.Gb7rdg, set.ToSlotSchedule().Daylight);
     }
@@ -204,8 +240,9 @@ public class DaylightConfigTests
     [Theory]
     [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "XX99"}}""", "locator")]
     [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 800}}""", "afterSunriseMinutes")]
-    [InlineData("""{"everyMinutes": 60, "daylight": {"afterSunriseMinutes": 600, "beforeSunsetMinutes": 600}}""", "no slot in a whole year")]
-    [InlineData("""{"everyMinutes": 60, "daylight": {"sunrise": 1}}""", "sunrise")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 600, "beforeSunsetMinutes": 600}}""", "no slot in a whole year")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk", "sunrise": 1}}""", "sunrise")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {}}""", "\"locator\" is required")]
     public void Parse_RefusesDaylightSettingsThatCannotWork(string slot, string mentions)
     {
         var e = Assert.Throws<ConfigException>(() => Parse(slot));
@@ -213,10 +250,10 @@ public class DaylightConfigTests
     }
 
     [Fact]
-    public void TheExampleFile_IsGb7rdgsDaylightHours()
+    public void TheExampleFile_IsHourlyInDaylight()
     {
         string example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "headend.example.json"));
-        var config = HeadEndConfig.Parse(example.Replace("\"apiKey\": \"\"", "\"apiKey\": \"k\"", StringComparison.Ordinal));
+        var config = HeadEndConfig.Parse(ExampleConfig.Filled(example));
         Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), config.ToSlotTimetable());
     }
 }
@@ -226,9 +263,9 @@ public class SymbolSizeTests
     [Fact]
     public void A_Symbol_Size_Reaches_The_Scheduler_And_The_Default_Is_Unchanged()
     {
-        var small = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "schedule": {"symbolSize": 240}}""");
+        var small = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 240}}""");
         Assert.Equal(240, small.ToScheduleOptions().SymbolSize);
-        var standard = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""");
+        var standard = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}}""");
         Assert.Equal(Packet.Mailcast.MailcastFrame.StandardSymbolSize, standard.ToScheduleOptions().SymbolSize);
     }
 }

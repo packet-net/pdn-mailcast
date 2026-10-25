@@ -17,7 +17,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         {
             Time = new VirtualTime(Noon);
             Station = new FakeStation(Time, 4);
-            Settings = settings ?? new SlotSettings { SubChannel = 4 };
+            Settings = settings ?? new SlotSettings { Callsign = "M0LTE", SubChannel = 4 };
             Flex = withFlex ? new FakeFlex(Time, pa ?? (_ => 40.0), Gps, flexReachable) : null;
             Runner = new SlotRunner(Settings, Station, Station, Flex, FakeAirtime.For(Station), Journal, Time, Clock);
         }
@@ -132,7 +132,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_FramesPerBurstOverridesTheModel()
     {
-        var rig = new Rig(new SlotSettings { SubChannel = 4, FramesPerBurst = 4 });
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, FramesPerBurst = 4 });
         rig.Run(10);
         Assert.Equal(["burst of 4", "burst of 4", "burst of 2"], rig.Station.Keyups.Skip(1).Select(b => b.What));
     }
@@ -188,7 +188,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_HasAHardStopAtTheMaximumLength()
     {
-        var rig = new Rig(new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(5) });
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(5) });
         var report = rig.Run(200);
 
         Assert.Equal(SlotOutcome.Aborted, report.Outcome);
@@ -284,7 +284,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Empty(rig.Station.LeaseRequests);
         Assert.Contains(rig.Journal.Lines, l => l.Contains("waiting for the system clock", StringComparison.Ordinal));
 
-        var relaxed = new Rig(new SlotSettings { SubChannel = 4, RequireClockSync = false });
+        var relaxed = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, RequireClockSync = false });
         relaxed.Clock.Synchronised = false;
         Assert.Equal(SlotOutcome.Completed, relaxed.Run(5).Outcome);
     }
@@ -292,7 +292,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_SkipsWhenTheChannelStaysBusyAndTheConfigurationSaysSo()
     {
-        var rig = new Rig(new SlotSettings { SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
         rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
         var report = rig.Run(5);
         Assert.Equal(SlotOutcome.Skipped, report.Outcome);
@@ -303,7 +303,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(0, report.FramesQueued);
     }
 
-    private static readonly SlotSettings TenSecondTone = new() { SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), ToneHz = 4050 };
+    private static readonly SlotSettings TenSecondTone = new() { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), ToneHz = 4050 };
 
     [Fact]
     public void Run_FollowsTheToneWithTheChannelProbe_InOneKeyup_AndReportsIt()
@@ -475,7 +475,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_WithNoTone_AsksForNoProbe()
     {
-        var rig = new Rig(new SlotSettings { SubChannel = 4, ToneLength = TimeSpan.Zero });
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.Zero });
         var report = rig.Run(5);
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         Assert.False(report.ToneSent);
@@ -510,7 +510,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     [Fact]
     public void Run_SkipsOrCarriesOnWhenTheFlexIsUnreachable_AsConfigured()
     {
-        var skip = new Rig(new SlotSettings { SubChannel = 4, WhenFlexUnreachable = FlexUnreachablePolicy.Skip }, flexReachable: false);
+        var skip = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenFlexUnreachable = FlexUnreachablePolicy.Skip }, flexReachable: false);
         Assert.Equal(SlotOutcome.Skipped, skip.Run(5).Outcome);
         Assert.Empty(skip.Station.LeaseRequests);
 
@@ -591,7 +591,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(SlotOutcome.Completed, completed.Outcome);
         Assert.Contains(carryOn.Journal.Lines, l => l.Contains("lost the PA temperature watch: the Flex has sent no recent PA temperature; carrying on", StringComparison.Ordinal));
 
-        var stop = new Rig(new SlotSettings { SubChannel = 4, WhenFlexUnreachable = FlexUnreachablePolicy.Skip }, pa: t => t < TimeSpan.FromMinutes(3) ? 40 : null);
+        var stop = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenFlexUnreachable = FlexUnreachablePolicy.Skip }, pa: t => t < TimeSpan.FromMinutes(3) ? 40 : null);
         var aborted = stop.Run(40);
         Assert.Equal(SlotOutcome.Aborted, aborted.Outcome);
         Assert.StartsWith("lost the PA temperature watch", aborted.Reason, StringComparison.Ordinal);
@@ -604,7 +604,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         var time = new VirtualTime(Noon);
         var station = new FakeStation(time, 4);
         Assert.Throws<ArgumentException>(() => new SlotRunner(
-            new SlotSettings { MaxCarrierWait = TimeSpan.FromSeconds(20), LeaseMargin = TimeSpan.FromSeconds(15) },
+            new SlotSettings { Callsign = "M0LTE", MaxCarrierWait = TimeSpan.FromSeconds(20), LeaseMargin = TimeSpan.FromSeconds(15) },
             station, station, null, FakeAirtime.For(station), new MemoryJournal(), time));
     }
 
@@ -753,7 +753,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     public void Run_NeverQueuesABurstThatCouldOutliveTheLease()
     {
         // A lease only just long enough: the runner renews before each burst rather than risk it.
-        var rig = new Rig(new SlotSettings { SubChannel = 4, LeaseLength = TimeSpan.FromSeconds(75), RenewEvery = TimeSpan.FromSeconds(30) });
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, LeaseLength = TimeSpan.FromSeconds(75), RenewEvery = TimeSpan.FromSeconds(30) });
         var report = rig.Run(30);
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         AssertNothingKeyedOutsideTheLease(rig.Station);

@@ -1,8 +1,10 @@
 {
-  // pdn-mailcast-headend. Every key has a default except "station"."apiKey"; the service will not
-  // start until that is set. docs/headend.md says what each one does. The slot settings here are
-  // GB7RDG's, a slot every hour on the hour in daylight; the rest are the defaults.
-  "callsign": "GB7RDG",
+  // pdn-mailcast-headend. Every key has a default except the ones that name your station:
+  // "callsign", "station"."apiKey" and the daylight "locator", empty here, and the BBS logins,
+  // Q0HEAD here; the service will not start until the empty ones are set. docs/headend.md says what
+  // each one does, and docs/run-your-own-headend.md how to set one up. The slot settings here are
+  // a slot every hour on the hour in daylight; the rest are the defaults.
+  "callsign": "",
   "destination": "MCAST",
   "stateDirectory": "/var/lib/pdn-mailcast-headend",
 
@@ -28,7 +30,7 @@
 
   // A slot at "timeUtc" and then every "everyMinutes" (dividing a day, at least 15). Left out,
   // "everyMinutes" is 1440, one slot a day, and then "toneSeconds" is 30, "maxMinutes" 40 and
-  // "catchUpMinutes" 30. Receivers expect GB7RDG every hour on the hour with a 10 s tone.
+  // "catchUpMinutes" 30. Receivers expect a 10 s tone in an hourly slot.
   // "daylight" runs only the slots that start from "afterSunriseMinutes" after sunrise to
   // "beforeSunsetMinutes" before sunset at "locator", worked out from the sun for each day, in
   // UTC; left out, every slot runs. --run-now runs whatever the time.
@@ -36,7 +38,7 @@
   "slot": {
     "timeUtc": "00:00",
     "everyMinutes": 60,
-    "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
+    "daylight": { "locator": "", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
     "catchUpMinutes": 5,
     "requireClockSync": true,
     "retryMinutes": 5,
@@ -100,11 +102,11 @@
     }
     // To tell listeners whose daily reports reached the BBS, add a login the head end can list
     // them with (L> MCAST) as an ordinary reader, before each slot and at most every 15 minutes.
-    // Left out, nothing is read and the directory says nothing about reports. On GB7RDG:
+    // Left out, nothing is read and the directory says nothing about reports. For example:
     // "reports": { "host": "127.0.0.1", "port": 8011, "user": "Q0CAST", "password": "" }
   },
 
-  // The ionosonde reading: is 40 m open from Reading, and how far out. Observe only: it is logged,
+  // The ionosonde reading: is 40 m open from the UK, and how far out. Observe only: it is logged,
   // reported and sent to receivers as a tiny object, and never changes what or when the head end
   // sends. A distance (100, 500, 1000 km) is open when its MUF is at least "openMhz", reliable
   // when "reliableFactor" times it still is; a sounding older than "staleMinutes" is UNKNOWN. The
