@@ -502,13 +502,17 @@ public sealed class ReceiverHost : IAsyncDisposable
             foreach (string station in adverts.Select(a => a.Callsign).Concat(heard).Distinct(StringComparer.Ordinal).Where(c => c != ReceiverStore.BuiltInStation).Order(StringComparer.Ordinal))
             {
                 var own = Intake.HeardTimetable(station);
-                var advert = adverts.FirstOrDefault(a => a.Callsign == station);
+                var advertised = adverts.Where(a => a.Callsign == station).ToList();
+                // Its own signed directory heard here: plainly within reach, whatever any advert
+                // says about its frequency. Known from adverts alone: the advert that puts it on
+                // this receiver's frequency, if one does, else the first, to show why not.
+                var advert = advertised.FirstOrDefault(a => CanHear(a.FrequencyHz, a.Sideband)) ?? advertised.FirstOrDefault();
                 if ((own ?? advert?.Timetable) is not { } timetable)
                 {
                     continue;
                 }
-                long hz = advert?.FrequencyHz ?? (long)Config.CentreHz;
-                var sideband = advert?.Sideband ?? Sideband.Usb;
+                long hz = own is not null ? (long)Config.CentreHz : advert!.FrequencyHz;
+                var sideband = own is not null ? Sideband.Usb : advert!.Sideband;
                 string? why = skip.Contains(station) ? "you chose not to listen at its slots"
                     : !CanHear(hz, sideband) ? $"it is on {OnAir.Mhz(hz)} MHz {(sideband == Sideband.Usb ? "USB" : "LSB")}, not where this receiver listens"
                     : null;

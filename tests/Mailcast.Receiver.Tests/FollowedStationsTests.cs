@@ -130,12 +130,26 @@ public class FollowedStationsTests
         Assert.Equal("G8BPQ", host.Slots.Schedule.StationAt(slot));
 
         // Its own signed directory moves it to :45, and the tracker takes that up at once.
+        // Another head end advertising it on QO-100, or on a wrong frequency, does not stop it
+        // being followed: its own directory is heard here.
+        var rdgLike = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        await HearAsync(host, ScheduleOptions.Hourly with
+        {
+            Timetable = new SlotTimetable(new TimeOnly(0, 50), 60),
+            Signer = rdgLike,
+            Station = "M0ABC",
+            Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 10_489_750_000, Sideband.Usb)],
+        }, slot.AddMinutes(20), 3);
+        Assert.Contains(host.Listening, l => l.Station == "G8BPQ" && l.Followed && l.Source == "its own directory");
+
         var moved = At(10, 45);
         await HearAsync(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 45), 60), Signer = bpq, Station = "G8BPQ" }, moved, 2);
         Assert.Equal(moved, host.Slots.Schedule!.LatestStart(moved.AddMinutes(1)));
         lock (log)
         {
-            Assert.Contains(log, l => l == "slots: now following GB7RDG every hour on the hour; G8BPQ every hour at 45 minutes past");
+            Assert.Contains(log, l => l.StartsWith("slots: now following GB7RDG every hour on the hour; G8BPQ every hour at 45 minutes past", StringComparison.Ordinal));
+            // Said once for each real change, never again for the same stations.
+            Assert.Equal(log.Count(l => l.StartsWith("slots: now following", StringComparison.Ordinal)), log.Where(l => l.StartsWith("slots: now following", StringComparison.Ordinal)).Distinct().Count());
         }
     }
 
@@ -159,11 +173,13 @@ public class FollowedStationsTests
                 Timetable = new SlotTimetable(new TimeOnly(0, 15), 60),
                 Signer = xyz,
                 Station = "M0XYZ",
-                Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_053_800, Sideband.Usb), new("M0FAR", new SlotTimetable(new TimeOnly(0, 45), 60), 7_047_000, Sideband.Usb)],
+                Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 10_489_750_000, Sideband.Usb), new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_053_800, Sideband.Usb), new("M0FAR", new SlotTimetable(new TimeOnly(0, 45), 60), 7_047_000, Sideband.Usb)],
             }, slot, 1);
             var listening = host.Listening;
             Assert.Equal(["GB7RDG", "G8BPQ", "M0FAR", "M0XYZ"], listening.Select(l => l.Station));
             Assert.Equal("an advert", listening[1].Source);
+            Assert.True(listening[1].Followed); // its HF advert, not its QO-100 one, decides
+            Assert.Equal(7_053_800, listening[1].FrequencyHz);
             Assert.False(listening[2].Followed);
             Assert.Contains("7.047 MHz USB, not where this receiver listens", listening[2].NotFollowedBecause, StringComparison.Ordinal);
             Assert.Equal("its own directory", listening[3].Source);
