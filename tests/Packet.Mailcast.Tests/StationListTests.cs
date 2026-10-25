@@ -205,6 +205,25 @@ public class StationListTests
         Assert.Equal("signed by G8BPQ", result.Check!.Describe());
     }
 
+    [Fact]
+    public void ANewList_TrustsADirectoryHeardBefore_AndReleasesWhatItHeld()
+    {
+        var bulletin = TestBulletins.Day(2, 1)[0];
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var entry = new DirectoryEntry(obj.ObjectId, obj.DictionaryId, bulletin.Serialize().Length, bulletin.Bid, bulletin.Title, Hash: ObjectId.LongHash(obj.DictionaryId, obj.Bytes));
+        var directory = new BroadcastDirectory(new DateOnly(2026, 10, 25), [entry], new SlotTimetable(new TimeOnly(0, 30), 60), signer: BpqSigner);
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { ListKeys = [ListKey] });
+        Assert.Equal(FrameOutcome.RejectedDirectory, FeedAll(store, TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default)).Outcome);
+        Assert.Equal(FrameOutcome.Withheld, FeedAll(store, obj).Outcome);
+        Assert.Empty(store.Pending());
+
+        var result = store.Accept(TransferObject.ForStationList(Signed(1)).Frame(0).ToBytes());
+        Assert.Equal(bulletin.Bid, Assert.Single(result.Released!).Bid);
+        Assert.Single(store.Pending());
+        Assert.Equal(directory.Date, store.Directory!.Date);
+    }
+
     private static AcceptResult FeedAll(ReceiverStore store, TransferObject obj)
     {
         AcceptResult result = null!;

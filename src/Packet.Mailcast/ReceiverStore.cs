@@ -592,6 +592,34 @@ public sealed class ReceiverStore
         DirectoryKeys = keys;
     }
 
+    /// <summary>
+    /// Checks every remembered directory again against <see cref="DirectoryKeys"/> after a new
+    /// list changed them: one by a newly listed station is used from now on, and one by a station
+    /// no longer listed (and not otherwise trusted) is used for nothing.
+    /// </summary>
+    private void RecheckDirectories()
+    {
+        var all = _knownDirectories.Concat(_rejectedDirectories).ToList();
+        _knownDirectories.Clear();
+        _rejectedDirectories.Clear();
+        foreach (var (id, (directory, heardAt, _)) in all)
+        {
+            var check = directory.Check(DirectoryKeys);
+            (check.Usable ? _knownDirectories : _rejectedDirectories)[id] = (directory, heardAt, check);
+        }
+        if (Directory is { } newest)
+        {
+            var check = newest.Check(DirectoryKeys);
+            (Directory, NewestCheck) = check.Usable ? (newest, check) : (null, null);
+        }
+        var latest = _knownDirectories.Values.OrderBy(k => k.Directory.Date).ThenBy(k => k.HeardAt).LastOrDefault();
+        if (latest.Directory is { } heard && (Directory is null || heard.Date > Directory.Date))
+        {
+            DurableFile.WriteAtomically(Path.Combine(_root, "directory.txt"), heard.Serialize(), flush: _options.FlushToDisk);
+            (Directory, NewestCheck) = (heard, latest.Check);
+        }
+    }
+
     private void LoadStations()
     {
         SetStations(null);
@@ -645,16 +673,25 @@ public sealed class ReceiverStore
             Log(why);
             return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, Detail: why, ContentType: (byte)ObjectKind.StationList, Check: check, StationList: list);
         }
+        List<Bulletin>? released = null;
         if (Stations?.Serial != list.Serial)
         {
             DurableFile.WriteAtomically(Path.Combine(_root, StationsFile), list.Serialize(), flush: _options.FlushToDisk);
             SetStations(list);
+            RecheckDirectories();
+            foreach (var known in _knownDirectories.Values.ToList())
+            {
+                if (ReleaseWithheld(known.Directory) is { } some)
+                {
+                    (released ??= []).AddRange(some);
+                }
+            }
         }
         foreach (var skipped in list.Skipped)
         {
             Log($"station list serial {list.Serial}: skipped {skipped}");
         }
-        return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, ContentType: (byte)ObjectKind.StationList, Check: check, StationList: list);
+        return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, ContentType: (byte)ObjectKind.StationList, Check: check, StationList: list, Released: released);
     }
 
     /// <summary>Where the newest PSK Reporter reading is kept, as the object that carried it, under the store's folder.</summary>
