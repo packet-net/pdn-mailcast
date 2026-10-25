@@ -41,14 +41,14 @@
     "password": ""
   },
 
-  // GB7RDG's slots: one at "slotUtc" (UTC), then one every "everyMinutes", so every hour
+  // GB7RDG's slots: at "minute" past the hour (UTC), then one every "everyMinutes", so every hour
   // on the hour, but only in daylight: from 2 hours after sunrise to 30 minutes before sunset
   // near Reading (IO91lk). Once the receiver has heard GB7RDG's directory, which gives its
   // slots, it uses that instead. A sound card decodes from 2 minutes before each slot until
   // it is over, and rests between slots unless a status page shows the spectrogram. A web SDR listens from 2
   // minutes before each daylight slot to 12 after, which is every slot for most of the year;
   // near midsummer it skips the earliest morning ones to stay inside its 3 hours a day.
-  "slotUtc": "00:00",
+  "minute": 0,
   "everyMinutes": 60,
   "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
 

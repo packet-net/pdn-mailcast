@@ -49,7 +49,7 @@ public sealed record HeadEndConfig
     /// <summary>The stations in <see cref="Advertise"/>, as the directory carries them.</summary>
     public IReadOnlyList<StationAdvert> ToAdverts() =>
         [.. Advertise.Select(a => new StationAdvert(a.Callsign, new SlotTimetable(
-            TimeOnly.ParseExact(a.Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture), a.Slot.EveryMinutes, a.Slot.Daylight?.ToSettings().ToRule()),
+            TimeOnly.ParseExact(a.Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture), a.Slot.EveryMinutes, a.Slot.Daylight?.ToSettings().ToRule()),
             a.FrequencyHz, a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Sideband.Lsb : Sideband.Usb))];
 
     private static readonly JsonSerializerOptions Options = new()
@@ -236,7 +236,7 @@ public sealed record HeadEndConfig
     }
 
     /// <summary>The first slot's time of day, UTC, which the others are counted from.</summary>
-    public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture);
+    public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>When the slots are.</summary>
     public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings().ToRule());
@@ -278,8 +278,13 @@ public sealed record HeadEndConfig
             {
                 problems.Add($"{where}: \"sideband\" is usb or lsb, not '{a.Sideband}'");
             }
-            bool anchorFine = TimeOnly.TryParseExact(a.Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor);
-            if (!anchorFine)
+            bool anchorFine = TimeOnly.TryParseExact(a.Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor);
+            if (SlotAnchor.Problem(a.Slot.TimeUtc, a.Slot.Minute, "\"timeUtc\"", "\"minute\"") is { } both)
+            {
+                problems.Add($"{where}: \"slot\": {both}");
+                anchorFine = false;
+            }
+            else if (!anchorFine)
             {
                 problems.Add($"{where}: \"slot\".\"timeUtc\" '{a.Slot.TimeUtc}' is not HH:mm");
             }
@@ -301,7 +306,7 @@ public sealed record HeadEndConfig
 
     private SlotTimetable? TimetableIfValid()
     {
-        if (!TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+        if (!TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
             || Slot.EveryMinutes < 1 || MinutesPerDay % Slot.EveryMinutes != 0)
         {
             return null;
@@ -336,7 +341,11 @@ public sealed record HeadEndConfig
         {
             problems.Add($"\"destination\": '{Destination}' is not an AX.25 address");
         }
-        if (!TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        if (SlotAnchor.Problem(Slot.TimeUtc, Slot.Minute, "\"slot\".\"timeUtc\"", "\"slot\".\"minute\"") is { } anchorProblem)
+        {
+            problems.Add(anchorProblem);
+        }
+        else if (!TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
         {
             problems.Add($"\"slot\".\"timeUtc\": '{Slot.TimeUtc}' is not HH:mm");
         }
@@ -366,14 +375,14 @@ public sealed record HeadEndConfig
             problems.Add("\"slot\".\"daylight\".\"locator\" is required: the station's Maidenhead locator, such as IO91lk, where sunrise and sunset are worked out");
             daylightFine = false;
         }
-        else if (Slot.Daylight is { } daylight && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
+        else if (Slot.Daylight is { } daylight && TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
             && daylight.ToSettings().Problem(everyFine ? Slot.EveryMinutes : 0, anchor) is { } daylightProblem)
         {
             problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
             daylightFine = false;
         }
         problems.AddRange(AdvertProblems());
-        ValidateSchedule(problems, everyFine && daylightFine && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
+        ValidateSchedule(problems, everyFine && daylightFine && TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
         if (Slot.Tone is < 0 or > 60)
         {
             problems.Add("\"slot\".\"toneSeconds\" must be 0 to 60 (the station caps a test at 60 s, 30 s unless its txTest.maxSeconds says more)");
@@ -620,8 +629,18 @@ public sealed record HeadEndConfig
 
 public sealed record SlotConfig
 {
-    /// <summary>A slot's start, UTC, HH:mm: the first of the day's slots, or the only one for a daily station.</summary>
-    public string TimeUtc { get; init; } = "12:00";
+    /// <summary>
+    /// The minute past the hour slots start at, 0 to 59: slots are counted from 00:MM UTC, so
+    /// 30 with <c>everyMinutes</c> 60 is :30 past every hour. Use this, not <see cref="TimeUtc"/>.
+    /// </summary>
+    public int? Minute { get; init; }
+
+    /// <summary>The older way to say it: a slot's start, UTC, HH:mm. Still read; only for a daily anchor such as 12:00 that has no <see cref="Minute"/>.</summary>
+    public string? TimeUtc { get; init; }
+
+    /// <summary>The anchor as HH:mm, from whichever of <see cref="Minute"/> and <see cref="TimeUtc"/> is given (12:00 if neither).</summary>
+    [JsonIgnore]
+    public string Anchor => SlotAnchor.Text(TimeUtc, Minute, "12:00");
 
     /// <summary>Minutes from one slot to the next, at least 15 and dividing a day: 1440 is daily, 60 hourly.</summary>
     public int EveryMinutes { get; init; } = 1440;
@@ -1048,8 +1067,15 @@ public sealed record AdvertisedStation
 /// <summary>An advertised station's slots.</summary>
 public sealed record AdvertisedSlot
 {
-    /// <summary>One slot's start, HH:mm UTC.</summary>
-    public string TimeUtc { get; init; } = "00:00";
+    /// <summary>The minute past the hour slots start at, 0 to 59 (see <see cref="SlotConfig.Minute"/>).</summary>
+    public int? Minute { get; init; }
+
+    /// <summary>The older way to say it: one slot's start, HH:mm UTC. Still read.</summary>
+    public string? TimeUtc { get; init; }
+
+    /// <summary>The anchor as HH:mm (00:00 if neither is given).</summary>
+    [JsonIgnore]
+    public string Anchor => SlotAnchor.Text(TimeUtc, Minute, "00:00");
 
     /// <summary>Minutes between slots; it divides a day.</summary>
     public int EveryMinutes { get; init; } = 60;

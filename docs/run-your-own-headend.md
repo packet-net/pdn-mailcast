@@ -15,7 +15,7 @@ The package puts an example in `/etc/pdn-mailcast-headend/headend.json`. Fill in
 ```json
 "callsign": "G0ABC",
 "slot": {
-  "timeUtc": "00:30",
+  "minute": 30,
   "everyMinutes": 60,
   "daylight": { "locator": "IO92ab", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 }
 },
@@ -33,7 +33,7 @@ Then `sudo pdn-mailcast-headend --check-config` and `sudo systemctl start pdn-ma
 
 ## The slot start
 
-Pick a time no other mailcast station on your frequency uses. GB7RDG sends on the hour, so on 40 m start yours at half past: `"timeUtc": "00:30"` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal's `schedule:` line at start-up says when your slots are.
+Pick a time no other mailcast station on your frequency uses. GB7RDG sends on the hour, so on 40 m start yours at half past: `"minute": 30` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal's `schedule:` line at start-up says when your slots are.
 
 ## The signing key
 

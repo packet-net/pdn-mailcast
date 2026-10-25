@@ -28,15 +28,15 @@
     "retireHours": 36
   },
 
-  // A slot at "timeUtc" and then every "everyMinutes" (dividing a day, at least 15). Left out,
+  // A slot at "minute" past the hour (0 to 59, counted from 00:MM UTC) and then every "everyMinutes" (dividing a day, at least 15). Left out,
   // "everyMinutes" is 1440, one slot a day, and then "toneSeconds" is 30, "maxMinutes" 40 and
   // "catchUpMinutes" 30. Receivers expect a 10 s tone in an hourly slot.
   // "daylight" runs only the slots that start from "afterSunriseMinutes" after sunrise to
   // "beforeSunsetMinutes" before sunset at "locator", worked out from the sun for each day, in
   // UTC; left out, every slot runs. --run-now runs whatever the time.
-  // "timeUtc" also sets the minute: "00:30" with "everyMinutes" 60 is a slot at half past each hour.
+  // "minute" 30 with "everyMinutes" 60 is a slot at half past each hour. (The older "minute": 30 still works.)
   "slot": {
-    "timeUtc": "00:00",
+    "minute": 0,
     "everyMinutes": 60,
     "daylight": { "locator": "", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
     "catchUpMinutes": 5,
@@ -131,7 +131,7 @@
   // Other mailcast stations to tell listeners about in every directory, so their receivers
   // also listen at those stations' slots. Only a hint about where to listen: receivers trust a
   // station from its own signed directory. For example:
-  // { "callsign": "G8BPQ", "slot": { "timeUtc": "00:30", "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
+  // { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
   "advertise": [],
 
   // GET /status for the state; POST /run (pdn-mailcast-headend --run-now) for a one-off slot,

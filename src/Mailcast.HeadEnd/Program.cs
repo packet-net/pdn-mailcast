@@ -32,7 +32,7 @@ public static partial class Program
               Runs the service: takes bulletins in, and sends them in each slot.
           pdn-mailcast-headend --plan [--date YYYY-MM-DD] [--time HH:MM] [--config FILE]
               Prints what a slot would send, and changes nothing. The slot is the one running
-              at --time (slot.timeUtc if left out) on --date (today if left out).
+              at --time (slot.minute, with the hour 00, if left out) on --date (today if left out).
           pdn-mailcast-headend --wav OUT.wav [--date YYYY-MM-DD] [--time HH:MM] [--bulletins DIR] [--rate HZ] [--config FILE]
               Renders that slot to a WAV file, offline. --bulletins takes a directory of
               bulletin files (the file drop format), all new in that slot; without it the head
@@ -396,9 +396,11 @@ public static partial class Program
         int every = config.Slot.EveryMinutes;
         if (every == 1440)
         {
-            return $"schedule: a slot every day at {config.Slot.TimeUtc}Z";
+            return $"schedule: a slot every day at {config.Slot.Anchor}Z";
         }
-        string line = $"schedule: a slot every {every} min, counted from {config.Slot.TimeUtc}Z";
+        string line = config.SlotTime.Hour == 0
+            ? $"schedule: a slot every {every} min, counted from minute {config.SlotTime.Minute} past 00:00Z"
+            : $"schedule: a slot every {every} min, counted from {config.Slot.Anchor}Z";
         if (60 % every != 0)
         {
             return line;

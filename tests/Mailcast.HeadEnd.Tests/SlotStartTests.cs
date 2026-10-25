@@ -15,7 +15,7 @@ public class SlotStartTests
     private static HeadEndConfig Parse(string slot, string schedule = "{}") =>
         HeadEndConfig.Parse($$"""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
 
-    private const string HalfPastInDaylight = """{"timeUtc": "00:30", "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""";
+    private const string HalfPastInDaylight = """{"minute": 30, "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""";
 
     private static DateTimeOffset At(int hour, int minute = 0, int day = 5) => new(2026, 10, day, hour, minute, 0, TimeSpan.Zero);
 
@@ -49,7 +49,7 @@ public class SlotStartTests
 
         // "12:30" is the same hourly timetable as "00:30".
         var noonish = Parse("""{"timeUtc": "12:30", "everyMinutes": 60}""").ToSlotSchedule();
-        Assert.Equal(Parse("""{"timeUtc": "00:30", "everyMinutes": 60}""").ToSlotSchedule().Timetable.SlotsOn(day), noonish.Timetable.SlotsOn(day));
+        Assert.Equal(Parse("""{"minute": 30, "everyMinutes": 60}""").ToSlotSchedule().Timetable.SlotsOn(day), noonish.Timetable.SlotsOn(day));
     }
 
     [Fact]
@@ -89,14 +89,63 @@ public class SlotStartTests
     }
 
     [Theory]
-    [InlineData("""{"timeUtc": "00:30", "everyMinutes": 60}""", "schedule: a slot every 60 min, counted from 00:30Z, so at :30 each hour")]
-    [InlineData("""{"timeUtc": "00:00", "everyMinutes": 60}""", "schedule: a slot every 60 min, counted from 00:00Z, so at :00 each hour")]
+    [InlineData("""{"timeUtc": "00:30", "everyMinutes": 60}""", "schedule: a slot every 60 min, counted from minute 30 past 00:00Z, so at :30 each hour")]
+    [InlineData("""{"minute": 30, "everyMinutes": 60}""", "schedule: a slot every 60 min, counted from minute 30 past 00:00Z, so at :30 each hour")]
+    [InlineData("""{"minute": 0, "everyMinutes": 60}""", "schedule: a slot every 60 min, counted from minute 0 past 00:00Z, so at :00 each hour")]
+    [InlineData("""{"everyMinutes": 60, "minute": 10}""", "schedule: a slot every 60 min, counted from minute 10 past 00:00Z, so at :10 each hour")]
     [InlineData("""{"timeUtc": "07:10", "everyMinutes": 30}""", "schedule: a slot every 30 min, counted from 07:10Z, so at :10 and :40 each hour")]
-    [InlineData("""{"timeUtc": "00:00", "everyMinutes": 15}""", "schedule: a slot every 15 min, counted from 00:00Z, so at :00, :15, :30 and :45 each hour")]
+    [InlineData("""{"minute": 0, "everyMinutes": 15}""", "schedule: a slot every 15 min, counted from minute 0 past 00:00Z, so at :00, :15, :30 and :45 each hour")]
     [InlineData("""{"timeUtc": "01:30", "everyMinutes": 120}""", "schedule: a slot every 120 min, counted from 01:30Z")]
     [InlineData("""{"timeUtc": "12:00"}""", "schedule: a slot every day at 12:00Z")]
     public void TheStartUpLine_SaysWhereInTheHourSlotsStart(string slot, string expected)
     {
         Assert.Equal(expected, Program.DescribeSchedule(Parse(slot)));
+    }
+    [Fact]
+    public void Minute_IsTheSameAsTheOldKeyAt00MM()
+    {
+        foreach (int minute in new[] { 0, 7, 30, 59 })
+        {
+            string old = $"00:{minute:00}";
+            foreach (int every in new[] { 15, 60, 120 })
+            {
+                Assert.Equal(
+                    Parse($$"""{"timeUtc": "{{old}}", "everyMinutes": {{every}}}""").ToSlotTimetable(),
+                    Parse($$"""{"minute": {{minute}}, "everyMinutes": {{every}}}""").ToSlotTimetable());
+            }
+        }
+    }
+
+    [Fact]
+    public void BothKeys_AreRefused()
+    {
+        var e = Assert.Throws<ConfigException>(() => Parse("""{"minute": 30, "timeUtc": "00:30", "everyMinutes": 60}"""));
+        Assert.Contains("\"slot\".\"minute\" and \"slot\".\"timeUtc\" are both given", e.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(60)]
+    public void AMinuteOutsideZeroTo59_IsRefused(int minute)
+    {
+        var e = Assert.Throws<ConfigException>(() => Parse($$"""{"minute": {{minute}}, "everyMinutes": 60}"""));
+        Assert.Contains("must be 0 to 59", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALegacyDailyAnchor_StillWorksThroughTheOldKey()
+    {
+        Assert.Equal(new TimeOnly(12, 0), Parse("""{"timeUtc": "12:00", "everyMinutes": 1440}""").SlotTime);
+    }
+
+    [Fact]
+    public void Advertise_TakesMinuteOrTheOldKey_AndRefusesBoth()
+    {
+        string Config(string slot) => $$"""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "advertise": [{"callsign": "G8BPQ", "frequencyHz": 7053800, "slot": {{slot}}}]}""";
+        Assert.Equal(
+            HeadEndConfig.Parse(Config("""{"timeUtc": "00:30", "everyMinutes": 60}""")).ToAdverts()[0].Timetable,
+            HeadEndConfig.Parse(Config("""{"minute": 30, "everyMinutes": 60}""")).ToAdverts()[0].Timetable);
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(Config("""{"minute": 30, "timeUtc": "00:30"}""")));
+        Assert.Contains("are both given", e.Message, StringComparison.Ordinal);
     }
 }

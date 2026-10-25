@@ -182,16 +182,29 @@ public sealed record ReceiverConfig
     public ArchiveSettings Archive { get; init; } = new();
 
     /// <summary>
-    /// When GB7RDG's slots are, UTC, as HH:mm: one slot starts here and then every
-    /// <see cref="EveryMinutes"/> round the clock. GB7RDG sends every hour on the hour, so
-    /// "00:00" and 60.
+    /// The minute past the hour GB7RDG's slots start at, 0 to 59: slots are counted from 00:MM
+    /// UTC. GB7RDG sends every hour on the hour, so 0 and <see cref="EveryMinutes"/> 60. Left
+    /// out, 0 (unless the older <see cref="SlotUtc"/> is given).
     /// </summary>
-    public string SlotUtc { get; init; } = "00:00";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Minute { get; init; }
+
+    /// <summary>
+    /// The older way to say <see cref="Minute"/>: a time of day as HH:mm that every slot is
+    /// counted from. Still read, so existing files work; saving writes <c>minute</c> instead
+    /// when it is 00:MM, and keeps this only for an anchor with no minute equivalent (12:00).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SlotUtc { get; init; }
+
+    /// <summary>The anchor as HH:mm, from whichever of <see cref="Minute"/> and <see cref="SlotUtc"/> is given (00:00 if neither).</summary>
+    [JsonIgnore]
+    public string SlotAnchor => Packet.Mailcast.SlotAnchor.Text(SlotUtc, Minute, "00:00");
 
     /// <summary>
     /// Minutes from one slot's start to the next: it divides a day (1440) and is at least
     /// <see cref="ShortestEveryMinutes"/>. A config from before hourly slots has only
-    /// <see cref="SlotUtc"/> (12:00), and gets the default 60: the same hourly slots.
+    /// <c>slotUtc</c> (12:00), and gets the default 60: the same hourly slots.
     /// </summary>
     public int EveryMinutes { get; init; } = 60;
 
@@ -234,7 +247,7 @@ public sealed record ReceiverConfig
 
     /// <summary>The first slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
     [JsonIgnore]
-    public TimeOnly SlotStart => TimeOnly.TryParseExact(SlotUtc, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)
+    public TimeOnly SlotStart => TimeOnly.TryParseExact(SlotAnchor, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)
         ? t
         : throw new ConfigException($"\"slotUtc\" \"{SlotUtc}\" is not a time like 00:00");
 
@@ -505,7 +518,14 @@ public sealed record ReceiverConfig
     }
 
     /// <summary>The file <see cref="Save"/> writes, byte for byte.</summary>
-    internal byte[] ToFile() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n");
+    internal byte[] ToFile() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(WithMinute(), Json) + "\n");
+
+    /// <summary>This config with the older <c>slotUtc</c> given as 00:MM turned into <c>minute</c>; anything else is as it is.</summary>
+    private ReceiverConfig WithMinute() =>
+        SlotUtc is { } old && Minute is null && old.Length == 5 && old.StartsWith("00:", StringComparison.Ordinal)
+            && int.TryParse(old.AsSpan(3), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int m) && m is >= 0 and <= 59
+            ? this with { SlotUtc = null, Minute = m }
+            : this;
 
     /// <summary>Throws <see cref="ConfigException"/> if a setting cannot work.</summary>
     public void Validate()
@@ -531,9 +551,13 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException($"\"archive\": \"days\" is from 0 to {ArchiveSettings.MostDays} and \"maxMegabytes\" cannot be negative; 0 for either keeps no copies");
         }
-        if (StateDirectory is null || SlotUtc is null)
+        if (StateDirectory is null)
         {
-            throw new ConfigException("\"stateDirectory\" or \"slotUtc\" is null");
+            throw new ConfigException("\"stateDirectory\" is null");
+        }
+        if (Packet.Mailcast.SlotAnchor.Problem(SlotUtc, Minute, "\"slotUtc\"", "\"minute\"") is { } anchorProblem)
+        {
+            throw new ConfigException(anchorProblem);
         }
         _ = AudioSource.Parse(Audio);
         if (Locator is not null && !Maidenhead.TryParse(Locator.Trim(), out _, out _))

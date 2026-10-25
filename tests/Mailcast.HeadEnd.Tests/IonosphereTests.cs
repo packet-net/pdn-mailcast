@@ -22,7 +22,7 @@ public class IonosphereTests
         {
           "callsign": "M0LTE",
           "station": { "apiKey": "k", "mode": "ms110d-wn4", "maxBurstSeconds": 18 },
-          "slot": { "timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120 },
+          "slot": { "minute": 0, "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120 },
           "schedule": { "symbolSize": 240 }
         }
         """);
