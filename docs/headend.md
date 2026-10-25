@@ -6,6 +6,16 @@ The head end runs beside GB7RDG's BBS and its pdn-soundmodem. It takes bulletins
 
 A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the clock. `everyMinutes` must divide a day (1440) and be at least 15. Left out it is 1440, one slot a day, which is how a head end configured before hourly slots carries on unchanged. GB7RDG uses `"timeUtc": "00:00"` and `"everyMinutes": 60`, a slot every hour on the hour, which is what receivers expect.
 
+### Slots at another minute
+
+`timeUtc` is what every slot is counted from, so it also says where in the interval the slots start. A second station on the same band starts elsewhere, so the two never transmit at once. For a slot at half past each hour:
+
+```json
+"slot": { "timeUtc": "00:30", "everyMinutes": 60 }
+```
+
+That gives 00:30, 01:30 and so on; `"12:30"` would give the same slots. Everything that counts slots counts from these: the daylight window picks from the half-hour slots, `slot.maxMinutes`, `slot.catchUpMinutes` and `slot.retryMinutes` count from each slot's own start, and `schedule.slotOffsets` and the budget rule count slots from a bulletin's first. The directory carries the timetable (`slots=00:30/60`), and the journal says it at start-up: `schedule: a slot every 60 min, counted from 00:30Z, so at :30 each hour`. Left at `"00:00"`, nothing changes.
+
 ### Daylight only
 
 40 m NVIS only carries over UK paths in daylight. On 2026-10-05 GB7RDG's slots at 07:12 and 18:00 UTC, an hour after sunrise and twenty minutes after sunset, were heard by nobody, while those from 09:12 to 16:00 decoded well. So GB7RDG runs only the slots that start in daylight:
