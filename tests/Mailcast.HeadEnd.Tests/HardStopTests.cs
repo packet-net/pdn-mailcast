@@ -21,7 +21,7 @@ public class HardStopTests
             // without, and every burst waits its 10 s carrier limit.
             station.ChannelBusyUntil = Slot.AddHours(1);
         }
-        var settings = new SlotSettings { SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), MaxSlotLength = TimeSpan.FromMinutes(10), MaxBurst = TimeSpan.FromSeconds(18) };
+        var settings = new SlotSettings { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), MaxSlotLength = TimeSpan.FromMinutes(10), MaxBurst = TimeSpan.FromSeconds(18) };
         var runner = new SlotRunner(settings, station, station, null, FakeAirtime.For(station), new MemoryJournal(), time, new FakeClockSync());
         var report = time.Run(() => runner.RunAsync(Slot, [.. Enumerable.Range(0, frames).Select(i => FakeAirtime.Frame(i))], 5, CancellationToken.None));
         return (report, station);

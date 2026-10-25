@@ -28,7 +28,7 @@ public class OfflineTests
         var plan = new StoreSlotPlanner(store, Compression.Default, options).Plan(new DateTimeOffset(day.ToDateTime(new TimeOnly(12, 0), DateTimeKind.Utc)));
 
         string wav = Path.Combine(output.Path, "slot.wav");
-        var settings = new SlotSettings { ToneLength = TimeSpan.FromSeconds(3), PauseAfterTone = TimeSpan.FromSeconds(4) };
+        var settings = new SlotSettings { Callsign = "M0LTE", ToneLength = TimeSpan.FromSeconds(3), PauseAfterTone = TimeSpan.FromSeconds(4) };
         var summary = new WavRenderer(settings, "ms110d-wn4", 48000).Render(plan.Frames, wav, new DateTimeOffset(day.ToDateTime(new TimeOnly(12, 0), DateTimeKind.Utc)));
         Assert.True(summary.Tone);
         Assert.True(summary.Probe);
@@ -51,7 +51,7 @@ public class OfflineTests
         var rebuilt = new List<Bulletin>();
         foreach (byte[] ax25 in heard)
         {
-            Assert.Equal(Station.Ax25Ui.Encode("MCAST", "GB7RDG", []).AsSpan(0, 16).ToArray(), ax25[..16]);
+            Assert.Equal(Station.Ax25Ui.Encode("MCAST", "M0LTE", []).AsSpan(0, 16).ToArray(), ax25[..16]);
             var result = receiver.Accept(ax25.AsSpan(16));
             if (result.Bulletin is not null)
             {
@@ -59,5 +59,34 @@ public class OfflineTests
             }
         }
         Assert.Equal(bulletins.OrderBy(b => b.Bid), rebuilt.OrderBy(b => b.Bid));
+    }
+}
+
+public class OfflineWithoutConfigTests
+{
+    [Fact]
+    public void PlanAndWav_WithNoConfigAtAll_RunOnAPlaceholderCallsign()
+    {
+        using var dir = new TempDirectory();
+        string missing = Path.Combine(dir.Path, "headend.json");
+
+        // Offline, with no file and no --config: the defaults, with a callsign plainly not a real one.
+        var config = Program.LoadConfig(missing, offline: true, pathGiven: false, out bool placeholder);
+        Assert.True(placeholder);
+        Assert.Equal(Program.PlaceholderCallsign, config.Callsign);
+        Assert.Equal("N0CALL", config.ToSlotSettings().Callsign);
+
+        // The service, or a --config that is not there, still needs a real file.
+        Assert.Throws<ConfigException>(() => Program.LoadConfig(missing, offline: false, pathGiven: false, out _));
+        Assert.Throws<ConfigException>(() => Program.LoadConfig(missing, offline: true, pathGiven: true, out _));
+
+        string drop = Path.Combine(dir.Path, "drop");
+        Directory.CreateDirectory(drop);
+        File.WriteAllBytes(Path.Combine(drop, "one.bul"), Bulletins.Make(41, 1500).Serialize());
+        string wav = Path.Combine(dir.Path, "slot.wav");
+        var options = new Dictionary<string, string?> { ["--wav"] = wav, ["--bulletins"] = drop };
+        var slot = new DateTimeOffset(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
+        Assert.Equal(0, Program.Offline(config, options, slot, new ConsoleJournal(), null));
+        Assert.True(new FileInfo(wav).Length > 0);
     }
 }

@@ -22,11 +22,11 @@ public enum FlexUnreachablePolicy
     Skip,
 }
 
-/// <summary>How the slot runs. Everything has the design's default.</summary>
+/// <summary>How the slot runs. Everything but the callsign has the design's default.</summary>
 public sealed record SlotSettings
 {
-    /// <summary>The AX.25 source of every frame: the station's callsign.</summary>
-    public string Callsign { get; init; } = "GB7RDG";
+    /// <summary>The AX.25 source of every frame: the station's callsign. No default: it is the station's own.</summary>
+    public required string Callsign { get; init; }
 
     /// <summary>The AX.25 destination of every frame.</summary>
     public string Destination { get; init; } = "MCAST";

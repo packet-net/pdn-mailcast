@@ -74,12 +74,10 @@ public static partial class Program
         string configPath = options.GetValueOrDefault("--config") ?? DefaultConfig;
         bool offline = options.ContainsKey("--wav") || options.ContainsKey("--plan");
         HeadEndConfig config;
+        bool placeholder;
         try
         {
-            // Offline work needs no station, so a missing file is fine there.
-            config = offline && !File.Exists(configPath) && !options.ContainsKey("--config")
-                ? HeadEndConfig.Parse("""{"station": {"apiKey": "offline"}}""")
-                : HeadEndConfig.Load(configPath);
+            config = LoadConfig(configPath, offline, options.ContainsKey("--config"), out placeholder);
         }
         catch (ConfigException e)
         {
@@ -143,9 +141,32 @@ public static partial class Program
         {
             var day = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
             DateTimeOffset slot = config.ToSlotSchedule().SlotAtOrBefore(new DateTimeOffset(day.ToDateTime(at, DateTimeKind.Utc)));
+            if (placeholder)
+            {
+                journal.Write($"offline: no config at {configPath}, so the frames are made as {PlaceholderCallsign}, a placeholder callsign; give --config for your own");
+            }
             return Offline(config, options, slot, journal, signer);
         }
         return await ServiceAsync(config, journal, signer);
+    }
+
+    /// <summary>
+    /// The callsign offline work uses with no config at all: plainly not a real one. It can never
+    /// key a radio, since offline work has no station.
+    /// </summary>
+    internal const string PlaceholderCallsign = "N0CALL";
+
+    /// <summary>
+    /// Reads the configuration. Offline work (<c>--plan</c>, <c>--wav</c>) needs no station, so with
+    /// no file at the usual place and no <c>--config</c> it runs on the defaults, with
+    /// <see cref="PlaceholderCallsign"/>, and <paramref name="placeholder"/> says so.
+    /// </summary>
+    internal static HeadEndConfig LoadConfig(string path, bool offline, bool pathGiven, out bool placeholder)
+    {
+        placeholder = offline && !pathGiven && !File.Exists(path);
+        return placeholder
+            ? HeadEndConfig.Parse($$$"""{"callsign": "{{{PlaceholderCallsign}}}", "station": {"apiKey": "offline"}}""")
+            : HeadEndConfig.Load(path);
     }
 
     /// <summary>One plain line on whether directories are signed, and with which key.</summary>
@@ -153,7 +174,7 @@ public static partial class Program
         ? $"signing: no key at {path}, so directories go out unsigned"
         : $"signing: directories are signed with key {KeyId.Format(signer.KeyId)}, public key {signer.PublicKeyBase64}";
 
-    private static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateTimeOffset slot, ConsoleJournal journal, DirectorySigner? signer)
+    internal static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateTimeOffset slot, ConsoleJournal journal, DirectorySigner? signer)
     {
         var day = DateOnly.FromDateTime(slot.UtcDateTime);
         // Offline work never touches the head end's own state: it runs on a copy, or on a store

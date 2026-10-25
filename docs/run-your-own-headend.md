@@ -33,7 +33,7 @@ Then `sudo pdn-mailcast-headend --check-config` and `sudo systemctl start pdn-ma
 
 ## The slot start
 
-Pick a time no other mailcast station on your frequency uses. GB7RDG sends on the hour, so on 40 m start yours at half past: `"timeUtc": "00:30"` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal says it at start-up: `schedule: a slot every 60 min, counted from 00:30Z, so at :30 each hour`.
+Pick a time no other mailcast station on your frequency uses. GB7RDG sends on the hour, so on 40 m start yours at half past: `"timeUtc": "00:30"` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal's `schedule:` line at start-up says when your slots are.
 
 ## The signing key
 
@@ -50,4 +50,4 @@ The journal's `signing:` line gives your public key. Keep the private key safe a
 
 ## Getting heard
 
-Receivers listen to GB7RDG out of the box. A signed list of transmitters, sent over the air, will let them find and follow yours too; that is [#178](https://github.com/packet-net/pdn-mailcast/issues/178), and it is not built yet. Until then a listener who wants yours sets their receiver to your frequency (`dialKHz`), your callsign (`sources`), your slots (`slotUtc`, `daylight`) and your public key (`trustedKeys`); see [receiver.md](receiver.md).
+Receivers listen to GB7RDG out of the box. A signed list of transmitters, sent over the air, will let them find and follow yours too; that is [#178](https://github.com/packet-net/pdn-mailcast/issues/178), and it is not built yet. Until then a listener who wants yours sets their receiver to your frequency (`dialKHz`), your callsign (`sources`), your slots (`slotUtc`), your locator (`daylight.locator`, since receivers work out GB7RDG's daylight at IO91lk unless told otherwise) and your public key (`trustedKeys`); see [receiver.md](receiver.md).

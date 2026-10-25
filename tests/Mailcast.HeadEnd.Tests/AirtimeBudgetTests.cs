@@ -18,7 +18,7 @@ public class AirtimeBudgetTests(ITestOutputHelper output)
     public void HourlyDefaults_AverageAboutThreeMinutesAnHour_AndTheWorstHourFitsTheHardStop()
     {
         var options = ScheduleOptions.Hourly with { SymbolSize = 240 };
-        var settings = new SlotSettings { MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
+        var settings = new SlotSettings { Callsign = "M0LTE", MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
         var station = new FakeStation(new VirtualTime(DateTimeOffset.UnixEpoch), 4);
         var runner = new SlotRunner(settings, station, station, null, LinearAirtime.Measure("ms110d-wn4"), new MemoryJournal(), TimeProvider.System);
 

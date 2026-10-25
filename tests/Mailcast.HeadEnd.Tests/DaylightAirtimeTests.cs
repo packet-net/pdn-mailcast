@@ -25,7 +25,7 @@ public class DaylightAirtimeTests(ITestOutputHelper output)
     /// </summary>
     public static Result Simulate(ScheduleOptions options, DateTimeOffset start, int days = 6, int measured = 3)
     {
-        var settings = new SlotSettings { MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
+        var settings = new SlotSettings { Callsign = "M0LTE", MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
         var station = new FakeStation(new VirtualTime(DateTimeOffset.UnixEpoch), 4);
         var runner = new SlotRunner(settings, station, station, null, LinearAirtime.Measure("ms110d-wn4"), new MemoryJournal(), TimeProvider.System);
         var timetable = options.Timetable ?? new SlotTimetable(TimeOnly.MinValue, options.SlotMinutes);

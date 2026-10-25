@@ -113,7 +113,7 @@ public class ServiceTests
     public void ASlotCutShort_RollsItsUnsentFramesToTomorrow_AndNoEsiIsEverSentTwice()
     {
         using var dir = new TempDirectory();
-        var settings = new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(4) };
+        var settings = new SlotSettings { Callsign = "M0LTE", SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(4) };
 
         var monday = new Head(dir, Day1, settings);
         foreach (int seed in Enumerable.Range(1, 8))
@@ -153,7 +153,7 @@ public class ServiceTests
     public void ARestartMidSlot_CarriesOnTheSameDayWithoutRepeatingAnyPiece()
     {
         using var dir = new TempDirectory();
-        var settings = new SlotSettings { SubChannel = 4 };
+        var settings = new SlotSettings { Callsign = "M0LTE", SubChannel = 4 };
         var first = new Head(dir, Day1, settings);
         foreach (int seed in Enumerable.Range(20, 6))
         {
@@ -212,7 +212,7 @@ public class ServiceTests
     public void ABbsThatDoesNotAnswer_DelaysTheSlotOnlyByThePreSlotLimit()
     {
         using var dir = new TempDirectory();
-        var head = new Head(dir, Day1, new SlotSettings { SubChannel = 4 }, [new ScheduledIntake(new HangingIntake(), TimeSpan.FromMinutes(30))]);
+        var head = new Head(dir, Day1, new SlotSettings { Callsign = "M0LTE", SubChannel = 4 }, [new ScheduledIntake(new HangingIntake(), TimeSpan.FromMinutes(30))]);
         head.Store.Offer(Bulletins.Make(40, 3000), Day1);
         var report = head.Run(Day1);
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
@@ -225,7 +225,7 @@ public class ServiceTests
     {
         // Booted at 00:30 by a clock eleven and a half hours slow, corrected 90 s later to 12:02.
         using var dir = new TempDirectory();
-        var head = new Head(dir, Day1, new SlotSettings { SubChannel = 4 });
+        var head = new Head(dir, Day1, new SlotSettings { Callsign = "M0LTE", SubChannel = 4 });
         head.Store.Offer(Bulletins.Make(41, 3000), Day1);
         head.Time.StepWallClock(TimeSpan.FromHours(-11.5));
         DateTimeOffset? started = head.WaitForTheSlotAcrossAClockStep(TimeSpan.FromHours(11.5));
@@ -289,7 +289,7 @@ public class ServiceTests
     }
 
     private static Head HourlyHead(TempDirectory dir, DateTimeOffset start, string? statusDirectory = null) =>
-        new(dir, start, Hourly, ScheduleOptions.Hourly, new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
+        new(dir, start, Hourly, ScheduleOptions.Hourly, new SlotSettings { Callsign = "M0LTE", SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
             statusDirectory: statusDirectory, catchUp: TimeSpan.FromMinutes(5));
 
     /// <summary>When each slot took its lease: the first request after a release, not the renewals.</summary>
@@ -484,7 +484,7 @@ public class ServiceTests
 
     private static Head DaylightHead(TempDirectory dir, DateTimeOffset start) =>
         new(dir, start, Daylight, ScheduleOptions.HourlyDaylight with { Timetable = Daylight.Timetable },
-            new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
+            new SlotSettings { Callsign = "M0LTE", SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
             catchUp: TimeSpan.FromMinutes(5));
 
     [Fact]

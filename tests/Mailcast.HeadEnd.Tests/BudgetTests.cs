@@ -174,7 +174,7 @@ public class BudgetTests(ITestOutputHelper output)
     [InlineData(41, 30, 7, 161.5)]
     public void Estimate_MatchesTheRealSlots(int frames, int toneSeconds, int bursts, double seconds)
     {
-        var settings = new SlotSettings { MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(toneSeconds) };
+        var settings = new SlotSettings { Callsign = "M0LTE", MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(toneSeconds) };
         var model = new SlotAirtime(settings, Measure("ms110d-wn4"));
         // 271-octet mailcast frames (240-octet symbols) as AX.25 UI frames.
         int[] lengths = [.. Enumerable.Repeat(271 + MailcastFrame.Ax25UiOverhead, frames)];
@@ -190,7 +190,7 @@ public class BudgetTests(ITestOutputHelper output)
     [Fact]
     public void Estimate_FollowsTheWaveform_Wn3FramesTakeAboutTwiceAsLong()
     {
-        var settings = new SlotSettings { MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
+        var settings = new SlotSettings { Callsign = "M0LTE", MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
         int[] lengths = [.. Enumerable.Repeat(271 + MailcastFrame.Ax25UiOverhead, 60)];
         var wn4 = new SlotAirtime(settings, Measure("ms110d-wn4"));
         var wn3 = new SlotAirtime(settings, Measure("ms110d-wn3"));

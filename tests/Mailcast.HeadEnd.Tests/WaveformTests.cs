@@ -127,7 +127,7 @@ public class WaveformTests
 
         public FakeStation Station { get; }
 
-        public SlotSettings Settings { get; } = new() { SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10) };
+        public SlotSettings Settings { get; } = new() { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10) };
 
         public MemoryJournal Journal { get; } = new();
 
@@ -321,7 +321,7 @@ public class WaveformTests
         var plan = new StoreSlotPlanner(store, Compression.Default, options).Plan(slot);
 
         string wav = Path.Combine(output.Path, "wn3.wav");
-        var settings = new SlotSettings { ToneLength = TimeSpan.Zero, PauseAfterTone = TimeSpan.Zero };
+        var settings = new SlotSettings { Callsign = "M0LTE", ToneLength = TimeSpan.Zero, PauseAfterTone = TimeSpan.Zero };
         new WavRenderer(settings, "ms110d-wn3", 48000).Render(plan.Frames, wav, slot);
 
         var heard = new List<byte[]>();
