@@ -34,7 +34,7 @@
   // "daylight" runs only the slots that start from "afterSunriseMinutes" after sunrise to
   // "beforeSunsetMinutes" before sunset at "locator", worked out from the sun for each day, in
   // UTC; left out, every slot runs. --run-now runs whatever the time.
-  // "minute" 30 with "everyMinutes" 60 is a slot at half past each hour. (The older "minute": 30 still works.)
+  // "minute" 30 with "everyMinutes" 60 is a slot at half past each hour.
   "slot": {
     "minute": 0,
     "everyMinutes": 60,
