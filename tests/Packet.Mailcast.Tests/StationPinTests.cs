@@ -104,6 +104,40 @@ public class StationPinTests
     }
 
     [Fact]
+    public void TwoTrustedKeysWithOneLabel_AreBothTrusted_AsOneStation()
+    {
+        // A key rotation: the old and the new GB7RDG key both in trustedKeys.
+        var newer = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with
+        {
+            TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("GB7RDG", newer.PublicKeyBase64)],
+        });
+        var result = Feed(store, Directory(OnTheHour, newer, "M0LTE", null, Big(90)));
+        Assert.Equal(FrameOutcome.CompletedDirectory, result.Outcome);
+        Assert.Equal(ReceiverStore.BuiltInStation, store.StationOf(result.Directory!, result.Check!));
+        Assert.Equal(2, store.Pins.Count(p => p.Station == ReceiverStore.BuiltInStation));
+    }
+
+    [Fact]
+    public void ATrustedKeysLabelThatIsNotACallsign_TakesTheCallsignItsDirectoryNames()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        File.WriteAllText(Path.Combine(dir.Path, ReceiverStore.PinsFile), "G4XYZ\tnot a key\t2026-10-25T00:00:00Z\nG4ABC\t" + Impostor.PublicKeyBase64 + "\tno date\n");
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with
+        {
+            TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("Bob's station", Bpq.PublicKeyBase64)],
+            Log = log.Add,
+        });
+        Assert.Equal(2, log.Count(l => l.Contains("skipped an unreadable line", StringComparison.Ordinal)));
+        var result = Feed(store, Directory(HalfPast, Bpq, "G8BPQ", null, Big(91)));
+        Assert.Equal("G8BPQ", store.StationOf(result.Directory!, result.Check!));
+        Assert.Equal(["GB7RDG", "G8BPQ"], store.StationDirectories().Select(d => d.Station).Where(s => s != ReceiverStore.BuiltInStation).Prepend("GB7RDG"));
+        Assert.DoesNotContain(store.Pins, p => p.Station.Contains("BOB", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ADirectoryNamingAPinnedStation_UnderAnotherKey_IsRefusedAndShown()
     {
         var (store, _, dir) = Open();
@@ -157,8 +191,15 @@ public class StationPinTests
         Assert.Equal([BpqAdvert], store.Adverts());
         Assert.DoesNotContain(store.Pins, p => p.Station == "G8BPQ");
         var moved = BpqAdvert with { Timetable = new SlotTimetable(new TimeOnly(0, 45), 60) };
-        Feed(store, Directory(OnTheHour, Rdg, "M0LTE", [moved], Big(51)));
-        Assert.Equal([moved], store.Adverts());
+        var qo100 = BpqAdvert with { FrequencyHz = 10_489_750_000 };
+
+        // Another directory the same day that disagrees does not move it (no flip-flopping)...
+        Feed(store, Directory(OnTheHour, Rdg, "M0LTE", [moved, qo100], Big(51)));
+        Assert.Equal([BpqAdvert, qo100], store.Adverts()); // one advert per frequency: HF and QO-100
+        // ...a later one does.
+        var tomorrow = new BroadcastDirectory(Day.AddDays(1), [new DirectoryEntry(Big(52).ObjectId, ZstdDictionary.Gb7rdg1Id, 9000, "52_TEST", "B")], OnTheHour, signer: Rdg, station: "M0LTE", adverts: [moved]);
+        Feed(store, tomorrow);
+        Assert.Equal([moved, qo100], store.Adverts());
     }
 
     [Fact]

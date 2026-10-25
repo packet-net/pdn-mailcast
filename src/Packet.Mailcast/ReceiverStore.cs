@@ -458,6 +458,10 @@ public sealed partial class ReceiverStore
             }
         }
         LoadKnownDirectories();
+        foreach (var (directory, _, check) in _knownDirectories.Values.OrderBy(k => k.Directory.Date).ThenBy(k => k.HeardAt))
+        {
+            NoteAdverts(directory, check);
+        }
 
         foreach (var dir in System.IO.Directory.EnumerateDirectories(_objects).Order(StringComparer.Ordinal).ToList())
         {
@@ -623,6 +627,7 @@ public sealed partial class ReceiverStore
     {
         var now = _options.Time.GetUtcNow();
         (check.Usable ? _knownDirectories : _rejectedDirectories)[objectId] = (directory, now, check);
+        NoteAdverts(directory, check);
         LastDirectoryHeard = new HeardDirectoryCheck(directory.Date, check);
         try
         {

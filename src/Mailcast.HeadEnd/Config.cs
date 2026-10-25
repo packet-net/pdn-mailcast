@@ -292,9 +292,9 @@ public sealed record HeadEndConfig
                 problems.Add($"{where}: \"slot\".\"daylight\": {problem}");
             }
         }
-        foreach (var twice in Advertise.Where(a => a is not null).GroupBy(a => a.Callsign, StringComparer.Ordinal).Where(g => g.Count() > 1))
+        foreach (var twice in Advertise.Where(a => a is not null).GroupBy(a => (a.Callsign, a.FrequencyHz, a.Sideband.ToLowerInvariant())).Where(g => g.Count() > 1))
         {
-            problems.Add($"\"advertise\" lists {twice.Key} twice");
+            problems.Add($"\"advertise\" lists {twice.Key.Callsign} on {twice.Key.FrequencyHz} Hz twice (a station on two frequencies, such as HF and QO-100, is listed once for each)");
         }
         return problems;
     }
