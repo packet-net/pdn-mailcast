@@ -72,6 +72,107 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
     } + (Daylight is { } d ? ", in daylight: " + d.Describe() : "");
 }
 
+/// <summary>A station whose slots this receiver knows (issues #178 and #144).</summary>
+/// <param name="Station">Its callsign.</param>
+/// <param name="Timetable">Its slots.</param>
+/// <param name="FrequencyHz">Where its signal is centred.</param>
+/// <param name="Sideband">Its sideband.</param>
+/// <param name="Source">Where the slots come from, in words: "its own directory", "an advert" or "the config file".</param>
+/// <param name="Followed">Whether this receiver listens at its slots.</param>
+/// <param name="NotFollowedBecause">Why not, in words, when not.</param>
+public sealed record ListenedStation(string Station, SlotTimetable Timetable, long FrequencyHz, Sideband Sideband, string Source, bool Followed, string? NotFollowedBecause);
+
+/// <summary>
+/// The slots this receiver follows (issue #144): every followed station's, each with its own
+/// timetable. With one station, as before other stations were heard of, every answer is exactly that station's
+/// <see cref="SlotSchedule"/>'s.
+/// </summary>
+public sealed class FollowedSlots
+{
+    /// <summary>The slots of the given stations, in order; at least one.</summary>
+    public FollowedSlots(IReadOnlyList<(string Station, SlotSchedule Schedule)> stations)
+    {
+        ArgumentNullException.ThrowIfNull(stations);
+        ArgumentOutOfRangeException.ThrowIfZero(stations.Count);
+        Stations = stations;
+    }
+
+    /// <summary>One station's slots: GB7RDG's, unless named.</summary>
+    public static FollowedSlots One(SlotSchedule schedule, string station = Packet.Mailcast.ReceiverStore.BuiltInStation)
+    {
+        ArgumentNullException.ThrowIfNull(schedule);
+        return new([(station, schedule)]);
+    }
+
+    /// <summary>A single station's slots, as before other stations were heard of.</summary>
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(schedule))]
+    public static implicit operator FollowedSlots?(SlotSchedule? schedule) => schedule is null ? null : One(schedule);
+
+    /// <summary>The stations followed, each with its slots.</summary>
+    public IReadOnlyList<(string Station, SlotSchedule Schedule)> Stations { get; }
+
+    /// <summary>Whether only one station is followed.</summary>
+    public bool OneStation => Stations.Count == 1;
+
+    /// <summary>The first station's slots: the only one's, when <see cref="OneStation"/>.</summary>
+    public SlotSchedule First => Stations[0].Schedule;
+
+    /// <summary>
+    /// The station whose slot starts at <paramref name="slot"/> (whether it runs or not), the
+    /// first listed when two share it; null when none does.
+    /// </summary>
+    public string? StationAt(DateTimeOffset slot)
+    {
+        var utc = slot.ToUniversalTime();
+        foreach (var (station, schedule) in Stations)
+        {
+            if (schedule.LatestStart(utc) == utc)
+            {
+                return station;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Every station's slots that run on a UTC day, earliest first, each start once.</summary>
+    public IReadOnlyList<DateTimeOffset> ActiveOn(DateOnly day) =>
+        OneStation ? First.ActiveOn(day) : [.. Stations.SelectMany(s => s.Schedule.ActiveOn(day)).Distinct().Order()];
+
+    /// <summary>The first slot of any station that runs, starting at or after <paramref name="t"/>.</summary>
+    public DateTimeOffset? NextActiveAtOrAfter(DateTimeOffset t) => Earliest(s => s.Timetable.NextActiveAtOrAfter(t));
+
+    /// <summary>The first slot of any station that runs, starting after <paramref name="t"/>.</summary>
+    public DateTimeOffset? NextActiveAfter(DateTimeOffset t) => Earliest(s => s.Timetable.NextActiveAfter(t));
+
+    /// <summary>The latest slot of any station that ran, starting at or before <paramref name="t"/>.</summary>
+    public DateTimeOffset? ActiveAtOrBefore(DateTimeOffset t) => Latest(s => s.Timetable.ActiveAtOrBefore(t));
+
+    /// <summary>The first slot that runs starting at or after <paramref name="now"/> (<see cref="SlotSchedule.NextActiveStart"/>).</summary>
+    public DateTimeOffset NextActiveStart(DateTimeOffset now) => Stations.Min(s => s.Schedule.NextActiveStart(now));
+
+    /// <summary>The latest slot that ran starting at or before <paramref name="now"/>, if any.</summary>
+    public DateTimeOffset? LatestActiveStart(DateTimeOffset now) => Latest(s => s.LatestActiveStart(now));
+
+    /// <summary>The latest slot of any station, run or not, starting at or before <paramref name="at"/>.</summary>
+    public DateTimeOffset LatestStart(DateTimeOffset at) => Stations.Max(s => s.Schedule.LatestStart(at));
+
+    /// <summary>The slot start of any station nearest <paramref name="at"/>, before or after it; the earlier on a tie.</summary>
+    public DateTimeOffset NearestStart(DateTimeOffset at) =>
+        Stations.Select(s => s.Schedule.NearestStart(at)).OrderBy(t => (t - at).Duration()).ThenBy(t => t).First();
+
+    /// <summary>
+    /// The slots in words, for the page and the log: one station's as <see cref="SlotSchedule.Describe"/>,
+    /// several as "GB7RDG every hour on the hour; G8BPQ every hour at 30 minutes past".
+    /// </summary>
+    public string Describe() => OneStation ? First.Describe() : string.Join("; ", Stations.Select(s => $"{s.Station} {s.Schedule.Describe()}"));
+
+    private DateTimeOffset? Earliest(Func<SlotSchedule, DateTimeOffset?> each) =>
+        Stations.Select(s => each(s.Schedule)).Where(t => t is not null).DefaultIfEmpty(null).Min();
+
+    private DateTimeOffset? Latest(Func<SlotSchedule, DateTimeOffset?> each) =>
+        Stations.Select(s => each(s.Schedule)).Where(t => t is not null).DefaultIfEmpty(null).Max();
+}
+
 /// <summary>
 /// When a web SDR is listened to: every daylight slot that fits in its allowance, each from a little before its
 /// start to a little after, so as to stay inside a public receiver's daily allowance.
@@ -99,6 +200,56 @@ public static class ListeningWindow
     /// fits in its allowance, which is all of them for most of the year, and near midsummer, when
     /// there are more, the latest that fit.
     /// </summary>
+    public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(FollowedSlots followed, DateOnly day)
+    {
+        ArgumentNullException.ThrowIfNull(followed);
+        if (followed.OneStation)
+        {
+            return WebSdrSlotsOn(followed.First, day);
+        }
+        // Several stations share the one allowance, as evenly as their slots allow: each gets an
+        // equal part (any a station cannot use goes to the others), and picks within it by the
+        // one-station rule, so no station is left out by the way their slots interleave.
+        var active = followed.Stations.Select(st => st.Schedule.ActiveOn(day)).ToList();
+        var quota = new int[active.Count];
+        int left = ReceiverConfig.MostWebSdrSlotsPerDay;
+        while (left > 0)
+        {
+            var wanting = Enumerable.Range(0, active.Count).Where(i => quota[i] < active[i].Count).ToList();
+            if (wanting.Count == 0)
+            {
+                break;
+            }
+            int share = Math.Max(1, left / wanting.Count);
+            foreach (int i in wanting)
+            {
+                int add = Math.Min(Math.Min(share, active[i].Count - quota[i]), left);
+                quota[i] += add;
+                left -= add;
+            }
+        }
+        var picked = new List<DateTimeOffset>();
+        for (int i = 0; i < active.Count; i++)
+        {
+            var schedule = followed.Stations[i].Schedule;
+            int n = quota[i];
+            if (n == active[i].Count)
+            {
+                picked.AddRange(active[i]);
+            }
+            else if (schedule.Daylight is not null)
+            {
+                picked.AddRange(active[i].Skip(active[i].Count - n));
+            }
+            else
+            {
+                picked.AddRange(Enumerable.Range(0, n).Select(k => active[i][k * active[i].Count / n]));
+            }
+        }
+        return [.. picked.Distinct().Order()];
+    }
+
+    /// <summary>One station's web SDR slots on a day (see the overload for several).</summary>
     public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(SlotSchedule schedule, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);
@@ -119,7 +270,7 @@ public static class ListeningWindow
     /// <see cref="ReceiverConfig.WebSdrBefore"/> before one of <see cref="WebSdrSlotsOn"/> to
     /// <see cref="ReceiverConfig.WebSdrAfter"/> after it.
     /// </summary>
-    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot) Next(DateTimeOffset now, SlotSchedule schedule)
+    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot) Next(DateTimeOffset now, FollowedSlots schedule)
     {
         var utc = now.ToUniversalTime();
         var today = DateOnly.FromDateTime(utc.UtcDateTime);
@@ -144,10 +295,10 @@ public static class ListeningWindow
     /// that runs. A sound card listens all the time; this is when the hooks run. Null when no slot
     /// runs in the year ahead.
     /// </summary>
-    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot)? SoundCard(DateTimeOffset now, SlotSchedule schedule)
+    public static (DateTimeOffset Opens, DateTimeOffset Closes, DateTimeOffset Slot)? SoundCard(DateTimeOffset now, FollowedSlots schedule)
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        var timetable = schedule.Timetable;
+        var timetable = schedule;
         var utc = now.ToUniversalTime();
         if (timetable.ActiveAtOrBefore(utc) is { } latest && utc < latest + ReceiverConfig.WebSdrAfter)
         {
@@ -209,6 +360,24 @@ public static class ListeningWindow
     /// <see cref="Describe(SlotSchedule, IReadOnlyList{TimeOnly})"/> without a daylight rule, and
     /// with one, which of that day's daylight slots.
     /// </summary>
+    public static string Describe(FollowedSlots followed, DateOnly day)
+    {
+        ArgumentNullException.ThrowIfNull(followed);
+        if (followed.OneStation)
+        {
+            return Describe(followed.First, day);
+        }
+        var active = followed.ActiveOn(day);
+        var listened = WebSdrSlotsOn(followed, day);
+        var skipped = active.Except(listened).ToList();
+        string which = active.Count == 0 ? "no slots, as none runs today"
+            : skipped.Count == 0 ? $"all {active.Count} slots of the {followed.Stations.Count} stations it follows, at {SlotTimetable.Times(listened)}"
+            : $"{listened.Count} of the {active.Count} slots of the {followed.Stations.Count} stations it follows, at {SlotTimetable.Times(listened)}, and skips {SlotTimetable.Times(skipped)}";
+        return string.Create(CultureInfo.InvariantCulture,
+            $"on {day:yyyy-MM-dd} the web SDR listens to {which}, from {ReceiverConfig.WebSdrBefore.TotalMinutes:F0} minutes before each to {ReceiverConfig.WebSdrAfter.TotalMinutes:F0} after, to stay inside its listening allowance of about 3 hours a day");
+    }
+
+    /// <summary>One station's web SDR day in words (see the overload for several).</summary>
     public static string Describe(SlotSchedule schedule, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);

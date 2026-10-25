@@ -309,6 +309,9 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/filter/measure", "POST"):
                     await MeasureFilterAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/stations/listen", "POST"):
+                    await ListenToStationAsync(context).ConfigureAwait(false);
+                    break;
                 case ("/api/filter/dial", "POST"):
                     await FilterDialAsync(context).ConfigureAwait(false);
                     break;
@@ -835,10 +838,22 @@ public sealed class StatusPage : IAsyncDisposable
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },
-            schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
+            schedule = Schedule(config, _host.Followed, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
             // Issues #178 and #144: each station's pinned key, when its newest directory was dated,
             // and any directory refused for naming a pinned station under another key.
             stations = StationsView(_host.Intake.Pins(), _host.Intake.StationDirectories(), _host.Intake.KeyConflicts()),
+            // Every station whose slots are known, whether this receiver listens at them, and if not why.
+            listening = _host.Listening.Select(l => new
+            {
+                station = l.Station,
+                slots = SlotSchedule.From(l.Timetable).Describe(),
+                frequencyHz = l.FrequencyHz,
+                sideband = l.Sideband == Packet.Mailcast.Sideband.Usb ? "usb" : "lsb",
+                from = l.Source,
+                followed = l.Followed,
+                why = l.NotFollowedBecause,
+                skipped = (config.SkipStations ?? []).Contains(l.Station, StringComparer.OrdinalIgnoreCase),
+            }),
             // Issue #53: the "Listen now" button, for a web SDR only.
             listenNow = ListenNowView(_host, config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
@@ -1155,7 +1170,6 @@ public sealed class StatusPage : IAsyncDisposable
         _ => "starting",
     };
 
-    /// <summary>When the slots are, for the page, as the config file gives them.</summary>
     /// <summary>The stations this receiver knows, for the page.</summary>
     internal static object StationsView(IReadOnlyList<Packet.Mailcast.PinnedStation> pins, IReadOnlyList<Packet.Mailcast.StationDirectory> heard, IReadOnlyList<Packet.Mailcast.KeyConflict> conflicts) => new
     {
@@ -1176,6 +1190,7 @@ public sealed class StatusPage : IAsyncDisposable
         }),
     };
 
+    /// <summary>When the slots are, for the page, as the config file gives them.</summary>
     internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
 
     /// <summary>
@@ -1183,20 +1198,25 @@ public sealed class StatusPage : IAsyncDisposable
     /// it if that may still be on, and for a web SDR which slots it listens to and the next of
     /// those. <paramref name="fromDirectory"/> says the schedule is GB7RDG's own, from its directory.
     /// </summary>
-    internal static object Schedule(ReceiverConfig config, SlotSchedule schedule, bool fromDirectory, DateTimeOffset now)
+    internal static object Schedule(ReceiverConfig config, FollowedSlots followed, bool fromDirectory, DateTimeOffset now)
     {
-        var next = schedule.NextActiveStart(now);
-        var before = schedule.LatestActiveStart(now);
+        // Issue #144: the next slot, today's and the web SDR's are those of every station
+        // followed; the timetable's own fields (every, anchor, daylight) are the first one's.
+        var schedule = followed.First;
+        var next = followed.NextActiveStart(now);
+        var before = followed.LatestActiveStart(now);
         var today = DateOnly.FromDateTime(now.UtcDateTime);
-        var todays = schedule.ActiveOn(today);
+        var todays = followed.ActiveOn(today);
         bool webSdr = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.UberSdr;
-        var (opens, closes, listenSlot) = ListeningWindow.Next(now, schedule);
-        var listened = ListeningWindow.WebSdrSlotsOn(schedule, today);
+        var (opens, closes, listenSlot) = ListeningWindow.Next(now, followed);
+        var listened = ListeningWindow.WebSdrSlotsOn(followed, today);
         static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         return new
         {
-            words = schedule.Describe(),
+            words = followed.Describe(),
             from = fromDirectory ? "directory" : "config",
+            // Each station followed, with its slots in words; one entry, GB7RDG, until another station is heard of.
+            followed = followed.Stations.Select(f => new { station = f.Station, words = f.Schedule.Describe() }),
             everyMinutes = schedule.EveryMinutes,
             slotUtc = schedule.Anchor.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
             slotsPerDay = todays.Count,
@@ -1973,6 +1993,58 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>The typed-edges form: low and high, Hz.</summary>
     private sealed record FilterEdgesForm(double LowHz, double HighHz);
+
+    private sealed record ListenForm(string? Station, bool Listen);
+
+    /// <summary>
+    /// Issue #178: listens, or stops listening, at one station's slots, saved in the config
+    /// file's <c>skipStations</c>, as the page's buttons ask. GB7RDG's slots are always listened at.
+    /// </summary>
+    private async Task ListenToStationAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<ListenForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        string? station = form?.Station?.Trim().ToUpperInvariant();
+        if (form is null || !Packet.Mailcast.StationAdvert.IsCallsign(station) || station == Packet.Mailcast.ReceiverStore.BuiltInStation)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Give the callsign of a station other than GB7RDG." })).ConfigureAwait(false);
+            return;
+        }
+        var current = _host.Config;
+        var skip = (current.SkipStations ?? []).Where(c => !string.Equals(c, station, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (!form.Listen)
+        {
+            skip.Add(station!);
+        }
+        var next = current with { SkipStations = skip.Count == 0 ? null : skip };
+        if (_configFile is not null)
+        {
+            try
+            {
+                switch (_configFile.TrySave(next, _log))
+                {
+                    case ConfigFile.SaveOutcome.EditedByHand:
+                        await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.EditedByHand + "." })).ConfigureAwait(false);
+                        return;
+                    case ConfigFile.SaveOutcome.Unreadable:
+                        await RespondAsync(context, 503, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.Unreadable + "." })).ConfigureAwait(false);
+                        return;
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                await RespondAsync(context, 500, "application/json", JsonSerializer.Serialize(new { error = $"Cannot write {_configFile.Path}: {Ascii.Clean(e.Message)}" })).ConfigureAwait(false);
+                return;
+            }
+        }
+        _log($"config: saved from the page: {(form.Listen ? "listening at" : "not listening at")} {station}'s slots");
+        _host.Reconfigure(next);
+        _host.RefreshFollowed();
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { station, listen = form.Listen })).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// POST /api/filter/dial: the dial for a typed low and high edge, the same maths "Measure my

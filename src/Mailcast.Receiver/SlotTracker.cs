@@ -15,6 +15,12 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
     /// <summary>Frames heard on each waveform, by the modem's autobaud (<c>ms110d-wn4</c>). Frames whose waveform it could not say are not in it.</summary>
     public ImmutableSortedDictionary<string, int> FrameCounts { get; init; } = ImmutableSortedDictionary<string, int>.Empty;
 
+    /// <summary>
+    /// Issue #144: the station whose slot this is, when the receiver follows more than one; null
+    /// when it follows one (GB7RDG alone, as before) or for a recording.
+    /// </summary>
+    public string? Station { get; init; }
+
     /// <summary>The waveform GB7RDG's directory said this slot went out on, if a directory completed in it.</summary>
     public string? ListedWaveform { get; init; }
 
@@ -106,20 +112,20 @@ public sealed class SlotTracker
     private readonly Action<string> _log;
     private readonly object _gate = new();
     private SlotSummary? _current;
-    private SlotSchedule? _schedule;
+    private FollowedSlots? _schedule;
     private DateTimeOffset? _listening;
     private DateTimeOffset? _lastEnded;
 
     /// <summary>Creates a tracker.</summary>
-    public SlotTracker(TimeProvider time, Action<string> log, SlotSchedule? schedule = null)
+    public SlotTracker(TimeProvider time, Action<string> log, FollowedSlots? schedule = null)
     {
         _time = time;
         _log = log;
         _schedule = schedule;
     }
 
-    /// <summary>GB7RDG's slots, or null when listening to a recording.</summary>
-    public SlotSchedule? Schedule
+    /// <summary>The slots of every station followed (issue #144), or null when listening to a recording.</summary>
+    public FollowedSlots? Schedule
     {
         get
         {
@@ -166,7 +172,7 @@ public sealed class SlotTracker
                 if (off > ToneWindow)
                 {
                     _log(string.Create(CultureInfo.InvariantCulture,
-                        $"tone: {measured}, but it began at {began.UtcDateTime:HH:mm:ss} UTC, {off.TotalMinutes:F0} min from any slot, so it is not GB7RDG's: ignored"));
+                        $"tone: {measured}, but it began at {began.UtcDateTime:HH:mm:ss} UTC, {off.TotalMinutes:F0} min from any slot, so it is not {(schedule.OneStation ? "GB7RDG's" : "any followed station's")}: ignored"));
                     return;
                 }
                 slot = nearest;
@@ -177,7 +183,7 @@ public sealed class SlotTracker
             }
             else
             {
-                ended = Replace(new SlotSummary(began, tone, 0, null, slot));
+                ended = Replace(new SlotSummary(began, tone, 0, null, slot) { Station = StationOf(slot) });
             }
         }
         if (ended is not null)
@@ -204,7 +210,7 @@ public sealed class SlotTracker
                 var slot = schedule.LatestStart(now + ClockAllowance);
                 if (_current?.Scheduled != slot)
                 {
-                    ended = Replace(new SlotSummary(now, null, 0, null, slot));
+                    ended = Replace(new SlotSummary(now, null, 0, null, slot) { Station = StationOf(slot) });
                 }
             }
             else if (_current is null || now - (_current.LastFrame ?? _current.Started) > Gap)
@@ -252,13 +258,27 @@ public sealed class SlotTracker
     /// would then judge completeness against the wrong rotation, and the window could never end
     /// early for this slot.
     /// </remarks>
-    public void OnDirectory(BroadcastDirectory directory)
+    public void OnDirectory(BroadcastDirectory directory) => TakeDirectory(directory, known: false, null);
+
+    /// <summary>
+    /// The same, for a directory known to be <paramref name="station"/>'s (issue #144; null for
+    /// none): when several stations are followed, one from another station than the slot's own,
+    /// or from none, heard during it, is not that slot's.
+    /// </summary>
+    public void OnDirectory(BroadcastDirectory directory, string? station) => TakeDirectory(directory, known: true, station);
+
+    private void TakeDirectory(BroadcastDirectory directory, bool known, string? station)
     {
         ArgumentNullException.ThrowIfNull(directory);
         lock (_gate)
         {
             if (_current is null)
             {
+                return;
+            }
+            if (known && _current.Station is { } own && own != station)
+            {
+                // Another station's, or no station's (issue #144): not this slot's directory.
                 return;
             }
             if (_current.HeardDirectory is { } tracked && !BelongsToSameSlot(tracked, directory))
@@ -421,6 +441,10 @@ public sealed class SlotTracker
         }
     }
 
+    /// <summary>The station of a slot, when more than one is followed; under <see cref="_gate"/>.</summary>
+    private string? StationOf(DateTimeOffset? slot) =>
+        slot is { } start && _schedule is { OneStation: false } followed ? followed.StationAt(start) : null;
+
     /// <summary>
     /// Makes <paramref name="next"/> the slot tracked. Returns the summary line of the one it
     /// replaces if that never had one (a check that came too late, or a recording), so no slot
@@ -453,7 +477,7 @@ public sealed class SlotTracker
         var c = CultureInfo.InvariantCulture;
         var parts = new List<string>();
         string which = slot.Scheduled is { } scheduled
-            ? $"the {scheduled.UtcDateTime.ToString("HH:mm", c)} UTC slot"
+            ? $"{(slot.Station is { } station ? station + "'s" : "the")} {scheduled.UtcDateTime.ToString("HH:mm", c)} UTC slot"
             : $"the slot that began at {slot.Started.UtcDateTime.ToString("HH:mm:ss", c)} UTC";
         string frames = Count(slot.FramesHeard, "frame");
         int known = slot.FrameCounts.Values.Sum();

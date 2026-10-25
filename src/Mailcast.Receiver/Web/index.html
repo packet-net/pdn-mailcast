@@ -1141,8 +1141,9 @@ function schedule(s) {
     : kind === "radio" && a.dialFromSoundModem ? `pdn-soundmodem says its radio is on USB with the dial on ${mhz(a.dialKHz)} MHz.`
     : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
-    <dt>Slots</dt><dd>${esc(c.words)}${c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
+    <dt>Slots</dt><dd>${esc(c.words)}${c.followed.length < 2 && c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
     <dt>Stations</dt><dd>${s.stations.known.map(k => `${esc(k.station)} (key ${esc(k.keyId)}${k.pinnedAt ? `, learnt ${esc(new Date(k.pinnedAt).toISOString().slice(0, 10))}` : ""}${k.heardDirectory ? `, directory heard for ${esc(k.heardDirectory)}` : ""})`).join("; ")}.${s.stations.conflicts.map(c => ` <strong>Refused</strong>: a directory naming ${esc(c.station)} signed by key ${esc(c.heardKeyId)}, not its pinned key ${esc(c.pinnedKeyId)}, last at ${utc(c.heardAt)}.`).join("")}</dd>
+    <dt>Listening</dt><dd>${s.listening.map(l => `${esc(l.station)}: ${esc(l.slots)}, ${mhz(l.frequencyHz / 1000)} MHz ${l.sideband.toUpperCase()}, from ${esc(l.from)}; ${l.followed ? "listened at" : `not listened at: ${esc(l.why)}`}${l.station === "GB7RDG" ? "" : ` <button type="button" class="listenToggle" data-station="${esc(l.station)}" data-listen="${l.skipped ? "true" : "false"}">${l.skipped ? "Listen" : "Don't listen"}</button>`}`).join("<br>")}</dd>
     <dt>Today</dt><dd>${c.today.length ? `${c.daylight ? "in daylight, " : ""}${c.today.join(", ")} UTC` : "no slots today"}</dd>
     <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
   if (web) {
@@ -1170,6 +1171,17 @@ function schedule(s) {
   tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
   $("help").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
 }
+
+/* issue #178: listen, or not, at one advertised station's slots */
+document.addEventListener("click", async e => {
+  const b = e.target.closest && e.target.closest(".listenToggle");
+  if (!b) return;
+  b.disabled = true;
+  const r = await api("api/stations/listen", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ station: b.dataset.station, listen: b.dataset.listen === "true" }) });
+  if (!r.ok) alert(r.error);
+  refresh();
+});
 
 /* issue #53: the "Listen now" button, for a web SDR only; counts down while a session is open */
 function listenNow(s) {

@@ -38,11 +38,11 @@ public sealed class ReceiverHost : IAsyncDisposable
         });
         Intake.Sources = config.AcceptedSources;
         Ledger = new DeliveryLedger(config.StateDirectory);
-        Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Schedule);
+        Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Followed);
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;
-        Intake.DirectoryHeard += Slots.OnDirectory;
+        Intake.DirectoryHeard += OnDirectoryHeard;
         Intake.IonosphereHeard += _ => Slots.OnIonosphereHeard();
         Intake.PskReporterHeard += _ => Slots.OnPskReporterHeard();
         // Issue #133: the bulletins of the slot now on, for its summary line.
@@ -63,13 +63,13 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             // pdn-soundmodem's receive window: it tunes its own radio and holds its own
             // transmitting, so neither rigctld nor LinBPQ is touched.
-            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.SoundModem, time, log,
+            Retuner = new Retuner(config, () => Followed, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.SoundModem, time, log,
                 new ReceiveWindow(() => AudioSource.Parse(Config.Audio) is { Kind: AudioSourceKind.SoundModem } s ? s.SoundModemPort : AudioSource.DefaultSoundModemPort),
                 () => Config.DialHz, FollowDial, Hooks, EarlyEndReason);
         }
         else if (config.Rig is not null)
         {
-            Retuner = new Retuner(config, () => Schedule, () => AudioSource.Parse(Config.Audio).IsSoundCard, time, log, Hooks, EarlyEndReason);
+            Retuner = new Retuner(config, () => Followed, () => AudioSource.Parse(Config.Audio).IsSoundCard, time, log, Hooks, EarlyEndReason);
         }
         ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
@@ -119,7 +119,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             return (null, "\"Measure my filter\" is for a sound card or pdn-soundmodem only.");
         }
         var now = _time.GetUtcNow();
-        var window = ListeningWindow.SoundCard(now, Schedule);
+        var window = ListeningWindow.SoundCard(now, Followed);
         if (window is { } w && now >= w.Opens && now < w.Closes && EarlyEndFinished?.Slot != w.Slot)
         {
             return (null, "A slot's window is open now: wait until it closes and try again.");
@@ -171,9 +171,23 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The daily report to the broadcast's author, when the config's <c>feedback</c> turns it on.</summary>
     public FeedbackService Feedback { get; }
 
-    /// <summary>The slots the receiver listens to on a UTC day: a web SDR's own, or every one that runs.</summary>
-    private IReadOnlyList<DateTimeOffset> ListenedOn(DateOnly day) =>
-        AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(Schedule, day) : Schedule.ActiveOn(day);
+    /// <summary>The slots the receiver listens to on a UTC day, of every station it follows: a web SDR's own, or every one that runs.</summary>
+    private IReadOnlyList<DateTimeOffset> ListenedOn(DateOnly day)
+    {
+        var followed = Followed;
+        return AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(followed, day) : followed.ActiveOn(day);
+    }
+
+    /// <summary>
+    /// GB7RDG's slots of those listened to on a UTC day, for its daily report: per-transmitter
+    /// reports are issue #148, so the report stays GB7RDG's.
+    /// </summary>
+    private IReadOnlyList<DateTimeOffset> ListenedOfGb7rdg(DateOnly day)
+    {
+        var followed = Followed;
+        var schedule = Schedule;
+        return followed.OneStation ? ListenedOn(day) : [.. ListenedOn(day).Where(s => schedule.LatestStart(s) == s)];
+    }
 
     private FeedbackService CreateFeedback()
     {
@@ -182,7 +196,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Settings = () => Config.Feedback,
             Schedule = () => Kind() == AudioSourceKind.Wav ? null : Schedule,
-            Listened = ListenedOn,
+            Listened = ListenedOfGb7rdg,
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
             PskReporter = () => Intake.PskReporter,
@@ -192,7 +206,15 @@ public sealed class ReceiverHost : IAsyncDisposable
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
         Intake.GivenUp += feedback.NoteGivenUp;
-        Intake.DirectoryHeard += feedback.NoteDirectory;
+        // The daily report is GB7RDG's until per-transmitter reports (issue #148): only its
+        // directories say whether a report reached it.
+        Intake.DirectoryHeard += directory =>
+        {
+            if (Intake.StationOf(directory) == ReceiverStore.BuiltInStation)
+            {
+                feedback.NoteDirectory(directory);
+            }
+        };
         Delivery.SessionFinished += report =>
         {
             feedback.NoteDelivered(report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted));
@@ -404,7 +426,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             switch (AudioSource.Parse(config.Audio).Kind)
             {
                 case AudioSourceKind.UberSdr:
-                    var (opens, closes, slot) = ListeningWindow.Next(at, Schedule);
+                    var (opens, closes, slot) = ListeningWindow.Next(at, Followed);
                     // Issue #49: a web SDR's window that already ended early closed then, not
                     // at its usual time; "after" (run by the hooks loop, not this audio one)
                     // should not wait for a close that already happened.
@@ -417,7 +439,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                     // pdn-soundmodem's radio and SDRconnect's, like a sound card's, are heard all the
                     // time. A slot heard in full closes its window then (WatchSlotWindowsAsync), the
                     // same as a web SDR's, so "after" runs then too.
-                    if (ListeningWindow.SoundCard(at, Schedule) is not { } window)
+                    if (ListeningWindow.SoundCard(at, Followed) is not { } window)
                     {
                         return null;
                     }
@@ -449,6 +471,100 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public SlotSchedule Schedule => Intake.HeardSchedule is { } heard ? SlotSchedule.From(heard) : Config.Schedule;
 
+    /// <summary>
+    /// How far, in Hz, a station's signal may be from where this receiver listens
+    /// (<see cref="ReceiverConfig.CentreHz"/>) and still be followed. The decoder is fixed on that
+    /// centre, so a station elsewhere cannot be heard until the receiver moves for it (issue #179).
+    /// </summary>
+    public const double SameFrequencyHz = 100;
+
+    /// <summary>Whether a signal at <paramref name="frequencyHz"/> on <paramref name="sideband"/> can be heard where this receiver listens.</summary>
+    public bool CanHear(long frequencyHz, Sideband sideband) =>
+        sideband == Sideband.Usb && Math.Abs(frequencyHz - Config.CentreHz) <= SameFrequencyHz;
+
+    /// <summary>
+    /// Every station this receiver knows the slots of (issues #178 and #144), GB7RDG first:
+    /// GB7RDG by its directory or the config; any other by the timetable its own signed directory
+    /// gives, or else the newest advert for it. Each says whether it is followed, and if not, why.
+    /// </summary>
+    public IReadOnlyList<ListenedStation> Listening
+    {
+        get
+        {
+            var skip = new HashSet<string>(Config.SkipStations ?? [], StringComparer.OrdinalIgnoreCase);
+            var list = new List<ListenedStation>
+            {
+                new(ReceiverStore.BuiltInStation, Schedule.Timetable, (long)Config.CentreHz, Sideband.Usb,
+                    ScheduleFromDirectory ? "its own directory" : "the config file", true, null),
+            };
+            var adverts = Intake.Adverts();
+            var heard = Intake.StationDirectories().Select(d => d.Station);
+            foreach (string station in adverts.Select(a => a.Callsign).Concat(heard).Distinct(StringComparer.Ordinal).Where(c => c != ReceiverStore.BuiltInStation).Order(StringComparer.Ordinal))
+            {
+                var own = Intake.HeardTimetable(station);
+                var advert = adverts.FirstOrDefault(a => a.Callsign == station);
+                if ((own ?? advert?.Timetable) is not { } timetable)
+                {
+                    continue;
+                }
+                long hz = advert?.FrequencyHz ?? (long)Config.CentreHz;
+                var sideband = advert?.Sideband ?? Sideband.Usb;
+                string? why = skip.Contains(station) ? "you chose not to listen at its slots"
+                    : !CanHear(hz, sideband) ? $"it is on {OnAir.Mhz(hz)} MHz {(sideband == Sideband.Usb ? "USB" : "LSB")}, not where this receiver listens"
+                    : null;
+                list.Add(new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : "an advert", why is null, why));
+            }
+            return list;
+        }
+    }
+
+    /// <summary>
+    /// The slots of every station this receiver follows (issue #144): GB7RDG's
+    /// (<see cref="Schedule"/>), then every other station in <see cref="Listening"/> that is
+    /// followed. With none, GB7RDG's alone, exactly as before.
+    /// </summary>
+    public FollowedSlots Followed
+    {
+        get
+        {
+            var followed = Listening.Where(l => l.Followed).ToList();
+            return followed.Count == 1
+                ? FollowedSlots.One(Schedule)
+                : new FollowedSlots([.. followed.Select(l => (l.Station, l.Station == ReceiverStore.BuiltInStation ? Schedule : SlotSchedule.From(l.Timetable)))]);
+        }
+    }
+
+    /// <summary>
+    /// A directory was heard: the slot now on keeps it if it is that slot's station's, and the
+    /// slot tracker takes up any change it made to the stations followed (a new station, an
+    /// advert, or a station moving its slots), so frames and channel bursts land in the right slot.
+    /// </summary>
+    private void OnDirectoryHeard(BroadcastDirectory directory)
+    {
+        Slots.OnDirectory(directory, Intake.StationOf(directory));
+        RefreshFollowed();
+    }
+
+    /// <summary>Gives the slot tracker the stations followed now, and says so, if they changed.</summary>
+    internal void RefreshFollowed()
+    {
+        if (Slots.Schedule is not { } tracked)
+        {
+            return;
+        }
+        var followed = Followed;
+        if (followed.Describe() != tracked.Describe())
+        {
+            _log($"slots: now following {followed.Describe()}");
+            foreach (var skipped in Listening.Where(l => !l.Followed))
+            {
+                _log($"slots: not following {skipped.Station}: {skipped.NotFollowedBecause}");
+            }
+            Slots.Schedule = followed;
+            WakeListenNow();
+        }
+    }
+
     /// <summary>Whether <see cref="Schedule"/> comes from GB7RDG's directory rather than the config file.</summary>
     public bool ScheduleFromDirectory => Intake.HeardSchedule is not null;
 
@@ -458,7 +574,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         _log($"slots: GB7RDG's directory gives its slots as {schedule.Describe()}; using that instead of the config file's");
         if (Slots.Schedule is not null)
         {
-            Slots.Schedule = schedule;
+            Slots.Schedule = Followed;
         }
         // Issue #57: a "Listen now" session re-checks its close against the new schedule at
         // once, rather than waiting for its next clock check.
@@ -570,7 +686,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         var now = _time.GetUtcNow();
         (DateTimeOffset Opens, DateTimeOffset Slot)? between = null;
         if (source.Kind is AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect
-            && ListeningWindow.SoundCard(now, Schedule) is { } window)
+            && ListeningWindow.SoundCard(now, Followed) is { } window)
         {
             var (opens, closes, slot) = window;
             if (now >= opens && slot != EarlyEndFinished?.Slot && EarlyEndReason(slot) is { } why)
@@ -582,7 +698,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 }
                 EarlyEndFinished = (slot, now);
             }
-            if (slot == EarlyEndFinished?.Slot && ListeningWindow.SoundCard(closes, Schedule) is { } next)
+            if (slot == EarlyEndFinished?.Slot && ListeningWindow.SoundCard(closes, Followed) is { } next)
             {
                 // Heard in full: the rest of its window is between slots, the same as after it.
                 (opens, _, slot) = next;
@@ -692,6 +808,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         _log(ScheduleFromDirectory
             ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's)"
             : $"slots: GB7RDG's slots are {Schedule.Describe()}");
+        if (Followed is { OneStation: false } followed)
+        {
+            _log($"slots: following {followed.Describe()}");
+        }
         _log(SourcesLine(Config));
         if (ConfigFile is { } file)
         {
@@ -947,7 +1067,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // listened to around some of the slots.
                 // Said again whenever it changes: once a day with a daylight rule, as the days
                 // lengthen and shorten.
-                var schedule = Schedule;
+                var schedule = Followed;
                 var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule);
                 if (slot == EarlyEndFinished?.Slot)
                 {
@@ -1014,7 +1134,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             pipeline.BetweenSlots = source.IsSoundCard && BetweenSlots is not null;
             pipeline.SdrConnectAnsweredBefore = source.Kind == AudioSourceKind.SdrConnect
                 && string.Equals(sdrConnectAnswered, config.Audio, StringComparison.OrdinalIgnoreCase);
-            Slots.Schedule = source.Kind == AudioSourceKind.Wav ? null : Schedule;
+            Slots.Schedule = source.Kind == AudioSourceKind.Wav ? null : Followed;
             lock (_gate)
             {
                 _pipeline = pipeline;
@@ -1257,10 +1377,11 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     internal DateTimeOffset NextWebSdrWindowOpens(DateTimeOffset now)
     {
-        var (opens, closes, slot) = ListeningWindow.Next(now, Schedule);
+        var followed = Followed;
+        var (opens, closes, slot) = ListeningWindow.Next(now, followed);
         if (slot == EarlyEndFinished?.Slot)
         {
-            (opens, _, _) = ListeningWindow.Next(closes, Schedule);
+            (opens, _, _) = ListeningWindow.Next(closes, followed);
         }
         return opens;
     }
