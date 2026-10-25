@@ -226,8 +226,9 @@ public sealed record ReceiverStoreOptions
     public bool PublishMailOnChange { get; init; } = true;
 
     /// <summary>
-    /// The transmitter keys whose signed directories are trusted: <see cref="TrustedKey.BuiltIn"/>
-    /// unless the owner adds more. A directory signed by any other key is not used.
+    /// The transmitter keys pinned before any is learnt on the air: <see cref="TrustedKey.BuiltIn"/>
+    /// unless the owner adds more, each pinned to its label. Others are pinned the first time
+    /// their station's signed directory is heard (see <see cref="ReceiverStore"/>'s remarks).
     /// </summary>
     public IReadOnlyList<TrustedKey> TrustedKeys { get; init; } = TrustedKey.BuiltIn;
 
@@ -257,6 +258,7 @@ public sealed record ReceiverStoreOptions
 /// archive/OOOOOOOOOOOOOOOO.mail                  an acknowledged bulletin and the BBS's answer (see MailArchive)
 /// quarantine/                                    outbox and archive files that could not be read
 /// directory.txt                                  the newest directory heard
+/// pins.txt                                       each station's key, pinned when its first signed directory was heard
 /// </code>
 /// <para>
 /// A rebuilt bulletin is returned once, from the <see cref="Accept"/> call whose frame completed
@@ -299,7 +301,7 @@ public sealed record ReceiverStoreOptions
 /// <para>Not thread-safe: use one store from one thread, except <see cref="Mail"/> and
 /// <see cref="ReadMail(ulong, out bool)"/>, which any thread may call.</para>
 /// </remarks>
-public sealed class ReceiverStore
+public sealed partial class ReceiverStore
 {
     private static readonly TimeSpan ExpiryInterval = TimeSpan.FromHours(1);
 
@@ -430,13 +432,14 @@ public sealed class ReceiverStore
                 File.Delete(pskFile);
             }
         }
+        LoadPins();
         var directoryFile = Path.Combine(root, "directory.txt");
         if (File.Exists(directoryFile))
         {
             try
             {
                 var newest = BroadcastDirectory.Parse(File.ReadAllBytes(directoryFile));
-                var check = newest.Check(_options.TrustedKeys);
+                var check = CheckDirectory(newest);
                 if (check.Usable)
                 {
                     Directory = newest;
@@ -600,7 +603,7 @@ public sealed class ReceiverStore
             try
             {
                 var directory = BroadcastDirectory.Parse(File.ReadAllBytes(file));
-                var check = directory.Check(_options.TrustedKeys);
+                var check = CheckDirectory(directory);
                 (check.Usable ? _knownDirectories : _rejectedDirectories)[id] = (directory, heardAt, check);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
@@ -693,7 +696,7 @@ public sealed class ReceiverStore
                 repeated = known.Directory;
                 check = known.Check;
                 RememberDirectory(frame.ObjectId, known.Directory, known.Check);
-                stopped = CheckRotation(known.Directory, now);
+                stopped = CheckRotation(known.Directory, known.Check, now);
                 released = ReleaseWithheld(known.Directory);
                 SayMismatches(known.Directory, known.Check);
             }
@@ -1126,11 +1129,16 @@ public sealed class ReceiverStore
     /// heard, or dated after today by this receiver's clock, says nothing about what is being
     /// sent now.</para>
     /// </remarks>
-    private List<ulong>? CheckRotation(BroadcastDirectory directory, DateTimeOffset heardAt)
+    private List<ulong>? CheckRotation(BroadcastDirectory directory, DirectoryCheck check, DateTimeOffset heardAt)
     {
         var listed = new HashSet<ulong>(directory.Entries.Select(e => e.ObjectId));
         DateOnly latest = LatestPlausibleDate(heardAt);
-        bool canMark = directory.Date <= latest && directory.Date >= NewestDirectoryDate(latest);
+        // Issue #144: a station's directory speaks only for that station. A bulletin another
+        // station's newest directory still lists is still being sent, and a directory that
+        // belongs to no station gives nothing up.
+        string? station = StationOf(directory, check);
+        var others = station is null ? [] : StationDirectories().Where(d => d.Station != station).ToList();
+        bool canMark = station is not null && directory.Date <= latest && directory.Date >= NewestDirectoryDate(latest, station);
         List<ulong>? marked = null;
         foreach (var held in _instances.Values.GroupBy(i => i.ObjectId).OrderBy(g => g.Key))
         {
@@ -1144,7 +1152,8 @@ public sealed class ReceiverStore
                 }
                 continue;
             }
-            if (!canMark || _stopped.ContainsKey(id) || held.Max(i => i.LastPiece) >= heardAt || !IsKnownBulletin(id, held))
+            if (!canMark || _stopped.ContainsKey(id) || held.Max(i => i.LastPiece) >= heardAt || !IsKnownBulletin(id, held)
+                || others.Any(o => o.Directory.Find(id) is not null))
             {
                 continue;
             }
@@ -1164,15 +1173,18 @@ public sealed class ReceiverStore
     /// </summary>
     private static DateOnly LatestPlausibleDate(DateTimeOffset now) => DateOnly.FromDateTime((now + TimeSpan.FromHours(1)).UtcDateTime);
 
-    /// <summary>The newest date of any directory heard (the newest, or one still remembered) that is not after <paramref name="latest"/>.</summary>
-    private DateOnly NewestDirectoryDate(DateOnly latest)
+    /// <summary>
+    /// The newest date of any directory heard from <paramref name="station"/> (the newest, or one
+    /// still remembered) that is not after <paramref name="latest"/>.
+    /// </summary>
+    private DateOnly NewestDirectoryDate(DateOnly latest, string station)
     {
         var newest = DateOnly.MinValue;
-        foreach (var date in _knownDirectories.Values.Select(k => k.Directory.Date).Append(Directory?.Date ?? DateOnly.MinValue))
+        foreach (var (directory, check) in UsableDirectories())
         {
-            if (date <= latest && date > newest)
+            if (directory.Date <= latest && directory.Date > newest && StationOf(directory, check) == station)
             {
-                newest = date;
+                newest = directory.Date;
             }
         }
         return newest;
@@ -1472,7 +1484,7 @@ public sealed class ReceiverStore
             {
                 return Unusable(instance, "is a directory that does not parse: " + e.Message);
             }
-            var check = directory.Check(_options.TrustedKeys);
+            var check = CheckDirectory(directory);
             if (!check.Usable)
             {
                 // Once per directory: it is marked done, so its repeats are not rebuilt again.
@@ -1489,7 +1501,8 @@ public sealed class ReceiverStore
                 NewestCheck = check;
             }
             RememberDirectory(instance.ObjectId, directory, check);
-            if (directory.Schedule is { } schedule && (HeardScheduleDate is null || directory.Date >= HeardScheduleDate))
+            var released = AfterNewPin() ?? [];
+            if (directory.Schedule is { } schedule && StationOf(directory, check) == BuiltInStation && (HeardScheduleDate is null || directory.Date >= HeardScheduleDate))
             {
                 if (schedule != HeardSchedule || directory.Date != HeardScheduleDate)
                 {
@@ -1500,10 +1513,10 @@ public sealed class ReceiverStore
                 HeardScheduleDate = directory.Date;
             }
             MarkDone(instance);
-            var stopped = CheckRotation(directory, _options.Time.GetUtcNow());
-            var released = ReleaseWithheld(directory);
+            var stopped = CheckRotation(directory, check, _options.Time.GetUtcNow());
+            released.AddRange(ReleaseWithheld(directory) ?? []);
             SayMismatches(directory, check);
-            return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped, Check: check, Released: released);
+            return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped, Check: check, Released: released.Count > 0 ? released : null);
         }
 
         Bulletin bulletin;

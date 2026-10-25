@@ -578,7 +578,7 @@ public class ServiceTests
             await stop.CancelAsync();
             await service;
             return 0;
-        }, TimeSpan.FromHours(3));
+        }, TimeSpan.FromHours(4));
 
         // 15:30 for the first, 16:30 for the second; 17:30 is after the window closes at 17:03.
         var leases = LeaseTimes(head);

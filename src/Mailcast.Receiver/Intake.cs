@@ -126,6 +126,61 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
+    /// <summary>Every station's pinned key (issue #178): built in, configured, and learnt on the air.</summary>
+    public IReadOnlyList<PinnedStation> Pins()
+    {
+        lock (_gate)
+        {
+            return _store.Pins;
+        }
+    }
+
+    /// <summary>Directories refused for naming a pinned station under another key (issue #178).</summary>
+    public IReadOnlyList<KeyConflict> KeyConflicts()
+    {
+        lock (_gate)
+        {
+            return _store.KeyConflicts;
+        }
+    }
+
+    /// <summary>The newest directory heard from each station (issue #144).</summary>
+    public IReadOnlyList<StationDirectory> StationDirectories()
+    {
+        lock (_gate)
+        {
+            return _store.StationDirectories();
+        }
+    }
+
+    /// <summary>The stations the head ends heard advertise (issue #178): listening hints only.</summary>
+    public IReadOnlyList<StationAdvert> Adverts()
+    {
+        lock (_gate)
+        {
+            return _store.Adverts();
+        }
+    }
+
+    /// <summary>The timetable <paramref name="station"/>'s own signed directories give, or null: see <see cref="ReceiverStore.HeardTimetable"/>.</summary>
+    public SlotTimetable? HeardTimetable(string station)
+    {
+        lock (_gate)
+        {
+            return _store.HeardTimetable(station);
+        }
+    }
+
+    /// <summary>Which station a directory belongs to, or null: see <see cref="ReceiverStore.StationOf"/>.</summary>
+    public string? StationOf(BroadcastDirectory directory)
+    {
+        ArgumentNullException.ThrowIfNull(directory);
+        lock (_gate)
+        {
+            return _store.StationOf(directory, directory.Check(_store.DirectoryKeys));
+        }
+    }
+
     /// <summary>A directory gave a timetable different from the one held (raised on the worker).</summary>
     public event Action<SlotTimetable>? ScheduleHeard;
 

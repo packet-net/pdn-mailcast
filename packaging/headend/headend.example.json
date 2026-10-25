@@ -128,6 +128,12 @@
     "port": 1883
   },
 
+  // Other mailcast stations to tell listeners about in every directory, so their receivers
+  // also listen at those stations' slots. Only a hint about where to listen: receivers trust a
+  // station from its own signed directory. For example:
+  // { "callsign": "G8BPQ", "slot": { "timeUtc": "00:30", "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
+  "advertise": [],
+
   // GET /status for the state; POST /run (pdn-mailcast-headend --run-now) for a one-off slot,
   // accepted only from this machine.
   "status": {

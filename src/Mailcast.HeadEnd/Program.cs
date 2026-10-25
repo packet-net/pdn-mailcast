@@ -111,6 +111,7 @@ public static partial class Program
         {
             Console.WriteLine($"{configPath}: fine");
             Console.WriteLine(DescribeSigning(signer, SigningKeyPath));
+            Console.WriteLine(DescribeAdverts(config));
             return 0;
         }
 
@@ -167,6 +168,16 @@ public static partial class Program
         return placeholder
             ? HeadEndConfig.Parse($$$"""{"callsign": "{{{PlaceholderCallsign}}}", "station": {"apiKey": "offline"}}""")
             : HeadEndConfig.Load(path);
+    }
+
+    /// <summary>One plain line on the other stations each directory tells listeners about (issue #178).</summary>
+    internal static string DescribeAdverts(HeadEndConfig config)
+    {
+        var adverts = config.ToScheduleOptions().Adverts;
+        return adverts.Count == 0
+            ? "advertising: no other stations (\"advertise\" in the configuration)"
+            : "advertising: " + string.Join("; ", adverts.Select(a => string.Create(CultureInfo.InvariantCulture,
+                $"{a.Callsign} {string.Join(" ", a.Timetable.ToFields())} on {a.FrequencyHz / 1e6:0.0000} MHz {(a.Sideband == Sideband.Usb ? "USB" : "LSB")}")));
     }
 
     /// <summary>One plain line on whether directories are signed, and with which key.</summary>
@@ -265,6 +276,7 @@ public static partial class Program
     {
         journal.Write($"pdn-mailcast-headend {Version} starting");
         journal.Write(DescribeSigning(signer, SigningKeyPath));
+        journal.Write(DescribeAdverts(config));
         TimeProvider time = TimeProvider.System;
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) =>
