@@ -84,7 +84,7 @@ public sealed class Retuner : IAsyncDisposable
 
     private readonly TimeProvider _time;
     private readonly Action<string> _log;
-    private readonly Func<SlotSchedule> _schedule;
+    private readonly Func<FollowedSlots> _schedule;
     private readonly Func<bool> _onRadio;
     private readonly RigTuning _tuning;
     private readonly Func<double>? _windowDialHz;
@@ -132,13 +132,13 @@ public sealed class Retuner : IAsyncDisposable
     /// <paramref name="onRadio"/> says the audio comes from the radio. <paramref name="hooks"/>,
     /// if given, are run around each slot it retunes for.
     /// </summary>
-    public Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+    public Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
         : this(config, schedule, onRadio, time, log, time, hooks, earlyEnd)
     {
     }
 
     /// <summary>As the public one, with rig control on a clock of its own, so a test can step its polls by themselves.</summary>
-    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+    internal Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         var rig = config.Rig ?? throw new ArgumentException("the config has no \"rig\"", nameof(config));
@@ -195,7 +195,7 @@ public sealed class Retuner : IAsyncDisposable
     /// dial) and given back or lost (the rig's, or null when pdn-soundmodem did not say), so the
     /// audio's band placement can follow it.
     /// </summary>
-    internal Retuner(ReceiverConfig config, Func<SlotSchedule> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, ReceiveWindow window, Func<double> dialHz, Action<double?>? dialFollows, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+    internal Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, ReceiveWindow window, Func<double> dialHz, Action<double?>? dialFollows, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         _time = time;
@@ -508,7 +508,7 @@ public sealed class Retuner : IAsyncDisposable
     /// </summary>
     private DateTimeOffset? NextSlotFrom(DateTimeOffset now)
     {
-        var timetable = _schedule().Timetable;
+        var timetable = _schedule();
         var utc = now.ToUniversalTime();
         if (timetable.ActiveAtOrBefore(utc) is { } latest && utc < latest + After && latest != _finished)
         {
@@ -617,7 +617,7 @@ public sealed class Retuner : IAsyncDisposable
                     if (_time.GetUtcNow() >= closes)
                     {
                         // A following slot whose window would open before this one closes keeps the radio.
-                        if (_schedule().Timetable.NextActiveAfter(slot) is { } next && next - Lead - HookLead <= closes)
+                        if (_schedule().NextActiveAfter(slot) is { } next && next - Lead - HookLead <= closes)
                         {
                             _finished = slot;
                             slot = next;

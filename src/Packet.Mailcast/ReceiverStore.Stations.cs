@@ -261,7 +261,10 @@ public sealed partial class ReceiverStore
 
     // The advert taken for each station and place (callsign, frequency, sideband), and the date
     // of the directory it came from.
-    private readonly Dictionary<(string Callsign, long FrequencyHz, Sideband Sideband), (StationAdvert Advert, DateOnly Date)> _adverts = [];
+    private readonly Dictionary<(string Callsign, long FrequencyHz, Sideband Sideband), (StationAdvert Advert, DateOnly Date, DateOnly First)> _adverts = [];
+
+    // Stations advertised only past a directory's first BroadcastDirectory.MostAdverts, with the station whose directory did.
+    private readonly Dictionary<string, string?> _beyondCap = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Takes the adverts of a trusted signed directory: a station and place not yet advertised is
@@ -278,16 +281,31 @@ public sealed partial class ReceiverStore
         foreach (var advert in directory.Adverts)
         {
             var place = (advert.Callsign, advert.FrequencyHz, advert.Sideband);
-            if (!_adverts.TryGetValue(place, out var held) || (directory.Date > held.Date && advert != held.Advert))
+            if (!_adverts.TryGetValue(place, out var held))
             {
-                _adverts[place] = (advert, directory.Date);
+                _adverts[place] = (advert, directory.Date, directory.Date);
             }
             else if (directory.Date > held.Date)
             {
-                _adverts[place] = (held.Advert, directory.Date);
+                _adverts[place] = (advert != held.Advert ? advert : held.Advert, directory.Date, held.First);
             }
         }
+        foreach (var advert in directory.IgnoredAdverts)
+        {
+            _beyondCap[advert.Callsign] = StationOf(directory, check);
+        }
     }
+
+    /// <summary>The date of the first directory heard that advertised <paramref name="callsign"/>, or null if none has.</summary>
+    public DateOnly? AdvertFirstSeen(string callsign) =>
+        _adverts.Where(a => a.Key.Callsign == callsign).Select(a => (DateOnly?)a.Value.First).Min();
+
+    /// <summary>
+    /// Stations only ever advertised past a directory's first <see cref="BroadcastDirectory.MostAdverts"/>
+    /// fields, each with the station whose directory did (null if none): not listened at, only shown.
+    /// </summary>
+    public IReadOnlyList<(string Callsign, string? AdvertisedBy)> AdvertsBeyondCap() =>
+        [.. _beyondCap.Where(b => !_adverts.Keys.Any(k => k.Callsign == b.Key)).Select(b => (b.Key, b.Value)).OrderBy(b => b.Key, StringComparer.Ordinal)];
 
     /// <summary>
     /// The stations the head ends heard tell listeners about (issue #178), one advert for each

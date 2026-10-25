@@ -249,7 +249,13 @@ public sealed class BroadcastDirectory
     /// </summary>
     public byte[]? PublicKey { get; }
 
-    /// <summary>The other stations the head end tells listeners about (<c>advert=</c>); empty when none.</summary>
+    /// <summary>How many <c>advert=</c> fields a reader takes from one directory: any after these are not used for listening (<see cref="IgnoredAdverts"/>).</summary>
+    public const int MostAdverts = 8;
+
+    /// <summary>The <c>advert=</c> fields read past the first <see cref="MostAdverts"/>: not used, only shown.</summary>
+    public IReadOnlyList<StationAdvert> IgnoredAdverts { get; private init; } = [];
+
+    /// <summary>The other stations the head end tells listeners about (<c>advert=</c>), the first <see cref="MostAdverts"/> read; empty when none.</summary>
     public IReadOnlyList<StationAdvert> Adverts { get; }
 
     /// <summary>
@@ -424,6 +430,7 @@ public sealed class BroadcastDirectory
         string? station = null;
         byte[]? publicKey = null;
         var adverts = new List<StationAdvert>();
+        var ignoredAdverts = new List<StationAdvert>();
         string? keyText = null;
         string? signatureText = null;
         int signedLength = 0;
@@ -479,12 +486,14 @@ public sealed class BroadcastDirectory
                         publicKey = null;
                     }
                 }
-                adverts.AddRange(parts[5..].Select(StationAdvert.FromField).OfType<StationAdvert>());
+                var fields = parts[5..].Where(f => f.StartsWith(StationAdvert.FieldName, StringComparison.Ordinal)).ToList();
+                adverts.AddRange(fields.Take(MostAdverts).Select(StationAdvert.FromField).OfType<StationAdvert>());
+                ignoredAdverts.AddRange(fields.Skip(MostAdverts).Select(StationAdvert.FromField).OfType<StationAdvert>());
             }
         }
         try
         {
-            return new BroadcastDirectory(date, entries, schedule, mode, reports, station, adverts, publicKey, serialized.ToArray(), keyText, signatureText, signedLength);
+            return new BroadcastDirectory(date, entries, schedule, mode, reports, station, adverts, publicKey, serialized.ToArray(), keyText, signatureText, signedLength) { IgnoredAdverts = ignoredAdverts };
         }
         catch (ArgumentException e)
         {

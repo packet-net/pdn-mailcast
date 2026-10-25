@@ -316,6 +316,15 @@ public sealed record ReceiverConfig
     public IReadOnlyList<TrustedKeySettings>? TrustedKeys { get; init; }
 
     /// <summary>
+    /// Stations, by callsign, whose slots this receiver does not listen at although a head end
+    /// advertises them or their own directory gives them (issue #178). Their bulletins are still
+    /// delivered if heard. GB7RDG's slots are always listened at. Null (the default) skips none;
+    /// left out of a saved file while null. The status page sets it too.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? SkipStations { get; init; }
+
+    /// <summary>
     /// Every key this receiver trusts: the built-in ones, then <see cref="TrustedKeys"/>. Throws
     /// <see cref="ConfigException"/> if one of those cannot be read.
     /// </summary>

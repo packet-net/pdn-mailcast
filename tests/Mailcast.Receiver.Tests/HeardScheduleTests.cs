@@ -29,7 +29,7 @@ public class HeardScheduleTests
 
             Assert.True(host.ScheduleFromDirectory);
             Assert.Equal(SlotSchedule.From(heard), host.Schedule);
-            Assert.Equal(heard.Daylight, host.Slots.Schedule!.Daylight);
+            Assert.Equal(heard.Daylight, host.Slots.Schedule!.First.Daylight);
             Assert.Single(log, l => l == "slots: GB7RDG's directory gives its slots as every hour at 30 minutes past, in daylight: from 60 minutes after sunrise to 60 minutes before sunset at IO91lk; using that instead of the config file's");
 
             // Hearing the same again says nothing more.
