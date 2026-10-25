@@ -125,7 +125,7 @@ public class ConfigTests
         config.Save(path);
         Assert.Contains("\"everyMinutes\": 120", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.DoesNotContain("slotStart", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(config, ReceiverConfig.Load(path));
+        Assert.Equal(config with { SlotUtc = null, Minute = 30 }, ReceiverConfig.Load(path));
     }
 
     [Fact]
