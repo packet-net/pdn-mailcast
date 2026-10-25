@@ -162,6 +162,24 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
+    /// <summary>When <paramref name="callsign"/> was first advertised, or null: see <see cref="ReceiverStore.AdvertFirstSeen"/>.</summary>
+    public DateOnly? AdvertFirstSeen(string callsign)
+    {
+        lock (_gate)
+        {
+            return _store.AdvertFirstSeen(callsign);
+        }
+    }
+
+    /// <summary>Stations advertised only past a directory's first eight adverts: see <see cref="ReceiverStore.AdvertsBeyondCap"/>.</summary>
+    public IReadOnlyList<(string Callsign, string? AdvertisedBy)> AdvertsBeyondCap()
+    {
+        lock (_gate)
+        {
+            return _store.AdvertsBeyondCap();
+        }
+    }
+
     /// <summary>The timetable <paramref name="station"/>'s own signed directories give, or null: see <see cref="ReceiverStore.HeardTimetable"/>.</summary>
     public SlotTimetable? HeardTimetable(string station)
     {

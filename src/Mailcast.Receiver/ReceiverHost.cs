@@ -478,6 +478,12 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public const double SameFrequencyHz = 100;
 
+    /// <summary>The most stations, besides GB7RDG, whose slots this receiver listens at.</summary>
+    public const int MostFollowedStations = 6;
+
+    /// <summary>The fewest minutes between a followed station's slots: at most one slot an hour.</summary>
+    public const int MinutesBetweenFollowedSlots = 60;
+
     /// <summary>Whether a signal at <paramref name="frequencyHz"/> on <paramref name="sideband"/> can be heard where this receiver listens.</summary>
     public bool CanHear(long frequencyHz, Sideband sideband) =>
         sideband == Sideband.Usb && Math.Abs(frequencyHz - Config.CentreHz) <= SameFrequencyHz;
@@ -499,6 +505,8 @@ public sealed class ReceiverHost : IAsyncDisposable
             };
             var adverts = Intake.Adverts();
             var heard = Intake.StationDirectories().Select(d => d.Station);
+            var pins = Intake.Pins();
+            var candidates = new List<(ListenedStation Station, bool Direct, DateTimeOffset Seen)>();
             foreach (string station in adverts.Select(a => a.Callsign).Concat(heard).Distinct(StringComparer.Ordinal).Where(c => c != ReceiverStore.BuiltInStation).Order(StringComparer.Ordinal))
             {
                 var own = Intake.HeardTimetable(station);
@@ -515,8 +523,34 @@ public sealed class ReceiverHost : IAsyncDisposable
                 var sideband = own is not null ? Sideband.Usb : advert!.Sideband;
                 string? why = skip.Contains(station) ? "you chose not to listen at its slots"
                     : !CanHear(hz, sideband) ? $"it is on {OnAir.Mhz(hz)} MHz {(sideband == Sideband.Usb ? "USB" : "LSB")}, not where this receiver listens"
+                    : timetable.EveryMinutes < MinutesBetweenFollowedSlots ? $"its slots are every {timetable.EveryMinutes} minutes, and a station is only listened at for at most one slot an hour"
                     : null;
-                list.Add(new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : "an advert", why is null, why));
+                // Heard directly first, by when its key was pinned (keys given by hand first);
+                // then advertised only, by the date it was first advertised; then by callsign.
+                DateTimeOffset seen = own is not null
+                    ? pins.Where(p => p.Station == station).Select(p => p.PinnedAt ?? DateTimeOffset.MinValue).DefaultIfEmpty(DateTimeOffset.MaxValue).Min()
+                    : Intake.AdvertFirstSeen(station) is { } first ? new DateTimeOffset(first.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : DateTimeOffset.MaxValue;
+                candidates.Add((new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : "an advert", why is null, why), own is not null, seen));
+            }
+            int taken = 0;
+            foreach (var (station, _, _) in candidates.OrderBy(c => !c.Direct).ThenBy(c => c.Seen).ThenBy(c => c.Station.Station, StringComparer.Ordinal))
+            {
+                if (station.Followed && ++taken > MostFollowedStations)
+                {
+                    list.Add(station with { Followed = false, NotFollowedBecause = $"this receiver listens at the slots of at most {MostFollowedStations} stations besides GB7RDG, and others were heard of first" });
+                }
+                else
+                {
+                    list.Add(station);
+                }
+            }
+            foreach (var (callsign, by) in Intake.AdvertsBeyondCap())
+            {
+                if (list.All(l => l.Station != callsign))
+                {
+                    list.Add(new ListenedStation(callsign, new SlotTimetable(TimeOnly.MinValue, 60), 0, Sideband.Usb, "an advert", false,
+                        $"it was advertised{(by is null ? "" : $" by {by}")} past the first {BroadcastDirectory.MostAdverts} adverts, the most a directory is read for"));
+                }
             }
             return list;
         }

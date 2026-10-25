@@ -176,19 +176,66 @@ public class FollowedStationsTests
                 Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 10_489_750_000, Sideband.Usb), new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_053_800, Sideband.Usb), new("M0FAR", new SlotTimetable(new TimeOnly(0, 45), 60), 7_047_000, Sideband.Usb)],
             }, slot, 1);
             var listening = host.Listening;
-            Assert.Equal(["GB7RDG", "G8BPQ", "M0FAR", "M0XYZ"], listening.Select(l => l.Station));
-            Assert.Equal("an advert", listening[1].Source);
-            Assert.True(listening[1].Followed); // its HF advert, not its QO-100 one, decides
-            Assert.Equal(7_053_800, listening[1].FrequencyHz);
-            Assert.False(listening[2].Followed);
-            Assert.Contains("7.047 MHz USB, not where this receiver listens", listening[2].NotFollowedBecause, StringComparison.Ordinal);
-            Assert.Equal("its own directory", listening[3].Source);
-            Assert.Equal(["GB7RDG", "G8BPQ", "M0XYZ"], host.Followed.Stations.Select(s => s.Station));
+            // Heard directly first, then advertised only.
+            Assert.Equal(["GB7RDG", "M0XYZ", "G8BPQ", "M0FAR"], listening.Select(l => l.Station));
+            Assert.Equal("its own directory", listening[1].Source);
+            Assert.Equal("an advert", listening[2].Source);
+            Assert.True(listening[2].Followed); // its HF advert, not its QO-100 one, decides
+            Assert.Equal(7_053_800, listening[2].FrequencyHz);
+            Assert.False(listening[3].Followed);
+            Assert.Contains("7.047 MHz USB, not where this receiver listens", listening[3].NotFollowedBecause, StringComparison.Ordinal);
+            Assert.Equal(["GB7RDG", "M0XYZ", "G8BPQ"], host.Followed.Stations.Select(s => s.Station));
         }
 
         // Told not to listen at G8BPQ's slots: its bulletins would still be delivered, but its slots are skipped.
         await using var skipping = new ReceiverHost(config with { SkipStations = ["G8BPQ"] }, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
         Assert.Equal(["GB7RDG", "M0XYZ"], skipping.Followed.Stations.Select(s => s.Station));
         Assert.Equal("you chose not to listen at its slots", skipping.Listening.Single(l => l.Station == "G8BPQ").NotFollowedBecause);
+    }
+
+    [Fact]
+    public async Task Caps_AtMostSixStations_EightAdvertsADirectory_AndOneSlotAnHour()
+    {
+        var xyz = DirectorySigner.FromPem(DirectorySigner.NewKeyPem()); // a throwaway key, pinned by hand
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig
+        {
+            Audio = "ubersdr:wessex.zapto.org",
+            StateDirectory = dir.Path,
+            Daylight = null,
+            TrustedKeys = [new TrustedKeySettings { Label = "M0XYZ", PublicKey = xyz.PublicKeyBase64 }],
+        };
+        var slot = At(10, 5);
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
+        // Ten adverts: G0AA1 every 30 minutes, then G0AA2 to G0AA8 hourly, then two past the first eight.
+        StationAdvert Advert(int i, int every = 60) => new($"G0AA{i}", new SlotTimetable(new TimeOnly(0, 10 + i), every), 7_053_800, Sideband.Usb);
+        await HearAsync(host, ScheduleOptions.Hourly with
+        {
+            Timetable = new SlotTimetable(new TimeOnly(0, 5), 60),
+            Signer = xyz,
+            Station = "M0XYZ",
+            Adverts = [Advert(1, 30), .. Enumerable.Range(2, 9).Select(i => Advert(i))],
+        }, slot, 1);
+        var listening = host.Listening.ToDictionary(l => l.Station);
+
+        Assert.Contains("every 30 minutes", listening["G0AA1"].NotFollowedBecause, StringComparison.Ordinal);
+        Assert.Contains("past the first 8 adverts", listening["G0AA9"].NotFollowedBecause, StringComparison.Ordinal);
+        Assert.False(listening["G0AA10"].Followed);
+
+        // Eight eligible besides GB7RDG: M0XYZ, heard directly, then G0AA2 to G0AA8 by callsign,
+        // as they were first advertised together. Six are followed, the last two left out.
+        Assert.Equal(7, host.Followed.Stations.Count);
+        Assert.Equal("M0XYZ", host.Followed.Stations[1].Station);
+        Assert.Contains("at most 6 stations besides GB7RDG", listening["G0AA7"].NotFollowedBecause, StringComparison.Ordinal);
+        Assert.Contains("at most 6 stations besides GB7RDG", listening["G0AA8"].NotFollowedBecause, StringComparison.Ordinal);
+        for (int i = 2; i <= 6; i++)
+        {
+            Assert.True(listening[$"G0AA{i}"].Followed);
+        }
+
+        // The listener's opt-out still applies, and frees a place.
+        await using var skipping = new ReceiverHost(config with { SkipStations = ["G0AA2"] }, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
+        Assert.True(skipping.Listening.Single(l => l.Station == "G0AA7").Followed);
+        Assert.False(skipping.Listening.Single(l => l.Station == "G0AA8").Followed);
     }
 }
