@@ -130,7 +130,7 @@ public class SlotIntervalTests
     [Fact]
     public void AnHourlyConfiguration_GetsTheHourlyDefaults()
     {
-        var config = Parse("""{"timeUtc": "00:00", "everyMinutes": 60}""");
+        var config = Parse("""{"minute": 0, "everyMinutes": 60}""");
         SameSchedule(ScheduleOptions.Hourly, config.ToScheduleOptions());
         var slot = config.ToSlotSettings();
         Assert.Equal(TimeSpan.FromSeconds(10), slot.ToneLength);
@@ -213,7 +213,7 @@ public class DaylightConfigTests
     [Fact]
     public void Daylight_ReachesTheScheduleTheSchedulerAndTheDirectory_WithLighterCarrying()
     {
-        var config = Parse("""{"timeUtc": "00:00", "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""");
+        var config = Parse("""{"minute": 0, "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""");
         var expected = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
         Assert.Equal(expected, config.ToSlotTimetable());
         Assert.Equal(expected, config.ToSlotSchedule().Timetable);
@@ -231,7 +231,7 @@ public class DaylightConfigTests
     [Fact]
     public void WithoutDaylight_EverySlotRuns_AndTheDirectoryStillGivesTheSlots()
     {
-        var config = Parse("""{"timeUtc": "00:00", "everyMinutes": 60}""");
+        var config = Parse("""{"minute": 0, "everyMinutes": 60}""");
         Assert.Null(config.ToSlotSchedule().Daylight);
         Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60), config.ToScheduleOptions().Timetable);
         Assert.Equal(ScheduleOptions.Hourly.SlotShares, config.ToScheduleOptions().SlotShares);

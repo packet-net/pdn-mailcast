@@ -215,7 +215,7 @@ public class WebSdrWindowTests
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 13:58 UTC, ready for the 14:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
-        Assert.Single(rig.Log, l => l.Contains("read as every 60 minutes from 12:00 UTC", StringComparison.Ordinal)
+        Assert.Single(rig.Log, l => l.Contains("read as every 60 minutes, at :00 past each hour", StringComparison.Ordinal)
             && l.Contains("nothing needs changing", StringComparison.Ordinal));
         Assert.Contains(rig.Log, l => l.Contains("12 of the 24 slots a day, at 00:00, 02:00", StringComparison.Ordinal));
     }

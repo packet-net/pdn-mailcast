@@ -14,7 +14,7 @@ public class ConfigTests
         Assert.Equal("Q0CAST", config.Bbs.Login);
         Assert.False(config.Web.Lan);
         Assert.Equal(7052.0, config.DialKHz);
-        Assert.Equal("00:00", config.SlotUtc);
+        Assert.Equal("00:00", config.SlotAnchor);
         Assert.Equal(60, config.EveryMinutes);
         Assert.False(config.WebSdrSlotsPerDayIgnored);
         Assert.False(config.SlotUtcWithoutEveryMinutes);
@@ -125,7 +125,30 @@ public class ConfigTests
         config.Save(path);
         Assert.Contains("\"everyMinutes\": 120", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.DoesNotContain("slotStart", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(config, ReceiverConfig.Load(path));
+        Assert.Equal(config with { SlotUtc = null, Minute = 30 }, ReceiverConfig.Load(path));
+    }
+
+    [Fact]
+    public void Minute_IsTheSameAsSlotUtcAt00MM()
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, """{ "minute": 30, "everyMinutes": 120 }""");
+        var byMinute = ReceiverConfig.Load(path);
+        File.WriteAllText(path, """{ "slotUtc": "00:30", "everyMinutes": 120 }""");
+        var byOldKey = ReceiverConfig.Load(path);
+
+        Assert.Equal(new SlotSchedule(new TimeOnly(0, 30), 120, Packet.Mailcast.DaylightRule.Gb7rdg), byMinute.Schedule);
+        Assert.Equal(byOldKey.Schedule, byMinute.Schedule);
+
+        // Saving writes minute and drops the old key, for the old key's 00:MM; 12:00 has no minute and stays.
+        byOldKey.Save(path);
+        string saved = File.ReadAllText(path);
+        Assert.Contains("\"minute\": 30", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("slotUtc", saved, StringComparison.Ordinal);
+        Assert.Equal(byOldKey.Schedule, ReceiverConfig.Load(path).Schedule);
+        new ReceiverConfig { SlotUtc = "12:00", EveryMinutes = 1440 }.Save(path);
+        Assert.Contains("\"slotUtc\": \"12:00\"", File.ReadAllText(path), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -231,6 +254,9 @@ public class ConfigTests
     [InlineData("""{ "bbs": { "host": null } }""", "bbs")]
     [InlineData("""{ "web": { "lan": true } }""", "password")]
     [InlineData("""{ "slotUtc": "noon" }""", "slotUtc")]
+    [InlineData("""{ "minute": 30, "slotUtc": "00:30" }""", "are both given")]
+    [InlineData("""{ "minute": 60 }""", "must be 0 to 59")]
+    [InlineData("""{ "minute": -1, "everyMinutes": 60 }""", "must be 0 to 59")]
     [InlineData("""{ "slotUtc": "noon", "everyMinutes": 60 }""", "slotUtc")]
     [InlineData("""{ "everyMinutes": 0 }""", "everyMinutes")]
     [InlineData("""{ "everyMinutes": -60 }""", "everyMinutes")]

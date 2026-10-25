@@ -11,13 +11,13 @@ public class AdvertiseTests
         {
           "callsign": "M0LTE",
           "station": { "apiKey": "k" },
-          "slot": { "timeUtc": "00:00", "everyMinutes": 60 },
+          "slot": { "minute": 0, "everyMinutes": 60 },
           "advertise": [{{advertise}}]
         }
         """;
 
-    private const string Hf = """{ "callsign": "G8BPQ", "slot": { "timeUtc": "00:30", "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }""";
-    private const string Qo100 = """{ "callsign": "G8BPQ", "slot": { "timeUtc": "00:15", "everyMinutes": 60, "daylight": { "locator": "IO93fb" } }, "frequencyHz": 10489750000 }""";
+    private const string Hf = """{ "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }""";
+    private const string Qo100 = """{ "callsign": "G8BPQ", "slot": { "minute": 15, "everyMinutes": 60, "daylight": { "locator": "IO93fb" } }, "frequencyHz": 10489750000 }""";
 
     [Fact]
     public void EveryDirectory_NamesTheHeadEnd_AndCarriesTheAdverts_OneStationOnTwoFrequencies()

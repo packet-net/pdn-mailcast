@@ -15,7 +15,7 @@ The package puts an example in `/etc/pdn-mailcast-headend/headend.json`. Fill in
 ```json
 "callsign": "G0ABC",
 "slot": {
-  "timeUtc": "00:30",
+  "minute": 30,
   "everyMinutes": 60,
   "daylight": { "locator": "IO92ab", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 }
 },
@@ -33,7 +33,7 @@ Then `sudo pdn-mailcast-headend --check-config` and `sudo systemctl start pdn-ma
 
 ## The slot start
 
-Pick a time no other mailcast station on your frequency uses. GB7RDG sends on the hour, so on 40 m start yours at half past: `"timeUtc": "00:30"` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal's `schedule:` line at start-up says when your slots are.
+Pick a time no other mailcast station on your frequency uses. GB7RDG sends on the hour, so on 40 m start yours at half past: `"minute": 30` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal's `schedule:` line at start-up says when your slots are.
 
 ## The signing key
 
@@ -50,4 +50,4 @@ The journal's `signing:` line gives your public key. Keep the private key safe a
 
 ## Getting heard
 
-Receivers listen to GB7RDG out of the box. A signed list of transmitters, sent over the air, will let them find and follow yours too; that is [#178](https://github.com/packet-net/pdn-mailcast/issues/178), and it is not built yet. Until then a listener who wants yours sets their receiver to your frequency (`dialKHz`), your callsign (`sources`), your slots (`slotUtc`), your locator (`daylight.locator`, since receivers work out GB7RDG's daylight at IO91lk unless told otherwise) and your public key (`trustedKeys`); see [receiver.md](receiver.md).
+Receivers listen to GB7RDG out of the box. To be heard by them, ask an existing station such as GB7RDG to add you to its `advertise` list: its directories then tell every receiver when and where your slots are, and receivers listen there unless the listener switches you off. The first time a receiver hears your signed directory it learns your key and delivers your bulletins from then on; it refuses anyone else sending under your callsign with another key. Receivers only follow stations on their own frequency for now, so a QO-100 station is shown but not followed yet. A listener can also add you by hand: your key in `trustedKeys` (and `daylight.locator` set to yours, since receivers work out daylight at IO91lk unless told otherwise); see [receiver.md](receiver.md).

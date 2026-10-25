@@ -4,19 +4,21 @@ The head end runs beside a BBS and the station's pdn-soundmodem: GB7RDG's first,
 
 ## When the slots are
 
-A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the clock. `everyMinutes` must divide a day (1440) and be at least 15. Left out it is 1440, one slot a day, which is how a head end configured before hourly slots carries on unchanged. GB7RDG uses `"timeUtc": "00:00"` and `"everyMinutes": 60`, a slot every hour on the hour, which is also what a receiver assumes until it has heard a directory.
+Slots are counted from `slot.minute` past 00:00 UTC, one every `slot.everyMinutes`, round the clock. `everyMinutes` must divide a day (1440) and be at least 15. Left out it is 1440, one slot a day, which is how a head end configured before hourly slots carries on unchanged. GB7RDG uses `"minute": 0` and `"everyMinutes": 60`, a slot every hour on the hour, which is also what a receiver assumes until it has heard a directory.
 
 ### Slots at another minute
 
-`timeUtc` is what every slot is counted from, so it also says where in the interval the slots start. A second station on the same band starts elsewhere, so the two never transmit at once. For a slot at half past each hour:
+`minute` (0 to 59) says where in the interval the slots start: slots are counted from 00:MM UTC, so hourly gives :MM past every hour and `everyMinutes` 120 gives 00:MM, 02:MM and so on. A second station on the same band starts elsewhere, so the two never transmit at once. For a slot at half past each hour:
 
 ```json
-"slot": { "timeUtc": "00:30", "everyMinutes": 60 }
+"slot": { "minute": 30, "everyMinutes": 60 }
 ```
 
-That gives 00:30, 01:30 and so on; `"12:30"` would give the same slots. Everything that counts slots counts from these: the daylight window picks from the half-hour slots, `slot.maxMinutes`, `slot.catchUpMinutes` and `slot.retryMinutes` count from each slot's own start, and `schedule.slotOffsets` and the budget rule count slots from a bulletin's first. The directory carries the timetable (`slots=00:30/60`), and the journal says it at start-up: `schedule: a slot every 60 min, counted from 00:30Z, so at :30 each hour`. Left at `"00:00"`, nothing changes.
+That gives 00:30, 01:30 and so on. Everything that counts slots counts from these: the daylight window picks from the half-hour slots, `slot.maxMinutes`, `slot.catchUpMinutes` and `slot.retryMinutes` count from each slot's own start, and `schedule.slotOffsets` and the budget rule count slots from a bulletin's first. The directory carries the timetable (`slots=00:30/60`), and the journal says it at start-up: `schedule: a slot every 60 min, counted from minute 30 past 00:00Z, so at :30 each hour`. Left at `0`, nothing changes.
 
-Receivers only decode around the slots they know about, and until #144 a receiver follows one station's timetable. So a listener who wants a half-hour station's slots sets the receiver's `slotUtc` to match, `"00:30"` here, and then hears that station instead of GB7RDG. The receiver also needs the station's key among its trusted keys, or it will not accept that station's directory.
+The older `timeUtc` (`"00:30"`) is still read and means the same as `minute` 30; give one or the other, not both. A daily anchor such as `"timeUtc": "12:00"` with `everyMinutes` 1440 has no `minute` equivalent, so it stays on `timeUtc`.
+
+Receivers only decode around the slots they know about, and until #144 a receiver follows one station's timetable. So a listener who wants a half-hour station's slots sets the receiver's `minute` to match, `30` here, and then hears that station instead of GB7RDG. The receiver also needs the station's key among its trusted keys, or it will not accept that station's directory.
 
 ### Daylight only
 
@@ -24,7 +26,7 @@ Receivers only decode around the slots they know about, and until #144 a receive
 
 ```json
 "slot": {
-  "timeUtc": "00:00",
+  "minute": 0,
   "everyMinutes": 60,
   "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 }
 }
@@ -341,7 +343,7 @@ Receivers learn when and where to listen for other mailcast stations from what e
 
 ```json
 "advertise": [
-  { "callsign": "G8BPQ", "slot": { "timeUtc": "00:30", "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
+  { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
 ]
 ```
 
@@ -349,7 +351,7 @@ A station on two frequencies, such as HF and QO-100, is listed once for each. Ev
 
 ## Offline
 
-`pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone and the channel probe, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.timeUtc` if left out), daylight or not, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state. Neither needs a config file: with none at the usual place and no `--config`, they run on the defaults with N0CALL, a placeholder callsign, and say so.
+`pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone and the channel probe, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.minute` if left out), daylight or not, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state. Neither needs a config file: with none at the usual place and no `--config`, they run on the defaults with N0CALL, a placeholder callsign, and say so.
 
 The published pdn-soundmodem package cannot pack frames yet, so offline every frame is its own burst, about 0.8 s longer each than on the air. A receiver decodes it the same way.
 

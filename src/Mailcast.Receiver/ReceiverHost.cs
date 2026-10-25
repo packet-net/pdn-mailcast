@@ -862,7 +862,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         if (Config.SlotUtcWithoutEveryMinutes)
         {
-            _log($"config: \"slotUtc\" without \"everyMinutes\" is from before hourly slots; read as every 60 minutes from {Config.SlotUtc} UTC, the same hourly slots, so nothing needs changing");
+            _log($"config: no \"everyMinutes\" (an older file); read as every 60 minutes, at :{Config.SlotStart.Minute:00} past each hour, the same hourly slots, so nothing needs changing");
         }
         if (Config.WebSdrSlotsPerDayIgnored)
         {
@@ -1020,7 +1020,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Whether going from <paramref name="a"/> to <paramref name="b"/> restarts the audio: its source, or when it listens.</summary>
     private static bool AudioSettingsDiffer(ReceiverConfig a, ReceiverConfig b) =>
         !string.Equals(a.Audio, b.Audio, StringComparison.Ordinal)
-        || !string.Equals(a.SlotUtc, b.SlotUtc, StringComparison.Ordinal)
+        || !string.Equals(a.SlotAnchor, b.SlotAnchor, StringComparison.Ordinal)
         || a.EveryMinutes != b.EveryMinutes
         || a.Daylight != b.Daylight
         || a.DialKHz != b.DialKHz;

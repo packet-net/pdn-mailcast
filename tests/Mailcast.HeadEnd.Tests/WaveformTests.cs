@@ -289,7 +289,7 @@ public class WaveformTests
     public void Plan_TheDirectoryNamesTheSlotsWaveform()
     {
         using var state = new TempDirectory();
-        var config = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "maxBurstSeconds": 18}, "slot": {"timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10}, "schedule": {"symbolSize": 240, "modes": ["ms110d-wn4", "ms110d-wn3"]}}""");
+        var config = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "maxBurstSeconds": 18}, "slot": {"minute": 0, "everyMinutes": 60, "maxMinutes": 10}, "schedule": {"symbolSize": 240, "modes": ["ms110d-wn4", "ms110d-wn3"]}}""");
         var options = config.ToScheduleOptions();
         var store = new RotationStore(state.Path, Compression.Default, options, new MemoryJournal());
         store.Offer(Bulletins.Make(71, 3000), new DateOnly(2026, 10, 6));
