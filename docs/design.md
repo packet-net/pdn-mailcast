@@ -156,7 +156,8 @@ The object's first byte flags what the object carries, so this traffic is marked
 | 2 | Directory |
 | 3 | DAPPS message (reserved) |
 | 4 | Propagation reading, one object per source (the ionosonde, and live PSK Reporter spots): a short record, not compressed, sent with dictionary 0 (see below) |
-| 5 to 111 | Unassigned; given out in this table |
+| 5 | Station list: the signed list of transmitters, not compressed, sent with dictionary 0 (see below) |
+| 6 to 111 | Unassigned; given out in this table |
 | 112 to 127 | Experiments; never assigned |
 
 Its top bit (128) says a metadata block follows the type byte: a 2-byte big-endian length, then that many bytes of the wrapper's own header, then the zstd frame. A reader skips a metadata block it does not understand. Types 1 and 2 are sent without one, exactly as before v0.3.0, so receivers already in the field read them unchanged.
@@ -239,6 +240,23 @@ A receiver checks each directory against the keys it trusts: GB7RDG's, built in,
 From v0.16.0 the first line may also list the listeners whose daily reports reached GB7RDG lately, `reports=2026-10-15:G4ABC,G8BPQ;2026-10-14:M9TWM`: each callsign once, under the day of its newest report, for that day and the two before, at most 100 callsigns, the newest reports first; `reports=` alone means none. It is inside what the signature covers, and earlier receivers ignore it. See [headend.md](headend.md#reports-in-the-directory).
 
 What this does not stop yet, while old receivers and unsigned transmitters are about: removing `key=` and `sig=` turns a signed directory into an unsigned one, which is used as today; a bulletin no directory lists is still delivered, as today; and a signed directory can be replayed the same day, which is no worse than before. A later step, not built, would let a receiver require signed directories and refuse the rest.
+
+### The station list
+
+From issue #178, receivers learn which transmitters to follow from a signed list sent over the air, not from their own settings. It is content type 5: the type byte, then the list's text exactly as signed, not compressed, with dictionary 0. So the object, and its ID, depend on nothing but the signed text: every head end that has a copy sends the same object, unchanged, whatever its own key, and pieces of it from different stations combine like pieces of any other object. A list that fits in one 940-byte symbol (about four stations) goes as one symbol of its own length, so any one frame rebuilds it; a longer one uses the standard 940-byte symbols. Each slot that keys anyway carries K + 1 fresh pieces of it (2 for a one-symbol list), inside the airtime budget and ahead of the readings; it never makes a slot key by itself.
+
+```
+MAILCAST STATIONS 1
+serial=2026102501
+GB7RDG<TAB>locator=IO91lk<TAB>hz=7053800<TAB>sideband=usb<TAB>slots=00:00/60<TAB>daylight=IO91lk/120/30<TAB>modes=ms110d-wn3,ms110d-wn4<TAB>key=<base64 of the 32-byte Ed25519 key>
+listkey=<16 hex digits><TAB>sig=<base64, 64 bytes>
+```
+
+Each station line is its callsign, then `name=value` fields: `hz` is the signal's centre, `slots` and `daylight` are the directory's own timetable fields, `modes` the waveforms it sends on, and `key` its directory signing key. A reader ignores fields it does not know, and skips a station line it cannot use, saying so in the log. The last line is the signature: `listkey=` (the first 8 bytes of the SHA-256 of the list key's 32 bytes, in hex) and `sig=`, over every byte before the tab that starts `sig=`, as in the signed directory.
+
+The list is signed by its own Ed25519 key, used for nothing else and kept off any live box; its public half is built into receivers and head ends. Until that key is made, the built-in list key is an empty placeholder, every list is refused, and receivers follow GB7RDG alone, exactly as before.
+
+A receiver keeps the list with the highest serial whose signature checks, in `store/stations.txt`, and never goes back to a lower serial; a list with the same serial as the one held but different bytes is ignored. With no list it follows GB7RDG, built in. The keys of the listed stations are trusted for their own signed directories, as well as GB7RDG's and any in `trustedKeys`. Receivers from before ignore type 5 without a word, as they do any type they do not know.
 
 A receiver forgets which objects it has rebuilt after 14 days, and drops a partial object 14 days after its last new piece, or 24 hours after a directory heard since that piece leaves it out (the head end has retired it, so it can never be finished; a new piece or a later directory listing it again undoes this). The BBS's BID check remains the real duplicate filter.
 

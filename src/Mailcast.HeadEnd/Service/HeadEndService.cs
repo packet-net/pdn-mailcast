@@ -348,7 +348,7 @@ public sealed class HeadEndService(
             journal.Write(spots);
         }
         SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation);
-        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames };
+        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, StationListFrames = plan.StationListFrames };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
         status.SetBulletinsHeld(store.Count);

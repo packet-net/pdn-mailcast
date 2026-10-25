@@ -65,6 +65,7 @@ public sealed class Intake : IAsyncDisposable
         _heardSchedule = _store.HeardSchedule;
         _ionosphere = _store.Ionosphere;
         _pskReporter = _store.PskReporter;
+        _stations = _store.Stations;
         _time = (options ?? new ReceiverStoreOptions()).Time;
         _progress = (_store.Directory, _store.Progress());
         _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
@@ -96,6 +97,16 @@ public sealed class Intake : IAsyncDisposable
     public IonoReading? Ionosphere => _ionosphere;
 
     private volatile PskReading? _pskReporter;
+    private volatile StationList? _stations;
+
+    /// <summary>
+    /// The newest signed station list taken (content type 5), kept across restarts; null until
+    /// one has been taken, while the receiver follows GB7RDG alone.
+    /// </summary>
+    public StationList? Stations => _stations;
+
+    /// <summary>A newer station list has been taken (raised on the worker).</summary>
+    public event Action<StationList>? StationsHeard;
 
     /// <summary>
     /// The newest PSK Reporter reading heard from the head end (content type 4, source 3), kept
@@ -600,6 +611,24 @@ public sealed class Intake : IAsyncDisposable
                 DateTimeOffset at = _time.GetUtcNow();
                 _log(Ascii.Clean(spots.AsOf(at, PskEvaluator.StaleAfter).Describe(at)));
                 PskReporterHeard?.Invoke(spots);
+                break;
+            case FrameOutcome.CompletedStationList:
+                // Once per object: it is marked done. The store has said why when it was not taken.
+                Interlocked.Increment(ref _framesStored);
+                if (result.Detail is null && result.StationList is { } list)
+                {
+                    bool newer;
+                    lock (_gate)
+                    {
+                        newer = _stations?.Serial != list.Serial;
+                        _stations = _store.Stations;
+                    }
+                    _log($"station list {(newer ? "taken" : "heard again")}: {Ascii.Clean(list.Describe())}, {Ascii.Clean(result.Check?.Describe())}");
+                    if (newer)
+                    {
+                        StationsHeard?.Invoke(list);
+                    }
+                }
                 break;
             case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
                 // Once per object: it is marked done, so its later frames are not rebuilt again.

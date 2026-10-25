@@ -335,6 +335,38 @@ signing: no key at /etc/pdn-mailcast-headend/signing-key.pem, so directories go 
 
 The public key in that line is what listeners trust. GB7RDG's is built into the receiver. Another transmitter gives its line to listeners, who add the key to `trustedKeys` in their receiver.json (see the receiver's docs). Keep the private key private and backed up: a new key means every receiver has to be told the new public key.
 
+## The station list
+
+Receivers learn which stations to follow from a signed station list that head ends send over the air ([design.md](design.md#the-station-list)). It is signed with a separate list key, used for nothing else, kept off any live box. Its public half is built into receivers. Until that key is made, the built-in one is a placeholder, so every list is refused and receivers follow GB7RDG alone.
+
+Write the list as JSON, one entry per station, with the slots as in a head end's own `slot` setting and each station's `publicKey` from its head end's `signing:` line:
+
+```json
+{
+  "serial": 2026102501,
+  "stations": [
+    { "callsign": "GB7RDG", "locator": "IO91lk", "frequencyHz": 7053800, "sideband": "usb",
+      "slot": { "timeUtc": "00:00", "everyMinutes": 60, "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 } },
+      "modes": ["ms110d-wn3", "ms110d-wn4"], "publicKey": "MCowBQYDK2VwAyEAe1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=" }
+  ]
+}
+```
+
+`frequencyHz` is where the signal's centre is on the air. Give each new list a higher `serial` than the last (YYYYMMDDNN works well): receivers never go back to a lower one. Then sign it, on the machine that holds the list key, which need not have a configuration or a network:
+
+```
+pdn-mailcast-headend --sign-list list.json --key list-key.pem --out station-list.txt
+```
+
+Copy `station-list.txt` to `/etc/pdn-mailcast-headend/station-list.txt` on each head end that is to carry it, and restart it. The place is fixed, with no setting. At start-up, and in `--check-config`, the journal says what it found:
+
+```
+station list: sends /etc/pdn-mailcast-headend/station-list.txt, serial 2026102501, 2 stations: GB7RDG, G8BPQ, signed by the station list key
+station list: none at /etc/pdn-mailcast-headend/station-list.txt, so none is sent
+```
+
+A list that cannot be read, or whose signature does not check against the built-in list key, is not sent, and the line says why. Every head end can send the same signed file unchanged.
+
 ## Offline
 
 `pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone and the channel probe, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.timeUtc` if left out), daylight or not, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state. Neither needs a config file: with none at the usual place and no `--config`, they run on the defaults with N0CALL, a placeholder callsign, and say so.

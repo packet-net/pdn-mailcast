@@ -201,4 +201,7 @@ public sealed record SlotReport
 
     /// <summary>How many of the planned frames carried it (content type 4, source 3).</summary>
     public int PskReporterFrames { get; init; }
+
+    /// <summary>How many of the planned frames carried the signed station list (content type 5).</summary>
+    public int StationListFrames { get; init; }
 }

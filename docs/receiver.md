@@ -518,6 +518,8 @@ A transmitter can sign its directory, the list of what it is sending, so you can
 - **in GB7RDG's signed list**: a signed directory lists it, but it is not complete yet, or was rebuilt by an older receiver that kept no fingerprint, so nothing has been checked.
 - **not signed**: only directories with no signature list it, which is how every directory was before signing, and how a transmitter without a key still sends. It is delivered as usual.
 
+The keys of the stations in the signed station list, which head ends send over the air, are trusted too; the page's Stations line shows the list held, or says it follows GB7RDG only. Until the list key is made, no list is taken, and the receiver follows GB7RDG only.
+
 A directory whose signature does not check, or is signed by a key you have not added, is not used at all: not for names, not for the list, and not to decide what has stopped being sent. The log says why, once for each such directory, and the summary line says "The last list heard was not used" with the reason. A bulletin that only such a directory lists is held when it completes, not delivered; the row says so, and it goes to your BBS as soon as a good directory lists it too.
 
 A bulletin shows this while a directory naming it is remembered, which is 48 hours. A held bulletin stays held across a restart, until a good directory lists it or 14 days pass.

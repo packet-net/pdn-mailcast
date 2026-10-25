@@ -25,6 +25,13 @@ public static partial class Program
     /// </summary>
     public const string SigningKeyPath = "/etc/pdn-mailcast-headend/signing-key.pem";
 
+    /// <summary>
+    /// The signed station list this head end carries: when this file is there and its signature
+    /// checks against the built-in station list key, every slot that keys sends it. A fixed place,
+    /// not a setting. Made by <c>--sign-list</c>, offline, with the list key; see docs/headend.md.
+    /// </summary>
+    public const string StationListPath = "/etc/pdn-mailcast-headend/station-list.txt";
+
     private const string Usage = """
         pdn-mailcast-headend: a mailcast head end, which sends a BBS's bulletins on the air.
 
@@ -43,6 +50,11 @@ public static partial class Program
               the schedule carries on afterwards.
           pdn-mailcast-headend --check-config [--config FILE]
               Checks the configuration, and says whether directories will be signed.
+          pdn-mailcast-headend --sign-list LIST.json --key LIST-KEY.pem [--out FILE]
+              Signs a station list offline with the station list key, and writes the signed
+              list to FILE (standard output if left out). Reads no configuration and opens no
+              connection. A head end sends the signed list from
+              /etc/pdn-mailcast-headend/station-list.txt.
           pdn-mailcast-headend --version
 
         Exit codes: 0 fine, 1 failed, 2 the configuration or the command line is wrong.
@@ -69,6 +81,11 @@ public static partial class Program
         {
             Console.WriteLine($"pdn-mailcast-headend {Version}");
             return 0;
+        }
+
+        if (options.GetValueOrDefault("--sign-list") is string listPath)
+        {
+            return await SignListAsync(listPath, options["--key"]!, options.GetValueOrDefault("--out"));
         }
 
         string configPath = options.GetValueOrDefault("--config") ?? DefaultConfig;
@@ -111,6 +128,7 @@ public static partial class Program
         {
             Console.WriteLine($"{configPath}: fine");
             Console.WriteLine(DescribeSigning(signer, SigningKeyPath));
+            Console.WriteLine(StationListFile.Load(StationListPath, StationListKey.BuiltIn).Line);
             return 0;
         }
 
@@ -205,7 +223,9 @@ public static partial class Program
             // The head end's own list of reports, read but never written, when it reads the BBS's.
             ReportLog? reports = config.Intake.Reports is null ? null
                 : new ReportLog(Directory.Exists(config.StateDirectory) ? config.StateDirectory : scratch, journal, readOnly: true);
-            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, reports: reports);
+            var (stationList, stationListLine) = StationListFile.Load(StationListPath, StationListKey.BuiltIn);
+            journal.Write(stationListLine);
+            var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, reports: reports, stationList: stationList);
 
             SlotPlan plan = planner.Plan(slot);
             SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
@@ -291,7 +311,9 @@ public static partial class Program
         var pskReporter = config.PskReporter.Enabled ? new PskReporterMonitor(config.Callsign, time, journal.Write, host: config.PskReporter.Host, port: config.PskReporter.Port) : null;
         Func<PskReading>? spots = pskReporter is null ? null : () => pskReporter.Current;
         ReportLog? reports = config.Intake.Reports is null ? null : new ReportLog(config.StateDirectory, journal);
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports);
+        var (stationList, stationListLine) = StationListFile.Load(StationListPath, StationListKey.BuiltIn);
+        journal.Write(stationListLine);
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports, stationList);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -411,6 +433,37 @@ public static partial class Program
             $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h only in airtime nothing else wants (the leftover tier), retired after {Math.Max(BroadcastScheduler.LeftoverCoverage, rule.RetireCoverage):0.##} K or {BroadcastScheduler.RetireAge(rule).TotalHours:0.#} h; {modes}");
     }
 
+    private static async Task<int> SignListAsync(string listPath, string keyPath, string? outPath)
+    {
+        try
+        {
+            var key = DirectorySigner.LoadIfPresent(keyPath) ?? throw new FormatException($"{keyPath}: no such file");
+            var list = StationListFile.Sign(File.ReadAllText(listPath), key);
+            byte[] signed = list.Serialize();
+            if (outPath is null)
+            {
+                using var stdout = Console.OpenStandardOutput();
+                await stdout.WriteAsync(signed);
+            }
+            else
+            {
+                await File.WriteAllBytesAsync(outPath, signed);
+            }
+            string trust = StationListKey.BuiltIn.Any(k => k.KeyId == key.KeyId)
+                ? "the built-in station list key, so receivers will take it"
+                : StationListKey.IsPlaceholder
+                    ? "a key that is not built in: the built-in station list key is still a placeholder, so no receiver takes any list yet"
+                    : "a key that is not the built-in station list key, so receivers will refuse it";
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: signed {Ascii.Plain(list.Describe())} with key {KeyId.Format(key.KeyId)}, {trust}{(outPath is null ? "" : $"; written to {outPath}")}");
+            return 0;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
+        {
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: --sign-list: {Ascii.Plain(e.Message)}");
+            return e is FormatException ? 2 : 1;
+        }
+    }
+
     private static async Task<int> RunNowAsync(HeadEndConfig config)
     {
         if (string.IsNullOrWhiteSpace(config.Status.Bind))
@@ -439,7 +492,7 @@ public static partial class Program
 
     internal static Dictionary<string, string?> ParseArguments(string[] args, out string? error)
     {
-        string[] withValue = ["--config", "--wav", "--date", "--time", "--bulletins", "--rate"];
+        string[] withValue = ["--config", "--wav", "--date", "--time", "--bulletins", "--rate", "--sign-list", "--key", "--out"];
         string[] flags = ["--plan", "--check-config", "--run-now", "--version", "--help"];
         var options = new Dictionary<string, string?>(StringComparer.Ordinal);
         error = null;
@@ -464,6 +517,14 @@ public static partial class Program
                 error = $"unknown argument '{a}'";
                 return options;
             }
+        }
+        if (options.ContainsKey("--sign-list") && !options.ContainsKey("--key"))
+        {
+            error = "--sign-list needs --key, the station list key";
+        }
+        if ((options.ContainsKey("--key") || options.ContainsKey("--out")) && !options.ContainsKey("--sign-list"))
+        {
+            error = "--key and --out go with --sign-list";
         }
         if (options.ContainsKey("--rate") && !options.ContainsKey("--wav"))
         {

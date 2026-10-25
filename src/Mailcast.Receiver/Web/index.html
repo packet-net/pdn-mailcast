@@ -1142,6 +1142,7 @@ function schedule(s) {
     : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
     <dt>Slots</dt><dd>${esc(c.words)}${c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
+    <dt>Stations</dt><dd>${s.stations ? `From the signed station list (serial ${esc(String(s.stations.serial))}): ${s.stations.stations.map(t => esc(t.words)).join("; ")}.` : "GB7RDG only: no signed station list heard yet."}</dd>
     <dt>Today</dt><dd>${c.today.length ? `${c.daylight ? "in daylight, " : ""}${c.today.join(", ")} UTC` : "no slots today"}</dd>
     <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
   if (web) {

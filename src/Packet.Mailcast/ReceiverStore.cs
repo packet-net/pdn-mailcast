@@ -73,6 +73,14 @@ public enum FrameOutcome
     /// delivered, until a directory that is signed by a trusted key, or not signed, lists it.
     /// </summary>
     Withheld,
+
+    /// <summary>
+    /// The symbol completed a station list (content type 5). <see cref="AcceptResult.StationList"/>
+    /// is the list and <see cref="AcceptResult.Check"/> its signature check; it is now
+    /// <see cref="ReceiverStore.Stations"/> only when it checks and its serial is higher than the
+    /// one held (<see cref="AcceptResult.Detail"/> says why not otherwise). Never for the BBS.
+    /// </summary>
+    CompletedStationList,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>
@@ -128,11 +136,12 @@ public sealed class MailParts
 /// stopped sending, newly marked so (see <see cref="ReceiverStore.NoLongerSentRetention"/>); null if none.
 /// </param>
 /// <param name="Check">What the signature check of the directory found, for a directory completed, repeated or rejected.</param>
+/// <param name="StationList">The station list the frame completed, for <see cref="FrameOutcome.CompletedStationList"/>, whether or not it was taken.</param>
 /// <param name="Released">
 /// Bulletins held back (<see cref="FrameOutcome.Withheld"/>) that this frame's directory
 /// (completed or repeated) lists, now delivered to the outbox; null if none.
 /// </param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null);
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null, StationList? StationList = null);
 
 /// <summary>The directory heard most recently, and what its signature check found.</summary>
 /// <param name="Date">The directory's date.</param>
@@ -231,6 +240,12 @@ public sealed record ReceiverStoreOptions
     /// </summary>
     public IReadOnlyList<TrustedKey> TrustedKeys { get; init; } = TrustedKey.BuiltIn;
 
+    /// <summary>
+    /// The keys a station list must be signed by: <see cref="StationListKey.BuiltIn"/>, which is
+    /// still an empty placeholder, so no list is taken. Tests give throwaway keys.
+    /// </summary>
+    public IReadOnlyList<TrustedKey> ListKeys { get; init; } = StationListKey.BuiltIn;
+
     /// <summary>Where the store says what it threw away and why. Plain ASCII.</summary>
     public Action<string>? Log { get; init; }
 
@@ -257,6 +272,7 @@ public sealed record ReceiverStoreOptions
 /// archive/OOOOOOOOOOOOOOOO.mail                  an acknowledged bulletin and the BBS's answer (see MailArchive)
 /// quarantine/                                    outbox and archive files that could not be read
 /// directory.txt                                  the newest directory heard
+/// stations.txt                                   the newest station list taken, exactly as signed
 /// </code>
 /// <para>
 /// A rebuilt bulletin is returned once, from the <see cref="Accept"/> call whose frame completed
@@ -430,13 +446,14 @@ public sealed class ReceiverStore
                 File.Delete(pskFile);
             }
         }
+        LoadStations();
         var directoryFile = Path.Combine(root, "directory.txt");
         if (File.Exists(directoryFile))
         {
             try
             {
                 var newest = BroadcastDirectory.Parse(File.ReadAllBytes(directoryFile));
-                var check = newest.Check(_options.TrustedKeys);
+                var check = newest.Check(DirectoryKeys);
                 if (check.Usable)
                 {
                     Directory = newest;
@@ -544,6 +561,102 @@ public sealed class ReceiverStore
     /// </summary>
     public IonoReading? Ionosphere { get; private set; }
 
+    /// <summary>Where the newest station list taken is kept, exactly as signed, under the store's folder.</summary>
+    public const string StationsFile = "stations.txt";
+
+    /// <summary>
+    /// The newest station list taken (content type 5): the one with the highest serial whose
+    /// signature checks against <see cref="ReceiverStoreOptions.ListKeys"/>, kept across restarts
+    /// in <see cref="StationsFile"/>; null until one has been taken, when the receiver follows
+    /// GB7RDG alone (<see cref="StationEntry.Gb7rdg"/>).
+    /// </summary>
+    public StationList? Stations { get; private set; }
+
+    /// <summary>
+    /// The keys directories are checked against: <see cref="ReceiverStoreOptions.TrustedKeys"/>,
+    /// then the key of each station in <see cref="Stations"/> that is not already among them.
+    /// </summary>
+    public IReadOnlyList<TrustedKey> DirectoryKeys { get; private set; } = [];
+
+    private void SetStations(StationList? list)
+    {
+        Stations = list;
+        var keys = new List<TrustedKey>(_options.TrustedKeys);
+        foreach (var station in list?.Stations ?? [])
+        {
+            if (!keys.Any(k => k.KeyId == station.Key.KeyId))
+            {
+                keys.Add(station.Key);
+            }
+        }
+        DirectoryKeys = keys;
+    }
+
+    private void LoadStations()
+    {
+        SetStations(null);
+        var file = Path.Combine(_root, StationsFile);
+        if (!File.Exists(file))
+        {
+            return;
+        }
+        try
+        {
+            var list = StationList.Parse(File.ReadAllBytes(file));
+            var check = list.Check(_options.ListKeys);
+            if (check.State == SignatureState.Trusted)
+            {
+                SetStations(list);
+                return;
+            }
+            Log($"{StationsFile} not used: {check.Reason}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
+        {
+            Log($"{StationsFile} unreadable, removed: {e.Message}");
+            TryDelete(file);
+        }
+    }
+
+    /// <summary>Takes a rebuilt station list if it checks and is newer than the one held.</summary>
+    private AcceptResult FinishStationList(Instance instance, byte[] data)
+    {
+        // Marked done either way, so its later frames are ignored.
+        MarkDone(instance);
+        StationList list;
+        try
+        {
+            list = StationList.Parse(data.AsSpan(1));
+        }
+        catch (FormatException e)
+        {
+            string why = $"station list {ObjectId.Format(instance.ObjectId)} not used: it does not parse: {e.Message}";
+            Log(why);
+            return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, Detail: why, ContentType: (byte)ObjectKind.StationList);
+        }
+        var check = list.Check(_options.ListKeys);
+        string? refused = check.State != SignatureState.Trusted ? check.Reason
+            : Stations is { } held && list.Serial < held.Serial ? $"its serial {list.Serial} is older than the list held, serial {held.Serial}"
+            : Stations is { } same && list.Serial == same.Serial && !list.Serialize().AsSpan().SequenceEqual(same.Serialize()) ? $"it has the same serial as the list held, {same.Serial}, but differs from it; the one held is kept"
+            : null;
+        if (refused is not null)
+        {
+            string why = $"station list {ObjectId.Format(instance.ObjectId)} ({list.Describe()}) not used: {refused}";
+            Log(why);
+            return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, Detail: why, ContentType: (byte)ObjectKind.StationList, Check: check, StationList: list);
+        }
+        if (Stations?.Serial != list.Serial)
+        {
+            DurableFile.WriteAtomically(Path.Combine(_root, StationsFile), list.Serialize(), flush: _options.FlushToDisk);
+            SetStations(list);
+        }
+        foreach (var skipped in list.Skipped)
+        {
+            Log($"station list serial {list.Serial}: skipped {skipped}");
+        }
+        return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, ContentType: (byte)ObjectKind.StationList, Check: check, StationList: list);
+    }
+
     /// <summary>Where the newest PSK Reporter reading is kept, as the object that carried it, under the store's folder.</summary>
     public const string PskReporterFile = "pskreporter.bin";
 
@@ -600,7 +713,7 @@ public sealed class ReceiverStore
             try
             {
                 var directory = BroadcastDirectory.Parse(File.ReadAllBytes(file));
-                var check = directory.Check(_options.TrustedKeys);
+                var check = directory.Check(DirectoryKeys);
                 (check.Usable ? _knownDirectories : _rejectedDirectories)[id] = (directory, heardAt, check);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
@@ -1435,6 +1548,10 @@ public sealed class ReceiverStore
             }
             return new AcceptResult(FrameOutcome.CompletedIonosphere, instance.ObjectId, ContentType: type, Ionosphere: reading);
         }
+        if (type == (byte)ObjectKind.StationList && (data[0] & ContentType.MetadataFollows) == 0)
+        {
+            return FinishStationList(instance, data);
+        }
         if (type != (byte)ObjectKind.Bulletin && type != (byte)ObjectKind.Directory)
         {
             // Not for the BBS, whatever it is. Marked done so its later frames are ignored.
@@ -1472,7 +1589,7 @@ public sealed class ReceiverStore
             {
                 return Unusable(instance, "is a directory that does not parse: " + e.Message);
             }
-            var check = directory.Check(_options.TrustedKeys);
+            var check = directory.Check(DirectoryKeys);
             if (!check.Usable)
             {
                 // Once per directory: it is marked done, so its repeats are not rebuilt again.

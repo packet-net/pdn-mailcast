@@ -836,6 +836,8 @@ public sealed class StatusPage : IAsyncDisposable
                 toneLive = liveTone is not null,
             },
             schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
+            // Issue #178: the signed station list held, or null while it follows GB7RDG alone.
+            stations = StationsView(_host.Intake.Stations),
             // Issue #53: the "Listen now" button, for a web SDR only.
             listenNow = ListenNowView(_host, config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
@@ -1153,6 +1155,24 @@ public sealed class StatusPage : IAsyncDisposable
     };
 
     /// <summary>When the slots are, for the page, as the config file gives them.</summary>
+    /// <summary>The station list held, for the page: null when none has been taken.</summary>
+    internal static object? StationsView(Packet.Mailcast.StationList? list) => list is null ? null : new
+    {
+        serial = list.Serial,
+        words = list.Describe(),
+        stations = list.Stations.Select(st => new
+        {
+            callsign = st.Callsign,
+            locator = st.Locator,
+            frequencyHz = st.FrequencyHz,
+            sideband = st.Sideband == Packet.Mailcast.Sideband.Usb ? "usb" : "lsb",
+            slots = SlotSchedule.From(st.Timetable).Describe(),
+            modes = st.Modes,
+            keyId = Packet.Mailcast.KeyId.Format(st.Key.KeyId),
+            words = st.Describe(),
+        }),
+    };
+
     internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
 
     /// <summary>

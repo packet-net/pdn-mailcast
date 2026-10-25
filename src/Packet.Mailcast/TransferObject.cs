@@ -24,6 +24,13 @@ public enum ObjectKind : byte
     /// <see cref="Propagation.IonoRecord"/>). Observe only, never for the BBS.
     /// </summary>
     Propagation = 4,
+
+    /// <summary>
+    /// The signed list of transmitters (<see cref="Mailcast.StationList"/>): its text as signed,
+    /// not compressed and sent with dictionary 0, so that every head end carrying the same signed
+    /// list sends the same object and their pieces combine. Never for the BBS.
+    /// </summary>
+    StationList = 5,
 }
 
 /// <summary>
@@ -60,6 +67,7 @@ public static class ContentType
         (byte)ObjectKind.Directory => "directory",
         (byte)ObjectKind.DappsMessage => "DAPPS message",
         (byte)ObjectKind.Propagation => "propagation reading",
+        (byte)ObjectKind.StationList => "station list",
         >= FirstExperimental and <= LastExperimental => $"experimental content type {type}",
         _ => $"unassigned content type {type}",
     };
@@ -200,6 +208,25 @@ public sealed class TransferObject
         return new TransferObject(bytes, Compression.NoDictionary, new ObjectTransmissionInformation(bytes.Length, symbolSize, 1, 1, alignment));
     }
 
+    /// <summary>
+    /// The signed station list as an object: the type octet and the list's octets as signed, not
+    /// compressed, with dictionary 0, so the object depends on nothing but the signed list. A list
+    /// that fits in <paramref name="symbolSize"/> goes as one symbol of its own length rounded up
+    /// to <paramref name="alignment"/>, so that any one frame rebuilds it; a longer one is cut
+    /// into symbols of <paramref name="symbolSize"/>.
+    /// </summary>
+    public static TransferObject ForStationList(StationList list, int symbolSize = MailcastFrame.StandardSymbolSize, int alignment = MailcastFrame.StandardAlignment)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        byte[] serialized = list.Serialize();
+        var bytes = new byte[1 + serialized.Length];
+        bytes[0] = (byte)ObjectKind.StationList;
+        serialized.CopyTo(bytes, 1);
+        int aligned = (bytes.Length + alignment - 1) / alignment * alignment;
+        int size = Math.Min(aligned, symbolSize);
+        return new TransferObject(bytes, Compression.NoDictionary, new ObjectTransmissionInformation(bytes.Length, size, 1, 1, alignment));
+    }
+
     /// <summary>An object kept from an earlier day, exactly as it was first prepared.</summary>
     public static TransferObject FromStored(ReadOnlySpan<byte> bytes, ushort dictionaryId, ObjectTransmissionInformation oti) =>
         new(bytes.ToArray(), dictionaryId, oti);
@@ -238,9 +265,9 @@ public sealed class TransferObject
         {
             throw new InvalidDataException("Not a mailcast object.");
         }
-        if (type == (byte)ObjectKind.Propagation)
+        if (type is (byte)ObjectKind.Propagation or (byte)ObjectKind.StationList)
         {
-            return (ObjectKind.Propagation, content.ToArray()); // a record, not compressed
+            return ((ObjectKind)type, content.ToArray()); // a record or a signed list, not compressed
         }
         return ((ObjectKind)type, compression.Decompress(content, dictionaryId));
     }

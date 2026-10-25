@@ -17,7 +17,8 @@ namespace Mailcast.HeadEnd.Planning;
 /// <param name="PskReporter">The PSK Reporter reading as the slot was planned; null when the head end takes none.</param>
 /// <param name="PskReporterFrames">How many of <paramref name="Frames"/> carry it (content type 4, source 3).</param>
 /// <param name="LeftoverInRotation">How many of <paramref name="BulletinsInRotation"/> are in the budget rule's leftover tier (<see cref="BroadcastScheduler.Leftover"/>).</param>
-public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0)
+/// <param name="StationListFrames">How many of <paramref name="Frames"/> carry the signed station list (content type 5).</param>
+public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0, int StationListFrames = 0)
 {
     /// <summary>A plan with nothing in it.</summary>
     public static SlotPlan Empty(DateTimeOffset slot) => new(slot, [], 0, null);
@@ -74,12 +75,19 @@ public interface ISlotPlanner
 /// <see cref="PskReporterFrames"/> more frames. When the two readings together would leave no
 /// room for any bulletin frame, this one is dropped first.
 /// </param>
+/// <param name="stationList">
+/// The signed station list this head end carries (<see cref="Program.StationListPath"/>), or null
+/// to send none. A slot that keys anyway carries <see cref="StationListFramesFor"/> fresh pieces
+/// of it, inside the airtime budget and ahead of the readings; it never makes a slot key.
+/// </param>
 /// <param name="reports">
 /// The listeners' daily reports that reached the head end (<see cref="ReportLog"/>); the
 /// directory lists the recent ones. Null lists none, and the directory says nothing about them.
 /// </param>
-public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null, ReportLog? reports = null) : ISlotPlanner
+public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null, ReportLog? reports = null, StationList? stationList = null) : ISlotPlanner
 {
+    private readonly TransferObject? _stationList = stationList is null ? null : TransferObject.ForStationList(stationList);
+
     /// <summary>Frames of the reading in each slot, either of which rebuilds it alone.</summary>
     public const int IonosphereFrames = 2;
 
@@ -99,14 +107,18 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         PskReading? spots = Spots();
         IReadOnlyList<MailcastFrame> ionoFrames = Sendable(reading) ? ReadingFrames(reading!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
-        IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
+        IReadOnlyList<MailcastFrame> listFrames = _stationList is null ? [] : StationListFrames(_stationList, store.NextEsi);
         ReportReceipts? listed = reports?.For(DateOnly.FromDateTime(slot.UtcDateTime));
-        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras, listed);
-        if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
+        // In order of what stays longest when they would crowd out every bulletin frame: the
+        // station list, then the ionosonde's reading, then PSK Reporter's. The scheduler drops
+        // every extra when with them no bulletin frame fits, so the last is dropped and the slot
+        // planned again, until what is left fits or only one is left.
+        var groups = new List<IReadOnlyList<MailcastFrame>> { listFrames, ionoFrames, spotFrames }.Where(g => g.Count > 0).ToList();
+        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, [.. groups.SelectMany(g => g)], listed);
+        while (broadcast.ExtraFrames == 0 && groups.Count > 1)
         {
-            // Both readings would crowd out every bulletin frame: PSK Reporter's go first, and the
-            // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
-            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames, listed);
+            groups.RemoveAt(groups.Count - 1);
+            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, [.. groups.SelectMany(g => g)], listed);
         }
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
@@ -114,7 +126,7 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
         bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins);
+        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins, Carried(listFrames) ? listFrames.Count : 0);
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>
@@ -137,6 +149,33 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
     /// <summary>The PSK Reporter reading's frames, the same way as the ionosonde's: <see cref="PskReporterFrames"/> fresh ESIs, each one that rebuilds the object on its own.</summary>
     public static IReadOnlyList<MailcastFrame> ReadingFrames(PskReading reading, Func<ulong, uint>? nextEsi = null) =>
         RecordFrames(PskRecord.ToTransferObject(reading), PskReporterFrames, nextEsi);
+
+    /// <summary>
+    /// How many pieces of the station list each slot carries: K + 1, so 2 for a list that fits one
+    /// symbol (either of which rebuilds it), and one more than the fewest that rebuild a longer one.
+    /// </summary>
+    public static int StationListFramesFor(TransferObject list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        return list.SourceSymbols + 1;
+    }
+
+    /// <summary>
+    /// The station list's frames for a slot: <see cref="StationListFramesFor"/> fresh ESIs from
+    /// where the object last got to (<paramref name="nextEsi"/>; 0 at first). A one-symbol list
+    /// takes only ESIs whose frame rebuilds it alone, like a reading.
+    /// </summary>
+    public static IReadOnlyList<MailcastFrame> StationListFrames(TransferObject list, Func<ulong, uint>? nextEsi = null)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        int count = StationListFramesFor(list);
+        if (list.SourceSymbols == 1)
+        {
+            return RecordFrames(list, count, nextEsi);
+        }
+        uint first = nextEsi?.Invoke(list.ObjectId) ?? 0;
+        return [.. Enumerable.Range(0, count).Select(i => list.Frame(first + (uint)i))];
+    }
 
     private static List<MailcastFrame> RecordFrames(TransferObject transfer, int count, Func<ulong, uint>? nextEsi)
     {
