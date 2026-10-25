@@ -8,13 +8,15 @@ using Mailcast.HeadEnd.Station;
 namespace Mailcast.HeadEnd;
 
 /// <summary>
-/// The head end's configuration, <c>/etc/pdn-mailcast-headend/headend.json</c>. Every key but the
-/// station's API key has a default; see <c>packaging/headend/headend.example.json</c>.
+/// The head end's configuration, <c>/etc/pdn-mailcast-headend/headend.json</c>. Every key has a
+/// default except those that name the station: <c>callsign</c>, the station's API key, the
+/// daylight locator when <c>slot.daylight</c> is given, and the BBS logins when the head end has
+/// any; see <c>packaging/headend/headend.example.json</c>.
 /// </summary>
 public sealed record HeadEndConfig
 {
-    /// <summary>The AX.25 source of every frame.</summary>
-    public string Callsign { get; init; } = "GB7RDG";
+    /// <summary>The AX.25 source of every frame: the station's callsign. Required.</summary>
+    public string Callsign { get; init; } = "";
 
     /// <summary>The AX.25 destination of every frame.</summary>
     public string Destination { get; init; } = "MCAST";
@@ -223,7 +225,7 @@ public sealed record HeadEndConfig
     public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>When the slots are.</summary>
-    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToRule());
+    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings().ToRule());
 
     /// <summary>The timetable, or null while validation still has something to say about it.</summary>
     private SlotTimetable? TimetableIfValid()
@@ -244,14 +246,18 @@ public sealed record HeadEndConfig
     }
 
     /// <summary>When the slots are, as the directory carries them.</summary>
-    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToRule());
+    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToSettings().ToRule());
 
     private const int MinutesPerDay = 1440;
 
     private void Validate(string source)
     {
         var problems = new List<string>();
-        if (!Ax25Ui.IsValidAddress(Callsign))
+        if (string.IsNullOrWhiteSpace(Callsign))
+        {
+            problems.Add("\"callsign\" is required: the station's callsign, which every frame is sent from");
+        }
+        else if (!Ax25Ui.IsValidAddress(Callsign))
         {
             problems.Add($"\"callsign\": '{Callsign}' is not an AX.25 callsign");
         }
@@ -284,8 +290,13 @@ public sealed record HeadEndConfig
             }
         }
         bool daylightFine = true;
-        if (Slot.Daylight is { } daylight && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
-            && daylight.Problem(everyFine ? Slot.EveryMinutes : 0, anchor) is { } daylightProblem)
+        if (Slot.Daylight is { } given && string.IsNullOrWhiteSpace(given.Locator))
+        {
+            problems.Add("\"slot\".\"daylight\".\"locator\" is required: the station's Maidenhead locator, such as IO91lk, where sunrise and sunset are worked out");
+            daylightFine = false;
+        }
+        else if (Slot.Daylight is { } daylight && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
+            && daylight.ToSettings().Problem(everyFine ? Slot.EveryMinutes : 0, anchor) is { } daylightProblem)
         {
             problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
             daylightFine = false;
@@ -366,7 +377,15 @@ public sealed record HeadEndConfig
             {
                 problems.Add("\"intake\".\"fbb\" needs a \"host\" and a \"port\"");
             }
-            if (!Ax25Ui.IsValidAddress(fbb.PartnerCallsign))
+            if (string.IsNullOrWhiteSpace(fbb.User))
+            {
+                problems.Add("\"intake\".\"fbb\".\"user\" is required: the login the BBS knows the head end by as a forwarding partner, such as Q0HEAD");
+            }
+            if (string.IsNullOrWhiteSpace(fbb.PartnerCallsign))
+            {
+                problems.Add("\"intake\".\"fbb\".\"partnerCallsign\" is required: the callsign the head end gives the BBS as a forwarding partner, usually the same as \"user\"");
+            }
+            else if (!Ax25Ui.IsValidAddress(fbb.PartnerCallsign))
             {
                 problems.Add($"\"intake\".\"fbb\".\"partnerCallsign\": '{fbb.PartnerCallsign}' is not a callsign");
             }
@@ -383,7 +402,7 @@ public sealed record HeadEndConfig
             }
             if (string.IsNullOrWhiteSpace(reports.User))
             {
-                problems.Add("\"intake\".\"reports\" needs a \"user\"");
+                problems.Add("\"intake\".\"reports\".\"user\" is required: the BBS login the head end lists the listeners' reports as, an ordinary reader such as Q0CAST");
             }
         }
         Ionosphere.Validate(problems);
@@ -558,11 +577,11 @@ public sealed record SlotConfig
 
     /// <summary>
     /// Send only in daylight: a slot runs only if it starts between
-    /// <see cref="DaylightSettings.AfterSunriseMinutes"/> after sunrise and
-    /// <see cref="DaylightSettings.BeforeSunsetMinutes"/> before sunset at the locator. Left out,
+    /// <see cref="HeadEndDaylight.AfterSunriseMinutes"/> after sunrise and
+    /// <see cref="HeadEndDaylight.BeforeSunsetMinutes"/> before sunset at the locator. Left out,
     /// every slot runs. A slot on demand (<c>--run-now</c>) runs whatever the time.
     /// </summary>
-    public DaylightSettings? Daylight { get; init; }
+    public HeadEndDaylight? Daylight { get; init; }
 
     /// <summary>Key nothing until the kernel says the clock is synchronised.</summary>
     public bool RequireClockSync { get; init; } = true;
@@ -764,10 +783,29 @@ public sealed record ReportsReaderConfig
     /// <summary>The login, as for <see cref="FbbIntakeConfig.Login"/>. The default is LinBPQ's FBBPORT: user, password, <c>BBS</c>.</summary>
     public IReadOnlyList<LoginStep> Login { get; init; } = FbbIntakeConfig.LinBpqFbbPort;
 
-    /// <summary>The user to log in as. LinBPQ logins are case-sensitive: it must match the USER= line exactly.</summary>
-    public string User { get; init; } = "Q0CAST";
+    /// <summary>The user to log in as. Required. LinBPQ logins are case-sensitive: it must match the USER= line exactly.</summary>
+    public string User { get; init; } = "";
 
     public string Password { get; init; } = "";
+}
+
+/// <summary>
+/// The daylight settings as the head end takes them: as <see cref="DaylightSettings"/>, but the
+/// locator has no default, since it is the station's own.
+/// </summary>
+public sealed record HeadEndDaylight
+{
+    /// <summary>Where the sun is reckoned, a 4 or 6 character Maidenhead locator. Required.</summary>
+    public string Locator { get; init; } = "";
+
+    /// <summary>The first slot may start this long after sunrise.</summary>
+    public int AfterSunriseMinutes { get; init; } = 120;
+
+    /// <summary>The last slot may start this long before sunset.</summary>
+    public int BeforeSunsetMinutes { get; init; } = 30;
+
+    /// <summary>As Packet.Mailcast takes them.</summary>
+    public DaylightSettings ToSettings() => new() { Locator = Locator, AfterSunriseMinutes = AfterSunriseMinutes, BeforeSunsetMinutes = BeforeSunsetMinutes };
 }
 
 /// <summary>One step of logging in to the BBS: wait for some text, then send a line.</summary>
@@ -783,8 +821,9 @@ public sealed record FbbIntakeConfig
     /// <summary>
     /// The callsign the head end is known by as a forwarding partner. A Q callsign is never issued,
     /// so it cannot clash with a station, and FBB-style BBSs only take logins shaped like a callsign.
+    /// Required; Q0HEAD is the usual choice.
     /// </summary>
-    public string PartnerCallsign { get; init; } = "Q0HEAD";
+    public string PartnerCallsign { get; init; } = "";
 
     /// <summary>
     /// The login, in order: wait for <see cref="LoginStep.Expect"/> (when given), then send the line.
@@ -801,7 +840,8 @@ public sealed record FbbIntakeConfig
     /// <summary>pdn-bbs's fbbTcp listener: it asks for the callsign and nothing else.</summary>
     public static IReadOnlyList<LoginStep> PdnBbsFbbTcp { get; } = [new("Callsign :", "{call}")];
 
-    public string User { get; init; } = "Q0HEAD";
+    /// <summary>The user to log in as, usually the same as <see cref="PartnerCallsign"/>. Required.</summary>
+    public string User { get; init; } = "";
 
     public string Password { get; init; } = "";
 

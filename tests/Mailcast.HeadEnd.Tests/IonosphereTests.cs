@@ -20,6 +20,7 @@ public class IonosphereTests
 
     private static readonly HeadEndConfig Config = HeadEndConfig.Parse("""
         {
+          "callsign": "M0LTE",
           "station": { "apiKey": "k", "mode": "ms110d-wn4", "maxBurstSeconds": 18 },
           "slot": { "timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120 },
           "schedule": { "symbolSize": 240 }
@@ -273,18 +274,18 @@ public class IonosphereTests
         var settings = Config.Ionosphere.ToSettings();
         Assert.Equal((7.1, 0.85, TimeSpan.FromMinutes(45)), (settings.OpenMhz, settings.ReliableFactor, settings.StaleAfter));
         Assert.Equal(["FF051", "RL052", "DB049"], settings.Stations);
-        var custom = HeadEndConfig.Parse("""{ "station": { "apiKey": "k" }, "ionosphere": { "openMhz": 7.2, "stations": ["ff051"] } }""");
+        var custom = HeadEndConfig.Parse("""{ "callsign": "M0LTE", "station": { "apiKey": "k" }, "ionosphere": { "openMhz": 7.2, "stations": ["ff051"] } }""");
         Assert.Equal(["FF051"], custom.Ionosphere.ToSettings().Stations);
-        Assert.Empty(HeadEndConfig.Parse("""{ "station": { "apiKey": "k" }, "ionosphere": { "stations": [] } }""").Ionosphere.Stations);
-        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{ "station": { "apiKey": "k" }, "ionosphere": { "openMhz": 0, "reliableFactor": 1.5, "staleMinutes": -1, "stations": ["Chilton"] } }"""));
+        Assert.Empty(HeadEndConfig.Parse("""{ "callsign": "M0LTE", "station": { "apiKey": "k" }, "ionosphere": { "stations": [] } }""").Ionosphere.Stations);
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{ "callsign": "M0LTE", "station": { "apiKey": "k" }, "ionosphere": { "openMhz": 0, "reliableFactor": 1.5, "staleMinutes": -1, "stations": ["Chilton"] } }"""));
         Assert.Contains("\"openMhz\"", e.Message, StringComparison.Ordinal);
         Assert.Contains("\"reliableFactor\"", e.Message, StringComparison.Ordinal);
         Assert.Contains("\"staleMinutes\"", e.Message, StringComparison.Ordinal);
         Assert.Contains("\"stations\"", e.Message, StringComparison.Ordinal);
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{ "station": { "apiKey": "k" }, "ionosphere": { "pollMinutes": 5 } }"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{ "callsign": "M0LTE", "station": { "apiKey": "k" }, "ionosphere": { "pollMinutes": 5 } }"""));
 
         string example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "headend.example.json"));
-        var fromExample = HeadEndConfig.Parse(example.Replace("\"apiKey\": \"\"", "\"apiKey\": \"k\"", StringComparison.Ordinal));
+        var fromExample = HeadEndConfig.Parse(ExampleConfig.Filled(example));
         Assert.Equal(new IonosphereConfig().Stations, fromExample.Ionosphere.Stations);
     }
 

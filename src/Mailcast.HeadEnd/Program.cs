@@ -26,7 +26,7 @@ public static partial class Program
     public const string SigningKeyPath = "/etc/pdn-mailcast-headend/signing-key.pem";
 
     private const string Usage = """
-        pdn-mailcast-headend: the GB7RDG mailcast head end.
+        pdn-mailcast-headend: a mailcast head end, which sends a BBS's bulletins on the air.
 
           pdn-mailcast-headend [--config FILE]
               Runs the service: takes bulletins in, and sends them in each slot.

@@ -21,6 +21,7 @@ public class PskReporterTests
 
     private static readonly HeadEndConfig Config = HeadEndConfig.Parse("""
         {
+          "callsign": "M0LTE",
           "station": { "apiKey": "k", "mode": "ms110d-wn4", "maxBurstSeconds": 18 },
           "slot": { "timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120 },
           "schedule": { "symbolSize": 240 }
@@ -225,14 +226,14 @@ public class PskReporterTests
     {
         Assert.True(Config.PskReporter.Enabled);
         Assert.Equal(("mqtt.pskreporter.info", 1883), (Config.PskReporter.Host, Config.PskReporter.Port));
-        var off = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "pskReporter": {"enabled": false}}""");
+        var off = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "pskReporter": {"enabled": false}}""");
         Assert.False(off.PskReporter.Enabled);
-        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "pskReporter": {"port": 0, "host": ""}}"""));
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "pskReporter": {"port": 0, "host": ""}}"""));
         Assert.Contains("\"pskReporter\".\"port\"", e.Message, StringComparison.Ordinal);
         Assert.Contains("\"pskReporter\".\"host\"", e.Message, StringComparison.Ordinal);
 
         string example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "headend.example.json"));
-        var fromExample = HeadEndConfig.Parse(example.Replace("\"apiKey\": \"\"", "\"apiKey\": \"k\"", StringComparison.Ordinal));
+        var fromExample = HeadEndConfig.Parse(ExampleConfig.Filled(example));
         Assert.Equal(new PskReporterConfig(), fromExample.PskReporter);
     }
 }

@@ -35,3 +35,12 @@ public static class Bulletins
         return Bulletin.FromMessageText(type, "G4ABC", "ALL", "WW", bid, $"Bulletin {seed}", new DateTimeOffset(2026, 10, 4, 10, 0, 0, TimeSpan.Zero), routing + body);
     }
 }
+
+/// <summary>The example configuration with what it leaves empty for the operator filled in.</summary>
+public static class ExampleConfig
+{
+    public static string Filled(string example) => example
+        .Replace("\"apiKey\": \"\"", "\"apiKey\": \"k\"", StringComparison.Ordinal)
+        .Replace("\"callsign\": \"\"", "\"callsign\": \"M0LTE\"", StringComparison.Ordinal)
+        .Replace("\"locator\": \"\"", "\"locator\": \"IO91lk\"", StringComparison.Ordinal);
+}

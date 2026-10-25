@@ -16,7 +16,7 @@ case "$1" in
         install -o root -g pdn-mailcast-headend -m 0640 "$EXAMPLE" "$CONFIG"
         echo "pdn-mailcast-headend: put an example config in $CONFIG."
         echo "  Set up the station and the BBS (see /usr/share/doc/pdn-mailcast-headend/headend.md),"
-        echo "  put the station's API key and the BBS password in $CONFIG, then:"
+        echo "  put your callsign, locator, the station's API key and the BBS password in $CONFIG, then:"
         echo "  systemctl start pdn-mailcast-headend"
     fi
     ;;

@@ -61,6 +61,7 @@ public class HardStopTests
         // GB7RDG's settings, a busy store, and a slot planned 5 minutes late.
         var config = HeadEndConfig.Parse("""
             {
+              "callsign": "M0LTE",
               "station": { "apiKey": "k", "mode": "ms110d-wn4", "maxBurstSeconds": 18 },
               "slot": { "timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120 },
               "schedule": { "symbolSize": 240 }

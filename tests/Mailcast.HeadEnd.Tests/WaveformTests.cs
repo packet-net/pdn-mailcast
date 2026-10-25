@@ -66,24 +66,24 @@ public class WaveformTests
     [Fact]
     public void Config_ModesDefaultToTheStationsOwn_AndAreChecked()
     {
-        var plain = HeadEndConfig.Parse("""{"station": {"apiKey": "k", "mode": "ms110d-wn4"}, "slot": {"everyMinutes": 60}}""");
+        var plain = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "ms110d-wn4"}, "slot": {"everyMinutes": 60}}""");
         Assert.Equal(["ms110d-wn4"], plain.Modes);
         Assert.False(plain.ToWaveforms(_ => new LinearAirtime(TimeSpan.Zero, TimeSpan.Zero, 0.01)).SetOnModem);
 
-        var both = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"modes": ["ms110d-wn4", "ms110d-wn3"]}}""");
+        var both = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"modes": ["ms110d-wn4", "ms110d-wn3"]}}""");
         Assert.Equal(["ms110d-wn4", "ms110d-wn3"], both.Modes);
         Assert.True(both.ToWaveforms(_ => new LinearAirtime(TimeSpan.Zero, TimeSpan.Zero, 0.01)).SetOnModem);
 
-        var bad = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "schedule": {"modes": ["ms110d-wn4", "vara"]}}"""));
+        var bad = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"modes": ["ms110d-wn4", "vara"]}}"""));
         Assert.Contains("'vara' is not an MS110D waveform", bad.Message, StringComparison.Ordinal);
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "schedule": {"modes": []}}"""));
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k", "mode": "afsk1200"}, "schedule": {"modes": ["ms110d-wn4"]}}"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"modes": []}}"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "afsk1200"}, "schedule": {"modes": ["ms110d-wn4"]}}"""));
     }
 
     [Fact]
     public void Config_HourlyFillsToBudget_TheSharesRuleStaysAvailable()
     {
-        var hourly = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}}""");
+        var hourly = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}}""");
         Assert.Equal(ScheduleRule.Budget, hourly.Rule);
         var rule = hourly.ToScheduleOptions().Budget!;
         Assert.Equal(0.6, rule.SlotCap);
@@ -95,23 +95,23 @@ public class WaveformTests
         // A slot that starts late fills less, so it ends when an on-time one would.
         Assert.Equal(TimeSpan.FromMinutes(5) - TimeSpan.FromSeconds(131), hourly.FillLimitAfter(TimeSpan.FromMinutes(5)));
         // Without a tone there is no clear-channel wait, but the carrier wait is still kept back.
-        Assert.Equal(TimeSpan.FromSeconds(11), HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60, "toneSeconds": 0}}""").Margin);
+        Assert.Equal(TimeSpan.FromSeconds(11), HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60, "toneSeconds": 0}}""").Margin);
 
-        var tuned = HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"budgetMinutes": 6, "slotCap": 0.5, "retireCoverage": 4, "retireHours": 24}}""");
+        var tuned = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"budgetMinutes": 6, "slotCap": 0.5, "retireCoverage": 4, "retireHours": 24}}""");
         Assert.Equal(TimeSpan.FromMinutes(6), tuned.FillLimit);
         Assert.Equal(new BudgetRule { SlotCap = 0.5, RetireCoverage = 4, RetireAfter = TimeSpan.FromHours(24) }, tuned.ToScheduleOptions().Budget);
-        Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(41), HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 30}}""").FillLimit);
+        Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(41), HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 30}}""").FillLimit);
 
         // The rule before, by name or by its keys, and a daily station by default.
-        Assert.Null(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "shares"}}""").ToScheduleOptions().Budget);
-        Assert.Null(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"slotShares": [1.5, 0.5]}}""").ToScheduleOptions().Budget);
-        Assert.Null(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}}""").ToScheduleOptions().Budget);
-        Assert.NotNull(HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "schedule": {"rule": "budget"}}""").ToScheduleOptions().Budget);
+        Assert.Null(HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "shares"}}""").ToScheduleOptions().Budget);
+        Assert.Null(HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"slotShares": [1.5, 0.5]}}""").ToScheduleOptions().Budget);
+        Assert.Null(HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}}""").ToScheduleOptions().Budget);
+        Assert.NotNull(HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"rule": "budget"}}""").ToScheduleOptions().Budget);
 
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "budget", "slotShares": [1.5]}}"""));
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "shares", "budgetMinutes": 5}}"""));
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"slotCap": 0}}"""));
-        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 600}}"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "budget", "slotShares": [1.5]}}"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"rule": "shares", "budgetMinutes": 5}}"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"slotCap": 0}}"""));
+        Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 600}}"""));
     }
 
     private sealed class Rig
@@ -289,7 +289,7 @@ public class WaveformTests
     public void Plan_TheDirectoryNamesTheSlotsWaveform()
     {
         using var state = new TempDirectory();
-        var config = HeadEndConfig.Parse("""{"station": {"apiKey": "k", "maxBurstSeconds": 18}, "slot": {"timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10}, "schedule": {"symbolSize": 240, "modes": ["ms110d-wn4", "ms110d-wn3"]}}""");
+        var config = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "maxBurstSeconds": 18}, "slot": {"timeUtc": "00:00", "everyMinutes": 60, "maxMinutes": 10}, "schedule": {"symbolSize": 240, "modes": ["ms110d-wn4", "ms110d-wn3"]}}""");
         var options = config.ToScheduleOptions();
         var store = new RotationStore(state.Path, Compression.Default, options, new MemoryJournal());
         store.Offer(Bulletins.Make(71, 3000), new DateOnly(2026, 10, 6));
