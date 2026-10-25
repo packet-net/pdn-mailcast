@@ -559,7 +559,7 @@ public class ServiceTests
 
     private static Head HalfPastHead(TempDirectory dir, DateTimeOffset start) =>
         new(dir, start, HalfPast, ScheduleOptions.HourlyDaylight with { Timetable = HalfPast.Timetable },
-            new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
+            new SlotSettings { Callsign = "M0LTE", SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
             catchUp: TimeSpan.FromMinutes(5));
 
     [Fact]

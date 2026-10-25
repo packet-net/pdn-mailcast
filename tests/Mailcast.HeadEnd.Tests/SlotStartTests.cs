@@ -13,7 +13,7 @@ namespace Mailcast.HeadEnd.Tests;
 public class SlotStartTests
 {
     private static HeadEndConfig Parse(string slot, string schedule = "{}") =>
-        HeadEndConfig.Parse($$"""{"station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
+        HeadEndConfig.Parse($$"""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {{slot}}, "schedule": {{schedule}}}""");
 
     private const string HalfPastInDaylight = """{"timeUtc": "00:30", "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""";
 
