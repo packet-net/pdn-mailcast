@@ -620,6 +620,9 @@ public sealed class ReceiverStore
         }
     }
 
+    /// <summary>Station lists refused for their signature in this run: their later frames are ignored, but never recorded as done.</summary>
+    private readonly HashSet<ulong> _refusedLists = [];
+
     private void LoadStations()
     {
         SetStations(null);
@@ -649,8 +652,6 @@ public sealed class ReceiverStore
     /// <summary>Takes a rebuilt station list if it checks and is newer than the one held.</summary>
     private AcceptResult FinishStationList(Instance instance, byte[] data)
     {
-        // Marked done either way, so its later frames are ignored.
-        MarkDone(instance);
         StationList list;
         try
         {
@@ -660,6 +661,7 @@ public sealed class ReceiverStore
         {
             string why = $"station list {ObjectId.Format(instance.ObjectId)} not used: it does not parse: {e.Message}";
             Log(why);
+            MarkDone(instance);
             return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, Detail: why, ContentType: (byte)ObjectKind.StationList);
         }
         var check = list.Check(_options.ListKeys);
@@ -671,8 +673,21 @@ public sealed class ReceiverStore
         {
             string why = $"station list {ObjectId.Format(instance.ObjectId)} ({list.Describe()}) not used: {refused}";
             Log(why);
+            if (check.State == SignatureState.Trusted)
+            {
+                MarkDone(instance); // older, or a twin of the one held: never wanted
+            }
+            else
+            {
+                // Refused for its signature, perhaps only because this build lacks the list key:
+                // remembered for this run only, never in done/, so a receiver upgraded to a build
+                // with the key takes the same list the next time it hears it.
+                Remove(instance);
+                _refusedLists.Add(instance.ObjectId);
+            }
             return new AcceptResult(FrameOutcome.CompletedStationList, instance.ObjectId, Detail: why, ContentType: (byte)ObjectKind.StationList, Check: check, StationList: list);
         }
+        MarkDone(instance);
         List<Bulletin>? released = null;
         if (Stations?.Serial != list.Serial)
         {
@@ -853,6 +868,10 @@ public sealed class ReceiverStore
                 RememberDirectory(frame.ObjectId, rejected.Directory, rejected.Check);
             }
             return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId, Directory: repeated, NoLongerSent: stopped, Check: check, Released: released);
+        }
+        if (_refusedLists.Contains(frame.ObjectId))
+        {
+            return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId);
         }
         if (!_compression.Knows(frame.DictionaryId))
         {

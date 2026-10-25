@@ -182,6 +182,12 @@ public class StationListTests
         Assert.Contains("no station list key is built in yet", result.Detail, StringComparison.Ordinal);
         Assert.Null(store.Stations);
         Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(TransferObject.ForStationList(Signed(1)).Frame(1).ToBytes()).Outcome);
+
+        // Not recorded as done: the same receiver, upgraded to a build with the key, takes the
+        // same list the next time it hears it.
+        var upgraded = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { ListKeys = [ListKey] });
+        Assert.Equal(FrameOutcome.CompletedStationList, upgraded.Accept(TransferObject.ForStationList(Signed(1)).Frame(2).ToBytes()).Outcome);
+        Assert.Equal(1, upgraded.Stations!.Serial);
     }
 
     [Fact]

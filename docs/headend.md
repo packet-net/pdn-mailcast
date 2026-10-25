@@ -365,7 +365,7 @@ station list: sends /etc/pdn-mailcast-headend/station-list.txt, serial 202610250
 station list: none at /etc/pdn-mailcast-headend/station-list.txt, so none is sent
 ```
 
-A list that cannot be read, or whose signature does not check against the built-in list key, is not sent, and the line says why. Every head end can send the same signed file unchanged.
+A list that cannot be read, or whose signature does not check against the built-in list key, is not sent, and the line says why. Every head end can send the same signed file unchanged. Receivers from before the release that builds the real list key in mark any list they hear as done, and ignore that same list for up to 14 days after upgrading, so once that release has had time to spread, sign and send a list with a fresh serial.
 
 ## Offline
 

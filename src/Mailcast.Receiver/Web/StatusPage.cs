@@ -1154,7 +1154,6 @@ public sealed class StatusPage : IAsyncDisposable
         _ => "starting",
     };
 
-    /// <summary>When the slots are, for the page, as the config file gives them.</summary>
     /// <summary>The station list held, for the page: null when none has been taken.</summary>
     internal static object? StationsView(Packet.Mailcast.StationList? list) => list is null ? null : new
     {
@@ -1173,6 +1172,7 @@ public sealed class StatusPage : IAsyncDisposable
         }),
     };
 
+    /// <summary>When the slots are, for the page, as the config file gives them.</summary>
     internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
 
     /// <summary>
