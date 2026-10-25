@@ -836,6 +836,9 @@ public sealed class StatusPage : IAsyncDisposable
                 toneLive = liveTone is not null,
             },
             schedule = Schedule(config, _host.Schedule, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
+            // Issues #178 and #144: each station's pinned key, when its newest directory was dated,
+            // and any directory refused for naming a pinned station under another key.
+            stations = StationsView(_host.Intake.Pins(), _host.Intake.StationDirectories(), _host.Intake.KeyConflicts()),
             // Issue #53: the "Listen now" button, for a web SDR only.
             listenNow = ListenNowView(_host, config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
@@ -1153,6 +1156,26 @@ public sealed class StatusPage : IAsyncDisposable
     };
 
     /// <summary>When the slots are, for the page, as the config file gives them.</summary>
+    /// <summary>The stations this receiver knows, for the page.</summary>
+    internal static object StationsView(IReadOnlyList<Packet.Mailcast.PinnedStation> pins, IReadOnlyList<Packet.Mailcast.StationDirectory> heard, IReadOnlyList<Packet.Mailcast.KeyConflict> conflicts) => new
+    {
+        known = pins.Select(p => new
+        {
+            station = p.Station,
+            keyId = Packet.Mailcast.KeyId.Format(p.Key.KeyId),
+            // "built in or configured", or when the key was learnt from the station's first signed directory.
+            pinnedAt = p.PinnedAt,
+            heardDirectory = heard.FirstOrDefault(h => h.Station == p.Station)?.Directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        }),
+        conflicts = conflicts.Select(c => new
+        {
+            station = c.Station,
+            pinnedKeyId = Packet.Mailcast.KeyId.Format(c.PinnedKeyId),
+            heardKeyId = Packet.Mailcast.KeyId.Format(c.HeardKeyId),
+            heardAt = c.HeardAt,
+        }),
+    };
+
     internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
 
     /// <summary>

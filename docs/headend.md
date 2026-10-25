@@ -335,6 +335,18 @@ signing: no key at /etc/pdn-mailcast-headend/signing-key.pem, so directories go 
 
 The public key in that line is what listeners trust. GB7RDG's is built into the receiver. Another transmitter gives its line to listeners, who add the key to `trustedKeys` in their receiver.json (see the receiver's docs). Keep the private key private and backed up: a new key means every receiver has to be told the new public key.
 
+## Telling listeners about other stations
+
+Receivers learn when and where to listen for other mailcast stations from what each head end says about them. List them in `advertise`, each with its slots in the same shape as your own `slot`, where its signal is centred and the sideband:
+
+```json
+"advertise": [
+  { "callsign": "G8BPQ", "slot": { "timeUtc": "00:30", "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
+]
+```
+
+A station on two frequencies, such as HF and QO-100, is listed once for each. Every directory then carries them. It is only a hint about where to listen: receivers trust a station from its own signed directory, never from yours. The journal and `--check-config` say what is advertised. Each directory also names this head end (`callsign`) and, when signed, gives its public key, so receivers can learn it the first time they hear it.
+
 ## Offline
 
 `pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone and the channel probe, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.timeUtc` if left out), daylight or not, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state. Neither needs a config file: with none at the usual place and no `--config`, they run on the defaults with N0CALL, a placeholder callsign, and say so.

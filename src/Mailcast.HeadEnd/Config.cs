@@ -40,6 +40,18 @@ public sealed record HeadEndConfig
 
     public PskReporterConfig PskReporter { get; init; } = new();
 
+    /// <summary>
+    /// Other stations to tell listeners about in every directory (issue #178): when and where to
+    /// listen for them. Only a hint for receivers, never trust. Empty by default.
+    /// </summary>
+    public IReadOnlyList<AdvertisedStation> Advertise { get; init; } = [];
+
+    /// <summary>The stations in <see cref="Advertise"/>, as the directory carries them.</summary>
+    public IReadOnlyList<StationAdvert> ToAdverts() =>
+        [.. Advertise.Select(a => new StationAdvert(a.Callsign, new SlotTimetable(
+            TimeOnly.ParseExact(a.Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture), a.Slot.EveryMinutes, a.Slot.Daylight?.ToSettings().ToRule()),
+            a.FrequencyHz, a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Sideband.Lsb : Sideband.Usb))];
+
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -192,6 +204,8 @@ public sealed record HeadEndConfig
             SymbolSize = Schedule.SymbolSize ?? defaults.SymbolSize,
             MaxBulletinSize = Intake.MaxBulletinBytes,
             Timetable = TimetableIfValid(),
+            Station = Ax25Ui.IsValidAddress(Callsign) && StationAdvert.IsCallsign(Callsign.ToUpperInvariant()) ? Callsign.ToUpperInvariant() : null,
+            Adverts = AdvertsIfValid(),
             Budget = Rule == ScheduleRule.Budget
                 ? new BudgetRule
                 {
@@ -228,6 +242,63 @@ public sealed record HeadEndConfig
     public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings().ToRule());
 
     /// <summary>The timetable, or null while validation still has something to say about it.</summary>
+    private IReadOnlyList<StationAdvert> AdvertsIfValid()
+    {
+        try
+        {
+            return AdvertProblems().Count == 0 ? ToAdverts() : [];
+        }
+        catch (ArgumentException)
+        {
+            return [];
+        }
+    }
+
+    private List<string> AdvertProblems()
+    {
+        var problems = new List<string>();
+        for (int i = 0; i < Advertise.Count; i++)
+        {
+            var a = Advertise[i];
+            string where = $"\"advertise\" entry {i + 1}";
+            if (a is null)
+            {
+                problems.Add($"{where} is null");
+                continue;
+            }
+            if (!StationAdvert.IsCallsign(a.Callsign))
+            {
+                problems.Add($"{where}: \"callsign\" '{a.Callsign}' is not a callsign (upper case, A to Z and 0 to 9, an optional -SSID)");
+            }
+            if (a.FrequencyHz < 1)
+            {
+                problems.Add($"{where}: \"frequencyHz\" is required: where the station's signal is centred, in Hz");
+            }
+            if (!a.Sideband.Equals("usb", StringComparison.OrdinalIgnoreCase) && !a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase))
+            {
+                problems.Add($"{where}: \"sideband\" is usb or lsb, not '{a.Sideband}'");
+            }
+            bool anchorFine = TimeOnly.TryParseExact(a.Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor);
+            if (!anchorFine)
+            {
+                problems.Add($"{where}: \"slot\".\"timeUtc\" '{a.Slot.TimeUtc}' is not HH:mm");
+            }
+            if (a.Slot.EveryMinutes < 1 || MinutesPerDay % a.Slot.EveryMinutes != 0)
+            {
+                problems.Add($"{where}: \"slot\".\"everyMinutes\" must divide a day");
+            }
+            else if (anchorFine && a.Slot.Daylight is { } d && d.ToSettings().Problem(a.Slot.EveryMinutes, anchor) is { } problem)
+            {
+                problems.Add($"{where}: \"slot\".\"daylight\": {problem}");
+            }
+        }
+        foreach (var twice in Advertise.Where(a => a is not null).GroupBy(a => (a.Callsign, a.FrequencyHz, a.Sideband.ToLowerInvariant())).Where(g => g.Count() > 1))
+        {
+            problems.Add($"\"advertise\" lists {twice.Key.Callsign} on {twice.Key.FrequencyHz} Hz twice (a station on two frequencies, such as HF and QO-100, is listed once for each)");
+        }
+        return problems;
+    }
+
     private SlotTimetable? TimetableIfValid()
     {
         if (!TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
@@ -301,6 +372,7 @@ public sealed record HeadEndConfig
             problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
             daylightFine = false;
         }
+        problems.AddRange(AdvertProblems());
         ValidateSchedule(problems, everyFine && daylightFine && TimeOnly.TryParseExact(Slot.TimeUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
         if (Slot.Tone is < 0 or > 60)
         {
@@ -956,3 +1028,32 @@ public static class SlotSettingsDefaults
 
 /// <summary>A configuration the head end will not run with.</summary>
 public sealed class ConfigException(string message) : Exception(message);
+
+/// <summary>One other station a head end tells listeners about (<see cref="HeadEndConfig.Advertise"/>).</summary>
+public sealed record AdvertisedStation
+{
+    /// <summary>Its callsign, as its own directories name it. Required.</summary>
+    public string Callsign { get; init; } = "";
+
+    /// <summary>Its slots, the same shape as this head end's own <c>slot</c>.</summary>
+    public AdvertisedSlot Slot { get; init; } = new();
+
+    /// <summary>Where its signal is centred, in Hz (GB7RDG's is 7053800). Required.</summary>
+    public long FrequencyHz { get; init; }
+
+    /// <summary><c>usb</c> or <c>lsb</c>.</summary>
+    public string Sideband { get; init; } = "usb";
+}
+
+/// <summary>An advertised station's slots.</summary>
+public sealed record AdvertisedSlot
+{
+    /// <summary>One slot's start, HH:mm UTC.</summary>
+    public string TimeUtc { get; init; } = "00:00";
+
+    /// <summary>Minutes between slots; it divides a day.</summary>
+    public int EveryMinutes { get; init; } = 60;
+
+    /// <summary>Its daylight rule, or null when every slot runs.</summary>
+    public HeadEndDaylight? Daylight { get; init; }
+}
