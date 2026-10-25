@@ -311,9 +311,7 @@ public static partial class Program
         journal.Write(pskReporter is null
             ? "pskreporter: off (\"pskReporter\".\"enabled\" is false)"
             : string.Create(CultureInfo.InvariantCulture, $"pskreporter: observe only, live spots from {config.PskReporter.Host}:{config.PskReporter.Port} near a slot, 40 and 80 m FT8/FT4/WSPR with both ends in the UK or Ireland, judged over the last {PskEvaluator.Window.TotalMinutes:0} min; 40 m sent"));
-        journal.Write(config.Slot.EveryMinutes == 1440
-            ? $"schedule: a slot every day at {config.Slot.TimeUtc}Z"
-            : $"schedule: a slot every {config.Slot.EveryMinutes} min, counted from {config.Slot.TimeUtc}Z");
+        journal.Write(DescribeSchedule(config));
         journal.Write(Describe(config, scheduleOptions, waveforms));
         using var service = new HeadEndService(
             schedule, TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
@@ -354,6 +352,29 @@ public static partial class Program
     internal static bool WantReading(SlotSchedule schedule, DateTimeOffset t) =>
         schedule.NextActiveAfter(t) - t <= TimeSpan.FromHours(1)
         || (schedule.ActiveAtOrBefore(t) is { } last && t - last <= TimeSpan.FromMinutes(15));
+
+    /// <summary>
+    /// The start-up line on when slots are: "schedule: a slot every 60 min, counted from 00:30Z,
+    /// so at :30 each hour". The minutes past the hour are given when every hour has the same
+    /// slots, so a head end started off the hour says so plainly.
+    /// </summary>
+    internal static string DescribeSchedule(HeadEndConfig config)
+    {
+        int every = config.Slot.EveryMinutes;
+        if (every == 1440)
+        {
+            return $"schedule: a slot every day at {config.Slot.TimeUtc}Z";
+        }
+        string line = $"schedule: a slot every {every} min, counted from {config.Slot.TimeUtc}Z";
+        if (60 % every != 0)
+        {
+            return line;
+        }
+        int first = config.SlotTime.Minute % every;
+        var minutes = Enumerable.Range(0, 60 / every).Select(i => ":" + (first + (i * every)).ToString("00", CultureInfo.InvariantCulture)).ToList();
+        string at = minutes.Count == 1 ? minutes[0] : string.Join(", ", minutes[..^1]) + " and " + minutes[^1];
+        return $"{line}, so at {at} each hour";
+    }
 
     /// <summary>One journal line on how bulletins are carried and on which waveforms.</summary>
     internal static string Describe(HeadEndConfig config, ScheduleOptions options, Waveforms waveforms)

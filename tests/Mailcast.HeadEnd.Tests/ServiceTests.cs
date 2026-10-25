@@ -554,4 +554,43 @@ public class ServiceTests
         Assert.Equal(Daylight.Timetable, plan.Broadcast!.Directory.Schedule);
         Assert.Equal(Daylight.Timetable, BroadcastDirectory.Parse(plan.Broadcast.Directory.Serialize()).Schedule);
     }
+    // Hourly in daylight at half past (issue #176): on 5 October 08:30 to 16:30 UTC.
+    private static readonly SlotSchedule HalfPast = new(new TimeOnly(0, 30), TimeSpan.FromHours(1), DaylightRule.Gb7rdg);
+
+    private static Head HalfPastHead(TempDirectory dir, DateTimeOffset start) =>
+        new(dir, start, HalfPast, ScheduleOptions.HourlyDaylight with { Timetable = HalfPast.Timetable },
+            new SlotSettings { SubChannel = 4, MaxSlotLength = TimeSpan.FromMinutes(10), ToneLength = TimeSpan.FromSeconds(10) },
+            catchUp: TimeSpan.FromMinutes(5));
+
+    [Fact]
+    public void HalfPast_KeysAtHalfPast_SkipsTheDark_AndTheDirectoryCarriesTheTimetable()
+    {
+        using var dir = new TempDirectory();
+        var head = HalfPastHead(dir, At(15, 29, 30));
+        head.Store.Offer(Bulletins.Make(94, 3000), Day1);
+        head.Time.Run(async () =>
+        {
+            using var stop = new CancellationTokenSource();
+            Task service = head.Service.RunAsync(stop.Token);
+            await Task.Delay(TimeSpan.FromMinutes(60), head.Time); // 16:29:30
+            head.Store.Offer(Bulletins.Make(95, 3000), Day1);
+            await Task.Delay(TimeSpan.FromMinutes(120), head.Time); // 18:29:30
+            await stop.CancelAsync();
+            await service;
+            return 0;
+        }, TimeSpan.FromHours(3));
+
+        // 15:30 for the first, 16:30 for the second; 17:30 is after the window closes at 17:03.
+        var leases = LeaseTimes(head);
+        Assert.Equal(2, leases.Count);
+        Assert.InRange(leases[0], At(15, 30), At(15, 32));
+        Assert.InRange(leases[1], At(16, 30), At(16, 32));
+        Assert.Contains(head.Journal.Lines, l => l.StartsWith("slot 2026-10-05 15:30Z", StringComparison.Ordinal));
+        Assert.DoesNotContain(head.Journal.Lines, l => l.StartsWith("slot 2026-10-05 17:30Z", StringComparison.Ordinal));
+        Assert.Contains(head.Journal.Lines, l => l.StartsWith("next slot 2026-10-06 08:30Z", StringComparison.Ordinal));
+        Assert.Equal(new SlotsToday(Day1, 2, 2, 0, 0), head.Status.SlotsToday);
+
+        var plan = head.Planner.Plan(At(8, 30).AddDays(1), evenIfNothingDue: true);
+        Assert.Equal(HalfPast.Timetable, BroadcastDirectory.Parse(plan.Broadcast!.Directory.Serialize()).Schedule);
+    }
 }
