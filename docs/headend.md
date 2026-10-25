@@ -16,7 +16,7 @@ A slot starts at `slot.timeUtc` and then every `slot.everyMinutes`, round the cl
 
 That gives 00:30, 01:30 and so on; `"12:30"` would give the same slots. Everything that counts slots counts from these: the daylight window picks from the half-hour slots, `slot.maxMinutes`, `slot.catchUpMinutes` and `slot.retryMinutes` count from each slot's own start, and `schedule.slotOffsets` and the budget rule count slots from a bulletin's first. The directory carries the timetable (`slots=00:30/60`), and the journal says it at start-up: `schedule: a slot every 60 min, counted from 00:30Z, so at :30 each hour`. Left at `"00:00"`, nothing changes.
 
-Receivers that listen all the time (a sound card, pdn-soundmodem or SDRconnect) pick up the new timetable from the first directory they hear. A web SDR receiver, or one sharing a radio through `rig`, only listens around the slots it already knows about, so it never hears a half-hour slot on its own: set its `slotUtc` to match, `"00:30"` here. Every receiver also needs the station's key among its trusted keys, or it will not accept that station's directory.
+Receivers only decode around the slots they know about, and until #144 a receiver follows one station's timetable. So a listener who wants a half-hour station's slots sets the receiver's `slotUtc` to match, `"00:30"` here, and then hears that station instead of GB7RDG. The receiver also needs the station's key among its trusted keys, or it will not accept that station's directory.
 
 ### Daylight only
 
