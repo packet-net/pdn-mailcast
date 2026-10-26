@@ -72,12 +72,24 @@ Each station says where it is on the air and where it is: its own signed directo
 
 A receiver listens at a station if it can hear it:
 
-- **It can move.** A rig (`rig`), pdn-soundmodem's receive window (`retune`) and a web SDR are tuned for each station's slots. The dial is chosen to keep the signal where your `dialKHz` keeps GB7RDG's (1800 Hz in the audio at the usual 7052 kHz), so 7.047 MHz is heard on a 7045.2 kHz dial. Only up to 30 MHz: above it needs a converter's offset (LNB or transverter), which this receiver does not have yet.
+- **It can move.** A rig (`rig`), pdn-soundmodem's receive window (`retune`) and a web SDR are tuned for each station's slots. The dial is chosen to keep the signal where your `dialKHz` keeps GB7RDG's (1800 Hz in the audio at the usual 7052 kHz), so 7.047 MHz is heard on a 7045.2 kHz dial. Only up to 30 MHz, unless you set `lnbHz` for a dish and LNB (see [QO-100 through an LNB](#qo-100-through-an-lnb)).
 - **It cannot move** (a sound card, pdn-soundmodem without `retune`, SDRconnect). A station is heard if its signal falls in the audio you already have, 1000 to 2000 Hz above the dial. Otherwise the page's Listening line says it is not followed and why, and what dial would hear it is yours to set.
 
 A station whose own signed directory this receiver hears is where it was heard: the directory's `hz=` if it gives one, otherwise the frequency this receiver was listening on when it decoded (kept for the run); adverts only place stations known from adverts alone. A rig on a sound card tells the audio the dial it tuned, so the signal is looked for where that dial puts it. SDRconnect cannot retune, and its filter is set when it is opened, so it is opened wide enough (100 to 3600 Hz) for a signal anywhere in the 1000 to 2000 Hz this receiver accepts, which is where every station it follows falls. Only upper sideband is listened for. Two stations whose slots start within a minute or two of each other on different frequencies are not both heard: the receiver is pointed at one station's signal at a time, so keep slots well apart.
 
 Path analysis (virtual height, multipath, the path picture and the globe) is for skywave HF paths only, 30 MHz and below. For a station above that, such as QO-100's downlink, the Channel tile shows signal to noise, the frequency offset and frames, and says why there is no more.
+
+### QO-100 through an LNB
+
+For QO-100 you need a dish, an LNB and an SDR or receiver that takes the LNB's output. Set `lnbHz` to the LNB's local oscillator in Hz. A Bullseye (2 ppm TCXO with PLL) is nominally 9750 MHz:
+
+```json
+"lnbHz": 9750012345
+```
+
+A station announcing a frequency above 30 MHz and within the LNB's input range (the oscillator plus 100 MHz to 2400 MHz) is then heard at its frequency less the oscillator: QO-100's 10489.75 MHz downlink comes out at 739.74 MHz, and the dial, the passband and the retuning all work there. The page, the log and the reports still show the real downlink frequency. Without `lnbHz`, a station above 30 MHz is shown as not followed and the Listening line names the setting. It is for a real dish and LNB, not a web SDR, and it does not search for drift: the oscillator must be right to within a few Hz. A rig, pdn-soundmodem's receive window or a sound card behind the SDR is set up as for HF; the `dialKHz` of a receiver that cannot retune is the dial on the IF, in kHz.
+
+To calibrate the oscillator, tune the SDR to the QO-100 beacon (10489.750 MHz). Note the IF frequency its carrier sits at, `ifHz`, then set `lnbHz` to 10489750000 less `ifHz` (a beacon at 739.737655 MHz gives 9750012345). Check again after the LNB has warmed up; a TCXO LNB should then hold within a few Hz.
 
 ## Using it with pdn-soundmodem
 

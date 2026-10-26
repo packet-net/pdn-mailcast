@@ -135,6 +135,20 @@ public sealed record ReceiverConfig
     /// </summary>
     public double DialKHz { get; init; } = DefaultDialKHz;
 
+    /// <summary>
+    /// The local oscillator of a downconverting LNB in front of the receiver, in Hz, as the
+    /// listener has calibrated it (against the QO-100 beacon, say), so a non-round value such as
+    /// 9750012345 is fine. With it set, a station above 30 MHz and within the LNB's input range
+    /// (its oscillator plus 100 MHz to 2400 MHz) is heard at its frequency less this, and
+    /// everything shown stays its real frequency. Null (the default) hears HF only. Not for a
+    /// web SDR. Left out of a saved file while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? LnbHz { get; init; }
+
+    /// <summary>The lowest and highest <see cref="LnbHz"/> accepted: any real LNB's oscillator, 1 to 40 GHz.</summary>
+    public const long LowestLnbHz = 1_000_000_000, HighestLnbHz = 40_000_000_000;
+
     /// <summary>The USB dial in Hz.</summary>
     [JsonIgnore]
     public double DialHz => DialKHz * 1000;
@@ -582,6 +596,10 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException(string.Create(System.Globalization.CultureInfo.InvariantCulture,
                 $"\"dialKHz\" {DialKHz} puts the signal's centre at {AudioCentreHz:F0} Hz in your audio, outside the {LowestAudioCentreHz:F0} to {HighestAudioCentreHz:F0} Hz this receiver can use; the usual dial is {DefaultDialKHz:F1} (1800 Hz)"));
+        }
+        if (LnbHz is { } lnb && (lnb < LowestLnbHz || lnb > HighestLnbHz))
+        {
+            throw new ConfigException($"\"lnbHz\" {lnb} is not an LNB's local oscillator in Hz, such as 9750000000");
         }
         if (string.IsNullOrWhiteSpace(Bbs.Host))
         {

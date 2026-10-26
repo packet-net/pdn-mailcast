@@ -83,9 +83,13 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
 /// <param name="Locator">Its Maidenhead locator, when a directory or advert gave one.</param>
 /// <param name="DialHz">The USB dial it is heard on, when it is followed.</param>
 /// <param name="How">How it is heard, when followed: in the passband already, or by retuning.</param>
+/// <param name="IfHz">When heard through a downconverting LNB, the intermediate frequency its signal is at; null otherwise.</param>
 public sealed record ListenedStation(string Station, SlotTimetable Timetable, long FrequencyHz, Sideband Sideband, string Source, bool Followed, string? NotFollowedBecause,
-    string? Locator = null, double? DialHz = null, HowHeard? How = null)
+    string? Locator = null, double? DialHz = null, HowHeard? How = null, long? IfHz = null)
 {
+    /// <summary>Where the signal is in this receiver's front end, Hz: the intermediate frequency behind an LNB, else the station's own frequency. Dials and audio positions are worked out from this; what is shown is <see cref="FrequencyHz"/>.</summary>
+    public double HeardAtHz => IfHz ?? FrequencyHz;
+
     /// <summary>Where the station is on the air, as this receiver knows it.</summary>
     public StationOnAir OnTheAir => new(Station, FrequencyHz, Sideband, Locator, Source);
 }
