@@ -615,6 +615,25 @@ public sealed class ReceiverHost : IAsyncDisposable
     }
 
     /// <summary>
+    /// Returns the audio to the config's dial and signal once a station's window has closed
+    /// (issue #187), so a tone heard between windows is looked for where the config says. A
+    /// window of pdn-soundmodem gives its own dial back through <see cref="FollowDial"/>.
+    /// </summary>
+    internal void ReturnToConfig(AudioPipeline? pipelineForTest = null)
+    {
+        if ((pipelineForTest ?? Pipeline) is not { } pipeline)
+        {
+            return;
+        }
+        pipeline.SetSignal(OnAir.DefaultSignalHz);
+        if (Retuner is { Window: null } && pipeline.Source.Kind != AudioSourceKind.SoundModem)
+        {
+            pipeline.SetDial(Config.DialHz);
+        }
+        ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz);
+    }
+
+    /// <summary>
     /// The slots of every station this receiver follows (issue #144): GB7RDG's
     /// (<see cref="Schedule"/>), then every other station in <see cref="Listening"/> that is
     /// followed. With none, GB7RDG's alone, exactly as before.
@@ -790,6 +809,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         var source = AudioSource.Parse(Config.Audio);
         var now = _time.GetUtcNow();
         (DateTimeOffset Opens, DateTimeOffset Slot)? between = null;
+        bool inWindow = false;
+        bool listensBySlot = source.Kind is AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect;
         if (source.Kind is AudioSourceKind.Alsa or AudioSourceKind.WindowsSoundCard or AudioSourceKind.SoundModem or AudioSourceKind.SdrConnect
             && ListeningWindow.SoundCard(now, Followed) is { } window)
         {
@@ -816,7 +837,13 @@ public sealed class ReceiverHost : IAsyncDisposable
             {
                 // The window of this slot's station is open: listen for that station's signal.
                 PointAtSlot(slot);
+                inWindow = true;
             }
+        }
+        if (listensBySlot && !inWindow)
+        {
+            // No station's window is open: back to the config's dial and signal.
+            ReturnToConfig();
         }
 
         var was = BetweenSlots;

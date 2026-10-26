@@ -554,7 +554,14 @@ public class FeedbackTests
 
             Assert.Empty(rig.Bbs.Sent);
             Assert.Empty(rig.Log);
-            Assert.False(File.Exists(Path.Combine(dir.Path, FeedbackService.FileName)));
+            // No report or day is kept; only the slots heard, for the page's per-station figures (issue #187).
+            string kept = Path.Combine(dir.Path, FeedbackService.FileName);
+            if (File.Exists(kept))
+            {
+                var state = JsonDocument.Parse(File.ReadAllText(kept)).RootElement;
+                Assert.Equal(0, state.GetProperty("days").GetArrayLength());
+                Assert.Equal(JsonValueKind.Null, state.GetProperty("last").ValueKind);
+            }
             Assert.Null(service.Next(rig.Time.GetUtcNow()));
             var view = JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine);
             Assert.False(view.GetProperty("enabled").GetBoolean());
@@ -731,5 +738,76 @@ public class FeedbackTests
         Assert.Equal(Slots.Count, report.Slots.Count);
         Assert.Equal(figures, report.Stations);
         Assert.Contains("S G8BPQ 2 1 40 2 9 -", mail.Body);
+    }
+
+    [Fact]
+    public async Task OverlappingWindows_DoNotZeroTheEarlierSlot()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        rig.Settings = null;
+        var first = Slots[0];
+        var second = first.AddMinutes(10);
+        rig.Others.Add(second);
+        var service = rig.Start();
+        rig.Last = new SlotSummary(first, new ToneReport(1801.2, 1.2, 15.6, TimeSpan.FromSeconds(10)), 150, first.AddMinutes(9), first)
+        {
+            FrameCounts = ImmutableSortedDictionary<string, int>.Empty.Add(Waveform.Name(4), 150),
+        };
+        await rig.AtAsync(service, first.AddMinutes(9));
+        // The tracker moves to the later slot while the earlier one's window is still open.
+        rig.Last = new SlotSummary(second, new ToneReport(1801.2, 1.2, 9.0, TimeSpan.FromSeconds(10)), 40, second.AddMinutes(1), second);
+        await rig.AtAsync(service, second.AddMinutes(1));
+
+        var figures = service.StationFigures(Day);
+        Assert.Equal(150, figures[0].Frames);
+        Assert.Equal(16, figures[0].SnrDb);
+        Assert.Equal(40, figures[1].Frames);
+    }
+
+    [Fact]
+    public async Task HeardToday_WithTheReportOff_SurvivesARestart()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        rig.Settings = null;
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 2);
+        var before = service.StationFigures(Day);
+        Assert.Equal(2, Assert.Single(before).Listened);
+
+        var restarted = rig.Start();
+        Assert.Equal(before, restarted.StationFigures(Day));
+    }
+
+    [Fact]
+    public async Task ADayOfOnlyOtherStationsSlots_SendsAReportWithStationLinesAndNoSlotLines()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var heard = Slots[3].AddMinutes(30);
+        rig.Others.Add(heard);
+        rig.OtherHeard[heard] = new SlotSummary(heard, new ToneReport(1801.2, 1.2, 9.0, TimeSpan.FromSeconds(10)), 40, heard.AddMinutes(9), heard);
+        var service = rig.Start();
+        // Only the other station's slot is listened to: GB7RDG's are missed.
+        await rig.AtAsync(service, heard.AddMinutes(1));
+        rig.Last = rig.OtherHeard[heard];
+        await rig.AtAsync(service, heard.AddMinutes(12));
+        await rig.AtAsync(service, ReportAt);
+
+        var mail = Assert.Single(rig.Bbs.Sent);
+        var report = DailyReport.Parse(mail.Title, mail.Body);
+        Assert.Empty(report.Slots);
+        Assert.Equal("G8BPQ", Assert.Single(report.Stations!, s => s.Station == "G8BPQ").Station);
+    }
+
+    [Fact]
+    public async Task ADayWithNoSlotsNoted_SendsNothing()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.AtAsync(service, ReportAt);
+        Assert.Empty(rig.Bbs.Sent);
     }
 }

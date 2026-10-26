@@ -264,6 +264,31 @@ public class PerStationTests
     }
 
     [Fact]
+    public async Task WhenAStationsWindowCloses_ThePipelineGoesBackToTheConfigDialAndSignal()
+    {
+        var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        using var dir = new TempDirectory();
+        var slot = new DateTimeOffset(2026, 10, 26, 10, 30, 0, TimeSpan.Zero);
+        var config = new ReceiverConfig
+        {
+            Audio = Samples.SoundCard,
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
+        };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
+        await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ", Details = new StationDetails(7_047_000, Sideband.Usb, "IO83") }, slot, 1);
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, _ => { }, new FakeTimeProvider(slot));
+        host.PointAtSlot(slot, pipeline);
+        Assert.Equal(7_047_000, pipeline.SignalHz);
+        Assert.Equal(7_045_200, pipeline.DialHz, 0.5);
+
+        host.ReturnToConfig(pipeline);
+        Assert.Equal(OnAir.DefaultSignalHz, pipeline.SignalHz);
+        Assert.Equal(7_052_000, pipeline.DialHz, 0.5);
+    }
+
+    [Fact]
     public async Task AnAdvert_DoesNotMoveAStationWhoseOwnDirectoryIsHeard()
     {
         var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());

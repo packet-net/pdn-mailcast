@@ -203,6 +203,61 @@ public class StationPinTests
     }
 
     [Fact]
+    public void AnAdvert_NoDirectoryRepeatsForTwoDays_Expires()
+    {
+        var (store, time, dir) = Open();
+        using var _d = dir;
+        Feed(store, Directory(OnTheHour, Rdg, "M0LTE", [BpqAdvert], Big(53)));
+        time.Advance(TimeSpan.FromDays(2));
+        Assert.Equal([BpqAdvert], store.Adverts());
+        Assert.NotNull(store.AdvertFirstSeen("G8BPQ"));
+        time.Advance(TimeSpan.FromDays(1));
+        Assert.Empty(store.Adverts());
+        Assert.Null(store.AdvertFirstSeen("G8BPQ"));
+        // Heard again, it is back, as new.
+        var again = new BroadcastDirectory(Day.AddDays(3), [new DirectoryEntry(Big(54).ObjectId, ZstdDictionary.Gb7rdg1Id, 9000, "54_TEST", "B")], OnTheHour, signer: Rdg, station: "M0LTE", adverts: [BpqAdvert]);
+        Feed(store, again);
+        Assert.Equal([BpqAdvert], store.Adverts());
+        Assert.Equal(Day.AddDays(3), store.AdvertFirstSeen("G8BPQ"));
+    }
+
+    [Fact]
+    public void ATrustedKeysKeyNamingAPinnedStation_IsRefusedAsAKeyConflict()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with
+        {
+            TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("Bob's station", Impostor.PublicKeyBase64)],
+        });
+        var result = Feed(store, Directory(OnTheHour, Impostor, "GB7RDG", null, Big(92)));
+        Assert.Equal(FrameOutcome.RejectedDirectory, result.Outcome);
+        var conflict = Assert.Single(store.KeyConflicts);
+        Assert.Equal(("GB7RDG", Rdg.KeyId, Impostor.KeyId), (conflict.Station, conflict.PinnedKeyId, conflict.HeardKeyId));
+        Assert.DoesNotContain(store.Pins, p => p.Key.KeyId == Impostor.KeyId);
+    }
+
+    [Fact]
+    public void RemovingAHandAddedKeyFromTrustedKeys_RemovesItsPin()
+    {
+        using var dir = new TempDirectory();
+        TrustedKey[] With() => [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("Bob's station", Bpq.PublicKeyBase64)];
+        var first = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { TrustedKeys = With() });
+        Feed(first, Directory(HalfPast, Bpq, "G8BPQ", null, Big(93)));
+        Assert.Contains(first.Pins, p => p.Station == "G8BPQ");
+
+        // Still in trustedKeys after a restart: still pinned.
+        var kept = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { TrustedKeys = With() });
+        Assert.Contains(kept.Pins, p => p.Station == "G8BPQ");
+
+        // Taken out: the pin goes (the station is learnt afresh like any other if its directory is heard again).
+        var log = new List<string>();
+        var removed = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64)], Log = log.Add });
+        Assert.Contains(log, l => l.Contains("no longer in trustedKeys", StringComparison.Ordinal));
+        Assert.DoesNotContain(removed.Pins, p => p.FromTrustedKeys);
+        Assert.DoesNotContain("trusted", File.ReadAllText(Path.Combine(dir.Path, ReceiverStore.PinsFile)), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ABulletinHeldForAnUnknownKey_IsReleased_WhenItsStationIsPinned()
     {
         var (store, _, dir) = Open();

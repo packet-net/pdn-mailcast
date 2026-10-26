@@ -6,7 +6,8 @@ namespace Packet.Mailcast;
 /// <param name="Station">The station's callsign.</param>
 /// <param name="Key">Its directory key.</param>
 /// <param name="PinnedAt">When it was learnt from the station's first signed directory; null for one built in or in <c>trustedKeys</c>.</param>
-public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt);
+/// <param name="FromTrustedKeys">Whether it was pinned because it is in <c>trustedKeys</c> (its label not a callsign): the pin goes when the key does.</param>
+public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false);
 
 /// <summary>
 /// A signed directory that named a station whose key is already pinned, under another key: it
@@ -57,6 +58,8 @@ public sealed partial class ReceiverStore
     public const string PinsFile = "pins.txt";
 
     // A station may hold several keys: GB7RDG's built-in one and a newer one in trustedKeys, say.
+    private const string FromTrustedKeysMark = "trusted";
+
     private readonly List<PinnedStation> _pins = [];
     private readonly Dictionary<string, KeyConflict> _conflicts = new(StringComparer.Ordinal);
     private bool _newPin;
@@ -85,6 +88,7 @@ public sealed partial class ReceiverStore
             }
         }
         string file = Path.Combine(_root, PinsFile);
+        bool dropped = false;
         if (File.Exists(file))
         {
             foreach (string line in Bulletin.TextEncoding.GetString(File.ReadAllBytes(file)).Split('\n', StringSplitOptions.RemoveEmptyEntries))
@@ -104,33 +108,49 @@ public sealed partial class ReceiverStore
                     Log($"{PinsFile}: skipped an unreadable line");
                     continue;
                 }
+                if (p.Length >= 4 && p[3] == FromTrustedKeysMark && !_options.TrustedKeys.Any(k => k.KeyId == key.KeyId))
+                {
+                    // Pinned because it was in trustedKeys, and it is not any more: the pin goes with it.
+                    Log($"{PinsFile}: {p[0]}'s key {KeyId.Format(key.KeyId)} is no longer in trustedKeys, so its pin is removed");
+                    dropped = true;
+                    continue;
+                }
                 if (!_pins.Any(x => x.Key.KeyId == key.KeyId))
                 {
-                    _pins.Add(new PinnedStation(p[0], key, at));
+                    _pins.Add(new PinnedStation(p[0], key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark));
                 }
             }
         }
         UpdateKeys();
+        if (dropped)
+        {
+            WritePins("a removed trustedKeys key");
+        }
     }
 
     private void UpdateKeys() => DirectoryKeys = [.. _options.TrustedKeys.Concat(_pins.Select(x => x.Key)).DistinctBy(k => k.KeyId)];
 
-    private void Pin(string station, TrustedKey key, string how)
+    private void Pin(string station, TrustedKey key, string how, bool fromTrustedKeys = false)
     {
         var now = _options.Time.GetUtcNow();
-        _pins.Add(new PinnedStation(station, key, now));
+        _pins.Add(new PinnedStation(station, key, now, fromTrustedKeys));
         UpdateKeys();
         Log($"pinned {station}'s key {KeyId.Format(key.KeyId)}, {how}");
         _newPin = true;
+        WritePins(station + "'s key");
+    }
+
+    private void WritePins(string what)
+    {
         var lines = _pins.Where(x => x.PinnedAt is not null)
-            .Select(x => $"{x.Station}\t{Convert.ToBase64String(x.Key.PublicKey)}\t{x.PinnedAt!.Value.ToString("o", CultureInfo.InvariantCulture)}\n");
+            .Select(x => $"{x.Station}\t{Convert.ToBase64String(x.Key.PublicKey)}\t{x.PinnedAt!.Value.ToString("o", CultureInfo.InvariantCulture)}{(x.FromTrustedKeys ? "\t" + FromTrustedKeysMark : "")}\n");
         try
         {
             DurableFile.WriteAtomically(Path.Combine(_root, PinsFile), Bulletin.TextEncoding.GetBytes(string.Concat(lines)), flush: _options.FlushToDisk);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Log($"cannot write {PinsFile}, so {station}'s key is pinned only until the receiver restarts: {e.Message}");
+            Log($"cannot write {PinsFile}, so {what} is kept only until the receiver restarts: {e.Message}");
         }
     }
 
@@ -145,8 +165,14 @@ public sealed partial class ReceiverStore
         if (check.State == SignatureState.Trusted && directory.SigningKeyId is { } trustedId && !_pins.Any(p => p.Key.KeyId == trustedId)
             && directory.Station is { } named && DirectoryKeys.FirstOrDefault(k => k.KeyId == trustedId) is { } configured)
         {
-            // A key in trustedKeys whose label is not a callsign: the station is the callsign its directory names.
-            Pin(named, configured, "from trustedKeys, as its first signed directory names it");
+            // A key in trustedKeys whose label is not a callsign: the station is the callsign its directory names,
+            // unless that callsign is pinned to another key already (issue #187).
+            if (_pins.FirstOrDefault(p => p.Station == named) is { } held)
+            {
+                _conflicts[named] = new KeyConflict(named, held.Key.KeyId, trustedId, _options.Time.GetUtcNow());
+                return new DirectoryCheck(SignatureState.Rejected, Reason: $"it names {named}, whose key is pinned as {KeyId.Format(held.Key.KeyId)}, but is signed by key {KeyId.Format(trustedId)}");
+            }
+            Pin(named, configured, "from trustedKeys, as its first signed directory names it", fromTrustedKeys: true);
             return check;
         }
         if (check.State != SignatureState.Rejected || directory.SigningKeyId is not { } id || DirectoryKeys.Any(k => k.KeyId == id) || directory.Station is not { } station)
@@ -335,16 +361,38 @@ public sealed partial class ReceiverStore
         }
     }
 
+    /// <summary>How many days an advert is kept when no directory repeats it (issue #187).</summary>
+    public const int AdvertKeptDays = 2;
+
+    /// <summary>Forgets adverts that no directory has repeated for <see cref="AdvertKeptDays"/> days.</summary>
+    private void ExpireAdverts()
+    {
+        var oldest = DateOnly.FromDateTime(_options.Time.GetUtcNow().UtcDateTime).AddDays(-AdvertKeptDays);
+        foreach (var place in _adverts.Where(a => a.Value.Date < oldest).Select(a => a.Key).ToList())
+        {
+            _adverts.Remove(place);
+        }
+    }
+
     /// <summary>The date of the first directory heard that advertised <paramref name="callsign"/>, or null if none has.</summary>
-    public DateOnly? AdvertFirstSeen(string callsign) =>
+    public DateOnly? AdvertFirstSeen(string callsign)
+    {
+        ExpireAdverts();
+        return AdvertFirstSeenKept(callsign);
+    }
+
+    private DateOnly? AdvertFirstSeenKept(string callsign) =>
         _adverts.Where(a => a.Key.Callsign == callsign).Select(a => (DateOnly?)a.Value.First).Min();
 
     /// <summary>
     /// Stations only ever advertised past a directory's first <see cref="BroadcastDirectory.MostAdverts"/>
     /// fields, each with the station whose directory did (null if none): not listened at, only shown.
     /// </summary>
-    public IReadOnlyList<(string Callsign, string? AdvertisedBy)> AdvertsBeyondCap() =>
-        [.. _beyondCap.Where(b => !_adverts.Keys.Any(k => k.Callsign == b.Key)).Select(b => (b.Key, b.Value)).OrderBy(b => b.Key, StringComparer.Ordinal)];
+    public IReadOnlyList<(string Callsign, string? AdvertisedBy)> AdvertsBeyondCap()
+    {
+        ExpireAdverts();
+        return [.. _beyondCap.Where(b => !_adverts.Keys.Any(k => k.Callsign == b.Key)).Select(b => (b.Key, b.Value)).OrderBy(b => b.Key, StringComparer.Ordinal)];
+    }
 
     /// <summary>
     /// The stations the head ends heard tell listeners about (issue #178), one advert for each
@@ -352,6 +400,9 @@ public sealed partial class ReceiverStore
     /// A station may be advertised on more than one frequency (HF and QO-100). Hints about where
     /// to listen, never trust.
     /// </summary>
-    public IReadOnlyList<StationAdvert> Adverts() =>
-        [.. _adverts.Values.Select(v => v.Advert).OrderBy(a => a.Callsign, StringComparer.Ordinal).ThenBy(a => a.FrequencyHz)];
+    public IReadOnlyList<StationAdvert> Adverts()
+    {
+        ExpireAdverts();
+        return [.. _adverts.Values.Select(v => v.Advert).OrderBy(a => a.Callsign, StringComparer.Ordinal).ThenBy(a => a.FrequencyHz)];
+    }
 }

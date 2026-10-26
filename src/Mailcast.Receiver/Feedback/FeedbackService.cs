@@ -161,7 +161,7 @@ public sealed class FeedbackService
         _log = log;
         _path = Path.Combine(stateDirectory, FileName);
         _state = Load(_path, log);
-        foreach (var slot in _state.Days.SelectMany(d => d.Slots))
+        foreach (var slot in _state.Seen.Concat(_state.Days.SelectMany(d => d.Slots)))
         {
             _seen[slot.Slot] = slot;
         }
@@ -568,22 +568,26 @@ public sealed class FeedbackService
                     }
                     var record = Enabled ? Day(DateOnly.FromDateTime(slot.UtcDateTime)) : null;
                     var before = record is null ? _seen.GetValueOrDefault(slot) : record.Slots.Find(s => s.Slot == slot);
-                    var tone = heard?.Scheduled == slot ? heard.Tone : null;
+                    // The tracker holds one slot: for an earlier slot whose window is still open as a later one's
+                    // begins (issue #187), what was noted stays and is not zeroed.
+                    bool tracked = heard?.Scheduled == slot;
+                    var tone = tracked ? heard!.Tone : null;
                     var line = new SlotRecord
                     {
                         Slot = slot,
                         Station = _sources.Station(slot),
-                        Completed = heard?.Scheduled == slot ? heard.BulletinsCompleted : before?.Completed ?? 0,
-                        Waveform = heard?.Scheduled == slot ? WaveformCode(heard) : null,
-                        Frames = heard?.Scheduled == slot ? heard.FramesHeard : 0,
-                        SnrDb = tone is null ? null : Math.Round(tone.SnrDb, 1),
-                        OffsetHz = tone is null ? null : Math.Round(tone.OffsetHz, 1),
+                        Completed = tracked ? heard!.BulletinsCompleted : before?.Completed ?? 0,
+                        Waveform = tracked ? WaveformCode(heard!) : before?.Waveform,
+                        Frames = tracked ? heard!.FramesHeard : before?.Frames ?? 0,
+                        SnrDb = tracked ? tone is null ? null : Math.Round(tone.SnrDb, 1) : before?.SnrDb,
+                        OffsetHz = tracked ? tone is null ? null : Math.Round(tone.OffsetHz, 1) : before?.OffsetHz,
                         Verdict = verdict ?? before?.Verdict,
                         Channel = _sources.Channel(slot) ?? before?.Channel,
                     };
                     _seen[slot] = line;
                     if (record is null)
                     {
+                        changed |= before != line;
                         continue;
                     }
                     if (before is null)
@@ -624,6 +628,8 @@ public sealed class FeedbackService
             }
             if (changed)
             {
+                // With the report off the slots are kept here instead, so 'Heard today' survives a restart.
+                _state.Seen = Enabled ? [] : [.. _seen.Values.OrderBy(v => v.Slot)];
                 Save();
             }
         }
@@ -861,6 +867,9 @@ public sealed class FeedbackService
     internal sealed class State
     {
         public List<DayRecord> Days { get; set; } = [];
+
+        /// <summary>The slots listened to while the report was off (issue #187), so the page's per-station figures survive a restart.</summary>
+        public List<SlotRecord> Seen { get; set; } = [];
 
         public SentReport? Last { get; set; }
 
