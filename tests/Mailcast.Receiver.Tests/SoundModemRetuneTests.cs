@@ -778,7 +778,7 @@ public sealed class SoundModemRetuneTests
     }
 
     [Fact]
-    public async Task APdnSoundmodemDialledOnAnLnbsIf_WithNoLnbStation_IsStillRefused()
+    public async Task APdnSoundmodemDialledOnAnLnbsIf_WithoutLnbHz_IsStillRefused()
     {
         await using var fake = new FakeSoundModem(dialHz: 739_735_855);
         var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -822,5 +822,36 @@ public sealed class SoundModemRetuneTests
         }
         await host.Intake.DrainAsync(CancellationToken.None);
         Assert.Contains(host.Intake.StationDirectories(), d => d.Station == "G8BPQ");
+    }
+
+    [Fact]
+    public async Task AFreshReceiverOnAnLnbsIf_KeepsDecodingOutsideAnyKnownWindow_WhereASoundCardPauses()
+    {
+        await using var fake = new FakeSoundModem(dialHz: 739_735_855);
+        using var dir = new TempDirectory();
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 12, 20, 0, TimeSpan.Zero));
+        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Daylight = null, LnbHz = 9_750_012_345 };
+        await using var host = new ReceiverHost(config, time, _ => { });
+        var pipeline = host.CreatePipeline(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)), config);
+        await using var _ = pipeline;
+        await pipeline.OpenAsync(CancellationToken.None);
+        typeof(ReceiverHost).GetField("_pipeline", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(host, pipeline);
+
+        // Before, during (GB7RDG's 12:00 and 13:00 windows) and after: never between slots, never moved off the downlink.
+        foreach (var at in new[] { new TimeSpan(12, 20, 0), new(12, 47, 0), new(12, 59, 0), new(13, 0, 30), new(13, 5, 0) })
+        {
+            time.SetUtcNow(new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero) + at);
+            host.CheckSlotWindow();
+            Assert.Null(host.BetweenSlots);
+            Assert.False(pipeline.BetweenSlots);
+            Assert.Equal(739_735_855 + 1800, pipeline.SignalHz, 0.5);
+        }
+
+        // The control: a sound card at the same time pauses between slots.
+        using var dir2 = new TempDirectory();
+        var card = new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir2.Path, Daylight = null };
+        await using var cardHost = new ReceiverHost(card, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 12, 47, 0, TimeSpan.Zero)), _ => { });
+        cardHost.CheckSlotWindow();
+        Assert.NotNull(cardHost.BetweenSlots);
     }
 }
