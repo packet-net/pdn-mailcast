@@ -1,3 +1,5 @@
+using Mailcast.Receiver.Retune;
+using Packet.SoundModem.Rig;
 using Mailcast.Receiver.Web;
 using Microsoft.Extensions.Time.Testing;
 using Packet.Mailcast;
@@ -225,5 +227,74 @@ public class PerStationTests
         var json = System.Text.Json.JsonSerializer.Serialize(ChannelTile.View(watch, null, Noon), ReceiverConfig.JsonLine);
         Assert.Contains("\"skywave\":true", json, StringComparison.Ordinal);
         Assert.Contains("\"station\":null", json, StringComparison.Ordinal);
+    }
+
+    private static async Task Hear(ReceiverHost host, ScheduleOptions options, DateTimeOffset slot, int bulletin)
+    {
+        foreach (var frame in Samples.Frames([Samples.Bulletin(bulletin)], options, slot))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ARigRetunedOnASoundCard_TellsThePipelineTheDialItTuned()
+    {
+        var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        using var dir = new TempDirectory();
+        var slot = new DateTimeOffset(2026, 10, 26, 10, 30, 0, TimeSpan.Zero);
+        var config = new ReceiverConfig
+        {
+            Audio = Samples.SoundCard,
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
+        };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
+        await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ", Details = new StationDetails(7_047_000, Sideband.Usb, "IO83") }, slot, 1);
+
+        // Config dial 7.052 MHz, station on 7.047 MHz, the rig retuned for its slot.
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, _ => { }, new FakeTimeProvider(slot));
+        Assert.Equal(7_052_000, pipeline.DialHz);
+        Assert.Equal(7_045_200, host.PointAtSlot(slot, pipeline)!.Value, 0.5);
+        Assert.Equal(7_045_200, pipeline.DialHz, 0.5);
+        Assert.Equal(7_047_000, pipeline.SignalHz);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
+    }
+
+    [Fact]
+    public async Task AnAdvert_DoesNotMoveAStationWhoseOwnDirectoryIsHeard()
+    {
+        var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var other = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        using var dir = new TempDirectory();
+        var slot = new DateTimeOffset(2026, 10, 26, 10, 30, 0, TimeSpan.Zero);
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
+        // G8BPQ's own directory, saying nothing of its frequency, is heard here.
+        await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ" }, slot, 1);
+        // Another head end advertises it elsewhere.
+        await Hear(host, ScheduleOptions.Hourly with
+        {
+            Timetable = new SlotTimetable(new TimeOnly(0, 50), 60),
+            Signer = other,
+            Station = "M0ABC",
+            Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_047_000, Sideband.Usb, "IO83")],
+        }, slot.AddMinutes(20), 2);
+
+        var g8bpq = host.Listening.Single(l => l.Station == "G8BPQ");
+        Assert.Equal("its own directory", g8bpq.Source);
+        Assert.Equal(7_053_800, g8bpq.FrequencyHz); // where it was heard, not the advert's 7.047 MHz
+        Assert.Null(g8bpq.Locator);
+        Assert.Equal(7_052_000, g8bpq.DialHz!.Value, 0.5);
+    }
+
+    [Fact]
+    public void SdrConnect_FilterHoldsASignalAnywhereInTheAcceptedRange()
+    {
+        var (low, high) = AudioPipeline.SdrConnectFilterForAnyStation();
+        Assert.Equal(100, low);
+        Assert.True(high >= ReceiverConfig.HighestAudioCentreHz + OnAir.HalfWidthHz);
     }
 }

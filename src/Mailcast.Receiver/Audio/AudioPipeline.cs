@@ -204,6 +204,27 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     public double SignalHz { get; private set; }
 
     /// <summary>
+    /// Moves the dial this pipeline's audio is heard on to <paramref name="dialHz"/>, as a radio
+    /// retuned for a slot (a rig on a sound card) now is: the audio thread places the signal afresh
+    /// before its next block. For sources pdn-soundmodem's stream does not manage. True if it changed.
+    /// </summary>
+    internal bool SetDial(double dialHz)
+    {
+        lock (_dialGate)
+        {
+            if (Math.Abs(dialHz - DialHz) < 0.5)
+            {
+                return false;
+            }
+            DialHz = dialHz;
+            _pendingDialHz = dialHz;
+        }
+        _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"audio: the radio is on USB dial {OnAir.Mhz(dialHz)} MHz now, the signal's centre at {OnAir.AudioCentreHz(dialHz, SignalHz):F0} Hz in its audio"));
+        return true;
+    }
+
+    /// <summary>
     /// Listens for a signal centred on <paramref name="signalHz"/> from now on: where it falls in
     /// the audio changes, and the audio thread places the signal afresh before its next block, as
     /// for a retuned dial. True if it changed.
@@ -577,6 +598,15 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     }
 
     /// <summary>
+    /// The filter SDRconnect's IQ is heard through when it may be listening for any followed
+    /// station (issue #179): its filter is set when the IQ is opened and not moved after, so it is
+    /// wide enough for a signal anywhere in the 1000 to 2000 Hz this receiver accepts, which is
+    /// where every station it follows falls (SDRconnect cannot retune).
+    /// </summary>
+    internal static (double Low, double High) SdrConnectFilterForAnyStation() =>
+        (Math.Max(100, ReceiverConfig.LowestAudioCentreHz - OnAir.HalfWidthHz - 150), ReceiverConfig.HighestAudioCentreHz + OnAir.HalfWidthHz + 150);
+
+    /// <summary>
     /// Connects to SDRconnect, points its radio a little below the dial (clear of its DC spike)
     /// and demodulates its IQ here as USB on <see cref="DialHz"/>, at the modem's rate.
     /// pdn-soundmodem's client reconnects by itself after a drop, and raises Lost only once
@@ -585,7 +615,7 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     private async Task OpenSdrConnectAsync(CancellationToken cancellation)
     {
         var endpoint = _source.SdrConnectEndpoint;
-        var (low, high) = SdrConnectFilter(DialHz, SignalHz);
+        var (low, high) = SdrConnectFilterForAnyStation();
         void Journal(string line)
         {
             _log(Ascii.Clean(line));
