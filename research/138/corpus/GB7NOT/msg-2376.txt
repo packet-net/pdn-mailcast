@@ -1,0 +1,32 @@
+From: KC2NJV
+To: MESH
+Type/Status: BN
+Date/Time: 15-Oct 05:00Z
+Bid: 15690_KC2NJV
+Title: MESH NEWS
+
+R:261015/0518Z 4153@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261015/0504Z 14807@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261015/0504Z 19585@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261015/0504Z 4516@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261015/0504Z 24965@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+R:261015/0500Z 15690@KC2NJV.#NASS.NY.USA.NOAM LinBPQ6.0.25
+
+      __  __ _____ ____  _   _            _   _ _______        ______  
+     |  \/  | ____/ ___|| | | |          | \ | | ____\ \      / / ___| 
+     | |\/| |  _| \___ \| |_| |  _____   |  \| |  _|  \ \ /\ / /\___ \ 
+     | |  | | |___ ___) |  _  | |_____|  | |\  | |___  \ V  V /  ___) |
+     |_|  |_|_____|____/|_| |_|          |_| \_|_____|  \_/\_/  |____/ 
+                                                                       
+----------------------------------------------------------------------------
+[01] Why your new node might not see your local mesh
+     Why a new node can hear nothing, why a node you bring to an event lists
+     nodes it can't reach, and how to find the settings your local mesh
+     uses.
+     Link: https://meshtastic.org/blog/finding-your-local-mesh/
+ 
+----------------------------------------------------------------------------
+Till next time...
+Wayne, KC2NJV
+
+

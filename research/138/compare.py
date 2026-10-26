@@ -22,10 +22,11 @@ ROUTE = re.compile(r"^R:\d{6}/\d{4}Z? ")
 def parse(path):
     lines = open(path, encoding="latin-1").read().split("\n")
     head, routes, i = {}, [], 0
-    while i < len(lines) and (m := HEADER.match(lines[i])):
-        head[m.group(1)] = m.group(2)
-        i += 1
-    while i < len(lines) and lines[i] == "":
+    while i < len(lines):
+        if (m := HEADER.match(lines[i])):
+            head[m.group(1)] = m.group(2)
+        elif lines[i] != "":
+            break
         i += 1
     while i < len(lines) and ROUTE.match(lines[i]):
         routes.append(lines[i])

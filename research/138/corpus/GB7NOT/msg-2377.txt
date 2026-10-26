@@ -1,0 +1,35 @@
+From: KC2NJV
+To: MESH
+Type/Status: BN
+Date/Time: 16-Oct 05:00Z
+Bid: 15783_KC2NJV
+Title: MESH NEWS
+
+R:261016/0534Z 4177@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261016/0502Z 14850@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261016/0502Z 49180@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261016/0502Z 4883@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261016/0500Z 15783@KC2NJV.#NASS.NY.USA.NOAM LinBPQ6.0.25
+
+      __  __ _____ ____  _   _            _   _ _______        ______  
+     |  \/  | ____/ ___|| | | |          | \ | | ____\ \      / / ___| 
+     | |\/| |  _| \___ \| |_| |  _____   |  \| |  _|  \ \ /\ / /\___ \ 
+     | |  | | |___ ___) |  _  | |_____|  | |\  | |___  \ V  V /  ___) |
+     |_|  |_|_____|____/|_| |_|          |_| \_|_____|  \_/\_/  |____/ 
+                                                                       
+----------------------------------------------------------------------------
+[01] Portable Station for Scout JOTA Activation
+     Members at the Nashua Area Radio Society recently built a very nice
+     portable station for the upcoming 2026 Scout JOTA activation. The
+     station features a modern HF Transceiver and a 500W amplifier. The JOTA
+     station uses a multiband wire antenna and a generator for power. It is
+     quick to set up and easy for Scouts &#8230; Continue reading &#8594;
+     The post Portable Station for Scout JOTA Activation appeared first on
+     Our HAM Station.
+     Link: https://stationproject.blog/2026/10/15/jota-portable-station/
+ 
+----------------------------------------------------------------------------
+Till next time...
+Wayne, KC2NJV
+
+

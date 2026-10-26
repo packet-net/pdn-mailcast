@@ -1,0 +1,30 @@
+From: LU9DCE
+To: NEWS
+Type/Status: BN
+Date/Time: 20-Oct 17:45Z
+Bid: 25527_LU9DCE
+Title: DX NEWS 20-OCT
+
+R:261020/1759Z 4303@GB7RDG.#42.GBR.EURO LinBPQ6.0.26
+R:261020/1746Z @:GB7CIP.#32.GBR.EURO #:8620 [Caterham Surrey GBR]
+R:261020/1746Z 25301@VK2RZ.#SYD.NSW.AUS.OC LinBPQ6.0.25
+R:261020/1746Z 5520@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261020/1745Z 25527@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM
+
+
+

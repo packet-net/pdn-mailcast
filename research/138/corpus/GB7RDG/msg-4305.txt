@@ -1,0 +1,30 @@
+From: KF7PSM@KE0GB.#SECO.CO.USA.NOAM
+To: PACKET
+Type/Status: B$
+Date/Time: 20-Oct 19:42Z
+Bid: 15935_KE0GB
+Title: HF Packet
+
+Body: 819
+
+R:261020/2001Z 15028@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261020/1959Z 20039@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261020/1959Z 38933@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261020/1959Z 21336@N3HYM.#FRDK.MD.USA.NOAM BPQ6.0.25
+R:261020/1958Z 12921@W9GM.#SWWI.WI.USA.NOAM BPQ6.0.26
+R:261020/1942Z 15935@KE0GB.#SECO.CO.USA.NOAM LinBPQ6.0.25
+
+I'm wondering how many stations operate on HF using standard ax.25 300 baud packet
+like on NETWORK 105 that are using standard TNC devices instead of direwolf or
+soundmodem etc. If you do, do you think it would be beneficial to have a 
+device you can install on external modem header that would give the device
+fx.25 capability for error correction on hf?
+
+I have an idea and am wondering if it would be beneficial to the HF
+300 baud packet community.
+
+73 de KF7PSM
+
+
+
+

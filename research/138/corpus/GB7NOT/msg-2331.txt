@@ -1,0 +1,84 @@
+From: K7EK
+To: HERMES
+Type/Status: BN
+Date/Time: 12-Oct 17:48Z
+Bid: 51763_K7EK
+Title: Mercury v1.9.18 is here, with a WARNING
+
+R:261012/2032Z 4099@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261012/1937Z 14725@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261012/1934Z @:GB7CIP.#32.GBR.EURO #:7798 [Caterham Surrey GBR] $:51763_K7EK
+R:261012/1929z @:SR1BSZ.SZ.POL.EU $:51763_K7EK
+R:261012/1937z @:SR6DWH.#DSL.POL.EU $:51763_K7EK
+R:261012/1934z @:OK1TOR.CZE.EU $:51763_K7EK
+R:261012/1908z @:OK0NAG.#BOH.CZE.EU $:51763_K7EK
+R:261012/1902Z @:F3KT.#44.FPDL.FRA.EU #:48414 [Pont Saint Martin] LFBB7.0.11
+R:261012/1858Z 17557@F1UBL.FRPA.FRA.EURO LinBPQ6.0.24
+R:261012/1748Z 51763@K7EK.#NOKY.KY.USA.NOAM BPQ6.0.25
+
+
+"
+
+Mercury 1.9.18 Latest @github-actions github-actions released this 49 minutes ago
+
+v1.9.18 9df34e9
+
+Warning
+
+Mercury 1.9.18 does not talk to Mercury 1.9.17 or any older version over 
+the air, in either direction. A 1.9.18 station and a 1.9.x station never connect. 
+
+Upgrade every station of a network together (on HERMES, the gateway and 
+all its remote stations in the same window).
+
+Read Upgrading to 1.9.18 before upgrading. It says what an operator sees with 
+mixed versions, how to upgrade, and what was tested before this release.
+
+"
+
+K7EK wil upgrade to Mercury v1.9.18 later this afternoon, giving this bulletin
+time to make it through BBS forwarding channels.
+
+---
+
+Get Mercury Modem here:
+
+https://github.com/Rhizomatica/mercury/releases
+
+-
+
+K7EK runs Mercury  as well as VARA-HF and Pactor 1/2/3/4 24/7 on the following 
+time schedule. Everyone is welcome:
+
+0000-1259z:  3.587 mhz
+
+1300-1859z:  7.1009 mhz 
+
+1900-2359z:  10.1430 mhz
+
+This schedule may change at any time in accordance with operational requirements 
+and seasonal propagation patterns. Check this schedule at  https://www.qrz.com/db/K7EK     
+often to insure that you have  the most up to date information.
+
+All frequencies are USB/dial.  For Center frequencies (CF), add 1.5 kilohertz.
+
+BPQ32 BBS is K7EK.
+
+BPQ32 Netrom Node is K7EK-7.
+
+Winlink RMS is K7EK-10.
+
+BPQ32 Worldwide Chat is K7EK-11.
+
+Make sure you choose the correct SSID for what it is you are trying to connect. Some
+have connected to the BPQ32 BBS, K7EK, when they thought they were connecting to
+the Winlink RMS. Their messages stayed on the BBS and did not make it to Winlink
+without manual system operator intervention.
+
+Best regards,
+
+Gary, K7EK
+
+Radcliff, KY (EM77at)
+
+

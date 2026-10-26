@@ -1,0 +1,83 @@
+From: EI5IN
+To: NEWS
+Type/Status: B$
+Date/Time: 24-Oct 09:59Z
+Bid: 14854_EI5IN
+Title: IRISH RADIO TRANSMITTERS SOCIETY NEWS
+
+R:261024/1007Z @:GB7CIP.#32.GBR.EURO #:8953 [Caterham Surrey GBR] $:14854_EI5IN
+R:261024/1006Z 3736@VE3KPG.#ECON.ON.CAN.NOAM BPQ6.0.26
+R:261024/1005Z 45283@VE3TOK.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261024/1005Z 6044@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261024/1005Z 58629@K5DAT.#NEWI.WI.USA.NOAM LinBPQ6.0.26
+R:261024/1003Z 55607@PY2BIL.SP.BRA.SOAM LinBPQ6.0.26
+R:261024/0959Z 14854@EI5IN.EI5IN.IRL.EURO LinBPQ6.0.26
+
+ ___ ____ _____ ____
+|_ _|  _ \_   _/ ___|
+ | || |_) || | \___ \
+ | ||  _ < | |  ___) |
+|___|_| \_\|_| |____/
+
+Irish Radio Transmitters Society
+Radio News Bulletin
+Sunday October 18th, 2026
+
+***
+
+IRTS President Attends 2026 RSGB Convention
+
+IRTS President Jeffrey Roe, EI7IRB, recently attended the 2026 RSGB Convention in Milton Keynes as a guest of Bob Beebe, GU4YOX, President of the Radio Society of Great Britain. One of the highlights of the Convention was Jeffreys participation in a filmed discussion with four presidents from the amateur-radio community. The panel also included Bob Beebe of the RSGB, Timothy Ellam, VE6SH, President of the IARU, and Christian Entsfellner, DL3MBG. The discussion covered the future of amateur radio, including regulation, spectrum defence, cooperation between societies, and the modern image of the hobby.
+
+Jeffrey also took the opportunity to carry out two Parks on the Air activations during the visit. On Friday, he activated Glebe Farm Wetland Reserve, reference GB-4764. On Sunday, he joined the RSGB Youth Team for an activation at Ouzel Valley Park, reference GB-3495. During Sundays activation, Jeffrey also called into the IRTS 40-metre news bulletin, demonstrating the service to the youth operators and showing how amateur radio can connect activities in the field with the wider amateur-radio community. The youth activation was a particular highlight, demonstrating the enthusiasm and energy that young people continue to bring to amateur radio. 
+
+Jeffrey would like to thank Bob Beebe and the RSGB team for their friendship, hospitality and warm welcome, and looks forward to continuing to strengthen the links between the RSGB, IRTS, and the wider amateur-radio community.
+
+***
+
+HAREC Online Training Class Commencing October 29th
+
+The National Shortwave Listeners Club has announced that its new HAREC preparation course, Class Juliett, will begin on Thursday, October 29th. Sessions will run on Thursday evenings from 8 p.m. to 10 p.m. on Zoom, continuing through to the HAREC examination in May 2027, with a brief break over Christmas. Anyone interested in studying for their amateur radio licence is encouraged to enrol. For full details and registration, visit swl.ie
+
+***
+
+Shannon Basin Radio Club Hosting the IRTS AGM Weekend 2027
+
+As mentioned in previous bulletins, Shannon Basin Radio Club will host the 2027 IRTS AGM Weekend on Saturday and Sunday, April 24th and 25th, 2027, at the centrally located Athlone Springs Hotel, County Roscommon.
+Radio-related activities will take place on Saturday afternoon, followed that evening by the IRTS Gala Dinner. On Sunday morning, the Shannon Basin Radio Club Rally will commence, followed by the IRTS 2027 AGM on Sunday afternoon, April 25th.
+
+A special accommodation rate is available for attendees at the Athlone Springs Hotel for Saturday, April 24th: 179 euro per night Bed and Breakfast for two people sharing, or 149 euro for a single room. To secure these special rates, guests must call the hotel directly and quote booking reference number 428165. Trader and club table applications for the rally are now open; please contact admin@sbrc.ie for booking details and further information.
+
+Staying with Shannon Basin Radio Club, their next SSB DX net will take place on Thursday night from 9 p.m. on the 80m band. The frequency will be 3.775MHz plus or minus QRM. All are welcome including SWLs. Conditions on the band have been very good for the first two nets of the season so far with large numbers of stations in the log as a result. Visit sbrc.ie for further information about the club and its activities.
+
+***
+
+HF News
+
+In HF news, look out for activity from Lesotho, where the 7P8GE DXpedition team will be active through October 23rd. Over in St. Vincent and the Grenadines, Brian, GW4DVB, will operate as J88PI starting this weekend from October 17th through the 24th. Meanwhile, following their activation from the Democratic Republic of Congo, the 9T0MD team has returned home safely, finishing their challenging DXpedition with over 90,000 QSOs in the log. Please check QRZ.com profiles and DX clusters for updated operating frequencies and QSL information for these stations.
+
+***
+
+VHF/Microwave News
+
+On Tuesday the 20th of October, the RSGB 1.3GHz UK Activity Contest runs from 19:00 UTC to 21:30 UTC. VHF and microwave enthusiasts should note that the next major meteor shower, the Orionids, peaks overnight this coming Wednesday, October 21st, into Thursday, October 22nd. Created as the Earth's orbit passes through the debris trail of Halley's Comet, this shower produces fast-moving meteors with persistent trains, offering excellent conditions for meteor scatter communications across the VHF bands.
+
+***
+
+IRTS 80m Counties Contest Coming Up on Wednesday
+
+The final event of the IRTS contest calendar, the 80-metre Counties Contest, takes place this coming Wednesday, October 21st. The contest runs for one hour, starting at 9 p.m. local time. Welcoming both SSB and CW operators as well as SWLs, it offers a fantastic opportunity for stations across the country and overseas to get on air and finish out the contest year on a high note. For full rules and contest guidance, please visit irts.ie/contests.
+
+***
+
+Weekly Tuesday Telegraph Club CW Contests
+
+For operators seeking a fast-paced CW challenge, the Tuesday Telegraph Club runs weekly one-hour contests every Tuesday evening at 19:30 UTC on the 40-metre and 80-metre bands. Featuring high power, low power, and QRP sections, the contest's unique format resets duplicate contacts every 15 minutes, allowing stations to work the same operator up to four times per band for points using standard serial exchanges. The event is fully supported by popular logging software. Full rules and configuration files are available at spcwc.pl 
+
+***
+
+Items for Inclusion in Next Week's Radio News
+
+That is the news for this week. Thanks to everyone for sending items into the weekly IRTS radio news. They are very much appreciated and are a great way to update the rest of the community about activities. If you have any club events, news, meetings, or other items of interest, please send them via email to newsteam@irts.ie . The deadline is midnight on Thursdays. Items intended for inclusion in Echo Ireland should be sent to echoireland@irts.ie
+
+

@@ -1,0 +1,82 @@
+From: G8MNY
+To: IBM
+Type/Status: B$
+Date/Time: 24-Oct 09:00Z
+Bid: 8939_GB7CIP
+Title: Gameport/Joystick Connections
+
+R:261024/0900Z @:GB7CIP.#32.GBR.EURO #:8939 [Caterham Surrey GBR] $:8939_GB7CIP
+
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To  : IBM@WW
+
+
+Game port short Jumper 5 two ports.
+J3 Pin no    DB15       sig name
+  1            1          +5VDC
+  3            2          Button 1
+  5            3          X Axis
+  7            4          Ground
+  9            5          Ground
+ 11            6          Y axis
+ 15            8          +5VDC
+---------------------------------
+  2            9          +5VDC
+  4           10         Button 3
+  6           11         X Axis
+  8           12         Ground
+ 10           13         Y Axis
+ 12           14         Button 4
+ 14           15         +5VDC
+
+The Standard IBM Joystick connector utilises a 15 pin Male Db connector:-
+Taken from the old IBM book.
+
+Joystick A
+   1       Pot common feed
+   2       Button  "
+   3       X- coordinate slider
+   4       Button  "
+   5       NC
+   6       Y- coordinate slider
+   7       NC
+   8       NC
+
+Joystick B
+   9      Pot Common feed
+  10      Button  "
+  11      X - coordinate slider.
+  12      Button  "
+  13      Y - coordinate slider.
+  14      NC
+  15      NC
+
+  NC = No Connection.
+  Pots are 0-100K lin
+  The "unused" end of the pots is unconnected.
+
+Name Port Adapter Connections :-
+Pin    I/O    Description
+-------------------------
+ 1      >      +5 Volts
+ 2      <      Button 4
+ 3      <      Position 0
+ 4             Ground
+ 5             Ground
+ 6      <      Position 1
+ 7      <      Button 5
+ 8      >      + 5 Volts
+ 9      >      + 5 Volts
+10      <      Button 6
+11      <      Position 2
+12             Ground
+13      <      Position 3
+14      <      Button 7
+15      >      +5 Volts
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP
+
+

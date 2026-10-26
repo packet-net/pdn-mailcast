@@ -1,0 +1,251 @@
+From: NK5LA
+To: ALL
+Type/Status: BN
+Date/Time: 13-Oct 00:44Z
+Bid: 3994_NS2B
+Title: PCL NET SCRIBE OCT 12 2026
+
+R:261013/0153Z 4100@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261013/0132Z 14727@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261013/0059Z 19423@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261013/0059Z 38662@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261013/0058Z 20655@N3HYM.#FRDK.MD.USA.NOAM BPQ6.0.25
+R:261013/0057Z 57115@K5DAT.#NEWI.WI.USA.NOAM LinBPQ6.0.25
+R:261013/0056Z 15512@KC2NJV.#NASS.NY.USA.NOAM LinBPQ6.0.25
+R:261013/0044Z 3994@NS2B.#WNY.NY.USA.NOAM LinBPQ6.0.25
+
+PCL NET SCRIBE OCT 12 2026
+
+NK5LA, Daryl, Arkansas (Net Control/Scribe)
+N6UTC, Endaf, California (Early Checkin)
+KX4AC, Carl, California (Early Checkin)
+VA7RBP, Rick, Canada (Early Checkin)
+K0WAV, Scott, Arkansas (1 rounder)
+NS2B, Bob, New York (Sysop)
+N3MEL, Glenn, Pennsylvania
+
+**
+
+GE All, and welcome to the Oct. 12, 2026 PCL Net.
+Early checkins for Endaf, N6UTC (heading toward
+PacifiCon at the end of the week)...Carl, KX4AC
+(on vacation with his XYL at Disneyland)...and
+Rick, VA7RBP (Canadian Thanksgiving Holiday).
+
+Net order is Daryl, Scott, Bob (NY), Glenn, and 
+whoever else shows up.
+
+**
+
+NK5LA:
+
+Our next net holiday is Nov. 23 for Thanksgiving 
+Week; Canada had theirs this weekend. I guess that
+is why the US gets table scraps (hi hi). But, I 
+wish our Canadian hams a happy holiday. Next, I 
+hope Carl and his XYL took plenty of money to the 
+Mickey Mouse operation in Anaheim (hi hi). I saw 
+where the Day Park Pass is now over $300!! Then, 
+you add in the transportation, food, souvenir, and 
+other costs, you could get a nice radio instead. 
+Endaf is going to PacifiCon in the northwest US 
+this coming weekend.
+
+I finally got the replacement battery for my APC
+UPS unit on the main computer...a similar battery
+for another UPS unit has to wait until November.
+At least I didn't have to pay any property taxes
+this year. When I tried to contact one of my late
+brother's ex-wives this spring, I just got a bunch
+of noise in the background and left a voice mail,
+but never heard back. Since I had sold it all to
+her for $1, it's none of my concern now.
+
+I figured out how to work DMR and TGIF with the 
+BlueDV program, and got QSO One installed on my 
+smartphone. Now, if I can get the energy to work 
+things. I crashed out much of today, with stiffness
+and a headache. I guess the arthritis is getting 
+worse with the change of seasons. There's a chance 
+of storms on Wednesday, and we may see a frost or 
+freeze in portions of the state this weekend, but 
+it's getting to be that time of year. I'm still 
+hearing different outlooks on what kind of winter 
+we'll have; but we'll know for sure eventually.
+
+I'll be doing a license exam session on Oct. 24. 
+Then, I'll miss the Oct. 26 PCL Net, as I'm to have 
+a chemical stress test, and an echocardiogram that 
+afternoon...so Bob, NS2B, will take the net for me 
+that night. I will have to make a co-pay on that, 
+but it'll have to wait until early November. I also 
+owe the urologist some money...it never ends (sigh!).
+
+I need to plan to early vote later this month...as I
+do NOT want to be at the polls on Election Day. And, 
+2 days before, on Sunday, November 1, much of the US 
+returns to Standard Time. Most net times won't change, 
+but check with the various net control stations to be 
+sure.
+
+**
+
+GE Scott, how was your week?? >>>
+
+K0WAV: 
+
+
+Good evening Daryl thanks for NCS and Bob thanks for 
+the venue... this past week was a bit of a blur... but 
+to sum up... I got my linbpq working better; in fact, 
+I am on it right now. Got my ampr.org vpn tunnel so I 
+have a static IP address for it.  
+
+Went to the S.P.A.R.K.-CON hamfest in Sedalia MO, it 
+was a bit light on attendance, but there were lots of 
+homecomings and such that weekend around the surrounding 
+states so there was some competing event.  
+
+I was able to pick up some refurbished mini PC for a 
+song and a dance, and I got "Jumped in" to the Brass 
+Knuckle Gang  2m CW "gang". Check them out at bkg.club 
+for more info.  my BKG number is 703.
+
+Had some vehicle drama during the trip, but all worked 
+out well and all home safe.
+
+I will be a 1 rounder so everyone have a great week and 
+7 3.  de K0WAV >>> BTU
+
+**
+
+NK5LA:
+
+Scott, first, thanks for being here. Second, FB on the 
+LinBPQ, the ampr.org tunnel, the hamfest, the new mini PC, 
+and the brass knuckle gang. There are always competing 
+things...that's why there's never a good time for a ham 
+radio license class, exam session, club meeting, net, 
+demo, hamfest, special event station, etc. -- someone, 
+somewhere, is going to miss it. See you next time.
+
+GE Bob (NY), how was your week?? >>>
+
+**
+
+NS2B: 
+
+GE All!
+
+A good week! WX was a little cool - but not complaining.
+
+Received that Quensheng UV-K1 and put the CW firmware in it. 
+I think it might make an interesting little QRP weak signal 
+radio. Can't wait till the next VHF contest to try it out!
+
+Saturday, 20M was back! Finally got to link up with my buddy 
+Steve KB9PVH in Wisconsin - seemed like months since I last 
+chatted with him!
+
+Went to the track and flagged for NASA (North America 
+Sportscar Association). Last race weekend of the year for 
+us. It'll be snowing down there soon enough!
+
+And finished Hamword in 4 guesses today.
+
+That's all for me Daryl >>>
+
+**
+
+NK5LA:
+
+Bob, when you mentioned that rig, I thought of a funny meme 
+of the HAM Happy Meal...it's in your box...guess where I'm 
+going for lunch?? (hi hi). Hope that rig works out for you. 
+FB on 20m working again, on flagging the races, and hamword.
+
+GE Glenn, how was your week?? >>>
+
+**
+
+N3MEL:
+
+Good evening everyone, there has been very little radio time, 
+as my wife fell Sunday a week ago, and was in the hospital 
+till Friday. She broke her ankle in 3 places and dislocated 
+it.
+
+So they had to put her under to reset the leg and then install 
+what works like a halo that use if you were to break your neck. 
+So she is using a walker now as she can not put any weight on 
+that foot. She goes back on the 19th to have the device removed 
+then back into surgery for plates and screws UGH..
+
+I felt really bad for her so I took 3 weeks off to help her 
+here at the house.
+
+So this months PKTNET starts this coming Sunday I just hope 
+I can keep up this month as we will be taking JS8CALL check-ins, 
+I do have a few stations around the county helping with them. 
+
+Well that's about it from SEPA same old stuff LOL, btu Daryl >>>
+
+**
+
+NK5LA:
+
+Glenn, so sorry to hear of your wife's fall. A ham with the local 
+club, who has done a lot of work with the repeaters over the years, 
+recently had his third fall within a month!! When he was at a meeting 
+in August, he looked like death warmed over. So, I hope the officers 
+can get things worked out, or their entire repeater deal will go down. 
+After having a fall in July, I can sympathize...but, the one thing 
+that really broke was the cellphone, when I lost the grip on it, and 
+it fell to the porch, and shattered. The repair facility on the mailing 
+label was WRONG, so they lost the phone, and I had no phone for nearly 
+a month!!
+
+That's it for round 1, back to the top for final comments.
+
+Scott said he was a 1 rounder, so I'll move on to Bob. Thanks for the 
+use of the BBS. Anything else?? >>>
+
+**
+
+NS2B: 
+
+nothing more here - everyone have a good week - 73 >>>
+
+**
+
+NK5LA:
+
+Take care, Bob...see you next time.
+
+Glenn, anything else?? >>>
+
+**
+
+N3MEL:
+
+No Daryl, that's it from here, have a great week 73 >>>
+
+**
+
+NK5LA:
+
+Take care, Glenn...hope your wife gets better soon.
+
+That'll do it for tonight's PCL Net. I'll post the scribe this evening 
+after I finish another net. Stay safe, healthy, weather aware, and 
+radio-active.
+
+73 and GN DE NK5LA >>>
+
+
+Daryl Stout, NK5LA, Little Rock, Arkansas
+
+
+
+
+

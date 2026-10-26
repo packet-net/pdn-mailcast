@@ -1,0 +1,92 @@
+From: DJ5AV
+To: DXNEWS
+Type/Status: BN
+Date/Time: 08-Oct 23:06Z
+Bid: ARLD040O
+Title: ARLD040 DX news
+
+R:261008/2315Z 4002@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261008/2309Z 14541@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261008/2308Z @:GB7CIP.#32.GBR.EURO #:7376 [Caterham Surrey GBR] $:ARLD040O
+R:261008/2308z @:DK0WUE.#BAY.DEU.EU $:ARLD040O
+R:261008/2308z @:DB0RKB.#BAY.DEU.EU $:ARLD040O
+R:261008/2306z @:DB0FHN.#BAY.DEU.EU [JN59NK Nuernberg] obcm1.13 LT:050
+From: DJ5AV @ DB0FHN.#BAY.DEU.EU (Mike)
+To:   DXNEWS @ WW
+X-Info: No login password
+
+
+ZCZC AE40
+QST de W1AW
+DX Bulletin 40 ARLD040
+From ARRL Headquarters
+Newington, CT  October 8, 2026
+To all radio amateurs
+
+SB DX ARL ARLD040
+ARLD040 DX news
+
+This week's bulletin was made possible with information provided by The Daily DX, 425 DX
+News, DXNL, Contest Corral from QST and the ARRL Contest Calendar and WA7BNM web sites.
+Thanks to all.
+
+5W, SAMOA. Jacek, 5W0AF, is QRV through October 12. Activity is on HF bands using
+various modes.
+
+6O, SOMALIA. Pertti, OH2RF, will be QRV as 6O2M through October 25. Activity will be
+holiday style on HF bands using various modes.
+
+7P, LESOTHO. 7P8JL, 7P8LZ, and 7P8TR are QRV through October 11. Activity will be on
+HF bands using various modes.
+
+8Q, MALDIVES. Juergen, 8Q7JH, is QRV from Thulhagiri Island, IOTA AS-013, through
+October 10. Activity will be on HF bands using various modes.
+
+8R, GUYANA. Aldir, 8R1TM, is QRV through October 12. Activity will be on HF bands
+using various modes.
+
+9Q, DEMOCRATIC REPUBLIC OF THE CONGO. 9T0MD is QRV through October 11. Activity has
+been reported on 160 through 6 meters, and QO-100, including EME.
+
+C5, THE GAMBIA. Lui, C5R, is QRV through November 4. Activity will be on HF bands
+using various modes.
+
+FW, WALLIS AND FUTUNA ISLANDS. Janusz, SP9FIH, is QRV as FW1P from Wallis Island, IOTA
+OC-054, through October 16. Activity will be on HF bands using various modes.
+
+H44, SOLOMON ISLANDS. Bernhard, H44MS, is QRV from IOTA OC-047 through November 20.
+Activity will be on HF bands using various modes.
+
+V5, NAMIBIA. V51WH and V55Y are QRV through October 10. Activity will be on HF bands
+using various modes.
+
+VK9, WILLIS ISLAND. Sands, VK9WX, is QRV through October 31. Activity will be on HF
+bands using various modes.
+
+VP8, SOUTH SHETLAND ISLANDS. The Polish Arctic Station, HF0PAS, is QRV through
+October 31. Activity is on 40 meters using SSB split.
+
+Z8, SOUTH SUDAN. Alex, HB9FND, is QRV as Z81Q from Juba. Activity is on the HF
+bands using CW.
+
+ZA, ALBANIA. John, AE5X, is QRV as ZA/AE5X beginning October 8. Activity is QRP
+on 20 through 10 meters using various modes.
+
+THIS WEEKEND ON THE RADIO. NCCC FT4 Sprint, Weekly RTTY Test, NCCC Sprint, K1USN Slow
+Speed Test, Makrothen RTTY Contest, QRP ARCI Fall QSO Party, 10-10 Int. 10-10 Day
+Sprint, Oceania DX Contest, CW, SKCC Weekend Sprintathon, Scandinavian Activity Contest,
+SSB, Arizona QSO Party, Pennsylvania QSO Party, South Dakota QSO Party, PODXS 070 Club
+160m Great Pumpkin Sprint, UBA ON Contest, CW, and 4 States QRP Group Second Sunday
+Sprint are on tap for this weekend.
+
+K1USN Slow Speed Test, ICWC Medium Speed Test, OK1WC Memorial MWC, ICWC Medium Speed
+Test, Worldwide Sideband Activity Contest, ICWC Medium Speed Test, DARC RTTY Sprint,
+Tuesday's Telegraphy Contest, NAQCC CW Sprint, Phone Weekly Test, A1Club AWT, CWops
+Test CWT, VHF-UHF FT8 Activity Contest, Mini-Test 40, Mini-Test 80, RSGB 80m Autumn
+Series, Data, and CWops Test CWT are all scheduled for October 12 through October 14.
+
+Please see October QST, page 94, and the ARRL and WA7BNM contest
+----------------
+Relayed from the internet by dj5av @ db0fhn.#bay.deu.eu
+
+

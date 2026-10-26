@@ -1,0 +1,18 @@
+From: G8BPQ
+To: MCAST
+Type/Status: BF
+Date/Time: 18-Oct 16:30Z
+Bid: 62918WG8BPQ
+Title: MCR G8BPQ 2026-10-18
+
+MCR1 0.16.2 IO92kx sc 7/7 32:AUD11,RIG21 0 0
+09 - 0 - - IU+PU
+10 - 0 0 -0.1 IU+PU 1 - 0.39 0.42 - p
+11 W3 20 2 -0.4 IG+PU 2 1.5/-10 0.45 0.34 235 p
+12 - 0 - - IU+PU
+13 W3 3 5 -0.4 IU+PU 1 - 0.27 0.27 - p
+14 W4 45 2 -1.1 IU+PU 1 - 0.51 0.19 - b
+15 W3 28 13 -0.8 IG+PU 1 - 0.29 0.23 - p
+16 W4 16 4 -0.8 IU+PU 3 1.7/-6 0.79 0.52 268 p
+
+

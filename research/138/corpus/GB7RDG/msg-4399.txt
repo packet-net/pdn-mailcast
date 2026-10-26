@@ -1,0 +1,73 @@
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To: IBM
+Type/Status: B$
+Date/Time: 25-Oct 08:19Z
+Bid: 9050_GB7CIP
+Title: Mouse Connections
+
+Body: 2461
+
+R:261025/0823Z 15185@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261025/0823Z 20411@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261025/0822Z 49860@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261025/0822Z 6177@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261025/0821Z @:PI8ZTM.#ZH1.NLD.EURO #:61617 [Den Haag] $:9050_GB7CIP
+R:261025/0820z @:DK0WUE.#BAY.DEU.EU $:9050_GB7CIP
+R:261025/0820z @:HB9ON.TI.CHE.EU $:9050_GB7CIP
+R:261025/0820z @:IK7NXU.IPUG.ITA.EU $:9050_GB7CIP
+R:261025/0820z @:IK6IHL.IABR.ITA.EU $:9050_GB7CIP
+R:261025/0820z @:IZ3LSV.IVEN.ITA.EU $:9050_GB7CIP
+R:261025/0820Z @:ED1ZAC.EAC.ESP.EU #:32679 [EANET1G.06] $:9050_GB7CIP
+R:261025/0819Z @:GB7CIP.#32.GBR.EURO #:9050 [Caterham Surrey GBR] $:9050_GB7CIP
+
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To  : IBM@WW
+
+By G8MNY                                                 (Updated Dec 05)
+
+PS2 Mouse.           or     ps2 mouse                  PS2 Mouse
+Pin   Description           1  mouse clk              1 = Mouse Data
+9     +5V DC                2  ground                 2 = No Connection
+11    Mouse Clk             3  n.c.                   3 = Ground
+12    Mouse Data            4  mouse data             4 = +5V DC
+14    Ground                5  n.c.                   5 = Mouse Clock
+                            6  n.c.                   6 = No Connection
+                            7  n.c.
+                            8  +5vdc
+
+6-pin bus connector (PS/2)
+1    Data
+2    Reserved
+3    Signal Ground
+4    Power (+5V)
+5    Clock
+6    Reserved
+
+D Type 9 pin                         or     9-pin connector
+1        DCD                                1    CD      Clocking
+2        Rxd
+3        Txd                                3    CTS     Power (+5V)
+4        DTR         < (-5V ?)              4    RI      Data
+5        Sig Ground                         5    Ground  Signal Ground
+6        DSR         < (Input ?)
+7        RTS (+5V)
+8        CTS
+9        Ring Indicator
+
+& From: Brian VK3EUB@VK3BBS.#MEL.VIC.AUS.OC
+Genius Mouse Model GM6000         Quick Mouse Model QM-E1
+Cable colours
+DB9 Socket                        DB25 Socket
+ 2 White                           1 Green
+ 3 Orange                          2 Orange
+ 4 Brown                           3 White
+ 5 Black                           4 Dark Blue
+ 7 Dark Blue                       7 Black
+                                  20 Dark Brown
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP
+
+

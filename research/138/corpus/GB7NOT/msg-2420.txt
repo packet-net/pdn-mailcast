@@ -1,0 +1,30 @@
+From: LU9DCE
+To: NEWS
+Type/Status: BN
+Date/Time: 19-Oct 17:45Z
+Bid: 25421_LU9DCE
+Title: DX NEWS 19-OCT
+
+R:261019/1843Z 4283@GB7RDG.#42.GBR.EURO LinBPQ6.0.26
+R:261019/1746Z 14986@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261019/1746Z 19948@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261019/1745Z 5040@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261019/1745Z 25421@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM
+
+
+

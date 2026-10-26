@@ -1,0 +1,92 @@
+From: VA2OM
+To: SOLAR
+Type/Status: BN
+Date/Time: 12-Oct 09:15Z
+Bid: 20578_VE2PKT
+Title: Solar and Geomagnetic Activity
+
+R:261012/1020Z 4079@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261012/0916Z 14688@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261012/0915Z 19366@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261012/0915Z @:PI8LAP.#ZLD.NLD.EURO [Kortgene] #:14007 XrLin505c
+R:261012/0915Z 20578@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+
+ 
+:Product: Weekly Highlights and Forecasts
+:Issued: 2026 Oct 12 0344 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# https://www.swpc.noaa.gov/content/subscription-services
+#
+#                Weekly Highlights and Forecasts
+#
+Highlights of Solar and Geomagnetic Activity
+05 - 11 October 2026
+
+Solar activity was at very low to (R1-R2 - Minor-Moderate) levels
+throughout the summary period. Region 4545 (N17, L=222, class/area
+Dso/070 on 08 Oct) produced an impulsive M1.0 (R1 - Minor) flare at
+05/1848 UTC. Region 4547 (N15, L=274, class/area Cri/030 on 06 Oct)
+produced an M1.3 flare at 09/1409 UTC as the region exited the west
+limb. The majority of the activity was observed from Region 4549
+(N10, L=216, class/area Eki/260 on 09 Oct). During the period, the
+region produced 39 C-class, 3 R1-Minor, and 2 R2-Moderate flares. It
+produced an M6.7/2b flare at 08/1548 UTC with an associated Type II
+Sweep with an estimated velocity of 4,125 km/s and a Type IV Sweep.
+At 10/1510 UTC, this region produced an M6.4/1n flare with an
+associated Type II Sweep with an estimated velocity of 929 km/s and
+a 240 sfu Tenflare. The largest region on the disk, Region 4551
+(S15, L=102, class/area Eko/400 on 11 Oct) produced 3 C-class
+flares. In total, 50 C-class and 7 M-class events were observed. 
+
+No proton events were observed at geosynchronous orbit.
+
+The greater than 2 MeV electron flux at geosynchronous orbit reached
+high levels on 05-08 Oct and 10 Oct with a peak of 11,300 pfu
+observed at 08/1250 UTC. Normal to moderate levels were observed on
+09 and 11 Oct. 
+
+Geomagnetic field activity ranged from quiet to G3-Strong levels
+during the period. Quiet to G1-Minor levels were observed on 05 Oct
+and quiet to unsettled levels were observed on 06 Oct, all due to
+influences from a positive polarity CH HSS. Mostly quiet levels were
+observed on 07-08 Oct. Activity increased on 09 Oct when unsettled
+to active levels were observed due to weak influence from a 06 Oct
+CME. Activity levels increased further on 10 Oct when unsettled to
+G3-Strong levels were observed due to continued influence from CME
+activity observed on 06 and 07 Oct. During this level of high
+activity, total magnetic field strength increased to a peak of 45 nT
+at about 10/1500 UTC and Bz observed some southward deflections to
+30 nT at about 10/1630 UTC. Solar wind speeds rapidly increased from
+about 380 km/s at 10/1500 UTC to a peak of about 890 km/s at 10/1755
+UTC. Associated with this CME activity was some influence from a
+negative polarity CH HSS. 
+
+Forecast of Solar and Geomagnetic Activity
+12 October - 07 November 2026
+
+Solar activity is likely to continue at very low to low levels with
+isolated R1-Minor levels possible throughout the period. 
+
+No proton events are expected at geosynchronous orbit.
+
+The greater than 2 MeV electron flux at geosynchronous orbit is
+expected to be at high levels on 14-15 Oct, 23-28 Oct, and 01-04
+Nov, all due to anticipated influence from multiple, recurrent CH
+HSSs. 
+
+Geomagnetic field activity is expected to be reach G1-Minor
+geomagnetic storm levels on 13 and 31 Oct , and 01 Nov. Active
+levels are likely on 12, 22, and 23 Oct. Unsettled levels are likely
+on 14-15, 21, and 24 Oct and 02 and 06-07 Nov. All increases in
+goemagnetic activity are associated with anticipated influence from
+multiple, recurrent, coronal hole HSSs. The remainder of the outlook
+period is likely to be at mostly quiet levels. 
+  
+ 
+ 73 de VA2OM, SYSOP of VE2PKT
+ 
+
+
+
+

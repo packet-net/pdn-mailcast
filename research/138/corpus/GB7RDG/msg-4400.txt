@@ -1,0 +1,173 @@
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To: IBM
+Type/Status: B$
+Date/Time: 25-Oct 08:17Z
+Bid: 9049_GB7CIP
+Title: Cables for Laplink, Fastlynx etc
+
+Body: 5526
+
+R:261025/0823Z 15186@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261025/0823Z 20412@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261025/0822Z 21950@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+R:261025/0821Z @:CX2SA.SAL.URY.SOAM #:5944 [Salto] FBB7.00e $:9049_GB7CIP
+R:261025/0818Z 34882@OK2PEN.SP.BRA.SOAM [Sao Jose dos Campos] $:9049_GB7CIP
+R:261025/0817Z @:GB7CIP.#32.GBR.EURO #:9049 [Caterham Surrey GBR] $:9049_GB7CIP
+
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To  : IBM@WW
+
+The following are cables that can be used with Laplink, Interlink & Fastlynx.
+Serial cables:
+DB9F  to   DB9F        DB25F   to   DB25F
+ 2 -------- 3            2 ---------- 3
+ 3 -------- 2            3 ---------- 2
+ 4 -------- 6            4 ---------- 5
+ 5 -------- 5            5 ---------- 4
+ 6 -------- 4            6 --------- 20
+ 7 -------- 8            7 ---------- 7
+ 8 -------- 7           20 ---------- 6
+
+DB9F  to   DB25F      DB9F -- DB25F   to   DB9F -- DB25F
+ 2 --------- 2          2 --- 3  ----------- 3 --- 2
+ 3 --------- 3          3 --- 2  ----------- 2 --- 3
+ 4 --------- 6          4 ---20  ----------- 6 --- 6
+ 5 --------- 7          5 --- 7  ----------- 5 --- 7
+ 6 -------- 20          6 --- 6  ----------- 4 -- 20
+ 7 --------- 5          7 --- 4  ----------- 8 --- 5
+ 8 --------- 4          8 --- 5  ----------- 7 --- 4
+
+Pinouts of Fastlynx v2         Parallel Cable:
+parallel cable for FAST data   (Printer Port cable)
+transfer.(18 way required)     25 pins D type connector.
+MALE to  MALE
+ 1 -----  7
+ 2 -----  15                DB25M   to   DB25M
+ 3 -----  13                  2 ----------- 15
+ 4 -----  12                  3 ----------- 13
+ 5 -----  10                  4 ----------- 12
+ 6 -----  11                  5 ----------- 10
+ 7 -----  1                   6 ----------- 11
+ 8 -----  14                 10 -----------  5
+ 9 -----  16                 11 -----------  6
+10 -----  5                  12 -----------  4
+11 -----  6                  13 -----------  3
+12 -----  4                  15 -----------  2
+13 -----  3                  25 ----------- 25
+14 -----  8
+15 -----  2
+16 -----  9
+17 -----  17
+18 -----  18
+
+This cable is also suitable for use with Microsoft's Interlink. Interlink
+(which is included with DOS 6) is a cut down version of Fastlynx.
+-------------------------------------------------------------------------------
+This is the pin layout for a PARALLEL INTERLINK CABLE For all you people with
+two computers & MS.DOS 6. with interlnk & intersvr. Both plugs are standard
+25 pin D plug. Hope this is useful.
+                             INTERLNK,XTREE,LAPLINK.
+25 pin D      25 pin D      25 pin          25 pin
+ 1 not connected  1          ======          ======
+ 2 ------------- 15          pin 2  <ÄÄÄÄ>  pin 15
+ 3 ------------- 13          pin 3  <ÄÄÄÄ>  pin 13
+ 4 ------------- 12          pin 4  <ÄÄÄÄ>  pin 12
+ 5 ------------- 10          pin 5  <ÄÄÄÄ>  pin 10
+ 6 ------------- 11          pin 6  <ÄÄÄÄ>  pin 11
+ 7 not connected  7         pin 15  <ÄÄÄÄ>   pin 2
+ 8 not connected  8         pin 13  <ÄÄÄÄ>   pin 3
+ 9 not connected  9         pin 12  <ÄÄÄÄ>   pin 4
+10 -------------  5         pin 10  <ÄÄÄÄ>   pin 5
+11 -------------  6         pin 11  <ÄÄÄÄ>   pin 6
+12 -------------  4         pin 25  <ÄÄÄÄ>  pin 25
+13 -------------  3
+14 not connected 14
+15 -------------- 2
+16 not connected 16
+17 not connected 17
+18 ------------- 18
+19 ------------- 19
+20 ------------- 20
+21 ------------- 21
+22 ------------- 22
+23 ------------- 23
+24 ------------- 24
+25 ------------- 25
+------------------------------------------------------------------------------
+Laplink3 cabling Specification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1)  25 way Parallel port connections
+2)  25 way to 25 way serial port connections
+3)  9 way to 25 way port connections
+
+The parallel connection is roughly twice as fast as the serial connection.
+--------------------------------------------------------------------------
+25 way Parallel port Connections
+================================
+ 2  ----  15
+ 3  ----  13
+ 4  ----  12
+ 5  ----  10
+ 6  ----  11
+10  ----   5
+11  ----   6
+12  ----   4
+13  ----   3
+15  ----   2
+25  ----  25
+--------------------------------------------------------------------------
+25 way to 25 way Serial port Connections
+========================================
+ 2  -----  3
+ 3  -----  2
+ 4  -----  5
+ 5  -----  4
+ 6  ----- 20
+ 7  -----  7
+20  -----  6
+--------------------------------------------------------------------------
+9 way to 25 way Serial port Connections
+=======================================
+ 2  -----  2
+ 3  -----  3
+ 4  -----  6
+ 5  -----  7
+ 6  ----- 20
+ 7  -----  5
+ 8  -----  4
+--------------------------------------------------------------------------
+LAPLINK 3 - cable
+wiring of serial cable for use with LAPLINK III
+ 2  oo  3
+ 3  oo  2
+ 7  oo  7
+Look for Interlnk in DOS 6+ for a more complete cable wiring which will
+allow faster transfers.
+-----------------------------------------------------------------------------
+LAPLINK LEAD CONNECTIONS
+PIN CONNECTIONS 25 PIN PARALLEL LEAD
+ 1  -  1
+ 2  - 15
+ 3  - 13
+ 4  - 12
+ 5  - 10
+ 6  - 11
+10  -  5
+11  -  6
+12  -  4
+13  -  3
+14  - 14
+15  -  2
+16  - 16
+17  - 17
+25  - 25 (Shield)
+
+As can be seen, the connections are mirrored. IE, pin 5 at one end goes to pin
+10 at the other, pin 10 at one end goes to pin 5 at the other & so on.
+
+
+Why Don't U send an interesing bul?
+
+73 De John, G8MNY @ GB7CIP
+
+

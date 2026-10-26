@@ -1,0 +1,88 @@
+From: EI5IN
+To: NEWS
+Type/Status: BN
+Date/Time: 13-Oct 21:25Z
+Bid: 14166_EI5IN
+Title: IRISH RADIO TRANSMITTERS SOCIETY NEWS
+
+R:261014/1121Z 4133@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261013/2128Z @:GB7CIP.#32.GBR.EURO #:7910 [Caterham Surrey GBR] $:14166_EI5IN
+R:261013/2127Z 3099@VE3KPG.#ECON.ON.CAN.NOAM BPQ6.0.25
+R:261013/2126Z 4576@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261013/2126Z 20718@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+R:261013/2126Z 55262@PY2BIL.SP.BRA.SOAM LinBPQ6.0.25
+R:261013/2125Z 14166@EI5IN.EI5IN.IRL.EURO LinBPQ6.0.25
+
+ ___ ____ _____ ____
+|_ _|  _ \_   _/ ___|
+ | || |_) || | \___ \
+ | ||  _ < | |  ___) |
+|___|_| \_\|_| |____/
+
+Irish Radio Transmitters Society
+Radio News Bulletin
+Sunday October 11th, 2026
+
+***
+
+IRTS and over a Century of International Amateur Radio Cooperation
+
+As an internationally coordinated radio service, the amateur radio hobby has always evolvedalongside an increasingly interconnected world of cooperationand regulations. The story goes back to 1865 when the International Telegraph Union was founded to establish standards for interconnected telegraph networks. As radio technology developed, amateur operators increasingly found needs for similar cooperation, thus in 1925, they came together in Paris to establish the International Amateur Radio Union - the first international collaboration for the hobby. 
+
+The modern ITU came as a merger of the International Telegraph Union and the International Radiotelegraph Union in 1932. Coincidentally in the same year, Ireland developed its own national body the Irish Radio Transmitters Society to support operators in Ireland. The international structure further developed in 1950 when the IARU region 1 was established in Paris, so that national societies such as IRTS could coordinate their interests. 
+
+Today, that structure remains relevant, IRTS represents Irish operators in IARU region 1, and works closely with the IrishCommission for Communications Regulation to make the hobby work for everyone. It is thus a useful reminder that while we operate a station in Ireland, we are taking part in a radio service whose international framework and cooperation have been built up over more than a century.
+
+***
+
+Invitation for Clubs to Meet the IRTS President
+
+Since taking on the role of IRTS President, Jeffrey Roe, EI7IRB, has made a point of visiting amateur-radio clubs and activities both in Ireland and abroad. These visits provide an opportunity to meet amateurs, listen to their experiences, learn what is working well, and understand what support clubs and their members may need. Jeffrey would be delighted to hear from clubs that would like to arrange a visit, or that have an upcoming meeting, rally, activation, presentation or other activity that they would like the IRTS President to attend. If your club would like to invite Jeffrey to visit or attend an event, please contact him at president@irts.ie . This is also an opportunity for clubs to share their ideas, projects, successes and challenges with the IRTS.
+
+***
+
+Mayo Radio Experimenters Network AGM 2026
+
+The AGM of Mayo Radio Experiments Network took place on Wednesday evening last.
+Chairman Jimmy EI2GCB reviewed a busy year of club activities and thanked members for their ongoing support. Padraic EI9JA presented the financial report, while Leonard EI2JHB provided a report on callers to the weekly news service.
+
+Following nominations, the incoming committee is Chairperson Jimmy EI2GCB, Treasurer Padraic EI9JA, Secretary Nic EI7JHB, PRO Leonard EI2JHB, and QSL Manager Brendan EI6IZ.
+
+The Domnic Curtin EI9JS Perpetual Shield, awarded for outstanding service to the club, was presented to Leonard EI2JHB for the second-year running. The club congratulates all committee members and award recipients. Here's to another successful year of amateur radio activity across Mayo and beyond!
+
+***
+
+Shannon Basin Radio Club SSB DX Net
+
+The next Shannon Basin Radio Club SSB DX net will take place on Thursday night from 9 p.m. on the 80m band. The frequency will be 3.775MHz plus or minus QRM. All are welcome including SWLs. Visit sbrc.ie for further information about the club and its activities.
+
+***
+
+JOTA-JOTI Lee Valley Scouts
+
+Following the success of last year's first Lee Valley Scout County JOTA-JOTI participation, up to 300 Scouts will again assemble at Kilcully Scout Camp, Co. Cork on Saturday 17th October for this 2026 global communications themed Jamboree, with onsite support from AREN and local radio club members. Amateurs from as far as the border counties are on the planning team and will chat with Scouts on the air on the day. 
+
+An emergency communications theme woven through the on-site activities ties well with the recently launched National Be Emergency Ready Campaign. A mass flooding event, a missing person search and community rest centre support are some of the scenarios that Scouts will use the radios to respond to. A highlight of the event will be an exhibit by the Reserve Defence Forces with FFR vehicles and personnel to demonstrate their signals equipment. EI4JOTA will be heard on HF, VHF, UHF, DMR, Echolink, and Zello. If you hear them, they would be delighted if youd chat with their Scouts.
+
+***
+
+HF News
+
+The big DX of the past week was the 9T0MD Dxpedition to the Democratic Republic of Congo, which wrapped up on Saturday. Many EI, GI, and G stations made the log before the radio news deadline; the team logged over 75,000 QSOs.
+
+Look out for the C5R DXpedition to The Gambia, running through the month until the 4th of November; activity will be around the team's humanitarian work building classrooms at the local school.This is amateur radio and community outreach in action, making a real difference.Also, next weekend, 16th to the 18th of October, is the JOTA-JOTI Jamboree on the air. Please listen out for the many stations participating locally and internationally and support the volunteers who make this annual event such a success.
+
+***
+
+VHF/Microwave News
+
+The results of the recent IRTS 70cm and 2m Counties contest have been published on the IRTS website. Well done to the winners and all that took part. Conditions were reported as very good on the day with QSOs reports with Scotland, Wales, and Isle of Man as well.
+An amateur radio contact is scheduled between the International Space Station and students in France, via the special event station F4KKM. The contact is set for Friday, October 16th, at 10:00 a.m. UTC. An astronaut on board will conduct the contact using the ISS callsign OR4ISS. Downlink signals can be monitored across Ireland and Europe on 145.800 MHz FM.
+
+***
+
+Items for Inclusion in Next Week's Radio News
+
+That is the news for this week. Thanks to everyone for sending items into the weekly IRTS radio news. They are very much appreciated and are a great way to update the rest of the community about activities. If you have any club events, news, meetings, or other items of interest, please send them via email to newsteam@irts.ie . The deadline is midnight on Thursdays. Items intended for inclusion in Echo Ireland should be sent to echoireland@irts.ie
+
+

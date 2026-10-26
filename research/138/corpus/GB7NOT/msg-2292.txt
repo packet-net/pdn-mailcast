@@ -1,0 +1,45 @@
+From: OK1DUB
+To: MAJAKY
+Type/Status: BN
+Date/Time: 11-Oct 17:09Z
+Bid: BA[OK0NAG004
+Title: Majak OV1BCN opet vysila / Beacon OV1BCN is on air again
+
+R:261011/1756Z 4071@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261011/1720Z 14678@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261011/1720Z 19340@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261011/1720Z 4154@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261011/1720Z 17505@F1UBL.FRPA.FRA.EURO LinBPQ6.0.24
+R:261011/1710Z @:F3KT.#44.FPDL.FRA.EU #:48373 [Pont Saint Martin] LFBB7.0.11
+R:261011/1709z @:OK0NAG.#BOH.CZE.EU [TCP/IP BBS Praha Strahov] bcm2.01e-zia
+Od: OK1DUB @OK0NAG.#BOH.CZE.EU (Mirek) Pro: MAJAKY @ WW
+X-Info: Prijato od 192.168.122.1 za pomoci HTTP rozhrani
+
+Beacon OV1BCN is on air again / Majak OV1BCN opet vysila:
+
+5290.0 kHz CW
+OV1BCN
+20 W
+FOLDED DIPOLE (NVIS)
+JO55SI
+CW IDENT 180 seconds cycle
+H24
+https://www.qrz.com/db/OV1BCN
+
+------------------------------------------
+1st. Danish NVIS Beacon on HF !
+
+RUNNING NVIS TEST  on and off with FT450 rig from 7.oct.2026 untill 19.oct.2026
+
+Next schedule:
+
+17.dec 2026 untill 1.st. january 2027
+
+cyclus is 180 secs.
+
+ON 5290.0 KHZ./ A1a,  WITH 20 WATTS output.
+------------------------------------------
+
+See / Viz: https://ok1dub.cz/ok0en/List_of_A1A_HF_Beacons_below_14_MHz.pdf 
+
+

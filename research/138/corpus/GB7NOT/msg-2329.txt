@@ -1,0 +1,38 @@
+From: K7EK
+To: HERMES
+Type/Status: BN
+Date/Time: 13-Oct 01:37Z
+Bid: 51823_K7EK
+Title: Mercury v1.9.19 is out. Upgrade immediately!
+
+R:261013/0155Z 4101@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261013/0140Z 14728@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261013/0140Z 19425@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261013/0140Z 38664@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261013/0139Z 36232@DK0WUE.#BAY.DEU.EU LinBPQ6.0.25
+R:261013/0137Z 51823@K7EK.#NOKY.KY.USA.NOAM BPQ6.0.25
+
+
+Download v1.9.19 at:  https://github.com/Rhizomatica/mercury/releases
+
+Info:
+
+Mercury 1.9.19 Latest
+@github-actions github-actions released this 40 minutes ago
+v1.9.19
+e9f0072
+
+Warning
+
+Mercury 1.9.19 does not talk to Mercury 1.9.18 or any older version over the air, in either direction. 
+MFSK moved to the centre of the passband (1500 Hz), and the connect frames now carry protocol 
+version 2. Upgrade every station you talk to at once. Read RELEASE-1.9.19.md before upgrading; 
+it says what an operator sees with mixed versions and what was tested on air.
+
+JNOS users: stock JNOS always asks the modem for BW500, which keeps a Mercury session at 
+DATAC3 or below. Our JNOS fork adds vara bw <interface> 2300 (Rhizomatica/jnos2 4850ff3). 
+See JNOS.md.
+
+
+
+

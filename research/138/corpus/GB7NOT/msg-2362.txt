@@ -1,0 +1,58 @@
+From: UT1HZM
+To: WSPR
+Type/Status: BN
+Date/Time: 15-Oct 05:53Z
+Bid: 44915_UT1HZM
+Title: Re: WSPR GLOBAL REPORT: MAX DISTANCE (24H 15-Oct)
+
+R:261015/0625Z 4154@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261015/0558Z 14808@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261015/0558Z 19586@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261015/0558Z 38733@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261015/0558Z 20835@N3HYM.#FRDK.MD.USA.NOAM BPQ6.0.25
+R:261015/0555Z 12877@IW2OHX.ILOM.ITA.EU BPQ6.0.25
+R:261015/0553Z 44915@UT1HZM.KREM.POL.UKR.EU BPQ6.0.25
+
+Hi HP2DFA and tks for your infos.
+
+Just please take attention to filter out false decoded calls like
+Q88KVF, YQ9HZK, QQ6UCX and more etc.
+(even that calls country prefix don't correspondent to the indicated GRID square!)
+
+Its normal to have false decodes in WSPR but it should be processed and filtered
+to have real DX-statistic.
+
+73, Sergej.
+
+
+
+Original Message
+
+> R:261015/0012Z 4479@HP2DFA.#COL.PAN.CEAM BPQ6.0.24
+> 
+> ======================================================================
+>      WORLDWIDE WSPR REPORT - TOP 10 MAX DISTANCE (24H UTC)
+>              AX.25 DATA NETWORK / ROUTE: WSPR@WW
+> ======================================================================
+> Capture Date: 15-Oct-2026 00:15 UTC
+> Source: Global WSPRnet / WSPR.live Database
+> ----------------------------------------------------------------------
+> 
+> TOP 10 TRANSMITTER BEACONS (TX) BY MAX DISTANCE:
+> CALLSIGN     GRID    MAX DISTANCE     HEARD BY (BAND)
+> ----------------------------------------------------------------------
+> CT1DJG       IN61    19,964 km        ZL2005SWL (14m)
+> Q88KVF       GF94    19,929 km        7L4IOU3 (14m)
+> EA4TK        IN80ej  19,928 km        ZL2P (14m)
+> YQ9HZK       AE02    19,897 km        F8UKP (1m)
+> VK9NT        RG30    19,889 km        EA8-DF4UE (10m)
+> ZC1WUB       MF15    19,880 km        K6VZK (24m)
+> O37IEV       BD17    19,869 km        SO5CW (10m)
+> QQ6UCX       NF81    19,823 km        N8GA (18m)
+> QS6ELQ       NF81    19,823 km        N8GA (18m)
+> OE3ZAF       AD96    19,803 km        SP5DQZ (7m)
+> 
+
+
+
+

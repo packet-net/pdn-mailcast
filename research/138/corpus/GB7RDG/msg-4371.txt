@@ -1,0 +1,381 @@
+From: PY2BIL@PY2BIL.SP.BRA.SOAM
+To: ARNR
+Type/Status: B$
+Date/Time: 23-Oct 12:28Z
+Bid: 55582_PY2BIL
+Title: Amateur Radio Newsline Report 2556 for Friday, October 23rd
+
+Body: 16518
+
+R:261023/1231Z 15122@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261023/1230Z 20238@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261023/1230Z 39022@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261023/1230Z 3657@VE3KPG.#ECON.ON.CAN.NOAM BPQ6.0.26
+R:261023/1229Z 21710@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+R:261023/1228Z 55582@PY2BIL.SP.BRA.SOAM LinBPQ6.0.26
+
+Amateur Radio Newsline Report 2556 for Friday, October 23rd, 2026
+ 
+Amateur Radio Newsline Report Number 2556 with a release date of Friday,
+October 23rd, 2026 to follow in 5-4-3-2-1.
+
+The following is a QST. A deadly helicopter crash into a ham radio tower
+in Florida. Australia's lunar rover makes its debut -- and hams haunt
+a number of Halloween events. All this and more as Amateur Radio Newsline
+Report Number 2556 comes your way right now.
+
+**
+BILLBOARD CART
+
+**
+PILOT DIES IN FATAL CRASH INTO FLORIDA HAM TOWER
+
+STEPHEN/ANCHOR: We begin our newscast this week with the fatal crash
+of a helicopter into a ham radio tower in Florida. We hear more from
+Kent Peterson KCÃDGY.
+
+KENT: A veteran helicopter pilot was the only one aboard when, authorities
+said, his helicopter struck a 150-foot-tall tower in back of a ham radio
+operator's home in Myakka City, Florida. The 63-year-old pilot had just
+completed a route of spraying for mosquito control shortly before 9 p.m.
+when he was killed in the Oct. 15th accident in Manatee County,  A spokesman
+for the county sheriff's office told local media that firefighters pulled
+the pilot from the wreckage as it burned. He was pronounced dead at the
+scene. The guyed tower - the tallest of three on the property - collapsed.
+
+
+The Wireless Estimator, a website for the wireless infrastructure industry,
+identified the property owner as Daniel Street, K1TO, who is also the
+owner of an antenna installation company, A1 Tower Service. The website
+noted that towers standing under 200 feet are not required by the Federal
+Aviation Administration to be lit or to be registered with the FCC's
+Antenna Structure Registration System. The Wireless Estimator said that
+according to the public record, the towers were in compliance with those
+rules.
+
+The National Transportation Safety Board was investigating the incident
+and typically issues a preliminary report within about 30 days after
+a crash.
+
+This is Kent Peterson KCÃDGY.
+
+(WIRELESS ESTIMATOR, WFLA, MYSUNCOAST.COM, WUSF)
+
+**
+PRIVATELY DEVELOPED CUBESAT TRANSMITS AI EXPERIMENTS
+
+STEPHEN/ANCHOR: The October 1st launch of a 2U CubeSat on a rideshare
+mission from Vandenberg Space Force Base in California has distinguished
+itself in a number of ways, as we hear from Jason Daniels VK2LAW.
+
+JASON: Guan Hao Chan, KO6IKZ, is being celebrated by many in the CubeSat
+community following the launch of KENSAT, a sun-synchronous satellite
+he designed and built as a private individual, creating such support
+systems as the ground station software. The radio amateur, who is from
+Malaysia, has taken an uncommon route, not relying on any government
+or big corporate funding. 
+
+The CubeSat's payload includes what is being called an unusual artificial-intelligence
+experiment in space: Using a neural network, KENSAT conducts machine
+learning, downlinking the results via UHF to amateur ground stations.
+According to the KENSAT website, the satellite is using a language model
+known as Gemma 3 which [quote] "thinks in space and beams the answer
+back to anyone listening." [endquote]
+
+The IARU coordinated a downlink of 437.080 for the CubeSat, which is
+using the same US callsign: KO6IKZ. The downlink uses GFSK modulation
+with AX.25/G3RUH framing.
+
+Chan said he hoped KENSAT would inspire other experimenters to attempt
+independent CubeSat development. He also said he hoped hams would be
+listening for the UHF transmissions as KENSAT makes its way in low-earth
+orbit.
+
+This is Jason Daniels VK2LAW.
+
+(AMSAT NEWS, KENSAT.COM)
+
+**
+HOA LOBBYISTS GIVE TOP PRIORITY TO HALTING ANTENNA BILL
+
+STEPHEN/ANCHOR: In the US, lawmakers have not yet scheduled a vote on
+a measure that would protect amateur radio antennas from the restrictions
+or bans imposed by private homeowners associations, but a powerful nationwide
+lobbying group representing those associations is strengthening its opposition
+to the measure.
+
+The Community Associations Institute met recently in Washington, DC,
+and announced it was giving top priority to fighting the passage of the
+Amateur Radio Emergency Preparedness Act, which has support of both parties.
+Last year, ARRL launched a nationwide grassroots campaign in support
+of the legislation.
+
+(AMATEUR RADIO DAILY, ARRL)
+
+**
+'PAYMENT LABYRINTH' CALLED OBSTACLE TO LICENSE RENEWALS
+
+STEPHEN/ANCHOR: If you're needing to renew your FCC license soon - or
+have tried but been unsuccessful in paying the $35 fee - you're not alone.
+Andy Morrison K9AWM tells us about a study of FCC data that turned up
+hundreds of failed amateur radio renewals - and lost callsigns.
+
+ANDY:  Rob Rosenberger, K4HST, calls it the FCC's "payment labyrinth"
+-- and he believes it is responsible for the failed attempts by 1 in
+18 hams to complete their payment of the $35 license-renewal fee. He
+came to his conclusions after analyzing the FCC's downloadable, publicly
+accessible two-year archive starting in 2024.
+
+In the US, the $35 fee applies to new license grants as well as renewals,
+vanity call signs and any modifications, such as upgrades.
+
+Rob, who is a retired systems analyst, said that his study shows that
+some hams have actually had repeated failures to make their payments
+- some as many as seven times. He said, however, [quote] "nine out of
+ten folks who stumbled into the labyrinth decided not to map it out a
+second time." [endquote] In the period he analyzed, he said, 3,901 hams
+successfully renewed their callsign each month -- but another 783 simply
+did not bother trying again and were lost to attrition..
+
+Rob said the numbers point out the need for clubs and others, such as
+the ARRL, to focus on the hams who fail the payment process in the ULS
+system before they lose their callsign after the FCC's two-year grace
+period. He said the solution begins at the local level - and ham radio
+clubs can reduce the failure-to-pay rate through outreach to those who
+may need assistance. His study has enabled him to produce free downloadable
+PDFs that list all operators, sorted by city and state, who are within
+three months of losing their callsign. The URL for the download is listed
+in the text version of this week's newscast at arnewsline.org
+
+[DO NOT READ: https://w4zbb.org/resources/    ]
+
+This is Andy Morrison K9AWM.
+
+**
+AUSTRALIAN MOON ROVER MAKES DEBUT
+
+STEPHEN/ANCHOR: Australia's moon rover is a work in progress and it made
+its debut recently in Queensland. Graham Kemp VK4BB tells us what's next
+for this important space explorer.
+
+GRAHAM: The Australian Space Agency says "G'Day Moon."
+
+Australia's first lunar rover -- that would be the Roo-ver -- met the
+public recently during World Space Week at the Queensland University
+of Technologyâs Lunar Testbed and Space Lab. Plans are to land the semi-autonomous
+vehicle at the lunar South Pole in 2030.
+
+The trip will take place under NASA's Commercial Lunar Payload Services
+program. Roo-ver will make its journey aboard an Intuitive Machines lander
+and then conduct studies relevant to eventual human exploration under
+the Artemis programme. It is being designed and created by an industry
+consortium comprising universities, researchers, major companies and
+startups.
+
+This is Graham Kemp VK4BB
+
+(AUSTRALIAN SPACE AGENCY; AMSAT NEWS SERVICE)
+
+**
+SKCC SEEKS DESIGNS FOR STRAIGHT KEY MONTH 2027 QSL CARD
+
+STEPHEN/ANCHOR: The Straight Key Century Club is preparing to turn 21
+on the second day of January 2027. The club has plans once again for
+its annual Straight Key Month, as we hear from Randy Sly W4XJ.
+
+RANDY: Twenty-one is a significant age of maturity for many of us and
+the Straight Key Century Club is no exception. This year's celebration
+will include yet another Straight Key Month event, which takes place
+from the anniversary date on the 2nd through to the end of January.
+
+The club has begun asking members to consider submitting designs they'd
+like to see on the activity's QSL card which, as always, features the
+callsign K3Y. Once designs are submitted, members will get to vote on
+their top choice starting in the middle of December. The winner will
+become the design for the official card; 12 of the most popular will
+become part of the club's calendar for 2027.
+
+Club members can visit the link that appears in the text version of this
+week's newscast at arnewsline.org to get more details.
+
+[DO NOT READ: https://skccgroup.com/k3y/k3y-qsl-vote.php  ]
+
+This is Randy Sly W4XJ.
+
+(STRAIGHT KEY CENTURY CLUB)
+
+**
+BREAK HERE: Time for you to identify your station. We are the Amateur
+Radio Newsline, heard on bulletin stations around the world including
+the Gronk Radio Network's WA6TTL repeater in Simi Valley, California,
+on Tuesdays at 7 p.m. local time.
+
+**
+LISTEN FOR NATIONAL ANIMAL SHELTER APPRECIATION WEEK
+
+STEPHEN/ANCHOR: If you've ever welcomed a rescued pet into your family
+or been an animal rescuer yourself, you'll want to share your experiences
+with fellow hams starting November 1st as the Dog Day Amateur Radio Club
+marks National Animal Shelter and Rescue Appreciation Week 2026. Operators
+will be calling CQ with the callsign KÃDOG using CW and SSB through to
+the 7th of November. The commemorative week was created by the Humane
+Society of the United States in 1996. Visit KÃDOG's page on QRZ.com to
+see ways you can help your local rescue efforts.
+
+(KÃDOG)
+
+**
+
+RSGB LAUNCHES NEWSLETTER FOR YOUNG HAMS
+
+STEPHEN/ANCHOR: When they aren't on the air making contacts, young amateurs
+in Great Britain have a new way to stay in touch, as we hear from Jeremy
+Boot G4NJH.
+
+JEREMY: Whether they're sharing the past season's experience at a camp
+in the Austrian Alps or discussing their first check-ins to a net on
+DMR, young amateurs throughout Great Britain are staying connected on
+or off the air through a newsletter launched by the Radio Society of
+Great Britain.
+
+The monthly publication is the work of the RSGB's Youth Committee, serving
+hams who are 25 years or  younger. The first few editions are being posted
+on the RSGB website but later editions will be sent directly to RSGB's
+youth members only.
+
+The newsletter also features a preview of events on the calendar. For
+details about submitting stories contact Leon Shaw, MÃVUF at the address
+that appears in the text version of this week's newscast. You'll also
+find a link that lets you read the first edition of the newsletter.
+
+This is Jeremy Boot G4NJH.
+
+[DO NOT READ:   Leon's email is youth.chair@rsgb.org.uk
+Newsletter link is rsgb.org/youth-newsletter      ]
+
+(RSGB)
+
+**
+SSTV EVENT ABOARD ISS FEATURES ARISS HARDWARE
+
+STEPHEN/ANCHOR: So what's on TV lately? Well, we're talking about Slow
+Scan TV and Travis Lisk N3ILS is here to let us know who - or what -
+has the starring role.
+
+TRAVIS: Slow Scan TV Series 34 aboard the International Space Station
+is once again all about ham radio operators capturing images.
+
+This latest SSTV activity on the ISS is running from October 22nd through
+to October 25th using Robot 36 Mode, which completes the transmission
+of a single image in 36 seconds. The frequency is 437.500 MHz, plus or
+minus Doppler shift. Various images of ARISS hardware will be transmitted
+and hams receiving them are encouraged to submit them to the ARISS gallery
+and receive an event certificate.
+
+Images can be uploaded via the website link that appears in the text
+version in this week's newscast at arnewsline.org
+
+[DO NOT READ:   https://ariss-usa.org/ARISS_SSTV/submit.php   ]
+
+This is Travis Lisk N3ILS.
+
+(ARISS)
+
+**
+WORLD OF DX
+
+In the World of DX, the S9R DXpedition is on the air through to the 31st
+of October from SÃ£o TomÃ© and PrÃ­ncipe, IOTA Number AF-023. The team is
+using CW, SSB and the digital modes on the HF bands.
+
+Greg, N9GB will operate holiday-style from Grenada from the 31st of October
+through to the 6th of November. He will be  using CW, SSB and FT8 on
+40 through 6 metres, and operating mostly during the evening hours, local
+time.
+
+John, AE5X, is operating on CW from Albania as ZA/AE5X through to the
+30th of October - perhaps longer. He is giving priority to POTA locations
+and is on the air holiday style.
+
+Listen for the callsign FK/KD6XU from New Caledonia, IOTA Number OC-032,
+where Barry KD6XU expects to be until the middle of November. His activation,
+using CW, is expected to include some POTA locations.
+
+Get ready for the VK9XY DXpedition to Christmas Island, IOTA Number OC-002,
+which will be on the air from the 16th of November through to the 4th
+of December. Youngsters on the Air and the Pacific Islands DXPedition
+Group have organized the activation which is being run entirely by young
+amateurs. Hams will be calling QRZ from the island and remotely, using
+NexGenRiB2 (pron: Next Gen R Eye Bee) stations nearby.
+
+For QSL information or other details, visit each callsign's page on QRZ.com
+
+
+(DXWORLD.NET)
+
+**
+HALLOWEEN EVENTS GIVE HAMS A GHOST OF A CHANCE
+
+STEPHEN/ANCHOR: Our final story is a real horror show. Oh, don't worry,
+we mean that in a good way. With a number of Halloween events happening
+on the air, you can expect the bands to be quite undead. Be not afraid:
+Ralph Squillace KK6ITB has scared up the details from the DX of....the
+Great Beyond.
+
+RALPH: Hams are celebrating the Halloween season with different events
+that are very much in the spirit. In fact, if you believe in ghosts,
+listen for Wyoming Ghost Towns on the Air starting on October 31st through
+to November 10th. Stations will be using 1x1 callsigns W7A through W7W,
+and will be operating at a number of these old haunts.
+
+In Pennsylvania, members of the Triple A Amateur Radio Association will
+breathe new life into the Evans City Cemetery by calling CQ as K2V starting
+on the 26th of October and continuing through Halloween night. This is
+a celebration of the film, "Night of the Living Dead," and this is the
+cemetery in the opening scenes of the original film. The club's other
+Halloween station, K2Q, will operate on the 30th and 31st of October
+near a bridge that also appears in the film.
+
+Meanwhile, since the original Frankenstein monster was famously wireless
+- and very much a homebrew build from used parts - it seems only fitting
+that the Mid-Missouri Amateur Radio Club will be on the air from a community
+known as Frankenstein. Listen for the callsign WÃO from the 20th of October
+through to the 1st of November.
+
+Finally, there's the Zombie Shuffle which, true to its name, is full
+of slow-moving and low-power CW operators. They'll be calling "CQ Boo"
+on October 30th from 1500 to midnight, in each operator's local time
+zone. Any key is welcome except, of course, a skeleton key.
+
+This is Ralph Squillace KK6ITB. 
+ 
+(QRZ.COM, ZIANET.COM)
+ 
+**
+NEWSCAST CLOSE
+
+With thanks to AMSAT News; ARRL, Amateur Radio Daily, ARISS; Australian
+Space Agency; David Behar, K7DB; DXWorld; FCC; 425 DX Bulletin; KenSat.com;
+KÃDOG; MySunCoast.com; QRZ.com; Radio Society of Great Britain; Rob Rosenberger,
+K4HST; Straight Key Century Club; WFLA; Wireless Estimator; Wireless
+Institute of Australia; WUSF; YouTube; Zero Retries newsletter; Zianet;
+and you our listeners, that's all from the Amateur Radio Newsline. We
+remind our listeners that Amateur Radio Newsline is an all-volunteer
+non-profit organization that incurs expenses for its continued operation.
+If you wish to support us, please visit our website at arnewsline.org
+and know that we appreciate you all. We also remind our listeners that
+if you like our newscast, please leave us a 5-star rating wherever you
+subscribe to us. 
+
+For now, with Caryn Eve Murray KD2GUT at the news desk in New York, and
+our news team worldwide, I'm Stephen Kinford N8WB in Wadsworth Ohio saying
+73. As always, we thank you for listening. Amateur Radio Newsline(tm)
+is Copyright 2026. Amateur Radio Newsline retains ownership of its material
+even when retransmitted elsewhere. All rights are reserved.
+
+
+73 de Bill, PY2BIL
+PY2BIL@PY2BIL.SP.BRA.SOAM
+
+
+
