@@ -51,7 +51,7 @@ public static class StationReaching
     /// <param name="audioCentreHz">Where in the audio the receiver wants a signal: its config's, 1800 Hz at the usual dial.</param>
     /// <param name="currentDialHz">The dial the receiver is on, which fixes what a receiver that cannot retune hears.</param>
     /// <param name="canRetune">Whether the receiver moves its dial for a station's slots.</param>
-    public static StationReach Judge(StationOnAir station, double audioCentreHz, double currentDialHz, bool canRetune, long? lnbHz = null)
+    public static StationReach Judge(StationOnAir station, double audioCentreHz, double currentDialHz, bool canRetune, long? lnbHz = null, bool webSdr = false)
     {
         ArgumentNullException.ThrowIfNull(station);
         string where = $"{OnAir.Mhz(station.FrequencyHz)} MHz {(station.Sideband == Sideband.Usb ? "USB" : "LSB")}";
@@ -74,7 +74,7 @@ public static class StationReaching
             }
             else if (canRetune)
             {
-                return new(false, 0, null, $"it is on {where}, above HF; set lnbHz for a dish and LNB to hear it");
+                return new(false, 0, null, $"it is on {where}, above HF{(webSdr ? ", which a web SDR does not cover" : "; set lnbHz for a dish and LNB to hear it")}");
             }
         }
         if (canRetune)
@@ -87,7 +87,7 @@ public static class StationReaching
             return new(true, currentDialHz, HowHeard.Passband, null, ifHz);
         }
         return new(false, 0, null, string.Create(CultureInfo.InvariantCulture,
-            $"it is on {where}, not where this receiver listens (USB dial {OnAir.Mhz(currentDialHz)} MHz hears {OnAir.Mhz(currentDialHz + ReceiverConfig.LowestAudioCentreHz)} to {OnAir.Mhz(currentDialHz + ReceiverConfig.HighestAudioCentreHz)} MHz), and this receiver does not retune{(station.FrequencyHz > HfMaxHz && lnbHz is null ? "; set lnbHz for a dish and LNB" : "")}"));
+            $"it is on {where}, not where this receiver listens (USB dial {OnAir.Mhz(currentDialHz)} MHz hears {OnAir.Mhz(currentDialHz + ReceiverConfig.LowestAudioCentreHz)} to {OnAir.Mhz(currentDialHz + ReceiverConfig.HighestAudioCentreHz)} MHz), and this receiver does not retune{(station.FrequencyHz > HfMaxHz && lnbHz is null && !webSdr ? "; set lnbHz for a dish and LNB" : "")}"));
     }
 }
 

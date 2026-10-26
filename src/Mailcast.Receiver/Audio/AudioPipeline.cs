@@ -211,6 +211,34 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     public double LnbOffsetHz { get; private set; }
 
     /// <summary>
+    /// Signals behind an LNB (intermediate frequency, oscillator) the pipeline may be listening
+    /// for instead of <see cref="SignalHz"/>: when pdn-soundmodem's radio is already on a dial
+    /// that only one of these falls in the audio of, the pipeline takes that one at open. Empty
+    /// unless <see cref="ReceiverConfig.LnbHz"/> is set.
+    /// </summary>
+    internal IReadOnlyList<(double IfHz, double LnbHz)> AlternateSignals { get; set; } = [];
+
+    /// <summary>Takes the LNB signal pdn-soundmodem's said dial hears, when the current signal is out of its reach.</summary>
+    private void UseLnbSignalFor(int channelRate, double? saidDialHz)
+    {
+        if (saidDialHz is not { } said || SoundModemReach(channelRate, said, said, SignalHz) is null)
+        {
+            return;
+        }
+        foreach (var (ifHz, lo) in AlternateSignals)
+        {
+            if (SoundModemReach(channelRate, said, said, ifHz) is null)
+            {
+                SignalHz = ifHz;
+                LnbOffsetHz = lo;
+                _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"audio: pdn-soundmodem's radio is on USB dial {OnAir.Mhz(said)} MHz, which hears {OnAir.Mhz(ifHz + lo)} MHz through the LNB"));
+                return;
+            }
+        }
+    }
+
+    /// <summary>
     /// Moves the dial this pipeline's audio is heard on to <paramref name="dialHz"/>, as a radio
     /// retuned for a slot (a rig on a sound card) now is: the audio thread places the signal afresh
     /// before its next block. For sources pdn-soundmodem's stream does not manage. True if it changed.
@@ -479,8 +507,9 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         // A dial that puts the signal outside 1000 to 2000 Hz has the input move its audio at the
         // channel's own rate, before a slow channel is brought up to 48 kHz.
         var stream = await SoundModemAudioInput.OpenAsync(_source.SoundModemPort, cancellation, (rate, said) =>
-            OnAir.AudioCentreHz(said ?? configured, SignalHz) is var at && SoundModemReach(rate, said, said ?? configured, SignalHz) is null && !UsesOwnCentre(at) ? at : null)
+            Settled(rate, said) is var _ && OnAir.AudioCentreHz(said ?? configured, SignalHz) is var at && SoundModemReach(rate, said, said ?? configured, SignalHz) is null && !UsesOwnCentre(at) ? at : null)
             .ConfigureAwait(false);
+        UseLnbSignalFor(stream.ChannelRate, stream.DialHz);
         double dial = stream.DialHz ?? configured;
         _channelRate = stream.ChannelRate;
         _saidDialHz = stream.DialHz;
@@ -552,6 +581,12 @@ public sealed partial class AudioPipeline : IAsyncDisposable
             + $"Its audio is moved to {OnAir.CentreAudioHz:F0} Hz here, where the usual dial puts the signal");
         _log(string.Create(invariant,
             $"audio: pdn-soundmodem on {stream.Where}, {rate}, {where}, the signal's centre {(awayHz is null ? "at" : "then at")} {centre:F0} Hz in its audio{moved}"));
+    }
+
+    private bool Settled(int rate, double? said)
+    {
+        UseLnbSignalFor(rate, said);
+        return true;
     }
 
     /// <summary>

@@ -486,7 +486,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Whether, and on which dial, this receiver can hear a station where it says it is (issue #179): see <see cref="StationReaching"/>.</summary>
     public StationReach Reach(StationOnAir station) =>
         StationReaching.Judge(station, Config.AudioCentreHz, Pipeline is { } pipeline ? pipeline.DialHz : Config.DialHz, CanRetune,
-            AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? null : Config.LnbHz);
+            AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? null : Config.LnbHz,
+            AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr);
 
     /// <summary>
     /// Every station this receiver knows the slots of (issues #178 and #144), GB7RDG first:
@@ -577,6 +578,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                         $"it was advertised{(by is null ? "" : $" by {by}")} past the first {BroadcastDirectory.MostAdverts} adverts, the most a directory is read for"));
                 }
             }
+            // A dial that cannot hear GB7RDG (pdn-soundmodem's radio on the LNB's IF) while it does
+            // hear another station: GB7RDG is not followed, rather than followed at a nonsense audio position.
+            if (!rdgReach.Heard && list.Any(l => l.Station != ReceiverStore.BuiltInStation && l.Followed))
+            {
+                list[0] = list[0] with { Followed = false, NotFollowedBecause = rdgReach.Why };
+            }
             return list;
         }
     }
@@ -644,7 +651,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         get
         {
             var followed = Listening.Where(l => l.Followed).ToList();
-            return followed.Count == 1
+            return followed.Count == 1 && followed[0].Station == ReceiverStore.BuiltInStation
                 ? FollowedSlots.One(Schedule)
                 : new FollowedSlots([.. followed.Select(l => (l.Station, l.Station == ReceiverStore.BuiltInStation ? Schedule : SlotSchedule.From(l.Timetable)))]);
         }
@@ -1581,8 +1588,35 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         // A web SDR is opened for one slot's window: tuned to that slot's station (issue #179).
         var station = slot is { } s ? StationAtSlot(s) : null;
-        return AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, _log, _time, config.Web.Port,
+        var pipeline = AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, _log, _time, config.Web.Port,
             retunedByWindow: Retuner?.Window is not null, signalHz: station?.HeardAtHz ?? OnAir.DefaultSignalHz);
+        pipeline.AlternateSignals = LnbSignals(source, config);
+        return pipeline;
+    }
+
+    /// <summary>
+    /// Behind an LNB (<see cref="ReceiverConfig.LnbHz"/>), the intermediate frequency and
+    /// oscillator of every station above HF this receiver knows of: where pdn-soundmodem's radio
+    /// may already be dialled when it opens, before any slot has pointed the pipeline at a station.
+    /// Empty without the setting, and for a web SDR.
+    /// </summary>
+    private List<(double IfHz, double LnbHz)> LnbSignals(AudioSource source, ReceiverConfig config)
+    {
+        var found = new List<(double, double)>();
+        if (config.LnbHz is not { } lo || source.Kind == AudioSourceKind.UberSdr)
+        {
+            return found;
+        }
+        var stations = Intake.Adverts().Select(a => a.Callsign).Concat(Intake.StationDirectories().Select(d => d.Station)).Distinct(StringComparer.Ordinal);
+        foreach (string station in stations)
+        {
+            long? hz = Intake.HeardDetails(station)?.FrequencyHz ?? Intake.Adverts().FirstOrDefault(a => a.Callsign == station)?.FrequencyHz;
+            if (hz is { } f && f > StationReaching.HfMaxHz && StationReaching.LnbIf(f, lo) is { } ifHz && !found.Contains((ifHz, lo)))
+            {
+                found.Add((ifHz, lo));
+            }
+        }
+        return found;
     }
 
     /// <summary>For tests: builds the pipeline for a source in place of the real one.</summary>

@@ -755,4 +755,34 @@ public sealed class SoundModemRetuneTests
             }
         }
     }
+
+    [Fact]
+    public async Task APdnSoundmodemDialledOnAnLnbsIf_IsOpened_WhenTheLnbStationIsKnown()
+    {
+        // An RTL dongle on a Bullseye: pdn-soundmodem's dial on the IF, 739.735855 MHz USB.
+        const double IfDial = 739_735_855;
+        await using var fake = new FakeSoundModem(dialHz: IfDial);
+        var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
+        await using var _ = pipeline;
+        pipeline.AlternateSignals = [(739_737_655, 9_750_012_345)];
+        await pipeline.OpenAsync(CancellationToken.None);
+
+        Assert.Equal(IfDial, pipeline.DialHz, 0.5);
+        Assert.Equal(739_737_655, pipeline.SignalHz);
+        Assert.Equal(9_750_012_345, pipeline.LnbOffsetHz);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
+        // The page's spectrogram is labelled with the downlink dial.
+        Assert.Equal(IfDial + 9_750_012_345, pipeline.SpectrumDialHz + pipeline.LnbOffsetHz, 0.5);
+    }
+
+    [Fact]
+    public async Task APdnSoundmodemDialledOnAnLnbsIf_WithNoLnbStation_IsStillRefused()
+    {
+        await using var fake = new FakeSoundModem(dialHz: 739_735_855);
+        var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
+        await using var _ = pipeline;
+        await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.OpenAsync(CancellationToken.None));
+    }
 }

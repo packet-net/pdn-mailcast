@@ -81,15 +81,17 @@ Path analysis (virtual height, multipath, the path picture and the globe) is for
 
 ### QO-100 through an LNB
 
-For QO-100 you need a dish, an LNB and an SDR or receiver that takes the LNB's output. Set `lnbHz` to the LNB's local oscillator in Hz. A Bullseye (2 ppm TCXO with PLL) is nominally 9750 MHz:
+For QO-100 you need a dish, an LNB and an SDR that takes the LNB's output. Set `lnbHz` to the LNB's local oscillator in Hz. A Bullseye (2 ppm TCXO with PLL) is nominally 9750 MHz:
 
 ```json
 "lnbHz": 9750012345
 ```
 
-A station announcing a frequency above 30 MHz and within the LNB's input range (the oscillator plus 100 MHz to 2400 MHz) is then heard at its frequency less the oscillator: QO-100's 10489.75 MHz downlink comes out at 739.74 MHz, and the dial, the passband and the retuning all work there. The page, the log and the reports still show the real downlink frequency. Without `lnbHz`, a station above 30 MHz is shown as not followed and the Listening line names the setting. It is for a real dish and LNB, not a web SDR, and it does not search for drift: the oscillator must be right to within a few Hz. A rig, pdn-soundmodem's receive window or a sound card behind the SDR is set up as for HF; the `dialKHz` of a receiver that cannot retune is the dial on the IF, in kHz.
+A station announcing a frequency above 30 MHz and within the LNB's input range (the oscillator plus 100 MHz to 2400 MHz) is then heard at its frequency less the oscillator: QO-100's 10489.75 MHz downlink comes out at 739.74 MHz. The page, the log and the reports still show the real downlink frequency. Without `lnbHz`, a station above 30 MHz is shown as not followed and the Listening line names the setting. It is for a real dish and LNB, not a web SDR.
 
-To calibrate the oscillator, tune the SDR to the QO-100 beacon (10489.750 MHz). Note the IF frequency its carrier sits at, `ifHz`, then set `lnbHz` to 10489750000 less `ifHz` (a beacon at 739.737655 MHz gives 9750012345). Check again after the LNB has warmed up; a TCXO LNB should then hold within a few Hz.
+**With an RTL dongle and pdn-soundmodem** (`rtltcp:`), set pdn-soundmodem's dial to the IF: the downlink less `lnbHz` less 1800 Hz, upper sideband (10489750000 - 9750012345 - 1800 = 739735855 Hz). Point this receiver at it with `"audio": "soundmodem"` and `lnbHz`; it takes the dial from pdn-soundmodem. Do not also set pdn-soundmodem's `rtltcp.converterLoHz`, or the offset is applied twice. A receiver that is on the IF hears QO-100 stations, and GB7RDG shows as not followed while the dial is there. The receiver does not retune an LNB signal back to HF, so use a second receiver (or a retuning source) for both.
+
+**Calibrating `lnbHz`.** Read the QO-100 beacon (10489.750 MHz) with the same dongle, through the same pdn-soundmodem, with the same `ppm` setting you will receive with. Note the IF the beacon's carrier appears at, then set `lnbHz` to 10489750000 less that IF (a beacon at 739.737655 MHz gives 9750012345). `lnbHz` then absorbs the dongle's crystal error as well as the LNB's, so it is only right for that dongle; use another and calibrate again. The MS110D receiver searches 75 Hz either side of the expected frequency when it locks, so `lnbHz` need only be right to within a few tens of Hz, but a dongle's crystal drifts: 1 ppm is about 740 Hz at 739 MHz, so check the beacon again after the dongle and LNB have warmed up. This receiver does not search for drift.
 
 ## Using it with pdn-soundmodem
 
