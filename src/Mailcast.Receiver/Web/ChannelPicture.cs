@@ -8,7 +8,7 @@ namespace Mailcast.Receiver.Web;
 internal readonly record struct PicturePoint(double X, double Y);
 
 /// <summary>
-/// The Channel tile's side view (packet-net/pdn-mailcast#50): GB7RDG to the receiver over a
+/// The Channel tile's side view (packet-net/pdn-mailcast#50): The station to the receiver over a
 /// deliberately curved earth, with the reflecting layer as a concentric curved band and one ray
 /// per path found, bouncing off both. Built here, as inline SVG markup, rather than in the
 /// page's own script, so its geometry and labelling can be unit tested like the rest of the hop
@@ -30,7 +30,7 @@ internal static class ChannelPicture
     private const int ArcSamples = 24;
 
     /// <summary>
-    /// A point <paramref name="atKm"/> along the ground track (0 at GB7RDG, <paramref name="groundKm"/>
+    /// A point <paramref name="atKm"/> along the ground track (0 at the station, <paramref name="groundKm"/>
     /// at the receiver), <paramref name="heightKm"/> above it, in the picture's own exaggerated,
     /// but internally consistent, curved plane.
     /// </summary>
@@ -116,7 +116,7 @@ internal static class ChannelPicture
     /// Every distinct ground bounce a 2 or more hop ray in <paramref name="rays"/> touches
     /// (packet-net/pdn-mailcast#89): a single hop path shows nothing new, so <see cref="HopsOf"/>
     /// 1 rays contribute none. A hop count of <c>n</c> bounces at the fractions 1/n, 2/n, ...,
-    /// (n-1)/n of the great circle from GB7RDG to <paramref name="endPlace"/> (the same equal-hops
+    /// (n-1)/n of the great circle from the station to <paramref name="endPlace"/> (the same equal-hops
     /// assumption the picture's own geometry draws, see <see cref="Hop"/>); two rays that happen
     /// to share a fraction (a short path's 2F and a longer one's first half, say) are only named
     /// once. Named from the gazetteer, nearest town on land or sea and shipping forecast area at
@@ -124,9 +124,9 @@ internal static class ChannelPicture
     /// every sea polygon) is left out rather than shown blank. Empty when the receiver's place is
     /// not known, since there is then no real bearing to put a bounce on.
     /// </summary>
-    private static List<Bounce> GroundBounces(List<Ray> rays, GroundPlace? endPlace)
+    private static List<Bounce> GroundBounces(List<Ray> rays, GroundPlace? startPlace, GroundPlace? endPlace)
     {
-        if (endPlace is null)
+        if (endPlace is null || startPlace is null)
         {
             return [];
         }
@@ -145,7 +145,7 @@ internal static class ChannelPicture
             }
         }
         return [.. bounces.OrderBy(b => b.Fraction)
-            .Select(b => (b.Point, Place: PathGeometry.IntermediatePoint(PathGeometry.Gb7rdg, endPlace, b.Fraction)))
+            .Select(b => (b.Point, Place: PathGeometry.IntermediatePoint(startPlace, endPlace, b.Fraction)))
             .Select(b => (b.Point, Label: GroundBounceGazetteer.Label(b.Place.Latitude, b.Place.Longitude)))
             .Where(b => b.Label is not null)
             .Select(b => new Bounce(b.Point, b.Label!))];
@@ -174,7 +174,7 @@ internal static class ChannelPicture
         var ground = Arc(groundKm, 0);
         var layers = rays.Select(r => (r.HeightKm, r.HeightKnown)).Distinct()
             .Select(h => (h.HeightKm, h.HeightKnown, Points: Arc(groundKm, h.HeightKm))).ToList();
-        var bounces = withLabels ? GroundBounces(rays, endPlace) : [];
+        var bounces = withLabels ? GroundBounces(rays, report.StationPlaceOrDefault, endPlace) : [];
 
         var all = ground.Concat(layers.SelectMany(l => l.Points)).Concat(rays.SelectMany(r => r.Points)).ToList();
         double minX = all.Min(p => p.X), maxX = all.Max(p => p.X);
@@ -193,7 +193,7 @@ internal static class ChannelPicture
         double Sy(PicturePoint p) => ((p.Y - minY) * scale) + padTop;
 
         bool anyE = rays.Any(r => r.Mode.Label!.EndsWith('E'));
-        var aria = $"Side view of the path from GB7RDG to {WebUtility.HtmlEncode(endLocator ?? "the receiver")}, {Math.Round(groundKm)} km, over a deliberately curved earth";
+        var aria = $"Side view of the path from {WebUtility.HtmlEncode(report.StationName)} to {WebUtility.HtmlEncode(endLocator ?? "the receiver")}, {Math.Round(groundKm)} km, over a deliberately curved earth";
         var sb = new StringBuilder();
         sb.Append(CultureInfo.InvariantCulture, $"<svg viewBox=\"0 0 {widthPx} {F(height)}\" role=\"img\" aria-label=\"{aria}\">");
         sb.Append(CultureInfo.InvariantCulture, $"<polyline points=\"{Points(ground, Sx, Sy)}\" fill=\"none\" stroke=\"var(--soft)\" stroke-width=\"{(withLabels ? 2 : 1.5)}\"/>");
@@ -233,18 +233,18 @@ internal static class ChannelPicture
             var start = ground[0];
             var end = ground[^1];
             double midX = (Sx(start) + Sx(end)) / 2;
-            // Normally GB7RDG's label grows in towards the middle and the other end's grows in
+            // Normally the station's label grows in towards the middle and the other end's grows in
             // the other way, which reads naturally when the two ends are well apart. On a short
             // path the reflecting layer's fixed real height can dominate the picture's width far
             // more than the ground track does, leaving the two ends closer together than their
             // labels are wide: then both instead grow outward, away from each other.
             string endLabel = endLocator ?? "receiver";
-            bool roomInward = (Sx(end) - Sx(start)) >= (("GB7RDG IO91lk".Length + endLabel.Length) * 7.0) + 10;
+            bool roomInward = (Sx(end) - Sx(start)) >= ((report.StationLabel.Length + endLabel.Length) * 7.0) + 10;
             string startAttrs = roomInward ? "" : " text-anchor=\"end\"";
             string endAttrs = roomInward ? " text-anchor=\"end\"" : "";
             sb.Append(CultureInfo.InvariantCulture,
                 $"<circle cx=\"{F(Sx(start))}\" cy=\"{F(Sy(start))}\" r=\"4\" fill=\"var(--bad)\"/>"
-                + $"<text x=\"{F(Sx(start))}\" y=\"{F(Sy(start) + 16)}\" font-size=\"11\"{startAttrs}>GB7RDG IO91lk</text>"
+                + $"<text x=\"{F(Sx(start))}\" y=\"{F(Sy(start) + 16)}\" font-size=\"11\"{startAttrs}>{WebUtility.HtmlEncode(report.StationLabel)}</text>"
                 + $"<circle cx=\"{F(Sx(end))}\" cy=\"{F(Sy(end))}\" r=\"4\" fill=\"var(--ink)\"/>"
                 + $"<text x=\"{F(Sx(end))}\" y=\"{F(Sy(end) + 16)}\" font-size=\"11\"{endAttrs}>{WebUtility.HtmlEncode(endLabel)}</text>");
             foreach (var b in bounces)
@@ -252,7 +252,7 @@ internal static class ChannelPicture
                 // A small dot marking where each named ground bounce falls, hover text the words
                 // in full: a label at every dot's own position would risk running into either the
                 // top legend or another dot's label in a picture this narrow (packet-net/pdn-mailcast#89),
-                // so the words themselves are said once, below, in the order GB7RDG to the receiver.
+                // so the words themselves are said once, below, in the order from the station to the receiver.
                 sb.Append(CultureInfo.InvariantCulture,
                     $"<circle cx=\"{F(Sx(b.Point))}\" cy=\"{F(Sy(b.Point))}\" r=\"2.5\" fill=\"var(--soft)\">"
                     + $"<title>{WebUtility.HtmlEncode(b.Label)}</title></circle>");

@@ -323,8 +323,8 @@ public class ChannelTests
     [Fact]
     public void Geometry_DistancesAndHeights()
     {
-        Assert.Equal(136, PathGeometry.DistanceKm(Wessex, PathGeometry.Gb7rdg), 1.0);
-        Assert.Equal(502, PathGeometry.DistanceKm(Ei4hq, PathGeometry.Gb7rdg), 1.0);
+        Assert.Equal(136, PathGeometry.DistanceKm(Wessex, GroundPlace.FromLocator("IO91lk")!), 1.0);
+        Assert.Equal(502, PathGeometry.DistanceKm(Ei4hq, GroundPlace.FromLocator("IO91lk")!), 1.0);
         // Straight up and down, 300 km: 600 km of path, 2.0 ms.
         Assert.Equal(2.0013, PathGeometry.DelayMs(0, 1, 300), 0.001);
         double gap = PathGeometry.DelayMs(136, 2, 270) - PathGeometry.DelayMs(136, 1, 270);

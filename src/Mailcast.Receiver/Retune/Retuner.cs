@@ -86,7 +86,10 @@ public sealed class Retuner : IAsyncDisposable
     private readonly Action<string> _log;
     private readonly Func<FollowedSlots> _schedule;
     private readonly Func<bool> _onRadio;
-    private readonly RigTuning _tuning;
+    private RigTuning _tuning;
+    private readonly RigTuning _configTuning;
+    private readonly Func<DateTimeOffset, double?>? _dialAt;
+    private long? _slotDialHz;
     private readonly Func<double>? _windowDialHz;
     private readonly Action<double?>? _dialFollows;
     private readonly BpqNodeSettings? _bpq;
@@ -132,13 +135,13 @@ public sealed class Retuner : IAsyncDisposable
     /// <paramref name="onRadio"/> says the audio comes from the radio. <paramref name="hooks"/>,
     /// if given, are run around each slot it retunes for.
     /// </summary>
-    public Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
-        : this(config, schedule, onRadio, time, log, time, hooks, earlyEnd)
+    public Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null, Func<DateTimeOffset, double?>? dialAt = null)
+        : this(config, schedule, onRadio, time, log, time, hooks, earlyEnd, dialAt)
     {
     }
 
     /// <summary>As the public one, with rig control on a clock of its own, so a test can step its polls by themselves.</summary>
-    internal Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+    internal Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, TimeProvider rigTime, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null, Func<DateTimeOffset, double?>? dialAt = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         var rig = config.Rig ?? throw new ArgumentException("the config has no \"rig\"", nameof(config));
@@ -151,7 +154,8 @@ public sealed class Retuner : IAsyncDisposable
         _bpq = config.Bpq;
         _dedicated = rig.DedicatedRadio;
         _owedPort = _bpq?.HfPort ?? 0;
-        _tuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
+        _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
+        _dialAt = dialAt;
         _file = InterlockFile.PathIn(config.StateDirectory);
         Endpoint = rig.Endpoint;
         _rigRestoreFile = Path.Combine(config.StateDirectory, RigRestoreFile.NameFor(Endpoint));
@@ -195,7 +199,7 @@ public sealed class Retuner : IAsyncDisposable
     /// dial) and given back or lost (the rig's, or null when pdn-soundmodem did not say), so the
     /// audio's band placement can follow it.
     /// </summary>
-    internal Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, ReceiveWindow window, Func<double> dialHz, Action<double?>? dialFollows, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null)
+    internal Retuner(ReceiverConfig config, Func<FollowedSlots> schedule, Func<bool> onRadio, TimeProvider time, Action<string> log, ReceiveWindow window, Func<double> dialHz, Action<double?>? dialFollows, SlotHooks? hooks = null, Func<DateTimeOffset, string?>? earlyEnd = null, Func<DateTimeOffset, double?>? dialAt = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         _time = time;
@@ -206,7 +210,8 @@ public sealed class Retuner : IAsyncDisposable
         _earlyEnd = earlyEnd;
         // pdn-soundmodem holds its own transmitting; LinBPQ is not this retuner's to hold off.
         _bpq = null;
-        _tuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
+        _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
+        _dialAt = dialAt;
         _windowDialHz = dialHz;
         _dialFollows = dialFollows;
         _file = InterlockFile.PathIn(config.StateDirectory);
@@ -227,7 +232,21 @@ public sealed class Retuner : IAsyncDisposable
     public string Via => Window is { } window ? $"pdn-soundmodem's receive window on {window.Where}" : $"rigctld at {Endpoint}";
 
     /// <summary>The dial asked for: the config's, read afresh with a receive window.</summary>
-    private long DialNow => _windowDialHz is { } dial ? (long)Math.Round(dial()) : _tuning.DialHz;
+    private long DialNow => _slotDialHz ?? (_windowDialHz is { } dial ? (long)Math.Round(dial()) : _tuning.DialHz);
+
+    /// <summary>
+    /// The dial for the slot starting at <paramref name="slot"/>: the station whose slot it is may be
+    /// on another frequency (issue #179), in which case the dial that keeps its signal where the
+    /// config's dial keeps GB7RDG's; otherwise the config's.
+    /// </summary>
+    private long? DialFor(DateTimeOffset slot) => _dialAt?.Invoke(slot) is { } dial ? (long)Math.Round(dial) : null;
+
+    /// <summary>Uses the dial for <paramref name="slot"/> from now on, in the rig's tuning and in the window's requests.</summary>
+    private void UseDialFor(DateTimeOffset slot)
+    {
+        _slotDialHz = DialFor(slot);
+        _tuning = _slotDialHz is { } dial ? _configTuning with { DialHz = dial } : _configTuning;
+    }
 
     /// <summary>
     /// The band a receive window asks pdn-soundmodem's rig to pass, in Hz of audio: up to the
@@ -522,6 +541,7 @@ public sealed class Retuner : IAsyncDisposable
     private async Task RunSlotAsync(DateTimeOffset slot, CancellationToken cancellation)
     {
         var closes = slot + After;
+        UseDialFor(slot);
         try
         {
             if (_hooks is { Configured: true } hooks)
@@ -617,7 +637,8 @@ public sealed class Retuner : IAsyncDisposable
                     if (_time.GetUtcNow() >= closes)
                     {
                         // A following slot whose window would open before this one closes keeps the radio.
-                        if (_schedule().NextActiveAfter(slot) is { } next && next - Lead - HookLead <= closes)
+                        if (_schedule().NextActiveAfter(slot) is { } next && next - Lead - HookLead <= closes
+                            && (DialFor(next) ?? _configTuning.DialHz) == (_slotDialHz ?? _configTuning.DialHz))
                         {
                             _finished = slot;
                             slot = next;

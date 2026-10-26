@@ -17,10 +17,12 @@ public static class OnAir
     public const string Mode = "ms110d-wn4";
 
     /// <summary>
-    /// GB7RDG's transmitter, fixed: it never moves off 7.0538 MHz, whatever dial a receiver
-    /// uses. See <see cref="ReceiverConfig.DialKHz"/> and <see cref="AudioCentreHz"/>.
+    /// The signal centre the config's <see cref="ReceiverConfig.DialKHz"/> is written for, and
+    /// where a station is taken to be until it says otherwise: GB7RDG's 7.0538 MHz. Each station's
+    /// own frequency comes from its directory or an advert (issue #179); nothing else in the
+    /// receiver assumes this one.
     /// </summary>
-    public const double TransmitHz = 7_053_800;
+    public const double DefaultSignalHz = 7_053_800;
 
     /// <summary>
     /// Where the centre of the signal and the tone fall in a receiver's own audio for its USB
@@ -33,11 +35,12 @@ public static class OnAir
     public const double CentreAudioHz = 1800;
 
     /// <summary>
-    /// Where <see cref="TransmitHz"/> falls in a receiver's own audio for USB dial
-    /// <paramref name="dialHz"/>, Hz: <see cref="CentreAudioHz"/> (1800) at the usual 7.052 MHz
-    /// dial, or 1500 Hz at 7.0523 MHz.
+    /// Where a signal centred on <paramref name="signalHz"/> falls in a receiver's own audio for
+    /// USB dial <paramref name="dialHz"/>, Hz: <see cref="CentreAudioHz"/> (1800) for GB7RDG's
+    /// signal at the usual 7.052 MHz dial, or 1500 Hz at 7.0523 MHz. <paramref name="signalHz"/>
+    /// is the station's own (issue #179); left out it is <see cref="DefaultSignalHz"/>.
     /// </summary>
-    public static double AudioCentreHz(double dialHz) => TransmitHz - dialHz;
+    public static double AudioCentreHz(double dialHz, double signalHz = DefaultSignalHz) => signalHz - dialHz;
 
     /// <summary>
     /// Half the signal's occupied width: MS110D with the standard's pulse shaping fills about

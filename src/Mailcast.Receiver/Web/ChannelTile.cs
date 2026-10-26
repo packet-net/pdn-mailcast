@@ -2,7 +2,7 @@ namespace Mailcast.Receiver.Web;
 
 /// <summary>
 /// The Channel tile's part of <c>/api/status</c>: the newest slot's picture of the radio path from
-/// GB7RDG, and a day of them for the strip.
+/// a station, and a day of them for the strip.
 /// </summary>
 internal static class ChannelTile
 {
@@ -27,6 +27,10 @@ internal static class ChannelTile
         return new
         {
             slot = latest?.Slot,
+            station = latest?.StationName,
+            stationLocator = latest?.Station is null ? Packet.Mailcast.ReceiverStore.BuiltInDetails.Locator : latest.StationLocator,
+            // False for a path above HF (QO-100): signal to noise, offset and frames only (issue #179).
+            skywave = latest?.Skywave ?? true,
             measured = latest?.Measured,
             basis = latest?.Basis ?? "bursts",
             enough = latest?.Enough ?? false,
@@ -53,7 +57,7 @@ internal static class ChannelTile
             kept = latest?.Kept ?? 0,
             words = latest?.Words ?? Nothing,
             floorDb = latest?.FloorDb,
-            profile = latest is { Enough: true } r ? new { startMs = r.ProfileStartMs, stepMs = r.ProfileStepMs, db = r.ProfileDb } : null,
+            profile = latest is { Enough: true, Skywave: true } r ? new { startMs = r.ProfileStartMs, stepMs = r.ProfileStepMs, db = r.ProfileDb } : null,
             // The side view of the path (packet-net/pdn-mailcast#50): null when there is nothing
             // plausible to draw (the receiver's place is not known, or nothing could be labelled).
             pathSvg = latest is null ? null : ChannelPicture.Svg(latest, latest.Locator, MainPictureWidthPx, withLabels: true, latest.Place),
@@ -90,6 +94,11 @@ internal static class ChannelTile
             history = history.Select(h => new
             {
                 slot = h.Slot,
+                station = h.StationName,
+                skywave = h.Skywave,
+                snrDb = h.SnrDb,
+                stationLatitude = h.StationPlaceOrDefault?.Latitude,
+                stationLongitude = h.StationPlaceOrDefault?.Longitude,
                 basis = h.Basis,
                 enough = h.Enough,
                 modes = h.Modes.Select(m => new { label = m.Label, delayMs = m.DelayMs, powerDb = m.PowerDb }),

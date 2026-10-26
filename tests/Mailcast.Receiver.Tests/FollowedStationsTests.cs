@@ -173,7 +173,7 @@ public class FollowedStationsTests
                 Timetable = new SlotTimetable(new TimeOnly(0, 15), 60),
                 Signer = xyz,
                 Station = "M0XYZ",
-                Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 10_489_750_000, Sideband.Usb), new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_053_800, Sideband.Usb), new("M0FAR", new SlotTimetable(new TimeOnly(0, 45), 60), 7_047_000, Sideband.Usb)],
+                Adverts = [new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 10_489_750_000, Sideband.Usb), new("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_053_800, Sideband.Usb), new("M0FAR", new SlotTimetable(new TimeOnly(0, 45), 60), 10_489_750_000, Sideband.Usb, "JM75")],
             }, slot, 1);
             var listening = host.Listening;
             // Heard directly first, then advertised only.
@@ -182,8 +182,10 @@ public class FollowedStationsTests
             Assert.Equal("an advert", listening[2].Source);
             Assert.True(listening[2].Followed); // its HF advert, not its QO-100 one, decides
             Assert.Equal(7_053_800, listening[2].FrequencyHz);
+            // A web SDR is tuned for each slot, but not above HF (QO-100 needs a converter offset: #180).
             Assert.False(listening[3].Followed);
-            Assert.Contains("7.047 MHz USB, not where this receiver listens", listening[3].NotFollowedBecause, StringComparison.Ordinal);
+            Assert.Contains("10489.750 MHz USB, above HF", listening[3].NotFollowedBecause, StringComparison.Ordinal);
+            Assert.Equal("JM75", listening[3].Locator);
             Assert.Equal(["GB7RDG", "M0XYZ", "G8BPQ"], host.Followed.Stations.Select(s => s.Station));
         }
 

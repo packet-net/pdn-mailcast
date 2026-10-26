@@ -14,7 +14,7 @@ public sealed record GroundPlace(double Latitude, double Longitude, string Locat
 }
 
 /// <summary>
-/// The geometry of the path from GB7RDG: which hops the measured modes are, and how high the
+/// The geometry of the path from a station: which hops the measured modes are, and how high the
 /// reflection is. Mirror-model hops over a round Earth: each hop goes up to a virtual height and
 /// back down, so a mode's delay is its group path over the speed of light.
 /// </summary>
@@ -37,9 +37,6 @@ public sealed record GroundPlace(double Latitude, double Longitude, string Locat
 /// </remarks>
 internal static class PathGeometry
 {
-    /// <summary>GB7RDG, near Reading.</summary>
-    public static readonly GroundPlace Gb7rdg = GroundPlace.FromLocator("IO91lk")!;
-
     private const double EarthKm = 6371.0;
 
     private const double LightKmPerMs = 299.792458;

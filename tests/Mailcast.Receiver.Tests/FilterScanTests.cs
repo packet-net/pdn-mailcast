@@ -160,7 +160,7 @@ public class FilterScanTests
 
         Assert.Null(problem);
         Assert.NotNull(filter);
-        double centreHz = OnAir.TransmitHz - (filter!.DialKHz * 1000);
+        double centreHz = OnAir.DefaultSignalHz - (filter!.DialKHz * 1000);
         Assert.InRange(centreHz, ReceiverConfig.LowestAudioCentreHz - 5, ReceiverConfig.HighestAudioCentreHz + 5);
     }
 

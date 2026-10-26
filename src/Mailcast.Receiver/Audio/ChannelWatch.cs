@@ -50,6 +50,12 @@ public sealed class ChannelWatch : IAsyncDisposable
     private readonly Action<string> _log;
     private readonly string? _path;
     private readonly Func<GroundPlace?> _place;
+
+    /// <summary>
+    /// Says which station a slot belongs to and where it is on the air and on the ground
+    /// (issue #179); null for GB7RDG, as every slot was before stations were named.
+    /// </summary>
+    internal Func<DateTimeOffset, StationOnAir?>? Transmitter { get; set; }
     private readonly Channel<object> _inbox = Channel.CreateUnbounded<object>(new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
@@ -393,8 +399,9 @@ public sealed class ChannelWatch : IAsyncDisposable
         _earlierProbes = probesKept;
         var now = _time.GetUtcNow();
         var place = _place();
-        var fromBursts = ChannelReport.Summarise(slot, now, [.. pictures.Where(p => p.Basis != ProbeChannel.Basis)], kept, place);
-        var fromProbe = probesKept == 0 ? null : ChannelReport.Summarise(slot, now, [.. pictures.Where(p => p.Basis == ProbeChannel.Basis)], probesKept, place, ProbeChannel.Basis);
+        var transmitter = Transmitter?.Invoke(slot);
+        var fromBursts = ChannelReport.Summarise(slot, now, [.. pictures.Where(p => p.Basis != ProbeChannel.Basis)], kept, place, transmitter: transmitter);
+        var fromProbe = probesKept == 0 ? null : ChannelReport.Summarise(slot, now, [.. pictures.Where(p => p.Basis == ProbeChannel.Basis)], probesKept, place, ProbeChannel.Basis, transmitter);
         if (kept == 0 && fromProbe is not { Measurements: > 0 })
         {
             return null;
