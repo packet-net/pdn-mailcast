@@ -342,6 +342,26 @@ When the slot's channel was measured, six more follow:
 
 A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the eighth field of the header (`-` or missing in the seventh or eighth means that count is not known) and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
 
+#### Station lines
+
+A receiver that follows more than one station adds a summary for each, after the slot lines (a receiver following only GB7RDG writes one for it too). The header and the slot lines stay GB7RDG's own, the station the report goes to, so a reader from before this reads the same report as ever:
+
+```
+S GB7RDG 9 9 1540 17 -14 287
+S G8BPQ 4 3 212 6 -12 -
+```
+
+1. `S`.
+2. The station's callsign.
+3. Slots of it the receiver listened to.
+4. Of those, slots heard: a tone or at least one frame.
+5. Frames decoded in them.
+6. Bulletins rebuilt while those slots were the one tracked.
+7. The median tone SNR, dB, over the slots with a tone, or `-`.
+8. The median virtual height, km, over the slots with a channel measurement, or `-`.
+
+The format stays `MCR1`: a reader from before station lines stops at the first line that does not start with a digit and ignores the rest, which is how it skips these (it would refuse a new format number). A reader should ignore anything after the eighth field of a station line, and any line it does not know after the station lines. `DailyReport.Parse` puts them in `Stations`. GB7RDG's receipt line (see above) is still only about whether GB7RDG got your report.
+
 ## The receiver's login on your BBS
 
 The receiver logs in as **Q0CAST**. It needs a login of its own:
@@ -440,6 +460,7 @@ http://127.0.0.1:8130/ shows:
 - what was heard, slot by slot: every burst, and every frame in it (see [What was heard](#what-was-heard));
 - what to try if nothing is heard;
 - the bulletins this receiver holds (see [Bulletins](#bulletins)): one row each, newest first, a part-received one with a progress bar (named from any directory that has named it, or "not yet named" otherwise) and a complete one with what the BBS said about it and when. A summary line at the top counts how many are coming in, waiting for your BBS, delivered, already had and refused. If the newest directory heard is not today's, it says so plainly instead of naming that stale date as if it were current;
+- **Heard today**, under Listening: for each station, how many of its slots today (UTC) were heard out of those listened to, the frames, the bulletins completed, and the median tone SNR and virtual height where they were measured. It is there whether or not the daily report is on, starts again when the receiver restarts, and is what the daily report's [station lines](#station-lines) say too (the journal's line for each slot names the station already);
 - the daily report, if you have turned it on: the last one as sent, what your BBS said, when the next goes, and whether GB7RDG got it (see [Sending a daily report](#sending-a-daily-report));
 - the settings: audio, the callsigns frames are accepted from (`sources`), the BBS's address and login, and the page's own password. The USB dial is shown too; for a sound card it also offers **Measure my filter** and typing the edges, above, which writes `dialKHz`. For a web SDR or a recording it is only changed in the config file. Saving writes them to the config file (without its comments) and puts them in force at once. If you change the BBS's address, port or type, enter its password again: the saved one is never sent anywhere new without you. A **Test BBS login** button tries the login shown without exchanging any mail (see [Testing the login](#testing-the-login)).
 

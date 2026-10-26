@@ -295,4 +295,71 @@ public class DailyReportTests
     [InlineData(null, false)]
     public void IsReportAddressee_IsMcastInAnyCase(string? to, bool expected) =>
         Assert.Equal(expected, DailyReport.IsReportAddressee(to));
+
+    [Fact]
+    public void StationLines_RoundTrip_AfterTheSlotLines()
+    {
+        var full = FullDay();
+        var stations = new[]
+        {
+            new ReportStation("GB7RDG", 9, 9, 1540, 17, -14.4, 287),
+            new ReportStation("G8BPQ", 4, 0, 0, 0),
+        };
+        var report = full with { Stations = stations };
+        var lines = report.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(12, lines.Length);
+        Assert.Equal("S GB7RDG 9 9 1540 17 -14 287", lines[10]);
+        Assert.Equal("S G8BPQ 4 0 0 0 - -", lines[11]);
+        var back = DailyReport.Parse(report.Title, "R:261007/1200Z @:GB7RDG\r\n\r\n" + report.Body + "\r\n[End of Message]\r\n");
+        Assert.Equal(9, back.Slots.Count);
+        Assert.Equal(new ReportStation("GB7RDG", 9, 9, 1540, 17, -14, 287), back.Stations![0]);
+        Assert.Equal(new ReportStation("G8BPQ", 4, 0, 0, 0), back.Stations[1]);
+    }
+
+    [Fact]
+    public void ReportWithoutStationLines_ReadsWithNone()
+    {
+        var back = DailyReport.Parse(FullDay().Title, FullDay().Body);
+        Assert.Empty(back.Stations!);
+    }
+
+    [Fact]
+    public void StationLine_IgnoresFieldsPastTheEighth_AndLinesItDoesNotKnow()
+    {
+        string body = FullDay().Body + "S G8BPQ 4 3 212 6 -14 290 future more\r\nX something else\r\nS GB7RDG 1 1 1 1\r\n";
+        var back = DailyReport.Parse(FullDay().Title, body);
+        Assert.Equal(new ReportStation("G8BPQ", 4, 3, 212, 6, -14, 290), Assert.Single(back.Stations!));
+    }
+
+    /// <summary>
+    /// The reader released before station lines (v0.20.0) read slot lines until the first line
+    /// that does not start with a digit, and ignored the rest; its loop, kept here, must still
+    /// see the same header and slots in a report with station lines.
+    /// </summary>
+    [Fact]
+    public void ReaderBeforeStationLines_SeesTheSameHeaderAndSlots()
+    {
+        var plain = FullDay();
+        var withStations = plain with { Stations = [new ReportStation("GB7RDG", 9, 9, 1540, 17, -14, 287), new ReportStation("G8BPQ", 4, 3, 212, 6)] };
+
+        static (string Header, string Slots) Released(string body)
+        {
+            var lines = body.Replace("\r\n", "\n").Split('\n').Select(l => l.Trim()).ToList();
+            int at = lines.FindIndex(l => l.StartsWith("MCR", StringComparison.Ordinal) && l.Length > 3 && char.IsAsciiDigit(l[3]));
+            var slots = new List<string>();
+            foreach (string line in lines.Skip(at + 1))
+            {
+                if (line.Length == 0 || !char.IsAsciiDigit(line[0]))
+                {
+                    break;
+                }
+                slots.Add(line);
+            }
+            return (lines[at], string.Join('|', slots));
+        }
+
+        Assert.Equal(Released(plain.Body), Released(withStations.Body));
+        Assert.True(DailyReport.LooksLikeReport(withStations.Title, withStations.Body));
+    }
 }

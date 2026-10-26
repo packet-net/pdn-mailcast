@@ -179,17 +179,6 @@ public sealed class ReceiverHost : IAsyncDisposable
         return AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(followed, day) : followed.ActiveOn(day);
     }
 
-    /// <summary>
-    /// GB7RDG's slots of those listened to on a UTC day, for its daily report: per-transmitter
-    /// reports are issue #148, so the report stays GB7RDG's.
-    /// </summary>
-    private IReadOnlyList<DateTimeOffset> ListenedOfGb7rdg(DateOnly day)
-    {
-        var followed = Followed;
-        var schedule = Schedule;
-        return followed.OneStation ? ListenedOn(day) : [.. ListenedOn(day).Where(s => schedule.LatestStart(s) == s)];
-    }
-
     private FeedbackService CreateFeedback()
     {
         AudioSourceKind Kind() => AudioSource.Parse(Config.Audio).Kind;
@@ -197,7 +186,9 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Settings = () => Config.Feedback,
             Schedule = () => Kind() == AudioSourceKind.Wav ? null : Schedule,
-            Listened = ListenedOfGb7rdg,
+            Listened = ListenedOn,
+            Station = slot => Followed.OneStation ? Followed.Stations[0].Station : Followed.StationAt(slot) ?? ReceiverStore.BuiltInStation,
+            OwnStation = () => Followed.OneStation ? Followed.Stations[0].Station : ReceiverStore.BuiltInStation,
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
             PskReporter = () => Intake.PskReporter,
@@ -207,8 +198,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
         Intake.GivenUp += feedback.NoteGivenUp;
-        // The daily report is GB7RDG's until per-transmitter reports (issue #148): only its
-        // directories say whether a report reached it.
+        // The report goes to GB7RDG, and only its directories say whether it got there, whatever
+        // the report says about other stations (issue #148).
         Intake.DirectoryHeard += directory =>
         {
             if (Intake.StationOf(directory) == ReceiverStore.BuiltInStation)
