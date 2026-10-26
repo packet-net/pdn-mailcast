@@ -2,7 +2,7 @@
 """Read-only BPQ telnet client: log in, run a fixed list of commands, print the transcript.
 
 Usage: bpqread.py HOST PORT CMD [CMD...]
-Credentials come from ~/.config/g8bpq/login (user line, password line).
+Credentials come from $BPQ_LOGIN, default ~/.config/g8bpq/login (user line, password line).
 Only list/read style commands are allowed; anything else is refused before sending.
 """
 import os
@@ -39,7 +39,13 @@ def strip_telnet(buf: bytes, sock: socket.socket) -> bytes:
     return bytes(out)
 
 
-def read_for(sock: socket.socket, seconds: float) -> str:
+# A BBS prompt ("de GB7NOT>") or a node prompt ("NOTTM:GB7NOT-2}") at the end of what has arrived.
+PROMPT = re.compile(rb"(de [A-Z0-9-]+>|[A-Z0-9]+:[A-Z0-9-]+\})\s*$")
+
+
+def read_for(sock: socket.socket, seconds: float, until_prompt: bool = False) -> str:
+    """Read until `seconds` pass; with until_prompt, stop as soon as a prompt ends the output,
+    otherwise after 2 s of quiet. A slow link pauses mid-message, so reads wait for the prompt."""
     sock.settimeout(0.5)
     data = bytearray()
     end = time.time() + seconds
@@ -51,9 +57,11 @@ def read_for(sock: socket.socket, seconds: float) -> str:
                 break
             data += strip_telnet(chunk, sock)
             quiet = 0.0
+            if until_prompt and PROMPT.search(bytes(data[-200:])):
+                break
         except socket.timeout:
             quiet += 0.5
-            if data and quiet >= 2.0:
+            if data and not until_prompt and quiet >= 2.0:
                 break
     return data.decode("latin-1").replace("\r\n", "\n").replace("\r", "\n")
 
@@ -64,7 +72,7 @@ def main() -> int:
         if not ALLOWED.match(c):
             print(f"refused: {c!r} is not a read-only command", file=sys.stderr)
             return 2
-    user, password = open(os.path.expanduser("~/.config/g8bpq/login")).read().split("\n")[:2]
+    user, password = open(os.path.expanduser(os.environ.get("BPQ_LOGIN", "~/.config/g8bpq/login"))).read().split("\n")[:2]
     with socket.create_connection((host, port), timeout=15) as s:
         out = read_for(s, 6)
         s.sendall((user + "\r").encode())
@@ -73,7 +81,8 @@ def main() -> int:
         out += read_for(s, 8)
         for c in cmds:
             s.sendall((c + "\r").encode())
-            out += f"\n>>> {c}\n" + read_for(s, 30)
+            waits = c.upper() not in ("B", "BYE")
+            out += f"\n>>> {c}\n" + read_for(s, 300 if waits else 10, until_prompt=waits)
     sys.stdout.write(out.replace(password, "********"))
     return 0
 

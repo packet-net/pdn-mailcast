@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Fetch every bulletin a LinBPQ BBS lists, read-only, into corpus/<STATION>/<BID>.txt (issue #138).
 
-Usage: fetch.py STATION HOST PORT [--max N]
+Usage: fetch.py STATION HOST PORT [--max N] [--direct]
+--direct: the port lands straight in the BBS, so no BBS command is sent.
+Set BPQ_LOGIN to use another login file.
 Logs in with ~/.config/g8bpq/login, sends LB, then R n for each bulletin not already in the
 corpus, a batch per connection. Only LB, R n and B are ever sent. Each file is the BBS's read
 output from "From:" to the line before "[End of Message", as telnet delivered it (line ends
@@ -18,11 +20,14 @@ LIST_LINE = re.compile(r"^(\d+)\s+\S+\s+(B\S)\s+(\d+)\s+(\S+)\s+@(\S*)\s+(\S+)\s
 BATCH = 15
 
 
+DIRECT = "--direct" in sys.argv
+
+
 def session(host: str, port: int, cmds: list[str]) -> str:
     import io
     import contextlib
     argv = sys.argv
-    sys.argv = ["bpqread", host, str(port), "BBS", *cmds, "B"]
+    sys.argv = ["bpqread", host, str(port), *([] if DIRECT else ["BBS"]), *cmds, "B"]
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf):
