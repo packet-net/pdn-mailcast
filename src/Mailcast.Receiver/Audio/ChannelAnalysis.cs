@@ -106,7 +106,7 @@ internal static class ChannelAnalysis
     /// <summary>The most Doppler a delay is corrected for: the probe's snapshots cover 4.7 Hz either way.</summary>
     private const double MostCoupledHz = 5;
 
-    /// <summary>The fewest usable snapshots worth analysing: about 2 s of WN4.</summary>
+    /// <summary>The fewest usable snapshots worth analysing: a count, not a time: 1.6 s of WN3 or WN4 frames (53 ms each), 3.6 s of WN5 and up (120 ms).</summary>
     public const int FewestSnapshots = 30;
 
     /// <summary>The picture from one run of estimates, or null if too few were usable.</summary>

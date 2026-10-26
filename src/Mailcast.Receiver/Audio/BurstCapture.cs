@@ -63,8 +63,8 @@ public sealed record CapturedProbe(Half[] Audio, ToneReport Tone, double ToneEnd
 /// </remarks>
 public sealed class BurstCapture
 {
-    /// <summary>Audio kept, seconds: enough for a 60 s burst and its margins.</summary>
-    public const int RingSeconds = 75;
+    /// <summary>Audio kept, seconds: enough for the longest burst a head end packs (120 s, whatever the waveform) and its margins.</summary>
+    public const int RingSeconds = 135;
 
     /// <summary>Audio taken before the burst could have begun, seconds: decoder delay and quiet before it.</summary>
     public const double BeforeSeconds = 6.5;

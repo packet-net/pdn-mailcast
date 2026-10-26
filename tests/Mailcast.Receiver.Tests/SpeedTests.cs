@@ -37,6 +37,13 @@ public class SpeedTests
     [InlineData(4, "1200 bps (WN4)")]
     [InlineData(3, "600 bps (WN3)")]
     [InlineData(13, "2400 bps (WN13)")]
+    [InlineData(0, "75 bps (WN0)")]
+    [InlineData(1, "150 bps (WN1)")]
+    [InlineData(2, "300 bps (WN2)")]
+    [InlineData(5, "1600 bps (WN5)")]
+    [InlineData(6, "3200 bps (WN6)")]
+    [InlineData(7, "4800 bps (WN7)")]
+    [InlineData(8, "6400 bps (WN8)")]
     public void Waveform_InWords(int wn, string words)
     {
         Assert.Equal(words, Waveform.Words(Waveform.Name(wn)));
@@ -311,5 +318,12 @@ public class SpeedTests
         string html = await new StreamReader(typeof(StatusPage).Assembly.GetManifestResourceStream("Mailcast.Receiver.Web.index.html")!).ReadToEndAsync();
         Assert.Contains("status.level.advice === \"target\"", html, StringComparison.Ordinal);
         Assert.Contains("Not heard yet.", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BurstRing_HoldsTheLongestBurstAHeadEndPacks_WhateverTheWaveform()
+    {
+        // MaxBurstSeconds is up to 120 on any waveform, so the audio kept covers it and its margins.
+        Assert.True(BurstCapture.RingSeconds >= 120 + BurstCapture.BeforeSeconds + BurstCapture.AfterSeconds);
     }
 }
