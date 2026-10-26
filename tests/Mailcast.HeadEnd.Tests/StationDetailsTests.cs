@@ -32,6 +32,16 @@ public class StationDetailsTests
     }
 
     [Fact]
+    public void Sideband_IsWrittenWheneverTheFrequencyIs()
+    {
+        var usb = HeadEndConfig.Parse(Config(", \"frequencyHz\": 7047000")).ToDetails();
+        Assert.Equal(Sideband.Usb, usb!.Sideband);
+        var lsb = HeadEndConfig.Parse(Config(", \"frequencyHz\": 7047000, \"sideband\": \"lsb\"")).ToDetails();
+        Assert.Equal(Sideband.Lsb, lsb!.Sideband);
+        Assert.Null(HeadEndConfig.Parse(Config(", \"locator\": \"IO83\"")).ToDetails()!.Sideband);
+    }
+
+    [Fact]
     public void WithNoneGiven_TheDirectoryCarriesNothingNew_AsBefore()
     {
         var config = HeadEndConfig.Parse(Config(""));

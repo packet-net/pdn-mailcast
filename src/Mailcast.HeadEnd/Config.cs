@@ -40,7 +40,8 @@ public sealed record HeadEndConfig
     public StationDetails? ToDetails() =>
         FrequencyHz is null && Sideband is null && Locator is null || DetailsProblems().Count > 0
             ? null
-            : new StationDetails(FrequencyHz, Sideband is null ? null : Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Packet.Mailcast.Sideband.Lsb : Packet.Mailcast.Sideband.Usb, Locator);
+            // sideband= is written whenever hz= is, so a reader never has to guess it.
+            : new StationDetails(FrequencyHz, FrequencyHz is null ? null : Sideband is not null && Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Packet.Mailcast.Sideband.Lsb : Packet.Mailcast.Sideband.Usb, Locator);
 
     private List<string> DetailsProblems()
     {

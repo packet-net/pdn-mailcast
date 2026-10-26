@@ -96,10 +96,16 @@ public class StationDetailsTests
         Feed(store, Directory(Day.AddDays(1), Bpq, "G8BPQ", new StationDetails(7_048_500), null, Big(4)));
         Assert.Equal(new StationDetails(7_048_500, Sideband.Usb, "IO83"), store.HeardDetails("G8BPQ"));
 
+        // A directory giving hz= with no sideband= means usb, not the older directory's lsb.
+        Feed(store, Directory(Day.AddDays(3), Bpq, "G8BPQ", new StationDetails(7_049_000, Sideband.Lsb), null, Big(6)));
+        Assert.Equal(Sideband.Lsb, store.HeardDetails("G8BPQ")!.Sideband);
+        Feed(store, Directory(Day.AddDays(4), Bpq, "G8BPQ", new StationDetails(7_050_000), null, Big(7)));
+        Assert.Equal(new StationDetails(7_050_000, Sideband.Usb, "IO83"), store.HeardDetails("G8BPQ"));
+
         // An unsigned directory naming it belongs to no station, so it can move nothing.
         var unsigned = new BroadcastDirectory(Day.AddDays(2), [new DirectoryEntry(5, 1, 9000, "5_T", "T")], HalfPast, "ms110d-wn4", null, station: "G8BPQ", details: new StationDetails(14_000_000));
         Feed(store, unsigned);
-        Assert.Equal(7_048_500, store.HeardDetails("G8BPQ")!.FrequencyHz);
+        Assert.Equal(7_050_000, store.HeardDetails("G8BPQ")!.FrequencyHz);
         Assert.Null(store.HeardDetails("GB7RDG"));
     }
 }

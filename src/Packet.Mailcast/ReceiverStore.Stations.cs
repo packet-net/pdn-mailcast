@@ -282,10 +282,13 @@ public sealed partial class ReceiverStore
         {
             return null;
         }
-        // A newer directory that leaves a part out does not unsay an older one: parts are optional.
+        // A newer directory that leaves the locator out does not unsay an older one. The sideband
+        // belongs to the frequency: a directory giving hz= without sideband= means usb, never an
+        // older directory's sideband.
+        var withHz = newestFirst.FirstOrDefault(d => d.FrequencyHz is not null);
         return new StationDetails(
-            newestFirst.Select(d => d.FrequencyHz).FirstOrDefault(v => v is not null),
-            newestFirst.Select(d => d.Sideband).FirstOrDefault(v => v is not null),
+            withHz?.FrequencyHz,
+            withHz is not null ? withHz.Sideband ?? Sideband.Usb : newestFirst.Select(d => d.Sideband).FirstOrDefault(v => v is not null),
             newestFirst.Select(d => d.Locator).FirstOrDefault(v => v is not null));
     }
 
