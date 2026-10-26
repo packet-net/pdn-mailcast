@@ -13,11 +13,17 @@ public sealed record FeedbackSources
     /// <summary>The config's <c>feedback</c>, as in force now.</summary>
     public required Func<FeedbackSettings?> Settings { get; init; }
 
-    /// <summary>GB7RDG's slots, or null when there are none to report on (a recording).</summary>
+    /// <summary>The slots of the station the report goes to (GB7RDG's), or null when there are none to report on (a recording).</summary>
     public required Func<SlotSchedule?> Schedule { get; init; }
 
-    /// <summary>The slots the receiver listens to on a UTC day.</summary>
+    /// <summary>The slots the receiver listens to on a UTC day, of every station it follows (issue #148).</summary>
     public required Func<DateOnly, IReadOnlyList<DateTimeOffset>> Listened { get; init; }
+
+    /// <summary>Whose slot this is, as a callsign (issue #148).</summary>
+    public Func<DateTimeOffset, string> Station { get; init; } = _ => ReceiverStore.BuiltInStation;
+
+    /// <summary>The station the report goes to: its slots are the report's slot lines, and its directories say whether a report arrived.</summary>
+    public Func<string> OwnStation { get; init; } = () => ReceiverStore.BuiltInStation;
 
     /// <summary>The slot in progress or most recently heard.</summary>
     public required Func<SlotSummary?> LastSlot { get; init; }
@@ -155,6 +161,50 @@ public sealed class FeedbackService
         _log = log;
         _path = Path.Combine(stateDirectory, FileName);
         _state = Load(_path, log);
+        foreach (var slot in _state.Days.SelectMany(d => d.Slots))
+        {
+            _seen[slot.Slot] = slot;
+        }
+    }
+
+    /// <summary>
+    /// Every slot listened to over the last few days, of every station, kept whether or not the
+    /// daily report is on: the status page's figures (issue #148) read it.
+    /// </summary>
+    private readonly Dictionary<DateTimeOffset, SlotRecord> _seen = [];
+
+    /// <summary>
+    /// What each station's slots came to on a UTC day (issue #148): slots listened to, heard,
+    /// frames, bulletins completed, and the median tone SNR and virtual height where measured.
+    /// The report's own station first, then the rest by callsign. Empty before any slot.
+    /// </summary>
+    public IReadOnlyList<ReportStation> StationFigures(DateOnly day)
+    {
+        lock (_gate)
+        {
+            return Figures(_seen.Values.Where(s => DateOnly.FromDateTime(s.Slot.UtcDateTime) == day), _sources.OwnStation());
+        }
+    }
+
+    internal static IReadOnlyList<ReportStation> Figures(IEnumerable<SlotRecord> slots, string own) =>
+    [
+        .. slots.GroupBy(s => s.Station ?? own, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => string.Equals(g.Key, own, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => new ReportStation(
+                g.Key,
+                g.Count(),
+                g.Count(s => s.Frames > 0 || s.SnrDb is not null),
+                g.Sum(s => s.Frames),
+                g.Sum(s => s.Completed),
+                Median(g.Where(s => s.SnrDb is not null).Select(s => s.SnrDb!.Value)) is { } snr ? Math.Round(snr) : null,
+                Median(g.Where(s => s.Channel?.VirtualHeightKm is not null).Select(s => s.Channel!.VirtualHeightKm!.Value)) is { } km ? Math.Round(km) : null)),
+    ];
+
+    private static double? Median(IEnumerable<double> values)
+    {
+        var sorted = values.Order().ToList();
+        return sorted.Count == 0 ? null : sorted.Count % 2 == 1 ? sorted[sorted.Count / 2] : (sorted[(sorted.Count / 2) - 1] + sorted[sorted.Count / 2]) / 2;
     }
 
     /// <summary>The report most recently made, if any.</summary>
@@ -431,7 +481,16 @@ public sealed class FeedbackService
             _said = false;
             _log("feedback: off. No daily report is sent");
         }
-        if (!Enabled || _sources.Schedule() is not { } schedule || _sources.Settings() is not { } settings)
+        if (!Enabled)
+        {
+            // Nothing is sent or kept, but the status page still shows what each station came to.
+            if (_sources.Schedule() is not null)
+            {
+                NoteSlots(_time.GetUtcNow());
+            }
+            return;
+        }
+        if (_sources.Schedule() is not { } schedule || _sources.Settings() is not { } settings)
         {
             return;
         }
@@ -507,12 +566,14 @@ public sealed class FeedbackService
                     {
                         continue;
                     }
-                    var record = Day(DateOnly.FromDateTime(slot.UtcDateTime));
-                    var before = record.Slots.Find(s => s.Slot == slot);
+                    var record = Enabled ? Day(DateOnly.FromDateTime(slot.UtcDateTime)) : null;
+                    var before = record is null ? _seen.GetValueOrDefault(slot) : record.Slots.Find(s => s.Slot == slot);
                     var tone = heard?.Scheduled == slot ? heard.Tone : null;
                     var line = new SlotRecord
                     {
                         Slot = slot,
+                        Station = _sources.Station(slot),
+                        Completed = heard?.Scheduled == slot ? heard.BulletinsCompleted : before?.Completed ?? 0,
                         Waveform = heard?.Scheduled == slot ? WaveformCode(heard) : null,
                         Frames = heard?.Scheduled == slot ? heard.FramesHeard : 0,
                         SnrDb = tone is null ? null : Math.Round(tone.SnrDb, 1),
@@ -520,6 +581,11 @@ public sealed class FeedbackService
                         Verdict = verdict ?? before?.Verdict,
                         Channel = _sources.Channel(slot) ?? before?.Channel,
                     };
+                    _seen[slot] = line;
+                    if (record is null)
+                    {
+                        continue;
+                    }
                     if (before is null)
                     {
                         record.Slots.Add(line);
@@ -534,6 +600,17 @@ public sealed class FeedbackService
                 }
             }
             // A slot's channel measurement can finish after its window closes: picked up once it has.
+            foreach (var slot in _seen.Keys.ToList())
+            {
+                if (_seen[slot].Channel is null && _sources.Channel(slot) is { } measured)
+                {
+                    _seen[slot] = _seen[slot] with { Channel = measured };
+                }
+            }
+            foreach (var old in _seen.Keys.Where(k => k < now.AddDays(-3)).ToList())
+            {
+                _seen.Remove(old);
+            }
             foreach (var record in _state.Days)
             {
                 for (int i = 0; i < record.Slots.Count; i++)
@@ -590,7 +667,9 @@ public sealed class FeedbackService
 
     private DailyReport Build(DayRecord record, FeedbackSettings settings)
     {
-        var slots = record.Slots.Select(s => new ReportSlot(
+        string own = _sources.OwnStation();
+        // The slot lines are the report's own station's, as before; the others are in the station lines.
+        var slots = record.Slots.Where(s => s.Station is null || string.Equals(s.Station, own, StringComparison.OrdinalIgnoreCase)).Select(s => new ReportSlot(
             TimeOnly.FromDateTime(s.Slot.UtcDateTime),
             s.Waveform,
             s.Frames,
@@ -604,7 +683,7 @@ public sealed class FeedbackService
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
             new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count);
-        return new DailyReport(settings.From, record.Day, header, slots);
+        return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, own));
     }
 
     /// <summary>
@@ -839,6 +918,12 @@ public sealed class FeedbackService
     internal sealed record SlotRecord
     {
         public DateTimeOffset Slot { get; init; }
+
+        /// <summary>Whose slot (issue #148); null in a feedback.json from before, when it was always the report's own station's.</summary>
+        public string? Station { get; init; }
+
+        /// <summary>Bulletins rebuilt while the slot was the one tracked (issue #148).</summary>
+        public int Completed { get; init; }
 
         public string? Waveform { get; init; }
 

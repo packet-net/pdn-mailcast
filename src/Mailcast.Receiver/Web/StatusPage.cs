@@ -854,6 +854,17 @@ public sealed class StatusPage : IAsyncDisposable
                 why = l.NotFollowedBecause,
                 skipped = (config.SkipStations ?? []).Contains(l.Station, StringComparer.OrdinalIgnoreCase),
             }),
+            // Issue #148: what each station's slots came to today (UTC), whether or not the daily report is on.
+            heardToday = _host.Feedback.StationFigures(DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime)).Select(f => new
+            {
+                station = f.Station,
+                listened = f.Listened,
+                heard = f.Heard,
+                frames = f.Frames,
+                completed = f.Completed,
+                snrDb = f.SnrDb,
+                virtualHeightKm = f.VirtualHeightKm,
+            }),
             // Issue #53: the "Listen now" button, for a web SDR only.
             listenNow = ListenNowView(_host, config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },

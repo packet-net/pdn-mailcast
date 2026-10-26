@@ -50,13 +50,20 @@ public class FeedbackTests
 
         public Dictionary<DateTimeOffset, ReportChannel> Channels { get; } = [];
 
+        /// <summary>Slots of a second station, G8BPQ (issue #148).</summary>
+        public List<DateTimeOffset> Others { get; } = [];
+
+        /// <summary>What was heard in those of them that were heard.</summary>
+        public Dictionary<DateTimeOffset, SlotSummary> OtherHeard { get; } = [];
+
         public FeedbackSettings? Settings { get; set; } = settings ?? new FeedbackSettings { Enabled = true, Callsign = "g4abc" };
 
         public FeedbackService Start() => new(new FeedbackSources
         {
             Settings = () => Settings,
             Schedule = () => Schedule,
-            Listened = Schedule.ActiveOn,
+            Listened = day => [.. Schedule.ActiveOn(day).Concat(Others.Where(o => DateOnly.FromDateTime(o.UtcDateTime) == day)).Order()],
+            Station = slot => Others.Contains(slot) ? "G8BPQ" : "GB7RDG",
             LastSlot = () => Last,
             Ionosphere = () => Iono,
             PskReporter = () => Psk,
@@ -75,7 +82,7 @@ public class FeedbackTests
         /// <summary>Listens through every slot of <paramref name="day"/>, hearing each, ticking at the start and end of each window.</summary>
         public async Task ListenAsync(FeedbackService service, DateOnly day, int? only = null)
         {
-            var slots = Schedule.ActiveOn(day);
+            var slots = Schedule.ActiveOn(day).Concat(Others.Where(o => DateOnly.FromDateTime(o.UtcDateTime) == day)).Order().ToList();
             for (int i = 0; i < slots.Count; i++)
             {
                 if (only is { } n && i >= n)
@@ -85,6 +92,12 @@ public class FeedbackTests
                 var slot = slots[i];
                 Last = null;
                 await AtAsync(service, slot.AddMinutes(1));
+                if (Others.Contains(slot))
+                {
+                    Last = OtherHeard.GetValueOrDefault(slot);
+                    await AtAsync(service, slot.AddMinutes(12));
+                    continue;
+                }
                 Last = new SlotSummary(slot, new ToneReport(1801.2, 1.2, 15.6 + i, TimeSpan.FromSeconds(10)), 150 + i, slot.AddMinutes(9), slot)
                 {
                     FrameCounts = ImmutableSortedDictionary<string, int>.Empty.Add(Waveform.Name(i % 2 == 0 ? 4 : 3), 150 + i),
@@ -185,9 +198,10 @@ public class FeedbackTests
         var mail = Assert.Single(rig.Bbs.Sent);
         var lines = mail.Body.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal("MCR1 0.6.0 IO91lk sc 1/1 3:AUD1,BBS2 0 0", lines[0]);
-        Assert.Equal(3, lines.Length);
+        Assert.Equal(4, lines.Length);
         Assert.Equal($"{Slots[1]:HH} - 0 - - -", lines[1]);
         Assert.Equal($"{Slots[2]:HH} - 7 - - IM+PG 2 1.9/-17 0.35 0.21 287 b", lines[2]);
+        Assert.Equal("S GB7RDG 2 1 7 0 - 287", lines[3]);
     }
 
     /// <summary>
@@ -680,5 +694,42 @@ public class FeedbackTests
         Assert.Equal(2, rig.Bbs.Sent.Count);
         Assert.Equal(rig.Bbs.Sent[0].Bid[4..6], rig.Bbs.Sent[1].Bid[4..6]);
         Assert.Equal("6280", rig.Bbs.Sent[1].Bid[..4]);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OtherStationsSlots_AreCountedPerStation_AndStayOutOfTheSlotLines(bool reportOn)
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        rig.Settings = reportOn ? rig.Settings : null;
+        var heard = Slots[3].AddMinutes(30);
+        var missed = Slots[4].AddMinutes(30);
+        rig.Others.AddRange([heard, missed]);
+        var service = rig.Start();
+
+        rig.OtherHeard[heard] = new SlotSummary(heard, new ToneReport(1801.2, 1.2, 9.0, TimeSpan.FromSeconds(10)), 40, heard.AddMinutes(9), heard)
+        {
+            BulletinsCompleted = 2,
+        };
+        await rig.ListenAsync(service, Day);
+
+        var figures = service.StationFigures(Day);
+        Assert.Equal(["GB7RDG", "G8BPQ"], figures.Select(f => f.Station));
+        Assert.Equal(new ReportStation("G8BPQ", 2, 1, 40, 2, 9, null), figures[1]);
+        Assert.Equal(Slots.Count, figures[0].Listened);
+        Assert.Equal(Slots.Count, figures[0].Heard);
+
+        if (!reportOn)
+        {
+            return;
+        }
+        await rig.AtAsync(service, ReportAt);
+        var mail = Assert.Single(rig.Bbs.Sent);
+        var report = DailyReport.Parse(mail.Title, mail.Body);
+        Assert.Equal(Slots.Count, report.Slots.Count);
+        Assert.Equal(figures, report.Stations);
+        Assert.Contains("S G8BPQ 2 1 40 2 9 -", mail.Body);
     }
 }

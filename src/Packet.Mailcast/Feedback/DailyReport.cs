@@ -45,6 +45,23 @@ public sealed record ReportSlot(
     IReadOnlyList<string> Verdicts,
     ReportChannel? Channel = null);
 
+/// <summary>One station's figures for the day (issue #148): the slots of it that the receiver listened to, and what came of them.</summary>
+/// <param name="Station">The station's callsign.</param>
+/// <param name="Listened">Slots of the station listened to.</param>
+/// <param name="Heard">Of those, slots with a tone or at least one frame.</param>
+/// <param name="Frames">Frames decoded in them.</param>
+/// <param name="Completed">Bulletins rebuilt while those slots were the one tracked.</param>
+/// <param name="SnrDb">The median tone signal to noise over the slots with a tone, dB; null if none.</param>
+/// <param name="VirtualHeightKm">The median virtual height over the slots with a channel measurement, km; null if none.</param>
+public sealed record ReportStation(
+    string Station,
+    int Listened,
+    int Heard,
+    int Frames,
+    int Completed,
+    double? SnrDb = null,
+    double? VirtualHeightKm = null);
+
 /// <summary>
 /// A listener's daily feedback report: what one receiver heard of GB7RDG's slots in a UTC day,
 /// small enough to go as a packet bulletin. See docs/receiver.md, "The daily report's format".
@@ -76,8 +93,16 @@ public sealed record ReportSlot(
 /// a slot line, and takes <c>-</c> as the seventh to mean no channel measurement whatever follows,
 /// so format 1 can grow at the ends of its lines: a later field on a line with no measurement
 /// comes after six <c>-</c>.</para>
+/// <para>Station lines (issue #148): after the slot lines, one line for each station the receiver
+/// listened to, <c>S CALL listened heard frames completed snr height</c>, such as
+/// <c>S G8BPQ 4 3 212 6 -14 290</c>: slots listened to, slots heard (a tone or a frame), frames
+/// decoded, bulletins completed, the median tone SNR (dB) and the median virtual height (km),
+/// <c>-</c> for one not measured. The slot lines stay the report's own station's. A reader that
+/// predates these stops at the first line that does not start with a digit, so it never sees
+/// them; a reader ignores fields after the eighth on a station line, and lines it does not know
+/// after the station lines.</para>
 /// </remarks>
-public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHeader Header, IReadOnlyList<ReportSlot> Slots)
+public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHeader Header, IReadOnlyList<ReportSlot> Slots, IReadOnlyList<ReportStation>? Stations = null)
 {
     /// <summary>The format this writes, and the newest it reads.</summary>
     public const int FormatVersion = 1;
@@ -99,6 +124,9 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
 
     private const string Missing = "-";
 
+    /// <summary>What a station line starts with (issue #148).</summary>
+    private const string StationTag = "S";
+
     /// <summary>The message title: <c>MCR G4ABC 2026-10-06</c>.</summary>
     public string Title => string.Create(CultureInfo.InvariantCulture, $"{Tag} {Callsign} {Day:yyyy-MM-dd}");
 
@@ -112,6 +140,10 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             foreach (var slot in Slots)
             {
                 text.Append(SlotLine(slot)).Append("\r\n");
+            }
+            foreach (var station in Stations ?? [])
+            {
+                text.Append(StationLine(station)).Append("\r\n");
             }
             return text.ToString();
         }
@@ -143,17 +175,24 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         }
         var header = ParseHeader(lines[at]);
         var slots = new List<ReportSlot>();
-        foreach (string line in lines.Skip(at + 1))
+        var stations = new List<ReportStation>();
+        int next = at + 1;
+        for (; next < lines.Count; next++)
         {
+            string line = lines[next];
             if (line.Length == 0 || !char.IsAsciiDigit(line[0]))
             {
                 // The slots end at a blank line or anything else a BBS adds, such as its
-                // "[End of Message]" or a signature.
+                // "[End of Message]" or a signature, or at the station lines.
                 break;
             }
             slots.Add(ParseSlot(line));
         }
-        return new DailyReport(t.Groups[1].Value, day, header, slots);
+        for (; next < lines.Count && IsStationLine(lines[next]); next++)
+        {
+            stations.Add(ParseStation(lines[next]));
+        }
+        return new DailyReport(t.Groups[1].Value, day, header, slots, stations);
     }
 
     /// <summary>As <see cref="Parse"/>, but false for anything it cannot read.</summary>
@@ -205,6 +244,30 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             line.Append(' ').Append(char.IsAsciiLetterLower(ch.Basis) ? ch.Basis : '-');
         }
         return line.ToString();
+    }
+
+    private static string StationLine(ReportStation s)
+    {
+        var c = CultureInfo.InvariantCulture;
+        return $"{StationTag} {Token(s.Station)} {s.Listened.ToString(c)} {s.Heard.ToString(c)} {s.Frames.ToString(c)} {s.Completed.ToString(c)} {Number(s.SnrDb, 0, "0")} {Number(s.VirtualHeightKm, 0, "0")}";
+    }
+
+    private static bool IsStationLine(string line) =>
+        line.StartsWith(StationTag + " ", StringComparison.Ordinal);
+
+    private static ReportStation ParseStation(string line)
+    {
+        var f = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (f.Length < 6)
+        {
+            throw new FormatException($"The station line \"{line}\" has {f.Length} fields, not at least 6.");
+        }
+        if (!TryInt(f[2], out int listened) || !TryInt(f[3], out int heard) || !TryInt(f[4], out int frames) || !TryInt(f[5], out int completed))
+        {
+            throw new FormatException($"The station line \"{line}\" does not have slot, frame and bulletin counts.");
+        }
+        return new ReportStation(f[1], listened, heard, frames, completed,
+            f.Length > 6 ? Double(f[6]) : null, f.Length > 7 ? Double(f[7]) : null);
     }
 
     private static ReportHeader ParseHeader(string line)
