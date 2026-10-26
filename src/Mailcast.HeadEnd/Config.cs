@@ -43,12 +43,35 @@ public sealed record HeadEndConfig
             // sideband= is written whenever hz= is, so a reader never has to guess it.
             : new StationDetails(FrequencyHz, FrequencyHz is null ? null : Sideband is not null && Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Packet.Mailcast.Sideband.Lsb : Packet.Mailcast.Sideband.Usb, Locator);
 
+    /// <summary>QO-100's uplink band: 2400.000 to 2450.000 MHz.</summary>
+    internal const long Qo100UplinkLowHz = 2_400_000_000, Qo100UplinkHighHz = 2_450_000_000;
+
+    /// <summary>
+    /// A line saying why <paramref name="hz"/> cannot be announced, when it is in QO-100's uplink
+    /// band: listeners receive on the downlink, never the 2.4 GHz uplink. Null for anything else.
+    /// </summary>
+    internal static string? UplinkProblem(long hz)
+    {
+        if (hz is < Qo100UplinkLowHz or > Qo100UplinkHighHz)
+        {
+            return null;
+        }
+        // The narrowband transponder turns 2400.000 to 2400.500 MHz into 10489.500 to 10490.000 MHz.
+        return hz <= 2_400_500_000
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{hz} is in QO-100's uplink band; give the downlink listeners receive on, {(hz + 8_089_500_000) / 1e6:0.###} MHz")
+            : $"{hz} is in QO-100's uplink band; give the downlink listeners receive on, 10489.5 to 10490.0 MHz";
+    }
+
     private List<string> DetailsProblems()
     {
         var problems = new List<string>();
         if (FrequencyHz is < 1)
         {
             problems.Add("\"frequencyHz\" must be the station's signal centre in Hz, such as 7053800");
+        }
+        else if (FrequencyHz is { } hz && UplinkProblem(hz) is { } uplink)
+        {
+            problems.Add($"\"frequencyHz\" {uplink}");
         }
         if (Sideband is not null && !Sideband.Equals("usb", StringComparison.OrdinalIgnoreCase) && !Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase))
         {
@@ -321,6 +344,10 @@ public sealed record HeadEndConfig
             if (a.FrequencyHz < 1)
             {
                 problems.Add($"{where}: \"frequencyHz\" is required: where the station's signal is centred, in Hz");
+            }
+            else if (UplinkProblem(a.FrequencyHz) is { } uplink)
+            {
+                problems.Add($"{where}: \"frequencyHz\" {uplink}");
             }
             if (!a.Sideband.Equals("usb", StringComparison.OrdinalIgnoreCase) && !a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase))
             {

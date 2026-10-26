@@ -74,4 +74,31 @@ public class StationDetailsTests
             """));
         Assert.Contains("not a 4 or 6 character Maidenhead locator", e.Message, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData(2_400_100_000L, "10489.6 MHz")]
+    [InlineData(2_400_000_000L, "10489.5 MHz")]
+    [InlineData(2_430_000_000L, "10489.5 to 10490.0 MHz")]
+    [InlineData(2_450_000_000L, "10489.5 to 10490.0 MHz")]
+    public void AUplinkFrequency_IsRefused_NamingTheDownlink(long hz, string says)
+    {
+        var own = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(Config($", \"frequencyHz\": {hz}")));
+        Assert.Contains("QO-100's uplink band", own.Message, StringComparison.Ordinal);
+        Assert.Contains(says, own.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain('\n', own.Message.Trim());
+
+        var advert = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(Config($$""", "advertise": [ { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": {{hz}}, "sideband": "usb" } ]""")));
+        Assert.Contains("\"advertise\" entry 1", advert.Message, StringComparison.Ordinal);
+        Assert.Contains(says, advert.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(10_489_700_000L)]
+    [InlineData(2_399_999_999L)]
+    [InlineData(2_450_000_001L)]
+    [InlineData(7_053_800L)]
+    public void ADownlinkOrOtherFrequency_IsAccepted(long hz)
+    {
+        Assert.Equal(hz, HeadEndConfig.Parse(Config($", \"frequencyHz\": {hz}")).FrequencyHz);
+    }
 }

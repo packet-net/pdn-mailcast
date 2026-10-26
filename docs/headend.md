@@ -347,7 +347,7 @@ So that receivers know where to listen for you, and can draw the path from you, 
 "locator": "IO83fb"
 ```
 
-All three are optional and go into every directory (`hz=`, `sideband=`, `locator=`). `frequencyHz` is the centre of your signal in Hz (GB7RDG's is 7053800), the same number you would give for yourself in another station's `advertise`. Left out, a receiver relies on what other head ends advertise for you; for GB7RDG alone it assumes 7.0538 MHz and IO91lk, as it always has. `--check-config` and the journal say what is carried. Receivers from before v0.20.0 ignore the new fields and still check the signature.
+All three are optional and go into every directory (`hz=`, `sideband=`, `locator=`). `frequencyHz` is the centre of your signal in Hz (GB7RDG's is 7053800), the same number you would give for yourself in another station's `advertise`. Give the frequency listeners receive on, the downlink, never the uplink or the IF of the radio driving a transverter (often 70 cm). For QO-100 that is the 10489.5 to 10490.0 MHz narrowband downlink, such as `"frequencyHz": 10489750000`, not the 2.4 GHz uplink; a `frequencyHz` from 2400.000 to 2450.000 MHz, here or in `advertise`, is refused when the config is read, and the message names the downlink to use. Left out, a receiver relies on what other head ends advertise for you; for GB7RDG alone it assumes 7.0538 MHz and IO91lk, as it always has. `--check-config` and the journal say what is carried. Receivers from before v0.20.0 ignore the new fields and still check the signature.
 
 ## Telling listeners about other stations
 
@@ -361,7 +361,7 @@ Receivers learn when and where to listen for other mailcast stations from what e
 
 The `locator` is optional: given, receivers draw the path from that station's place.
 
-A station on two frequencies, such as HF and QO-100, is listed once for each. Every directory then carries them. It is only a hint about where to listen: receivers trust a station from its own signed directory, never from yours. The journal and `--check-config` say what is advertised. Each directory also names this head end (`callsign`) and, when signed, gives its public key, so receivers can learn it the first time they hear it.
+A station on two frequencies, such as HF and QO-100, is listed once for each. For QO-100, give the downlink in `frequencyHz` (see [Saying where you are](#saying-where-you-are)). Every directory then carries them. It is only a hint about where to listen: receivers trust a station from its own signed directory, never from yours. The journal and `--check-config` say what is advertised. Each directory also names this head end (`callsign`) and, when signed, gives its public key, so receivers can learn it the first time they hear it.
 
 ## Offline
 
