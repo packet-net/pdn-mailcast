@@ -204,6 +204,63 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     public double SignalHz { get; private set; }
 
     /// <summary>
+    /// How far the real frequency of the signal is above <see cref="SignalHz"/>, Hz: the LNB's
+    /// oscillator when the signal is heard through one (the pipeline then works at the
+    /// intermediate frequency), else 0. Only for what is shown.
+    /// </summary>
+    public double LnbOffsetHz { get; private set; }
+
+    /// <summary>
+    /// Signals behind an LNB (intermediate frequency, oscillator) the pipeline may be listening
+    /// for instead of <see cref="SignalHz"/>: when pdn-soundmodem's radio is already on a dial
+    /// that only one of these falls in the audio of, the pipeline takes that one at open. Empty
+    /// unless <see cref="ReceiverConfig.LnbHz"/> is set.
+    /// </summary>
+    internal IReadOnlyList<(double IfHz, double LnbHz)> AlternateSignals { get; set; } = [];
+
+    /// <summary>The LNB's oscillator (<see cref="ReceiverConfig.LnbHz"/>), when set and the source is not a web SDR.</summary>
+    internal long? LnbHz { get; set; }
+
+    /// <summary>
+    /// Where this pipeline listens between stations' slots when pdn-soundmodem's radio was found
+    /// on an LNB's IF at open: that IF and oscillator. Null for any other pipeline, which goes back to
+    /// the config's signal.
+    /// </summary>
+    internal (double IfHz, double LnbHz)? HomeLnb { get; private set; }
+
+    /// <summary>Takes the LNB signal pdn-soundmodem's said dial hears, when the current signal is out of its reach.</summary>
+    private void UseLnbSignalFor(int channelRate, double? saidDialHz)
+    {
+        if (saidDialHz is not { } said || SoundModemReach(channelRate, said, said, SignalHz) is null)
+        {
+            return;
+        }
+        foreach (var (ifHz, lo) in AlternateSignals)
+        {
+            if (SoundModemReach(channelRate, said, said, ifHz) is null)
+            {
+                SignalHz = ifHz;
+                LnbOffsetHz = lo;
+                HomeLnb = (ifHz, lo);
+                _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"audio: pdn-soundmodem's radio is on USB dial {OnAir.Mhz(said)} MHz, which hears {OnAir.Mhz(ifHz + lo)} MHz through the LNB"));
+                return;
+            }
+        }
+        // No station known on the downlink (a receiver whose only radio is the QO-100 dongle never
+        // hears an advert): a dial in the LNB's range is taken to be on it, the signal at the usual
+        // place in the audio, and everything is decoded as it comes until a station is heard.
+        if (LnbHz is { } oscillator && said >= StationReaching.LnbIfMinHz && said <= StationReaching.LnbIfMaxHz)
+        {
+            SignalHz = said + OnAir.CentreAudioHz;
+            LnbOffsetHz = oscillator;
+            HomeLnb = (SignalHz, oscillator);
+            _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"audio: pdn-soundmodem's radio is on USB dial {OnAir.Mhz(said)} MHz, in the LNB's range; listening continuously for {OnAir.Mhz(SignalHz + oscillator)} MHz until it hears a station"));
+        }
+    }
+
+    /// <summary>
     /// Moves the dial this pipeline's audio is heard on to <paramref name="dialHz"/>, as a radio
     /// retuned for a slot (a rig on a sound card) now is: the audio thread places the signal afresh
     /// before its next block. For sources pdn-soundmodem's stream does not manage. True if it changed.
@@ -229,10 +286,11 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     /// the audio changes, and the audio thread places the signal afresh before its next block, as
     /// for a retuned dial. True if it changed.
     /// </summary>
-    internal bool SetSignal(double signalHz)
+    internal bool SetSignal(double signalHz, double lnbOffsetHz = 0)
     {
         lock (_dialGate)
         {
+            LnbOffsetHz = lnbOffsetHz;
             if (Math.Abs(signalHz - SignalHz) < 0.5)
             {
                 return false;
@@ -241,7 +299,7 @@ public sealed partial class AudioPipeline : IAsyncDisposable
             _pendingDialHz = DialHz;
         }
         _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-            $"audio: listening for a signal centred on {OnAir.Mhz(signalHz)} MHz now, at {OnAir.AudioCentreHz(DialHz, signalHz):F0} Hz in the audio of USB dial {OnAir.Mhz(DialHz)} MHz"));
+            $"audio: listening for a signal centred on {OnAir.Mhz(signalHz + lnbOffsetHz)} MHz now, at {OnAir.AudioCentreHz(DialHz, signalHz):F0} Hz in the audio of USB dial {OnAir.Mhz(DialHz)} MHz"));
         return true;
     }
 
@@ -471,8 +529,9 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         // A dial that puts the signal outside 1000 to 2000 Hz has the input move its audio at the
         // channel's own rate, before a slow channel is brought up to 48 kHz.
         var stream = await SoundModemAudioInput.OpenAsync(_source.SoundModemPort, cancellation, (rate, said) =>
-            OnAir.AudioCentreHz(said ?? configured, SignalHz) is var at && SoundModemReach(rate, said, said ?? configured, SignalHz) is null && !UsesOwnCentre(at) ? at : null)
+            Settled(rate, said) is var _ && OnAir.AudioCentreHz(said ?? configured, SignalHz) is var at && SoundModemReach(rate, said, said ?? configured, SignalHz) is null && !UsesOwnCentre(at) ? at : null)
             .ConfigureAwait(false);
+        UseLnbSignalFor(stream.ChannelRate, stream.DialHz);
         double dial = stream.DialHz ?? configured;
         _channelRate = stream.ChannelRate;
         _saidDialHz = stream.DialHz;
@@ -544,6 +603,12 @@ public sealed partial class AudioPipeline : IAsyncDisposable
             + $"Its audio is moved to {OnAir.CentreAudioHz:F0} Hz here, where the usual dial puts the signal");
         _log(string.Create(invariant,
             $"audio: pdn-soundmodem on {stream.Where}, {rate}, {where}, the signal's centre {(awayHz is null ? "at" : "then at")} {centre:F0} Hz in its audio{moved}"));
+    }
+
+    private bool Settled(int rate, double? said)
+    {
+        UseLnbSignalFor(rate, said);
+        return true;
     }
 
     /// <summary>
@@ -649,7 +714,7 @@ public sealed partial class AudioPipeline : IAsyncDisposable
         string rate = input.Source.SampleRate.ToString(invariant);
         string filter = string.Create(invariant, $"{low:F0} to {high:F0} Hz");
         _log($"audio: SDRconnect {endpoint}{device}, its IQ at {rate} S/s with the LO on {OnAir.Mhz(input.Source.CentreFrequencyHz)} MHz, "
-            + $"heard here as USB on dial {OnAir.Mhz(DialHz)} MHz ({filter}), signal centre {OnAir.Mhz(SignalHz)} MHz. "
+            + $"heard here as USB on dial {OnAir.Mhz(DialHz)} MHz ({filter}), signal centre {OnAir.Mhz(SignalHz + LnbOffsetHz)} MHz. "
             + "The receiver tunes SDRconnect itself: leave its tuning alone while it runs");
     }
 
@@ -819,7 +884,7 @@ public sealed partial class AudioPipeline : IAsyncDisposable
                 _input = web;
                 _webSdr = web;
                 WebSdrDescription = web.ReceiverDescription is { Length: > 0 } about ? Ascii.Clean(about) : null;
-                _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(SignalHz)} MHz"
+                _log($"audio: web receiver {endpoint}, USB dial {OnAir.Mhz(DialHz)} MHz, signal centre {OnAir.Mhz(SignalHz + LnbOffsetHz)} MHz"
                     + (WebSdrDescription is { } said ? $" ({said})" : ""));
                 break;
 

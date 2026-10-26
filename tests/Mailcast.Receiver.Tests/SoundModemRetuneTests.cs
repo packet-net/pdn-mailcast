@@ -1,3 +1,4 @@
+using Packet.Mailcast;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -754,5 +755,103 @@ public sealed class SoundModemRetuneTests
             {
             }
         }
+    }
+
+    [Fact]
+    public async Task APdnSoundmodemDialledOnAnLnbsIf_IsOpened_WhenTheLnbStationIsKnown()
+    {
+        // An RTL dongle on a Bullseye: pdn-soundmodem's dial on the IF, 739.735855 MHz USB.
+        const double IfDial = 739_735_855;
+        await using var fake = new FakeSoundModem(dialHz: IfDial);
+        var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
+        await using var _ = pipeline;
+        pipeline.AlternateSignals = [(739_737_655, 9_750_012_345)];
+        await pipeline.OpenAsync(CancellationToken.None);
+
+        Assert.Equal(IfDial, pipeline.DialHz, 0.5);
+        Assert.Equal(739_737_655, pipeline.SignalHz);
+        Assert.Equal(9_750_012_345, pipeline.LnbOffsetHz);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
+        // The page's spectrogram is labelled with the downlink dial.
+        Assert.Equal(IfDial + 9_750_012_345, pipeline.SpectrumDialHz + pipeline.LnbOffsetHz, 0.5);
+    }
+
+    [Fact]
+    public async Task APdnSoundmodemDialledOnAnLnbsIf_WithoutLnbHz_IsStillRefused()
+    {
+        await using var fake = new FakeSoundModem(dialHz: 739_735_855);
+        var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
+        await using var _ = pipeline;
+        await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.OpenAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AFreshReceiverOnAnLnbsIf_OpensAnyway_ListensOnTheDownlink_AndLearnsAStationOutsideAnyWindow()
+    {
+        // Only the QO-100 dongle: no advert, no station known, pdn-soundmodem's dial on the IF.
+        const double IfDial = 739_735_855;
+        await using var fake = new FakeSoundModem(dialHz: IfDial);
+        var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Daylight = null, LnbHz = 9_750_012_345 };
+        var log = new List<string>();
+        var noon = new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero);
+        // 12:47 UTC: not in any slot window of GB7RDG's.
+        var now = noon.AddMinutes(47);
+        await using var host = new ReceiverHost(config, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(now), l => { lock (log) { log.Add(l); } });
+        var pipeline = host.CreatePipeline(source, config);
+        await using var _ = pipeline;
+        await pipeline.OpenAsync(CancellationToken.None);
+
+        Assert.Equal(IfDial, pipeline.DialHz, 0.5);
+        Assert.Equal(IfDial + 1800, pipeline.SignalHz, 0.5);
+        Assert.Equal(9_750_012_345, pipeline.LnbOffsetHz);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
+        Assert.Contains(log, l => l.Contains("listening continuously for 10489.7", StringComparison.Ordinal) && l.Contains("until it hears a station", StringComparison.Ordinal));
+        host.ReturnToConfig(pipeline);
+        Assert.Equal(IfDial + 1800, pipeline.SignalHz, 0.5);
+
+        // A new station's signed directory arrives and is learnt.
+        var station = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var slot = new DateTimeOffset(2026, 10, 26, 12, 30, 0, TimeSpan.Zero);
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)], ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = station, Station = "G8BPQ", Details = new StationDetails(10_489_750_000, Sideband.Usb, "IO83") }, slot))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+        Assert.Contains(host.Intake.StationDirectories(), d => d.Station == "G8BPQ");
+    }
+
+    [Fact]
+    public async Task AFreshReceiverOnAnLnbsIf_KeepsDecodingOutsideAnyKnownWindow_WhereASoundCardPauses()
+    {
+        await using var fake = new FakeSoundModem(dialHz: 739_735_855);
+        using var dir = new TempDirectory();
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 12, 20, 0, TimeSpan.Zero));
+        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Daylight = null, LnbHz = 9_750_012_345 };
+        await using var host = new ReceiverHost(config, time, _ => { });
+        var pipeline = host.CreatePipeline(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)), config);
+        await using var _ = pipeline;
+        await pipeline.OpenAsync(CancellationToken.None);
+        typeof(ReceiverHost).GetField("_pipeline", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(host, pipeline);
+
+        // Before, during (GB7RDG's 12:00 and 13:00 windows) and after: never between slots, never moved off the downlink.
+        foreach (var at in new[] { new TimeSpan(12, 20, 0), new(12, 47, 0), new(12, 59, 0), new(13, 0, 30), new(13, 5, 0) })
+        {
+            time.SetUtcNow(new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero) + at);
+            host.CheckSlotWindow();
+            Assert.Null(host.BetweenSlots);
+            Assert.False(pipeline.BetweenSlots);
+            Assert.Equal(739_735_855 + 1800, pipeline.SignalHz, 0.5);
+        }
+
+        // The control: a sound card at the same time pauses between slots.
+        using var dir2 = new TempDirectory();
+        var card = new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir2.Path, Daylight = null };
+        await using var cardHost = new ReceiverHost(card, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 12, 47, 0, TimeSpan.Zero)), _ => { });
+        cardHost.CheckSlotWindow();
+        Assert.NotNull(cardHost.BetweenSlots);
     }
 }

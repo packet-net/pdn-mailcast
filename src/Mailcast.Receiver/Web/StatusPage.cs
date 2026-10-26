@@ -165,7 +165,7 @@ public sealed class StatusPage : IAsyncDisposable
     {
         var waterfall = WaterfallWebServer.Routed(pipeline.Channel, new WaterfallOptions
         {
-            DialFrequencyHz = pipeline.SpectrumDialHz,
+            DialFrequencyHz = pipeline.SpectrumDialHz + pipeline.LnbOffsetHz,
             Sideband = "usb",
             LinesPerSecond = 10,
             InputLevelMeter = true,

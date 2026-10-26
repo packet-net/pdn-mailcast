@@ -42,12 +42,96 @@ public class PerStationTests
     }
 
     [Fact]
+    public void BehindAnLnb_AStationAboveHfIsHeardAtItsIf_WithTheRealFrequencyKept()
+    {
+        // A calibrated, non-round oscillator; QO-100's downlink 10489.75 MHz comes out at 739.737655 MHz.
+        const long lo = 9_750_012_345;
+        var reach = StationReaching.Judge(Hf(10_489_750_000), 1800, 7_052_000, canRetune: true, lo);
+        Assert.True(reach.Heard);
+        Assert.Equal(HowHeard.Retune, reach.How);
+        Assert.Equal(739_737_655, reach.IfHz);
+        Assert.Equal(739_737_655 - 1800, reach.DialHz, 0.5);
+
+        // A fixed receiver whose dial is at the IF hears it in its passband.
+        var fixedDial = StationReaching.Judge(Hf(10_489_750_000), 1800, 739_735_855, canRetune: false, lo);
+        Assert.True(fixedDial is { Heard: true, How: HowHeard.Passband, IfHz: 739_737_655 });
+        Assert.False(StationReaching.Judge(Hf(10_489_750_000), 1800, 7_052_000, canRetune: false, lo).Heard);
+
+        // HF is unchanged by the setting.
+        var hf = StationReaching.Judge(Hf(7_047_000), 1800, 7_052_000, canRetune: true, lo);
+        Assert.Equal(7_045_200, hf.DialHz, 0.5);
+        Assert.Null(hf.IfHz);
+
+        // Outside the LNB's input range, or below its oscillator.
+        var wrong = StationReaching.Judge(Hf(14_000_000_000), 1800, 7_052_000, canRetune: true, lo);
+        Assert.False(wrong.Heard);
+        Assert.Contains("lnbHz", wrong.Why, StringComparison.Ordinal);
+        Assert.False(StationReaching.Judge(Hf(9_000_000_000), 1800, 7_052_000, canRetune: true, lo).Heard);
+    }
+
+    [Fact]
+    public void WithoutAnLnb_AStationAboveHfIsNotFollowed_NamingTheSetting()
+    {
+        var no = StationReaching.Judge(Hf(10_489_750_000), 1800, 7_052_000, canRetune: false);
+        Assert.False(no.Heard);
+        Assert.Contains("lnbHz", no.Why, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BehindAnLnb_TheHostTunesTheIf_AndShowsTheDownlink()
+    {
+        var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        using var dir = new TempDirectory();
+        var slot = new DateTimeOffset(2026, 10, 26, 10, 30, 0, TimeSpan.Zero);
+        var config = new ReceiverConfig
+        {
+            Audio = Samples.SoundCard,
+            StateDirectory = dir.Path,
+            Daylight = null,
+            Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
+            LnbHz = 9_750_000_000,
+        };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
+        await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ", Details = new StationDetails(10_489_750_000, Sideband.Usb, "IO83") }, slot, 1);
+
+        var listened = host.Listening.Single(l => l.Station == "G8BPQ");
+        Assert.True(listened.Followed);
+        Assert.Equal(10_489_750_000, listened.FrequencyHz);
+        Assert.Equal(739_750_000, listened.IfHz);
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, _ => { }, new FakeTimeProvider(slot));
+        Assert.Equal(739_748_200, host.PointAtSlot(slot, pipeline)!.Value, 0.5);
+        Assert.Equal(739_750_000, pipeline.SignalHz);
+        Assert.Equal(9_750_000_000, pipeline.LnbOffsetHz);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
+    }
+
+    [Theory]
+    [InlineData(9_750_012_345L, true)]
+    [InlineData(10_600_000_000L, true)]
+    [InlineData(5L, false)]
+    [InlineData(60_000_000_000L, false)]
+    public void LnbHz_IsReadFromTheConfig_AndHeldToARealOscillator(long lnb, bool ok)
+    {
+        using var dir = new TempDirectory();
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, $$"""{ "lnbHz": {{lnb}} }""");
+        if (ok)
+        {
+            Assert.Equal(lnb, ReceiverConfig.Load(path).LnbHz);
+        }
+        else
+        {
+            Assert.Contains("lnbHz", Assert.Throws<ConfigException>(() => ReceiverConfig.Load(path)).Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void AboveHf_OrLowerSideband_IsNotFollowed_WithTheReason()
     {
         var qo100 = StationReaching.Judge(Hf(10_489_750_000), 1800, 7_052_000, canRetune: true);
         Assert.False(qo100.Heard);
         Assert.Contains("above HF", qo100.Why, StringComparison.Ordinal);
-        Assert.Contains("converter", qo100.Why, StringComparison.Ordinal);
+        Assert.Contains("lnbHz", qo100.Why, StringComparison.Ordinal);
 
         var lsb = StationReaching.Judge(Hf(7_047_000, Sideband.Lsb), 1800, 7_052_000, canRetune: true);
         Assert.False(lsb.Heard);

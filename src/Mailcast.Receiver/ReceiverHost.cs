@@ -485,7 +485,9 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>Whether, and on which dial, this receiver can hear a station where it says it is (issue #179): see <see cref="StationReaching"/>.</summary>
     public StationReach Reach(StationOnAir station) =>
-        StationReaching.Judge(station, Config.AudioCentreHz, Pipeline is { } pipeline ? pipeline.DialHz : Config.DialHz, CanRetune);
+        StationReaching.Judge(station, Config.AudioCentreHz, Pipeline is { } pipeline ? pipeline.DialHz : Config.DialHz, CanRetune,
+            AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? null : Config.LnbHz,
+            AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr);
 
     /// <summary>
     /// Every station this receiver knows the slots of (issues #178 and #144), GB7RDG first:
@@ -509,7 +511,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             var list = new List<ListenedStation>
             {
                 new(ReceiverStore.BuiltInStation, Schedule.Timetable, rdgOnAir.FrequencyHz, rdgOnAir.Sideband,
-                    ScheduleFromDirectory ? "its own directory" : "the config file", true, null, rdgOnAir.Locator, rdgReach.Heard ? rdgReach.DialHz : Config.DialHz, rdgReach.How),
+                    ScheduleFromDirectory ? "its own directory" : "the config file", true, null, rdgOnAir.Locator, rdgReach.Heard ? rdgReach.DialHz : Config.DialHz, rdgReach.How, rdgReach.IfHz),
             };
             var adverts = Intake.Adverts();
             var heard = Intake.StationDirectories().Select(d => d.Station);
@@ -554,7 +556,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 DateTimeOffset seen = own is not null
                     ? pins.Where(p => p.Station == station).Select(p => p.PinnedAt ?? DateTimeOffset.MinValue).DefaultIfEmpty(DateTimeOffset.MaxValue).Min()
                     : Intake.AdvertFirstSeen(station) is { } first ? new DateTimeOffset(first.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : DateTimeOffset.MaxValue;
-                candidates.Add((new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : "an advert", why is null, why, locator, reach.Heard ? reach.DialHz : null, reach.Heard ? reach.How : null), own is not null, seen));
+                candidates.Add((new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : "an advert", why is null, why, locator, reach.Heard ? reach.DialHz : null, reach.Heard ? reach.How : null, reach.Heard ? reach.IfHz : null), own is not null, seen));
             }
             int taken = 0;
             foreach (var (station, _, _) in candidates.OrderBy(c => !c.Direct).ThenBy(c => c.Seen).ThenBy(c => c.Station.Station, StringComparer.Ordinal))
@@ -575,6 +577,12 @@ public sealed class ReceiverHost : IAsyncDisposable
                     list.Add(new ListenedStation(callsign, new SlotTimetable(TimeOnly.MinValue, 60), 0, Sideband.Usb, "an advert", false,
                         $"it was advertised{(by is null ? "" : $" by {by}")} past the first {BroadcastDirectory.MostAdverts} adverts, the most a directory is read for"));
                 }
+            }
+            // A dial that cannot hear GB7RDG (pdn-soundmodem's radio on the LNB's IF) while it does
+            // hear another station: GB7RDG is not followed, rather than followed at a nonsense audio position.
+            if (!rdgReach.Heard && (Pipeline?.HomeLnb is not null || list.Any(l => l.Station != ReceiverStore.BuiltInStation && l.Followed)))
+            {
+                list[0] = list[0] with { Followed = false, NotFollowedBecause = rdgReach.Why };
             }
             return list;
         }
@@ -600,7 +608,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         if ((pipelineForTest ?? Pipeline) is { } pipeline)
         {
-            pipeline.SetSignal(station.FrequencyHz);
+            pipeline.SetSignal(station.HeardAtHz, station.IfHz is null ? 0 : station.FrequencyHz - station.IfHz.Value);
             // A rig retuned for the slot moves the radio under a sound card's audio: the pipeline
             // must look for the signal where that dial puts it. (pdn-soundmodem's window tells it
             // through FollowDial; a web SDR is opened on the dial.)
@@ -609,7 +617,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 pipeline.SetDial(station.DialHz!.Value);
             }
             // The channel measurement and the page's marks look for the signal where this dial puts it.
-            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(station.How == HowHeard.Retune ? station.DialHz!.Value : pipeline.DialHz, station.FrequencyHz);
+            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(station.How == HowHeard.Retune ? station.DialHz!.Value : pipeline.DialHz, station.HeardAtHz);
         }
         return station.How == HowHeard.Retune ? station.DialHz : null;
     }
@@ -623,6 +631,13 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         if ((pipelineForTest ?? Pipeline) is not { } pipeline)
         {
+            return;
+        }
+        if (pipeline.HomeLnb is { } home)
+        {
+            // Opened on an LNB's IF: between slots it stays on the downlink, not on GB7RDG's HF signal.
+            pipeline.SetSignal(home.IfHz, home.LnbHz);
+            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz, home.IfHz);
             return;
         }
         pipeline.SetSignal(OnAir.DefaultSignalHz);
@@ -643,7 +658,13 @@ public sealed class ReceiverHost : IAsyncDisposable
         get
         {
             var followed = Listening.Where(l => l.Followed).ToList();
-            return followed.Count == 1
+            if (followed.Count == 0)
+            {
+                // Only the LNB's downlink is heard and no station on it is known yet: GB7RDG's
+                // slots stand in as the placeholder timetable, and nothing is pointed at them.
+                return FollowedSlots.One(Schedule);
+            }
+            return followed.Count == 1 && followed[0].Station == ReceiverStore.BuiltInStation
                 ? FollowedSlots.One(Schedule)
                 : new FollowedSlots([.. followed.Select(l => (l.Station, l.Station == ReceiverStore.BuiltInStation ? Schedule : SlotSchedule.From(l.Timetable)))]);
         }
@@ -662,7 +683,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             lock (_gate)
             {
-                _heardAtHz[heardStation] = (long)(Pipeline?.SignalHz ?? Config.CentreHz);
+                _heardAtHz[heardStation] = (long)(Pipeline is { } p ? p.SignalHz + p.LnbOffsetHz : Config.CentreHz);
             }
         }
         Slots.OnDirectory(directory, Intake.StationOf(directory));
@@ -1580,8 +1601,36 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         // A web SDR is opened for one slot's window: tuned to that slot's station (issue #179).
         var station = slot is { } s ? StationAtSlot(s) : null;
-        return AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, _log, _time, config.Web.Port,
-            retunedByWindow: Retuner?.Window is not null, signalHz: station?.FrequencyHz ?? OnAir.DefaultSignalHz);
+        var pipeline = AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, _log, _time, config.Web.Port,
+            retunedByWindow: Retuner?.Window is not null, signalHz: station?.HeardAtHz ?? OnAir.DefaultSignalHz);
+        pipeline.AlternateSignals = LnbSignals(source, config);
+        pipeline.LnbHz = source.Kind == AudioSourceKind.UberSdr ? null : config.LnbHz;
+        return pipeline;
+    }
+
+    /// <summary>
+    /// Behind an LNB (<see cref="ReceiverConfig.LnbHz"/>), the intermediate frequency and
+    /// oscillator of every station above HF this receiver knows of: where pdn-soundmodem's radio
+    /// may already be dialled when it opens, before any slot has pointed the pipeline at a station.
+    /// Empty without the setting, and for a web SDR.
+    /// </summary>
+    private List<(double IfHz, double LnbHz)> LnbSignals(AudioSource source, ReceiverConfig config)
+    {
+        var found = new List<(double, double)>();
+        if (config.LnbHz is not { } lo || source.Kind == AudioSourceKind.UberSdr)
+        {
+            return found;
+        }
+        var stations = Intake.Adverts().Select(a => a.Callsign).Concat(Intake.StationDirectories().Select(d => d.Station)).Distinct(StringComparer.Ordinal);
+        foreach (string station in stations)
+        {
+            long? hz = Intake.HeardDetails(station)?.FrequencyHz ?? Intake.Adverts().FirstOrDefault(a => a.Callsign == station)?.FrequencyHz;
+            if (hz is { } f && f > StationReaching.HfMaxHz && StationReaching.LnbIf(f, lo) is { } ifHz && !found.Contains((ifHz, lo)))
+            {
+                found.Add((ifHz, lo));
+            }
+        }
+        return found;
     }
 
     /// <summary>For tests: builds the pipeline for a source in place of the real one.</summary>
