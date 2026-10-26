@@ -197,8 +197,8 @@ public sealed class FeedbackService
                 g.Count(s => s.Frames > 0 || s.SnrDb is not null),
                 g.Sum(s => s.Frames),
                 g.Sum(s => s.Completed),
-                Median(g.Where(s => s.SnrDb is not null).Select(s => s.SnrDb!.Value)),
-                Median(g.Where(s => s.Channel?.VirtualHeightKm is not null).Select(s => s.Channel!.VirtualHeightKm!.Value)))),
+                Median(g.Where(s => s.SnrDb is not null).Select(s => s.SnrDb!.Value)) is { } snr ? Math.Round(snr) : null,
+                Median(g.Where(s => s.Channel?.VirtualHeightKm is not null).Select(s => s.Channel!.VirtualHeightKm!.Value)) is { } km ? Math.Round(km) : null)),
     ];
 
     private static double? Median(IEnumerable<double> values)
