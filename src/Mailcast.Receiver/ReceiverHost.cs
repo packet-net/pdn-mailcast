@@ -580,7 +580,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             }
             // A dial that cannot hear GB7RDG (pdn-soundmodem's radio on the LNB's IF) while it does
             // hear another station: GB7RDG is not followed, rather than followed at a nonsense audio position.
-            if (!rdgReach.Heard && list.Any(l => l.Station != ReceiverStore.BuiltInStation && l.Followed))
+            if (!rdgReach.Heard && (Pipeline?.HomeLnb is not null || list.Any(l => l.Station != ReceiverStore.BuiltInStation && l.Followed)))
             {
                 list[0] = list[0] with { Followed = false, NotFollowedBecause = rdgReach.Why };
             }
@@ -633,6 +633,13 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             return;
         }
+        if (pipeline.HomeLnb is { } home)
+        {
+            // Opened on an LNB's IF: between slots it stays on the downlink, not on GB7RDG's HF signal.
+            pipeline.SetSignal(home.IfHz, home.LnbHz);
+            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz, home.IfHz);
+            return;
+        }
         pipeline.SetSignal(OnAir.DefaultSignalHz);
         if (Retuner is { Window: null } && pipeline.Source.Kind != AudioSourceKind.SoundModem)
         {
@@ -651,6 +658,12 @@ public sealed class ReceiverHost : IAsyncDisposable
         get
         {
             var followed = Listening.Where(l => l.Followed).ToList();
+            if (followed.Count == 0)
+            {
+                // Only the LNB's downlink is heard and no station on it is known yet: GB7RDG's
+                // slots stand in as the placeholder timetable, and nothing is pointed at them.
+                return FollowedSlots.One(Schedule);
+            }
             return followed.Count == 1 && followed[0].Station == ReceiverStore.BuiltInStation
                 ? FollowedSlots.One(Schedule)
                 : new FollowedSlots([.. followed.Select(l => (l.Station, l.Station == ReceiverStore.BuiltInStation ? Schedule : SlotSchedule.From(l.Timetable)))]);
@@ -1591,6 +1604,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         var pipeline = AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, _log, _time, config.Web.Port,
             retunedByWindow: Retuner?.Window is not null, signalHz: station?.HeardAtHz ?? OnAir.DefaultSignalHz);
         pipeline.AlternateSignals = LnbSignals(source, config);
+        pipeline.LnbHz = source.Kind == AudioSourceKind.UberSdr ? null : config.LnbHz;
         return pipeline;
     }
 

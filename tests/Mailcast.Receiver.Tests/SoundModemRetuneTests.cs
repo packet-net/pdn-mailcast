@@ -1,3 +1,4 @@
+using Packet.Mailcast;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -784,5 +785,42 @@ public sealed class SoundModemRetuneTests
         var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
         await using var _ = pipeline;
         await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.OpenAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AFreshReceiverOnAnLnbsIf_OpensAnyway_ListensOnTheDownlink_AndLearnsAStationOutsideAnyWindow()
+    {
+        // Only the QO-100 dongle: no advert, no station known, pdn-soundmodem's dial on the IF.
+        const double IfDial = 739_735_855;
+        await using var fake = new FakeSoundModem(dialHz: IfDial);
+        var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Daylight = null, LnbHz = 9_750_012_345 };
+        var log = new List<string>();
+        var noon = new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero);
+        // 12:47 UTC: not in any slot window of GB7RDG's.
+        var now = noon.AddMinutes(47);
+        await using var host = new ReceiverHost(config, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(now), l => { lock (log) { log.Add(l); } });
+        var pipeline = host.CreatePipeline(source, config);
+        await using var _ = pipeline;
+        await pipeline.OpenAsync(CancellationToken.None);
+
+        Assert.Equal(IfDial, pipeline.DialHz, 0.5);
+        Assert.Equal(IfDial + 1800, pipeline.SignalHz, 0.5);
+        Assert.Equal(9_750_012_345, pipeline.LnbOffsetHz);
+        Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
+        Assert.Contains(log, l => l.Contains("listening continuously for 10489.7", StringComparison.Ordinal) && l.Contains("until it hears a station", StringComparison.Ordinal));
+        host.ReturnToConfig(pipeline);
+        Assert.Equal(IfDial + 1800, pipeline.SignalHz, 0.5);
+
+        // A new station's signed directory arrives and is learnt.
+        var station = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var slot = new DateTimeOffset(2026, 10, 26, 12, 30, 0, TimeSpan.Zero);
+        foreach (var frame in Samples.Frames([Samples.Bulletin(1)], ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = station, Station = "G8BPQ", Details = new StationDetails(10_489_750_000, Sideband.Usb, "IO83") }, slot))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+        Assert.Contains(host.Intake.StationDirectories(), d => d.Station == "G8BPQ");
     }
 }

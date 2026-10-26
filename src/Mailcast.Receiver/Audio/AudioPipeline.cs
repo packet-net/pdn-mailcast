@@ -218,6 +218,16 @@ public sealed partial class AudioPipeline : IAsyncDisposable
     /// </summary>
     internal IReadOnlyList<(double IfHz, double LnbHz)> AlternateSignals { get; set; } = [];
 
+    /// <summary>The LNB's oscillator (<see cref="ReceiverConfig.LnbHz"/>), when set and the source is not a web SDR.</summary>
+    internal long? LnbHz { get; set; }
+
+    /// <summary>
+    /// Where this pipeline listens between stations' slots when pdn-soundmodem's radio was found
+    /// on an LNB's IF at open: that IF and oscillator. Null for any other pipeline, which goes back to
+    /// the config's signal.
+    /// </summary>
+    internal (double IfHz, double LnbHz)? HomeLnb { get; private set; }
+
     /// <summary>Takes the LNB signal pdn-soundmodem's said dial hears, when the current signal is out of its reach.</summary>
     private void UseLnbSignalFor(int channelRate, double? saidDialHz)
     {
@@ -231,10 +241,22 @@ public sealed partial class AudioPipeline : IAsyncDisposable
             {
                 SignalHz = ifHz;
                 LnbOffsetHz = lo;
+                HomeLnb = (ifHz, lo);
                 _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
                     $"audio: pdn-soundmodem's radio is on USB dial {OnAir.Mhz(said)} MHz, which hears {OnAir.Mhz(ifHz + lo)} MHz through the LNB"));
                 return;
             }
+        }
+        // No station known on the downlink (a receiver whose only radio is the QO-100 dongle never
+        // hears an advert): a dial in the LNB's range is taken to be on it, the signal at the usual
+        // place in the audio, and everything is decoded as it comes until a station is heard.
+        if (LnbHz is { } oscillator && said >= StationReaching.LnbIfMinHz && said <= StationReaching.LnbIfMaxHz)
+        {
+            SignalHz = said + OnAir.CentreAudioHz;
+            LnbOffsetHz = oscillator;
+            HomeLnb = (SignalHz, oscillator);
+            _log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"audio: pdn-soundmodem's radio is on USB dial {OnAir.Mhz(said)} MHz, in the LNB's range; listening continuously for {OnAir.Mhz(SignalHz + oscillator)} MHz until it hears a station"));
         }
     }
 
