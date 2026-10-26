@@ -609,6 +609,7 @@ public sealed class FeedbackService
                 if (_seen[slot].Channel is null && _sources.Channel(slot) is { } measured)
                 {
                     _seen[slot] = _seen[slot] with { Channel = measured };
+                    changed = !Enabled || changed;
                 }
             }
             foreach (var old in _seen.Keys.Where(k => k < now.AddDays(-3)).ToList())

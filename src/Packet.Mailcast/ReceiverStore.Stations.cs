@@ -167,10 +167,9 @@ public sealed partial class ReceiverStore
         {
             // A key in trustedKeys whose label is not a callsign: the station is the callsign its directory names,
             // unless that callsign is pinned to another key already (issue #187).
-            if (_pins.FirstOrDefault(p => p.Station == named) is { } held)
+            if (KeyConflictOf(directory, check) is { } conflict)
             {
-                _conflicts[named] = new KeyConflict(named, held.Key.KeyId, trustedId, _options.Time.GetUtcNow());
-                return new DirectoryCheck(SignatureState.Rejected, Reason: $"it names {named}, whose key is pinned as {KeyId.Format(held.Key.KeyId)}, but is signed by key {KeyId.Format(trustedId)}");
+                return conflict;
             }
             Pin(named, configured, "from trustedKeys, as its first signed directory names it", fromTrustedKeys: true);
             return check;
@@ -198,6 +197,21 @@ public sealed partial class ReceiverStore
     }
 
     /// <summary>
+    /// The refusal for a directory signed by a trustedKeys key not pinned yet that names a callsign
+    /// pinned to another key (issue #187), recorded as a key conflict; null when it is not so.
+    /// </summary>
+    private DirectoryCheck? KeyConflictOf(BroadcastDirectory directory, DirectoryCheck check)
+    {
+        if (check.State != SignatureState.Trusted || directory.SigningKeyId is not { } id || directory.Station is not { } named
+            || _pins.Any(p => p.Key.KeyId == id) || _pins.FirstOrDefault(p => p.Station == named) is not { } held)
+        {
+            return null;
+        }
+        _conflicts[named] = new KeyConflict(named, held.Key.KeyId, id, _options.Time.GetUtcNow());
+        return new DirectoryCheck(SignatureState.Rejected, Reason: $"it names {named}, whose key is pinned as {KeyId.Format(held.Key.KeyId)}, but is signed by key {KeyId.Format(id)}");
+    }
+
+    /// <summary>
     /// After a key was pinned: directories remembered as refused that it now makes good are used
     /// from now on, and bulletins held because of them are released. Null when nothing was pinned.
     /// </summary>
@@ -212,7 +226,7 @@ public sealed partial class ReceiverStore
         foreach (var (id, (directory, heardAt, _)) in _rejectedDirectories.ToList())
         {
             var check = directory.Check(DirectoryKeys);
-            if (check.Usable)
+            if (check.Usable && KeyConflictOf(directory, check) is null)
             {
                 _rejectedDirectories.Remove(id);
                 _knownDirectories[id] = (directory, heardAt, check);
@@ -329,7 +343,7 @@ public sealed partial class ReceiverStore
     private readonly Dictionary<(string Callsign, long FrequencyHz, Sideband Sideband), (StationAdvert Advert, DateOnly Date, DateOnly First)> _adverts = [];
 
     // Stations advertised only past a directory's first BroadcastDirectory.MostAdverts, with the station whose directory did.
-    private readonly Dictionary<string, string?> _beyondCap = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string? By, DateOnly Date)> _beyondCap = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Takes the adverts of a trusted signed directory: a station and place not yet advertised is
@@ -357,7 +371,7 @@ public sealed partial class ReceiverStore
         }
         foreach (var advert in directory.IgnoredAdverts)
         {
-            _beyondCap[advert.Callsign] = StationOf(directory, check);
+            _beyondCap[advert.Callsign] = (StationOf(directory, check), directory.Date);
         }
     }
 
@@ -371,6 +385,10 @@ public sealed partial class ReceiverStore
         foreach (var place in _adverts.Where(a => a.Value.Date < oldest).Select(a => a.Key).ToList())
         {
             _adverts.Remove(place);
+        }
+        foreach (var call in _beyondCap.Where(b => b.Value.Date < oldest).Select(b => b.Key).ToList())
+        {
+            _beyondCap.Remove(call);
         }
     }
 
@@ -391,7 +409,7 @@ public sealed partial class ReceiverStore
     public IReadOnlyList<(string Callsign, string? AdvertisedBy)> AdvertsBeyondCap()
     {
         ExpireAdverts();
-        return [.. _beyondCap.Where(b => !_adverts.Keys.Any(k => k.Callsign == b.Key)).Select(b => (b.Key, b.Value)).OrderBy(b => b.Key, StringComparer.Ordinal)];
+        return [.. _beyondCap.Where(b => !_adverts.Keys.Any(k => k.Callsign == b.Key)).Select(b => (b.Key, b.Value.By)).OrderBy(b => b.Key, StringComparer.Ordinal)];
     }
 
     /// <summary>

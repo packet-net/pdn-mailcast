@@ -237,6 +237,23 @@ public class StationPinTests
     }
 
     [Fact]
+    public void AKeyConflictFromTrustedKeys_StaysRefused_WhenANewStationIsLearntLater()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with
+        {
+            TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("Bob's station", Impostor.PublicKeyBase64)],
+        });
+        var obj = Big(94);
+        Assert.Equal(FrameOutcome.RejectedDirectory, Feed(store, Directory(OnTheHour, Impostor, "GB7RDG", null, obj)).Outcome);
+        Assert.Equal(FrameOutcome.Withheld, Feed(store, obj).Outcome);
+        var pinned = Feed(store, Directory(HalfPast, Bpq, "G8BPQ", null, Big(95)));
+        Assert.Contains(store.Pins, p => p.Station == "G8BPQ");
+        Assert.DoesNotContain(pinned.Released ?? [], b => b.Bid == TestBulletins.Make(94, 9000).Bid);
+        Assert.Single(store.KeyConflicts);
+    }
+
+    [Fact]
     public void RemovingAHandAddedKeyFromTrustedKeys_RemovesItsPin()
     {
         using var dir = new TempDirectory();
