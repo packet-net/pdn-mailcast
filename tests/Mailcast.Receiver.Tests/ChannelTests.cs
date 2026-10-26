@@ -299,7 +299,14 @@ public class ChannelTests
         var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex);
         Assert.Equal(["1F", "2F"], report.Modes.Select(m => m.Label));
         Assert.InRange(report.VirtualHeightKm!.Value, 280, 305);
-        Assert.StartsWith("2 paths: 1 hop, and 2 hops 1.9 ms later, 17 dB weaker. Reflection about 290 km up. Doppler spread 0.2 Hz: steady", report.Words, StringComparison.Ordinal);
+        // The recording predates GB7RDG's switch to the standard mini-probe pattern
+        // (pdn-mailcast#168), and the reference burst is now rebuilt with the standard one, so
+        // the frames next to a probe the old transmitter shifted no longer match the rebuilt
+        // reference; the decoder-error check drops those snapshots (30 of 262 here) rather than
+        // measuring them. The rest move the Doppler reading from 0.16 to 0.125 Hz, so the words
+        // say 0.1 or 0.2 Hz, both steady; every other figure moves by at most 0.1 dB or 0.006 ms.
+        Assert.StartsWith("2 paths: 1 hop, and 2 hops 1.9 ms later, 17 dB weaker. Reflection about 290 km up. Doppler spread 0.", report.Words, StringComparison.Ordinal);
+        Assert.Matches(@"Doppler spread 0\.[12] Hz: steady", report.Words);
     }
 
     [Fact]
