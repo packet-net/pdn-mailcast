@@ -782,6 +782,9 @@ public class WebSdrWindowTests
         "the web SDR wessex.zapto.org is refusing us for now (daily limit reached); asking again later")]
     [InlineData("ubersdr: wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today). The stream will be retried patiently; audio starts when the receiver lets us back in.",
         "the web SDR wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today); asking again later")]
+    // pdn-soundmodem 0.95.0 shortened the start-up refusal (its #739).
+    [InlineData("ubersdr: wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today). The stream will be retried.",
+        "the web SDR wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today); asking again later")]
     public async Task ClientLine_ThatSaysTheWebSdrDropped_GivesTheWordsAndWhy(string line, string words)
     {
         await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
