@@ -259,6 +259,42 @@ public sealed partial class ReceiverStore
             .LastOrDefault().Directory?.Schedule;
     }
 
+    /// <summary>
+    /// What <paramref name="station"/> says about its own transmitter (issue #179): the
+    /// frequency, sideband and locator of its newest remembered trusted directory that gives
+    /// any, each part from the newest that gives that part. Null when no directory of its does
+    /// (GB7RDG then has the built-in details, see <see cref="BuiltInDetails"/>; any other is
+    /// known from its adverts).
+    /// </summary>
+    public StationDetails? HeardDetails(string station)
+    {
+        ArgumentNullException.ThrowIfNull(station);
+        var newestFirst = _knownDirectories.Values
+            .Where(k => k.Directory.Details is not null && k.Check.State == SignatureState.Trusted && StationOf(k.Directory, k.Check) == station)
+            .OrderByDescending(k => k.Directory.Date).ThenByDescending(k => k.HeardAt)
+            .Select(k => k.Directory.Details!)
+            .ToList();
+        if (Directory is { Details: not null } held && NewestCheck is { State: SignatureState.Trusted } heldCheck && StationOf(held, heldCheck) == station)
+        {
+            newestFirst.Add(held.Details!);
+        }
+        if (newestFirst.Count == 0)
+        {
+            return null;
+        }
+        // A newer directory that leaves a part out does not unsay an older one: parts are optional.
+        return new StationDetails(
+            newestFirst.Select(d => d.FrequencyHz).FirstOrDefault(v => v is not null),
+            newestFirst.Select(d => d.Sideband).FirstOrDefault(v => v is not null),
+            newestFirst.Select(d => d.Locator).FirstOrDefault(v => v is not null));
+    }
+
+    /// <summary>
+    /// What a receiver has always assumed of GB7RDG, used until a directory of its says otherwise:
+    /// 7.0538 MHz upper sideband, from IO91lk.
+    /// </summary>
+    public static StationDetails BuiltInDetails { get; } = new(7_053_800, Sideband.Usb, "IO91lk");
+
     // The advert taken for each station and place (callsign, frequency, sideband), and the date
     // of the directory it came from.
     private readonly Dictionary<(string Callsign, long FrequencyHz, Sideband Sideband), (StationAdvert Advert, DateOnly Date, DateOnly First)> _adverts = [];

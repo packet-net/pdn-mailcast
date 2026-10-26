@@ -23,18 +23,19 @@ public enum Sideband
 /// <param name="Timetable">Its slots.</param>
 /// <param name="FrequencyHz">Where its signal's centre is, in Hz.</param>
 /// <param name="Sideband">The sideband it is sent on.</param>
-public sealed record StationAdvert(string Callsign, SlotTimetable Timetable, long FrequencyHz, Sideband Sideband)
+/// <param name="Locator">Where it transmits from, a 4 or 6 character Maidenhead locator; null when not given (an advert from before v0.20.0 never does).</param>
+public sealed record StationAdvert(string Callsign, SlotTimetable Timetable, long FrequencyHz, Sideband Sideband, string? Locator = null)
 {
     /// <summary>The directory field's name.</summary>
     public const string FieldName = "advert=";
 
-    /// <summary>The station as a directory field: <c>advert=G8BPQ;00:30/60;-;7047000;usb</c>.</summary>
+    /// <summary>The station as a directory field: <c>advert=G8BPQ;00:30/60;-;7047000;usb</c>, with the locator after the sideband when it has one, <c>advert=G8BPQ;00:30/60;-;7047000;usb;IO83</c>.</summary>
     public string ToField()
     {
         var fields = Timetable.ToFields();
         string slots = fields[0]["slots=".Length..];
         string daylight = fields.Count > 1 ? fields[1]["daylight=".Length..] : "-";
-        return string.Create(CultureInfo.InvariantCulture, $"{FieldName}{Callsign};{slots};{daylight};{FrequencyHz};{(Sideband == Sideband.Usb ? "usb" : "lsb")}");
+        return string.Create(CultureInfo.InvariantCulture, $"{FieldName}{Callsign};{slots};{daylight};{FrequencyHz};{(Sideband == Sideband.Usb ? "usb" : "lsb")}{(Locator is null ? "" : ";" + Locator)}");
     }
 
     /// <summary>Reads one field, or null if it is not an advert this code reads.</summary>
@@ -52,13 +53,16 @@ public sealed record StationAdvert(string Callsign, SlotTimetable Timetable, lon
         }
         Sideband? sideband = p[4] switch { "usb" => Sideband.Usb, "lsb" => Sideband.Lsb, _ => null };
         var timetable = SlotTimetable.FromFields(p[2] == "-" ? ["slots=" + p[1]] : ["slots=" + p[1], "daylight=" + p[2]]);
-        return sideband is null || timetable is null ? null : new StationAdvert(p[0], timetable, hz, sideband.Value);
+        // A sixth part is the locator (v0.20.0); earlier readers ignore anything after the sideband.
+        string? locator = p.Length > 5 && Maidenhead.TryParse(p[5], out _, out _) ? p[5] : null;
+        return sideband is null || timetable is null ? null : new StationAdvert(p[0], timetable, hz, sideband.Value, locator);
     }
 
     /// <summary>What is wrong with it for a directory, or null if nothing.</summary>
     public string? Problem() =>
         !IsCallsign(Callsign) ? $"'{Callsign}' is not a callsign (A to Z and 0 to 9, an optional -SSID)"
         : FrequencyHz < 1 ? $"{Callsign}: {FrequencyHz} Hz is not a frequency"
+        : Locator is not null && !Maidenhead.TryParse(Locator, out _, out _) ? $"{Callsign}: '{Locator}' is not a 4 or 6 character Maidenhead locator"
         : null;
 
     /// <summary>A callsign as a directory names a station: 3 to 6 of A to Z and 0 to 9 with a digit, and an optional -SSID of 0 to 15.</summary>
@@ -151,6 +155,14 @@ public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Siz
 /// them like any field after the title: none of their names starts with a name those readers look for.
 /// </para>
 /// <para>
+/// From v0.20.0 (issue #179) the first entry's line may also say where the station itself is on
+/// the air and where it is: <c>hz=7053800</c> (its signal's centre), <c>sideband=usb</c> and
+/// <c>locator=IO91lk</c>, each optional, and an advert may end with its station's locator. A
+/// receiver then takes a station's frequency, sideband and place from its own directory, and from
+/// the adverts for a station it has not heard. Earlier readers ignore all of them (none of the
+/// names starts with one they look for) and the signature still checks.
+/// </para>
+/// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
 /// different contents never share an ID, even on the same day. Ed25519 signatures are
 /// deterministic, so the same directory signed twice is the same object.
@@ -180,8 +192,13 @@ public sealed class BroadcastDirectory
     /// Creates a directory, signed by <paramref name="signer"/> when given and there is an entry
     /// to carry the signature. Each entry should then give its <see cref="DirectoryEntry.Hash"/>.
     /// </summary>
-    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null, string? mode = null, DirectorySigner? signer = null, ReportReceipts? reports = null, string? station = null, IReadOnlyList<StationAdvert>? adverts = null)
+    public BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule = null, string? mode = null, DirectorySigner? signer = null, ReportReceipts? reports = null, string? station = null, IReadOnlyList<StationAdvert>? adverts = null, StationDetails? details = null)
     {
+        if (details?.Problem() is { } detailsProblem)
+        {
+            throw new ArgumentException(detailsProblem, nameof(details));
+        }
+        Details = details;
         if (station is not null && !StationAdvert.IsCallsign(station))
         {
             throw new ArgumentException($"The station '{station}' cannot be serialised.", nameof(station));
@@ -220,8 +237,8 @@ public sealed class BroadcastDirectory
         PublicKey = _signer?.PublicKey;
     }
 
-    private BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule, string? mode, ReportReceipts? reports, string? station, IReadOnlyList<StationAdvert> adverts, byte[]? publicKey, byte[] serialized, string? keyText, string? signatureText, int signedLength)
-        : this(date, entries, schedule, mode, reports: reports, station: station, adverts: adverts)
+    private BroadcastDirectory(DateOnly date, IEnumerable<DirectoryEntry> entries, SlotTimetable? schedule, string? mode, ReportReceipts? reports, string? station, IReadOnlyList<StationAdvert> adverts, StationDetails? details, byte[]? publicKey, byte[] serialized, string? keyText, string? signatureText, int signedLength)
+        : this(date, entries, schedule, mode, reports: reports, station: station, adverts: adverts, details: details)
     {
         PublicKey = publicKey;
         _serialized = serialized;
@@ -235,6 +252,12 @@ public sealed class BroadcastDirectory
     /// when serialised.
     /// </summary>
     public bool IsSigned => _signer is not null || _signatureText is not null;
+
+    /// <summary>
+    /// Where the station says its signal is and where it is (<c>hz=</c>, <c>sideband=</c>,
+    /// <c>locator=</c>, issue #179); null when the directory gives none, as from an earlier head end.
+    /// </summary>
+    public StationDetails? Details { get; }
 
     /// <summary>
     /// The station the directory says it is from (<c>station=</c>, the head end's callsign), or
@@ -331,6 +354,13 @@ public sealed class BroadcastDirectory
             if (i == 0 && Station is not null && _signer is { } keyed)
             {
                 text.Append('\t').Append(PublicKeyField).Append(keyed.PublicKeyBase64);
+            }
+            if (i == 0 && Details is { } details)
+            {
+                foreach (var field in details.ToFields())
+                {
+                    text.Append('\t').Append(field);
+                }
             }
             if (i == 0)
             {
@@ -429,6 +459,7 @@ public sealed class BroadcastDirectory
         ReportReceipts? reports = null;
         string? station = null;
         byte[]? publicKey = null;
+        StationDetails? details = null;
         var adverts = new List<StationAdvert>();
         var ignoredAdverts = new List<StationAdvert>();
         string? keyText = null;
@@ -486,6 +517,7 @@ public sealed class BroadcastDirectory
                         publicKey = null;
                     }
                 }
+                details = StationDetails.FromFields(parts[5..]);
                 var fields = parts[5..].Where(f => f.StartsWith(StationAdvert.FieldName, StringComparison.Ordinal)).ToList();
                 adverts.AddRange(fields.Take(MostAdverts).Select(StationAdvert.FromField).OfType<StationAdvert>());
                 ignoredAdverts.AddRange(fields.Skip(MostAdverts).Select(StationAdvert.FromField).OfType<StationAdvert>());
@@ -493,11 +525,72 @@ public sealed class BroadcastDirectory
         }
         try
         {
-            return new BroadcastDirectory(date, entries, schedule, mode, reports, station, adverts, publicKey, serialized.ToArray(), keyText, signatureText, signedLength) { IgnoredAdverts = ignoredAdverts };
+            return new BroadcastDirectory(date, entries, schedule, mode, reports, station, adverts, details, publicKey, serialized.ToArray(), keyText, signatureText, signedLength) { IgnoredAdverts = ignoredAdverts };
         }
         catch (ArgumentException e)
         {
             throw new FormatException(e.Message, e);
         }
     }
+}
+
+/// <summary>
+/// What a station says about its own transmitter in its directory (issue #179): where its signal
+/// is centred, on which sideband, and where it is. Each part is optional: a head end that is not
+/// told leaves it out, and a receiver then falls back to an advert for the station, and for GB7RDG
+/// to what it has always assumed.
+/// </summary>
+/// <param name="FrequencyHz">The signal's centre in Hz (GB7RDG's is 7053800); null for not given.</param>
+/// <param name="Sideband">The sideband; null for not given (usb is then assumed).</param>
+/// <param name="Locator">A 4 or 6 character Maidenhead locator; null for not given.</param>
+public sealed record StationDetails(long? FrequencyHz = null, Sideband? Sideband = null, string? Locator = null)
+{
+    /// <summary>The first entry's fields: <c>hz=</c>, <c>sideband=</c>, <c>locator=</c>, those given.</summary>
+    public IEnumerable<string> ToFields()
+    {
+        if (FrequencyHz is { } hz)
+        {
+            yield return string.Create(CultureInfo.InvariantCulture, $"hz={hz}");
+        }
+        if (Sideband is { } sideband)
+        {
+            yield return sideband == Packet.Mailcast.Sideband.Usb ? "sideband=usb" : "sideband=lsb";
+        }
+        if (Locator is { } locator)
+        {
+            yield return "locator=" + locator;
+        }
+    }
+
+    /// <summary>Reads the fields of a first entry; null when it gives none of the three.</summary>
+    public static StationDetails? FromFields(IEnumerable<string> fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        long? hz = null;
+        Sideband? sideband = null;
+        string? locator = null;
+        foreach (string field in fields)
+        {
+            if (field.StartsWith("hz=", StringComparison.Ordinal) && hz is null
+                && long.TryParse(field.AsSpan(3), NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) && parsed >= 1)
+            {
+                hz = parsed;
+            }
+            else if (field.StartsWith("sideband=", StringComparison.Ordinal) && sideband is null)
+            {
+                sideband = field[9..] switch { "usb" => Packet.Mailcast.Sideband.Usb, "lsb" => Packet.Mailcast.Sideband.Lsb, _ => null };
+            }
+            else if (field.StartsWith("locator=", StringComparison.Ordinal) && locator is null && Maidenhead.TryParse(field[8..], out _, out _))
+            {
+                locator = field[8..];
+            }
+        }
+        return hz is null && sideband is null && locator is null ? null : new StationDetails(hz, sideband, locator);
+    }
+
+    /// <summary>What is wrong with it for a directory, or null if nothing.</summary>
+    public string? Problem() =>
+        FrequencyHz is < 1 ? $"{FrequencyHz} Hz is not a frequency"
+        : Locator is not null && !Maidenhead.TryParse(Locator, out _, out _) ? $"'{Locator}' is not a 4 or 6 character Maidenhead locator"
+        : null;
 }

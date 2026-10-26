@@ -128,10 +128,15 @@
     "port": 1883
   },
 
+  // Where this station's signal is centred (Hz, the same number another station would advertise
+  // for you), its sideband and its Maidenhead locator. All optional; given, every directory
+  // carries them so receivers know where to listen for you and where the path starts. For example:
+  // "frequencyHz": 7053800, "sideband": "usb", "locator": "IO91lk",
+
   // Other mailcast stations to tell listeners about in every directory, so their receivers
   // also listen at those stations' slots. Only a hint about where to listen: receivers trust a
   // station from its own signed directory. For example:
-  // { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
+  // { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb", "locator": "IO83" }
   "advertise": [],
 
   // GET /status for the state; POST /run (pdn-mailcast-headend --run-now) for a one-off slot,

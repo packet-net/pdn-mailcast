@@ -111,6 +111,7 @@ public static partial class Program
         {
             Console.WriteLine($"{configPath}: fine");
             Console.WriteLine(DescribeSigning(signer, SigningKeyPath));
+            Console.WriteLine(DescribeSelf(config));
             Console.WriteLine(DescribeAdverts(config));
             return 0;
         }
@@ -171,6 +172,17 @@ public static partial class Program
     }
 
     /// <summary>One plain line on the other stations each directory tells listeners about (issue #178).</summary>
+    /// <summary>One plain line on what the directories say about this station's own frequency and place (issue #179).</summary>
+    internal static string DescribeSelf(HeadEndConfig config) => config.ToDetails() switch
+    {
+        null => "this station: no \"frequencyHz\" or \"locator\" given, so directories do not say where it is on the air or where it is; receivers then rely on what other head ends advertise",
+        var d => "this station: " + string.Join(", ", new[]
+        {
+            d.FrequencyHz is { } hz ? string.Create(CultureInfo.InvariantCulture, $"{hz / 1e6:0.0000} MHz {(d.Sideband == Sideband.Lsb ? "LSB" : "USB")}") : null,
+            d.Locator is { } l ? "locator " + l : null,
+        }.OfType<string>()) + " in every directory",
+    };
+
     internal static string DescribeAdverts(HeadEndConfig config)
     {
         var adverts = config.ToScheduleOptions().Adverts;
@@ -276,6 +288,7 @@ public static partial class Program
     {
         journal.Write($"pdn-mailcast-headend {Version} starting");
         journal.Write(DescribeSigning(signer, SigningKeyPath));
+        journal.Write(DescribeSelf(config));
         journal.Write(DescribeAdverts(config));
         TimeProvider time = TimeProvider.System;
         using var stop = new CancellationTokenSource();
