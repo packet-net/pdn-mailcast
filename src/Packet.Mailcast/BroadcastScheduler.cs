@@ -179,6 +179,9 @@ public sealed record ScheduleOptions
     /// <summary>The other stations the directory tells listeners about (<c>advert=</c>, issue #178); empty for none.</summary>
     public IReadOnlyList<StationAdvert> Adverts { get; init; } = [];
 
+    /// <summary>The station's own frequency, sideband and locator (<c>hz=</c>, <c>sideband=</c>, <c>locator=</c>, issue #179); null for none.</summary>
+    public StationDetails? Details { get; init; }
+
     /// <summary>
     /// An hourly station that sends in daylight only. All of a day's carrying then has to fit in
     /// the daylight slots, only 5 of them at GB7RDG in December, so each bulletin is carried less:
@@ -685,7 +688,7 @@ public static class BroadcastScheduler
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
-        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts);
+        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts, options.Details);
         var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 

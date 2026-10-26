@@ -18,6 +18,53 @@ public sealed record HeadEndConfig
     /// <summary>The AX.25 source of every frame: the station's callsign. Required.</summary>
     public string Callsign { get; init; } = "";
 
+    /// <summary>
+    /// Where this station's signal is centred, in Hz (GB7RDG's is 7053800). Optional; given, it is
+    /// carried in every directory (issue #179) so that receivers know where to listen for this
+    /// station without being told by another. A head end that transmits through another program,
+    /// such as pdn-soundmodem, knows this only from here.
+    /// </summary>
+    public long? FrequencyHz { get; init; }
+
+    /// <summary><c>usb</c> or <c>lsb</c>: the sideband <see cref="FrequencyHz"/> is on. Optional (usb is assumed).</summary>
+    public string? Sideband { get; init; }
+
+    /// <summary>
+    /// This station's 4 or 6 character Maidenhead locator, such as IO91lk. Optional; given, it is
+    /// carried in every directory (issue #179), so a receiver draws the path from here and works
+    /// out the distance to it.
+    /// </summary>
+    public string? Locator { get; init; }
+
+    /// <summary>The station's own details, as the directory carries them; null when none is given or one is wrong (validation says which).</summary>
+    public StationDetails? ToDetails() =>
+        FrequencyHz is null && Sideband is null && Locator is null || DetailsProblems().Count > 0
+            ? null
+            // sideband= is written whenever hz= is, so a reader never has to guess it.
+            : new StationDetails(FrequencyHz, FrequencyHz is null ? null : Sideband is not null && Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Packet.Mailcast.Sideband.Lsb : Packet.Mailcast.Sideband.Usb, Locator);
+
+    private List<string> DetailsProblems()
+    {
+        var problems = new List<string>();
+        if (FrequencyHz is < 1)
+        {
+            problems.Add("\"frequencyHz\" must be the station's signal centre in Hz, such as 7053800");
+        }
+        if (Sideband is not null && !Sideband.Equals("usb", StringComparison.OrdinalIgnoreCase) && !Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase))
+        {
+            problems.Add($"\"sideband\" is usb or lsb, not '{Sideband}'");
+        }
+        if (Locator is not null && !Maidenhead.TryParse(Locator, out _, out _))
+        {
+            problems.Add($"\"locator\" '{Locator}' is not a 4 or 6 character Maidenhead locator, such as IO91lk");
+        }
+        if (Sideband is not null && FrequencyHz is null)
+        {
+            problems.Add("\"sideband\" needs \"frequencyHz\"");
+        }
+        return problems;
+    }
+
     /// <summary>The AX.25 destination of every frame.</summary>
     public string Destination { get; init; } = "MCAST";
 
@@ -50,7 +97,7 @@ public sealed record HeadEndConfig
     public IReadOnlyList<StationAdvert> ToAdverts() =>
         [.. Advertise.Select(a => new StationAdvert(a.Callsign, new SlotTimetable(
             TimeOnly.ParseExact(a.Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture), a.Slot.EveryMinutes, a.Slot.Daylight?.ToSettings().ToRule()),
-            a.FrequencyHz, a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Sideband.Lsb : Sideband.Usb))];
+            a.FrequencyHz, a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase) ? Packet.Mailcast.Sideband.Lsb : Packet.Mailcast.Sideband.Usb, a.Locator))];
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -206,6 +253,7 @@ public sealed record HeadEndConfig
             Timetable = TimetableIfValid(),
             Station = Ax25Ui.IsValidAddress(Callsign) && StationAdvert.IsCallsign(Callsign.ToUpperInvariant()) ? Callsign.ToUpperInvariant() : null,
             Adverts = AdvertsIfValid(),
+            Details = ToDetails(),
             Budget = Rule == ScheduleRule.Budget
                 ? new BudgetRule
                 {
@@ -277,6 +325,10 @@ public sealed record HeadEndConfig
             if (!a.Sideband.Equals("usb", StringComparison.OrdinalIgnoreCase) && !a.Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase))
             {
                 problems.Add($"{where}: \"sideband\" is usb or lsb, not '{a.Sideband}'");
+            }
+            if (a.Locator is not null && !Maidenhead.TryParse(a.Locator, out _, out _))
+            {
+                problems.Add($"{where}: \"locator\" '{a.Locator}' is not a 4 or 6 character Maidenhead locator, such as IO91lk");
             }
             bool anchorFine = TimeOnly.TryParseExact(a.Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor);
             if (SlotAnchor.Problem(a.Slot.TimeUtc, a.Slot.Minute, "\"timeUtc\"", "\"minute\"") is { } both)
@@ -381,6 +433,7 @@ public sealed record HeadEndConfig
             problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
             daylightFine = false;
         }
+        problems.AddRange(DetailsProblems());
         problems.AddRange(AdvertProblems());
         ValidateSchedule(problems, everyFine && daylightFine && TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
         if (Slot.Tone is < 0 or > 60)
@@ -1062,6 +1115,9 @@ public sealed record AdvertisedStation
 
     /// <summary><c>usb</c> or <c>lsb</c>.</summary>
     public string Sideband { get; init; } = "usb";
+
+    /// <summary>Where it transmits from, a Maidenhead locator such as IO83. Optional; given, receivers draw the path from there (issue #179).</summary>
+    public string? Locator { get; init; }
 }
 
 /// <summary>An advertised station's slots.</summary>

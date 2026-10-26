@@ -337,15 +337,29 @@ signing: no key at /etc/pdn-mailcast-headend/signing-key.pem, so directories go 
 
 The public key in that line is what listeners trust. GB7RDG's is built into the receiver. Another transmitter gives its line to listeners, who add the key to `trustedKeys` in their receiver.json (see the receiver's docs). Keep the private key private and backed up: a new key means every receiver has to be told the new public key.
 
+## Saying where you are
+
+So that receivers know where to listen for you, and can draw the path from you, say where your signal is and where you are:
+
+```json
+"frequencyHz": 7047000,
+"sideband": "usb",
+"locator": "IO83fb"
+```
+
+All three are optional and go into every directory (`hz=`, `sideband=`, `locator=`). `frequencyHz` is the centre of your signal in Hz (GB7RDG's is 7053800), the same number you would give for yourself in another station's `advertise`. Left out, a receiver relies on what other head ends advertise for you; for GB7RDG alone it assumes 7.0538 MHz and IO91lk, as it always has. `--check-config` and the journal say what is carried. Receivers from before v0.20.0 ignore the new fields and still check the signature.
+
 ## Telling listeners about other stations
 
 Receivers learn when and where to listen for other mailcast stations from what each head end says about them. List them in `advertise`, each with its slots in the same shape as your own `slot`, where its signal is centred and the sideband:
 
 ```json
 "advertise": [
-  { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb" }
+  { "callsign": "G8BPQ", "slot": { "minute": 30, "everyMinutes": 60 }, "frequencyHz": 7053800, "sideband": "usb", "locator": "IO83" }
 ]
 ```
+
+The `locator` is optional: given, receivers draw the path from that station's place.
 
 A station on two frequencies, such as HF and QO-100, is listed once for each. Every directory then carries them. It is only a hint about where to listen: receivers trust a station from its own signed directory, never from yours. The journal and `--check-config` say what is advertised. Each directory also names this head end (`callsign`) and, when signed, gives its public key, so receivers can learn it the first time they hear it.
 
