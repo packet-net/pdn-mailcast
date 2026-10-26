@@ -4,7 +4,7 @@ namespace Mailcast.Receiver;
 
 /// <summary>
 /// A radio's receive filter, measured from band noise: its edges, how wide it is, and the USB
-/// dial that puts GB7RDG's fixed signal (<see cref="OnAir.TransmitHz"/>) in the middle of it.
+/// dial that puts GB7RDG's fixed signal (<see cref="OnAir.DefaultSignalHz"/>) in the middle of it.
 /// </summary>
 /// <param name="LowHz">The filter's lower edge, Hz.</param>
 /// <param name="HighHz">Its upper edge, Hz.</param>
@@ -70,16 +70,16 @@ public static class FilterScan
 
     private const double BinHz = (double)OnAir.SampleRate / FftSize;
 
-    /// <summary>The dial that centres GB7RDG's signal in a filter from <paramref name="lowHz"/> to <paramref name="highHz"/>, or a problem if it cannot be used.</summary>
-    public static (RadioFilter? Filter, string? Problem) DialFor(double lowHz, double highHz)
+    /// <summary>The dial that centres a signal (<paramref name="signalHz"/>, GB7RDG's unless given) in a filter from <paramref name="lowHz"/> to <paramref name="highHz"/>, or a problem if it cannot be used.</summary>
+    public static (RadioFilter? Filter, string? Problem) DialFor(double lowHz, double highHz, double signalHz = OnAir.DefaultSignalHz)
     {
         if (!(highHz > lowHz) || lowHz < 0)
         {
             return (null, "The low edge must be less than the high edge, and neither can be negative.");
         }
         double middle = (lowHz + highHz) / 2;
-        double dialHz = Math.Round((OnAir.TransmitHz - middle) / 10) * 10;
-        double centreHz = OnAir.TransmitHz - dialHz;
+        double dialHz = Math.Round((signalHz - middle) / 10) * 10;
+        double centreHz = signalHz - dialHz;
         if (centreHz < ReceiverConfig.LowestAudioCentreHz || centreHz > ReceiverConfig.HighestAudioCentreHz)
         {
             return (null, string.Create(System.Globalization.CultureInfo.InvariantCulture,

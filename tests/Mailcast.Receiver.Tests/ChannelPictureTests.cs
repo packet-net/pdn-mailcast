@@ -248,7 +248,7 @@ public class ChannelPictureTests
     [Fact]
     public void Svg_NamesGroundBounces_ForA2FPath_WhenTheReceiversPlaceIsKnown()
     {
-        double groundKm = PathGeometry.DistanceKm(PathGeometry.Gb7rdg, FarEnd);
+        double groundKm = PathGeometry.DistanceKm(GroundPlace.FromLocator("IO91lk")!, FarEnd);
         var report = Report(groundKm, 300, "far end", Mode("1F", 0, 0), Mode("2F", 2, -10));
         string svg = ChannelPicture.Svg(report, "far end", 340, withLabels: true, FarEnd)!;
         // Each bounce gets its own line (not joined with commas on one line): SVG text does not
@@ -262,7 +262,7 @@ public class ChannelPictureTests
     [Fact]
     public void Svg_NamesBothBounces_ForA3FPath()
     {
-        double groundKm = PathGeometry.DistanceKm(PathGeometry.Gb7rdg, FarEnd);
+        double groundKm = PathGeometry.DistanceKm(GroundPlace.FromLocator("IO91lk")!, FarEnd);
         var report = Report(groundKm, 300, "far end", Mode("1F", 0, 0), Mode("3F", 4, -12));
         string svg = ChannelPicture.Svg(report, "far end", 340, withLabels: true, FarEnd)!;
         Assert.Contains(">Ground bounces:<", svg, StringComparison.Ordinal);

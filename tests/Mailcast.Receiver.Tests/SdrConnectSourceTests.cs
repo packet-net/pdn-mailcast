@@ -100,7 +100,7 @@ public class SdrConnectSourceTests
         probe.Start();
         int closed = ((IPEndPoint)probe.LocalEndpoint).Port;
         probe.Stop();
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {
@@ -142,7 +142,7 @@ public class SdrConnectSourceTests
         page.Start();
         int pagePort = ((IPEndPoint)page.LocalEndpoint).Port;
         page.Stop();
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {
@@ -385,7 +385,7 @@ public class SdrConnectSourceTests
     public async Task Listening_PointsTheRadioBelowTheDial_AndAToneComesOutAsUsbAudio(double dialKHz)
     {
         double dial = dialKHz * 1000;
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
         var log = new List<string>();
         await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), dial, line => { lock (log) { log.Add(line); } });
 
@@ -418,7 +418,7 @@ public class SdrConnectSourceTests
     [Fact]
     public async Task DroppedConnection_IsTakenUpAgain_WithoutEndingThePipeline()
     {
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
         await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), Dial, _ => { });
         await pipeline.StartAsync(CancellationToken.None);
         await ListenAsync(pipeline, 0.2);
@@ -452,7 +452,7 @@ public class SdrConnectSourceTests
         page.Start();
         int pagePort = ((IPEndPoint)page.LocalEndpoint).Port;
         page.Stop();
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.TransmitHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {

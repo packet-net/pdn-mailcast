@@ -102,7 +102,7 @@ public sealed class BurstCapture
         receiver.BurstCompleted += OnBurst;
     }
 
-    /// <summary>A frame was delivered: the burst it came in is GB7RDG's, not noise or another station's.</summary>
+    /// <summary>A frame was delivered: the burst it came in is a station's, not noise or another station's.</summary>
     public void OnFrame() => _frames++;
 
     /// <summary>Each block of audio, before the modem hears it.</summary>

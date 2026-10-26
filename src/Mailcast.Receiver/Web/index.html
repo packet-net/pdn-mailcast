@@ -224,7 +224,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
   </section>
 
   <section>
-    <h2>Hearing GB7RDG</h2>
+    <h2 id="hearingTitle">Hearing GB7RDG</h2>
     <dl id="when"></dl>
     <p class="muted" id="slotShape">Each slot starts with a 10 second tone, then a few minutes of short data bursts.</p>
     <p id="listenNow" hidden>
@@ -240,7 +240,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 
   <section>
     <h2>Ionosphere</h2>
-    <div id="iono" class="muted">No reading heard yet. GB7RDG sends one in each slot.</div>
+    <div id="iono" class="muted">No reading heard yet. A station sends one in each slot.</div>
     <div id="pskr"></div>
   </section>
 
@@ -274,10 +274,10 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 
   <section class="wide" id="globeBox" hidden>
     <details id="globeDetails">
-      <summary><h2>Where it bounced</h2> <span class="muted">a globe of today's paths from GB7RDG</span></summary>
-      <p class="muted">Each slot's path from GB7RDG to this receiver, up to the virtual height measured and back down, on a true-size round Earth with nothing exaggerated. The bright points are where it turned round, and a ring marks where a two hop signal touched the ground. Where each bounce sits along the path is an estimate: halfway for one hop, a quarter and three quarters for two. Drag to turn, scroll or use + and - to zoom.</p>
+      <summary><h2>Where it bounced</h2> <span class="muted">a globe of today's paths from the stations heard</span></summary>
+      <p class="muted">Each slot's path from the station heard to this receiver, up to the virtual height measured and back down, on a true-size round Earth with nothing exaggerated. The bright points are where it turned round, and a ring marks where a two hop signal touched the ground. Where each bounce sits along the path is an estimate: halfway for one hop, a quarter and three quarters for two. Drag to turn, scroll or use + and - to zoom.</p>
       <div class="globeWrap">
-        <canvas id="globe" width="1200" height="760" aria-label="This receiver's radio paths from GB7RDG on a globe"></canvas>
+        <canvas id="globe" width="1200" height="760" aria-label="This receiver's radio paths from the stations it hears on a globe"></canvas>
         <div id="globeStamp"></div>
       </div>
       <div class="globeControls">
@@ -428,16 +428,15 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 /* ---------- the globe of where it bounced ----------
-   Today's paths from GB7RDG to this receiver on a sphere 6371 km in radius, to scale, drawn the
+   Today's paths from each station heard to this receiver on a sphere 6371 km in radius, to scale, drawn the
    way the receiver models them (packet-net/pdn-mailcast#60): straight rays from the ground up to
    a mirror at the virtual height and back down, the bounces equally spaced along the great
    circle. The section is closed by default; the coastlines (globe.json, about 300 kB) are only
    fetched, and anything only drawn, once it is opened. */
 const Globe = (() => {
   const R = 6371, DEG = Math.PI / 180;
-  const GB7RDG = { lat: 51.4375, lon: -0.9583 };
   const NEAR_VIEW = { yaw: -0.35, pitch: 0.42, dist: 1250 };
-  /* Side on, from far out: the camera sits nearly level with the receiver's horizon, so GB7RDG and
+  /* Side on, from far out: the camera sits nearly level with the receiver's horizon, so the station and
      its paths sit on the Earth's edge with the layer a thin line over the curve of the world. */
   const FAR_VIEW = { yaw: -1.2, pitch: 0.06, dist: 14000 };
   const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -454,9 +453,7 @@ const Globe = (() => {
   }
   const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
   const INK = "#dce8e6", SOFT = "#8aa29f", RAY = "#ffb547", DOUBT = "#e07a6b", LAND = "#1a2b2a", COAST = "#3f5c58", SEA = "#10222a";
-  const TX = unit(GB7RDG);
-
-  let coast = null, loading = false, slots = [], idx = 0, drawOn = 1, view = { ...NEAR_VIEW }, CAM = null, focus = TX;
+  let coast = null, loading = false, slots = [], idx = 0, drawOn = 1, view = { ...NEAR_VIEW }, CAM = null, focus = { x: 1, y: 0, z: 0 };
   let playing = null, flight = null, drag = null;
   const cv = $("globe"), ctx = cv.getContext("2d");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -538,7 +535,7 @@ const Globe = (() => {
   }
   /* One slot's path, drawn on with progress f (0 to 1). */
   function path(s, f) {
-    const RX = unit(s.place), measured = s.h != null, h = s.h ?? 300, colour = measured ? RAY : SOFT;
+    const TX = unit(s.tx), RX = unit(s.place), measured = s.h != null, h = s.h ?? 300, colour = measured ? RAY : SOFT;
     for (const n of s.hops) {
       const pts = [];
       for (let k = 0; k < n; k++) pts.push(at(slerp(TX, RX, k / n)), at(slerp(TX, RX, (k + 0.5) / n), h), at(slerp(TX, RX, (k + 1) / n)));
@@ -564,11 +561,11 @@ const Globe = (() => {
     // The day's earlier reflection points, faint, where the ray turned round.
     for (let i = 0; i < idx; i++) {
       const o = slots[i]; if (o.h == null) continue;
-      for (const k of [0.5]) spot(at(slerp(TX, unit(o.place), k), o.h), 2.2, "rgba(255,181,71,0.35)");
+      for (const k of [0.5]) spot(at(slerp(unit(o.tx), unit(o.place), k), o.h), 2.2, "rgba(255,181,71,0.35)");
     }
     if (s) path(s, drawOn);
     if (s) { spot(at(unit(s.place)), 5, "#7cc6ff"); label(at(unit(s.place)), "This receiver", "#7cc6ff"); }
-    spot(at(TX), 6, RAY, "rgba(255,181,71,0.6)"); label(at(TX), "GB7RDG", RAY, 10, 18);
+    if (s) { spot(at(unit(s.tx)), 6, RAY, "rgba(255,181,71,0.6)"); label(at(unit(s.tx)), s.name, RAY, 10, 18); }
     if (view.dist > 4000 && s?.h != null) {
       ctx.font = `500 ${Math.round(cv.width / 64)}px system-ui, sans-serif`; ctx.fillStyle = INK;
       ctx.fillText(`The layer is ${Math.round(s.h)} km up on an Earth ${R} km in radius.`, 16, cv.height - 18);
@@ -639,10 +636,10 @@ const Globe = (() => {
      section stays hidden until the receiver knows where it is (a web SDR, or "locator" set). */
   return function update(st) {
     const c = st.channel;
-    const list = (c?.history ?? []).filter(h => h.enough && h.latitude != null && h.longitude != null && h.modes.some(m => m.label)).map(h => {
+    const list = (c?.history ?? []).filter(h => h.enough && h.skywave && h.latitude != null && h.longitude != null && h.stationLatitude != null && h.stationLongitude != null && h.modes.some(m => m.label)).map(h => {
       const labels = h.modes.map(m => m.label).filter(Boolean);
       const hops = [...new Set(labels.filter(l => /^\dF$/.test(l)).map(l => +l[0]))].sort();
-      return { slot: h.slot, place: { lat: h.latitude, lon: h.longitude }, h: h.virtualHeightKm, hops: hops.length ? hops : [1] };
+      return { slot: h.slot, name: h.station, tx: { lat: h.stationLatitude, lon: h.stationLongitude }, place: { lat: h.latitude, lon: h.longitude }, h: h.virtualHeightKm, hops: hops.length ? hops : [1] };
     });
     $("globeBox").hidden = list.length === 0;
     const atEnd = idx >= slots.length - 1;
@@ -650,7 +647,7 @@ const Globe = (() => {
     slots = list;
     $("globeSlot").max = Math.max(0, slots.length - 1);
     // The camera circles the middle of the path.
-    if (slots.length) focus = norm(add(TX, unit(slots.at(-1).place)));
+    if (slots.length) focus = norm(add(unit(slots.at(-1).tx), unit(slots.at(-1).place)));
     if (changed && !playing) go(atEnd ? slots.length - 1 : Math.min(idx, slots.length - 1), false);
   };
 })();
@@ -693,7 +690,7 @@ async function api(url, options) {
   return { ok: false, status: answer.status, body, text, error: why };
 }
 
-/* ---------- channel: the radio path from GB7RDG, measured from the probe and the bursts decoded ---------- */
+/* ---------- channel: the radio path from the station heard, measured from the probe and the bursts decoded ---------- */
 const svgNs = "http://www.w3.org/2000/svg";
 function svgEl(tag, attrs, title) {
   const e = document.createElementNS(svgNs, tag);
@@ -741,6 +738,7 @@ function channelPathStrip(c) {
     const hour = new Date(h.slot).toISOString().slice(11, 13);
     const labelled = h.modes.some(m => m.label);
     const said = !h.enough ? "too little heard"
+      : !h.skywave ? (h.snrDb !== null ? `${h.snrDb} dB` : "heard")
       : h.virtualHeightKm !== null ? `${h.virtualHeightKm} km`
       : labelled ? "height unknown"
       : h.modes.length <= 1 ? "1 path" : "paths not labelled";
@@ -792,7 +790,7 @@ function channel(s) {
   }
 
   path.className = "";
-  path.innerHTML = `<div><span class="head">Last slot (${utc(c.slot)}):</span> ${esc(c.words)}</div>`;
+  path.innerHTML = `<div><span class="head">Last slot (${utc(c.slot)}${c.station ? `, ${esc(c.station)}` : ""}):</span> ${esc(c.words)}</div>`;
   if (c.pathSvg) {
     const pic = document.createElement("div");
     pic.style.marginTop = "8px";
@@ -804,7 +802,17 @@ function channel(s) {
 
   detail.innerHTML = "";
   detail.className = "";
-  if (c.enough && c.profile) {
+  if (c.enough && !c.skywave) {
+    // A path above HF (QO-100's downlink): no ionosphere, so no height, multipath or picture.
+    const rows = [["Station", `${esc(c.station)}${c.stationLocator ? ` (${esc(c.stationLocator)})` : ""}`]];
+    if (c.snrDb !== null) rows.push(["Signal to noise", `${c.snrDb} dB`]);
+    if (c.offsetHz !== null) rows.push(["Frequency offset", `${c.offsetHz} Hz`]);
+    rows.push(["Frames", `${c.kept} kept from ${c.measurements} measurement${c.measurements === 1 ? "" : "s"}`]);
+    const dl = document.createElement("dl");
+    dl.style.marginTop = "8px";
+    dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    detail.appendChild(dl);
+  } else if (c.enough && c.profile) {
     detail.appendChild(channelProfile(c));
     const rows = [];
     if (c.delaySpreadMs !== null) rows.push(["Delay spread", `${c.delaySpreadMs} ms (echoes smear each symbol by about ${c.delaySpreadMs.toFixed(1)} ms)`]);
@@ -1092,7 +1100,7 @@ function iono(s) {
   $("iono").innerHTML = `<div class="big ${tone}">${esc(i.headline)}</div>
     <div>${esc(i.words)}</div>
     ${i.distanceWords ? `<div class="muted">${esc(i.distanceWords)}.</div>` : ""}
-    <div class="muted">From the ionosonde reading GB7RDG sends in each slot. A guide only: it does not change what is sent.</div>`;
+    <div class="muted">From the ionosonde reading the station sends in each slot. A guide only: it does not change what is sent.</div>`;
 }
 /* beside it, the head end's reading of live PSK Reporter spots between UK and Irish stations */
 function pskr(s) {
@@ -1102,7 +1110,7 @@ function pskr(s) {
   $("pskr").innerHTML = `<div class="big ${tone}" style="margin-top:.8em">${esc(p.headline)}</div>
     <div>${esc(p.words)}</div>
     ${p.distanceWords ? `<div class="muted">40 m: ${esc(p.distanceWords)}.</div>` : ""}
-    <div class="muted">From GB7RDG's reading of live PSK Reporter spots between UK and Irish stations, sent in each slot. FT8 decodes signals far weaker than the mailcast needs, so "open" here does not mean you will hear GB7RDG: the median SNRs are the better guide.</div>`;
+    <div class="muted">From the station's reading of live PSK Reporter spots between UK and Irish stations, sent in each slot. FT8 decodes signals far weaker than the mailcast needs, so "open" here does not mean you will hear the station: the median SNRs are the better guide.</div>`;
 }
 /* the speed the frames are coming at, by the modem's autobaud */
 function speed(s) {
@@ -1121,7 +1129,7 @@ function speed(s) {
     html += `<dl style="margin-top:10px"><dt>Last slot</dt><dd>${heard.map(h => `${esc(h.words)}, ${h.frames} frame${h.frames === 1 ? "" : "s"}`).join("<br>")}</dd>`;
     if (slot.listedWaveform) {
       const same = slot.listedWaveform === slot.waveform;
-      html += `<dt>GB7RDG says</dt><dd class="${same ? "" : "warn"}">${esc(slot.listedWords)}${same ? ", which agrees" : ", which does not agree"}</dd>`;
+      html += `<dt>The station says</dt><dd class="${same ? "" : "warn"}">${esc(slot.listedWords)}${same ? ", which agrees" : ", which does not agree"}</dd>`;
     }
     html += "</dl>";
   }
@@ -1135,6 +1143,7 @@ const day = t => new Date(t).toISOString().slice(0, 10) !== new Date().toISOStri
 const at = t => `${day(t)}${utc(t)} (${local(t)} your time)`;
 function schedule(s) {
   const c = s.schedule, a = s.audio, web = c.webSdr;
+  $("hearingTitle").textContent = "Hearing " + (c.followed.map(f => f.station).join(", ") || "GB7RDG");
   const kind = a.source.startsWith("ubersdr:") ? "web" : a.source.startsWith("wav:") ? "wav" : /^sdrconnect:/i.test(a.source) ? "sdrconnect" : "radio";
   const tuning = kind === "web" ? `The web SDR ${esc(sdr(s))} is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
     : kind === "sdrconnect" ? `The receiver tunes SDRconnect (${esc(a.source.slice(11))}) for it (USB, dial ${mhz(a.dialKHz)} MHz); leave its tuning alone while the receiver runs.`
@@ -1279,7 +1288,7 @@ function partialRow(p) {
   /* The head end has retired it before enough pieces were heard: say so, rather than leave a
      bar that looks as if it might still fill. */
   if (p.noLongerSent) {
-    st.append(el("div", `GB7RDG has stopped sending this one, so it can't be finished. It will be cleared ${day(p.clearsAt) ? "" : "at "}${at(p.clearsAt)}.`, "muted stopped-note"));
+    st.append(el("div", `The station has stopped sending this one, so it can't be finished. It will be cleared ${day(p.clearsAt) ? "" : "at "}${at(p.clearsAt)}.`, "muted stopped-note"));
   }
   /* Rebuilt, but the only list naming it failed its signature check: held until a good one does. */
   if (p.withheld) st.append(el("div", "Complete, but held: only a list that failed its signature check names it.", "muted stopped-note"));

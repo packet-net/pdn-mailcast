@@ -189,6 +189,15 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
+    /// <summary>What <paramref name="station"/>'s own signed directories say about its frequency, sideband and place, or null: see <see cref="ReceiverStore.HeardDetails"/>.</summary>
+    public StationDetails? HeardDetails(string station)
+    {
+        lock (_gate)
+        {
+            return _store.HeardDetails(station);
+        }
+    }
+
     /// <summary>Which station a directory belongs to, or null: see <see cref="ReceiverStore.StationOf"/>.</summary>
     public string? StationOf(BroadcastDirectory directory)
     {

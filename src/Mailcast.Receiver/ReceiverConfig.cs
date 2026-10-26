@@ -139,10 +139,15 @@ public sealed record ReceiverConfig
     [JsonIgnore]
     public double DialHz => DialKHz * 1000;
 
-    /// <summary>The signal's true centre in Hz: always <see cref="OnAir.TransmitHz"/>; the dial does not move it.</summary>
+    /// <summary>
+    /// The signal centre in Hz that <see cref="DialKHz"/> is written for: <see cref="OnAir.DefaultSignalHz"/>
+    /// (GB7RDG's). It fixes where in the audio the dial puts a signal, 1800 Hz at the usual dial;
+    /// a station on another frequency (issue #179) is heard by moving the dial to keep the signal
+    /// at that audio centre, or, with the dial fixed, if its signal falls in the passband.
+    /// </summary>
     [JsonIgnore]
-    [SuppressMessage("Performance", "CA1822", Justification = "An instance property, so it reads beside DialKHz and AudioCentreHz; it is constant only because the transmitter never moves.")]
-    public double CentreHz => OnAir.TransmitHz;
+    [SuppressMessage("Performance", "CA1822", Justification = "An instance property, so it reads beside DialKHz and AudioCentreHz.")]
+    public double CentreHz => OnAir.DefaultSignalHz;
 
     /// <summary>
     /// Where <see cref="CentreHz"/> falls in this receiver's own audio, Hz above zero: 1800 Hz at

@@ -172,7 +172,7 @@ public sealed class SlotTracker
                 if (off > ToneWindow)
                 {
                     _log(string.Create(CultureInfo.InvariantCulture,
-                        $"tone: {measured}, but it began at {began.UtcDateTime:HH:mm:ss} UTC, {off.TotalMinutes:F0} min from any slot, so it is not {(schedule.OneStation ? "GB7RDG's" : "any followed station's")}: ignored"));
+                        $"tone: {measured}, but it began at {began.UtcDateTime:HH:mm:ss} UTC, {off.TotalMinutes:F0} min from any slot, so it is not {(schedule.OneStation ? schedule.Stations[0].Station + "'s" : "any followed station's")}: ignored"));
                     return;
                 }
                 slot = nearest;

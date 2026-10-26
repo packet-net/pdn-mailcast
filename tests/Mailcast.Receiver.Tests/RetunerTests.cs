@@ -59,7 +59,8 @@ public sealed partial class RetunerTests
             SlotSchedule? schedule = null,
             HooksSettings? hooks = null,
             Func<DateTimeOffset, string?>? earlyEnd = null,
-            bool noBpq = false)
+            bool noBpq = false,
+            Func<DateTimeOffset, double?>? dialAt = null)
         {
             _ownFakes = rig is null;
             Rig = rig ?? new FakeRigctld(PacketDialHz, "USB", 2400);
@@ -95,7 +96,7 @@ public sealed partial class RetunerTests
                 Log.Enqueue(line);
                 Events.Enqueue(line);
             });
-            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks, earlyEnd);
+            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks, earlyEnd, dialAt);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
             Retuner.Rig!.Changed += RigChanges.Enqueue;
         }
@@ -317,6 +318,22 @@ public sealed partial class RetunerTests
         Assert.Single(s.Events, e => e == "bpq: XMITOFF 2 0");
         Assert.Null(s.Retuner.LastProblem);
         Assert.Contains("ready for the 13:00 UTC slot", s.Retuner.State, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AStationOnAnotherFrequency_HasTheRigTunedToItsDial_NotTheConfigs()
+    {
+        // Issue #179: the slot belongs to a station on 7.0470 MHz, so the dial that keeps its
+        // signal where the config's dial keeps GB7RDG's is 7.0452 MHz.
+        await using var s = new Station(At(11, 58, 30), dedicated: true, dialAt: _ => 7_045_200);
+        s.Start();
+
+        await s.RunTo(At(12, 5));
+        Assert.Equal(7_045_200, s.Rig.DialHz);
+        Assert.Contains("tuned to 7.0452 MHz USB for the 12:00 UTC slot", s.Retuner.State, StringComparison.Ordinal);
+
+        await s.RunTo(At(12, 13));
+        Assert.Equal(PacketDialHz, s.Rig.DialHz);
     }
 
     [Theory]

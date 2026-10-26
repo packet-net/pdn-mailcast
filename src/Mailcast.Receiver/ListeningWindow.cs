@@ -80,7 +80,15 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
 /// <param name="Source">Where the slots come from, in words: "its own directory", "an advert" or "the config file".</param>
 /// <param name="Followed">Whether this receiver listens at its slots.</param>
 /// <param name="NotFollowedBecause">Why not, in words, when not.</param>
-public sealed record ListenedStation(string Station, SlotTimetable Timetable, long FrequencyHz, Sideband Sideband, string Source, bool Followed, string? NotFollowedBecause);
+/// <param name="Locator">Its Maidenhead locator, when a directory or advert gave one.</param>
+/// <param name="DialHz">The USB dial it is heard on, when it is followed.</param>
+/// <param name="How">How it is heard, when followed: in the passband already, or by retuning.</param>
+public sealed record ListenedStation(string Station, SlotTimetable Timetable, long FrequencyHz, Sideband Sideband, string Source, bool Followed, string? NotFollowedBecause,
+    string? Locator = null, double? DialHz = null, HowHeard? How = null)
+{
+    /// <summary>Where the station is on the air, as this receiver knows it.</summary>
+    public StationOnAir OnTheAir => new(Station, FrequencyHz, Sideband, Locator, Source);
+}
 
 /// <summary>
 /// The slots this receiver follows (issue #144): every followed station's, each with its own

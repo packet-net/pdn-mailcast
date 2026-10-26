@@ -1,4 +1,5 @@
 using System.Globalization;
+using Packet.Mailcast;
 
 namespace Mailcast.Receiver;
 
@@ -25,7 +26,7 @@ public sealed record ChannelMode
 }
 
 /// <summary>
-/// The radio path from GB7RDG over one slot, as measured from the bursts decoded or from the
+/// The radio path from a station over one slot, as measured from the bursts decoded or from the
 /// sounding probe after the tone: <see cref="Basis"/> says which, and <see cref="Other"/> holds
 /// the other measurement when there were both.
 /// </summary>
@@ -76,10 +77,38 @@ public sealed record ChannelReport
     /// <summary>Signal to noise in 3 kHz, dB.</summary>
     public double? SnrDb { get; init; }
 
-    /// <summary>The frequency offset GB7RDG was heard at, Hz: both radios' errors and the Doppler shift together.</summary>
+    /// <summary>The station the slot belongs to (issue #179); null in a report from before, which was always GB7RDG's.</summary>
+    public string? Station { get; init; }
+
+    /// <summary>The station's locator, when known.</summary>
+    public string? StationLocator { get; init; }
+
+    /// <summary>The station's place, when its locator is known; the far end of the path picture and of the distance.</summary>
+    public GroundPlace? StationPlace { get; init; }
+
+    /// <summary>The station's name: <see cref="Station"/>, or GB7RDG for a report from before stations were named.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string StationName => Station ?? ReceiverStore.BuiltInStation;
+
+    /// <summary>The station and its locator as the picture labels its end: "GB7RDG IO91lk".</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string StationLabel => Station is null ? $"{ReceiverStore.BuiltInStation} {ReceiverStore.BuiltInDetails.Locator}" : StationLocator is { } locator ? $"{Station} {locator}" : Station;
+
+    /// <summary>The station's place: <see cref="StationPlace"/>, or GB7RDG's for a report from before stations were named.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public GroundPlace? StationPlaceOrDefault => Station is null ? GroundPlace.FromLocator(ReceiverStore.BuiltInDetails.Locator) : StationPlace;
+
+    /// <summary>
+    /// Whether the path is skywave HF, so that virtual height, multipath and the path picture mean
+    /// something. False for a station above 30 MHz (QO-100's downlink): the report then gives
+    /// signal to noise, offset and frames only.
+    /// </summary>
+    public bool Skywave { get; init; } = true;
+
+    /// <summary>The frequency offset the station was heard at, Hz: both radios' errors and the Doppler shift together.</summary>
     public double? OffsetHz { get; init; }
 
-    /// <summary>Ground distance from GB7RDG, km; null if the receiver's place is not known.</summary>
+    /// <summary>Ground distance from the station, km; null if the receiver's place is not known.</summary>
     public double? DistanceKm { get; init; }
 
     /// <summary>The receiver's locator the hops were worked out for.</summary>
@@ -146,8 +175,11 @@ public sealed record ChannelReport
     /// modes against its first, clustered across measurements, kept if seen in enough of them,
     /// and medians of the rest.
     /// </summary>
-    internal static ChannelReport Summarise(DateTimeOffset slot, DateTimeOffset measured, IReadOnlyList<PathPicture> pictures, int kept, GroundPlace? place, string? basis = null)
+    internal static ChannelReport Summarise(DateTimeOffset slot, DateTimeOffset measured, IReadOnlyList<PathPicture> pictures, int kept, GroundPlace? place, string? basis = null, StationOnAir? transmitter = null)
     {
+        // A report made with no station named is GB7RDG's, as every one was before issue #179.
+        var tx = transmitter ?? Gb7rdgOnAir;
+        var txPlace = tx.Place;
         basis ??= pictures.Count > 0 ? pictures[0].Basis : "bursts";
         var report = new ChannelReport
         {
@@ -158,7 +190,11 @@ public sealed record ChannelReport
             Kept = kept,
             Locator = place?.Locator,
             Place = place,
-            DistanceKm = place is null ? null : Math.Round(PathGeometry.DistanceKm(place, PathGeometry.Gb7rdg)),
+            Station = tx.Station,
+            StationLocator = tx.Locator,
+            StationPlace = txPlace,
+            Skywave = tx.Skywave,
+            DistanceKm = place is null || txPlace is null ? null : Math.Round(PathGeometry.DistanceKm(place, txPlace)),
         };
         // One probe is a measurement in itself; bursts are short, so it takes a few.
         int fewest = basis == ProbeChannel.Basis ? ChannelAnalysis.FewestSnapshots : 2 * ChannelAnalysis.FewestSnapshots;
@@ -167,6 +203,18 @@ public sealed record ChannelReport
             return report with { Words = basis == ProbeChannel.Basis ? TooWeakProbe : TooLittle };
         }
         int n = pictures.Count;
+        if (!tx.Skywave)
+        {
+            // A satellite path: no ionosphere, so no modes, height or picture. What the signal
+            // itself says is all there is: signal to noise and the offset it was heard at.
+            var plain = report with
+            {
+                Enough = true,
+                SnrDb = Rounded(ChannelMaths.Median(pictures.Select(p => p.SnrDb)), 1),
+                OffsetHz = Rounded(ChannelMaths.Median(pictures.Select(p => p.OffsetHz ?? double.NaN)), 2),
+            };
+            return plain with { Words = DescribeDirect(plain) };
+        }
         // Every mode against each measurement's strongest, with its power and spread, and its
         // Doppler shift against that same strongest mode (packet-net/pdn-mailcast#60: naming
         // modes after whichever arrived first, rather than the strongest, let a sidelobe ahead
@@ -234,8 +282,8 @@ public sealed record ChannelReport
         double? height = null;
         // Naming the hops needs the distance; the height hardly does, so without the place it is
         // still given, from the paths as they would be named on a typical UK path.
-        var (labels, h) = PathGeometry.Label(place is null ? NominalKm : PathGeometry.DistanceKm(place, PathGeometry.Gb7rdg), modes.Select(m => m.DelayMs).ToArray());
-        if (place is not null)
+        var (labels, h) = PathGeometry.Label(place is null || txPlace is null ? NominalKm : PathGeometry.DistanceKm(place, txPlace), modes.Select(m => m.DelayMs).ToArray());
+        if (place is not null && txPlace is not null)
         {
             modes = [.. modes.Select((m, i) => m with { Label = labels[i] })];
         }
@@ -268,6 +316,26 @@ public sealed record ChannelReport
             ProfileStepMs = Rounded(first.ProfileStepMs, 6) ?? 0,
         };
         return report with { Words = Describe(report) };
+    }
+
+    /// <summary>GB7RDG as every report from before issue #179 assumed it.</summary>
+    private static readonly StationOnAir Gb7rdgOnAir = new(ReceiverStore.BuiltInStation, ReceiverStore.BuiltInDetails.FrequencyHz!.Value, Sideband.Usb, ReceiverStore.BuiltInDetails.Locator, "assumed");
+
+    /// <summary>A path with no ionosphere in it, in a plain sentence: "Signal to noise 8.4 dB, heard 3.2 Hz high. No ionosphere on this path, so no multipath to measure."</summary>
+    internal static string DescribeDirect(ChannelReport r)
+    {
+        var c = CultureInfo.InvariantCulture;
+        var parts = new List<string>();
+        if (r.SnrDb is { } snr)
+        {
+            parts.Add(string.Create(c, $"Signal to noise {snr:0.#} dB"));
+        }
+        if (r.OffsetHz is { } offset)
+        {
+            parts.Add(string.Create(c, $"heard {Math.Abs(offset):0.#} Hz {(offset < 0 ? "low" : "high")}"));
+        }
+        string said = parts.Count == 0 ? "Heard" : string.Join(", ", parts);
+        return $"{said}. This is not a skywave path, so there is no height or multipath to measure.";
     }
 
     /// <summary>Rounded, or null for NaN or infinity: neither may reach the JSON status, which cannot carry them.</summary>
