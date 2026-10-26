@@ -10,9 +10,9 @@ public static class OnAir
     public const string Destination = "MCAST";
 
     /// <summary>
-    /// The waveform name ModemCatalog places the receive modem by: MS110D WN4. Receiving is
-    /// autobaud, so this only names a default; whichever waveform the head end actually sent
-    /// still decodes.
+    /// The waveform name ModemCatalog places the receive modem by. Receiving is autobaud, so
+    /// this only names a default (nothing is assumed from it); any waveform the MS110D receiver
+    /// can lock to, WN1 to WN8 and WN13, decodes whatever this says.
     /// </summary>
     public const string Mode = "ms110d-wn4";
 

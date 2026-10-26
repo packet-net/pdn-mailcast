@@ -226,7 +226,7 @@ public class ChannelTests
         Assert.True(p.FadeDb < 1.5, $"fade {p.FadeDb} dB");
         Assert.True(p.CoherenceS >= 10, $"coherence {p.CoherenceS} s");
         var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex);
-        Assert.Equal("1 path: 1 hop. Doppler spread under 0.1 Hz: steady (good for 1200 bps).", report.Words);
+        Assert.Equal("1 path: 1 hop. Doppler spread under 0.1 Hz: steady (suits any speed).", report.Words);
         Assert.Null(report.VirtualHeightKm);
     }
 
@@ -446,11 +446,11 @@ public class ChannelTests
         };
         Assert.Equal(
             "3 paths: 1 hop; 2 hops 1.8 ms later, 10 dB weaker; and 3 hops 4.0 ms later, 22 dB weaker. Reflection about 310 km up. "
-            + "Doppler spread 0.7 Hz: a little unsteady (1200 bps should still cope).",
+            + "Doppler spread 0.7 Hz: a little unsteady (the slower speeds cope best).",
             ChannelReport.Describe(report));
         // Unknown place: no hops named.
         Assert.Equal(
-            "2 paths: the second 1.9 ms after the first, 17 dB weaker. Doppler spread 1.5 Hz: unsteady (600 bps copes better).",
+            "2 paths: the second 1.9 ms after the first, 17 dB weaker. Doppler spread 1.5 Hz: unsteady (slower speeds cope better).",
             ChannelReport.Describe(new ChannelReport
             {
                 Enough = true,

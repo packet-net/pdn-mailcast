@@ -346,7 +346,7 @@ public sealed record ChannelReport
 
     /// <summary>
     /// The picture in a few plain sentences: "2 paths: 1 hop, and 2 hops 1.9 ms later, 17 dB
-    /// weaker. Reflection about 290 km up. Doppler spread 0.2 Hz: steady (good for 1200 bps)."
+    /// weaker. Reflection about 290 km up. Doppler spread 0.2 Hz: steady (suits any speed)."
     /// </summary>
     internal static string Describe(ChannelReport r)
     {
@@ -404,9 +404,9 @@ public sealed record ChannelReport
     /// <summary>What a Doppler spread means for the broadcast, in words.</summary>
     internal static string Steadiness(double spreadHz) => spreadHz switch
     {
-        < 0.5 => "steady (good for 1200 bps)",
-        < 1.0 => "a little unsteady (1200 bps should still cope)",
-        < 2.0 => "unsteady (600 bps copes better)",
-        _ => "fast fading (hard going even at 600 bps)",
+        < 0.5 => "steady (suits any speed)",
+        < 1.0 => "a little unsteady (the slower speeds cope best)",
+        < 2.0 => "unsteady (slower speeds cope better)",
+        _ => "fast fading (hard going even at slow speeds)",
     };
 }
