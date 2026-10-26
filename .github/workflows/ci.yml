@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Build (Release)
         run: dotnet build -c Release
@@ -51,10 +51,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Check the tools this job needs
-        run: scripts/ci-require-tools.sh docker
+        run: scripts/ci-require-tools.sh docker:docker.io
       - name: Pull LinBPQ
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
       - name: End-to-end test
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Check the tools this job needs
         run: scripts/ci-require-tools.sh curl cc:build-essential
@@ -116,10 +116,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Check the tools this job needs
-        run: scripts/ci-require-tools.sh dpkg-deb:dpkg readelf:binutils docker
+        run: scripts/ci-require-tools.sh dpkg-deb:dpkg readelf:binutils docker:docker.io
       - name: Build the .deb
         run: scripts/build-receiver-deb.sh linux-x64 0.1.0-ci${{ github.run_number }}
       - name: Install it in a clean Debian and run it

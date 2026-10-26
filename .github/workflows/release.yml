@@ -118,10 +118,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Check the tools this job needs
-        run: scripts/ci-require-tools.sh docker
+        run: scripts/ci-require-tools.sh docker:docker.io
       - name: Pull LinBPQ
         timeout-minutes: 5
         run: docker pull m0lte/linbpq@sha256:b01155258c50c0a3f039bc7e3db92e669af505fa95328470980d977d54dd6903
@@ -171,13 +171,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Check the tools this job needs
         run: scripts/ci-require-tools.sh dpkg-deb:dpkg readelf:binutils python3
       - name: Check docker (install test)
         if: matrix.install_test
-        run: scripts/ci-require-tools.sh docker
+        run: scripts/ci-require-tools.sh docker:docker.io
 
       - name: Build the receiver .deb
         run: scripts/build-receiver-deb.sh ${{ matrix.rid }} "$VERSION"
@@ -269,7 +269,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
       - name: Check the tools this job needs
         run: scripts/ci-require-tools.sh python3
@@ -322,10 +322,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-          cache: true
+          cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
-      - name: Check the tools this job needs
-        run: scripts/ci-require-tools.sh python3 gh sha256sum:coreutils
       # The FBB forwarding code is Packet.Fbb, published from packet-net/pdn-fbb; it is a dependency here,
       # not something this repo packs.
       - name: Pack M0LTE.RaptorQ and Packet.Mailcast
@@ -364,6 +362,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # the release notes are written from first-parent history between tags
+
+      - name: Check the tools this job needs
+        run: scripts/ci-require-tools.sh python3 gh sha256sum:coreutils
 
       - uses: actions/download-artifact@v4
         with:
