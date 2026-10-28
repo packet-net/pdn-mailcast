@@ -50,7 +50,8 @@ enhancements for that device. Set the radio to USB on "dialKHz", as for any soun
 The status page on your network
 -------------------------------
 
-"web": { "lan": true, "password": "..." } needs the service (or an administrator command
-prompt) to listen on the network, and Windows Firewall to let TCP port 8130 in.
+The page is on your network unless "web" says "lan": false. That needs the service (or an
+administrator command prompt) to listen on the network, and Windows Firewall to let TCP port
+8130 in. Set "web": { "password": "..." } to stop others on the network changing the settings.
 
 More: README.md, and https://github.com/packet-net/pdn-mailcast/blob/main/docs/receiver.md

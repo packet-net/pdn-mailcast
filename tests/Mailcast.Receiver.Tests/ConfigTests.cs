@@ -12,7 +12,7 @@ public class ConfigTests
         Assert.Equal(8011, config.Bbs.Port);
         Assert.Equal(8130, config.Web.Port);
         Assert.Equal("Q0CAST", config.Bbs.Login);
-        Assert.False(config.Web.Lan);
+        Assert.True(config.Web.Lan);
         Assert.Equal(7052.0, config.DialKHz);
         Assert.Equal("00:00", config.SlotAnchor);
         Assert.Equal(60, config.EveryMinutes);
@@ -252,7 +252,6 @@ public class ConfigTests
     [InlineData("""{ "audio": null }""", "audio")]
     [InlineData("""{ "bbs": null }""", "bbs")]
     [InlineData("""{ "bbs": { "host": null } }""", "bbs")]
-    [InlineData("""{ "web": { "lan": true } }""", "password")]
     [InlineData("""{ "slotUtc": "noon" }""", "slotUtc")]
     [InlineData("""{ "minute": 30, "slotUtc": "00:30" }""", "are both given")]
     [InlineData("""{ "minute": 60 }""", "must be 0 to 59")]
