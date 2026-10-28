@@ -19,7 +19,7 @@ case "$1" in
         echo "pdn-mailcast-receiver: put an example config in $CONFIG."
         echo "  Set up your BBS for the receiver (see /usr/share/doc/pdn-mailcast-receiver/README.md),"
         echo "  put its password in $CONFIG, then: systemctl start pdn-mailcast-receiver"
-        echo "  The status page is then at http://127.0.0.1:8130/"
+        echo "  The status page is then at http://127.0.0.1:8130/, or port 8130 at this machine's address"
     fi
     ;;
 esac

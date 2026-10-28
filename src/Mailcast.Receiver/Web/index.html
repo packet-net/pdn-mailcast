@@ -1619,7 +1619,7 @@ async function loadSettings() {
   $("pagePassword").placeholder = web.passwordSet ? "unchanged" : "not set";
   $("pageNote").textContent = web.passwordSet
     ? "The password for this page. Leave it empty to keep the one you have. Changing it signs out every other browser."
-    : "This page has no password, so it only answers on this machine. Setting one means it asks for it here too.";
+    : web.lan ? "This page has no password, so anyone on your network can change these settings. Setting one means it asks for it." : "This page has no password, so it only answers on this machine. Setting one means it asks for it here too.";
 }
 function updateFilter(kind) {
   $("filterSection").hidden = kind !== "alsa" && kind !== "soundmodem";
