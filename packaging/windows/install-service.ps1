@@ -43,4 +43,4 @@ sc.exe failureflag $name 1 | Out-Null
 sc.exe start $name | Out-Null
 
 Write-Host "The service $name is running. Its log is $(Join-Path $folder 'receiver.log');"
-Write-Host 'the status page is http://localhost:8130/ unless receiver.json says another port.'
+Write-Host 'the status page is http://localhost:8130/, or port 8130 at this PC''s address, unless receiver.json says another port.'

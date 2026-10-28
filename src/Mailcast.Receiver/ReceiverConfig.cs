@@ -67,15 +67,14 @@ public sealed record WebSettings
     public int Port { get; init; } = 8130;
 
     /// <summary>
-    /// Whether the page is reachable from the local network as well as from this machine. Off
-    /// unless asked for, and it needs <see cref="Password"/>.
+    /// Whether the page is reachable from the local network as well as from this machine. On
+    /// unless turned off; without <see cref="Password"/> anyone on the network can use it.
     /// </summary>
-    public bool Lan { get; init; }
+    public bool Lan { get; init; } = true;
 
     /// <summary>
     /// The page's password, asked for on its sign-in page (or given by a script with HTTP Basic).
-    /// Required when <see cref="Lan"/> is set, since anything on the network could otherwise
-    /// change the settings; optional otherwise.
+    /// Optional: without one, anyone who can reach the page can change the settings.
     /// </summary>
     public string Password { get; init; } = "";
 }
@@ -620,10 +619,6 @@ public sealed record ReceiverConfig
         if (Web.Port is < 1 or > 65535)
         {
             throw new ConfigException($"\"web\".\"port\" {Web.Port} is not a TCP port");
-        }
-        if (Web.Lan && Web.Password.Length == 0)
-        {
-            throw new ConfigException("\"web\".\"lan\" is on but \"web\".\"password\" is empty: the page can change the BBS settings, so on the network it needs a password");
         }
         if (string.IsNullOrWhiteSpace(StateDirectory))
         {

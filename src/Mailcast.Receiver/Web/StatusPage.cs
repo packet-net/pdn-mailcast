@@ -20,8 +20,8 @@ namespace Mailcast.Receiver.Web;
 /// this page's port. This page reads its WebSocket for the spectrum lines and the level, and draws
 /// them with the broadcast's markers on top; pdn-soundmodem's own full page is there too, at
 /// <c>/waterfall/</c>.</para>
-/// <para>It listens on this machine only unless the config's <c>web.lan</c> is set, which needs
-/// <c>web.password</c>, because its settings include the BBS password. With a password set, a
+/// <para>It listens on the local network too unless the config's <c>web.lan</c> is off. Without
+/// <c>web.password</c> anyone who can reach it can change the settings. With a password set, a
 /// browser signs in on a page of its own and is given a session cookie (see
 /// <see cref="SessionStore"/>); a script can give the password with HTTP Basic instead.</para>
 /// </remarks>

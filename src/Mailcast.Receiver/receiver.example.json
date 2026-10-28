@@ -33,11 +33,12 @@
     "command": "BBS"
   },
 
-  // The status page. It is on this machine only unless "lan" is true, and on the network
-  // it needs a password, which the browser asks for.
+  // The status page, on this machine and the local network. "lan": false keeps it to this
+  // machine. A "password", if set, is asked for by the browser; without one, anyone who can
+  // reach the page can change the settings, the BBS login included.
   "web": {
     "port": 8130,
-    "lan": false,
+    "lan": true,
     "password": ""
   },
 
