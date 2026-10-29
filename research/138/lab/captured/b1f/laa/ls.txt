@@ -1,0 +1,8 @@
+DIRMES.SYS
+Mail
+WFBID.SYS
+axipcache2.cfg
+bpq32.cfg
+linmail.cfg
+logLatest_BBS.txt
+logs

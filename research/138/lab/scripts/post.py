@@ -48,7 +48,7 @@ def _post(where, key, title, body, ending):
     r += s.tx(title + b"\r", 2)
     # body: send line by line (split after CR or LF) so the BBS sees realistic pacing
     for chunk in re.findall(rb"[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$", body):
-        s.s.sendall(chunk); s.log += b"[[" + chunk + b"]]"; time.sleep(PACE if len(body) < 5000 else 0.1)
+        s.s.sendall(chunk); s.log += b"[[" + chunk + b"]]"; time.sleep(PACE if len(body) < 5000 else 0.25)
     r = s.rd(0.5)
     s.log += b"[[" + ending + b"]]"; s.s.sendall(ending)
     r = b""; t0 = time.time()
