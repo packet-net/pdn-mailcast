@@ -689,6 +689,18 @@ public sealed partial class RetunerTests
     }
 
     [Fact]
+    public async Task RigWithoutPktUsb_IsTunedInUsbAndTheLogSaysSo()
+    {
+        await using var rig = new FakeRigctld(PacketDialHz, "USB", 2400);
+        rig.RefusesModes.Add("PKTUSB");
+        await using var s = await TunedForNoon(new Station(At(11, 58, 30), rig: rig));
+
+        Assert.Equal(BulletinDialHz, rig.DialHz);
+        Assert.Equal("USB", rig.Mode);
+        Assert.Contains(s.Log, l => l.StartsWith("rig: the rig refused PKTUSB", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ReceiverRestartedMidSlot_PutsTheRigBackBeforeLinBpqTransmits()
     {
         await using var rig = new FakeRigctld(PacketDialHz, "USB", 2400);
