@@ -22,7 +22,7 @@ add("t07_title40", lines(b"title is 40 chars exactly."), title=b"T40 " + b"a" * 
 add("t08_title60", lines(b"title is 60 chars exactly."), title=b"T60 " + b"b" * 56)
 add("t09_title100", lines(b"title is 100 chars."), title=b"T100 " + b"c" * 95)
 add("t10_latin1", lines(b"latin1: caf\xe9 na\xefve \xa3 \xb0 \xfe \xc0\xdf end", b"high: " + bytes(range(0x80, 0xa0)).replace(b"\xff", b"") , b"end."), title=b"caf\xe9 title \xa3")
-add("t11_utf8", lines("utf8: café naïve £ ° € — – … 日本".encode(), b"end."), title="café £ ° — title".encode())
+add("t11_utf8", lines("utf8: caf\u00e9 na\u00efve \u00a3 \u00b0 \u20ac \u2014 \u2013 \u2026 \u65e5\u672c".encode(), b"end."), title="caf\u00e9 \u00a3 \u00b0 \u2014 title".encode())
 add("t12_no_final_newline", lines(b"line one", b"line two") + b"last line without newline", ending=b"\x1a")
 add("t13_ends_blank_lines", lines(b"text", b"", b"", b""))
 add("t14_crlf_body", lines(b"crlf one", b"crlf two", b"crlf three", t=b"\r\n"))

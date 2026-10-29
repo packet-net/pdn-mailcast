@@ -37,6 +37,34 @@ def show(keys):
                         b = body(st, r["num"])
                         print(f"{st}: #{r['num']} bid={r['bid']} bbsfrom={r['bbs']!r} via={r['via']!r} from={r['frm']} to={r['to']} hdrsize={r['size']} tlen={len(r['title'])} title={r['title'][:12]!r}")
                         print(f"   file {len(b)} bytes sha1={hashlib.sha1(b).hexdigest()[:8]} body={b[:400]!r}{'...' if len(b)>400 else ''}")
+
+def strip_added(b):
+    """Remove what forwarding prepends: leading R: lines, the blank line after them, and FBB's From:/To   : pair + blank."""
+    lines = b.split(b"\r\n")
+    i = 0
+    while i < len(lines) and lines[i].startswith(b"R:"): i += 1
+    if i and i < len(lines) and lines[i] == b"": i += 1
+    if lines[i:i+2] and lines[i].startswith(b"From: ") and lines[i+1].startswith(b"To  : ") and i and lines[i+2:i+3] == [b""]:
+        i += 3
+    return b"\r\n".join(lines[i:])
+def matrix():
+    print("| key | origin | LAA/LAF origin copy | next hop(s) after stripping R:/From/To | notes |")
+    for k in sorted({r["key"] for r in S["laa"] + S["laf"]}):
+        for org, ost in (("LAA", "laa"), ("LAF", "laf")):
+            orig = [r for r in S[ost] if r["key"] == k and origin(r) == org]
+            if not orig: print(f"| {k} | {org} | not created | | |"); continue
+            ob = body(ost, orig[0]["num"]); res = []
+            for st in ("laf", "lab"):
+                if st == ost: continue
+                for r in S[st]:
+                    if r["key"] == k and origin(r) == org:
+                        b = body(st, r["num"]); sb = strip_added(b)
+                        diff = "same" if sb == ob else ("differs: %d vs %d bytes" % (len(sb), len(ob)))
+                        extra = len(b) - len(sb)
+                        res.append(f"{st}: {diff} (+{extra}B prefix)" + (" TITLE %d" % len(r["title"]) if r["title"] != orig[0]["title"] else ""))
+            print(f"| {k} | {org} | {len(ob)}B title {len(orig[0]['title'])} | {'; '.join(res) or 'not forwarded'} | |")
+
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[2] == "--matrix": matrix(); sys.exit()
     keys = sys.argv[2:] or sorted({r["key"] for r in S["laa"]})
     show(keys)
