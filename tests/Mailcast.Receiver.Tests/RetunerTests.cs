@@ -290,9 +290,10 @@ public sealed partial class RetunerTests
         Assert.Equal(TimeSpan.FromSeconds(5), await s.NextWait());
         Assert.Equal(RetuneStage.Tuned, s.Retuner.Stage);
         Assert.Equal(BulletinDialHz, s.Rig.DialHz);
-        Assert.Equal("USB", s.Rig.Mode);
+        Assert.Equal("PKTUSB", s.Rig.Mode);
+        Assert.Equal(3000, s.Rig.PassbandHz);
         Assert.Equal("tuned", InterlockFile.Read(s.NotePath, 2)!.Stage);
-        Assert.Contains("tuned to 7.052 MHz USB for the 12:00 UTC slot until 12:12 UTC; LinBPQ port 2 transmit off", s.Retuner.State, StringComparison.Ordinal);
+        Assert.Contains("tuned to 7.052 MHz for the 12:00 UTC slot until 12:12 UTC; LinBPQ port 2 transmit off", s.Retuner.State, StringComparison.Ordinal);
 
         // Through the slot it stays there, LinBPQ checked every 5 s.
         await s.RunTo(At(12, 11));
@@ -330,7 +331,7 @@ public sealed partial class RetunerTests
 
         await s.RunTo(At(12, 5));
         Assert.Equal(7_045_200, s.Rig.DialHz);
-        Assert.Contains("tuned to 7.0452 MHz USB for the 12:00 UTC slot", s.Retuner.State, StringComparison.Ordinal);
+        Assert.Contains("tuned to 7.0452 MHz for the 12:00 UTC slot", s.Retuner.State, StringComparison.Ordinal);
 
         await s.RunTo(At(12, 13));
         Assert.Equal(PacketDialHz, s.Rig.DialHz);
@@ -686,6 +687,18 @@ public sealed partial class RetunerTests
         await s.StepUntil(() => s.Node.XmitOff(2) == 0, "LinBPQ's transmit back on");
         Assert.False(File.Exists(s.NotePath));
         Assert.Empty(s.Rig.Sets);
+    }
+
+    [Fact]
+    public async Task RigWithoutPktUsb_IsTunedInUsbAndTheLogSaysSo()
+    {
+        await using var rig = new FakeRigctld(PacketDialHz, "USB", 2400);
+        rig.RefusesModes.Add("PKTUSB");
+        await using var s = await TunedForNoon(new Station(At(11, 58, 30), rig: rig));
+
+        Assert.Equal(BulletinDialHz, rig.DialHz);
+        Assert.Equal("USB", rig.Mode);
+        Assert.Contains(s.Log, l => l.StartsWith("rig: the rig refused PKTUSB", StringComparison.Ordinal));
     }
 
     [Fact]

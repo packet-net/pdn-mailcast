@@ -29,7 +29,8 @@ public enum RetuneStage
 /// the port with PORTS, read its XMITOFF, write <see cref="InterlockFile"/>, send
 /// <c>XMITOFF port 1</c> and see LinBPQ confirm it; wait <see cref="BpqNodeSettings.DrainSeconds"/>
 /// for frames already with the TNC (XMITOFF only stops LinBPQ's own queue); check that rigctld
-/// reads PTT off; write the file again; then tune the rig to the dial in USB through
+/// reads PTT off; write the file again; then tune the rig to the dial in PKTUSB with a 3000 Hz
+/// filter (which rig control turns into USB, or the rig's normal width, on a rig without them) through
 /// pdn-soundmodem's <see cref="RigControl"/> until <see cref="After"/> past the slot's start
 /// (or a following slot's, when they are that close), checking LinBPQ every
 /// <see cref="WindowPoll"/> and at once when its session ends, and renewing the window every
@@ -154,7 +155,7 @@ public sealed class Retuner : IAsyncDisposable
         _bpq = config.Bpq;
         _dedicated = rig.DedicatedRadio;
         _owedPort = _bpq?.HfPort ?? 0;
-        _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
+        _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "PKTUSB", 3000);
         _dialAt = dialAt;
         _file = InterlockFile.PathIn(config.StateDirectory);
         Endpoint = rig.Endpoint;
@@ -175,6 +176,8 @@ public sealed class Retuner : IAsyncDisposable
         };
         Rig.Problem += line =>
         {
+            // pdn-soundmodem's own config key; the receiver has no such setting.
+            line = line.Replace("; see \"rig\".\"passbandHz\"", "", StringComparison.Ordinal);
             _log(Ascii.Clean(line));
             NoteProblem(Ascii.Clean(line.StartsWith("rig: WARNING - ", StringComparison.Ordinal) ? "rig: " + line["rig: WARNING - ".Length..] : line));
         };
@@ -353,10 +356,10 @@ public sealed class Retuner : IAsyncDisposable
             _log(Window is not null
                 ? $"retune: the radio is retuned through pdn-soundmodem's receive window on {Window.Where} to dial {OnAir.Mhz(DialNow)} MHz for each slot; pdn-soundmodem holds its own transmitting meanwhile"
                 : _bpq is null && _dedicated
-                ? $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot; \"dedicatedRadio\" says nothing else transmits on it"
+                ? $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot; \"dedicatedRadio\" says nothing else transmits on it"
                 : _bpq is null
-                ? $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot; there is no \"bpq\", so the \"hooks\" are trusted to keep the radio quiet while it is retuned (it is not retuned for a slot whose \"before\" fails)"
-                : $"retune: the radio is retuned through rigctld at {Endpoint} to USB dial {OnAir.Mhz(_tuning.DialHz)} MHz for each slot, with LinBPQ port {_bpq.HfPort}'s transmit held off meanwhile through its node at {_bpq.Host}:{_bpq.Port} as {_bpq.User}");
+                ? $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot; there is no \"bpq\", so the \"hooks\" are trusted to keep the radio quiet while it is retuned (it is not retuned for a slot whose \"before\" fails)"
+                : $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot, with LinBPQ port {_bpq.HfPort}'s transmit held off meanwhile through its node at {_bpq.Host}:{_bpq.Port} as {_bpq.User}");
             Recover();
             if (_hooks is not null)
             {
@@ -625,8 +628,8 @@ public sealed class Retuner : IAsyncDisposable
                     Warn($"retune: WARNING - could not tune the rig for the {Hhmm(slot)} UTC slot ({result.Why})");
                     return;
                 }
-                SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
-                _log($"retune: tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
+                SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
+                _log($"retune: tuned to {OnAir.Mhz(_tuning.DialHz)} MHz for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
             }
 
             try
@@ -657,7 +660,7 @@ public sealed class Retuner : IAsyncDisposable
                             else
                             {
                                 _log($"retune: the {Hhmm(slot)} UTC slot follows straight on, so the rig stays tuned until {Hhmm(closes)} UTC");
-                                SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz USB for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
+                                SetState(RetuneStage.Tuned, $"tuned to {OnAir.Mhz(_tuning.DialHz)} MHz for the {Hhmm(slot)} UTC slot until {Hhmm(closes)} UTC{held}");
                             }
                         }
                         else
