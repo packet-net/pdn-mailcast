@@ -1,0 +1,70 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:21
+Bid: 24200_N4SD
+Title: Space Weather Forecast Discussion
+Path: !YT7MPB!N6RME!KE6JJJ!KQ6UP!K5DAT!WW6Q!W9GM!KA3BVJ!KA3VSP!N3MEL!N4SD!
+
+FXXX12 KWNP 260031
+DAYDIS
+
+:Product: Forecast Discussion
+:Issued: 2026 Oct 26 0030 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             Forecast Discussion
+#
+Solar Activity
+
+.24 hr Summary...
+Solar activity was at low levels. Region 4560 (N13W84, Fao/beta)
+produced the strongest flare of the period, a C1.5/Sf at 25/1942 UTC.
+Two regions of emerging flux were observedin the SW and SE quadrant but
+will need to persist longer before begin assigned an active region
+number.
+
+No Earth-directed CMEs were observed in available coronagraph imagery.
+
+.Forecast...
+Solar activity is likely to remain at very low levels through 28 Oct,
+with a slight chance for isolated M-class flares (R1-R2, Minor-Moderate)
+on 26 Oct.
+
+Energetic Particle
+
+.24 hr Summary...
+The greater than 2 MeV electron flux reached high levels, with a peak
+flux of 2,864 pfu observed at 25/1820 UTC. The greater than 10 MeV
+proton flux remained steady at background levels.
+
+.Forecast...
+The greater than 2 MeV electron flux is expected to continue reaching
+high levels through 28 Oct. The greater than 10 MeV proton flux is
+anticipated to persist at background levels through 28 Oct.
+
+Solar Wind
+
+.24 hr Summary...
+Solar wind parameters continued at nominal levels. Total magnetic field
+stregnth was at or below 6 nT and no signficant periods of southward Bz
+were observed. Solar wind speeds varied between ~350-375 km/s. Phi was
+predominantly oriented in the positive solar sector.
+
+.Forecast...
+Nominal conditions are expected to maintain through 28 Oct.
+
+Geospace
+
+.24 hr Summary...
+The geomagnetic activity was at quiet levels.
+
+.Forecast...
+The geomagnetric field is likely to remain at mostly quiet levels over
+26-28 Oct.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

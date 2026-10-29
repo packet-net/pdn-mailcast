@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 29-Oct-26 05:52
+Bid: 6089-CX2SA
+Title: (M5.1) Balleny Islands region -61.3 161.2
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Balleny Islands region
+Geographic coordinates:           61.328S, 161.164E
+Magnitude:                        5.1
+Depth:                            10 km
+Universal Time (UTC):             29 Oct 2026  05:33:36
+Time near the Epicenter (1):      29 Oct 2026  16:33:36
+Time in your area (1):            29 Oct 2026  02:33:36
+Location with respect to nearby cities:
+1703.0 km (1055.8 mi) SSW of Bluff, New Zealand
+1724.9 km (1069.4 mi) SSW of Invercargill, New Zealand
+1767.7 km (1095.9 mi) SSW of Gore, New Zealand
+1823.4 km (1130.5 mi) SSW of Dunedin, New Zealand
+1878.8 km (1164.8 mi) SSW of Queenstown, New Zealand
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttx8
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttx8?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 29/10/2026 05:51:01 UTC
+________________________________________________________________

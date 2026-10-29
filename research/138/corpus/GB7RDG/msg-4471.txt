@@ -1,0 +1,22 @@
+From: M9TWM@GB7LOX.#19.GBR.EURO
+To: MCAST
+Type/Status: BN
+Date/Time: 22-Oct 16:30Z
+Bid: 6295A0M9TWM
+Title: MCR M9TWM 2026-10-22
+
+Body: 262
+
+R:261022/1630Z 18699@GB7LOX.#19.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.16.2 - m9twm-1.tunnel.ubersdr.org 0/0 224:AUD224 0 0
+09 - 0 - - IU+PU
+10 - 0 - - IU+PU
+11 - 0 - - IU+PU
+12 - 0 - - IU+PU
+13 - 0 - - IU+PU
+14 - 0 - - IU+PU
+15 - 0 - - IU+PU
+16 - 0 - - IU+PU
+
+

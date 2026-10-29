@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 17:04
+Bid: 6072-CX2SA
+Title: (M5.5) near the east coast of Honshu, Japan 35.7 140.7
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           near the east coast of Honshu, Japan
+Geographic coordinates:           35.702N, 140.706E
+Magnitude:                        5.5
+Depth:                            41 km
+Universal Time (UTC):             28 Oct 2026  15:07:52
+Time near the Epicenter (1):      29 Oct 2026  00:07:52
+Time in your area (1):            28 Oct 2026  12:07:52
+Location with respect to nearby cities:
+5.3 km (3.3 mi) ESE of Asahi, Japan
+12.1 km (7.5 mi) WSW of Hasaki, Japan
+13.9 km (8.6 mi) E of SÅsa, Japan
+14.1 km (8.7 mi) E of YÅkaichiba, Japan
+54.5 km (33.8 mi) ENE of Chiba, Japan
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttpe
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttpe?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 28/10/2026 17:03:41 UTC
+________________________________________________________________

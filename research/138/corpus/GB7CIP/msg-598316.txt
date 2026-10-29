@@ -1,0 +1,51 @@
+From: VA2OM
+To: SOLAR
+Type/Status: B$
+Date/Time: 19-Oct-26 09:17
+Bid: 21281_VE2PKT
+Title: Latest solar radio flux report
+Path: !VE3KPG!VE2PKT!
+
+ 
+:Product: 27-day Space Weather Outlook Table 27DO.txt
+:Issued: 2026 Oct 19 0141 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# https://www.swpc.noaa.gov/content/subscription-services
+#
+#      27-day Space Weather Outlook Table
+#                Issued 2026-10-19
+#
+#   UTC      Radio Flux   Planetary   Largest
+#  Date       10.7 cm      A Index    Kp Index
+2026 Oct 19     100          18          5
+2026 Oct 20     100          22          5
+2026 Oct 21     105          15          4
+2026 Oct 22     100          10          3
+2026 Oct 23     100           5          2
+2026 Oct 24      95          15          4
+2026 Oct 25      95           8          3
+2026 Oct 26      95           5          2
+2026 Oct 27     100           5          2
+2026 Oct 28     105           5          2
+2026 Oct 29     105           5          2
+2026 Oct 30     105           5          2
+2026 Oct 31     105          30          5
+2026 Nov 01     105          25          5
+2026 Nov 02     105          10          3
+2026 Nov 03      95           5          2
+2026 Nov 04      95           5          2
+2026 Nov 05     100          10          3
+2026 Nov 06     100          10          3
+2026 Nov 07      95          10          3
+2026 Nov 08      90           5          2
+2026 Nov 09      90          15          4
+2026 Nov 10      85          10          3
+2026 Nov 11      85          10          3
+2026 Nov 12      85          10          3
+2026 Nov 13      85           5          2
+2026 Nov 14      85           5          2
+
+ 
+ 
+ 73 de VA2OM, SYSOP of VE2PKT 

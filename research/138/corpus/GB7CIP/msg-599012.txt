@@ -1,0 +1,41 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 26-Oct-26 17:31
+Bid: 26115_LU9DCE
+Title: EARTHQUAKES 26-OCT
+Path: !GB7BED!K1AJD!VK2RZ!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-26 07:48 - 4.5 - 107 KM WNW OF TUMXUK, CHINA
+2026-10-26 04:53 - 5.0 - 45 KM NNW OF ENDE, INDONESIA
+2026-10-26 04:53 - 4.8 - 182 KM NW OF PORT-OLRY, VANUATU
+2026-10-26 03:59 - 4.8 - 41 KM WNW OF KUPANG, INDONESIA
+2026-10-26 01:22 - 4.9 - 205 KM NW OF PORT-OLRY, VANUATU
+2026-10-25 22:16 - 4.8 - BONIN ISLANDS, JAPAN REGION
+2026-10-25 22:14 - 5.3 - BONIN ISLANDS, JAPAN REGION
+2026-10-25 22:01 - 4.7 - 170 KM ENE OF NAGQU, CHINA
+2026-10-25 20:30 - 4.8 - 167 KM WNW OF PORT-OLRY, VANUATU
+2026-10-25 17:49 - 4.6 - 153 KM WNW OF ADAK, ALASKA
+2026-10-25 17:44 - 5.2 - 59 KM SW OF ASHKASHAM, AFGHANISTAN
+2026-10-25 17:11 - 4.7 - 19 KM NE OF ATICO, PERU
+2026-10-25 11:25 - 5.9 - 218 KM ENE OF NAGQU, CHINA
+2026-10-25 11:24 - 5.1 - 199 KM ENE OF NAGQU, CHINA
+2026-10-25 10:30 - 5.4 - 33 KM ESE OF AMBUNTI, PAPUA NEW GUINEA
+2026-10-25 09:11 - 4.6 - VOLCANO ISLANDS, JAPAN REGION
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

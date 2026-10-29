@@ -1,0 +1,91 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:20
+Bid: 24083_N4SD
+Title: Space Weather Forecast Discussion
+Path: !YT7MPB!N6RME!N0ARY!N2MH!K5DAT!N3MEL!KA3VSP!N4SD!
+
+FXXX12 KWNP 230031
+DAYDIS
+
+:Product: Forecast Discussion
+:Issued: 2026 Oct 23 0030 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             Forecast Discussion
+#
+Solar Activity
+
+.24 hr Summary...
+Solar activity continued at low levels. There are two numbered sunspot
+regions on the visible disk: Region 4557 (N07W68, Dao/beta) showed
+modest new flux emergence in its intermediate spots following a period
+of decay, producing a C1.4/Sf flare at 22/1733 UTC. Region 4560 (N13W42,
+Eai/beta-gamma) was the primary driver of flaring, producing the largest
+event of the period-a C3.5 flare at 22/0309 UTC. The region continued to
+undergo flux emergence in its intermediate portions and briefly
+developed a delta magnetic configuration alongside its mixed gamma
+polarities.
+
+No new Earth-directed CMEs were observed in available coronagraph
+imagery.
+
+.Forecast...
+Solar activity is expected to remain at low levels through 25 Oct, with
+a slight chance for isolated M-class flares (R1-R2, Minor-Moderate),
+primarily due to the flare potential and ongoing development of Region
+4560.
+
+Energetic Particle
+
+.24 hr Summary...
+The greater than 2 MeV electron flux was at moderate to high levels,
+briefly exceeding the 1,000 pfu threshold for a single reading before
+returning below high levels. The greater than 10 MeV proton flux
+remained steady at background levels.
+
+.Forecast...
+The greater than 2 MeV electron flux is expected to reach high levels on
+23-25 Oct in response to coronal hole high-speed stream (CH HSS)
+influences. The greater than 10 MeV proton flux is anticipated to
+persist at background levels through 25 Oct.
+
+Solar Wind
+
+.24 hr Summary...
+Solar wind parameters reflected diminishing positive polarity CH HSS
+influences. Total magnetic field strength (Bt) steadily declined over
+the period, moving from 9 nT down to 5 nT. The North-South (Bz)
+component exhibited multiple extended southward deflections, reaching
+peak negative values between -5 nT and -7 nT. Solar wind speeds
+gradually drifted downward from early values around 480-490 km/s to
+around 430-440 km/s late in the period. The phi angle remained
+predominantly positive (away from the Sun).
+
+.Forecast...
+Positive polarity CH HSS influences are anticipated to continue waning
+through 23 Oct, returning to mostly background-like conditions by early
+24 Oct. Enhancements are likely to return on 25 Oct due to the combined
+influences of a negative polarity CH HSS and possible glancing CME
+effects from the 21 Oct eruptions.
+
+Geospace
+
+.24 hr Summary...
+The geomagnetic field reached mostly active levels due to ongoing
+positive polarity CH HSS influences.
+
+.Forecast...
+Quiet to unsettled conditions are expected on 23 Oct as CH HSS
+influences wane, transitioning to mostly quiet levels on 24 Oct. A
+return to active levels, with a chance for geomagnetic storming, is
+expected on 25 Oct due to low-confidence combined effects from a
+recently emerged negative polarity coronal hole and potential glancing
+CME impacts.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

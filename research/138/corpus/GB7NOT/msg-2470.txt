@@ -1,0 +1,35 @@
+From: NS2B
+To: ALL
+Type/Status: BF
+Date/Time: 27-Oct 00:31Z
+Bid: 5298_NS2B
+Title: PCL Packet Net Summary for Oct 26, 2026
+
+R:261027/0107Z 4452@GB7RDG.#42.GBR.EURO LinBPQ6.0.26
+R:261027/0054Z 15257@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261027/0053Z 20545@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261027/0053Z 49968@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261027/0053Z 6372@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261027/0053Z 52729@VE7ASS.#VAN.BC.CAN.NOAM LinBPQ6.0.24
+R:261027/0052Z 50762@VA7RBP.#SCBC.BC.CAN.NOAM LinBPQ6.0.25
+R:261027/0031Z 5298@NS2B.#WNY.NY.USA.NOAM LinBPQ6.0.25
+
+PCL Packet Net Summary for Oct 26, 2026
+
+Checkins:
+
+NS2B	Bob	Penfield, NY	(sysop/nco)
+NK5LA	Daryl	Little Rock, AR	(courtesy check)
+K0WAV	Scott	Berryville, AR	(in and out)
+KC2NJV	Wayne	Bellmore, NY
+KX4AC	Carl	Glendale, AZ
+VA7RBP	Rick	Castlegar, BC
+
+Commentary:
+
+finally got antennas up, NYC marathon, state fair, a better antenna,
+packet node, weather, bugs, financial report, election
+
+
+
+

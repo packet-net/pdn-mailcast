@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 20-Oct-26 23:43
+Bid: 5228_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - south of the Fiji Islands
+Path: !GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us6000u3r3
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-20 23:24:26 UTC
+Depth      : 517.1 km
+Coordinates: -25.5451 Lat / 179.5284 Lon
+--------------------------------------------------
+Location:
+  south of the Fiji Islands
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3r3
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

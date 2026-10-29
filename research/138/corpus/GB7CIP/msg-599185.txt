@@ -1,0 +1,102 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 28-Oct-26 09:47
+Bid: 6133_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (28-Oct 04:45Z)
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+000
+AXNT20 KNHC 280930
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1215 UTC Wed Oct 28 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_06Z.gif'>0600 UT
+0925 UTC.
+
+...SPECIAL FEATURES...
+
+Significant Swell N of Bahamas: A tight pressure gradient between
+a 1035 mb high pressure system over New England and a stationary
+front extending from SE of Bermuda to a 1011 mb low in the NW
+Bahamas supports fresh to near gale-force NE winds and rough to
+very rough seas N of the front and W of the low. Peak seas are
+near 17 ft N of the NW Bahamas. Scattered showers and isolated
+thunderstorms are occurring N of the front and S of the front
+between 65W and 72W. Strong NE to E winds and rough to very rough
+seas will persist N of 28N and W of 65W through Thu night as the
+low pressure moves southwestward and the front weakens. Mariners
+are urged to remain alert to these dangerous marine conditions and
+take the necessary precautions to avoid these affected areas.
+
+Please, see the latest NWS High Seas Forecast issued by the
+National Hurricane Center at website
+https:<a href='https://www.nhc.noaa.gov/text/MIAHSFAT2.shtml'>www.nh
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough reaches the Atlantic through the coast of
+Guinea-Bissau near 12N16W and continues to 11N20W. The ITCZ
+extends from 11N20W to 08N37W and to 08N54W. Scattered moderate
+to isolated strong convection is observed from 03N to 12N and betwee
+22W and 53W.
+
+...GULF OF AMERICA...
+
+High pressure over New England extends a ridge across the Gulf
+waters. The pressure gradient between the ridge and low pres over
+the Bahamas is supporting moderate to locally strong NE winds E
+of 90W. Moderate to locally rough seas are over these waters.
+Gentle to moderate winds and moderate seas are found west of 90W.
+
+For the forecast, the aforementioned pressure gradient will
+continue to support fresh to strong NE to E winds and rough seas
+in the E Gulf into late this week. Winds and seas will gradually
+diminish into Sat as the ridge slides eastward. Looking ahead,
+another robust high pressure system will reach New England late
+this weekend and early next week allowing winds and seas to
+increase in the NE Gulf. Elsewhere, gentle to moderate winds and
+moderate seas will prevail through the forecast period.
+
+...CARIBBEAN SEA...
+
+Scattered showers and isolated thunderstorms continues to affect
+the central Caribbean waters, extending from northern Colombia to
+E Hispaniola and Puerto Rico. Generally dry conditions prevail
+elsewhere. A weak pressure gradient allows for moderate or weaker
+winds and slight to moderate seas.
+
+For the forecast, a surface trough along 80W will drift westward
+and weaken over the next couple of days. Ample tropical moisture
+and upper-level divergence support scattered showers and isolated
+thunderstorms over the central Caribbean, especially over the
+Dominican Republic. Otherwise, moderate to locally fresh trade
+winds in the E Caribbean will continue over the next few days,
+gradually extending westward through the week and into the
+upcoming weekend.
+
+...ATLANTIC OCEAN...
+
+Please see the Special Features section above for information on
+significant swell causing very rough seas north of the Bahamas.
+
+E of 70W, the tropical Atlantic is dominated by a broad subtropical
+ridge that supports moderate or weaker winds and seas of 4-8 ft.
+
+For the forecast west of 55W, looking ahead, weak low pressure
+will develop southwest of Bermuda by Fri, then lift northeastward
+and reinforce the frontal boundary over the waters between the
+central Bahamas and Bermuda. Expect fresh to strong NE-E winds and
+seas to 10 ft N of the front through early next week.
+
+$$
+Delgado

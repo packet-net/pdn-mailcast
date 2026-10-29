@@ -1,0 +1,560 @@
+From: CX2SA
+To: LETTER
+Type/Status: B$
+Date/Time: 23-Oct-26 18:13
+Bid: ARRL4443
+Title: The ARRL Letter - 44/43
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : LETTER@ARRL
+
+                               ===============
+                               The ARRL Letter
+                               ===============
+
+Richard Moseson, W2VU, Editor | October 22, 2026
+
+In this Issue:
+
+- Latest Colvin Grants Assist Youth-Focused DXpeditions
+- San Diego Balloon Launch Draws in High School Students
+- Hams Help "Run" the Chicago Marathon
+- A Century-Plus of Radio Innovation: The 102nd ARRL Handbook is Now
+  Available
+- Amateur Radio in the News
+- ARRL Live Events and Podcasts
+- Announcements
+- In Brief...
+- The ARRL Solar Report
+- Just Ahead in Radiosport
+- Upcoming ARRL Conventions and Major Events
+- Save the Date
+
+
+Latest Colvin Grants Assist Youth-Focused DXpeditions
+-----------------------------------------------------
+Two upcoming DXpeditions with a focus on young operators are the latest
+recipients of Colvin grants from ARRL. The grants, funded by an endowment
+established by noted DXpeditioner Lloyd Colvin, W6KG (SK), are intended to
+support amateur radio projects that promote international goodwill in the
+field of DX.
+
+The latest recipients are the upcoming VK9XY DXpedition to Christmas Island,
+south of Indonesia - scheduled for this November 16 through December 4 - and
+the VPSG expedition to South Georgia Island, in the South Atlantic, planned
+for March 2027.
+
+Ten of the 12 VK9XY operators are under age 26, and the team leader is ARRL
+Education and Learning Support Specialist Max Freedman, N4ML, already a
+veteran DXpeditioner at age 22. But the truly unique aspect of this
+expedition are plans for up to 40 young hams to operate the station remotely
+from various parts of the world, using an internet-linked "rig in a box," or
+RIB.
+
+"The VK9XY team would like to sincerely thank ARRL granting us the Colvin
+Award," said Freedman. "It is only with this collective support from groups
+like NCDXF, DX Engineering, ARRL, and the community at large that we are
+able to bring the next generation of radio amateurs right to the bleeding
+edge of DXpeditioning."
+
+The VPSG team will also include three (on-site) young operators and will be
+the first amateur radio activation of South Georgia since 2016. (One young
+operator, Violetta Latham, KN2P, is part of both the VK9XY and VPSG teams!)
+In addition to the challenges associated with getting to and operating from
+a sub-Antarctic island, the team also has to negotiate very strict
+environmental regulations. According to the team's website, the group is
+committed to "operating with the highest possible standards of environmental
+responsibility" while maximizing the number of unique contacts to give
+smaller stations a better opportunity to work South Georgia.
+
+
+San Diego Balloon Launch Draws in High School Students
+------------------------------------------------------
+Members of the Mt. Carmel High School Amateur Radio Club in San Diego,
+California, used a high-altitude balloon launch October 17 to generate
+interest among their fellow students and the community in amateur radio,
+science, technology, engineering and math. Members of the public were
+encouraged to track the balloon flight in real time using an app called
+Sondehub-Amateur, which displays telemetry from amateur radio high altitude
+balloon launches.
+
+This flight, which carried the call sign K6GO, belonging to Gayle Olson, a
+volunteer for the ARRL Foundation Scholarship Committee and Maxim Society
+member, flew to an altitude of 17-1/2 miles before the balloon burst and the
+payload parachuted back to the ground in Julian, California, some 60 miles
+inland from its launch point on Fiesta Island. The launch was part of the
+San Diego Repeater Association's annual "Hamtastic" event, which brings
+together hams and clubs from throughout the region to get on the air,
+socialize, and demonstrate amateur radio to the public. The San Diego
+Repeater Association is an ARRL Affiliated Club.
+Randy Standke, KQ6RS, prepares
+the K6GO weather balloon for
+launch during the San Diego
+Repeater Association's annual "Hamtastic" event in Southern California.
+[Photo courtesy of Gayle Olson, K6GO]
+	
+Gayle Olson, K6GO, holding the weather balloon that would carry her call
+sign to an altitude of more than
+17 miles from its launch at the San
+Diego Repeater Association's Hamtastic event on October 17.
+[Photo courtesy of Gayle Olson, K6GO]
+
+
+Hams Help "Run" the Chicago Marathon
+------------------------------------
+The 2026 Chicago Marathon on October 11 drew 55,000 runners from around the
+world and 165 ham radio operators from 6 states to help provide medical
+communications and logistical support. This was the 18th year of amateur
+radio participation, according to Rob Orr, K9RST, president of Ham Radio
+Chicago, which coordinated amateur radio activity at the marathon. The group
+also helps recruit new volunteers and provides training in public service
+communications.
+
+Orr said the hams relied on 5 repeaters with citywide coverage as well as 5
+portable UHF tactical repeaters to make sure every amateur radio team had at
+least three ways to contact the command tent in Grant Park. In addition to
+traditional FM voice communications, Orr said the hams also use DMR (digital
+mobile radio) and, this year, introduced a Zoom channel on which medical
+personnel could have private consults if needed. The hams coordinated the
+calls on the radio and then got the parties together at a Zoom station in
+the command tent.
+
+One hundred radio amateurs were stationed at medical tents along the course,
+as well as a medical hub, passing along the medical teams' requests for
+transport, supplies, and other information. The hams also provide
+situational awareness to the event organizers, reporting on the number of
+patients being cared for at each medical tent, as well as the stress levels
+the medical teams face in providing care. Orr notes that amateur radio is
+just one component of a very complex event that requires 15,000 volunteers
+to succeed. However, the hams' role is unique, he points out, adding that
+"this event has shown the public, city officials, and the runners that ham
+radio is very much alive and doing well."
+
+Jiangyun Zuo, KE9BWM, was one
+of 165 ham radio operators from 6 states who helped provide communications
+and logistical support for the 2026 Chicago Marathon earlier this month.
+[Photo courtesy of Ham Radio Chicago, Inc.]
+	
+One hundred amateur radio operators - including Jon Baker, KC9OO, pictured
+here - were stationed at medical tents along the course of
+the 2026 Chicago Marathon,
+keeping course medical staff in contact with the medical hub.
+[Photo courtesy of Ham Radio Chicago, Inc.]
+
+
+A Century-Plus of Radio Innovation: The 102nd ARRL Handbook is Now Available
+----------------------------------------------------------------------------
+First published in 1926, The ARRL Handbook has helped generations of radio
+amateurs turn curiosity into knowledge, ideas into circuits, and experiments
+into new discoveries. Over the past century, it has evolved alongside radio
+technology, reflecting new developments and inspiring hands-on learning and
+experimentation.
+
+Edited by Gregory D. Lapin, Ph.D., P.E., N9GL, the 102nd edition continues
+The ARRL Handbook's long history of technical excellence, with updated
+coverage of radio electronics, circuit design, antennas, propagation,
+digital communications, testing, and troubleshooting. New and expanded
+topics include signals below the noise, AI and FreeDV, digital mesh
+networks, satellite communications, compact and stealth antennas, NanoVNA
+applications, software defined radio (SDR), and microwave technology.
+
+Now shipping, the 102nd edition is available in a six-volume set, a
+softcover edition, and a digital edition. The print editions include the
+digital edition and more than 350 supplemental files, including articles,
+projects, software, PC board templates, and support files.
+
+From understanding fundamental radio principles to experimenting with
+emerging technologies, The ARRL Handbook continues to give radio amateurs
+the knowledge and inspiration to build, experiment, and innovate.
+
+The ARRL Handbook is available from the ARRL Store or your ARRL Dealer.
+Handbook 102 six-volume book set, ARRL Item No. 2462, ISBN
+978-1-62595-246-2, is $69.95 retail. Handbook 102 softcover edition, ARRL
+Item No. 2455, ISBN 978-1-62595-245-5, is $69.95 retail. Handbook 102
+digital edition, ARRL Item No. 2455D, is $49.95 retail.
+
+To order by phone, call 1-888-277-5289 (toll-free in the US), Monday through
+Thursday, 8 AM to 7 PM, and Friday, 8 AM to 5 PM Eastern Time. Outside the
+US, call (860) 594-0200.
+
+
+Amateur Radio in the News
+-------------------------
+"Mosquito control pilot killed after helicopter strikes 150-foot amateur
+radio operator's tower in Myakka City, FL" / Wireless Estimator (Online),
+October 19, 2026 (Also see "In Brief." item below)
+
+"Ham radio buffs to gather Saturday at Fiesta Island for weather balloon
+launch" / San Diego Union Tribune (San Diego, CA), October 15, 2026 (Also
+see "San Diego Balloon Launch Draws in High School Students" above) -- The
+San Diego Repeater Association is an ARRL Affiliated Club
+
+"When the Power Goes Out, This Montco Radio Club Stays Connected" /
+Montco.today (Montgomery County, PA), October 20, 2026 -- Pottstown Area
+Amateur Radio Club is an ARRL Affiliated Club
+
+"These amateur radio enthusiasts build community over the air on Denton
+County's 'The Morning Show' " / Denton County Magazine (Denton, TX), October
+11, 2026
+
+
+ARRL Live Events and Podcasts
+-----------------------------
+On the Air LIVE
+
+Contesting for the Beginning Radio Amateur
+
+Join Wayne Greene, KB4DSF, ARRL Director of Education and Learning, for the
+October episode of On the Air Live on Tuesday, October 27, at 8 PM Eastern.
+Wayne will introduce the fun and benefits of amateur radio contesting, with
+a special focus on how newly licensed hams can get started.
+
+Contesting is more than chasing points and making contacts. It's a great way
+to improve your operating skills, gain confidence on the air, learn about
+propagation, and become a more effective operator-all while having a lot of
+fun. Whether you're interested in casual operating, awards, emergency
+communications, DXing, or eventually competing in major contests, contesting
+can help sharpen skills that carry across the hobby. The livestream will air
+on the ARRL's Learning Center, learn.arrl.org. Preregistration is required
+and can be accomplished through the Learning Center.
+
+-- Date: October 27, 2026
+-- Time: 8 PM Eastern / 5 PM Pacific
+-- Register Now | ? Previously Recorded Sessions
+
+ARRL Audio News
+
+Listen to ARRL Audio News, available every Friday. ARRL Audio News is a
+summary of the week's top news stories in the world of amateur radio and
+ARRL, along with interviews and other features. More info | Listen on
+Blubrry | Also available on iTunes and Apple Podcasts.
+
+On the Air
+Sponsored by Icom
+
+Get Ready for Contest Season
+
+ARRL Director of Education and Learning and host of On the Air LIVE, Wayne
+Greene, KB4DSF, joins the podcast to talk about what goes into an on-air
+contest, and what you, as a new ham, can get out of participating in one.
+More info | Listen on Blubrry | Also available on iTunes and Apple Podcasts.
+The ARRL Letter
+
+
+Announcements
+-------------
+The following America250 W1AW Portable Activations begin 0000z on
+Wednesdays, and end 2359z on Tuesdays (7 days total for each activation).
+See the complete schedule at www.arrl.org/america250-was. Review your award
+progress and order your certificate and endorsements at america250.arrl.org.
+
+10/21/2026 Arkansas W1AW/5 (host K5DB)
+10/21/2026 Alaska W1AW/KL7 (host KTW)
+10/21/2026 Wisconsin W1AW/9 (host W9XT)
+10/28/2026 Michigan W1AW/8 (host K8NGW)
+10/28/2026 Nevada W1AW/7 (host NCSM)
+11/4/2026 Arizona W1AW/7 (host W7RAP)
+11/4/2026 Virginia W1AW/4 (host WA8AHZ)
+11/4/2026 Oklahoma W1AW/5 (host N5HZR)
+
+Last chance for this year's ARRL Online Auction! Today is the final day of
+the 2026 ARRL Online Auction, sponsored by GigaParts. More than 200 items
+are up for bid, including gear from QST "Product Review" articles, vintage
+books, pre-owned equipment, signed original sketches by Salty Walt Hudson,
+K4OGO, from Salty Walt's Portable Antenna Sketchbook, and four popular
+mystery boxes contributed by the ARRL Lab team. Proceeds from the annual
+auction benefit ARRL education programs. All bidders must register on the
+auction website, arrl.auctionanything.com. ALL BIDS MUST BE SUBMITTED BY 10
+PM EDT TODAY.
+
+Historic LF station SAQ will be on the air on October 23 and 24 to mark
+United Nations Day on the 24th. The Alexanderson alternator-based Grimeton
+Radio Station in Sweden transmits on 17.2 kHz, and operated as a commercial
+radio station from 1924 until the early 1990s. It is now a World Heritage
+Site. SAQ will conduct test transmissions on the 23rd, between 1100 and 1400
+UTC, and will "spread a peace message to the world" in Morse code on October
+24th at 1245 UTC. The event will be livestreamed on YouTube. In addition,
+amateur station SK6SAQ will be on the air on the 24th, operating CW on 80,
+40, and 20 meters, as well as SSB on 75 and 40 meters. Reception reports for
+SAQ may be submitted online for an E-QSL card. QSLs for SK6SAQ contacts may
+be sent via the SM bureau, by email to info@xxxxxxxxx.x.xxx or by postal
+mail to Alexander Association, Radiostationen 72, SE-432 98 Grimeton, Sweden.
+
+The FCC will allow amateurs to communicate with two military stations aboard
+museum battleships in connection with National Pearl Harbor Remembrance Day
+on December 5-7, 2026. The Battleship Iowa Amateur Radio Association
+received a waiver on October 14, permitting short-term crossband
+communications between amateurs and military stations NEPM aboard the Museum
+Battleship Iowa (transmitting on 6.989, 14.375, 18.036, and 21.856 MHz), and
+NEMW aboard the Museum Battleship Alabama (transmitting on 3.347, 7.463,
+14.7615, and 18.060 MHz). The military station operators will announce the
+amateur frequencies on which they will be listening. Read the complete FCC
+order (PDF).
+
+
+In Brief...
+-----------
+A helicopter pilot was killed after his aircraft crashed into a radio tower
+believed to belong to a well-known ham in Florida. According to various news
+reports, the pilot worked for the Manatee County Mosquito Control District
+and had been conducting aerial spraying on October 15 in an effort to
+control the spread of a mosquito-borne illness. He was reportedly returning
+to his base when he struck what was described as a 150-foot private radio
+tower in Myakka City, east of Sarasota. The tower apparently belonged to
+well-known contester Dan Street, K1TO, and was the tallest of three on his
+property. ARRL has reached out to Street for additional information.
+
+The YASME Foundation has presented its 2026 YASME Excellence Award to the
+team behind the Reverse Beacon Network, or RBN, in recognition of their
+"support of a global volunteer-operated network of automated amateur radio
+receiver stations (SDR skimmers) that listen to radio bands and report who
+is transmitting in near-real time." According to the foundation, the RBN
+typically has 250 active nodes around the world measuring a station's
+frequency, signal strength, signal-to-noise ratio, and sending speed, all of
+which is then reported live to a central RBN database. Amateurs use this
+data for many purposes, including propagation testing, antenna comparisons,
+contest operating and results adjudication. The RBN team consists of founder
+Felipe Ceglia, PY1NB; Nick Sinanis, F5VIH; Mark Glenn, K7MJG; Dave Pascoe,
+KM3T; Pete Smith, N4ZR; Dick Williams, W3OA, and Chris White, WX7V.
+
+October 31 is the deadline for schools to apply for grants from ARRL's
+Education and Technology Program (ETP). The grants assist schools and
+teachers in the purchase of radio equipment, software, and other
+radio-related resources for school ham stations. The program offers two
+types of grants: ETP School Station Grants for schools providing a plan to
+use amateur radio as part of in-classroom learning or an enrichment program;
+and ETP Progress Grants for teachers already using amateur radio in their
+classrooms to purchase additional resources or for those teachers needing
+resources in order to start teaching about electronics and wireless
+technology using amateur radio. Details are on the ETP page of the ARRL
+website.
+
+Former ARRL Membership Services Manager Charles "Chuck" Hutchinson, K8CH, of
+Lake Odessa, Michigan, became a Silent Key on October 10, 2026 at age 86.
+Chuck was born on August 25, 1940, in Lansing, Michigan. He earned a
+bachelor's degree in TV/radio broadcasting from Michigan State University,
+while working at the university as a TV engineer. He later worked for IBM
+servicing computers and spent 3 years in Ecuador as an engineer for
+shortwave station HCJB before coming to work at ARRL Headquarters in
+Newington, Connecticut. Chuck retired after 20 years at ARRL and moved back
+to Michigan, but continued to contribute to amateur radio through various
+ARRL publications, including Simple and Fun Antennas for Hams. He is
+survived by his wife, Sylvia, two sons, and a granddaughter. A complete
+obituary is online.
+
+Students and faculty members at the University of Scranton in Pennsylvania
+have been working for the past year and a half with five clients of the
+Lackawanna Blind Association to teach them ham radio and help them get their
+Technician licenses. All five have now successfully earned their licenses,
+and are regulars on the university amateur radio club's W3USR repeater,
+according to club advisor Dr. Nathaniel Frissell, W2NAF. Frissell says the
+club used training materials from the Handiham program, and that at a recent
+graduation ceremony, each of the new licensees was presented with a tactile
+plaque containing their name and call sign, 3D-printed and in Braille. The
+program was recently highlighted on the university's online news site, Royal
+News. The University of Scranton Amateur Radio Club is an ARRL Affiliated
+Club.
+
+HAARP, the University of Alaska Fairbanks High Frequency Active Auroral
+Research Program, is in the middle of a research campaign that will result
+in high-powered transmissions on frequencies between 2.8 and 10 MHz (but not
+within the 80- or 40-meter amateur bands). The research campaign began on
+October 20 and will continue through October 24, with transmissions on
+varying frequencies between 0530 and 0930 UTC daily. According to the
+university, these transmissions are being conducted in support of the
+INFUSE-II and DUST-III sounding rocket missions. INFUSE-II will test a new
+type of ultraviolet imager for use on future space telescopes, while
+DUST-III will carry a miniature laboratory into space to study how tiny
+grains of space dust form and grow.
+
+Open Positions at ARRL
+
+Come join the headquarters staff of ARRL The National Association for
+Amateur Radio©! We are currently seeking qualified applicants for the
+following positions:
+
+Technical Editor
+RFI Lab Engineer
+Public Relations and Outreach Manager
+
+Membership Marketing Analyst
+Instructional Specialist
+
+Full details may be found on the ARRL HR web page at www.arrl.org/careers.
+
+ARRL is an equal opportunity employer.
+
+
+The ARRL Solar Report
+---------------------
+The active sunspot region that has been giving us improved propagation over
+the past several days will be rotating away from Earth's view today, but
+conditions on most of the HF amateur bands should remain pretty decent in
+the days ahead, as the 10.7-centimeter radio flux remains right around 100.
+However, NOAA's Space Weather Prediction Center (SWPC) says the geomagnetic
+field could become unsettled to active heading into the weekend as a
+negative polarity coronal hole high-speed stream (CHHSS) heads toward Earth.
+
+The Australian Space Weather Forecasting Centre predicts mostly normal HF
+propagation conditions worldwide.
+
+The W3LPL Propagation Forecast from the Daily DX is predicting a dropoff in
+DX openings on 10 and 12 meters as the active sunspot region rotates away
+from Earth and the solar cycle continues its decline. However, good
+conditions are expected to continue on 15, 17, and 20 meters, with the lower
+HF bands (30, 40 and 80 meters) providing excellent long distance nighttime
+propagation.
+
+This weekend is the CQ World Wide SSB DX Contest (0000Z October 24 through
+2359 Z October 25). It's often said that this contest makes its own
+propagation, most likely because there are stations active to take advantage
+of unanticipated openings, even on the higher HF bands. So keep listening
+for calls from faraway stations.
+
+Predicted 10.7-centimeter solar flux: Oct 22-23, 100; Oct 24-26, 95; Oct 27,
+100; Oct 28-29, 105. (Source: NOAA SWPC)
+
+Share your reports and observations. Send your tips, questions, or comments
+to w2vu@xxxx.xxx.
+
+For more information concerning radio propagation, visit the ARRL Technical
+Information Service, read "What the Numbers Mean...," and check out the
+Propagation Page of Carl Luetzelschwab, K9LA.
+
+A propagation bulletin archive is available. For customizable propagation
+charts, visit the VOACAP Online for Ham Radio website.
+
+Solar image on October 22, 2026
+[Photo courtesy NOAA Space Weather Prediction Center]
+
+
+Just Ahead in Radiosport
+------------------------
+October 19 - 23 -- ARRL School Club Roundup (CW, phone, digital)
+October 24 - 25 -- CQ World Wide DX Contest, SSB (phone)
+October 26 -- RSGB FT4 Contest (digital)
+October 28 -- SKCC Sprint (CW)
+October 28 -- UKEICC 80m Contest (CW)
+October 30 -- Zombie Shuffle (CW)
+October 31 - November 1 -- ARRL EME Contest (CW, phone, digital)
+October 31 - November 1 -- Russian WW MultiMode Contest (CW, phone, digital)
+October 31 - November 1 -- UK/EI DX Contest, SSB (phone)
+November 1 -- North American SSB Sprint (phone)
+November 1 -- EANET Sprint (CW, phone, digital)
+November 1 -- High Speed Club CW Contest (CW)
+November 1 -- Real Time Contest (CW, phone)
+November 1 - 4 -- Classic Exchange, CW (CW)
+November 2 -- RSGB 80m Autumn Series, Data (digital)
+November 3 -- ARS Spartan Sprint (CW)
+November 4 -- UKEICC 80m Contest (phone)
+November 5 -- VHF-UHF FT8 Activity, NA (digital)
+November 5 -- NRAU 10m Activity Contest (CW, phone, digital)
+November 5 -- SKCC Sprint Europe (CW)
+November 5 - 6 -- Walk for the Bacon QRP Contest (CW)
+November 7 -- IPARC Contest, CW (CW)
+November 7 - 8 -- YBDXPI FT8 Contest (digital)
+November 7 - 9 -- ARRL November Sweepstakes, CW (CW)
+November 8 -- IPARC Contest, SSB (phone)
+November 8 -- FIRAC HF Contest (phone)
+Remember to visit the ARRL Contest Calendar for more events and information.
+
+
+Upcoming ARRL Conventions and Major Events
+------------------------------------------
+ARRL Section, State, and Division Conventions (next 60 days)
+
+Search the ARRL Hamfest and Convention Database at www.arrl.org/hamfests to
+find events in your area.
+
+October 24  | ARRL Day in the Park, hosting the ARRL Mississippi Section
+Convention, Ridgeland, Mississippi.
+
+October 30 - 31 | Stone Mountain Hamfest, hosting the ARRL Georgia State
+Convention, Lawrenceville, Georgia.
+
+November 7 | Superstition ARC Superfest, hosting the ARRL Arizona State
+Convention, Mesa, Arizona
+
+November 14 | Montgomery Hamfest, hosting the ARRL Alabama State Convention,
+Montgomery, Alabama
+
+December 11 - 12 | Tampa Bay Hamfest, hosting the ARRL West Central Florida
+Section Convention, Plant City, Florida
+
+
+Save the Date
+-------------
+Join ARRL at these Division Conventions and other major events throughout
+the upcoming year, 2027.
+
+February 12 - 14  | Orlando HamCation, hosting the ARRL Southeastern
+Division Convention, Orlando, Florida
+
+April 3 | RARSfest, The Raleigh Hamfest, hosting the ARRL Roanoke Division
+Convention, Raleigh, North Carolina
+
+April 17 | Ham Radio University, hosting the ARRL Hudson Division
+Convention, Brookville, New York
+
+May 21 - 23 | Dayton Hamvention, Xenia, Ohio
+
+August 14 | Cincinnati Hamfest, hosting the ARRL Great Lakes Division
+Convention, Owensville, Ohio
+
+Have News for ARRL?
+
+Submissions for the ARRL Letter and ARRL News can be sent to news@xxxx.xxx.
+-- Richard Moseson, W2VU, ARRL News Editor
+
+ARRL -- Your One-Stop Resource for Amateur Radio News and Information
+
+Join ARRL or renew today! No other organization works harder to promote and
+protect amateur radio. Membership supports benefits, services, programs, and
+advocacy to help you get (and stay) active and on the air. Membership
+includes access to digital editions of all four ARRL magazines: QST, On the
+Air, QEX, and NCJ.
+
+Listen to ARRL Audio News, available every Friday.
+
+The ARRL Letter is available in an accessible format, posted weekly to the
+Blind-hams Groups.io email group. The group is dedicated to discussions
+about amateur radio as it concerns blind hams, plus related topics including
+ham radio use of adaptive technology.
+
+On the Air. Published bimonthly for newer hams, featuring introductions to
+popular activities and key concepts, equipment buying guides, and practical
+projects with step-by-step instructions - all in language that's easy to
+understand.
+
+NCJ -- National Contest Journal. Published bimonthly, features articles by
+top contesters, letters, hints, statistics, scores, NA Sprints, and QSO
+parties.
+
+QEX -- A Forum for Communications Experimenters. Published bimonthly,
+features technical articles, construction projects, columns, and other items
+of interest to radio amateurs and communications professionals.
+
+Free of charge to ARRL members...
+
+Subscribe to the ARES© Letter (monthly public service and emergency
+communications news), the NTS© Letter (monthly news about the ARRL National
+Traffic System message-relay network), the ARRL Contest Update (biweekly
+contest newsletter), Division and Section news alerts, and much more!
+
+Find ARRL on Facebook! Follow us on Threads, X, and Instagram.
+
+The ARRL Letter is published on Thursdays, 51 times each year. ARRL members
+may subscribe at no cost or unsubscribe by editing their profile at
+www.arrl.org/opt-in-out.
+
+Copyright ¸ 2026 American Radio Relay League, Incorporated. Use and
+distribution of this publication, or any portion thereof, is permitted for
+non-commercial or educational purposes, with attribution. All other purposes
+require written permission.
+
+
+                   ****************************************
+                   * Distributed on the packet network by *
+                   * CX2SA <> 1978-2026 <> Salto, Uruguay *
+                   ****************************************

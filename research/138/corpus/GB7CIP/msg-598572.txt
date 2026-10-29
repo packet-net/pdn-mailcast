@@ -1,0 +1,41 @@
+From: LA3RIA
+To: WX
+Type/Status: B$
+Date/Time: 22-Oct-26 07:48
+Bid: 180352LA3RIA
+Title: wx report
+Path: !GB7COW!
+
+From: LA3RIA@GB7COW.#44.GBR.EU
+To  : WX@WW
+
+
+From: LA3RIA@GB7COW.#44.GBR.EURO
+TO  : WX@WW
+
+$ weather engm
+Current conditions at Oslo / Gardermoen, Norway (ENGM) 60-12N 011-05E 204M
+Last updated Oct 22, 2026 - 03:20 AM EDT / 2026.10.22 0720 UTC
+   Temperature: 50 F (10 C)
+   Relative Humidity: 93%
+   Wind: from the ESE (120 degrees) at 9 MPH (8 KT) (direction variable)
+   Weather: drizzle, rain
+   Sky conditions: mostly cloudy
+la3ria@la3ria:~ $
+------------------------------
+weather ensb
+Current conditions at Svalbard Lufthavn, Norway (ENSB) 78-15N 015-28E 29M
+Last updated Oct 22, 2026 - 03:20 AM EDT / 2026.10.22 0720 UTC
+   Temperature: 44 F (7 C)
+   Relative Humidity: 81%
+   Wind: from the W (260 degrees) at 7 MPH (6 KT) (direction variable)
+   Weather: light rain
+   Sky conditions: mostly cloudy
+la3ria@la3ria:~ $
+
+
+
+73 - MUSHTAQ, LA3RIA @ GB7COW
+
+Message timed: 09:43 on 2026-Oct-22
+Message sent using WinPack-Telnet V6.80

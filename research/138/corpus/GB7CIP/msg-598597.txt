@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 22-Oct-26 15:31
+Bid: 5852-CX2SA
+Title: (M7.0) Xizang-Qinghai border region 32.3 93.7
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Xizang-Qinghai border region
+Geographic coordinates:           32.336N,  93.714E
+Magnitude:                        7.0
+Depth:                            10 km
+Universal Time (UTC):             22 Oct 2026  14:33:39
+Time near the Epicenter (1):      22 Oct 2026  22:33:39
+Time in your area (1):            22 Oct 2026  11:33:39
+Location with respect to nearby cities:
+183.4 km (113.7 mi) ENE of Nagqu, China
+354.6 km (219.8 mi) WNW of Qamdo, China
+388.3 km (240.8 mi) NE of DÃªqÃªn, China
+388.5 km (240.9 mi) NE of Lhasa, China
+426.6 km (264.5 mi) N of Shi Yomi, India
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u43g
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u43g?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 22/10/2026 15:30:40 UTC
+________________________________________________________________

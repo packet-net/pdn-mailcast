@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 22-Oct-26 20:41
+Bid: 5855-CX2SA
+Title: (M5.0) New Britain region, Papua New Guinea -5.7 152.3
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           New Britain region, Papua New Guinea
+Geographic coordinates:           5.728S, 152.265E
+Magnitude:                        5.0
+Depth:                            10 km
+Universal Time (UTC):             22 Oct 2026  20:05:04
+Time near the Epicenter (1):      23 Oct 2026  07:05:04
+Time in your area (1):            22 Oct 2026  17:05:04
+Location with respect to nearby cities:
+153.1 km (94.9 mi) S of Kokopo, Papua New Guinea
+236.4 km (146.6 mi) E of Kimbe, Papua New Guinea
+369.7 km (229.2 mi) W of Arawa, Papua New Guinea
+385.1 km (238.8 mi) SSE of Kavieng, Papua New Guinea
+545.0 km (337.9 mi) NNE of Alotau, Papua New Guinea
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u473
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u473?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 22/10/2026 20:40:46 UTC
+________________________________________________________________

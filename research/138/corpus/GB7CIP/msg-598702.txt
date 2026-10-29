@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 23-Oct-26 14:25
+Bid: 5888-CX2SA
+Title: (M5.2) Sicily, Italy 38.8 14.3
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Sicily, Italy
+Geographic coordinates:           38.779N,  14.315E
+Magnitude:                        5.2
+Depth:                            10 km
+Universal Time (UTC):             23 Oct 2026  13:55:36
+Time near the Epicenter (1):      23 Oct 2026  15:55:36
+Time in your area (1):            23 Oct 2026  10:55:36
+Location with respect to nearby cities:
+50.5 km (31.3 mi) WNW of Malfa, Italy
+79.5 km (49.3 mi) NNW of Capo d'Orlando, Italy
+86.0 km (53.3 mi) NNE of CefalÃ¹, Italy
+101.8 km (63.1 mi) NW of Milazzo, Italy
+110.9 km (68.8 mi) NE of Palermo, Italy
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4dc
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4dc?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 23/10/2026 14:24:37 UTC
+________________________________________________________________

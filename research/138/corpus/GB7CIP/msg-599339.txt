@@ -1,0 +1,113 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 29-Oct-26 10:48
+Bid: 6275_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (29-Oct 05:45Z)
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+000
+AXNT20 KNHC 291042
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1215 UTC Thu Oct 29 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_06Z.gif'>0600 UT
+1020 UTC.
+
+...SPECIAL FEATURES...
+
+Gales N of Bahamas: A tight pressure gradient between a 1028 mb
+high pressure system offshore New England, and a stationary front
+extending from S of Bermuda across the northern Bahamas to a 1012
+mb low in the Straits of Florida, is supporting fresh to near
+gale-force NE winds and rough seas N of the front and W of 57W.
+Winds are reaching minimal gale force in zones AMZ064 and AMZ065.
+Winds will diminish below gale force later this morning, however
+fresh to strong NE winds will prevail through late Fri as the low
+in the Straits tracks northeastward N of the area dragging a cold
+front forecast to extend from Bermuda to the central Bahamas by
+Fri morning, and moving east of 55W by Sun morning. Mariners are
+urged to remain alert to these dangerous marine conditions and
+take the necessary precautions to avoid these affected areas.
+
+Please, see the latest NWS High Seas Forecast issued by the
+National Hurricane Center at website
+https:<a href='https://www.nhc.noaa.gov/text/MIAHSFAT2.shtml'>www.nh
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough reaches the Atlantic through the coast of
+Africa near 15N16W and continues to 14N20W to 08N26W. The ITCZ
+extends from 08N26W to 05N44W to 07N58W. Scattered moderate to
+isolated strong convection is noted from 05N to 13N between 16W
+and 38W.
+
+...GULF OF AMERICA...
+
+A broad ridge over the eastern CONUS and the NW Atlantic extends a
+ridge across the Gulf. The pressure gradient tightens over the
+eastern half of the Gulf due to the presence of a stationary front
+N of the Bahamas. This is resulting in moderate to fresh NE winds
+E of 90W along with moderate to rough seas.
+
+For the forecast, a tight pressure gradient between a high
+pressure system over New England and a stationary front over the
+offshores NE of the Bahamas will continue to support fresh to
+locally strong NE to E winds and rough seas in the E Gulf into Mon
+night. Winds and seas will gradually diminish into Sat as the
+ridge slides eastward. Looking ahead, another robust high pressure
+system will reach New England late this weekend and early next
+week allowing winds and seas to increase in the NE Gulf.
+Elsewhere, gentle to moderate winds and moderate seas will prevail
+into early next week. Otherwise, expect fresh SE to S winds over
+much of the Gulf by Mon between high pressure over the western
+Atlantic and a cold front moving through the Southern Plains.
+
+...CARIBBEAN SEA...
+
+The passage of a stationary front over the SW N Atlantic waters is
+supporting a weak gradient over the Caribbean waters W of 76W,
+thus leading to light to gentle winds and slight seas. Moderate to
+fresh trades and moderate seas are elsewhere.
+
+For the forecast, moderate to locally fresh trade winds will
+continue south of 15N through the eastern, central and portions of
+the SW Caribbean through Sun night. Moderate or weaker winds are
+forecast elsewhere and through the remainder forecast period.
+
+...ATLANTIC OCEAN...
+
+Please see the Special Features section above for information on
+a Gale warning north of the Bahamas.
+
+A tight pressure gradient between a high pressure system over New
+England and a stationary front extending across the offshore
+zones N of 27N, across the northern Bahamas to a 1012 mb low in
+the Florida Straits supports strong to gale-force NE winds and
+rough seas north of the front. Scattered showers and isolated
+thunderstorms are occurring across the offshores between 55W and
+77W. The aforementioned stationary front connects to a cold front
+near 28N49W and extends NE to 31N31W. Scattered showers and tstms
+are N of 25N and ahead of the front to 25W. Moderate to fresh
+winds are ahead and behind the front with seas to 7 ft. Otherwise,
+moderate or weaker winds and moderate seas are elsewhere.
+
+For the forecast west of 55W, the gales will end later this
+morning, however fresh to strong NE winds will prevail through
+late Fri as the low in the Straits tracks northeastward N of the
+area dragging a cold front forecast to extend from Bermuda to the
+central Bahamas by Fri morning, and moving east of 55W by Sun
+morning. Expect fresh to strong NE-E winds and rough seas N of the
+front through early next week.
+
+$$
+Ramos

@@ -16,17 +16,27 @@ import sys
 HEADER = re.compile(r"^(From|To|Type/Status|Date/Time|Bid|Title|Body|Path): ?(.*)$")
 # Shown only to some users (e.g. a "Body: size" line, the full route on From:): not part of the bulletin.
 PER_USER = {"Type/Status", "Body", "Path", "Date/Time"}
-ROUTE = re.compile(r"^R:\d{6}/\d{4}Z? ")
+ROUTE = re.compile(r"^R:\d{6}/\d{4}[Zz]? ")
 
 
 def parse(path):
     lines = open(path, encoding="latin-1").read().split("\n")
     head, routes, i = {}, [], 0
-    while i < len(lines):
-        if (m := HEADER.match(lines[i])):
-            head[m.group(1)] = m.group(2)
-        elif lines[i] != "":
-            break
+    # The BBS header is a block of field lines; LinBPQ may follow it with a blank line and a
+    # "Body: size" line. Anything after that is the bulletin, even if it looks like a header.
+    while i < len(lines) and (m := HEADER.match(lines[i])):
+        head[m.group(1)] = m.group(2)
+        i += 1
+    j = i
+    while j < len(lines) and lines[j] == "":
+        j += 1
+    if j < len(lines) and lines[j].startswith("Body: "):
+        head["Body"] = lines[j][6:]
+        i = j + 1
+    while i < len(lines) and lines[i] == "":
+        i += 1
+    # FBB wraps a long Path onto indented continuation lines ("      !NC8Q!").
+    while "Path" in head and i < len(lines) and re.match(r"^\s+![A-Z0-9!.#-]+!$", lines[i]):
         i += 1
     while i < len(lines) and ROUTE.match(lines[i]):
         routes.append(lines[i])

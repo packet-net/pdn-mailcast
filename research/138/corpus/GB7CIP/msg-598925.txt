@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 22:35
+Bid: 5851_HP2DFA
+Title: EARTHQUAKE ALERT M5.3 - Bonin Islands, Japan region
+Path: !GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.3+)       
+==================================================
+Event ID   : us6000u4we
+Magnitude  : M 5.3
+Time (UTC) : 2026-10-25 22:14:15 UTC
+Depth      : 485.1 km
+Coordinates: 27.8376 Lat / 139.6752 Lon
+--------------------------------------------------
+Location:
+  Bonin Islands, Japan region
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4we
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

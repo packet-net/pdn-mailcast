@@ -1,0 +1,18 @@
+From: KF7PSM
+To: PACKET
+Type/Status: B$
+Date/Time: 20-Oct-26 20:00
+Bid: 15935_KE0GB
+Title: HF Packet
+Path: !GB7BED!N2MH4!N3HYM!W9GM!KE0GB!
+
+I'm wondering how many stations operate on HF using standard ax.25 300 baud packet
+like on NETWORK 105 that are using standard TNC devices instead of direwolf or
+soundmodem etc. If you do, do you think it would be beneficial to have a 
+device you can install on external modem header that would give the device
+fx.25 capability for error correction on hf?
+
+I have an idea and am wondering if it would be beneficial to the HF
+300 baud packet community.
+
+73 de KF7PSM

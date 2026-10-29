@@ -1,0 +1,331 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 20-Oct-26 11:47
+Bid: 25484_LU9DCE
+Title: ARCHLINUX UPDATES 20-OCT
+Path: !VE3KPG!VE3CGR!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+OPENOBSERVE 1.1.2-1 X86_64
+
+OBSERVABILITY PLATFORM FOR LOGS, METRICS, TRACES, AND FRONTEND
+MONITORING
+
+========================================
+
+SCX-SCHEDS 1.1.4-1 X86_64
+
+SCHED_EXT SCHEDULERS AND TOOLS
+
+========================================
+
+PROTON-VPN-GTK-APP 4.18.7-1 ANY
+
+PROTONVPN GTK APP, MAINTAINED BY COMMUNITY
+
+========================================
+
+PYTHON-FASTAPI 0.151.0-1 ANY
+
+FASTAPI FRAMEWORK, HIGH PERFORMANCE, EASY TO LEARN, FAST TO CODE,
+READY FOR PRODUCTION
+
+========================================
+
+CPP-HTTPLIB 0.62.0-1 ANY
+
+A C++ HEADER-ONLY HTTP/HTTPS SERVER AND CLIENT LIBRARY
+
+========================================
+
+SCRIBUS 1.6.6-8 X86_64
+
+DESKTOP PUBLISHING SOFTWARE
+
+========================================
+
+PYTHON-PYMUPDF 2.0-1 X86_64
+
+PYTHON BINDINGS FOR MUPDF'S RENDERING LIBRARY
+
+========================================
+
+PYTHON-GDAL 3.13.3-5 X86_64
+
+PYTHON BINDINGS FOR GDAL
+
+========================================
+
+POPPLER-QT6 26.10.0-1 X86_64
+
+POPPLER QT6 BINDINGS
+
+========================================
+
+POPPLER-QT5 26.10.0-1 X86_64
+
+POPPLER QT5 BINDINGS
+
+========================================
+
+POPPLER-GLIB 26.10.0-1 X86_64
+
+POPPLER GLIB BINDINGS
+
+========================================
+
+POPPLER 26.10.0-1 X86_64
+
+PDF RENDERING LIBRARY BASED ON XPDF 3.0
+
+========================================
+
+OPENBOARD 1.7.7-6 X86_64
+
+INTERACTIVE WHITEBOARD APPLICATION INTENDED FOR USE IN A CLASSROOM
+SETTING
+
+========================================
+
+LIMINE 12.9.4-1 X86_64
+
+AN ADVANCED, PORTABLE, MULTIPROTOCOL BOOTLOADER
+
+========================================
+
+LIBREOFFICE-STILL-SDK 26.2.6-3 X86_64
+
+SOFTWARE DEVELOPMENT KIT FOR LIBREOFFICE MAINTENANCE BRANCH
+
+========================================
+
+LIBREOFFICE-STILL 26.2.6-3 X86_64
+
+LIBREOFFICE MAINTENANCE BRANCH
+
+========================================
+
+LIBREOFFICE-FRESH-SDK 26.8.1-2 X86_64
+
+SOFTWARE DEVELOPMENT KIT FOR LIBREOFFICE FRESH
+
+========================================
+
+LIBREOFFICE-FRESH 26.8.1-2 X86_64
+
+LIBREOFFICE BRANCH WHICH CONTAINS NEW FEATURES AND PROGRAM
+ENHANCEMENTS
+
+========================================
+
+KITINERARY 26.08.2-2 X86_64
+
+DATA MODEL AND EXTRACTION SYSTEM FOR TRAVEL RESERVATION INFORMATION
+
+========================================
+
+INKSCAPE 1.4.4-7 X86_64
+
+PROFESSIONAL VECTOR GRAPHICS EDITOR
+
+========================================
+
+GDAL 3.13.3-5 X86_64
+
+A TRANSLATOR LIBRARY FOR RASTER AND VECTOR GEOSPATIAL DATA FORMATS
+
+========================================
+
+CALLIGRA 26.08.2-2 X86_64
+
+A SET OF APPLICATIONS FOR PRODUCTIVITY AND CREATIVE USAGE
+
+========================================
+
+PYTHON-MISTUNE 1:3.4.0-1 ANY
+
+A FAST YET POWERFUL PYTHON MARKDOWN PARSER WITH RENDERERS AND PLUGINS
+
+========================================
+
+DISCORD 1:1.0.164-1 X86_64
+
+ALL-IN-ONE VOICE AND TEXT CHAT FOR GAMERS
+
+========================================
+
+NBSDGAMES 6.0.3-2 X86_64
+
+A COLLECTION OF TEXT-BASED GAMES
+
+========================================
+
+OPENCODE 2.1.0-1 X86_64
+
+THE OPEN SOURCE CODING AGENT
+
+========================================
+
+LIB32-LIBELF 0.197-1 X86_64
+
+HANDLE ELF OBJECT FILES AND DWARF DEBUGGING INFORMATION (LIBRARIES,
+32-BIT)
+
+========================================
+
+ELECTRON43 43.8.0-1 X86_64
+
+BUILD CROSS PLATFORM DESKTOP APPS WITH WEB TECHNOLOGIES
+
+========================================
+
+TREESHEETS 2.19.1-1 X86_64
+
+A FREE-FORM HIERARCHICAL DATA ORGANIZER
+
+========================================
+
+PYTHON-PYGRAPHVIZ 2.0.4-1 X86_64
+
+PYTHON INTERFACE TO GRAPHVIZ
+
+========================================
+
+PYTHON-JQ 1.13.0-1 X86_64
+
+PYTHON BINDINGS FOR JQ
+
+========================================
+
+PYTHON-SETUPTOOLS 1:84.2.0-1 ANY
+
+EASILY DOWNLOAD, BUILD, INSTALL, UPGRADE, AND UNINSTALL PYTHON
+PACKAGES
+
+========================================
+
+PYTHON-PYTHON-DISCOVERY 1.6.4-1 ANY
+
+PYTHON INTERPRETER DISCOVERY
+
+========================================
+
+PYTHON-PKGINFO 1.13.3-1 ANY
+
+QUERY METADATA FROM SDISTS / BDISTS / INSTALLED PACKAGES
+
+========================================
+
+PYTHON-MORE-ITERTOOLS 11.2.1-1 ANY
+
+MORE ROUTINES FOR OPERATING ON ITERABLES, BEYOND ITERTOOLS
+
+========================================
+
+PYTHON-MARKDOWN 3.11.2-1 ANY
+
+PYTHON IMPLEMENTATION OF JOHN GRUBER'S MARKDOWN
+
+========================================
+
+PYTHON-JSONPOINTER 3.4-1 ANY
+
+IDENTIFY SPECIFIC NODES IN A JSON DOCUMENT (RFC 6901)
+
+========================================
+
+PYTHON-GITPYTHON 3.2.1-1 ANY
+
+A PYTHON LIBRARY USED TO INTERACT WITH GIT REPOSITORIES
+
+========================================
+
+PYTHON-AUTHLIB 1.9.1-1 ANY
+
+THE ULTIMATE PYTHON LIBRARY IN BUILDING OAUTH AND OPENID CONNECT
+SERVERS & CLIENTS
+
+========================================
+
+LIBINSTPATCH 1.1.8-1 X86_64
+
+INSTRUMENT FILE SOFTWARE LIBRARY
+
+========================================
+
+URLSCAN 1.2.0-1 ANY
+
+MUTT AND TERMINAL URL SELECTOR
+
+========================================
+
+DD_RESCUE 1.99.25-1 X86_64
+
+A DD VERSION THAT IS VERY USEFUL FOR DATA-RECOVERY
+
+========================================
+
+BROWSERPASS-CHROMIUM 3.13.0-1 ANY
+
+CHROMIUM EXTENSION FOR BROWSERPASS, BROWSER EXTENSION FOR ZX2C4'S PASS
+(PASSWORD MANAGER)
+
+========================================
+
+BROWSERPASS-FIREFOX 3.13.0-1 ANY
+
+FIREFOX EXTENSION FOR BROWSERPASS, BROWSER EXTENSION FOR ZX2C4'S PASS
+(PASSWORD MANAGER)
+
+========================================
+
+ZIG 0.17.0-1 X86_64
+
+A GENERAL-PURPOSE PROGRAMMING LANGUAGE AND TOOLCHAIN FOR MAINTAINING
+ROBUST, OPTIMAL, AND REUSABLE SOFTWARE
+
+========================================
+
+LIBELF 0.197-1 X86_64
+
+HANDLE ELF OBJECT FILES AND DWARF DEBUGGING INFORMATION (LIBRARIES)
+
+========================================
+
+ELFUTILS 0.197-1 X86_64
+
+HANDLE ELF OBJECT FILES AND DWARF DEBUGGING INFORMATION (UTILITIES)
+
+========================================
+
+DEBUGINFOD 0.197-1 X86_64
+
+HANDLE ELF OBJECT FILES AND DWARF DEBUGGING INFORMATION (DEBUGINFOD)
+
+========================================
+
+FIREFOX-DEVELOPER-EDITION-I18N-ZH-TW 159.0B4-1 ANY
+
+CHINESE (TRADITIONAL) LANGUAGE PACK FOR FIREFOX DEVELOPER EDITION
+
+========================================
+
+FIREFOX-DEVELOPER-EDITION-I18N-ZH-CN 159.0B4-1 ANY
+
+CHINESE (SIMPLIFIED) LANGUAGE PACK FOR FIREFOX DEVELOPER EDITION
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

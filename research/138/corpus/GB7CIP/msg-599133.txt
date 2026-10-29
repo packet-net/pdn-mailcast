@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6047_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - south of the Fiji Islands
+Path: !GB7COW!GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us7000ttgq
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-27 15:31:42 UTC
+Depth      : 509.1 km
+Coordinates: -23.7469 Lat / -179.7358 Lon
+--------------------------------------------------
+Location:
+  south of the Fiji Islands
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttgq
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

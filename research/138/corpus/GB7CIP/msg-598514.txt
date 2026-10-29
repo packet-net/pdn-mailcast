@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 21-Oct-26 18:59
+Bid: 5325_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - south of Africa
+Path: !VE3KPG!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us6000u3wh
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-21 18:12:35 UTC
+Depth      : 10.0 km
+Coordinates: -52.8338 Lat / 27.5329 Lon
+--------------------------------------------------
+Location:
+  south of Africa
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3wh
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

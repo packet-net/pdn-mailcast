@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 20-Oct-26 16:51
+Bid: 5201_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - 21 km SW of Meulaboh, Indonesia
+Path: !GB7BED!K1AJD!VE3CGR!VK2RZ!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us6000u3nc
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-20 16:29:38 UTC
+Depth      : 75.9 km
+Coordinates: 4.0005 Lat / 95.9930 Lon
+--------------------------------------------------
+Location:
+  21 km SW of Meulaboh, Indonesia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3nc
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 21-Oct-26 19:28
+Bid: 5833-CX2SA
+Title: (M5.1) south of Africa -52.8 27.5
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           south of Africa
+Geographic coordinates:           52.834S,  27.533E
+Magnitude:                        5.1
+Depth:                            10 km
+Universal Time (UTC):             21 Oct 2026  18:12:35
+Time near the Epicenter (1):      21 Oct 2026  20:12:35
+Time in your area (1):            21 Oct 2026  15:12:35
+Location with respect to nearby cities:
+2099.7 km (1301.8 mi) SSE of Arniston, South Africa
+2102.3 km (1303.4 mi) S of Port Elizabeth, South Africa
+2103.9 km (1304.4 mi) S of Kruisfontein, South Africa
+2112.7 km (1309.9 mi) S of Plettenberg Bay, South Africa
+2220.3 km (1376.6 mi) S of Bhisho, South Africa
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3wh
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3wh?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 21/10/2026 19:27:23 UTC
+________________________________________________________________

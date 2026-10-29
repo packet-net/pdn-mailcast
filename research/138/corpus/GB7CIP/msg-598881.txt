@@ -1,0 +1,27 @@
+From: HP2DFA
+To: SOLAR
+Type/Status: B$
+Date/Time: 25-Oct-26 09:42
+Bid: 5784_HP2DFA
+Title: SOLAR WX: Space Weather Message Code: ALTEF3
+Path: !VE3KPG!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+    NOAA SPACE WEATHER ALERT BULLETIN - SOLAR     
+==================================================
+Source: NOAA Space Weather Prediction Center (SWPC)
+Product ID : EF3A
+Issue Time : 2026-10-25 09:27:50.723
+--------------------------------------------------
+Space Weather Message Code: ALTEF3
+Serial Number: 3757
+Issue Time: 2026 Oct 25 0927 UTC
+CONTINUED ALERT: Electron 2MeV Integral Flux exceeded 1,000pfu
+Continuation of Serial Number: 3756
+Begin Time: 2026 Oct 23 1140 UTC
+Yesterday Maximum 2MeV Flux: 3259 pfu
+Max time: 2026 Oct 24 1530 UTC
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 SOLAR MONITOR PANAMA
+==================================================

@@ -1,0 +1,95 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 19-Oct-26 00:40
+Bid: 4849_HP2DFA
+Title: WSPR TOP 10 BEACONS DISTANCE/SPOTS OCT18
+Path: !GB7BED!K1AJD!VE3CGR!VE2PKT!PY2BIL!HP2DFA!
+
+WORLDWIDE WSPR PROPAGATION BEACONS TOP 10 DISTANCE SUMMARY (VK7JJ / ARNE)
+
+TECHNICAL PROPAGATION AND BEACON NETWORK BULLETIN
+TOTAL KILOMETER COVERAGE & QRP METRICS (PAST 24 HOURS UTC)
+VALID: 18-OCT-2026 ONWARDS
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+======================================================================
+1. GENERAL SUMMARY & HIGHLIGHTS
+======================================================================
+THE FOLLOWING IS THE UPDATED TOP 10 WORLDWIDE RANKING OF PROPAGATION BEACONS
+SORTED BY TOTAL ACCUMULATED KILOMETERS OF DECODED WSPR PATHS OVER THE PAST
+24 HOURS UTC.
+
+======================================================================
+2. TOP 10 BEACONS TABLE BY TOTAL DISTANCE
+======================================================================
+RANK | CALLSIGN  | LOCATOR | PWR   | TOTAL KM    | UNIQUE SPOTS | TOP BANDS
+----- ----------- --------- ------- ------------- -------------- ------------------
+  1  | VK6XT     | OF88ji  | 5.0W  | 22,095,671  | 1,673        | 20M, 40M, 30M, 17M
+  2  | DP0GVN    | IB59ui  | 5.0W  | 20,640,833  | 1,541        | 20M, 40M, 17M, 30M
+  3  | TI4JWC    | EK70wb  | 1.0W  | 12,777,055  | 2,260        | 40M, 30M, 20M, 17M
+  4  | VK2EFM    | QF56oq  | 10.0W | 12,070,918  | 1,022        | 30M, 40M, 20M, 17M
+  5  | VK3NTB    | QF31cs  | 5.0W  | 11,370,611  |   906        | 40M, 30M, 20M, 17M
+  6  | EB1A      | IN53tf  | 0.5W  | 10,457,773  | 3,092        | 20M, 40M, 15M, 10M
+  7  | VK4TMH    | QG56fk  | 5.0W  |  9,968,565  |   878        | 30M, 40M, 20M, 17M
+  8  | HP2DFA    | FJ09cg  | 0.2W  |  8,643,326  | 1,623        | 20M, 15M, 30M, 40M
+  9  | TA4/G8SCU | KM56vo  | 5.0W  |  8,274,775  | 1,955        | 20M, 40M, 10M, 17M
+ 10  | VK3QN     | QF22    | 5.0W  |  8,092,822  |   551        | 20M
+
+======================================================================
+3. TECHNICAL ANALYSIS & PROPAGATION HIGHLIGHTS
+======================================================================
+- OCEANIA & ANTARCTIC LEADERSHIP: VK6XT AND ANTARCTIC STATION DP0GVN LEAD THE
+  GLOBAL TOTAL KILOMETERS EXCEEDING 20 MILLION KM.
+- HP2DFA (PANAMA) QRP PERFORMANCE: RUNNING A MERE 200 MILLIWATTS (0.2W), LOCAL
+  STATION HP2DFA HOLDS RANK #10 GLOBALLY WITH 8,643,326 TOTAL KILOMETERS AND
+  1,623 UNIQUE SPOTS, SHOWCASING OUTSTANDING PROPAGATION ON 20M, 15M, AND 30M.
+- CENTRAL AMERICAN PATHS: TI4JWC (COSTA RICA) REMAINS STRONG AT RANK #3 WITH
+  12.77M KM AND 2,260 UNIQUE SPOTS RUNNING 1 WATT.
+
+CREDITS & SOURCES: ARNE / ROB / PHIL VK7JJ
+
+
+ACTIVITY SUMMARY AND WORLDWIDE WSPR BEACON RANKING BY SPOT COUNT (VK7JJ / ARNE)
+
+WORLDWIDE BEACON NETWORKS AND PROPAGATION TECHNICAL BULLETIN
+REPORT, DUPLICATE, AND UNIQUE SPOT STATISTICS (PAST 24 HOURS UTC)
+VALID: 18-OCT-2026 ONWARDS
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+======================================================================
+1. GENERAL SUMMARY AND MAIN STATISTICS
+======================================================================
+THE FOLLOWING IS THE WORLDWIDE TOP 10 BEACON STATIONS RANKED BY RAW SPOT
+COUNTS AND UNIQUE SPOTS RECORDED OVER THE PAST 24 HOURS UTC ACROSS
+PROPAGATION MONITORING NETWORKS.
+
+======================================================================
+2. TOP 10 BEACONS TABLE BY SPOT COUNT
+======================================================================
+POS | BEACON    | LOCATOR | PWR   | RAW SPOTS | DUPES   | UNIQUE SPOTS | TOP BANDS
+---- ----------- --------- ------- ----------- --------- -------------- ------------------
+  1 | EB1A      | IN53tf  | 0.5W  |   123,822 |      64 |        3,098 | 20M, 40M, 15M, 30M
+  2 | G4GCI     | IO90gu  | 10.0W |    28,696 |      18 |        2,577 | 40M, 20M, 30M, 17M
+  3 | G3JKF     | JO00bs  | 2.0W  |    39,217 |      28 |        2,518 | 40M, 30M, 20M, 80M
+  4 | TI4JWC    | EK70wb  | 1.0W  |   165,591 |     122 |        2,267 | 40M, 20M, 17M, 30M
+  5 | KK1D      | FN31vi  | 1.0W  |    10,929 |      12 |        2,182 | 40M, 30M, 20M, 17M
+  6 | KD3CCO    | FN10cs  | 5.0W  |     8,179 |      16 |        2,008 | 40M, 20M, 30M, 17M
+  7 | TA4/G8SCU | KM56vo  | 5.0W  |    34,948 |      52 |        1,947 | 40M, 20M, 15M, 17M
+  8 | WW0WWV    | DN70mq  | 1.0W  |   285,335 |     469 |        1,898 | 20M, 40M, 30M, 17M
+  9 | G4HSB     | IO94ll  | 0.2W  |    75,679 |      72 |        1,829 | 20M, 40M, 80M, 160M
+ 10 | K3FZ      | FN30kx  | 10.0W |    13,056 |      22 |        1,745 | 40M, 20M, 30M, 17M
+
+======================================================================
+3. TECHNICAL DETAILS AND PROPAGATION OBSERVATIONS
+======================================================================
+- EB1A QRP LEADERSHIP: SPANISH STATION EB1A REMAINS AT THE WORLDWIDE LEAD WITH
+  3,098 UNIQUE SPOTS AND OVER 123,000 RAW REPORTS USING 0.5 WATTS (QRP).
+- CENTRAL AMERICAN ACTIVITY: TI4JWC (COSTA RICA) MAINTAINS A STRONG PRESENCE
+  AT RANK #4 WITH 165,591 RAW SPOTS AND 2,267 UNIQUE SPOTS RUNNING 1 WATT.
+- NEW TOP 10 ENTRY: NORTH AMERICAN STATION KD3CCO ENTERS THE GLOBAL TOP 10
+  WITH 2,008 UNIQUE SPOTS AND STRONG DECODE PATHS ON 40M AND 20M.
+
+INFORMATION AND CREDITS: ARNE / ROB / PHIL VK7JJ
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

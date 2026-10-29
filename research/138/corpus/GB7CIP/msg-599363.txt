@@ -1,0 +1,37 @@
+From: HP2DFA
+To: DX
+Type/Status: B$
+Date/Time: 29-Oct-26 18:02
+Bid: 6329_HP2DFA
+Title: DX BULLETIN: Active DXpeditions 29 Oct
+Path: !VE3KPG!VE3TOK!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+      DAILY ACTIVE DXPEDITIONS BULLETIN - DX      
+==================================================
+Issue Date : 2026-10-29 18:00 UTC
+Source     : NG3K Announced DX Operations
+--------------------------------------------------
+CALLSIGN     ENTITY / LOCATION        DATES       
+--------------------------------------------------
+C5R			  [s  Gambia                   Oct01-Nov04 
+H44MS			    Solomon Is               Oct03-Nov20 
+3DA0GY			   eSwatini                 Oct15-Nov02 
+7P8GE			    Lesotho                  Oct16-Oct29 
+S9R			  [s  Sao Tome &amp; Principe  Oct17-Oct31 
+JD1BQP			   Ogasawara                Oct17-Nov02 
+YJ0CA			    Vanuatu                  Oct18-Oct30 
+5H3MB			    Tanzania                 Oct19-Nov19 
+3B9 [spots]  Rodrigues I              Oct20-Nov28 
+E51MWA			   North Cook Is            Oct21-Nov16 
+5W0ZP			    Samoa                    Oct21-Oct29 
+C5A			  [s  Gambia                   Oct21-Oct31 
+TZ4AM			    Mali                     Oct22-Dec02 
+9N7XT			    Nepal                    Oct23-Oct31 
+JD1 [spots]  Ogasawara                Oct25-Nov04 
+--------------------------------------------------
+Info: Check local DX Cluster (144.930 MHz) for spots
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 DX MONITOR PANAMA
+==================================================

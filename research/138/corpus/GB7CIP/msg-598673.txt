@@ -1,0 +1,407 @@
+From: CX2SA
+To: ARES
+Type/Status: B$
+Date/Time: 23-Oct-26 04:10
+Bid: ARES1O2026
+Title: The ARES Letter - 10/2026
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : ARES@ARRL
+
+                               ===============
+                               The ARES Letter
+                               ===============
+
+Editor: Rick Palm, K1CE - October 21, 2026
+
+In this Issue:
+
+- ARES© Briefs, Links
+- Hurricane Isaias Response
+- Amateur Radio Delivers Over 670 USGS ShakeOut "DYFI" Reports in Major
+  Emergency Communications Exercise
+- Amateur Radio at the Elm Creek (Minnesota) Half Marathon
+- Letters: Alaska Earthquake
+- Letters: Portable Winlink Sysops Station
+- FEMA Study Findings
+- ARES© Resources
+- Support ARES©: Join ARRL
+
+
+ARES© Briefs, Links
+-------------------
+An ARES©/RACES team in Texas was called out to help with communications
+following an apparent carbon monoxide incident at a local middle school on
+August 27. Team member Liz Brown, K5EMB, reports the school's roughly 1,200
+students were evacuated to a nearby stadium. Staff members found it
+difficult to communicate from one side of the facility to the other, so the
+city's Emergency Management Coordinator requested help from the
+Carrollton-Farmers Branch-Addison ARES©/RACES group. While the
+communications problems were quickly resolved, the hams were asked to remain
+and "shadow" certain school officials until all students and parents were
+reunited about 4 hours later. -Thanks to Rich Moseson, W2VU, The ARRL Letter
+
+
+Hurricane Isaias Response
+-------------------------
+Florida Hams Provide Communications Support During Hurricane Isaias
+
+Amateur radio operators from Florida's Santa Rosa, Nassau, Lake, Pinellas,
+and Leon Counties played an important role in supporting emergency
+communications efforts during and following Hurricane Isaias, helping ensure
+that critical communication capabilities remained available throughout the
+storm.
+
+In Santa Rosa County, volunteer amateur radio operators staffed the
+Emergency Operations Center (EOC) and the evacuation shelter at the Milton
+Community Center. These volunteers provided a communications link between
+the shelter and the EOC, relaying situational updates and maintaining
+readiness to support emergency communications should traditional systems
+become unavailable.
+
+Amateur radio operators across the state also supported auxiliary
+communications efforts, providing additional capabilities to maintain
+contact with the State Emergency Operations Center in Tallahassee if
+conventional communication networks experienced disruptions.
+
+"While traditional communications systems have become significantly more
+reliable over the years, amateur radio continues to serve as a dependable
+auxiliary communications resource," said Santa Rosa County Community
+Emergency Response Team (CERT) and Amateur Radio Emergency Service© (ARES©)
+Program Manager Arc Thames, W4CPD. "When disaster strikes, our volunteers
+are trained, prepared, and ready to step in wherever we're needed. It's
+another layer of resiliency that helps protect our communities."
+
+Thames also serves as the ARRL Northern Florida Section Emergency
+Coordinator and the Amateur Radio Liaison to the Florida Division of
+Emergency Management, supporting the coordination of amateur radio and
+auxiliary communications resources statewide.
+
+"During tropical weather events impacting Florida, our Auxiliary
+Communications team provides volunteer operators to monitor amateur radio
+communications at the State Emergency Operations Center in Tallahassee,"
+Thames explained. "This ensures that if someone is unable to reach emergency
+officials through traditional means, we have another way to receive and
+relay critical information. We always hope we're not needed, but we're glad
+to be there just in case when all else fails." - Thanks to ARRL Northern
+Florida SEC Arc Thames, W4CPD, and The ARRL Letter
+
+Mississippi Active for Isaias
+
+Between October 6 and October 9, 2026, Mississippi ARES monitored,
+mobilized, and staged statewide operational readiness for Hurricane Isaias.
+Initial numerical modeling and dynamic guidance presented significant spread
+across the central and northern Gulf Coast, indicating potential Category 2
+to Category 3 landfall between southeastern Louisiana, coastal Mississippi,
+southern Alabama, and the Florida Panhandle.
+
+Mississippi was fortunate to miss a direct strike from the hurricane. The
+system rapidly intensified over unseasonably warm Gulf waters (84 øF-86 øF),
+reaching peak sustained winds of 120 mph (958 mb central pressure).
+Crucially, the ultimate steering pattern and center track did not solidify
+until just hours prior to landfall, steering the core sharply northeastward
+toward southern Alabama and the Florida Panhandle.
+
+Because of this late eastward deflection, coastal and southeastern
+Mississippi remained on the weaker western (clean) side of the circulation,
+averting catastrophic storm surge (3-7 feet forecast) and widespread
+hurricane-force wind damage. Mississippi ARES activated on SSB and DMR at
+1200 CDST on Friday, October 9, and stood down at 2200 CDST that evening.
+-ARRL Mississippi Section Emergency Coordinator Robert Hayes, KC5IMN
+
+
+Amateur Radio Delivers Over 670 USGS ShakeOut "DYFI" Reports in Major
+---------------------------------------------------------------------
+Emergency Communications Exercise
+---------------------------------
+When the ground moves, seconds count-and when standard telecommunications
+collapse, emergency management depends on ground-truth reports from
+operators already in the field. During the 2026 Great ShakeOut exercise,
+amateur radio operators across the country and around the globe came
+together, joining forces as a dedicated community to demonstrate why
+auxiliary communications remain a vital lifeline for disaster response and
+seismic science.
+
+The 2026 exercise was designed and managed end-to-end by ARES LAX Northeast
+and the Emcomm Training Organization (ETO), led by Oliver Dully, K6OLI, and
+Bob Tykulsker, KM6SO, in direct operational alignment with the U.S.
+Geological Survey (USGS). Major elements included:
+
+Scientific Collaboration: The USGS earthquake hazards team continues to
+pioneer institutional openness to auxiliary radio data, establishing a
+real-world testing ground for zero-infrastructure citizen science.
+
+Exercise Architecture: ARES LAX Northeast and ETO developed the scenarios,
+standardized templates, GIS ingestion pipelines, and automated reporting
+dashboards.
+
+Field Advocacy & Global Reach: Turnout spanning 43 states and 11 nations was
+driven by countless local and regional champions, including European and
+Caribbean partners, specialized training groups like Winlink Treff and
+WLNET-OE, RATPAC, regional nets across the US, and many emergency
+coordinators who mobilized their local sections and clubs. A big thank you
+to all who advocated for ShakeOut and made this a meaningful local exercise.
+
+The response was swift, disciplined, and massive. As the operational window
+headed into its final weekend, the USGS event portal had received over 670
+direct "Did You Feel It?" (DYFI) reports originated by amateur radio
+operators. More than 610 individual participants mobilized across 43 US
+states and 11 countries, routing well over 1,100 digital DYFI, Preparedness
+Survey, and Quiz messages via Winlink Express Telnet, Packet, PACTOR, and
+VARA protocols.
+
+Scientific Utility Meets Tactical Rigor
+
+Unlike routine check-in nets, the 2026 ShakeOut demanded end-to-end data
+precision. Using standardized Winlink templates, hams compiled simulated
+seismic intensity reports-quantifying shaking levels, damage observations,
+and building performance-and transmitted them directly into the USGS
+scientific pipeline.
+
+Beyond raw volume, the exercise provided valuable data-hygiene insights,
+highlighting key areas like geocoding consistency between street addresses
+and coordinate pairs that will inform future template refinements and
+operator training.
+
+This joint drill validated that amateur radio is not merely a backup voice
+channel; it is an agile, zero-infrastructure data pipeline capable of
+feeding mission-critical ground truth into national emergency dashboards
+when commercial internet and cellular systems go dark.
+
+In addition to Winlink reporting, local voice and data nets managed
+real-time check-ins and check-outs across participating regions. For
+example, the regional SoCal ShakeOut net, co-hosted by San Diego ARES and
+ARES LAX, logged 43 active participants, while numerous other local groups
+operated dedicated ShakeOut nets to handle regional traffic and coordinate
+ground team reports.
+
+Proven Knowledge and Deep Preparedness
+
+Alongside seismic reports, participants tackled an earthquake science and
+preparedness quiz as part of an extensive all-hazards preparedness audit:
+
+Earthquake Science & Preparedness Knowledge: Operators posted an exceptional
+94% average score on the exercise quiz, demonstrating mastery of earthquake
+science fundamentals, USGS intensity terminology (MMI vs. magnitude), and
+recommended protective actions like Drop, Cover, and Hold On.
+
+Station & Household Readiness: On a 25-point comprehensive preparedness
+scale measuring essential supplies, emergency power, communications gear,
+and household plans, participants averaged 18.9 out of 25 (75.6%).
+
+These figures challenge the misconception that disaster exercises are merely
+hobbyist drills. They prove that participating amateur radio operators are
+well-equipped, knowledgeable, and genuinely invested in community resilience.
+
+Looking Ahead
+
+With the operational submission window now closed, final figures and
+post-exercise maps will be consolidated and shared across regional teams.
+The data gathered from the ShakeOut scenario demonstrates that effective
+disaster response begins at home and extends into our communities. Moving
+forward, operators and community members alike are urged to strengthen
+personal, family, and neighborhood preparedness-ensuring household safety
+and local resilience while continuing to serve as a vital ground-truth
+reporting network for the USGS during major seismic events.
+
+Detailed map dashboards, participation breakdowns, and exercise resources
+remain available at https://www.emcomm-training.org/Winlink_Thursdays.html
+and laxnortheast.org/exercises/shakeout. - Oliver Dully, K6OLI (DEC, ARES
+LAX Northeast), and Bob Tykulsker, KM6SO (ETO)
+
+
+Amateur Radio at the Elm Creek (Minnesota) Half Marathon
+--------------------------------------------------------
+September 12, 2026--With just over 1100 runners, this was our second year
+supporting the event in Elm Creek Park Reserve, just northwest of
+Minneapolis. At 4,900 acres, this large park has several hills that can
+block repeater signals. The race director was out of town for this one, so
+extra time was allocated to brief hams on the route safety details. We were
+provided (and were part of) a detailed medical plan. Half marathons can have
+serious health situations, particularly with heatstroke, so we had the full
+list of capabilities-a medical tent, EMS rigs, aid stations, and running
+medics, who have a red shirt and first aid fanny pack to provide care in a
+hurry.
+
+Hams were assigned to complex trail crossings. At my stop, we again saw the
+ability of runners, presumably "in the zone" or wearing earbuds, to blast
+through signs, arrows, and cones down the wrong trail at intersections. This
+kept us entertained (we learned the proper wave) and we kept an eye out for
+injuries.
+
+The medical director was not a ham, and we had to keep her and her team, and
+the other race officials informed. We ended up handing them a handheld on
+"scan" mode so they could listen in. We are now testing PTT-over-cellular
+(POC) radios at a larger event. Best practice at the moment here is probably
+Zello at Work.
+
+We signed out a Hennepin County Sheriff amateur service repeater (146.82
+MHz) which was not far away and on a massive tower. (My tow vehicle for our
+portable repeater trailer was in the repair shop.) This worked well except
+at my location, where I could hear the repeater output but could not get in.
+Cell coverage was excellent and we had a text chat group.
+
+The runners had to turn right off the trail, do a U-turn to avoid some old
+boards, and then go through the water stop and up another hill to the west.
+Signs, a cowbell, a dozen orange cones and vigorous waving usually worked.
+We had seven operators, and provided an ICS 205 form, used the existing
+medical plan, and did not have a net control. Jen Zielinski, KFMPK, a
+former EMT, was our lead. With cool weather, we had just one serious injury.
+911 was called and a medical cart responded. -Erik Westgard, NY9D, Assistant
+Section Emergency Coordinator for Events, ARRL Minnesota Section
+
+
+Letters: Alaska Earthquake
+--------------------------
+I enjoyed the September ARES Letter summary of amateur radio responses to
+significant events over the years. The 1964 Alaska earthquake, also known as
+the Great Alaska Earthquake and the Good Friday Earthquake, occurred at 5:36
+PM AKST on Good Friday, March 27, 1964. One of the lower 48 states'
+responding stations and maybe the first to receive messages from Alaska, was
+Al Francisco, K7NHV. Al was an active member of the ARRL National Traffic
+System in Montana at the time and, on that evening, started receiving
+emergency traffic from Alaska. He spent the following 2 to 3 days handling
+emergency traffic and routing it into the NTS. Many other amateurs were
+involved, but Al was only 17 years old at the time. Quite an effort and an
+indication of future excellence for Al. -Ward Silver, NAX, St. Charles,
+Missouri
+
+
+Letters: Portable Winlink Sysops Station
+----------------------------------------
+I was inspired to build a portable Winlink sysops station that I could use
+almost anywhere and link to my mini Starlink antenna for the internet. I
+live in Alaska and there are not that many options for hitting a Winlink
+Sysops base station. I actually live between two of them but due to terrain
+and obstacles, I could not hit either of them from my home base, so I
+established my own VHF packet base station, but also came up with the idea
+of building a portable system. I built a portable unit and the Matanuska
+Amateur Radio Association/Club in Wasilla, Alaska, tested it out for the
+first time with a mini-Starlink satellite dish, and it worked perfectly.
+
+Now, I am wondering how many other emergency preparedness organizations or
+individuals have thought about doing this. I never heard nor read any
+discussion or articles about it. Obviously not everyone could do it but it
+could be done at other radio clubs and organizations if they were lacking
+connectivity in their area. I think about all the communities that had
+disasters and normal communications completely wiped out. I can set up a VHF
+sysops station and Starlink with an antenna mounted on top of my car or on a
+tripod for higher coverage.
+
+I posted on Facebook under Amateur Radio Alaska: "A marriage between Winlink
+RMS Express and Starlink Satellite." -Ken Hudson, KL2HF, with thanks to Rich
+Moseson, W2VU, The ARRL Letter
+
+
+FEMA Study Findings
+-------------------
+ARRL has a formal memorandum of understanding (MOU) with the Federal
+Emergency Management Agency (FEMA). The agency and its partners released a
+new study that provides key insights into challenges faced by emergency
+managers across the nation. The "Emergency Management Organizational
+Structures, Staffing, and Capacity Study" confirms that the country's
+emergency management system is strongest when it is locally led, state
+managed, and federally supported. The study surveyed over 1,700 emergency
+management officials nationwide and found that local and state agencies are
+best positioned to understand and address the unique needs of their
+communities.
+
+"FEMA is focused on empowering state, local, tribal, and territorial
+governments to lead through all phases of emergency management," said
+Administrator Cameron Hamilton. "This study makes clear that a
+one-size-fits-all, federally driven approach will never be as effective as
+community-led efforts. FEMA will continue to partner with officials at every
+level of government, empowering them to build local capabilities and invest
+in resilience efforts."
+
+FEMA sponsored the study to better understand the emergency management
+landscape. The report finds that local emergency management agencies are
+critical to our nation's resilience, but it also finds that those
+organizations are typically understaffed and underfunded.
+
+For decades, many states have relied excessively on federal grants to
+maintain emergency response capabilities-to their own detriment. To
+strengthen their resilience against disasters and emergencies, states,
+tribal nations, territories, and local jurisdictions should consistently
+invest in their own emergency management capabilities.
+
+This study was funded by FEMA and conducted by the Argonne National
+Laboratory, Big City Emergency Managers (BCEM), the International
+Association of Emergency Managers (IAEM-USA), and the National Emergency
+Management Association (NEMA), which also collaborated on the study.
+
+In addition to publishing the study's findings as a report, FEMA worked with
+the Argonne National Laboratory to launch the National Emergency Management
+Data Explorer (NEMDEX) tool. This tool is available to help review and
+analyze the summary information gathered from the local survey component of
+the study. Community leaders can review the findings to make informed,
+strategic decisions on investment and capacity building efforts.
+
+To view the report and access the NEMDEX tool, please visit the Argonne
+National Laboratory.
+
+
+ARES© Resources
+---------------
+ARES Field Resources Manual [PDF]
+ARES Standardized Training Plan Task Book [Fillable PDF]
+ARES Standardized Training Plan Task Book [Word]
+ARES Plan
+ARES Group Registration
+Emergency Communications Training
+
+The Amateur Radio Emergency Service© (ARES) consists of licensed amateurs
+who have voluntarily registered their qualifications and equipment with
+their local ARES leadership, for communications duty in the public service
+when disaster strikes. Every licensed amateur, regardless of membership in
+ARRL or any other local or national organization is eligible to apply for
+membership in ARES. Training may be required or desired to participate fully
+in ARES. Please inquire at the local level for specific information. Because
+ARES is an amateur radio program, only licensed radio amateurs are eligible
+for membership. The possession of emergency-powered equipment is desirable,
+but is not a requirement for membership.
+
+How to Get Involved in ARES: Fill out the ARES Registration form and submit
+it to your local Emergency Coordinator.
+
+
+Support ARES©: Join ARRL
+------------------------
+ARES© is a program of ARRL The National Association for Amateur Radio©. No
+other organization works harder than ARRL to promote and protect amateur
+radio! ARRL members enjoy many benefits and services including digital
+magazines, e-newsletters, online learning (learn.arrl.org), and technical
+support. Membership also supports programs for radio clubs, on-air contests,
+Logbook of The World©, ARRL Field Day, and the all-volunteer ARRL Field
+Organization.
+
+Join ARRL or renew today! www.arrl.org/join
+
+The ARES Letter is free of charge to ARRL members. Subscribe:
+www.arrl.org/subscribe
+
+Find ARRL on Facebook, Instagram, YouTube, X (@arrl and @arrl_ares), and
+Threads
+
+ARRL Store: www.arrl.org/shop
+
+Support programs not funded by member dues at www.arrl.org/donate
+
+Contact us to advertise in this newsletter (space subject to availability):
+ads@xxxx.xxx
+
+The ARES Letter is published on the third Wednesday of each month. ARRL
+members may subscribe at no cost or unsubscribe by editing their Member Data
+Page at www.arrl.org/opt-in-out.
+
+Copyright ¸ 2026 American Radio Relay League, Incorporated. Use and
+distribution of this publication, or any portion thereof, is permitted for
+non-commercial or educational purposes, with attribution. All other purposes
+require written permission.
+
+
+                   ****************************************
+                   * Distributed on the packet network by *
+                   * CX2SA <> 1978-2026 <> Salto, Uruguay *
+                   ****************************************

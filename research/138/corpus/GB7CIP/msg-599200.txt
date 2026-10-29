@@ -1,0 +1,330 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 28-Oct-26 11:46
+Bid: 26273_LU9DCE
+Title: ARCHLINUX UPDATES 28-OCT
+Path: !GB7BED!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+PYTHON-AIOMISC 18.0.37-2 ANY
+
+MISCELLANEOUS UTILITIES FOR ASYNCIO
+
+========================================
+
+LIBREWOLF 159.0.0_1-1 X86_64
+
+COMMUNITY-MAINTAINED FORK OF FIREFOX, FOCUSED ON PRIVACY, SECURITY AND
+FREEDOM
+
+========================================
+
+SUPER-PRODUCTIVITY 19.3.1-1 X86_64
+
+AN ADVANCED TODO LIST APP WITH TIMEBOXING AND TIME TRACKING
+CAPABILITIES
+
+========================================
+
+PYTHON-FASTMCP-TASKS 4.1.3-1 ANY
+
+BACKGROUND TASK EXECUTION FOR FASTMCP SERVERS
+
+========================================
+
+PYTHON-FASTMCP-SLIM 4.1.3-1 ANY
+
+FASTMCP LIBRARY WITH MINIMAL DEPENDENCIES
+
+========================================
+
+PYTHON-FASTMCP-REMOTE 4.1.3-1 ANY
+
+PYTHON STDIO BRIDGE FOR REMOTE MCP SERVERS
+
+========================================
+
+PYTHON-FASTMCP 4.1.3-1 ANY
+
+THE FAST, PYTHONIC WAY TO BUILD MCP SERVERS AND CLIENTS
+
+========================================
+
+DEEPIN-IMAGE-VIEWER 6.0.35-1 X86_64
+
+AN IMAGE VIEWING TOOL WITH FASHION INTERFACE AND SMOOTH PERFORMANCE
+
+========================================
+
+PYTHON-PIPX 1.18.4-2 ANY
+
+INSTALL AND RUN PYTHON APPLICATIONS IN ISOLATED ENVIRONMENTS
+
+========================================
+
+MISE 2026.10.21-1 X86_64
+
+THE FRONT-END TO YOUR DEV ENV
+
+========================================
+
+PYTHON-PYDANTIC-MONTY-RUNTIME 1.4.0-1 X86_64
+
+MONTY SANDBOX RUNTIME AND COMMAND-LINE INTERFACE
+
+========================================
+
+PYTHON-PYDANTIC-MONTY-CLIENT 1.4.0-1 X86_64
+
+PYTHON CLIENT FOR THE MONTY SANDBOX
+
+========================================
+
+PYTHON-PYDANTIC-MONTY 1.4.0-1 X86_64
+
+A PYTHON SANDBOX WRITTEN IN RUST
+
+========================================
+
+DEEPIN-GRAND-SEARCH 6.0.22-1 X86_64
+
+SYSTEM-WIDE DESKTOP SEARCH FOR DDE
+
+========================================
+
+DEEPIN-FILE-MANAGER 1:6.5.49.1-1 X86_64
+
+DEEPIN FILE MANAGER
+
+========================================
+
+LIMINE 12.9.6-1 X86_64
+
+MODERN, SECURE, PORTABLE, MULTIPROTOCOL BOOTLOADER AND BOOT MANAGER
+
+========================================
+
+PYTHON-JUPYTER-BUILDER 1.2.4-1 ANY
+
+BUILD TOOLS FOR JUPYTERLAB
+
+========================================
+
+XDG-TERMINAL-EXEC 0.14.4-1 ANY
+
+PROPOSAL FOR XDG DEFAULT TERMINAL EXECUTION SPECIFICATION AND
+SHELL-BASED REFERENCE IMPLEMENTATION
+
+========================================
+
+SWAY-CONTRIB 1.12-1 ANY
+
+A COLLECTION OF USER-CONTRIBUTED SCRIPTS FOR SWAY
+
+========================================
+
+GTKLOCK-USERINFO-MODULE 5.0.0-1 X86_64
+
+GTKLOCK MODULE ADDING USER INFO TO THE LOCKSCREEN
+
+========================================
+
+GTKLOCK-POWERBAR-MODULE 5.0.0-1 X86_64
+
+GTKLOCK MODULE ADDING POWER CONTROLS TO THE LOCKSCREEN
+
+========================================
+
+GTKLOCK-PLAYERCTL-MODULE 5.0.0-1 X86_64
+
+GTKLOCK MODULE ADDING MEDIA PLAYER CONTROLS TO THE LOCKSCREEN
+
+========================================
+
+GTKLOCK 5.0.0-1 X86_64
+
+GTK-BASED LOCKSCREEN FOR WAYLAND
+
+========================================
+
+QGIS 4.2.3-4 X86_64
+
+GEOGRAPHIC INFORMATION SYSTEM (GIS) THAT SUPPORTS VECTOR, RASTER &
+DATABASE FORMATS
+
+========================================
+
+GITEA-RUNNER 5.2.4-1 X86_64
+
+OFFICIAL RUNNER FOR GITEA
+
+========================================
+
+CMAKE 4.4.5-1 X86_64
+
+A CROSS-PLATFORM OPEN-SOURCE MAKE SYSTEM
+
+========================================
+
+PYTHON-AIOHTTP-ASGI 0.7.1-1 ANY
+
+ADAPTER FOR RUNNING ASGI APPLICATIONS ON AIOHTTP
+
+========================================
+
+NODEJS 26.12.1-2 X86_64
+
+EVENTED I/O FOR V8 JAVASCRIPT ("CURRENT" RELEASE)
+
+========================================
+
+GOST 3.3.2-1 X86_64
+
+GO SIMPLE TUNNEL
+
+========================================
+
+PYTHON-CYCLOPTS 5.3.2-1 ANY
+
+COMMAND-LINE INTERFACES BASED ON TYPE HINTS
+
+========================================
+
+PYTHON-CONFIGARGPARSE 1.9.0-1 ANY
+
+A DROP-IN REPLACEMENT FOR ARGPARSE THAT ALLOWS OPTIONS TO ALSO BE SET
+VIA CONFIG FILES AND/OR ENVIRONMENT VARIABLES
+
+========================================
+
+PYTHON-PYTEST 1:9.2.0-1 ANY
+
+SIMPLE POWERFUL TESTING WITH PYTHON
+
+========================================
+
+R8168-LTS 8.057.00-11 X86_64
+
+A KERNEL MODULE FOR REALTEK 8168 NETWORK CARDS FOR LINUX-LTS
+
+========================================
+
+NVIDIA-OPEN-LTS 1:615.78.08-7 X86_64
+
+NVIDIA OPEN KERNEL MODULES
+
+========================================
+
+ACPI_CALL-LTS 1.2.2-372 X86_64
+
+A LINUX KERNEL MODULE THAT ENABLES CALLS TO ACPI METHODS THROUGH
+/PROC/ACPI/CALL
+
+========================================
+
+LINUX-LTS-HEADERS 6.18.59-1 X86_64
+
+HEADERS AND SCRIPTS FOR BUILDING MODULES FOR THE LTS LINUX KERNEL
+
+========================================
+
+LINUX-LTS-DOCS 6.18.59-1 X86_64
+
+DOCUMENTATION FOR THE LTS LINUX KERNEL
+
+========================================
+
+LVM2 2.03.44-1 X86_64
+
+LOGICAL VOLUME MANAGER 2 UTILITIES
+
+========================================
+
+LINUX-LTS 6.18.59-1 X86_64
+
+THE LTS LINUX KERNEL AND MODULES
+
+========================================
+
+DEVICE-MAPPER 2.03.44-1 X86_64
+
+DEVICE MAPPER USERSPACE LIBRARY AND TOOLS
+
+========================================
+
+SING-GEOSITE-RULE-SET 20261027070632-1 ANY
+
+GEOSITE RULE SETS FOR SING-BOX
+
+========================================
+
+OBS-STUDIO 33.0.0-1 X86_64
+
+FREE, OPEN SOURCE SOFTWARE FOR LIVE STREAMING AND RECORDING
+
+========================================
+
+V2RAY-DOMAIN-LIST-COMMUNITY 20261027070632-1 ANY
+
+A LIST OF DOMAINS TO BE USED AS GEOSITES FOR ROUTING PURPOSE IN
+PROJECT V
+
+========================================
+
+LIBMIKMOD 3.3.16-1 X86_64
+
+MODULE PLAYER LIBRARY SUPPORTING MANY FORMATS, INCLUDING MOD, S3M, IT
+AND XM
+
+========================================
+
+GPASTE 51.2-1 X86_64
+
+CLIPBOARD MANAGEMENT SYSTEM
+
+========================================
+
+GHOSTTY-TERMINFO 1.4.0-1 X86_64
+
+TERMINFO FOR GHOSTTY
+
+========================================
+
+GHOSTTY-SHELL-INTEGRATION 1.4.0-1 X86_64
+
+SHELL INTEGRATION SCRIPTS FOR GHOSTTY
+
+========================================
+
+GHOSTTY-NAUTILUS 1.4.0-1 X86_64
+
+OPEN IN GHOSTTY FOR GNOME FILES
+
+========================================
+
+GHOSTTY 1.4.0-1 X86_64
+
+FAST, NATIVE, FEATURE-RICH TERMINAL EMULATOR PUSHING MODERN FEATURES
+
+========================================
+
+SSLSPLIT 0.5.5-4 X86_64
+
+TOOL FOR MAN-IN-THE-MIDDLE ATTACKS AGAINST SSL/TLS ENCRYPTED NETWORK
+CONNECTIONS
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 24-Oct-26 04:51
+Bid: 5904-CX2SA
+Title: (M5.3) Vanuatu -13.7 165.6
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Vanuatu
+Geographic coordinates:           13.732S, 165.551E
+Magnitude:                        5.3
+Depth:                            10 km
+Universal Time (UTC):             24 Oct 2026  04:19:39
+Time near the Epicenter (1):      24 Oct 2026  15:19:39
+Time in your area (1):            24 Oct 2026  01:19:39
+Location with respect to nearby cities:
+216.9 km (134.5 mi) W of Sola, Vanuatu
+263.1 km (163.1 mi) NW of Luganville, Vanuatu
+532.9 km (330.4 mi) NNW of Port-Vila, Vanuatu
+774.0 km (479.9 mi) SE of Honiara, Solomon Islands
+777.0 km (481.7 mi) SE of Malango, Solomon Islands
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4jy
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4jy?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 24/10/2026 04:50:33 UTC
+________________________________________________________________

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 29-Oct-26 07:52
+Bid: 6255_HP2DFA
+Title: EARTHQUAKE ALERT M5.4 - 114 km ENE of Barcelona, Philippine
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.4+)       
+==================================================
+Event ID   : us7000ttxn
+Magnitude  : M 5.4
+Time (UTC) : 2026-10-29 07:31:30 UTC
+Depth      : 10.0 km
+Coordinates: 8.4677 Lat / 127.4269 Lon
+--------------------------------------------------
+Location:
+  114 km ENE of Barcelona, Philippines
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttxn
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: DX
+Type/Status: B$
+Date/Time: 20-Oct-26 18:01
+Bid: 5213_HP2DFA
+Title: DX BULLETIN: Active DXpeditions 20 Oct
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+==================================================
+      DAILY ACTIVE DXPEDITIONS BULLETIN - DX      
+==================================================
+Issue Date : 2026-10-20 18:00 UTC
+Source     : NG3K Announced DX Operations
+--------------------------------------------------
+CALLSIGN     ENTITY / LOCATION        DATES       
+--------------------------------------------------
+No active DXpeditions currently reported.
+--------------------------------------------------
+Info: Check local DX Cluster (144.930 MHz) for spots
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 DX MONITOR PANAMA
+==================================================

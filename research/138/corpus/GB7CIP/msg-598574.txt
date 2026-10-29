@@ -1,0 +1,118 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 22-Oct-26 08:31
+Bid: 8750_GB7CIP
+Title: Coax Traps
+Path: 
+
+By G8MNY                                  (Updated Nov 08)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+To make a coax trap to reject a frequency you basically just T any piece of low
+loss coax with electrical length equal to a 1/4 wave for the notch frequency
+needed, across the aerial feeder/socket.
+
+ Aerial            "Teed"
+  \³/     feeder    notch     Rx
+   ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÙ
+                      ³
+                  Open coax
+
+Leaving the teed coax "open" a 1/4 wave back from that where the T is you get
+the opposite impedance "a short circuit", and it this that gives the attention
+across the feeder. So the lower loss in the trap coax the deeper the notch.
+
+To determine the physical length the coax velocity factor is needed (how much
+shorter than an actual 1/4 wave the coax has to be). e.g. 0.66 for clear
+poly and 0.78 for air spaced and foamed (white) poly.
+
+Cutting the length too long & trimming it shorter at the lower frequency
+e.g. 144MHz not 145MHz to start with, so you know the depth of the notch then
+trim on frequency until the signals attenuates at the wanted frequency.
+
+  Starting point            Done             Overdone start again!
+ ³---.   .----         ³----.   .---           ³-----.   .---
+ ³    \ /Too           ³     \ /Just           ³      \ /Too
+ ³     V Long          ³      V Right          ³       V Short
+ ÀÄÄÄÄÄÄÂÄÄÄÄÄ         ÀÄÄÄÄÄÄÂÄÄÄÄÄÄ          ÀÄÄÄÄÄÄÂÄÄÄÄÄÄ
+       145                   145                     145
+
+This is more difficult if the trap is for say a 158MHz pager Tx to a 2m Rx,
+than say 145MHz to VHF Rx, unless you have signal generator and a Rx for the
+frequency (scanner). See multiple resonance below.
+
+Using a 1/4 wave coax stub on 144MHz also works on 3x @ 432MHz, but unwanted
+notch @ 5x 720MHz. This may not be what is wanted for a UHF TV Rx !!
+ Loss
+  0dB³Ä-._     _.-ÄÄÄ-._     _.--ÄÄ--._   _.--ÄÄÄ--._   _.--
+     ³    \   /         \   /          \ /           \ /
+-10dB³     | |           | |            V             '
+     ³     Þ Ý            V
+-20dB³      V             
+     ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ>Frequency
+            1      2      3      4      5      6      7     1/4 Waves
+           144           432           720           1008   MHz
+ 
+Of course leaving a teed piece of coax across a Tx feeder would upset the SWR!
+
+MULTIPLE RESONANCE TX TRAPS
+On a 2 Tx site use can be made of this multiple notch, to stop PA inter mixing
+instead of circulators, if the 2 Tx are a fair frequency apart. The open
+circuit coax length needs to be approx a 1/4 wave at the difference frequency
+and an even number of 1/2 waves at each Tx. Or say a 400W pager Tx on 158MHz &
+144MHz nearby ham with Rx QRM, coax of about 0.66x 1/4 @ 14MHz = 3.5m long cut
+back to 3.446m for reject and 3.4m pass.
+                                                           Tx    QRM
+³-._     _.-Ä-._     _.-Ä-._     _.-Ä-._     _.-Ä-._     _.-Ä-._     _.-Ä
+³   \   /       \   /       \   /       \   /       \   /       \   /
+³    | |         | |         | |         | |         | |         | |
+³    Þ Ý         Þ Ý         Þ Ý         Þ Ý         Þ Ý         Þ Ý
+³     V           V           Y           Y           Y           Y
+ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ>1/4
+      1     2     3     4     5     6     7     8     9     10    11   Waves
+      14                                                   144   158    MHz
+
+With heavy low loss coax this approach can give a QRO trap that is open circuit
+on the Tx frequency, but 20dB down on a nearby QRM frequency. To set up the
+coax is just TEED to the Tx line with a Rx looking at the QRM instead of the
+Tx then the line is trimmed to null out the QRM. On Tx of the line is still
+near a 1/2 wave line resonance so on Tx the SWR will still be 1:1.
+
+See also my bul "VHF/UHF TVI Filter" & also "HF Rx Suckout Trap".
+
+DC SHORT & HARMONIC ATTENUATING
+However using a short circuit 1/4 wave Teed in a Tx/Rx for its frequency, will
+attenuate all even harmonics and protect from static. The shorted line is seen
+as open circuit a 1/4 wave away at the T point so has no affect on SWR.
+
+ Loss
+  0dB³     .-Ä-.       _.-Ä-._      _.--ÄÄ--._   _.--ÄÄ--._    _.--
+     ³   .'     `\   /'       '\   /          \ /          '\ / 
+-10dB³  /         | |           | |            V             '
+     ³ /           V             '
+-20dB³/
+     ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ>Frequency
+     DC     1      2      3      4      5      6      7      8   Harmonics
+
+Feedback from Pete G6KUI...
+I've used co-ax traps for many many years, both on RX and TX.
+A couple of points.
+You really need to use solid dialectric co-ax. If you use semi-air-spaced you
+will find the electrical quarter wave will vary as you bend the co-ax stub and
+hence the notch frequency will shift as you bend it.
+
+When I was very active on 70cm ATV, I had to manufacture a whole pile of the
+stubs for my neighbours TVs. The quarter wave stub plus a patch length of coax
+were squeezed into one belling-lee(plug) and a belling-lee(socket) on the free
+end of patch length. Final trimming of the stub done in the shack after
+assembly. This way the fitting to neighbours TVs was a very simple and quick
+operation. A very cheap solution to the problems in those days.
+
+On the TX side of things (2M) - I fitted a shorted stub to my 2M linear,
+it got rid of a horrible 2nd harmonic that the linear was producing.
+
+
+Why don't U send an interesting bul?
+
+73 De John G8MNY @ GB7CIP

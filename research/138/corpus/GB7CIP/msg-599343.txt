@@ -1,0 +1,326 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 29-Oct-26 11:46
+Bid: 26369_LU9DCE
+Title: ARCHLINUX UPDATES 29-OCT
+Path: !VK2RZ!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+ASPELL 0.60.8.3-1 X86_64
+
+A SPELL CHECKER DESIGNED TO EVENTUALLY REPLACE ISPELL
+
+========================================
+
+SBT 1:2.0.12-1 ANY
+
+THE INTERACTIVE BUILD TOOL
+
+========================================
+
+MISE 2026.10.22-1 X86_64
+
+THE FRONT-END TO YOUR DEV ENV
+
+========================================
+
+ZED 1.26.2-1 X86_64
+
+A HIGH-PERFORMANCE, MULTIPLAYER CODE EDITOR FROM THE CREATORS OF ATOM
+AND TREE-SITTER
+
+========================================
+
+V2RAY-DOMAIN-LIST-COMMUNITY 20261028111806-1 ANY
+
+A LIST OF DOMAINS TO BE USED AS GEOSITES FOR ROUTING PURPOSE IN
+PROJECT V
+
+========================================
+
+SIMDJSON 2:5.0.5-1 X86_64
+
+A C++ LIBRARY TO SEE HOW FAST WE CAN PARSE JSON WITH COMPLETE
+VALIDATION.
+
+========================================
+
+TAFFYBAR 7.4.4-1 X86_64
+
+A DESKTOP BAR SIMILAR TO XMOBAR, BUT WITH MORE GUI
+
+========================================
+
+PYTHON-CACHETOOLS 7.2.7-1 ANY
+
+EXTENSIBLE MEMOIZING COLLECTIONS AND DECORATORS
+
+========================================
+
+PERL-DATETIME-TIMEZONE 2.72-1 ANY
+
+TIME ZONE OBJECT BASE CLASS AND FACTORY
+
+========================================
+
+NEXTCLOUD-APP-CONTACTS 8.9.3-1 ANY
+
+CONTACTS APP FOR NEXTCLOUD
+
+========================================
+
+PNPM 12.16.1-1 X86_64
+
+FAST, DISK SPACE EFFICIENT PACKAGE MANAGER
+
+========================================
+
+OLLAMA-VULKAN 0.40.12-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS) WITH VULKAN
+
+========================================
+
+OLLAMA-ROCM 0.40.12-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS) WITH ROCM
+
+========================================
+
+OLLAMA-DOCS 0.40.12-1 X86_64
+
+DOCUMENTATION FOR OLLAMA
+
+========================================
+
+OLLAMA-CUDA 0.40.12-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS) WITH CUDA
+
+========================================
+
+OLLAMA 0.40.12-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS)
+
+========================================
+
+MEILISEARCH 1:1.56.0-1 X86_64
+
+LIGHTNING FAST, ULTRA RELEVANT, AND TYPO-TOLERANT SEARCH ENGINE
+
+========================================
+
+PYTHON-URWID 1:4.2.5-1 ANY
+
+CURSES-BASED USER INTERFACE LIBRARY
+
+========================================
+
+DTKDECLARATIVE 1:6.7.52-1 X86_64
+
+DEEPIN TOOLKIT, DECLARATIVE MODULE FOR DDE LOOK AND FEEL (QT5 BUILD)
+
+========================================
+
+DTK6DECLARATIVE 1:6.7.52-1 X86_64
+
+DEEPIN TOOLKIT, DECLARATIVE MODULE FOR DDE LOOK AND FEEL (QT6 BUILD)
+
+========================================
+
+DEEPIN-ANYTHING-ARCH 7.0.11-1 X86_64
+
+DEEPIN ANYTHING FILE SEARCH TOOL, KERNEL MODULE FOR ARCH KERNEL
+
+========================================
+
+DTKWIDGET 1:6.7.52-1 X86_64
+
+DEEPIN BASE GRAPHICAL WIDGETS LIBRARY (QT5 BUILD)
+
+========================================
+
+DTK6WIDGET 1:6.7.52-1 X86_64
+
+DEEPIN BASE GRAPHICAL WIDGETS LIBRARY (QT6 BUILD)
+
+========================================
+
+PARI 2.19.0-4 X86_64
+
+COMPUTER ALGEBRA SYSTEM DESIGNED FOR FAST COMPUTATIONS IN NUMBER
+THEORY
+
+========================================
+
+PYTHON-PYFLAKES 4.1.0-1 ANY
+
+A LINT-LIKE TOOL FOR PYTHON TO IDENTIFY COMMON ERRORS QUICKLY WITHOUT
+EXECUTING CODE
+
+========================================
+
+PYTHON-PYDANTIC-SETTINGS 2.16.2-1 ANY
+
+SETTINGS MANAGEMENT USING PYDANTIC
+
+========================================
+
+PYTHON-FLAKE8 1:7.5.0-1 ANY
+
+THE MODULAR SOURCE CODE CHECKER: PEP8, PYFLAKES AND CO
+
+========================================
+
+VULKAN-VIRTIO 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR VIRTIO-GPU (VENUS)
+
+========================================
+
+VULKAN-SWRAST 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR CPUS (SOFTWARE RASTERIZER)
+
+========================================
+
+VULKAN-RADEON 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR AMD GPUS
+
+========================================
+
+VULKAN-POWERVR 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR POWERVR GPUS
+
+========================================
+
+VULKAN-PANFROST 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR MALI GPUS
+
+========================================
+
+VULKAN-NOUVEAU 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR NVIDIA GPUS
+
+========================================
+
+VULKAN-MESA-LAYERS 1:26.2.6-1 X86_64
+
+MESA'S EXPLICIT VULKAN LAYERS
+
+========================================
+
+VULKAN-MESA-IMPLICIT-LAYERS 1:26.2.6-1 X86_64
+
+MESA'S IMPLICIT VULKAN LAYERS
+
+========================================
+
+VULKAN-INTEL 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR INTEL GPUS
+
+========================================
+
+VULKAN-GFXSTREAM 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR GRAPHICS STREAMING KIT
+
+========================================
+
+VULKAN-FREEDRENO 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR ADRENO GPUS
+
+========================================
+
+VULKAN-DZN 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR D3D12
+
+========================================
+
+VULKAN-BROADCOM 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR VIDEOCORE GPUS
+
+========================================
+
+VULKAN-ASAHI 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR APPLE GPUS
+
+========================================
+
+LIB32-VULKAN-VIRTIO 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR VIRTIO-GPU (VENUS) - 32-BIT
+
+========================================
+
+OPENCL-MESA 1:26.2.6-1 X86_64
+
+OPEN-SOURCE OPENCL DRIVERS
+
+========================================
+
+LIB32-VULKAN-SWRAST 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR CPUS (SOFTWARE RASTERIZER) - 32-BIT
+
+========================================
+
+MESA-DOCS 1:26.2.6-1 X86_64
+
+MESA'S DOCUMENTATION
+
+========================================
+
+LIB32-VULKAN-RADEON 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR AMD GPUS - 32-BIT
+
+========================================
+
+MESA 1:26.2.6-1 X86_64
+
+OPEN-SOURCE OPENGL DRIVERS
+
+========================================
+
+LIB32-VULKAN-POWERVR 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR POWERVR GPUS - 32-BIT
+
+========================================
+
+LIB32-VULKAN-PANFROST 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR MALI GPUS - 32-BIT
+
+========================================
+
+LIB32-VULKAN-NOUVEAU 1:26.2.6-1 X86_64
+
+OPEN-SOURCE VULKAN DRIVER FOR NVIDIA GPUS - 32-BIT
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

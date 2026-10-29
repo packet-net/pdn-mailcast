@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 24-Oct-26 15:45
+Bid: 5924-CX2SA
+Title: (M5.8) Bouvet Island region -54.0 7.0
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Bouvet Island region
+Geographic coordinates:           54.030S,   7.015E
+Magnitude:                        5.8
+Depth:                            12 km
+Universal Time (UTC):             24 Oct 2026  15:24:20
+Time near the Epicenter (1):      24 Oct 2026  17:24:20
+Time in your area (1):            24 Oct 2026  12:24:20
+Location with respect to nearby cities:
+2379.3 km (1475.1 mi) SSW of Simon's Town, South Africa
+2380.0 km (1475.6 mi) SSW of Hermanus, South Africa
+2394.3 km (1484.4 mi) SSW of Bredasdorp, South Africa
+2395.0 km (1484.9 mi) SSW of Retreat, South Africa
+2398.3 km (1487.0 mi) SE of Edinburgh of the Seven Seas, Saint Helena
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4mn
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4mn?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 24/10/2026 15:44:57 UTC
+________________________________________________________________

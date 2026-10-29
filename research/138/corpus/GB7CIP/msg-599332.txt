@@ -1,0 +1,177 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 29-Oct-26 09:35
+Bid: 9508_GB7CIP
+Title: Marconi Counter Type 2432A
+Path: 
+
+By G8MNY                                   (Updated Nov 20)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+I have repaired one of these old Marconi Instruments 560MHz Precision Frequency
+Counters, Model No.52432-313Z.
+
+ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿  >1 50MHz-560MHz, 50mV-5V max, 50ohm BNC
+ ³  _    __________________      ³    Burst Mode, holds reading on sig loss
+ ³ (_)  ³ø8.8.8.8.8.8.8.8.:³     ³  >2 10Hz-200MHz 25mV-5V (250V 50Hz) 1M BNC
+Éµ      ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ     Æ»   AF filter, <200kHz
+Ìµ   _           _               Æ¹   LF Multiplier, 0.01Hz Res to 13kHz (1Sec)
+º³  (_)  Ý Ü  Ý (_)  Û Û Û Û ±   ³º Gate times  10S, 1S,  10mS,  1mS
+º³   1           2               ³º Resolution 0.1Hz,1Hz, 10Hz, 100Hz ñ1 count
+º ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ º Oven Ref Output & Ext 1MHz 1V BNCs
+ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼ Supply 110/120/220/240V AC IEC.
+
+I could not find a diagram for this "A" version, board layout and circuit are
+not the same as the 2432 model, the 3 power supplies are all different. But the
+counter and ICs are all the same, so a good starting point.
+
+FAULT
+"Not working", there was no -12V, caused by a shorted tantalum capacitor, and
+that had taken out the T05 pass transistor. The +12V +5V rails were both
+dangerously high, due to no negative rail on their control 741 op-amps! A
+simple fault, if none of the chips were fried with the over voltage, it should
+work now? But life is never that simple, as that was not the only fault! The 1S
+gate range read 10x too low and other ranges occasionally read 0.6x low.
+
+                Sequence
+        Drivers  Timers  40pin IC   TOP PCB    Up End Out Rigger
+       =============================================== Connection
+FRONT  Ý7seg        JoiningÀÂÂÂÂÂÂÙ     Hing out
+       Ý                 PCB||||||     /~~~~~~~~~~\  [ MAINS IEC
+       ÝLEDs              ÚÄ||||||Ä¿  ³   Mains    ³ [ & Volts
+       _ _ _ _ _ _ _  XTAL³ |||||| ³  ³   Toroid   ³ Ä¿           REAR
+BNCs      Screened    OVEN³ |||||| ³   \__________/  ÄÙRef BNCs
+IN  ÚÄÜÜ  Pre-amps    UNIT³ÚÁÁÁÁÁÁ¿³   metal frame  o< Age Cal
+& SWÀÄßß=============================================
+       - - - - - - -   Pre-scalers  *    PSUs  BOTTOM PCB
+
+Pressing hard on the top PCB did change the faults, but a good solder up over
+the 2 PCBs, did nothing! All these faults eventually proved to the large main
+special counter IC, with it's 40 gold plated pins and socket on the top PCB.
+Re-seating it MANY TIMES initialy cleared all the faults, so no blown chips,
+from the original PSU fault. But it did not stay OK for long so I looked inside
+the IC holder to see several broken socket fingers! So I soldered the IC
+directly in. (well you would never get a replacement IC)
+
+A year later another fault appeared, the Ovened 10MHz Ref Osc stopped working!
+An aged rubber sleeve (conducting) around the Trimmer C was the fault, after
+much poking around.
+
+HOW IT WORKS
+The 2 inputs both see pre-amps with a common AGC (90dB LF, 54dB UHF) and are
+relay selected, to feed a special gated UHF ö10 pre-scaler IC, then into an HF
+ö10 pre-scaler, and last into a ö2. The resultant ö200 feeds the slower special
+40 pin main 5.5 digit counter IC. The pre-scalers also feed 9 BCD data lines,
+read during gate reset time, for the additional (LSD) 2.5 digit information to
+make up the 8 digit read out.
+
+                     TB Gate            Gate time select
+                   ÚÄ<ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿10m 100m 1S 10S LF
+                   ³    Reset/read    ³ v   v   v   v   v
+       VHF-UHF     ³ ÚÄÄÄÂÄÄÄÄÄÂÄÄ<ÄÄ¿³ |...|...|...|...|......DP......
+1)fuse-Preamp__  ÚÄÁÄÁ¿ÚÄÁÄÄ¿ÚÄÁÄ¿  ÚÁÁÄÁÄÄÄÁÄÄÄÁÄÄÄÁÄÄÄÁ¿             \
+        ÃAGC   \_³ö10 Ã´ö10 Ã´ö2 ÃÄ>´   MAIN 5.5 DIGIT   Ã>DRIVERS->8x 7seg
+2)ÄÄxÄÄPreamp__  ÀÂÂÂÂÙÀÂÂÂÂÙÀÄÂÄÙÚ>´     COUNTER IC     ³       LED display
+   AF  LF-VHF     A\\\__B\\\__C\__³ ÀÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÂÄÄÂÄÙ
+  Filter                 BCD data          ³        |  |
+                   ÚÄÄÄ¿          ÚÄÄÄ¿    ³        |  À-->Overflow LED
+      Ref 10MHzÄÄ>Ä´ö10ÃÄÂÄÄÄÄ\___³ö10ÃÄÄ>ÄÙRef     |
+       Osc Oven    ÀÄÄÄÙ ³ ÚÄÄ  | ÀÄÄÄÙ   100kHz    À--------->Gate LED
+                         ³ ³ ÚÄÄÁÄÄÄÄÄÄ¿
+Int)<ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ ÃÄ´Auto Ext Ã----------------------->Ext LED 
+      1MHz                 ³ ³Ref Sence³
+Ext)>ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÄÄÄÄÙ
+
+The main IC determines the TimeBase gate time and is feed with 100kHz
+reference. This is derived from a fairly accurate and stable 10MHz Xtal osc and
+buffer in the electronicaly controlled oven.
+
+The fast reading LF multiplier range (a useful LF feature) gives resolution
+down to 0.01Hz in 1 second! It counts reference clock for a few input cycles
+(100kHz Ref & Gate swapped) and then the reciprical is calculated and
+displayed. But it only works up to 13kHz!
+
+TESTING & CALIBRATION
+The +5V rail has a preset for setting it to +5.10V and the +12V rail follows.
+The -12V is independant.
+
+Input 1 VHF-UHF, pre-amp tends to oscillate @ 400MHz with no input, and a 
+lockout preset (like a squelch) kills the erroneous reading. When adjusted well
+it managed >810MHz @ 1V input (5V max=250mW).
+
+Input 2 AF-VHF, pre-amp has a Schmitt trigger, and setting the bias preset
+(DC1) well, is very important for best sensitivity, and good to VHF. It managed
+>320MHz @ 1V input.
+
+Both pre-amps share the same AGC preset with 6V DC set testpoint (no signal).
+
+Reference oscillator calibration is done after at least 15 min warm up with the
+rear multi-turn preset. Compare the 1MHz output with an off air locked 1MHz on
+dual beam scope (while counting something), or just count a reference source.
+
+Overflow LED lights over 99999999 count, but the display is still accurate for
+>8 digits.
+
+OVEN STABILITY
+Square law Time-Hz plot of a 10MHz off air locked reference.
+  Hz     _
+ +20´   Þ 'ú Fast Oven   - - Longer term Oven & PCB warm up heat drift - -
+ +10´   Ý   ' Heat Up            Heater &
+ 5.0´  Þ     ' Overshoot        Thermisitor
+ 2.0´  Ý      '                Delay Oven Cycle
+ 1.0´  Ý       '              .ú''''ú.    .úúú.      
+ 0.5´ Þ         '           ú'        ''''     'ú...ú''ú.  ..    
+ 0.2´_Þ_  _  _  _ú _  _  _.'_  _  _  _  _  _  _  _  _  _ ''_ 'ú''ú.ú'úúú..
+-0.2´ Þ           ,      .                       _     -
+-0.5´ Þ                 ú            _     -  
+-1.0´ Ý            'ú.ú' _     -  Warm up Drift Compenstion diode
+-2.0´ Ý      _     -           Correction offset mod for quicker accuracy.
+-5.0´ Ý-                      I------------------------------------------->
+ -10´Þ
+ -20´Þ
+ -50´Ý
+-100´Ý____________________________________________________________________
+    0     0.5      1       2       4       8      16      30      60    120Min
+ Longer term Oven & PCB warm up heat drift
+
+In use it gives repeatable accuracy of < 2/10^7 ñ1, or less than ñ2Hz in 10MHz
+after 1 min warm up! But 1 hr for 20x better stable reading of < 1/10^8 ñ1, or
+less than ñ0.1Hz in 10MHz! (ref to an off air source)
+
+The internal reference is 10-100x more stable/accurate than a non-ovened Xtal
+in a cheaper counter, or for that matter your rig !
+
+MODIFICATION. To reduce the warm up drift of above in a few mins.
+
++12VÄÄ750RÄÂÄÄÄÄ¿                      ÄÂÄ+12V
+          _³_  10K            *1N4148  43K*    Cal Voltage to 
+     6.8V /_\' Cal<ÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄ´<ÃÄÄÄÁÄÄÄÄÄ>Varicap of ref Osc
+           ³   Pot  *4u7 ===     Inside Oven 
+ ÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄÄÄÄÄÄÄÁÄÄ
+
+Put *4u7 near oven connections to reduce stray Counter input pickup affecting
+the reference. Take plastic cover off oven and put *diode and 43K under the
+foam insulation.
+
+OVEN LED MOD. This shows when Oven is warming up.
+
++12V >ÄÂÄÄ5R6ÄÂÄÄo Heater
+       ³      ³
+       ÃÄÄ´>ÃÄ´1N4001     The main PCB +12V track is cut feeding 
+       ³      ³           the oven & components soldered to the
+       e\³   4K7          tracks & nearby ground. A wire is threaded
+     PNP ÃÄÄÄÄÙ           from the 2K7 to the front bezel and a small 
+        /³     //         LED -ve lead clamped under the metal surrond
+       ÃÄÄ2K7Ä´>ÃÄ¿       under the Overload LED. Care must be taken
+      4K7         Á       to avoide other components! 
+       Á
+
+See my other tech buls "Watson 'Hunter' Counter Mods", "PIC Freq Counter Mods",
+"Old Venner Counter Type TSA3334", "198kHz Off Air Standard", "Off Air Lock for
+Ref Osc", "Calibrating Frequency" & "RTT Comms Test Set".
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

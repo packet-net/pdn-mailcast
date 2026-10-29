@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 29-Oct-26 05:51
+Bid: 6248_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - Balleny Islands region
+Path: !GB7BED!K1AJD!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us7000ttx8
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-29 05:33:36 UTC
+Depth      : 10.0 km
+Coordinates: -61.3277 Lat / 161.1643 Lon
+--------------------------------------------------
+Location:
+  Balleny Islands region
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttx8
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

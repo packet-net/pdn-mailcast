@@ -1,0 +1,93 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 27-Oct-26 06:27
+Bid: 5985_HP2DFA
+Title: WSPR TOP10 BEACON  DISTANCE/SPOT OCT26
+Path: !GB7BED!DM4RW!HP2DFA!
+
+SB ALL @ PANAMA
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY TOTAL DISTANCE (OCTOBER 26-27, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR GLOBAL DISTANCE RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON REPORT ORDERED BY
+TOTAL DISTANCE (TOTAL KILOMETERS) FOR THE PERIOD
+OCTOBER 26-27, 2026, IS PRESENTED BELOW. PANAMANIAN
+STATION **HP2DFA** RANKS 10TH GLOBALLY, OPERATING AT
+QRP LEVEL (0.2W) WITH OVER 7.88 MILLION KILOMETERS.
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY DISTANCE)
+==================================================
+RANK | CALL     | LOCATOR | WATTS | KPW   | TOTAL KM   | SPOTS
+----- ---------- --------- ------- ------- ------------ --------
+ 1   | VK6XT    | OF88ji  |   5   |  2746 | 18,489,228 | 13,730
+ 2   | DP0GVN   | IB59ui  |   5   |  2014 | 17,702,891 | 10,068
+ 3   | VK2EFM   | QF56oq  |   10  |   564 | 16,885,470 |  5,639
+ 4   | VK2JPB   | QF59tl  |  0.2  | 39345 | 12,481,191 |  7,869
+ 5   | TI4JWC   | EK70wb  |   1   |160758 | 11,598,903 |160,758
+ 6   | VK4TMH   | QG56fk  |   5   |   723 | 10,908,012 |  3,617
+ 7   | VK2TLQ   | QF45oa  |   5   |  1104 | 10,219,788 |  5,519
+ 8   | EB1A     | IN53tf  |  0.5  |216342 |  9,144,647 |108,171
+ 9   | VK3ARW/2 | QF12rv  |   2   |  9762 |  8,974,579 | 19,525
+ 10  | HP2DFA   | FJ09cg  |  0.2  | 73865 |  7,885,749 | 14,773
+
+==================================================
+3. TECHNICAL & PROPAGATION NOTES
+==================================================
+- **HP2DFA STATION**: SUSTAINS A GLOBAL TOP 10 STANDING
+  FROM PANAMA (FJ09cg) AT 0.2 WATTS, ACCUMULATING
+  7,885,749 KM ACROSS 14,773 SPOTS.
+- **PROPAGATION CONDITIONS**: STRONG TRANSOCEANIC
+  PATHS SUPPORT HIGH-EFFICIENCY QRP RADIO LINKS
+  WORLDWIDE.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR SPOT COUNT RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON REPORT ORDERED BY
+TOTAL SPOT COUNT (RAW SPOTS) FOR THE PERIOD OCTOBER
+26-27, 2026, IS PRESENTED BELOW. PANAMANIAN STATION
+**HP2DFA** RANKS 10TH GLOBALLY WITH 14,771 RAW SPOTS
+OPERATING AT QRP LEVEL (0.2W).
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY SPOTS)
+==================================================
+RANK | CALL     | LOCATOR | WATTS | KPW    | RAW SPOTS | UNIQUES
+----- ---------- --------- ------- -------- ----------- --------
+ 1   | EB1A     | IN53tf  |  0.5  | 216342 |   108,171 |     150
+ 2   | G4GCI    | IO90gu  |   5   |   4781 |    23,905 |      70
+ 3   | TI4JWC   | EK70wb  |   1   | 160757 |   160,757 |     272
+ 4   | G3JKF    | JO00bs  |   2   |  17814 |    35,627 |      42
+ 5   | KK1D     | FN31vi  |   1   |   9768 |     9,768 |      18
+ 6   | G4HSB    | IO94ll  |  0.2  | 353720 |    70,744 |      90
+ 7   | WW0WWV   | DN70mq  |   1   | 247598 |   247,598 |     544
+ 8   | KI7DX    | DN40cq  |   2   |  14641 |    29,282 |      46
+ 9   | G8ORM    | IO93cu  |   5   |   2418 |    12,092 |      20
+ 10  | HP2DFA   | FJ09cg  |  0.2  |  73855 |    14,771 |      32
+
+==================================================
+3. TECHNICAL & ACTIVITY NOTES
+==================================================
+- **HP2DFA STATION**: SECURES A TOP 10 GLOBAL POSITION
+  IN SPOT VOLUME FROM PANAMA (FJ09cg) AT 0.2 WATTS,
+  logging 14,771 spots across the network.
+- **TRAFFIC LEADERS**: WW0WWV (247,598 raw spots) and
+  EB1A (108,171 raw spots) lead overall network reporting
+  volumes.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

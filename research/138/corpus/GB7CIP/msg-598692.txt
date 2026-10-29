@@ -1,0 +1,326 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 23-Oct-26 11:47
+Bid: 25765_LU9DCE
+Title: ARCHLINUX UPDATES 23-OCT
+Path: !GB7BED!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+PYTHON-PIPX 1.18.4-1 ANY
+
+INSTALL AND RUN PYTHON APPLICATIONS IN ISOLATED ENVIRONMENTS
+
+========================================
+
+PLEZY 2.24.0-1 X86_64
+
+A MODERN PLEX AND JELLYFIN CLIENT
+
+========================================
+
+MODRINTH-APP 0.22.0-1 X86_64
+
+MINECRAFT LAUNCHER TO PLAY YOUR FAVORITE MODS AND KEEP THEM UP TO
+DATE.
+
+========================================
+
+RELEASE-PLZ 0.4.0-1 X86_64
+
+RELEASE RUST PACKAGES WITHOUT USING THE COMMAND LINE
+
+========================================
+
+PYTHON-IMPORTLIB-METADATA 9.1.0-1 ANY
+
+READ METADATA FROM PYTHON PACKAGES
+
+========================================
+
+PLEZY 2.23.0-1 X86_64
+
+A MODERN PLEX AND JELLYFIN CLIENT
+
+========================================
+
+MODRINTH-APP 0.21.10-1 X86_64
+
+MINECRAFT LAUNCHER TO PLAY YOUR FAVORITE MODS AND KEEP THEM UP TO
+DATE.
+
+========================================
+
+DPRINT 0.63.0-1 X86_64
+
+PLUGGABLE AND CONFIGURABLE CODE FORMATTING PLATFORM
+
+========================================
+
+CHROMIUM 156.0.8078.47-1 X86_64
+
+A WEB BROWSER BUILT FOR SPEED, SIMPLICITY, AND SECURITY
+
+========================================
+
+CEF 154.0.34-2 X86_64
+
+CHROMIUM EMBEDDED FRAMEWORK (CEF), SIMPLE FRAMEWORK FOR EMBEDDING
+CHROMIUM-BASED BROWSERS IN OTHER APPLICATIONS
+
+========================================
+
+VUE-LANGUAGE-SERVER 3.3.13-1 ANY
+
+LANGUAGE SERVER FOR VUE
+
+========================================
+
+DPRINT 0.64.3-1 X86_64
+
+PLUGGABLE AND CONFIGURABLE CODE FORMATTING PLATFORM
+
+========================================
+
+XMONAD-UTILS 0.1.3.3-417 X86_64
+
+SMALL COLLECTION OF X UTILITIES
+
+========================================
+
+XMONAD-EXTRAS 0.17.3-103 X86_64
+
+THIRD PARTY EXTENSIONS FOR XMONAD WITH WACKY DEPENDENCIES
+
+========================================
+
+XMONAD-DBUS 0.1.0.2-334 X86_64
+
+XMONAD DBUS MONITOR APPLICATION AND LIBRARY TO EASILY CONNECT XMONAD
+WITH POLYBAR
+
+========================================
+
+XMONAD-CONTRIB 0.18.2-35 X86_64
+
+COMMUNITY-MAINTAINED EXTENSIONS FOR XMONAD
+
+========================================
+
+XMONAD 0.18.1-38 X86_64
+
+LIGHTWEIGHT X11 TILED WINDOW MANAGER WRITTEN IN HASKELL
+
+========================================
+
+XMOBAR 0.51.1-38 X86_64
+
+MINIMALISTIC TEXT BASED STATUS BAR
+
+========================================
+
+UUSI 0.4.4.0-76 X86_64
+
+TWEAK .CABAL FILES
+
+========================================
+
+TAMARIN-PROVER 1.12.0-162 X86_64
+
+THE TAMARIN PROVER FOR SECURITY PROTOCOL ANALYSIS
+
+========================================
+
+TAFFYBAR 7.4.2-10 X86_64
+
+A DESKTOP BAR SIMILAR TO XMOBAR, BUT WITH MORE GUI
+
+========================================
+
+STYLISH-HASKELL 0.14.5.0-96 X86_64
+
+HASKELL CODE PRETTIFIER
+
+========================================
+
+STACK 2.15.1-6 X86_64
+
+THE HASKELL TOOL STACK
+
+========================================
+
+SHELLCHECK 0.11.0-162 X86_64
+
+SHELL SCRIPT ANALYSIS TOOL
+
+========================================
+
+POSTGREST 10.1.0-164 X86_64
+
+REST API FOR ANY POSTGRES DATABASE
+
+========================================
+
+PANDOC-PLOT 1.9.2-97 X86_64
+
+A PANDOC FILTER TO INCLUDE FIGURES GENERATED FROM CODE BLOCKS USING
+YOUR PLOTTING TOOLKIT OF CHOICE.
+
+========================================
+
+PANDOC-CROSSREF 0.3.20-49 X86_64
+
+PANDOC FILTER FOR CROSS-REFERENCES
+
+========================================
+
+PANDOC-CLI 3.11-49 X86_64
+
+CONVERSION BETWEEN DOCUMENTATION FORMATS
+
+========================================
+
+MISFORTUNE 0.1.2.1-231 X86_64
+
+FORTUNE-MOD CLONE
+
+========================================
+
+MIGHTTPD2 4.0.6-49 X86_64
+
+HIGH PERFORMANCE WEB SERVER ON WAI/WARP
+
+========================================
+
+KMONAD 0.4.5-35 X86_64
+
+ADVANCED KEYBOARD REMAPPING UTILITY
+
+========================================
+
+IHASKELL 0.13.0.0-112 X86_64
+
+A HASKELL BACKEND KERNEL FOR THE JUPYTER PROJECT.
+
+========================================
+
+IDRIS 1.3.4-603 X86_64
+
+FUNCTIONAL PROGRAMMING LANGUAGE WITH DEPENDENT TYPES
+
+========================================
+
+HSLUA-CLI 1.4.4-36 X86_64
+
+COMMAND-LINE INTERFACE FOR LUA
+
+========================================
+
+HOPENPGP-TOOLS 0.23.11-153 X86_64
+
+HOPENPGP-BASED COMMAND-LINE TOOLS
+
+========================================
+
+HOOGLE 5.0.18.4-387 X86_64
+
+HASKELL API SEARCH
+
+========================================
+
+HLINT 3.6.1-93 X86_64
+
+SOURCE CODE SUGGESTIONS
+
+========================================
+
+HLEDGER-WEB 1.52.4-59 X86_64
+
+WEB-BASED USER INTERFACE FOR THE HLEDGER ACCOUNTING SYSTEM
+
+========================================
+
+HLEDGER-UI 1.52.4-39 X86_64
+
+CURSES-STYLE TERMINAL INTERFACE FOR THE HLEDGER ACCOUNTING SYSTEM
+
+========================================
+
+HLEDGER-IADD 1.3.23-22 X86_64
+
+A TERMINAL UI AS DROP-IN REPLACEMENT FOR HLEDGER ADD
+
+========================================
+
+HLEDGER 1.52.4-37 X86_64
+
+COMMAND-LINE INTERFACE FOR THE HLEDGER ACCOUNTING SYSTEM
+
+========================================
+
+HINDENT 6.2.1-11 X86_64
+
+EXTENSIBLE HASKELL PRETTY PRINTER
+
+========================================
+
+HEDGEWARS 1.0.3-107 X86_64
+
+TURN-BASED STRATEGY ARTILLERY GAME SIMILIAR TO WORMS
+
+========================================
+
+HASKTAGS 0.73.0-205 X86_64
+
+PRODUCES CTAGS "TAGS" AND ETAGS "TAGS" FILES FOR HASKELL PROGRAMS
+
+========================================
+
+HASKELL-ZLIB-BINDINGS 0.1.1.5-328 X86_64
+
+LOW-LEVEL BINDINGS TO THE ZLIB PACKAGE.
+
+========================================
+
+HASKELL-ZLIB 0.7.1.1-23 X86_64
+
+COMPRESSION AND DECOMPRESSION IN THE GZIP AND ZLIB FORMATS
+
+========================================
+
+HASKELL-ZIP-ARCHIVE 0.4.3.2-174 X86_64
+
+LIBRARY FOR CREATING AND MODIFYING ZIP ARCHIVES.
+
+========================================
+
+HASKELL-ZINZA 0.2.1-80 X86_64
+
+TYPED TEMPLATES WITH JINJA LIKE SYNTAX
+
+========================================
+
+HASKELL-ZEROMQ4-HASKELL 0.8.0-216 X86_64
+
+BINDINGS TO ZEROMQ 4.X
+
+========================================
+
+HASKELL-ZENC 0.1.2-344 X86_64
+
+GHC STYLE NAME Z-ENCODING AND Z-DECODING
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

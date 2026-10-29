@@ -1,0 +1,41 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 05:28
+Bid: 26206_LU9DCE
+Title: EARTHQUAKES 27-OCT
+Path: !VK6HGR!OK2PEN!N3HYM!W0ARP!VK2RZ!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-27 02:02 - 4.9 - 69 KM WSW OF KIRAKIRA, SOLOMON ISLANDS
+2026-10-27 01:17 - 4.6 - 203 KM SSE OF TATEYAMA, JAPAN
+2026-10-27 00:25 - 4.8 - 54 KM E OF TOMIOKA, JAPAN
+2026-10-26 22:52 - 4.5 - 98 KM NNW OF TOBELO, INDONESIA
+2026-10-26 22:33 - 4.5 - 96 KM ENE OF PAMANDZI, MAYOTTE
+2026-10-26 21:18 - 4.7 - 98 KM S OF ENCOUNTER BAY, AUSTRALIA
+2026-10-26 20:52 - 4.6 - 20 KM NNW OF LA LIGUA, CHILE
+2026-10-26 20:41 - 4.5 - 89 KM SSE OF PONDAGUITAN, PHILIPPINES
+2026-10-26 19:36 - 4.9 - 100 KM E OF LA TIRANA, CHILE
+2026-10-26 18:07 - 4.5 - 74 KM SE OF RASHT, TAJIKISTAN
+2026-10-26 15:08 - 4.6 - 154 KM NW OF PORT-OLRY, VANUATU
+2026-10-26 12:13 - 5.2 - 205 KM NW OF PORT-OLRY, VANUATU
+2026-10-26 11:38 - 4.6 - 81 KM SSE OF AKUTAN, ALASKA
+2026-10-26 11:17 - 5.0 - 218 KM NW OF PORT-OLRY, VANUATU
+2026-10-26 11:01 - 4.8 - SOUTH SANDWICH ISLANDS REGION
+2026-10-26 10:13 - 5.5 - 283 KM E OF LEVUKA, FIJI
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

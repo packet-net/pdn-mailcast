@@ -1,0 +1,97 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 29-Oct-26 09:46
+Bid: 9511_GB7CIP
+Title: RF Directional Coupler
+Path: 
+
+By G8MNY                                       (Updated Jul 19)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+This is an item used for VHF broadcast transmitter monitoring. It provides a
+low level calibrated RF sniff point in the aerial coax for Ofcom (UK regulator)
+spectrum analyser etc. without turning the Tx off. It is not generally used by
+other RF users!
+             ÚÄÄÄÄÄÄÄÄ¿
+             ³Spectrum³
+             ³Analyser³
+             ÀÄÄÄÂÄÄÄÄÙ
+ Aerial        .ú'ú.
+ System    To Ant  To Tx
+   \³/     ÚÄÁÄÄÄÄÄÄÄÁÄ¿   ÚÄÄÄ¿
+    ÀÄÄÄÄÄÄ´DirectionalÃÄÄÄ´Tx ³
+           ³  Coupler  ³   ÀÄÄÄÙ
+           ÀÄÄÄÄÄÄÄÄÄÄÄÙ
+CIRCUIT
+This is quite a straight forward 3 line directional coupler as used in some VHF
+SWR bridges, but here all the lines are very accurate 50ohm transmission lines.
+
+          To Aerial                         Loss
+            BNC                              dB
+          ÚÄ(o)ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿            -16 ´                      _.-
+ Aerial   ³  ÀÜÜÜÜÜÜÜÜÜÜÜÜÜÜ50R´   Tx       -22 ´                  _.-'
+N Female o)ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ(o N Male    -28 ´              _.-'
+          ³  .ÜÜÜÜÜÜÜÜÜÜÜÜÜÜ.  ³            -34 ´          _.-'
+          Ã50R              ³  ³            -40 ´      _.-'
+          ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ(o)ÄÙ            -46 ´  _.-'
+                           BNC              -52 ´-'
+                          To Tx             -58 ÅÄÄÄÂÄÄÄÂÄÄÄÂÄÄÄÂÄÄÄÂÄÄÄÂ
+                                               12   25  50 100 200 400 800MHz
+
+Such couplers do not have a flat response, they typically have a 6dB per Octave
+rise until they are near a resonance or some other losses affect them. Ofcom
+said some spectrum analysers have calibration offset parameters that can allow
+for this? (I have never seen one)
+
+A HOMEMADE ONE
+Simpler one I made up was from PCB..
+
+         To Aerial     To Tx
+            BNC         BNC
+          ÚÄ(o)ÄÄÄÄÄÄÄÄÄ(o)Ä¿
+ Aerial   ³  ÞÜÜÜÜÜÜÜÜÜÜÜÝ  ³   Tx
+N Female o)ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ(o N Male
+          ³                 ³
+          ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+The 'N' connectors were bolted to 1" x1" PCB plates, the whole double sided PCB
+box soldered up around them & the double sided PCB lines inside that. The 50ohm
+double sided PCB lines were salvaged from an old VHF SWR detector bridge. But
+to make a really good accurate match, it needed solder added to them to get a
+deep SWR null >30dB, on a good load. For this single pick up line design a 50R
+BNC terminator plug is used in the unused port.
+
+IN USE
+There are accuracy limits to all test gear, here if the transmission system is
+not 50ohm at the frequency of interest and the spectrum analyser results can be
+meaningless! This is generally the case off frequency on a resonant aerial.
+
+Actual power measurement is possible provided all the patch lead losses are
+known and the match is good.
+
+However the directional coupler does have the ability to show up which of any
+RF mixing signals are internal & external to the Tx! So nearby corroded metal
+joints, or other nearby transmitter PAs acting as a mixer etc, can easily be
+identified as "QRM not in the local Tx". So it is very useful when tracking
+down the real cause of QRM.
+
+³ Local²                  ³                         ³
+³    Tx²                  ³   Local                 ³   Local
+³      ²                  ³    Tx²                  ³    Tx²
+³      ²                  ³      ²   Other          ³      ²   Other
+³      ²   Other          ³      ²    ÞTx           ³      ²    ÞTx
+³      ²    Tx            ³      ²    Þ             ³ Mix  ²    Þ   Mix
+³      ²    Þ             ³      ²    Þ             ³  ³   ²    Þ    ³
+³ Mix  ²    Þ   Mix       ³      ²    Þ             ³  ³   ²    Þ    ³
+³  ³   ²    Þ    ³        ³ Mix  ²    Þ   Mix       ³  ³   ²    Þ    ³
+ÀÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄ    ÀÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄ    ÀÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄ
+ Tx Port Spectrum          Aerial Port Spectrum       Aerial Port Spectrum
+                          Showing Local Tx Mixing    Showing External Mixing
+                         (mix smaller than Tx Port) (mix bigger than Tx Port)
+
+
+See my tech bul on "FM Stereo Radio Principles", & "A Versatile Pulse Tester"
+
+
+Why Don't U send an interesting bul?
+
+73 de John G8MNY @ GB7CIP

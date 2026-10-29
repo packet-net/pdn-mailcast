@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 03:59
+Bid: 5755_HP2DFA
+Title: EARTHQUAKE ALERT M5.2 - 63 km NNE of Lae, Papua New Guinea
+Path: !GB7BED!K1AJD!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.2+)       
+==================================================
+Event ID   : us6000u4s5
+Magnitude  : M 5.2
+Time (UTC) : 2026-10-25 03:29:10 UTC
+Depth      : 80.8 km
+Coordinates: -6.1737 Lat / 147.1659 Lon
+--------------------------------------------------
+Location:
+  63 km NNE of Lae, Papua New Guinea
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4s5
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

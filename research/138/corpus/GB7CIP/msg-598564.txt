@@ -1,0 +1,93 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 22-Oct-26 02:20
+Bid: 5355_HP2DFA
+Title: WSPR TOP 10 BEACONS DISTANCE/SPOTS OCT21
+Path: !VE3KPG!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+ACTIVITY SUMMARY & WORLDWIDE WSPR BEACON RANKING - LOCAL HP2DFA STATION IN TOP 10
+
+WORLDWIDE BEACON NETWORKS AND PROPAGATION TECHNICAL BULLETIN
+TOTAL KM, RAW SPOTS, AND UNIQUE SPOT STATISTICS (PAST 24 HOURS UTC)
+VALID: 21-OCT-2026 ONWARDS
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+======================================================================
+1. GENERAL SUMMARY & LOCAL HP2DFA HIGHLIGHT
+======================================================================
+THE UPDATED WORLDWIDE WSPR BEACON RANKING SORTED BY TOTAL ACCUMULATED KILOMETERS
+SHOWS OUR LOCAL STATION **HP2DFA (PANAMA, LOCATOR FJ09CG)** HOLDING STRONG AT **#8 WORLDWIDE**,
+OPERATING WITH QRP POWER OF JUST **0.2 WATTS** AND ACHIEVING A TOTAL OF 8,324,648
+KILOMETERS WITH 16,933 RAW REPORTS AND 1,593 UNIQUE SPOTS.
+
+======================================================================
+2. TOP 10 BEACONS TABLE BY TOTAL DISTANCE
+======================================================================
+POS | BEACON | LOCATOR | PWR  | KPW    | TOTAL KM    | RAW SPOTS | UNICS | TOP MAIN BANDS
+---- -------- --------- ------ -------- ------------- ----------- ------- ------------------
+  1 | VK2EFM | QF56oq  | 10W  |    564 |  22,635,989 |     5,636 | 1,751 | 20M, 30M, 40M, 17M
+  2 | VK6XT  | OF88ji  | 5.0W |  3,319 |  21,727,318 |    16,594 | 1,636 | 20M, 17M, 15M, 30M
+  3 | DP0GVN | IB59ui  | 5.0W |  1,252 |  14,818,750 |     6,259 | 1,093 | 20M, 17M, 30M, 40M
+  4 | TI4JWC | EK70wb  | 1.0W | 190,09 |  11,777,058 |   190,093 | 2,130 | 40M, 20M, 17M, 30M
+  5 | VK3NTB | QF31cs  | 5.0W |    918 |  11,647,557 |     4,589 |   920 | 20M, 15M, 17M, 30M
+  6 | VK4TMH | QG56fk  | 5.0W |    706 |  10,672,470 |     3,530 |   927 | 20M, 15M, 17M, 30M
+  7 | EB1A   | IN53tf  | 0.5W | 245,93 |  10,109,075 |   122,967 | 3,000 | 20M, 15M, 30M, 17M
+  8 | HP2DFA | FJ09cg  | 0.2W | 84,665 |   8,324,648 |    16,933 | 1,593 | 15M, 17M, 20M, 10M
+  9 | VK3QN  | QF22    | 5.0W |  2,280 |   8,251,199 |    11,400 |   567 | 20M, 30M, 40M, 17M
+ 10 | KK1D   | FN31vi  | 1.0W | 12,540 |   7,782,562 |    12,540 | 2,163 | 20M, 17M, 15M, 30M
+
+======================================================================
+3. TECHNICAL ANALYSIS & PROPAGATION OBSERVATIONS
+======================================================================
+- **LOCAL HP2DFA MILESTONE**: PANAMANIAN STATION HP2DFA MAINTAINS EXCEPTIONAL
+  DX PROPAGATION EFFICIENCY RUNNING 0.2W QRP, SURPASSING HIGHER-POWER STATIONS
+  AND SECURING A SOLID POSITION IN THE GLOBAL TOP 10.
+- **WORLD LEADERS**: VK2EFM AND VK6XT LEAD GLOBAL DISTANCE WITH OVER 21.7 MILLION KM.
+- **CENTRAL AMERICA**: TI4JWC (COSTA RICA) MAINTAINS A MASSIVE DECODE VOLUME WITH
+  190,093 RAW SPOTS AND 11.77 MILLION KM.
+
+CREDITS & SOURCES: ARNE / ROB / PHIL VK7JJ
+
+ACTIVITY SUMMARY AND WORLDWIDE WSPR BEACON RANKING BY SPOT COUNT (VK7JJ / ARNE)
+
+WORLDWIDE BEACON NETWORKS AND PROPAGATION TECHNICAL BULLETIN
+REPORT, DUPLICATE, AND UNIQUE SPOT STATISTICS (PAST 24 HOURS UTC)
+VALID: 21-OCT-2026 ONWARDS
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+======================================================================
+1. GENERAL SUMMARY AND MAIN STATISTICS
+======================================================================
+THE FOLLOWING IS THE WORLDWIDE TOP 10 BEACON STATIONS RANKED BY RAW SPOT
+COUNTS AND UNIQUE SPOTS RECORDED OVER THE PAST 24 HOURS UTC ACROSS
+PROPAGATION MONITORING NETWORKS.
+
+======================================================================
+2. TOP 10 BEACONS TABLE BY SPOT COUNT
+======================================================================
+POS | BEACON    | LOCATOR | PWR   | RAW SPOTS | DUPES   | UNIQUE SPOTS | TOP BANDS
+---- ----------- --------- ------- ----------- --------- -------------- ------------------
+  1 | EB1A      | IN53tf  | 0.5W  |   122,898 |     124 |        2,999 | 20M, 17M, 15M, 30M
+  2 | G4GCI     | IO90gu  |  5.0W |    28,302 |      24 |        2,421 | 20M, 17M, 15M, 30M
+  3 | G3JKF     | JO00bs  |  2.0W |    35,680 |      48 |        2,272 | 40M, 20M, 30M, 17M
+  4 | KK1D      | FN31vi  |  1.0W |    12,527 |      18 |        2,162 | 20M, 17M, 15M, 30M
+  5 | TI4JWC    | EK70wb  |  1.0W |   189,870 |     100 |        2,128 | 40M, 20M, 17M, 30M
+  6 | WW0WWV    | DN70mq  |  1.0W |   311,418 |     434 |        1,870 | 20M, 17M, 30M, 15M
+  7 | NB8K      | FM18ff  |  100W |     8,776 |      16 |        1,796 | 20M, 17M, 30M, 15M
+  8 | TA4/G8SCU | KM56vo  |  5.0W |    30,429 |      60 |        1,777 | 40M, 20M, 17M, 15M
+  9 | VK2EFM    | QF56oq  | 10.0W |     5,636 |      13 |        1,751 | 20M, 30M, 40M, 17M
+ 10 | K3FZ      | FN30kx  | 10.0W |    13,197 |      20 |        1,737 | 20M, 17M, 15M, 30M
+
+======================================================================
+3. TECHNICAL DETAILS AND PROPAGATION OBSERVATIONS
+======================================================================
+- EB1A QRP LEADERSHIP: SPANISH STATION EB1A REMAINS AT THE WORLDWIDE LEAD WITH
+  nearly 3,000 unique spots and over 122,000 raw reports using 0.5 watts (QRP).
+- CENTRAL AMERICAN ACTIVITY: TI4JWC (COSTA RICA) MAINTAINS A STRONG PRESENCE
+  AT RANK #5 WITH 189,870 RAW SPOTS AND 2,128 UNIQUE SPOTS RUNNING 1 WATT.
+- NEW TOP 10 ENTRIES: STATION NB8K ENTERS THE GLOBAL TOP 10 RANKING.
+
+CREDITS & SOURCES: ARNE / ROB / PHIL VK7JJ
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

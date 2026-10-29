@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 21-Oct-26 08:06
+Bid: 5254_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - 164 km NE of Lospalos, Timor Leste
+Path: !GB7JED!GB7BED!K1AJD!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us6000u3t4
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-21 07:44:16 UTC
+Depth      : 122.7 km
+Coordinates: -7.5619 Lat / 128.1355 Lon
+--------------------------------------------------
+Location:
+  164 km NE of Lospalos, Timor Leste
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3t4
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

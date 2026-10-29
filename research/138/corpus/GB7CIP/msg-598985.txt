@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 26-Oct-26 10:31
+Bid: 5992-CX2SA
+Title: (M5.5) Fiji region -18.3 -178.0
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Fiji region
+Geographic coordinates:           18.283S, 178.011W
+Magnitude:                        5.5
+Depth:                            641 km
+Universal Time (UTC):             26 Oct 2026  10:13:01
+Time near the Epicenter (1):      26 Oct 2026  23:13:01
+Time in your area (1):            26 Oct 2026  07:13:01
+Location with respect to nearby cities:
+283.8 km (175.9 mi) E of Levuka, Fiji
+346.0 km (214.5 mi) SE of Labasa, Fiji
+368.5 km (228.5 mi) E of Nasinu, Fiji
+377.3 km (233.9 mi) E of Suva, Fiji
+431.9 km (267.8 mi) NW of Nukuâalofa, Tonga
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4yr
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4yr?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 26/10/2026 10:30:12 UTC
+________________________________________________________________

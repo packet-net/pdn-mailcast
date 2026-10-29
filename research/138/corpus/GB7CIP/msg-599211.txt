@@ -1,0 +1,519 @@
+From: I0OJJ
+To: DXNEWS
+Type/Status: B$
+Date/Time: 28-Oct-26 13:46
+Bid: 19478_IR0AAB
+Title: DXNL 2534 (Oct 28, 2026)
+Path: !VE3KPG!VE3TOK!IR0AAB!
+
+From: "DX Newsletter (DXNL)" <dxmb@darcdxhf.de
+Subject: DXNL 2534 (Oct 28, 2026)
+Date: Wed, 28 Oct 2026 03:44:46 EDT
+To: dx@ww
+
+
+                DXNL 2534 - October 28, 2026
+                      DX Newsletter
+
+                a free and weekly service of
+                   DARC Committee "DX"
+                 (http://www.darcdxhf.de)
+
+                Editor: Andreas Salder, DK5ON
+                (e-mail: dxmb@darcdxhf.de)
+
+            translation by: Oliver Bock, DJ9AO
+
+DX Activities
+=============
+
+6W, SENEGAL:
+     An Italian team (Elvira IV3FSG, Franco I1FQH, Alfeo I1HJT, Tony
+     I2PJA, Silvano I2YSB, Oscar IK2AQZ, Angelo IK2CKR, and Stefano
+     IK2HKT) will be active between Oc.t 28 and Nov. 9 as 6W/I2YSB (CW,
+     SSB, RTTY) and 6W/IK2HKT (FT8) on 160-6m (including 60m) with 5
+     rigs. QSL direct via I2YSB, OQRS.
+
+9X, RUANDA:
+     Al, F8FUA, operates holiday-style as 9X5KM from Kigali between Oct.
+     31 and Nov. 11. QRV on CW, SSB, digital modes with a focus on the
+     lower bands. QSL via F8FUA, LoTW.
+
+ON, BELGIUM:
+     OR80AF marks the 80th anniverary of the Belgian Air Force.
+
+PY, BRAZIL:
+     The Araucaria DX Group celebrates its 50th anniversary with the
+     callsign ZW50B until the end of October.
+
+PY, BRAZIL:
+     ZZ5UNO operates around the Brazilian Amateur Radio Day 2026 (Nov.
+     5) between Oct. 31 and Nov. 15.
+
+ZA, ALBANIA:
+     ZA/AE5X remains active until the end of October. QRV on 20-10m (CW)
+     with 10 watts; possibly from POTA locations. QSL via LoTW.
+
+
+IOTA
+====
+
+IOTA QRGs
+CW:  28040 24920 21040 18098 14040 10114 7030 3530 kHz
+SSB: 28560 28460 24950 21260 18128 14260 7055 3760 kHz
+SSB: 28560 28460 24950 21260 18128 14260 7055 3760 kHz
+
+AF-067; 5Z, COAST PROVINCE SOUTH group: Reto 5Z4GO (HB9BFL)
+     activates Wasini Island from the 28th to 30th as 5Z4GO/p. QSL
+     direct via qrz.com address or LoTW.
+
+AN-010; Various, SOUTH SHETLAND ISLANDS: Rafal, SQ4O, remains on
+     the air as HF0PAS from the base Henryk Arctowksi on King George
+     Island until Oct. 30.
+
+AN-011; Various, ROSS ISLAND group: Watch out for Joe, KC4/W1WCN,
+     showing up on 20-10m (CW, SSB, FT8) until March 2027 from McMurdo
+     Base during his spare time. QSL via LoTW, eQSL.
+
+AN-016; Various, ANTARCTICA: Felix, DL5XL, will be back on the air
+     as DP1POL from the Neumayer III station between November 2026 and
+     February 2027.
+
+EU-005; G/GM/GW/M/MM/MW, GREAT BRITAIN: Members of the Cray Valley
+     Radio Society celebrate their club's 80th anniversary with the
+     callsign GB80CV until Oct. 28. QSL via LoTW.
+
+NA-024; J3, GRENADA: Gregory, N9GB, signs J3/N9GB from Grenada
+     between the 31st of October and the 6th of November on 40-10m (CW,
+     SSB, maybe FT8). QSL via EB7DX, LoTW.
+
+NA-100; V2, ANTIGUA AND BARBUDA: Between Oct. 30 and Nov. 6, ops
+     JJ2RCJ (also known as AB2RF), JA3FHL, JA3PJL, JH3UHG, and JA0JHQ
+     operate together as V26JJ from the station V26B.
+
+NA-104; V4, ST KITTS AND NEVIS: John, W5JON, will be back on the
+     air as V47JA from St. Kitts between Oct. 28 and Nov. 6. QRV on
+     160-6m (SSB, FT8). QSL via W5JON (d), LoTW.
+
+OC-007, VK9, WILLIS ISLANDS: VK9WX (op Sands, VK4WXW) remains
+     active until the end of October. QSL via M0OXO.
+
+OC-014; E5, MANIHIKI ATOLL: Rob, N7QT, remains on Manihiki until
+     Nov. 16 and operates as E51MWA on FT8 and CW. QSL via M0URX OQRS.
+
+OC-035; YJ, NEW HEBRIDES: Steve, VK2SP, signs YJ0SB from Port Vila
+     between Oct. 30 and Nov. 6. QSL via homecall.
+
+OC-045; KH8, TUTUILA ISLAND: A German team (DJ9KH, DK5WL, DL1KWK,
+     DL2RNS, DL4SVA, DL6KAC, DL6KVA, DL7JOM, DL7VEE) is going to put
+     American Samoa on the air between Oct. 30 and Nov. 12. QRV as KH8A
+     with 4 rigs on 160-6m (CW, SSB, RTTY, FT8). QSL via ClubLog OQRS,
+     LoTW after 6 months. For more information see: www.kh8a.mydx.de/.
+
+OC-118; FW, FUTUNA ISLANDS: Gavin, GM3GAV, will be active as FW3GT
+     from Futuna between the 31st of October and the 14th of November.
+     QRV on 40-10m, maybe also 80 and 60m, on CW and maybe FT8 with 600W
+     and a multiband vertical antenna. QSL via M0OXO.
+
+
+DX News
+=======
+
+40 Years European DX Foundation (EUDXF): During November, the EUDXF
+     celebrates its 40th anniversary with special event callsigns from
+     numerous countries, including for example Spain, Germany,
+     Philippines, Hungary, Belgium, The Netherlands, Australia. Many
+     will follow a [prefix]40EUDXF format; however, EA6EUDXF from the
+     Baleares will also be active.
+
+3DA#, KINGDOM Of ESWATINI:
+     Morten's (LA8GY) planned activity (3DA0GY) took a heavy blow when
+     his transceiver died after just a few QSOs and could not be
+     resurrected during his stay.
+
+
+Calendar
+========
+start      - end        DX              DXNL
+20.10.     - 28.10.     3B9/M0CFW       2532
+15.10.     - 02.11.     3DA0GY          2532
+01.06.     - 30.11.     3E40CDW         2513
+28.10.     - 30.10.     5Z4GO/p         2534*
+28.10.     - 09.11.     6W/I2HKT        2534*
+28.10.     - 09.11.     6W/I2YSB        2534*
+16.10.     - 29.10.     7P3GE           2532
+26.10.     - 25.11.     7P9EA           2533
+           - 2027       7Q5C            2493
+22.05.     - 29.01.27   8J70JARE        2510
+23.10.     - 31.10.     9N7XT           2533
+31.10.     - 11.11.     9X5KM           2534*
+01.01.     - 31.12.     AX120AAC        2491
+01.10.     - 04.11.     C5R             2530
+23.10.     - 01.11.     C5C             2530
+22.10.     - 27.10.     C6AQQ           2533
+25.10.     - 29.11.     CE7/DD0VR       2533
+26.10.     - 08.11.     CN1UNI          2533
+01.01.     - 31.12.     DA100LH         2491
+01.01.     - 31.12.     DA100TV         2491
+01.10.     - 31.12.     DA125RH         2526
+01.01.     - 31.12.     DB100FT         2491
+01.01.     - 31.12.     DK100LH         2491
+01.01.     - 31.12.     DL100DM         2442
+01.01.     - 31.12.     DL100LH         2491
+01.01.     - 31.12.     DL100TV         2491
+           - 12/26      DP0GVN          2486
+11/2026    - 02/2027    DP1POL          2534*
+21.10.     - 16.11.     E51MWA          2534*
+25.10.     - 31.01.     FT4YM/p         2533
+           - 28.10.     GB80CV          2534*
+03.10.     - 20.11.     H44MS           2530
+           - 31.10.     HF0PAS          2534*
+11.09.     - 15.05.27   HK3JCL          2528
+31.10.     - 06.11.     J3/N9GB         2534*
+           - 31.03.27   J79H            2499
+17.10.     - 02.11.     JD1BQP          2532
+17.10.     - 02.11.     JR6HYO/JD1      2532
+           - 03/2027    KC4/W1WCN       2534*
+30.10.     - 12.11.     KH8A            2534*
+           - 31.12.     LU1ZA           2504
+01.10.     - 31.10.     ON4BBE          2530
+01.10.     - 31.10.     ON4BAF          2530
+01.10.     - 31.10.     ON4BFS          2530
+01.10.     - 31.10.     ON4BK           2530
+01.10.     - 31.10.     OR80AF          2534*
+           - 31.12.     OT26B           2504
+           - 12/28      RI1ANY          2506
+           - 12/28      RI1ZK           2517
+17.10.     - 31.10.     S9R             2532
+           - 31.12.     SZ40A           2512
+09/26      - 11/26      T32AZ           2526
+03.07.     -            T40FRC          2518
+21.10.     - 29.10.     T88CZ           2533
+21.10.     - 29.10.     T88DK           2533
+21.10.     - 29.10.     T88DN           2533
+21.10.     - 29.10.     T88ED           2533
+26.10.     - 30.10.     T88KH           2533
+21.10.     - 29.10.     T88MB           2533
+20.10.     - 01.11.     TM8R            2533
+11.11.     - 11.11.     TM1BOTA         2518
+09/25      - 12/25      TZ4AM           2513
+30.10.     - 06.11.     V26JJ           2534*
+28.10.     - 06.11.     V47JA           2534*
+10/23      - 10/27      V73ML           2374
+           - 01/30      V85NPV          2518
+           - 31.12.     VK0TBC          2527
+           - 31.10.     VK9WX           2530
+05.10.     - 06.11.     VY0ZOO          2530
+           - 31.12.     XR90RG          2527
+30.10.     - 06.11.     YJ0SB           2534*
+           - 31.12.     YT170TESLA      2499
+           - 30.10.     ZA/AE5X         2534*
+           - 31.12.     ZB2FTY          2514
+           - 31.10.     ZW50B           2534*
+31.10.     - 15.11.     ZZ5UNO          2534*
+
+*  = new or updated
+.. = and other calls
+
+
+QSL information
+===============
+3B8HE             via    M0OXO        (O)
+3G1DX             via    CE1KR,       (L)
+3V8LL             via    IT9TQH,      (L)
+4A1CMX            via    K3UJ         (d)
+4A1GDL            via    K3UJ         (d)
+4A2MAX            via    EA5GL        (d), (L)
+4A1MTY            via    K3UJ         (d)
+4L7T              via    K6VHF        (d)
+4L8A              via    M0OXO        (O), (d), (L)
+4M5DX             via    YV5SSB       (L)
+4O3A              via    DJ4MX,       YU1FW, IK2WAD, (L)
+4O7CC             via    UA4CC,       (L)
+4X80VF            via    4X1VF        (USA: via K1FJ)
+5P5T              via    OZ1FDH
+5P5Z              via    OZ0KP        (e)
+5Q2R              via    LB3RE
+5Z4VJ             via    M0URX        (O), (L)
+6O2M              via    OG2M         (d), (L)
+7Q5C              via    ZS6RI,       (L)
+7Q6UJ             via    7Q6UJ        (O), (L)
+7Q9JT             via    N3JT         (L)
+8A1A              via    N2OO         (B), (d), (L)
+8J70JARE/2        via    JG2MLI
+8P5A              via    HA1AG        (B), (d), (L)
+8Q7QR             via    JJ1DQR
+8Q7ZW             via    OM5ZW        (O), (L)
+8R/PZ5TW          via    PY8WW        (O), (L)
+8R1TM             via    PY1SAD       (d), (L), (e)
+9A60CBM           via    9A1CBM,      (L)
+9A69AA            via    9A2AA
+9H6C              via    IU8HEP       (d), (L)
+9H6BPS            via    9H1MRC       (d)
+A44A              via    EC6DX,       (L)
+A61Q              via    EA7FTR
+A71AT             via    EA7FTR,      (L)
+AM3MERCE          via    EA3IAO,      (e)
+AO500LJN          via    EA2URI
+C5R               via    YU5R         (d), (L)
+CN2LW             via    HB9EOU
+D2ACE             via    EA7FTR       (O), (L)
+D4L               via    IK2NCJ,      (L)
+D4K               via    IZ4DPV       (d)
+D44EC             via    EC1A
+D4K               via    IZ4DPV       (d)
+D4OL              via    TF1OL        (d), (L)
+DA0ANT            via    DL1RUN       (e)
+DA0BCC            via    DL2JRM       (B), (d), (L)
+DA0CAT            via    DF4WX        (B)
+DA0CW/p           via    DF6EX
+DA0DIG            via    DH1PAL
+DA0HQ             via    DL5AXX       (B)
+DA0LE             via    DE2HJW
+DA0M              via    DD5DD        (e)
+DA0TA             via    DJ3XM        (B), (e)
+DA100TV           via    DK5ON        (L)
+DA2D              via    DK1MFI,      (L)
+DA26WARD          via    DK5ON,       (d), (B), (L), DCL
+DA0LCC            via    DH4HAN       (B)
+DA0LH             via    DK5ON        (d), (B), (O), (L)
+DA0M              via    DD5DD
+DA0OIE            via    DL4NWD
+DA0RR             via    DJ5BWD       (L)
+DA0TOR            via    DL9WJM,      (L)
+DA0UDS            via    DH1OL
+DA0UT             via    DJ5NF
+DA0WCA            via    DF6EX
+DA100LH           via    DK5ON        (A), (d), (B), (L), (O)
+DA1000ROD         via    DK1BU        (B)
+DA1250HAS         via    DL7PIA
+DA2026SKI         via    DK5ON,       (d), (B), (L), (O)
+DA25THL           via    DL0THL       (B), (e)
+DA3T              via    DL8DXL
+DB125OEB          via    DL8ARJ       (B), (L)/(e)
+DB60FIR           via    DL8DWL       (L)
+DB70DLRS          via    DK5ON        (d), (B)
+DD2D              via    DK8ZB,       (L)
+DD4U              via    DK2BK        (B)
+DF0AN             via    DJ9AT
+DF0FDN            via    DG6SDY
+DF0G              via    DL9RAR
+DF0HQ             via    DL5AXX,      (L)
+DF100KWTJ         via    DJ9AO        (B)
+DF26FIFA          via    DK5ON,       (L)
+DF40ABF           via    DG1YDX,      (e)
+DF60WAT           via    DL4WAT       (B)
+DF8V              via    DF8VO,       (L)
+DH2026EM          via    DK5ON        (d), (B), (L), (O)
+DK0AJ             via    DH1FBP,      (L)
+DK0HL             via    DF8FL        (d), (L)
+DK0MM             via    DF5FW        (B)
+DK0OG             via    DL8MDD,      (L)
+DK0SL/P           via    DG1LS
+DK100LH           via    DK5ON        (A), (d), (B), (L), (O), DCL
+DK50K32MR         via    DK0MR
+DK5T/LH           via    DK5ON        (d), (B), (L), (O)
+DL0AG             via    DK8QY        (B)
+DL0LOL            via    DB4SCW       (B), (L)
+DL0PAF            via    DL4RDM       (B)
+DL0PMV            via    DL9GMN,      (L)
+DL0RRC            via    DL6ZFG
+DL0ROI            via    DC1RSS,      (e)
+DL0SOP            via    DL4SVA       (O), (L), No QSL RX!
+DL0SX             via    DL5LBQ
+DL0SY/P           via    DK8OL
+DL0UE             via    DL6ON        (O), (e), no RX QSL
+DL0VBK            via    DL1RI        (B), (e)
+DL0WRTC           via    DK5ON        and , (L)
+DL100DM           via    DL8FA
+DL100LH           via    DK5ON,       (d), (B), (L), (O)
+DL200KIT          via    DF0UK
+DL2026C           via    DK5ON        and (L)
+DL2026W           via    DK5ON,       (L)
+DL25BELT          via    DJ3XM,       (e)
+DL25WIKI          via    DK5ON        (d), (B), (L), (O)
+DL26WRTC          via    DK5ON        (A), (d), (B), (L), (O)
+DL2L              via    DL4RCE,      (L)
+DL35MDXC          via    RQ7L
+DL39EUDXF         via    PA1AW
+DL40RIG           via    DM6BU
+DL60AZBL          via    DL5SFC,      (L)
+DL70ESSEN         via    DK1DM        (no QSL)
+DL70IPASD         via    DC2WF
+DL75WAU           via    DL7TNY
+DL80BOCH          via    DB6NL
+DL80NRW           via    DG7YEO,      (e)
+DM0CRACY          via    DK5ON        (A), (d), (B), (L), (O)
+DM50GFS           via    DK5ON,       (B), (L)
+DM7X              via    DL1PAN       (d), (e)
+DM800KM           via    DL8DSL       (B)
+DN2LSG            via    DL2DN
+DP4E              via    DK9KW
+DP5G              via    DM1CG
+DP6A              via    DL8OH,       (L)
+DP6SEVEN          via    DB4SCW,      (L), (e)
+DP7D              via    DF1QR        (B), (d), (L), (e)
+DP75BAC           via    DL3BH
+DQ0STRATEX        via    DK4REX
+DQ20JUF           via    DM2TO,       (O), (L)
+DQ30GDXF          via    DK6SP        (O), (B), (d)
+DQ40CNP           via    DL1EAL
+DQ80BYV           via    DF2NU
+DR170TESLA        via    DK8ZZ        (O)
+DR800WE           via    DF2SD        (O), (L)
+DU0A              via    KU9C,        (L)
+EA6/DF9BN         via    DF9BN
+EA6/SP9PND        via    SP9PND,      (L)
+ED8M              via    EA7FTR       (L)
+EG1PCJ            via    EA1OK        (d)
+EG2JAM            via    EB2FRM
+FK8HA             via    N2OO         (B), (d), (L)
+FW1P              via    SP9FIH,      (L)
+G8X               via    G4FJK        (d), (L)
+GB1PRT            via    M1AQR,       (e)
+GX7RAF/p          via    G0KUC,       (e)
+H49A              via    DK8ZZ
+HB0/DL1GLO        via    DL1GLO,      (L)
+HB10GBT           via    HB9OCR
+HB9CR             via    HB9NBG
+HB9SPACE          via    HB9ACA
+HF0PAS            via    SQ4O,        (L)
+HF160ID           via    SP4LVK
+HF37KJP           via    SQ2WKJ       (d)
+HH2K              via    N3BNA        (LoTW only)
+HK0/PY8WW         via    PY8WW
+HP/WE9G           via    WE9G         (O), (L)
+HP3AK             via    K4PWS,       (L)
+I8/DG5BQ          via    DG5BQ
+IE9/DJ4EL         via    DJ4EL,       (L)
+II9BP             via    IT9LIZ
+IO4JOTA           via    IQ4AX
+IS0/ON9DJ/p       via    ON9DJ,       (L), (e)
+IT9/OK2PXJ        via    OK2PXJ,      (e)
+J48S              via    ON5CT        (L), (e)
+JW9DL             via    LA9DL        (L)
+K0C               via    WB0SFT       (d), (L)
+K3S               via    K3LU         (d)
+K4A               via    KP4ARA
+K4C               via    WB3ISP       (d), (L)
+K6C               via    N6SAC        (e)
+KL5DX             via    N5XZ,        (L)
+KH0W              via    KC0W         (d)
+LA/DK8NE          via    DK8NE        (O), (L)
+LT3E              via    LU8DPM       (d)
+LX9POL            via    LX1NX        (d)
+LX9S              via    HB9AOF,      (L)
+LY90KRS           via    LY2ON        (B)
+LZ936BA           via    LZ1KCP
+M/K4NAS           via    K4NAS        (d)
+MX0SQC            via    M0URX        (O), (e)
+N7NU/VP9          via    N7NU         (O), (L)
+OD5ZZ             via    N4GNR        (d), (L)
+OK8CX/p           via    DL7CX,       (L)
+ON4JOTA           via    ON4GDV
+PA/DL1WH/p        via    DL1WH
+PJ4/DH8BQA        via    DH8BQA,      (L)
+PV5N              via    PP5AA,       (L)
+R103ME            via    RQ7L
+R1996A            via    RK9LWA
+RI0SP             via    RN3RQ
+S580ZRS           via    S50ZRS
+S9R               via    EA7FTR,      (L)
+SP1550SK          via    SP3PDO
+SU8JOTA           via    N200         (2026)
+TA4/DL9SCO        via    DL9SCO,      (L)
+TF/DO2BT          via    DO2BT
+TF/PD9DX          via    M0URX        (O)
+TM17FFF           via    F4GFE
+TM5YOTA           via    F6KGL,       (L)
+TM960H            via    F5NWL        and (e)
+UK/SP9DLM         via    SP9DLM       (d), (L), (e)
+UN/NT2X           via    NT2X
+UN/SP9DLM         via    SP9DLM,      (L), (e)
+UN0GY             via    M0OXO        (O), (L)
+V47FWX            via    M0URX        (O), (L)
+V5/HB9SHD         via    HB9SHD
+V85NPV            via    LZ3HI        (O), (L), (B), (d), (e)
+VJ6X              via    VK6CQ        (d)
+VK0DS             via    VK2JDS       (d), (L)
+VP2MAW            via    DL8ALU       (O), (L)
+VP9/K0PJH         via    K0PJH,       (L)
+VU2ABE            via    AB1F,        (L), (e)
+VX9M              via    VE9CZ        (L), (e)
+W0C               via    WB0FFE
+W6/UT5UF          via    UT5UF        (L)
+W7I               via    W7DK         (d)
+XT2AW             via    M0OXO        (O), (L)
+XV9R              via    EA5GL,       (L)
+XW4KV             via    F4BKV        (O), (d), (L)
+XX9W              via    M0OXO,       (O)
+YJ1JXZ            via    JK1JXZ,      (L)
+YL/OE6CUD/P       via    OE6CUD,      (L), (e)
+YL1DOG            via    YL3JD        (L), no RX QSL
+YN9H              via    EA5GL
+YO90YR5           via    YO3KAA,      (L)
+YR2X              via    YO2LEA
+YR8D              via    YO8KRR,      (L)
+YS/WE9G           via    WE9G         (O)
+YT2IDX            via    VE3DXK/VE3UE
+YU/OK1MDX/p       via    OK1MDX,      (L)
+YU65AEC           via    YU7XW        (d)
+Z81Q              via    HB9FND       (O), (L)
+ZA/OG2T           via    OH5LLR       (L)
+ZF2OO             via    WB2REM       (O), (L)
+
+(d) = direct    (B) = Buereau ok    (L) = LoTW
+(O) = OQRS-B    (C) = ClubLog       (e) = eQSL
+(D) = downloadable QSL              (M) = E-Mail QSL
+(Q) = QRZ.COM   (A) = QSL automatic
+
+H/c = Homecall
+(*) = new manager
+
+
+Abbreviations in this DXNL:
+===========================
+ARC        Amateur Radio Club
+ARLHS      Amateur Radio Lighthouse Society
+AUTO       QSL Versand automatisch an alle QSO's, meist wird keine QSL Karte benoetigt
+BOTA       Beaches On The Air
+DCI        D.C.I. (Diploma Castelli Italia) http://www.dcia.it/dci/
+DCPC       D.C.P.C. (Diploma Castelli Provincia Cuneo)
+DFCF       Diplome des Forts et Chateaux de France
+DIFM       Diplome des Iles de la France Metropolitaine
+H/c        Homecall
+ILLW       International Lighthouse Lightship Weekend
+IOCA       Islands Of Croatia Award
+IOTA       Islands on the Air
+IRC        International Reply Coupon
+JOTA       Jamboree On The Air
+LoTW       Logbook of the World
+OQRS       Online QSL Request System
+POTA       Parks On The Air
+RDA        Russian District's Award Program
+RIB        Radio in a Box (Remote Operation)
+RLHA       Russian Lighthouse Award
+S.A.S.E    Self addressed stamped envelope
+SES        Special Event Station
+SNSM       Societe Nationale des Sauveteurs en Mer
+URE        Union de Radioaficionados Espanoles
+WCA        World Castles Award
+WLOTA      World Lighthouse On The Air Award
+WRTC       World Radiosport Team Championship
+WWFF       World Wide Flora & Fauna
+
+
+
+
+Thanks for contributing to this issue of the DXNL:
+  I1JQJ/IK1ADH & 425 DX News, DX World, DXNews.com, VA3RJ, KB8NW &
+  OPDX-Bulletin, DF6EX (fuer WIN-QSL), DL1SBF, DL3FF, DL7MAE, F6AJA &
+  Les Nouvelles DX, Islands On The Air, NG3K & ADXO, OE2IKN, OM3JW &
+  IDXP, W3UR & The Daily DX ... u. a.
+
+
+Free subscription DXMB / DXNL:
+==============================
+
+Homepage and archives:
+https://www.darc.de/der-club/referate/dx/en/dxnl/

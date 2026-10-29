@@ -1,0 +1,81 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:21
+Bid: 24215_N4SD
+Title: Space Weather Forecast Discussion
+Path: !YT7MPB!N6RME!N0ARY!N2MH!K5DAT!WW6Q!W9GM!KA3BVJ!KA3VSP!N4SD!
+
+FXXX12 KWNP 261231
+DAYDIS
+
+:Product: Forecast Discussion
+:Issued: 2026 Oct 26 1230 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             Forecast Discussion
+#
+Solar Activity
+
+.24 hr Summary...
+Solar activity was at low levels. Two new active regions were numbered
+in the past 24h: Region 4561 (S09W70, Dro/beta) and Region 4562 (S17E57,
+Axx/alpha). The C-class activity observed was from Region 4561 and
+Region 4560 (N13, L=48), that rotated beyond the W limb during the
+period. The strongest flare was a C1.9 at 26/0838 UTC from Region 4561.
+This flare presented secondary peaks during its decay phase, including a
+C1.0/Sf at 26/0933 UTC associated with a CME first seeing at CCOR-1
+images at 26/0945 UTC. More data is necessary for the analysis of the
+trajectory of this CME. Other coronal activity were observed near or
+beyond the NE limb, but no impact near Earth is anticipated from them.
+
+No Earth-directed CMEs were identified in available coronagraph imagery
+during the day.
+
+.Forecast...
+Solar activity is likely to remain at low levels, with a slight chance
+for isolated M-class flares (R1-R2, Minor-Moderate) through 27 Oct,
+mostly due to the flare potential and evolution of Region 4561. Very low
+levels of solar activity are expected on 28 Oct, as Region 4561 rotates
+off the visible solar disk.
+
+Energetic Particle
+
+.24 hr Summary...
+The greater than 2 MeV electron flux reached high levels, with a peak
+flux of 3,000 pfu observed at 26/0925 UTC. The greater than 10 MeV
+proton flux remained steady at background levels.
+
+.Forecast...
+The greater than 2 MeV electron flux is expected to continue reaching
+high levels through 28 Oct. The greater than 10 MeV proton flux is
+anticipated to persist at background levels through 28 Oct.
+
+Solar Wind
+
+.24 hr Summary...
+Solar wind parameters continued reflecting mostly nominal levels, with a
+weak transient observed after 26/0500 UTC. Total magnetic field strength
+increased from 5 nT levels to 8 nT around 26/0730 UTC, with Bz component
+briefly reaching below -5 nT around 26/0810 UTC. Solar wind speeds
+gradually decreased from 375 km/s to 325 km/s and phi was predominantly
+oriented in the positive solar sector, with a single period of sustained
+negative sector around 26/0245-0430 UTC.
+
+.Forecast...
+Nominal solar wind conditions are expected to maintain through 28 Oct.
+
+Geospace
+
+.24 hr Summary...
+The geomagnetic activity was at quiet levels.
+
+.Forecast...
+The geomagnetic field is likely to remain at mostly quiet levels over
+26-28 Oct.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

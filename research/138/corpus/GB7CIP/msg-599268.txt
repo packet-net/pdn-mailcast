@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 22:27
+Bid: 6075-CX2SA
+Title: (M5.7) Banda Sea -6.4 130.4
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Banda Sea
+Geographic coordinates:           6.396S, 130.376E
+Magnitude:                        5.7
+Depth:                            128 km
+Universal Time (UTC):             28 Oct 2026  22:06:45
+Time near the Epicenter (1):      29 Oct 2026  07:06:45
+Time in your area (1):            28 Oct 2026  19:06:45
+Location with respect to nearby cities:
+276.4 km (171.4 mi) WSW of Tual, Indonesia
+374.6 km (232.2 mi) SSE of Amahai, Indonesia
+376.4 km (233.4 mi) SSE of Masohi, Indonesia
+385.1 km (238.7 mi) SE of Ambon, Indonesia
+439.1 km (272.2 mi) SSW of Fakfak, Indonesia
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttua
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttua?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 28/10/2026 22:26:28 UTC
+________________________________________________________________

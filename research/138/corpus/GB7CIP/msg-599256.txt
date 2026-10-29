@@ -1,0 +1,38 @@
+From: HP2DFA
+To: SOLAR
+Type/Status: B$
+Date/Time: 28-Oct-26 16:50
+Bid: 6189_HP2DFA
+Title: SOLAR WX: Space Weather Message Code: WATA20
+Path: !GB7BED!DM4RW!HP2DFA!
+
+==================================================
+    NOAA SPACE WEATHER ALERT BULLETIN - SOLAR     
+==================================================
+Source: NOAA Space Weather Prediction Center (SWPC)
+Product ID : A20F
+Issue Time : 2026-10-28 16:38:01.100
+--------------------------------------------------
+Space Weather Message Code: WATA20
+Serial Number: 1133
+Issue Time: 2026 Oct 28 1638 UTC
+WATCH: Geomagnetic Storm Category G1 Predicted
+Highest Storm Level Predicted by Day:
+Oct 29:  None (Below G1)   Oct 30:  None (Below G1)   Oct 31:  G1
+(Minor)
+THIS SUPERSEDES ANY/ALL PRIOR WATCHES IN EFFECT
+Comment: G1 (Minor) geomagnetic storms are likely on 31 Oct
+primarily due to recurrent, positive polarity coronal hole high
+speed stream effects.
+NOAA Space Weather Scale descriptions can be found at
+www.swpc.noaa.gov/noaa-scales-explanation
+Potential Impacts: Area of impact primarily poleward of 60
+degrees Geomagnetic Latitude.
+Induced Currents - Weak power grid fluctuations can occur.
+Spacecraft - Minor impact on satellite operations possible.
+Aurora - Aurora may be visible at high latitudes, i.e., northern
+tier of the U.S. such as northern Michigan and Maine.
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 SOLAR MONITOR PANAMA
+==================================================

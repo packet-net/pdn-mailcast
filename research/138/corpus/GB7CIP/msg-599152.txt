@@ -1,0 +1,94 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6091_HP2DFA
+Title: WSPR TOP 10 BEACONS DISTANCE/SPOTS OCT27
+Path: !GB7COW!GB7BED!K1AJD!LU9DCE!VE3CGR!VE2PKT!PY2BIL!HP2DFA!
+
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY TOTAL DISTANCE (OCTOBER 27-28, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR GLOBAL DISTANCE RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON REPORT ORDERED BY
+TOTAL DISTANCE (TOTAL KILOMETERS) FOR THE PERIOD
+OCTOBER 27-28, 2026, IS PRESENTED BELOW. PANAMANIAN
+STATION **HP2DFA** ADVANCES TO 9TH PLACE GLOBALLY,
+OPERATING AT QRP LEVEL (0.2W) WITH OVER 8.17 MILLION KM.
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY DISTANCE)
+==================================================
+RANK | CALL   | LOCATOR | WATTS | KPW    | TOTAL KM   | SPOTS
+----- -------- --------- ------- -------- ------------ --------
+ 1   | VK6XT  | OF88ji  |   5   |   3296 | 21,855,875 | 16,482
+ 2   | DP0GVN | IB59ui  |   5   |   2227 | 19,162,889 | 11,136
+ 3   | VK2EFM | QF56oq  |  10   |    295 | 13,558,546 |  2,947
+ 4   | TI4JWC | EK70wb  |   1   | 166960 | 11,908,468 |166,960
+ 5   | VK2JPB | QF59tl  |  0.2  |  33815 | 10,638,163 |  6,763
+ 6   | VK4TMH | QG56fk  |   5   |    710 | 10,334,730 |  3,551
+ 7   | EB1A   | IN53tf  |  0.5  | 220570 |  9,989,464 |110,285
+ 8   | VK3NTB | QF31cs  |   5   |    576 |  9,819,317 |  2,881
+ 9   | HP2DFA | FJ09cg  |  0.2  |  75445 |  8,170,534 | 15,089
+ 10  | G4GCI  | IO90gu  |   5   |   5267 |  7,456,927 | 26,334
+
+==================================================
+3. TECHNICAL & PROPAGATION NOTES
+==================================================
+- **HP2DFA STATION**: ADVANCES TO RANK 9 GLOBALLY FROM
+  PANAMA (FJ09cg), ACCUMULATING 8,170,534 KM ACROSS
+  15,089 SPOTS (1,547 UNIQUES) AT ONLY 0.2 WATTS,
+  POSTING AN OUTSTANDING 75,445 KPW METRIC.
+- **PROPAGATION CONDITIONS**: STRONG INTERCONTINENTAL
+  PATHS ENABLE BROAD REACH, LED BY VK6XT (21.8M KM)
+  AND DP0GVN (19.1M KM).
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY SPOT COUNT (OCTOBER 27-28, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR SPOT COUNT RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON REPORT ORDERED BY
+SPOT COUNT PERFORMANCE (RAW SPOTS AND UNIQUE SPOTTERS)
+FOR THE PERIOD OCTOBER 27-28, 2026, IS PRESENTED BELOW.
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY SPOTS)
+==================================================
+RANK | CALL       | LOCATOR | WATTS | KPW    | RAW SPOTS | UNIQUES
+----- ------------ --------- ------- -------- ----------- --------
+ 1   | EB1A       | IN53tf  |  0.5  | 220554 |   110,277 |   2,791
+ 2   | G4GCI      | IO90gu  |   5   |   5267 |    26,334 |   2,291
+ 3   | G3JKF      | JO00bs  |   2   |  19314 |    38,628 |   2,232
+ 4   | TI4JWC     | EK70wb  |   1   | 166958 |   166,958 |   2,181
+ 5   | G4HSB      | IO94ll  |  0.2  | 382525 |    76,505 |   1,869
+ 6   | KK1D       | FN31vi  |   1   |   8294 |     8,294 |   1,853
+ 7   | TA4/G8SCU  | KM56vo  |   5   |   5204 |    26,019 |   1,771
+ 8   | KF9KV      | EN52et  |   5   |   1494 |     7,471 |   1,757
+ 9   | WW0WWV     | DN70mq  |   1   | 256263 |   256,263 |   1,725
+ 10  | N7BUI      | CN84ih  |   5   |   2549 |    12,745 |   1,683
+
+==================================================
+3. TECHNICAL & GLOBAL NETWORK OBSERVATIONS
+==================================================
+- **UNIQUE RECEIVER LEADERS**: EB1A HEADS THE CYCLE
+  LOGGING 2,791 UNIQUE REPORTERS (#UNIQ) AND 110,277
+  RAW SPOTS, FOLLOWED BY G4GCI (2,291) AND G3JKF (2,232).
+- **QRP & KPW METRICS**: G4HSB DEMONSTRATES EXCEPTIONAL
+  LINK EFFICIENCY POSTING A 382,525 KPW AT 0.2W, WHILE
+  WW0WWV LOGGED OVER 256K TOTAL NETWORK SPOTS AT 1W.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

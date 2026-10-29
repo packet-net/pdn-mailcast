@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 21-Oct-26 08:59
+Bid: 5258_HP2DFA
+Title: EARTHQUAKE ALERT M5.2 - 68 km NE of Cabatuan, Philippines
+Path: !VK2RZ!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.2+)       
+==================================================
+Event ID   : us6000u3t6
+Magnitude  : M 5.2
+Time (UTC) : 2026-10-21 08:37:41 UTC
+Depth      : 10.0 km
+Coordinates: 13.0297 Lat / 125.5898 Lon
+--------------------------------------------------
+Location:
+  68 km NE of Cabatuan, Philippines
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3t6
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

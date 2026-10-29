@@ -1,0 +1,43 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 21-Oct-26 17:31
+Bid: 25614_LU9DCE
+Title: EARTHQUAKES 21-OCT
+Path: !GB7BED!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-21 08:37 - 5.2 - 68 KM NE OF CABATUAN, PHILIPPINES
+2026-10-21 07:44 - 5.1 - 164 KM NE OF LOSPALOS, TIMOR LESTE
+2026-10-21 04:23 - 4.7 - 173 KM NW OF PORT-OLRY, VANUATU
+2026-10-21 01:20 - 5.0 - SOUTH OF PANAMA
+2026-10-21 01:04 - 4.5 - 2 KM N OF HONCHO, JAPAN
+2026-10-20 23:24 - 4.9 - SOUTH OF THE FIJI ISLANDS
+2026-10-20 23:16 - 4.6 - 115 KM NNE OF BARISHAL, PAKISTAN
+2026-10-20 20:03 - 4.9 - 187 KM NW OF PORT-OLRY, VANUATU
+2026-10-20 19:53 - 4.7 - KURIL ISLANDS
+2026-10-20 18:07 - 5.1 - 39 KM W OF MOSTEIROS, PORTUGAL
+2026-10-20 17:18 - 4.5 - 215 KM S OF BURICA, PANAMA
+2026-10-20 17:05 - 5.4 - 192 KM S OF BURICA, PANAMA
+2026-10-20 16:29 - 4.8 - SOUTH OF THE FIJI ISLANDS
+2026-10-20 16:29 - 5.0 - 21 KM SW OF MEULABOH, INDONESIA
+2026-10-20 14:20 - 4.5 - 111 KM S OF KOKOPO, PAPUA NEW GUINEA
+2026-10-20 13:27 - 4.5 - 142 KM SSW OF ABEPURA, INDONESIA
+2026-10-20 11:40 - 4.9 - 184 KM NW OF PORT-OLRY, VANUATU
+2026-10-20 10:40 - 5.0 - 81 KM S OF SAND POINT, ALASKA
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

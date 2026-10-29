@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 22-Oct-26 15:02
+Bid: 5424_HP2DFA
+Title: EARTHQUAKE ALERT M7.0 - 183 km ENE of Nagqu, China
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M7.0+)       
+==================================================
+Event ID   : us6000u43g
+Magnitude  : M 7.0
+Time (UTC) : 2026-10-22 14:33:39 UTC
+Depth      : 10.0 km
+Coordinates: 32.3357 Lat / 93.7138 Lon
+--------------------------------------------------
+Location:
+  183 km ENE of Nagqu, China
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u43g
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

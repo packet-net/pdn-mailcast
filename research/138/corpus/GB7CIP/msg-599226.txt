@@ -1,0 +1,77 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:20
+Bid: 24128_N4SD
+Title: Space Weather Forecast Discussion
+Path: !YT7MPB!N6RME!N0ARY!KE6JJJ!KQ6UP!K5DAT!NS2B!N3IP!KA3VSP!N4SD!
+
+FXXX12 KWNP 240031
+DAYDIS
+
+:Product: Forecast Discussion
+:Issued: 2026 Oct 24 0030 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             Forecast Discussion
+#
+Solar Activity
+
+.24 hr Summary...
+Solar activity continued at low levels. The largest flare was a C3.3/Sf
+at 23/0542 UTC from Region 4560 (N13W58, Eai/beta-gamma). Decay was
+observed in the intermediate spots of AR4560 over the past 24 hours. The
+other active region on the visible solar disk, Region 4557 (N07W75,
+Cao/beta), was responsible for a few low-level C-class flares.
+
+No new Earth-directed CMEs were observed in available coronagraph
+imagery.
+
+.Forecast...
+Solar activity is expected to remain at low levels through 26 Oct, with
+a slight chance for isolated M-class flares (R1-R2, Minor-Moderate),
+mostly due to the flare potential of Region 4560.
+
+Energetic Particle
+
+.24 hr Summary...
+The greater than 2 MeV electron flux reached high levels. The greater
+than 10 MeV proton flux remained steady at background levels.
+
+.Forecast...
+The greater than 2 MeV electron flux is expected to continue reaching
+high levels on 24-26 Oct. The greater than 10 MeV proton flux is
+anticipated to persist at background levels through 26 Oct.
+
+Solar Wind
+
+.24 hr Summary...
+Solar wind parameters reflected continued positive polarity CH HSS
+influences. Total magnetic field strength (Bt) was at or below 6 nT and
+the Bz component was briefly observed as far south as -6 nT. Solar wind
+speeds maintained between ~400-450 km/s. Phi angle was predominantly in
+the positive solar sector (away from the Sun).
+
+.Forecast...
+Solar wind conditions are expected to continue at similar levels over 24
+Oct. Enhanced solar wind conditions are likely on 25-26 Oct due to
+combined influences of a negative polarity CH HSS and possible glancing
+CME effects from the 21 Oct eruptions.
+
+Geospace
+
+.24 hr Summary...
+Geomagnetic activity reached active levels.
+
+.Forecast...
+Active conditions are expected on 24 Oct as CH HSS influences wane.
+Additional periods of active conditions, with a chance for G1 (Minor)
+storming, are anticipated on 25-26 Oct due to combined effects from a
+recently emerged negative polarity coronal hole and potential glancing
+CME impacts.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 12:01
+Bid: 5801_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - 199 km ENE of Nagqu, China
+Path: !VK2RZ!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us6000u4tx
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-25 11:24:14 UTC
+Depth      : 10.0 km
+Coordinates: 32.3695 Lat / 93.8872 Lon
+--------------------------------------------------
+Location:
+  199 km ENE of Nagqu, China
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4tx
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

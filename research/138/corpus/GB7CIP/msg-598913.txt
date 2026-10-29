@@ -1,0 +1,52 @@
+From: NS2B
+To: ALL
+Type/Status: B$
+Date/Time: 25-Oct-26 15:18
+Bid: 5189_NS2B
+Title: PCL Packet Net
+Path: !VK2RZ!VE3CGR!WG0A!N2MH4!N3HYM!WG3K!NS2B!
+
+The PCL Packet Net is "on the air" most Mondays, at 8pm
+Eastern, 7pm Central, 6pm Mountain, 5pm Pacific, US Time.
+The net doesn't meet on the Mondays where these US Holidays
+occur during the week: Easter, Memorial Day, Independence
+Day, Labor Day, Thanksgiving Day, Christmas, and New Years
+Day.
+
+Sometimes funny, sometimes serious, but always interesting.
+Friendly hams from all over gather on the net for chuckles,
+tips, tricks, and tall tales. The net is done in a
+roundtable format, and is dedicated to the memory of K.O.
+Higgs, N0KFQ, and his XYL, Billie, KB0WSA, who began The PCL
+Net years ago from their QTH in Branson, Missouri. The
+available options to connect are as follows.
+For options 2 and 3 below, please contact NS2B for your
+username (usually your callsign) and password.
+
+1) AX25 Users: At any Packet node, look for and connect to
+NS2B-7. Once there, type PCL to connect to the PCL Net
+chat server.
+
+2) Outpost, Winpack and HyperTerminal Users: Using Telnet
+(iptelnet with the Outpost Packet Program is highly
+recommended), connect to ns2b.ddns.net -- port 8010.
+
+3) Internet users: Using your favorite web browser, connect
+to this address:
+http://ns2b.ddns.net:8080/Node/Terminal.html?pcl
+
+Once you enter your username and password, type PCL and
+press <ENTER> to join the net.
+
+If you can't make the net that week, please email Bob, NS2B,
+at ns2b@arrl.net or ns2b@winlink.org -- or Daryl, NK5LA, at
+n5vlz@duck.com or nk5la@winlink.org and you'll be
+acknowledged as an "early check-in". If you email your
+comments to Daryl, NK5LA, your comments will be noted in
+the weekly scribe. Please email them at least an hour
+before the net is to start, to ensure that they are obtained
+in time. He's usually Net Control and Scribe, with Bob
+(Sysop), as backup. We hope that you can join us on the net
+real soon...you'll be glad you did!!
+
+73 DE NK5LA and NS2B

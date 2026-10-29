@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 29-Oct-26 03:32
+Bid: 6084-CX2SA
+Title: (M5.4) Philippine Islands region 8.4 127.4
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Philippine Islands region
+Geographic coordinates:           8.370N, 127.443E
+Magnitude:                        5.4
+Depth:                            10 km
+Universal Time (UTC):             29 Oct 2026  03:17:55
+Time near the Epicenter (1):      29 Oct 2026  11:17:55
+Time in your area (1):            29 Oct 2026  00:17:55
+Location with respect to nearby cities:
+113.5 km (70.4 mi) ENE of Barcelona, Philippines
+122.1 km (75.7 mi) E of Hinatuan, Philippines
+125.2 km (77.7 mi) E of Bislig, Philippines
+131.2 km (81.3 mi) NE of Baganga, Philippines
+218.6 km (135.5 mi) ESE of Butuan, Philippines
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttw2
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttw2?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 29/10/2026 03:31:55 UTC
+________________________________________________________________

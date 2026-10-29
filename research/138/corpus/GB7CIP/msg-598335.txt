@@ -1,0 +1,31 @@
+From: LA3RIA
+To: WX
+Type/Status: B$
+Date/Time: 19-Oct-26 16:10
+Bid: 9E0336LA3RIA
+Title: WX-REPORT
+Path: !GB7COW!
+
+From: LA3RIA@GB7COW.#44.GBR.EU
+To  : WX@WW
+
+
+From: LA3RIA@GB7COW.#44.GBR.EURO
+TO  : WW@WW
+
+QTH: OSLO 14:10 UTC _ 19 Oct. 2026
+Temperature & Weather
+Weather 	Partial fog
+Temperature 	3 °C
+Dewpoint 	3 °C
+Rel. humidity 	100%
+QNH: 1032 mb
+Kp-index 	0 (0-9)
+Today the sun rises at 08:05 and sets at 17:55.
+de LA3RIA-7
+
+'
+73 - MUSHTAQ, LA3RIA @ GB7COW
+
+Message timed: 18:06 on 2026-Oct-19
+Message sent using WinPack-Telnet V6.80

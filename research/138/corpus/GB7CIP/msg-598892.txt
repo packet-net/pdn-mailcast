@@ -1,0 +1,325 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 25-Oct-26 11:46
+Bid: 25986_LU9DCE
+Title: ARCHLINUX UPDATES 25-OCT
+Path: !GB7BED!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+LUX-CLI 0.49.2-1 X86_64
+
+A LUXURIOUS PACKAGE MANAGER FOR LUA (CLI)
+
+========================================
+
+LUA54-LUX 0.49.2-1 X86_64
+
+A LUXURIOUS PACKAGE MANAGER FOR LUA (ROCK FOR LUA 5.4)
+
+========================================
+
+LUA53-LUX 0.49.2-1 X86_64
+
+A LUXURIOUS PACKAGE MANAGER FOR LUA (ROCK FOR LUA 5.3)
+
+========================================
+
+LUA52-LUX 0.49.2-1 X86_64
+
+A LUXURIOUS PACKAGE MANAGER FOR LUA (ROCK FOR LUA 5.2)
+
+========================================
+
+LUA51-LUX 0.49.2-1 X86_64
+
+A LUXURIOUS PACKAGE MANAGER FOR LUA (ROCK FOR LUA 5.1)
+
+========================================
+
+LUA-LUX 0.49.2-1 X86_64
+
+A LUXURIOUS PACKAGE MANAGER FOR LUA (ROCK FOR LUA 5.5)
+
+========================================
+
+MISE 2026.10.19-1 X86_64
+
+THE FRONT-END TO YOUR DEV ENV
+
+========================================
+
+TTF-SARASA-GOTHIC 1.0.43-1 ANY
+
+A CJK PROGRAMMING FONT BASED ON IOSEVKA AND SOURCE HAN SANS. (TTC)
+
+========================================
+
+PYTHON-CMD2 4.3.1-1 ANY
+
+A TOOL FOR BUILDING INTERACTIVE COMMAND LINE APPS
+
+========================================
+
+V2RAY-DOMAIN-LIST-COMMUNITY 20261025014458-1 ANY
+
+A LIST OF DOMAINS TO BE USED AS GEOSITES FOR ROUTING PURPOSE IN
+PROJECT V
+
+========================================
+
+PYTHON-JSONPATCH 1.37-1 ANY
+
+AN IMPLEMENTATION OF THE JSON PATCH FORMAT
+
+========================================
+
+RESVG 0.49.0-1 X86_64
+
+SVG RENDERING LIBRARY AND CLI
+
+========================================
+
+GRAM 3.4.1-1 X86_64
+
+A CODE EDITOR FOR HUMANOID APES AND GRUMPY TOADS
+
+========================================
+
+FUZZEL 1.15.0-2 X86_64
+
+APPLICATION LAUNCHER FOR WLROOTS BASED WAYLAND COMPOSITORS
+
+========================================
+
+BIOME 2.6.3-1 X86_64
+
+FORMATTER, LINTER, AND MORE FOR JAVASCRIPT, TYPESCRIPT, JSON, AND CSS
+
+========================================
+
+ZVBI 0.2.46-1 X86_64
+
+VBI CAPTURE AND DECODING LIBRARY
+
+========================================
+
+VAPOURSYNTH-PLUGIN-VSHIP-VULKAN 5.1.2-1 X86_64
+
+VSHIP VAPOURSYNTH PLUGIN
+
+========================================
+
+VAPOURSYNTH 81-1 X86_64
+
+A VIDEO PROCESSING FRAMEWORK WITH THE FUTURE IN MIND
+
+========================================
+
+TOMCAT-NATIVE 2.0.17-1 X86_64
+
+OPTIONAL COMPONENT FOR TOMCAT TO USE CERTAIN NATIVE RESOURCES FOR
+PERFORMANCE, COMPATIBILITY
+
+========================================
+
+SCCACHE 0.19.0-1 X86_64
+
+SHARED COMPILATION CACHE
+
+========================================
+
+RSPAMD 4.2.3-1 X86_64
+
+FAST, FREE AND OPEN-SOURCE SPAM FILTERING SYSTEM
+
+========================================
+
+RELEASE-PLZ 0.4.1-1 X86_64
+
+RELEASE RUST PACKAGES WITHOUT USING THE COMMAND LINE
+
+========================================
+
+MKVTOOLNIX-GUI 103.0-1 X86_64
+
+SET OF TOOLS TO CREATE, EDIT AND INSPECT MATROSKA FILES
+
+========================================
+
+MKVTOOLNIX-CLI 103.0-1 X86_64
+
+SET OF TOOLS TO CREATE, EDIT AND INSPECT MATROSKA FILES
+
+========================================
+
+RETROARCH-ASSETS-XMB 1:20261001.174016.GD9F969054DC7-1 ANY
+
+XMB UI/UX ASSETS FOR RETROARCH
+
+========================================
+
+RETROARCH-ASSETS-OZONE 1:20261001.174016.GD9F969054DC7-1 ANY
+
+OZONE UI/UX ASSETS FOR RETROARCH
+
+========================================
+
+RETROARCH-ASSETS-GLUI 1:20261001.174016.GD9F969054DC7-1 ANY
+
+GLUI UI/UX ASSETS FOR RETROARCH
+
+========================================
+
+PATCH 2.8.1-1 X86_64
+
+A UTILITY TO APPLY PATCH FILES TO ORIGINAL SOURCES
+
+========================================
+
+NEXTCLOUD-APP-BOOKMARKS 1:17.0.1-1 ANY
+
+BOOKMARKS APP FOR NEXTCLOUD
+
+========================================
+
+PYTHON-PATIENCEDIFF 1.0.2-1 X86_64
+
+PATIENCEDIFF PYTHON AND C IMPLEMENTATIONS
+
+========================================
+
+PYTHON-DBUS-FAST 5.2.0-1 X86_64
+
+A FASTER VERSION OF DBUS-NEXT
+
+========================================
+
+PYTHON-BROTLICFFI 1.2.1.0-1 X86_64
+
+PYTHON BINDINGS TO THE BROTLI COMPRESSION LIBRARY
+
+========================================
+
+PYTHON-SLUGIFY 9.1.3-1 ANY
+
+A PYTHON SLUGIFY APPLICATION THAT HANDLES UNICODE
+
+========================================
+
+PYTHON-REACTIVEX 6.0.0-1 ANY
+
+REACTIVE EXTENSIONS FOR PYTHON
+
+========================================
+
+PYTHON-MERGE3 1.0.0-1 ANY
+
+PYTHON IMPLEMENTATION OF 3-WAY MERGE
+
+========================================
+
+PYTHON-MARSHMALLOW-SQLALCHEMY 1.6.0-1 ANY
+
+SQLALCHEMY INTEGRATION WITH MARSHMALLOW
+
+========================================
+
+PYTHON-BLESSED 1.52-1 ANY
+
+A THIN, PRACTICAL WRAPPER AROUND TERMINAL STYLING, SCREEN POSITIONING,
+AND KEYBOARD INPUT
+
+========================================
+
+OLLAMA-VULKAN 0.40.10-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS) WITH VULKAN
+
+========================================
+
+OLLAMA-ROCM 0.40.10-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS) WITH ROCM
+
+========================================
+
+OLLAMA-DOCS 0.40.10-1 X86_64
+
+DOCUMENTATION FOR OLLAMA
+
+========================================
+
+OLLAMA-CUDA 0.40.10-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS) WITH CUDA
+
+========================================
+
+OLLAMA 0.40.10-1 X86_64
+
+CREATE, RUN AND SHARE LARGE LANGUAGE MODELS (LLMS)
+
+========================================
+
+EMBY-SERVER 4.10.2.0-2 X86_64
+
+BRING TOGETHER YOUR VIDEOS, MUSIC, PHOTOS, AND LIVE TELEVISION
+
+========================================
+
+SKIA-SHARP 4.153.1-1 X86_64
+
+THE SKIA 2D GRAPHICS LIBRARY FROM GOOGLE EXPOSED TO .NET LANGUAGES AND
+RUNTIMES ACROSS THE BOARD
+
+========================================
+
+LIBRETRO-SCUMMVM 20261022.195909.GE0DDC60BFABB-1 X86_64
+
+SCUMMVM CORE
+
+========================================
+
+LIBRETRO-PPSSPP 20261024.114650.G13FFE2873F06-1 X86_64
+
+SONY PLAYSTATION PORTABLE CORE
+
+========================================
+
+LIBRETRO-PLAY 20261022.144909.G505DAC73149F-1 X86_64
+
+SONY PLAYSTATION 2 CORE
+
+========================================
+
+BLENDER 17:5.2.3-4 X86_64
+
+A FULLY INTEGRATED 3D GRAPHICS CREATION SUITE
+
+========================================
+
+LIBRETRO-PARALLEL-N64 20261023.101947.GA467DDAF904C-1 X86_64
+
+NINTENDO 64 CORE
+
+========================================
+
+LIBRETRO-NESTOPIA 1:20261023.192225.G2110D21B7174-1 X86_64
+
+NINTENDO ENTERTAINMENT SYSTEM CORE
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

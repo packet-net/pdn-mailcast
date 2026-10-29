@@ -1,0 +1,56 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 25-Oct-26 17:30
+Bid: 26029_LU9DCE
+Title: EARTHQUAKES 25-OCT
+Path: !GB7BED!EI2GYB!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-25 08:41 - 5.4 - 205 KM NW OF PORT-OLRY, VANUATU
+2026-10-25 07:44 - 4.6 - 82 KM SSE OF AKUTAN, ALASKA
+2026-10-25 07:11 - 4.6 - 50 KM SW OF ATIQUIPA, PERU
+2026-10-25 06:04 - 4.5 - 74 KM SSE OF ONAGAWA CHO, JAPAN
+2026-10-25 05:15 - 4.9 - 17 KM SE OF AMBELOKIPOI, GREECE
+2026-10-25 03:29 - 5.2 - 63 KM NNE OF LAE, PAPUA NEW GUINEA
+2026-10-25 02:36 - 4.8 - BONIN ISLANDS, JAPAN REGION
+2026-10-25 02:24 - 6.1 - 25 KM ENE OF PORT-OLRY, VANUATU
+2026-10-25 02:09 - 6.5 - BONIN ISLANDS, JAPAN REGION
+2026-10-25 02:06 - 5.1 - 161 KM WNW OF PORT-OLRY, VANUATU
+2026-10-25 01:46 - 5.1 - 166 KM WNW OF PORT-OLRY, VANUATU
+2026-10-24 23:59 - 5.3 - 44 KM ESE OF MIYAZAKI, JAPAN
+2026-10-24 23:44 - 5.0 - 192 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 23:39 - 4.8 - 203 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 22:47 - 5.0 - 210 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 21:41 - 4.9 - 53 KM NNW OF FEF, INDONESIA
+2026-10-24 20:35 - 5.3 - 101 KM SSE OF VILYUCHINSK, RUSSIA
+2026-10-24 19:18 - 4.9 - 73 KM SW OF ISANGEL, VANUATU
+2026-10-24 19:07 - 5.0 - 193 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 16:54 - 4.8 - 153 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 15:45 - 4.7 - 238 KM WNW OF PORT-OLRY, VANUATU
+2026-10-24 15:24 - 5.8 - BOUVET ISLAND REGION
+2026-10-24 15:19 - 4.9 - 217 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 15:07 - 4.8 - 215 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 13:53 - 4.8 - 216 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 13:26 - 4.6 - 195 KM NE OF NAGQU, CHINA
+2026-10-24 11:48 - 4.7 - 72 KM S OF BASCO, PHILIPPINES
+2026-10-24 11:20 - 4.9 - 148 KM NNW OF KILMIA, YEMEN
+2026-10-24 11:14 - 4.9 - 196 KM W OF SOLA, VANUATU
+2026-10-24 09:38 - 4.9 - 169 KM NW OF PORT-OLRY, VANUATU
+2026-10-24 09:07 - 5.0 - 219 KM WNW OF PORT-OLRY, VANUATU
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

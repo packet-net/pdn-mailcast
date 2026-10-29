@@ -1,0 +1,160 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 25-Oct-26 17:03
+Bid: 5839_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (25-Oct 12:00Z)
+Path: !VE3KPG!VE3CGR!DM4RW!HP2DFA!
+
+000
+AXNT20 KNHC 251658
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1815 UTC Sun Oct 25 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_12Z.gif'>1200 UT
+1650 UTC.
+
+...SPECIAL FEATURES...
+
+Atlantic Gale Warning: A tightening pressure gradient will
+continue to develop across the western and central offshore zones
+today through this evening as strong high pressure builds
+southward over the western Atlantic, and low pressure deepens ENE
+of the central Bahamas along a stationary front extending from 31N56
+the NW Bahamas near 27N77W to the Florida Straits. This setup is
+inducing widespread strong to gale- force NE to E winds and very
+rough seas building to 20 ft. Gale- force winds to 40 kt prevail nor
+of 27N between 61.5N and 72.5W according to the latest wind-
+derived satellite. Strong to gale winds north of 27N between 61W
+and 80W will prevail today through early Mon morning. The portion
+of the front E of 70W is expected to begin to lift northward
+tonight through Mon morning, and stall from near Bermuda to W Cuba
+Mon and Mon night, then drift southeastward Tue through Wed
+night. Strong high pressure across the eastern U.S. will shift
+slowly eastward and into the NW Atlantic during this time, and
+maintain fresh to strong winds and rough to very rough seas in NE
+swell to the north of the front through the period. Mariners are
+urged to remain alert to these dangerous marine conditions, and
+take the necessary precautions to avoid these affected areas.
+
+Please, see the latest NWS High Seas
+Forecast issued by the National Hurricane Center at website
+https:<a href='https://www.nhc.noaa.gov/text/MIAHSFAT2.shtml'>www.nh
+
+Heavy Rainfall in the Northern Caribbean: A mid to upper level
+trough over Florida, the NW Caribbean and the Bahamas combined
+with abundant tropical moisture will support periods of heavy rain
+over eastern Cuba, Hispaniola, Jamaica, the southern Bahamas, and
+the Turks and Caicos Islands through Mon. Today, model guidance
+indicates that the trough will begin to weaken and meander
+northward. The main areas that are expected to be impacted by
+abundant tropical moisture and heavy rainfall will then shift to
+north and east of Cuba over the southern Bahamas, Turks and
+Caicos, the Windward Passage and Hispaniola. The heavy rainfall
+will raise concerns for dangerous and life-threatening flash
+flooding. Please refer to your local weather services and the
+International Desk at the Weather Prediction Center for more
+information.
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough axis extends from the coast of Africa near
+16N17W southwestward to 09N34W. The ITCZ extends from 09N44W to
+11N59W. Scattered moderate convection is seen from 04N to 25N
+and east of 40W.
+
+...GULF OF AMERICA...
+
+A strong ridge extends over most of the eastern United States and
+into the central Gulf, supporting fresh to strong winds east of
+90W along with seas 6 to 9 ft. Elsewhere, mainly moderate winds
+prevail along seas 4 to 6 ft.
+
+For the forecast, the tight pressure gradient between the high
+pressure and a stationary front across the NW Bahamas and into the
+eastern Florida Straits will maintain fresh to strong NE winds
+and rough seas over the eastern Gulf, including the Florida
+Straits, through Wed.
+
+...CARIBBEAN SEA...
+
+Please see the Special Features section above for information
+about the potential for heavy rainfall over eastern Cuba,
+Hispaniola, and Jamaica, the Turks and Caicos and locations farther
+east through the early part of the upcoming week.
+
+A broad surface trough over the central Bahamas extends southward
+across E Cuba to a 1010 mb low NE of Jamaica near 19.5N76W.
+Numerous moderate to strong convection is along and ahead of this
+low under an area of upper level diffluence that covers
+Hispaniola and adjacent waters. Gust to gale force winds and rough
+seas are likely within this area of convection between eastern
+Cuba and Jamaica and south of Hispaniola between 69W and 72.5W.
+Winds over the NW and portions of SW Caribbean are moderate to
+fresh from the N while ENE winds of the same speeds are E of 74W.
+Seas over these regions are moderate and slight between 74W and
+78W where winds are light to gentle and variable due to the low
+pressure.
+
+For the forecast, a middle to upper level trough over Florida,
+the Bahamas and NW Caribbean will shift very slowly eastward
+through Tue and support scattered to numerous showers and
+thunderstorms over the central Caribbean and Windward Passage.
+Meanwhile, a broad surface trough over the central Bahamas
+extending southward across E Cuba to a 1010 mb low N of Jamaica
+near 19.5N76.5W, continuing to the SW Caribbean, will drift
+eastward through Tue. Strong high pressure across the eastern U.S.
+will continue to build southward across Florida and the Gulf of
+America through early next week, leading to moderate to fresh N
+winds and moderate seas across the western Caribbean W of the
+trough through late Tue. Expect rough seas in large N swell across
+the Yucatan Channel late tonight through early Tue. Otherwise,
+moderate to fresh E-SE winds in the E Caribbean will diminish to
+gentle to moderate speeds by Mon evening.
+
+...ATLANTIC OCEAN...
+
+Please see the Special Features section above for information
+about a Gale Warning over the western Atlantic, and on heavy
+rainfall expected for the southern Bahamas, the Turks and Caicos
+Islands, the Windward Passage, and Hispaniola.
+
+A stationary front extends from 31N56W to the NW Bahamas near
+27N77W to the Florida Straits. Along the front, a 1010 mb low
+pressure is near 28.5N66W. A surface trough then extends
+southward from this low to Hispaniola adjacent waters. These
+features are supporting scattered moderate convection north of 20N
+and between 58W and 74W. Widespread strong to gale-force winds
+and rough seas are north of the front and along the trough or
+across many of the offshores N of 27N. Otherwise, the Azores ridge
+dominates the remainder Atlantic subtropical waters, providing
+mainly moderate or weaker winds and moderate seas, except for
+fresh to strong winds funneling through the Canary Islands and
+west of Cape Verde where rough seas are ongoing.
+
+For the forecast west of 55W, strong to gale-force NE to E winds
+will continue through early tonight, across the western and
+central offshore zones, along and N of a stationary front
+extending from 31N56W to the NW Bahamas near 27N77W to the Florida
+Straits. Very rough seas to 20 ft are expected. The portion of
+the front E of 70W is expected to begin to lift northward tonight
+through Mon morning, and stall from near Bermuda to W Cuba Mon and
+Mon night, then drift southeastward Tue through Wed night. Strong
+high pressure across the eastern U.S. will shift slowly eastward
+and into the NW Atlantic during this time, and maintain fresh to
+strong winds and rough to very rough seas in NE swell to the north
+of the front through the period. Mariners are urged to remain
+alert to these dangerous marine conditions, and take the necessary
+precautions to avoid these affected areas.
+
+$$
+KRV

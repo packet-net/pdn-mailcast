@@ -1,0 +1,95 @@
+From: N3MEL
+To: SITREP
+Type/Status: B$
+Date/Time: 28-Oct-26 14:21
+Bid: 30289_N3MEL
+Title: U.S. SITREP 10-26-26
+Path: !YT7MPB!N6RME!N0ARY!N2MH!N2NOV!N3MEL!
+
+================================================================================
+                       U.S. DAILY SITUATION REPORT (SITREP)
+================================================================================
+DATE: October 26, 2026 | TIME: 18:00 EST
+--------------------------------------------------------------------------------
+
+[ BLUF: BOTTOM LINE UP FRONT ]
+-----------------------------
+ISRAELI PRIME MINISTER NETANYAHU PUSHES FOR RENEWED OFFENSIVE STRIKES AS WASHINGTON 
+REQUESTS COORDINATION DELAYS; CENTCOM COMMANDER ADMIRAL BRAD COOPER INSPECTS STRAIT 
+OF HORMUZ BLOCKADE SCREENING. NATIONAL WILDFIRE PREPAREDNESS HOLDS AT LEVEL PL-1 
+WITH 8 ACTIVE LARGE INCIDENTS AND 9,060,375 YTD ACRES BURNED NATIONWIDE. SPC OUTLOOKS 
+BENIGN CONVECTIVE CONDITIONS ACROSS THE LOWER 48. DHS ISSUES FORMAL EXCLUSION ORDER 
+REMOVING DEEPSEEK AI PRODUCTS FROM FEDERAL IT SYSTEMS AMID ADVERSARY TELEMETRY RISKS.
+
+--------------------------------------------------------------------------------
+I. THE IRAN WAR (OPERATION EPIC FURY)
+--------------------------------------------------------------------------------
+* NETANYAHU PUSHES COMBAT RESUMPTION & US COORDINATION: Israeli Prime Minister Benjamin 
+  Netanyahu continues pressing for a resumption of major offensive operations against 
+  Iran, though the U.S. administration has requested coordination pauses pending 
+  preparedness for joint strategic execution. Brent Crude values fluctuate near 
+  $115.15/bbl as international markets digest persistent regional escalation risks.
+* CENTCOM HORMUZ INSPECTION & REGIONAL POSTURE: CENTCOM Commander Admiral Brad Cooper 
+  conducted an aerial inspection tour over the Strait of Hormuz aboard a U.S. Army 
+  CH-47 Chinook, reviewing blockade enforcement and commercial interception screens. 
+  Meanwhile, regional delegations prepare for upcoming diplomatic talks in Tehran involving 
+  Mecca Pact representatives from Saudi Arabia, Turkey, and Pakistan.
+* IDF DRILLS & PROXY INCIDENTS: The Israel Defense Forces initiated a two-day multi-front 
+  military defense exercise across northern and central Israel, while intercepting an 
+  unidentified aerial target over southern Lebanon.
+
+--------------------------------------------------------------------------------
+II. HOMELAND SECURITY (DHS)
+--------------------------------------------------------------------------------
+* DEEPSEEK AI FEDERAL IT EXCLUSION ORDER: DHS officially published and enforced a 
+  Secretary's order excluding and removing all artificial intelligence products and services 
+  developed by Hangzhou DeepSeek AI from federal civilian executive branch IT networks, 
+  citing severe risks regarding insecure data handling and potential telemetry routing to adversaries.
+* CONGRESSIONAL OVERSIGHT ON INTERIOR REMOVALS: DHS leadership received detailed follow-up 
+  inquiries from House oversight committees regarding comprehensive interior enforcement 
+  metrics, detention capacity numbers, and operational prioritization across non-sanctuary jurisdictions.
+* CRITICAL AUTOMATION TELEMETRY HARDENING: CyberAI Sentinels under Secretary Markwayne 
+  Mullin maintain continuous, real-time sanitization sweeps across national intermodal 
+  transportation backbones, quarantining state-sponsored "Salt Typhoon" malware loops targeting 
+  Class I freight rail automated dispatch networks and energy pipeline telemetry. TSA wait times hold at 14-22 min.
+
+--------------------------------------------------------------------------------
+III. SEVERE WEATHER & WILDFIRES
+--------------------------------------------------------------------------------
+* BENIGN CONVECTIVE REGIME NATIONWIDE: The Storm Prediction Center (SPC) reports no 
+  organized severe thunderstorm activity across the contiguous United States today. 
+  Continental high pressure maintains stable, clear weather across all lower-48 sectors.
+* INTERMOUNTAIN & SOUTHERN TIER FIRE WEATHER: Seasonal drying and stable ridge patterns 
+  persist across western and southern states, keeping general chaparral growth subdued 
+  under light regional wind fields.
+* NATIONAL WILDFIRES (PREPAREDNESS LEVEL PL-1):
+  - MOBILIZATION OVERVIEW: Suppression operations hold at National Preparedness Level 
+    PL-1 with 8 active large incidents and 1,230 personnel assigned nationwide (NIFC 
+    Situation Report). Cumulative YTD burned area reached 9,060,375 acres across 66,494 fires.
+  - INCIDENT FRONTS: Ground crews manage active wind-driven runs on the East Bailey Road 
+    Fire in Oklahoma and the Range 47B fire in Mississippi, alongside continued smoldering 
+    mop-up on Michigan's Ridge and Black River timber complexes.
+
+--------------------------------------------------------------------------------
+IV. ECONOMIC & INFRASTRUCTURE IMPACT
+--------------------------------------------------------------------------------
+* ENERGY SPOT VOLATILITY: Global Brent Crude values trade firm near $115.15/bbl 
+  as commodity markets price in potential post-election kinetic expansions and persistent 
+  maritime security risks in the Persian Gulf.
+* FREIGHT CORRIDOR VELOCITY: Southwest "Mullin Corridors" maintain steady container 
+  throughput. Class I rail networks report nominal main-line speeds across Midwest, 
+  High Plains, and Eastern seaboard logistics arteries under clear autumn weather.
+* MARKET METRICS: Domestic financial markets opened cautious, balancing Middle East 
+  geopolitical friction, DHS DeepSeek IT exclusion protocols, and PL-1 wildland 
+  suppression stability against resilient intermodal routing.
+
+--------------------------------------------------------------------------------
+[ END OF REPORT ]
+================================================================================
+DISCLAIMER: I am not responsible for accuracy of this reports, this information 
+is intended for general use only.
+================================================================================
+
+Glenn Allison, N3MEL
+(TPRFN) The Packet Radio Forwarding Network
+www.tprfn.net

@@ -1,0 +1,102 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 22-Oct-26 08:25
+Bid: 8749_GB7CIP
+Title: Coax Feeder Tests
+Path: 
+
+By John G8MNY                       (Updated Feb 11)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+When putting up a new aerial system (fixed, /P or /M) it is generally worth
+while testing the feeder. RF SWR testing seems the best as far as the Tx goes,
+but it is not always fool proof!
+
+DC TEST
+With an Ohm meter it is quite simple to measure the coax and if there are no
+copper whiskers across the Tx or Aerial coax ends an open circuit will be seen.
+
+Tx End                                            \³/
+   Meter > Íµ±±===========================±±ÆÍ     Ù
+           Plug          Coax            Plug   Aerial
+
+But this is not the most efficient DC test, by putting a dummy load at one end
+e.g. instead of the aerial, Short, Open circuits and then RF tests can be done.
+
+Tx End                                         Aerial End
+   Meter > Íµ±±===========================±±ÆÍ 50R Dummy
+           Plug          Coax            Plug    Load
+
+Here the meter should reads 50R + cable DC resistance.
+
+LOG AERIAL DC TEST 
+It is worth noting (in your log book for example) if the aerial is a DC short
+or not, as this will cut down a lot of hassel later if there is a problem.
+
+RF TESTING
+                                            Aerial End
+Tx End
+SWR Bridge> Íµ±±===========================±±ÆÍ 50R Dummy
+             Plug         Coax            Plug    Load
+
+After the DC test, this RF test will reveal if there is problem that will
+affect the Tx. Try sliding your hand along the coax to see of there are
+changes! If there is RF is leaking out! E.g. too long an unscreen tail into the
+plug, screen earthed at wrong part of plug (UHF).
+
+Now putting the aerial in should give the same results.
+
+Tx End                                         \³/
+SWR Bridge> Íµ±±============================±±ÆÍÙAerial
+
+It is possible to get a good DC & RF SWR indication on a faulty installation,
+where say the braid is bypassed by other earths and the coax outer then becomes
+the aerial. This is a safety issue in cars, where say 50W of 70cms is fine to
+an external aerial, by might cause brakes or airbags to go off if radiated
+inside the car!
+
+CONNECTORS
+The most common is PL259, with its 4mm wander plug centre it is rated at 500V
+& 10A, it is hardy plug usable to 200MHz (400W). The Z is not 50R on the cheap
+versions and generally the mismatch length is so short compared to a 1/4 wave
+it is quite irrelevant as is the loss, fully waterproof 50R version are made
+but for a price! To waterproof the cheap ones it is best to fill them with
+grease (vaceline) and then clean off the outside and tape over with
+amalgamating tape. Making a good shield connection in some designs can be
+difficult and some have white nylon insulators that melt easily when soldering
+up, while others have brown ones that burn and char on very high voltages.
+Small cable bore plugs or adaptors are needed for thin coax. There are "in line
+female SO239" made, if you can find them, otherwise you need barrel joiners.
+
+N connectors are used above 200MHz, these are made to be 50R & 75R, & are
+fairly rugged, but the thin centre pin, socket and small 6mm surrounding shield
+connection (not the screw up bit) must give good RF connection to maintain 50R
+and low losses. The thin centre pin & mating leafed pin are quite fragile and
+are not rated to carry heavy current like the 259 so high SWR and high power
+can potentially damage it. There are many designs of plug/socket with loads of
+fiddly bits to put on the coax in the right order, but the principle is to keep
+the Z constant, so the outer connection is made close to the front of the plug
+as possible, until the centre conductor size alters. Be aware the waterproof
+seal not only keeps water out, but keep it in too!
+
+BNC connectors use the same small 50R or 75R pin N plug system, but with small
+bayonet locking arrangement. Normally made for 5mm & 7mm coax, but larger cable
+types are made.
+
+TNC connectors are as BNC, except have a smaller screw outer than the N type.
+
+All 3 types plug into each other to make a good RF link when the outer screw/
+bayonet/larger screw parts do not foul.
+
+SMA/SMB/SMC series of small connecters are use on UHF small QRP kit. My advice
+is to get a wander lead to a sensible plug/socket, to take the cable strain off
+the tiny connectors and kit.
+
+
+See Tech buls on "PL259 Losses", "Cable Tester", "Coax Faulting" & "A Versatile
+Pulse Tester".
+
+Why don't U send an interesting bud?
+
+73 de John G8MNY @ GB7CIP

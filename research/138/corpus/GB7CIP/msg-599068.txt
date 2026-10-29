@@ -1,0 +1,31 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 27-Oct-26 07:48
+Bid: 9244_GB7CIP
+Title: USB Connections
+Path: 
+
+By G8MNY                                   (Corrected Oct 07)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+(from info suppied by DG1VV, F5CMK & GM7HUD)
+
+               ______         ______
+Pin Name      /  UU  \       /      \       _________      _________
+ 1  VCC      ³  1  2  ³     ³  2  1  ³     ³ ß     ß ³    ³ ß=====ß ³
+ 2 - Data    ³        ³     ³        ³     ³ 4 3 2 1 ³    ³ 1 2 3 4 ³
+ 3 + Data    ³  4  3  ³     ³  3  4  ³     ÀÄ=ÄÄÄÄÄ=ÄÙ    ÀÄ=ÄÄÄÄÄ=ÄÙ
+ 4  Gnd      ³__ÚÄÄ¿__³     ³__ÚÄÄ¿__³       BucK4ABT       BucK4ABT
+            Periferal end  Periferal end   Type A Male    Type A Female
+             Type B Male   Type B Female    Plug Front    Socket Front
+                Plug          Socket
+
+If still confused which way around the the connections are measure the earth or
++5V to prove which way you are looking at your plug/socket PCB pins etc.
+
+Hub PSU requirements: 5V @ 500mA per port. So a 4 port hub needs a 5V 2A PSU.
+
+
+Y Don't U sent an interesting bul?
+
+73 de John G8MNY @ GB7CIP

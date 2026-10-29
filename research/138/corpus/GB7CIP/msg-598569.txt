@@ -1,0 +1,109 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 22-Oct-26 04:07
+Bid: 5369_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (21-Oct 23:00Z)
+Path: !GB7BED!DM4RW!HP2DFA!
+
+189
+AXNT20 KNHC 220355
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+0615 UTC Thu Oct 22 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_00Z.gif'>0000 UT
+0335 UTC.
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough reaches the Atlantic through the coast of
+Senegal near 13N16W and continues southwestward to 08N26W. A
+surface trough is analyzed from 14N23W to 05N30W. The ITCZ extends
+from 08N30W to 08N53W. A few showers and isolated thunderstorms
+are noted from 05N to 15N and east of 35W.
+
+...GULF OF AMERICA...
+
+A surface trough extends from southern Texas to the SW Gulf and
+the southern Yucatan peninsula. Scattered showers and isolated
+thunderstorms are occurring within 120 nm on either side of this
+boundary. High pressure dominates the remainder of the basin
+allowing for generally dry conditions. Fresh to strong NW winds and
+seas of 5-7 ft are evident off Veracruz, south of 21N and west of
+95W. Fresh to locally strong NE winds and moderate seas are found in
+the eastern Bay of Campeche. Elsewhere, moderate or weaker winds and
+moderate seas are prevalent.
+
+For the forecast, a tightening pressure gradient between the
+aforementioned high pressure and a low pressure forecast to
+develop near the Bahamas will bring fresh to strong NE winds and
+moderate to rough seas over the eastern Gulf Fri night into Sat.
+These marine conditions will spread westward to the central Gulf
+Sat night through Sun night. Seas are expected to build to 12 or
+13 ft with these winds over the eastern Gulf on Sun.
+
+...CARIBBEAN SEA...
+
+A few showers and isolated thunderstorms are seen in the NW and SW
+Caribbean. A weak pressure gradient sustains moderate or weaker
+winds and slight to moderate seas across the basin.
+
+For the forecast, a weak pressure gradient across the basin will
+promote gentle to moderate winds through Fri. The pressure
+gradient between a developing low pressure near the Bahamas and
+the Atlantic ridge will bring moderate to fresh E to SE winds
+over the eastern Caribbean beginning Fri night. At the same
+time, strong high pressure over the eastern seaboard and the
+same low pressure will produce moderate to fresh northerly winds
+over the western part of the basin, including the Yucatan
+Channel. Mainly light to gentle winds are expected over the
+central Caribbean. These marine conditions will persist through
+the upcoming weekend.
+
+...ATLANTIC OCEAN...
+
+A surface trough extends from near 31N69W to a 1011 mb low near
+25N70W and then to the SE Bahamas and eastern Cuba. Another
+surface trough is noted south of Bermuda. Plenty of tropical
+moisture and divergence aloft support scattered showers and isolated
+thunderstorms north of 22N and between 62W and 72W.
+Moderate to locally fresh northerly winds and rough seas are found
+behind the westernmost trough, especially north of 25N.
+
+A similar weather pattern is present in the central Atlantic, where
+a surface trough extends southeastward from a 1012 mb low near
+31N58W. Numerous showers and isolated thunderstorms are found north
+of 21N and between 41W and 55W. A moderate pressure gradient between
+this surface trough and a broad ridge over the NE Atlantic sustains
+fresh southerly winds and seas of 4-8 ft in the area described. The
+remainder of the Atlantic is dominated by the aforementioned broad
+ridge, supporting moderate or weaker winds and moderate seas. An
+exception is evident off NE South America where wind speeds reach
+fresh force.
+
+For the forecast west of 55W, moderate to fresh N to NE winds and
+NE swell persist west of a trough that extends from near Bermuda
+to the central Bahamas and to east-central Cuba. Winds will
+diminish to gentle to moderate speeds by this evening while seas
+will slowly subside across the waters W of 65W and NE of the
+Bahamas through Fri. A tightening pressure gradient will develop
+beginning late Fri as high pressure builds southward over the
+western Atlantic and low pressure deepens near the Bahamas along
+the trough. This setup is expected to induce widespread fresh to
+strong NE to E winds and rough to very rough seas, with winds
+likely reaching gale-force over the waters roughly NW of a line
+from near 31N60W to the northern Bahamas on Sun. Mariners should
+monitor the latest marine forecasts, and have avoidance plans in
+place.
+
+$$
+Delgado

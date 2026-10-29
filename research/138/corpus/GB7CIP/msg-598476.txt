@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 21-Oct-26 08:11
+Bid: 5816-CX2SA
+Title: (M5.1) Kepulauan Barat Daya, Indonesia -7.6 128.1
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Kepulauan Barat Daya, Indonesia
+Geographic coordinates:           7.562S, 128.136E
+Magnitude:                        5.1
+Depth:                            122 km
+Universal Time (UTC):             21 Oct 2026  07:44:16
+Time near the Epicenter (1):      21 Oct 2026  16:44:16
+Time in your area (1):            21 Oct 2026  04:44:16
+Location with respect to nearby cities:
+164.3 km (101.8 mi) NE of Lospalos, Timor Leste
+210.9 km (130.8 mi) ENE of Baukau, Timor Leste
+227.6 km (141.1 mi) ENE of Venilale, Timor Leste
+303.1 km (187.9 mi) ENE of Dili, Timor Leste
+311.1 km (192.9 mi) ENE of Aileu, Timor Leste
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3t4
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3t4?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 21/10/2026 08:10:18 UTC
+________________________________________________________________

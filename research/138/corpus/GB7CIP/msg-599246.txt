@@ -1,0 +1,79 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:21
+Bid: 24245_N4SD
+Title: Space Weather Forecast Discussion
+Path: !YT7MPB!N6RME!KE6JJJ!N0ARY!N2MH!K5DAT!WW6Q!W9GM!KA3BVJ!KA3VSP!N4SD!
+
+FXXX12 KWNP 271231
+DAYDIS
+
+:Product: Forecast Discussion
+:Issued: 2026 Oct 27 1230 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             Forecast Discussion
+#
+Solar Activity
+
+.24 hr Summary...
+Solar activity was at low levels. Regions 4560 (N13, L=048) and 4561
+(S09W83, Dro/beta) produced low level C-class flare activity. The
+largest flare was a long duration C2.8 AT 26/1840 UTC from Region 4561.
+This region also produced two CMEs, but neither are considered
+Earth-directed considering their origin. Region 4562 (S16E42, Axx/alpha)
+remained stable and relatively quiet.
+
+Other activity included a filament eruption centered near N30E75 that
+lifted off at approximately 26/2142 UTC. Preliminary analysis showed the
+potential for glancing effects arriving early on 31 Oct.
+
+.Forecast...
+Solar activity will likely remain at low levels with C-class flares and
+slight chance for isolated M-class flare activity through 27 Oct as AR
+4561 rotates beyond the western limb. A chance for isolated C-class
+flare activity will remain thereafter and through 29 Oct.
+
+Energetic Particle
+
+.24 hr Summary...
+The greater than 2 MeV electron flux reached high levels, with a peak
+flux of 2,915 pfu observed at 26/1345 UTC. The greater than 10 MeV
+proton flux remained steady at background levels.
+
+.Forecast...
+The greater than 2 MeV electron flux is expected to continue at high
+levels on 27 Oct before decreasing to normal to moderate levels on 28-29
+Oct. The greater than 10 MeV proton flux is anticipated to persist at
+background levels through 29 Oct.
+
+Solar Wind
+
+.24 hr Summary...
+Solar wind parameters reflected transient-like enhancements. Total field
+became elevated at 6 to 10 nT beginning at approximately 26/0535 UTC.
+The Bz component was between +8/-7 nT. Solar wind speeds overall
+underwent a decrease from ~360 km/s to ~320 km/s before increasing once
+again to ~420 km/s by the end of the period. Phi was predominantly
+positive until 26/1620 UTC when it switched to a mostly negative sector.
+
+.Forecast...
+Mildly enhanced solar wind parameters are likely to persist over the
+course of 27 Oct, but ambient-like conditions are expected to prevail on
+28-29 Oct.
+
+Geospace
+
+.24 hr Summary...
+The geomagnetic field was quiet to unsettled.
+
+.Forecast...
+A chance for isolated unsettled periods will linger on 27 Oct. Mostly
+quiet conditions are then expected on 28-29 Oct.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

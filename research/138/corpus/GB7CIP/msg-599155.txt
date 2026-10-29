@@ -1,0 +1,98 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6093_HP2DFA
+Title: WSPR TOP 10 SPOTTERS BY DISTANCE/SPOTS OCT27
+Path: !GB7COW!GB7BED!K1AJD!F1UBL!DK0WUE!PI8ZTM!DM4RW!HP2DFA!
+
+WSPRNET GLOBAL SPOTTER STATISTICS & RANKINGS (24 HOURS TO UTC)
+
+DATABASE: v3.1.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+EMITIDO VÃA NODO BPQ32 HP2DFA-5 EN PANAMA
+
+==================================================
+1. SINOPSIS GLOBAL DE ESTACIONES RECEPTORAS (SPOTTERS)
+==================================================
+SE PRESENTA EL REPORTE OFICIAL DE LAS MEJORES ESTACIONES
+RECEPTORAS (SPOTTERS/MONITORES) DE LA RED GLOBAL WSPR
+CLASIFICADAS POR DISTANCIA TOTAL ACUMULADA (TOTAL KM)
+Y VOLUMEN DE TRAMAS DECODIFICADAS (#RAW / #UNIQ).
+
+==================================================
+2. TABLA DE CLASIFICACIÃN DE SPOTTERS (TOP 10)
+==================================================
+RANK | CALL      | LOCATOR | TOTAL KM   | #RAW   | #UNIQ
+----- ----------- --------- ------------ -------- -------
+ 1   | VK5ARG    | PF95ht  | 14,726,989 | 16,991 | 1,209
+ 2   | EA8/DF4UE | IL38bp  | 12,461,508 | 49,213 | 2,538
+ 3   | EA8BFK    | IL38bo  |  9,830,728 | 40,204 | 2,120
+ 4   | K3FEF     | FN21mh  |  9,307,089 | 41,033 | 2,176
+ 5   | W1XP      | FN42fo  |  8,584,268 | 47,576 | 2,118
+ 6   | KD2OM     | FN12gx  |  8,490,210 | 50,355 | 2,076
+ 7   | VK6PVL    | OF88bc  |  8,285,238 |  9,861 |   762
+ 8   | GM0UDL    | IO77vo  |  7,719,845 | 49,914 | 2,169
+ 9   | N2YCH     | FN31jg  |  7,688,278 | 47,469 | 1,967
+ 10  | VE6JY     | DO33or  |  7,671,542 | 34,033 | 1,815
+
+==================================================
+3. OBSERVACIONES TÃCNICAS DE RECEPCIÃN Y COBERTURA
+==================================================
+- **LÃDER EN DISTANCIA**: VK5ARG (Australia, PF95ht)
+  encabeza la tabla acumulando 14.72 millones de km,
+  con un aporte masivo de recepciÃ³n en 20m (6.08M km)
+  y 30m (2.65M km).
+- **LÃDERES EN VOLUMEN Y MULTIBANDA**: KD2OM (50,355 spots)
+  y GM0UDL (49,914 spots) destacan en captaciÃ³n continua,
+  mientras EA8/DF4UE en Islas Canarias logra 2,538
+  estaciones Ãºnicas con decodificaciones desde LF/MF
+  hasta 10 metros.
+
+INFORMACIÃN Y CRÃDITOS: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+WSPRNET GLOBAL SPOTTER STATISTICS & RANKINGS BY SPOT COUNT (OCTOBER 27-28, 2026 UTC)
+
+DATABASE: v4.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR SPOTTERS SPOT COUNT OVERVIEW
+==================================================
+OFFICIAL WSPRNET GLOBAL SPOTTER (RECEIVING MONITOR)
+REPORT SORTED BY NUMBER OF UNIQUE TRANSMITTERS DECODED
+(#UNIQUE) AND TOTAL RAW PACKETS (#RAW) FOR THE PERIOD
+OCTOBER 27-28, 2026.
+
+==================================================
+2. TOP SPOTTERS LEADERBOARD (TOP 10 BY SPOTS)
+==================================================
+RANK | SPOTTER   | LOCATOR | #RAW   | #DUPES | #UNIQUE
+----- ----------- --------- -------- -------- --------
+ 1   | EA8/DF4UE | IL38bp  | 49,204 |    0   |  2,536
+ 2   | K3FEF     | FN21mh  | 41,033 |    0   |  2,176
+ 3   | GM0UDL    | IO77vo  | 49,912 |   16   |  2,168
+ 4   | EA8BFK    | IL38bo  | 40,196 |    0   |  2,118
+ 5   | W1XP      | FN42fo  | 47,572 |    0   |  2,117
+ 6   | KD2OM     | FN12gx  | 50,355 |    0   |  2,076
+ 7   | PD0OHW    | JO33lc  | 48,477 |    0   |  2,040
+ 8   | N2YCH     | FN31jg  | 47,469 |    0   |  1,967
+ 9   | DK6UG     | JN49cm  | 44,419 |   32   |  1,936
+ 10  | OE3GBB/Q  | JN87aq  | 45,888 |    0   |  1,906
+
+==================================================
+3. TECHNICAL METRICS & GLOBAL NETWORK TOTALS
+==================================================
+- **NETWORK AGGREGATE**: OVER 4.61 MILLION RAW SPOTS
+  (4,612,270) AND 229,975 UNIQUE TRANSMITTER SIGNATURES
+  WERE PROCESSED NETWORK-WIDE OVER 24 HOURS.
+- **UNIQUE RECEPTION LEADERS**: EA8/DF4UE IN THE CANARY
+  ISLANDS SECURES TOP SPOT GLOBALLY WITH 2,536 UNIQUE
+  STATIONS, FOLLOWED BY K3FEF (2,176) AND GM0UDL (2,168).
+- **RAW VOLUME BENCHMARK**: KD2OM (USA, FN12gx) LOGGED
+  THE HIGHEST RAW PACKET COUNT WITH 50,355 DECODES.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

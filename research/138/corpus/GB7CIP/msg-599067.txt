@@ -1,0 +1,89 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 27-Oct-26 07:47
+Bid: 9243_GB7CIP
+Title: Towing Socket For Caravans
+Path: 
+
+By Fred G4VVQ                              (Updated Jun 12)
+
+12 N SOCKET CONNECT TO VEHICLE WIRING.
+
+12N STANDARD LOOKING
+FROM REAR OF CAR
+      1           TERMINAL NUMBER  CABLE COLOUR     12 N SOCKET
+                     1 / L           YELLOW      L.H. INDICATOR LAMP
+6            2       2 / 54G         BLUE        REAR FOG LIGHT
+      7              3 / 31          WHITE       CHASSIS EARTH
+                     4 / R           GREEN       R.H. INDICATOR
+5            3       5 / 58R         BROWN       R.H. TAIL/NO.PLATE LIGHT
+      4              6 / 54          RED         STOP/BRAKE LAMP
+     /~\             7 / 58L         BLACK       L.H. TAIL/NO.PLATE LIGHT
+
+12S SPLIT CHARGE EXTRA LIGHTING
+FROM REAR OF CAR
+      1                1=REVERSING LIGHTS
+                       2=BATTERY CHARGING
+6            2         3=EARTH
+      7                4=INTERIOR LIGHTS
+                       5=SENSING DEVICE USUALLY SPARE
+5            3         6=FRIDGE
+      4                7=SPARE
+     /~\
+
+ON OLDER CARAVANS PIN 2 MAY BE WIRED FOR INTERNAL CARAVAN LIGHTS
+
+12S SOCKET LOOKING
+FROM REAR OF CAR
+      1           TERM No  CABLE COLOUR       12 S SOCKET
+                   1 / L     YELLOW   REVERSE LAMP(IF REQUIRED REVERSING CATCH)
+6            2     2 / 54G   BLUE     RELAYED+VE(CHARGING BATTERY IN CARAVAN)
+      7            3 / 31    WHITE    CHASSIS EARTH
+                   4 / R     GREEN    BATTERY+VE VIA 25AMP FUSE(INT LIGHT)VAN
+5            3     5 / 58R   BROWN    NOT USED
+      4            6 / 54    RED      RELAYED+VE(IF REQUIRED FOR REFRIGERATOR)
+     /~\           7 / 58L   BLACK    NOT USED
+
+Fault finding, with 12V circuit tester check for current at pins under flap
+when circuits are active, ie brake lights on, & check earth by putting on rear
+lamps & connect tester from pin 5 or 7 to pin 3 (earth/white/31)
+
+de Fred...G4VVQ
+-------------------------------------------------------------------------------
+Comment from Dave VK2AWZ
+     Hi down in Aus the round towing sockes just about obsolete! All new
+fittings have a flat configuration like so  OOOOOOOOOOOOO  for the pins.
+73 - de Dave, VK2AWZ @ VK2DOT
+-------------------------------------------------------------------------------
+From Wim PA3AKK
+Towing Socket For Caravans
+(+ = male, o = female,  . = thin female)
+
+Feder/Multicon/West                                        Old model  Colour
+                          13 - pole                        7 - pole   wire
+    .13 o1  .8
+    o6      +2      1 = left hand indicator lamp             1/L      green
+   .12  +7   .9     2 = rear fog light
+    +5      o3      3 = chassis earth pin 1 - 8              3/31     brown
+    .11 o4  .10     4 = right hand indicator lamp            4/R      yellow
+        |           5 = right hand tail / no plate light     5/58R    blue
+                    6 = stop / brake lamp                    6/54     red
+Volta/Jaeger/Hella  7 = left hand tail / no plate light      7/58L    black
+        o8          8 = backwards driving lamp
+     o7    o9       9 = constant current                     2/54G    white
+   o6   o1   o10   10 = loading cable for battery in caravan
+   o5 o4  o2 o11   11 = not yet in use                            o1
+        o3         12 = not yet in use                        o6      +2
+     o13    o12    13 = chassis earth pin 9 - 13                  +7
+        []                                                    +5      o3
+                                                                  o4
+                                                                  |
+73, Wim, PA3AKK
+
+
+Also see my TECH bul on "Towing & Reversing Beeper"   
+
+Why don't U send an interesting bul?
+
+73 De G8MNY @ GB7CIP

@@ -1,0 +1,36 @@
+From: G8MNY
+To: ATV
+Type/Status: B$
+Date/Time: 23-Oct-26 06:55
+Bid: 8846_GB7CIP
+Title: 10Pin VCR Camera Connections
+Path: 
+
+               ^
+           8       1
+
+       7       9       2
+
+       6       10      3
+
+           5       4
+
+    |--------15 mm--------|
+           shell dia
+
+On JVC equipment (& its Badged versions) the pin layout is ...
+1 VIDEO in & out (Higher DC voltage on play > Camera)
+2 Gnd
+3 batt alarm/rec ind
+4 Gnd
+5 Audio Playback
+6 Start/Stop
+7 Audio in
+8 Gnd
+9 Gnd
+10 +12V (1A?)
+
+
+Why Don' U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

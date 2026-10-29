@@ -1,0 +1,34 @@
+From: HP2DFA
+To: SOLAR
+Type/Status: B$
+Date/Time: 22-Oct-26 20:31
+Bid: 5456_HP2DFA
+Title: SOLAR WX: Space Weather Message Code: WARK04
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+==================================================
+    NOAA SPACE WEATHER ALERT BULLETIN - SOLAR     
+==================================================
+Source: NOAA Space Weather Prediction Center (SWPC)
+Product ID : K04W
+Issue Time : 2026-10-22 20:21:43.920
+--------------------------------------------------
+Space Weather Message Code: WARK04
+Serial Number: 5442
+Issue Time: 2026 Oct 22 2021 UTC
+EXTENDED WARNING: Geomagnetic K-index of 4 expected
+Extension to Serial Number: 5441
+Valid From: 2026 Oct 21 1616 UTC
+Now Valid Until: 2026 Oct 23 0300 UTC
+Warning Condition: Persistence
+NOAA Space Weather Scale descriptions can be found at
+www.swpc.noaa.gov/noaa-scales-explanation
+Potential Impacts: Area of impact primarily poleward of 65
+degrees Geomagnetic Latitude.
+Induced Currents - Weak power grid fluctuations can occur.
+Aurora - Aurora may be visible at high latitudes such as Canada
+and Alaska.
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 SOLAR MONITOR PANAMA
+==================================================

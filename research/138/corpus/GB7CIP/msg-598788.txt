@@ -1,0 +1,55 @@
+From: NC8Q
+To: PROP
+Type/Status: B$
+Date/Time: 24-Oct-26 13:05
+Bid: ARLP043
+Title: ARLP043  Propagation Forecast
+Path: !N2NOV!KQ6UP!VE3CGR!NC8Q!
+
+ZCZC AP43
+QST de W1AW
+Propagation Forecast Bulletin 43 ARLP043
+>From ARRL Headquarters
+Newington, CT  October 23, 2026
+To all radio amateurs
+SB PROP ARL ARLP043
+ARLP043 The ARRL Solar Report
+The active sunspot region that has been giving us improved propagation over the past several days will be rotating away from Ea
+
+rthÃ­s view today, but conditions on most of the HF amateur bands should remain pretty decent in the days ahead, as the 10.7-ce
+
+ntimeter radio flux remains right around 100. However, NOAAÃ­s Space Weather Prediction Center (SWPC) says the geomagnetic fiel
+
+d could become unsettled to active heading
+into the weekend as a negative polarity coronal hole high-speed stream (CHHSS) heads toward Earth.
+The Australian Space Weather Forecasting Centre predicts mostly normal HF propagation conditions worldwide.
+The W3LPL Propagation Forecast from the Daily DX is predicting a dropoff in DX openings on 10 and 12 meters as the active sunsp
+
+ot region rotates away from Earth and the solar cycle continues its decline. However, good conditions are expected to continue 
+
+on 15, 17, and 20 meters, with the lower HF bands (30, 40 and 80 meters) providing excellent long distance
+nighttime propagation.
+This weekend is the CQ World Wide SSB DX Contest (0000Z October 24 through 2359 Z October 25). ItÃ­s often said that this conte
+
+st makes its own propagation, most likely because there are stations active to take advantage of unanticipated openings, even o
+
+n the higher HF bands. So keep listening for calls from faraway stations.
+Weekly Commentary on the Sun, the Magnetosphere, and the Earth's Ionosphere, October 22, 2026, by F. K. Janda, OK1HH:
+Solar activity is gradually declining in the second half of October, as expected. The decline will continue into early November
+
+, with Class C solar flares still occurring infrequently. Class M flares may continue to occur on rare occasions.
+The next increase in solar activity is not expected until the second half of November. In the meantime, there will continue to 
+
+be isolated and generally brief spikes in geomagnetic activity, which will be difficult to predict with precision.
+The Predicted Planetary A Index for October 23 to October 29 is 5, 15, 8, 5, 5, 5, and 5 with a mean of 6.9. The Predicted Plan
+
+etary K Index is 2, 4, 3, 2, 2, 2, and 2 with a mean of 2.4. 10.7 centimeter flux is 100, 95, 95, 95, 100, 105, and 105 with a 
+
+mean of 99.3.
+For more information concerning shortwave radio propagation, see www.arrl.org/propagation and the ARRL Technical Information Se
+
+rvice web page at www.arrl.org/propagation-of-rf-signals. For an explanation of numbers used in this bulletin, see www.arrl.org
+
+/the-sun-the-earth-the-ionosphere. Information and tutorials on propagation can be found at http://k9la.us.
+Also, check this: ''Understanding Solar Indices'' from September 2002 QST. https://bit.ly/3Rc8Njt
+NNNN

@@ -1,0 +1,54 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 29-Oct-26 17:30
+Bid: 26399_LU9DCE
+Title: EARTHQUAKES 29-OCT
+Path: !VE3KPG!VE3CGR!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-29 07:54 - 4.6 - 41 KM W OF MOSTEIROS, PORTUGAL
+2026-10-29 07:49 - 6.4 - SOUTHEAST OF EASTER ISLAND
+2026-10-29 07:31 - 5.4 - 114 KM ENE OF BARCELONA, PHILIPPINES
+2026-10-29 05:33 - 5.1 - BALLENY ISLANDS REGION
+2026-10-29 05:06 - 5.4 - SOUTH SANDWICH ISLANDS REGION
+2026-10-29 03:26 - 5.7 - 82 KM NE OF KIUNGA, PAPUA NEW GUINEA
+2026-10-29 03:19 - 5.8 - 110 KM ENE OF BARCELONA, PHILIPPINES
+2026-10-29 03:17 - 5.4 - 113 KM ENE OF BARCELONA, PHILIPPINES
+2026-10-29 02:18 - 4.8 - 36 KM SSW OF MERIZO VILLAGE, GUAM
+2026-10-29 01:07 - 4.8 - WESTERN INDIAN-ANTARCTIC RIDGE
+2026-10-29 00:57 - 4.9 - 117 KM E OF PORT-OLRY, VANUATU
+2026-10-29 00:08 - 5.4 - 109 KM ENE OF LUGANVILLE, VANUATU
+2026-10-28 23:13 - 4.6 - 17 KM N OF KUSHIRO, JAPAN
+2026-10-28 22:42 - 4.6 - 80 KM SE OF BOLE, CHINA
+2026-10-28 22:06 - 5.7 - 271 KM WSW OF TUAL, INDONESIA
+2026-10-28 19:56 - 5.3 - 159 KM WNW OF TOBELO, INDONESIA
+2026-10-28 19:45 - 5.2 - REYKJANES RIDGE
+2026-10-28 18:44 - 4.7 - REYKJANES RIDGE
+2026-10-28 18:32 - 4.7 - 6 KM N OF ASAHI, JAPAN
+2026-10-28 15:40 - 4.7 - 81 KM ENE OF MAZHA, CHINA
+2026-10-28 15:07 - 5.5 - 5 KM ESE OF ASAHI, JAPAN
+2026-10-28 13:31 - 4.5 - 13 KM WSW OF AWASH, ETHIOPIA
+2026-10-28 12:58 - 4.6 - SOUTH OF THE FIJI ISLANDS
+2026-10-28 12:47 - 5.0 - REYKJANES RIDGE
+2026-10-28 12:35 - 4.9 - 88 KM SE OF HIHIFO, TONGA
+2026-10-28 12:14 - 4.9 - 1 KM WSW OF BUTULAN, PHILIPPINES
+2026-10-28 11:56 - 5.0 - REYKJANES RIDGE
+2026-10-28 11:37 - 5.5 - REYKJANES RIDGE
+2026-10-28 09:32 - 4.8 - 29 KM SSW OF SARANGANI, PHILIPPINES
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

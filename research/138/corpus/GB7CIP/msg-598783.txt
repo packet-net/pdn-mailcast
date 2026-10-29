@@ -1,0 +1,327 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 24-Oct-26 11:46
+Bid: 25882_LU9DCE
+Title: ARCHLINUX UPDATES 24-OCT
+Path: !GB7BED!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+SWAYIMG 5.7-1 X86_64
+
+A LIGHTWEIGHT IMAGE VIEWER FOR WAYLAND DISPLAY SERVERS
+
+========================================
+
+MANGOWM 0.18.3-1 X86_64
+
+LIGHTWEIGHT, FEATURE RICH MODERN WAYLAND COMPOSITOR
+
+========================================
+
+PYTHON-FASTAPI 0.162.0-1 ANY
+
+FASTAPI FRAMEWORK, HIGH PERFORMANCE, EASY TO LEARN, FAST TO CODE,
+READY FOR PRODUCTION
+
+========================================
+
+LIBFILEZILLA 1:0.58.0-1 X86_64
+
+SMALL AND MODERN C++ LIBRARY, OFFERING SOME BASIC FUNCTIONALITY TO
+BUILD HIGH-PERFORMING, PLATFORM-INDEPENDENT PROGRAMS
+
+========================================
+
+FZSSH 1.5.0-1 X86_64
+
+A SSH/SFTP LIBRARY BASED ON LIBFILEZILLA
+
+========================================
+
+FILEZILLA 3.71.1-2 X86_64
+
+FAST AND RELIABLE FTP, FTPS AND SFTP CLIENT
+
+========================================
+
+PYTHON-AIOCARBON 0.15.3-1 ANY
+
+ASYNCHRONOUS CLIENT FOR CARBON
+
+========================================
+
+PYTHON-IMMUTABLES 0.21-1 X86_64
+
+IMMUTABLE COLLECTIONS FOR PYTHON
+
+========================================
+
+PYTHON-AIOTHREADS 1.1.4-1 ANY
+
+GLUE BETWEEN ASYNC AND THREAD WORLDS
+
+========================================
+
+HASKELL-NONEMPTY-VECTOR 0.3-1 X86_64
+
+NON-EMPTY VECTORS
+
+========================================
+
+HASKELL-NONEMPTY-CONTAINERS 0.4.0.0-9 X86_64
+
+NON-EMPTY VARIANTS OF CONTAINERS DATA TYPES, WITH FULL API
+
+========================================
+
+AGDA 2.8.0.2-30 X86_64
+
+A DEPENDENTLY TYPED FUNCTIONAL PROGRAMMING LANGUAGE AND PROOF
+ASSISTANT
+
+========================================
+
+PYTHON-ASYNC-TIMEOUT 5.0.1-1 ANY
+
+ASYNCIO-COMPATIBLE TIMEOUT CLASS
+
+========================================
+
+HASKELL-TIDAL-LINK 1.2.1-2 X86_64
+
+ABLETON LINK INTEGRATION FOR TIDAL
+
+========================================
+
+HASKELL-TIDAL 1.10.0-12 X86_64
+
+A DOMAIN SPECIFIC LANGUAGE FOR LIVE CODING PATTERN.
+
+========================================
+
+HASKELL-HOSC 0.21.1-3 X86_64
+
+HASKELL OPEN SOUND CONTROL
+
+========================================
+
+STACK 2.15.1-12 X86_64
+
+THE HASKELL TOOL STACK
+
+========================================
+
+HASKELL-STATIC-BYTES 0.2.0-1 X86_64
+
+A HASKELL LIBRARY TO PROVIDE COMPANION THREADS.
+
+========================================
+
+HASKELL-PANTRY 0.9.3.1-19 X86_64
+
+CONTENT ADDRESSABLE HASKELL PACKAGE MANAGEMENT
+
+========================================
+
+PYTHON-LANGCHAIN-PROTOCOL 0.0.20-1 ANY
+
+PYTHON BINDINGS FOR THE LANGCHAIN AGENT STREAMING PROTOCOL
+
+========================================
+
+PYTHON-PYTEST-MYPY-PLUGINS 4.1.0-1 ANY
+
+PYTEST PLUGIN FOR WRITING TESTS FOR MYPY PLUGINS
+
+========================================
+
+PYTHON-LOGGING-JOURNALD 0.6.12-1 ANY
+
+PURE PYTHON LOGGING HANDLER FOR JOURNALD USING THE NATIVE PROTOCOL
+
+========================================
+
+PYTHON-MARKDOWN-PYTEST 0.6.6-1 ANY
+
+PYTEST PLUGIN FOR RUNNING TESTS DIRECTLY FROM MARKDOWN FILES
+
+========================================
+
+OBS-STUDIO 33.0.0-1 X86_64
+
+FREE, OPEN SOURCE SOFTWARE FOR LIVE STREAMING AND RECORDING
+
+========================================
+
+PYTHON-JSONREF 1.1.0-1 ANY
+
+AUTOMATIC DEREFERENCING OF JSON REFERENCE OBJECTS FOR PYTHON
+
+========================================
+
+PYTHON-MCP 1.29.1-1 ANY
+
+MODEL CONTEXT PROTOCOL SDK
+
+========================================
+
+PYTHON-LANGGRAPH-CHECKPOINT-POSTGRES 3.1.3-1 ANY
+
+LIBRARY WITH A POSTGRES IMPLEMENTATION OF LANGGRAPH CHECKPOINT SAVER
+
+========================================
+
+DISTRO-INFO-DATA 2026.10.12-1 ANY
+
+INFORMATION ABOUT ALL RELEASES OF DEBIAN AND UBUNTU (DATA FILES)
+
+========================================
+
+BTRFS-PROGS 7.3-1 X86_64
+
+BTRFS FILESYSTEM UTILITIES
+
+========================================
+
+XMONAD-EXTRAS 0.17.3-105 X86_64
+
+THIRD PARTY EXTENSIONS FOR XMONAD WITH WACKY DEPENDENCIES
+
+========================================
+
+XMONAD-DBUS 0.1.0.2-336 X86_64
+
+XMONAD DBUS MONITOR APPLICATION AND LIBRARY TO EASILY CONNECT XMONAD
+WITH POLYBAR
+
+========================================
+
+XMOBAR 0.51.1-42 X86_64
+
+MINIMALISTIC TEXT BASED STATUS BAR
+
+========================================
+
+TAFFYBAR 7.4.2-15 X86_64
+
+A DESKTOP BAR SIMILAR TO XMOBAR, BUT WITH MORE GUI
+
+========================================
+
+HASKELL-STATUS-NOTIFIER-ITEM 0.3.2.16-37 X86_64
+
+A WRAPPER OVER THE STATUSNOTIFIERITEM/LIBAPPINDICATOR DBUS
+SPECIFICATION
+
+========================================
+
+HASKELL-GTK-SNI-TRAY 0.2.1.4-38 X86_64
+
+A STANDALONE STATUSNOTIFIERITEM/APPINDICATOR TRAY
+
+========================================
+
+HASKELL-FDO-NOTIFY 0.3.1-1018 X86_64
+
+DESKTOP NOTIFICATIONS CLIENT
+
+========================================
+
+HASKELL-DBUS-MENU 0.1.4.0-27 X86_64
+
+A HASKELL IMPLEMENTATION OF THE DBUSMENU PROTOCOL
+
+========================================
+
+HASKELL-DBUS-HSLOGGER 0.1.1.1-38 X86_64
+
+EXPOSE A DBUS SERVER TO CONTROL HSLOGGER
+
+========================================
+
+HASKELL-DBUS 1.3.5-1 X86_64
+
+A CLIENT LIBRARY FOR THE D-BUS IPC SYSTEM
+
+========================================
+
+GIT-ANNEX 10.20261020-9 X86_64
+
+MANAGE FILES WITH GIT, WITHOUT CHECKING THEIR CONTENTS INTO GIT
+
+========================================
+
+DEEPIN-SERVICE-MANAGER 1.0.24-1 X86_64
+
+MANAGE DBUS SERVICE ON DEEPIN
+
+========================================
+
+DEEPIN-POLKIT-AGENT 6.0.25-1 X86_64
+
+DEEPIN POLKIT AGENT
+
+========================================
+
+PYTHON-TENACITY 9.2.1-1 ANY
+
+RETRY CODE UNTIL IT SUCCEEEDS
+
+========================================
+
+PYTHON-UPDATE-CHECKER 1.0.1-1 ANY
+
+A PYTHON MODULE THAT WILL CHECK FOR PACKAGE UPDATES
+
+========================================
+
+POSTGREST 10.1.0-168 X86_64
+
+REST API FOR ANY POSTGRES DATABASE
+
+========================================
+
+HASKELL-HASQL-TRANSACTION 1.1-10 X86_64
+
+A COMPOSABLE ABSTRACTION OVER THE RETRYABLE TRANSACTIONS FOR HASQL
+
+========================================
+
+HASKELL-HASQL-POOL 0.8.0.5-10 X86_64
+
+A POOL OF CONNECTIONS FOR HASQL
+
+========================================
+
+HASKELL-HASQL-NOTIFICATIONS 0.2.2.0-10 X86_64
+
+LISTEN/NOTIFY SUPPORT FOR HASQL
+
+========================================
+
+HASKELL-HASQL-IMPLICITS 0.1.1.3-24 X86_64
+
+IMPLICIT DEFINITIONS FOR HASQL, SUCH AS DEFAULT CODECS FOR STANDARD
+TYPES
+
+========================================
+
+HASKELL-HASQL-DYNAMIC-STATEMENTS 0.3.1.4-9 X86_64
+
+TOOLKIT FOR CONSTRUCTING HASQL STATEMENTS DYNAMICALLY
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

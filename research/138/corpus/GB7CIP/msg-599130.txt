@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6045_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - 27 km W of RÃ­o Grande, Panama
+Path: !GB7COW!GB7BED!K1AJD!LU9DCE!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us7000ttgm
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-27 15:26:02 UTC
+Depth      : 10.0 km
+Coordinates: 7.7060 Lat / -81.5840 Lon
+--------------------------------------------------
+Location:
+  27 km W of RÃ­o Grande, Panama
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttgm
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,91 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 28-Oct-26 09:36
+Bid: 9360_GB7CIP
+Title: Old Venner Counter Type TSA3334
+Path: 
+
+By G8MNY                                    (Updated Feb 11)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+I have been investigating how this very old 1MHz Frequency Counter/Timer works.
+It is all done with Germanium PNPs and no ICs! And it uses 4x 2.5cm tall
+projected moving number displays, as it was made before Nixi tubes or LEDs!
+
+ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿    INPUT           0.1-1V 100k//60pF
+ ³  _____________            Ü    ³    FREQUENCY Range 1Hz-1.2MHz ñ1 count
+ ³ ³ [] [] [] [] ³   /~~\       ß ³         Gate times 1S 10mS 1ms 100uS 10uS
+Éµ ³ [] [] [] [] ³  ³    ³        Æ»   PERIOD          0.1uS-99.99mS
+º³ ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÙ   \__/         ³º        Prescalers 1:1 1:10 1:100
+º³                ø ø     ß  O  O ³º   COUNT           0-9999 repeating
+º ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ º   Ref Output      100kHz 1V
+ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼   Supply 115/230V or 12V DC (+ case!)
+
+SCHEMATIC
+        ÚÄÄÄÄÄÄ¿ÚÄÄÄÄÄÄ¿      ÚÄÄÄÄ¿        ÚÄÄÄÄÄÄÄÄ¿              ÚÄÄÄÄÄÄÄÄÄ¿
+InputÄo/´PreampÃ´BufferÃ>¿  Ú>´GateÃ>¿   ÚÄ>´1s CountÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´0-9 Meter³
+      o ÀÄÄÄÄÄÄÙÀÄÄÄÄÄÄÙ ³  ³ ÀÄÄÂÄÙ ³   ³  ÀÂÂÄÄÄÄÄÄÙ              ³Projector³
+  Test³                  |  |    |   |   |   ³³Overflow             ÀÄÄÄÄÄÄÄÄÄÙ
+      ³   =======M O D E  S W I T C H====== >´³ ÚÄÄÄÄÄÄÄÄ¿          ÚÄÄÄÄÄÄÄÄÄ¿
+      ³   |   |     |     | |     |     | |  ³À>´10 CountÃÄÄÄÄÄÄÄÄÄÄ´0-9 Meter³
+Ref<ÄÄÁÄÂTB  TB    TB    TB ³    TB    TB ³  ³  ÀÂÂÄÄÄÄÄÄÙ          ³Projector³
+        ³     ³     ³     ³ ³     ³     ³ ³  ÃÄÄÄÙ³Overflow         ÀÄÄÄÄÄÄÄÄÄÙ
+ÚÄÄÄÄÄÄ¿³ÚÄÄÄ¿³ÚÄÄÄ¿³ÚÄÄÄ¿³ ³ÚÄÄÄ¿³ÚÄÄÄ¿³ ³  ³    ³ ÚÄÄÄÄÄÄÄÄÄ¿     ÚÄÄÄÄÄÄÄÄÄ¿
+³100kHzÃÁ´ö10ÃÁ´ö10ÃÁ´ö10ÃÙ À´ö10ÃÁ´ö10ÃÙ ³  ³    À>´100 CountÃÄÄÄÄÄ´0-9 Meter³
+³ Osc  ³ ³10k³ ³ 1k³ ³100³   ³10 ³ ³1Hz³  ³  ³      ÀÂÂÄÄÄÄÄÄÄÙ     ³Projector³
+ÀÄÄÄÄÄÄÙ ÀÄÄÄÙ ÀÄÄÄÙ ÀÄÄÄÙ   ÀÄÄÄÙ ÀÄÄÄÙ  ³  ÃÄÄÄÄÄÄÄÙ³Overflow     ÀÄÄÄÄÄÄÄÄÄÙ
+      Time Base TB       Time/Prescaller  ³  ³        ³ ÚÄÄÄÄÄÄÄÄÄÄ¿ÚÄÄÄÄÄÄÄÄÄ¿
+                     ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿ ³  ³        À>´1000 CountÃ´0-9 Meter³
+                     ³Display Hold TimerÃ>Ù  ³Resets    ÀÂÄÄÄÄÄÄÄÄÄÙ³Projector³
+                     ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ    ÀÄÄÄÄÄÄÄÄÄÄÄÙ          ÀÄÄÄÄÄÄÄÄÄÙ
+HOW IT WORKS
+The large MODE SWITCH can rearrange the units to COUNT continuously, Gated with
+a TimeBase for FREQUENCY, or count a TimeBase gated with the input for PERIODS.
+
+The display timer (Manual or about 2 seconds) starts the process off, clears
+down the counters and enables the timer gate.
+
+Each counter and divider circuit uses 8 transistor in 4 bistables as binary
+ripple counters they are wired to reset @ 10 & overflow to the next counter or
+divider.
+
+Each display digit consists of a meter with 0-9 number shadow mask & lamp. The
+DC drive for these uses 4 resistor (72k 36k 18k & 9k) from each binary stage of
+the BCD counter output, such that the meter current represents the number 0-9.
+
+ _      Continiously
+³ À¿_     Counting  
+     À¿_   Signal      1 digit,  10x slower for 2nd
+        À¿_                      100x slower for 3rd
+           À¿_³                  1000x slower for 4th.
+
+External presets are used to calibrate scale & zero each meter (0 & 9 test
+buttons provided).
+
+For PERIOD measurement, it rewires the units, to counts the 100kHz and uses the
+last 2 ö10s fed from the input frequency, to give of the input gates of 1x 10x
+or 100x that period. This results in measurements of 10x 1x 0.1x in uS.
+
+PSU
+This is -7.5V for the electronics & a raw -10V regulated for the 4 lamps.
+
+IN USE
+Despite being very old it still all works and is very easy to read. The 4 digit
+readout might seem to be a limitation, but overflow counting is possible. So to
+measure say 1.250895MHz you 1st read the 1250kHz and then alter the range to
+see the 0895Hz.
+
+For low frequencies like CTCSS tones, where 1/10 of Hz resolution is needed,
+then Period measurement and a calculator comes into its own.
+
+
+See other tech buls "Watson 'Hunter' Counter Mods", "PIC Freq Counter Mods",
+"Marconi Counter Type 2434A", "198kHz Off Air Standard", "Off Air Lock for Ref
+Osc." & "Calibrating Frequency".
+
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

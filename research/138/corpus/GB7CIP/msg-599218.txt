@@ -1,0 +1,71 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:20
+Bid: 24082_N4SD
+Title: Space Weather 3-Day Forecast
+Path: !YT7MPB!N6RME!N0ARY!N2MH!NS2B!N3IP!KA3VSP!N4SD!
+
+FXXX10 KWNP 230031
+DAYTDF
+
+:Product: 3-Day Forecast
+:Issued: 2026 Oct 23 0030 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             3-Day Forecast
+#
+A. NOAA Geomagnetic Activity Observation and Forecast
+
+The greatest observed 3 hr Kp over the past 24 hours was 4 (below NOAA
+Scale levels).
+The greatest expected 3 hr Kp for Oct 23-Oct 25 2026 is 3.67 (below NOAA
+Scale levels).
+
+NOAA Kp index breakdown Oct 23-Oct 25 2026
+
+             Oct 23       Oct 24       Oct 25
+00-03UT       3.67         2.67         3.00         
+03-06UT       3.33         2.33         3.33         
+06-09UT       3.00         2.00         3.67         
+09-12UT       2.67         2.00         3.33         
+12-15UT       2.33         2.00         3.67         
+15-18UT       2.00         1.67         3.00         
+18-21UT       2.33         1.67         3.33         
+21-00UT       2.33         1.67         3.00         
+
+Rationale: No G1 (Minor) or greater geomagnetic storms are expected. No
+significant transient or recurrent solar wind features are forecast.
+
+B. NOAA Solar Radiation Activity Observation and Forecast
+
+Solar radiation, as observed by NOAA GOES-18 over the past 24 hours, was
+below S-scale storm level thresholds.
+
+Solar Radiation Storm Forecast for Oct 23-Oct 25 2026
+
+              Oct 23  Oct 24  Oct 25
+S1 or greater    5%      5%      5%
+
+Rationale: No S1 (Minor) or greater solar radiation storms are expected.
+No significant active region activity favorable for radiation storm
+production is forecast.
+
+C. NOAA Radio Blackout Activity and Forecast
+
+No radio blackouts were observed over the past 24 hours.
+
+Radio Blackout Forecast for Oct 23-Oct 25 2026
+
+              Oct 23        Oct 24        Oct 25
+R1-R2           20%           20%           20%
+R3 or greater    5%            5%            5%
+
+Rationale: There is a slight chance for R1-R2 (Minor-Moderate) radio
+blackouts on 23-25 Oct.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

@@ -1,0 +1,123 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6108_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (28-Oct 00:00Z)
+Path: !GB7COW!GB7BED!GB7OSW!VE3CGR!DM4RW!HP2DFA!
+
+724
+AXNT20 KNHC 280441
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+0615 UTC Wed Oct 28 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_00Z.gif'>0000 UT
+0400 UTC.
+
+...SPECIAL FEATURES...
+
+Significant Swell N of Bahamas: NE swell from earlier gales in the
+area continue to lead to very rough seas for waters N of 26N and W
+of 71W. Peak seas are near 18 ft offshore east-central Florida.
+Although gales have ended, the pressure gradient between a strong
+ridge over the eastern U.S. and low pressure centered in the
+Bahamas will continue to produce strong NE to E winds into Thu,
+keep seas rough to very rough. Seas of 12 ft or greater are likely
+to persist for waters offshore NE Florida through at least
+tonight. Mariners are urged to remain alert to these dangerous
+marine conditions and take the necessary precautions to avoid
+these affected areas.
+
+Please, see the latest NWS High Seas Forecast issued by the
+National Hurricane Center at website
+https:<a href='https://www.nhc.noaa.gov/text/MIAHSFAT2.shtml'>www.nh
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough extends from 11N15W to 10N20W. The ITCZ
+stretches from 10N20W to 08N55W. Scattered moderate convection is
+noted from 07N to 12N between 28W and 54W.
+
+...GULF OF AMERICA...
+
+High pressure over the eastern United States extends a ridge
+across the Gulf waters. The pressure gradient between the ridge
+and low pres over the Bahamas is supporting moderate to fresh
+winds E of 90W. Moderate to rough seas are over these waters.
+Gentle to moderate winds and moderate seas are found west of 90W.
+
+
+For the forecast, a tight pressure gradient between a strong ridge
+over the eastern United States and a complex weather system over
+the Bahamas will continue to support fresh to strong NE to E
+winds and rough seas over the E Gulf into late this week. Winds
+and seas will gradually diminish into the weekend. Elsewhere,
+gentle to moderate winds and moderate seas will prevail through
+the forecast period.
+
+...CARIBBEAN SEA...
+
+A surface trough extends from low pres over the Bahamas across
+central Cuba to around 15N80W. Moderate to locally fresh
+northerly winds and moderate seas are found N of 16N and W of the
+trough. Gentle to moderate winds and moderate seas are found over
+the eastern Caribbean east of 70W. Light to gentle winds and
+slight to moderate seas prevail elsewhere.
+
+For the forecast, the surface trough extends southward across
+central Cuba and into the Caribbean along 80W from low pressure
+near Andros Island in the Bahamas. The trough will remain nearly
+stationary. Ample tropical moisture and upper-level divergence
+support scattered showers and isolated thunderstorms over the
+central Caribbean, especially over Hispaniola. The surface trough
+will gradually weaken through the middle of the week. Winds and
+seas will diminish in the W Caribbean Wed. Otherwise, moderate to
+locally fresh trade winds in the E Caribbean will continue over
+the next few days, gradually extending westward this week and into
+the upcoming weekend.
+
+...ATLANTIC OCEAN...
+
+Please see the Special Features section above for information on
+significant swell causing very rough seas north of the Bahamas.
+
+Numerous moderate to isolated strong convection is noted S of 26N
+between 67W and 72W in association with a deep-layer trough and
+abundant tropical moisture. This activity will continue to provide
+periods of heavy rain to Hispaniola over the next couple of days.
+
+A stationary front extends from 31N55W to a 1010 mb low pressure
+over the Bahamas near 25N77W. N of this boundary, strong NE to E
+winds and very rough seas prevail, to the south and seas, mainly
+moderate SE winds with moderate to locally rough seas are present.
+To the east, another stationary front extends from 31N34W to
+29N40W. Moderate W winds and moderate seas are noted N and W of
+this front. In NE waters, rough seas are present N of 26N and E of
+40W. Elsewhere, mainly gentle winds and moderate seas prevail.
+
+For the forecast west of 55W, a tight pressure gradient between a
+1032 mb high pressure system over New England and a stationary
+front extending from near 31N55W to a 1010 mb low in the NW
+Bahamas supports fresh to near gale-force NE winds and rough to
+very rough seas north of the front and west of the low. Scattered
+showers and isolated thunderstorms are occurring north of the
+front and south of the front between 66W and 73W. Strong NE to E
+winds and rough to very rough seas will persist north of 28N and
+west of 65W through Thu as the low pressure moves southwestward
+and the front weakens. Looking ahead, weak low pressure will
+develop southwest of Bermuda by Fri, then lift to the northeast
+and reinforce the frontal boundary over the waters between the
+central Bahamas and Bermuda. Expect fresh to strong NE-E winds and
+seas to 10 ft north of the front through Sun.
+
+$$
+Konarik

@@ -1,0 +1,96 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 25-Oct-26 05:15
+Bid: 5760_HP2DFA
+Title: WSPR TOP10 BEACONS DISTANCE/SPOTS OCT24
+Path: !VE3KPG!VE3CGR!LU9DCE!PY2BIL!HP2DFA!
+
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY TOTAL DISTANCE (OCTOBER 24-25, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR GLOBAL DISTANCE RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON REPORT ORDERED BY
+TOTAL DISTANCE (TOTAL KILOMETERS) FOR THE PERIOD
+OCTOBER 24-25, 2026, IS PRESENTED BELOW. PANAMANIAN
+STATION **HP2DFA** RISES TO 6TH PLACE GLOBALLY,
+OPERATING AT QRP LEVEL (0.2W) WITH OVER 7.44 MILLION
+ACCUMULATED KILOMETERS.
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY DISTANCE)
+==================================================
+RANK | CALL   | LOCATOR | WATTS | KPW    | TOTAL KM   | SPOTS
+----- -------- --------- ------- -------- ------------ -------
+ 1   | DP0GVN | IB59ui  |   5   |   1898 | 18,801,213 | 9,489
+ 2   | VK6XT  | OF88ji  |   5   |   1781 | 13,200,207 | 8,904
+ 3   | VK3NTB | QF31cs  |   5   |    700 | 11,325,279 | 3,498
+ 4   | TI4JWC | EK70wb  |   1   | 170005 | 11,073,914 | 170,005
+ 5   | EB1A   | IN53tf  |  0.5  | 199368 |  8,163,136 | 99,684
+ 6   | HP2DFA | FJ09cg  |  0.2  |  78070 |  7,447,736 | 15,614
+ 7   | VK3QN  | QF22    |   5   |   1526 |  7,419,665 | 7,630
+ 8   | VK4TMH | QG56fk  |   5   |    464 |  7,159,499 | 2,322
+ 9   | KK1D   | FN31vi  |   1   |   9625 |  6,429,692 | 9,625
+ 10  | VK2JPB | QF59tl  |   5   |    643 |  6,093,035 | 3,215
+
+==================================================
+3. TECHNICAL & PROPAGATION NOTES
+==================================================
+- **HP2DFA STATION**: ACHIEVES EXCEPTIONAL QRP
+  PERFORMANCE FROM PANAMA (FJ09cg) AT 0.2 WATTS,
+  REACHING 6TH GLOBALLY WITH 7,447,736 KM ACROSS
+  15,614 spots.
+- **GLOBAL PATHS**: HIGH-LATITUDE AND OCEANIA BEACONS
+  CONTINUE TO DRIVE LONG-DISTANCE WSPR PROPAGATION.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJFrom: HP2DFA
+
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY SPOT COUNT (OCTOBER 24-25, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 EN PANAMA
+
+==================================================
+1. WSPR SPOT COUNT RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON REPORT ORDERED BY
+TOTAL SPOT COUNT (RAW SPOTS) FOR THE PERIOD OCTOBER
+24-25, 2026, IS PRESENTED BELOW, HIGHLIGHTING THE
+CONTINUED PRESENCE OF PANAMANIAN STATION **HP2DFA**
+IN THE GLOBAL TOP 10 OPERATING AT QRP LEVEL (0.2W).
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY SPOTS)
+==================================================
+RANK | CALL   | LOCATOR | WATTS | KPW    | RAW SPOTS | UNIQUES
+----- -------- --------- ------- -------- ----------- --------
+ 1   | EB1A   | IN53tf  |  0.5  | 199366 |    99,683 |      82
+ 2   | TI4JWC | EK70wb  |   1   | 170003 |   170,003 |     326
+ 3   | G4GCI  | IO90gu  |   5   |   4498 |    22,489 |      30
+ 4   | G3JKF  | JO00bs  |   2   |  15806 |    31,613 |      34
+ 5   | KK1D   | FN31vi  |   1   |   9625 |     9,625 |      16
+ 6   | G4HSB  | IO94ll  |  0.2  | 331115 |    66,223 |      85
+ 7   | WW0WWV | DN70mq  |   1   | 248209 |   248,209 |     574
+ 8   | K3FZ   | FN30kx  |  10   |   1135 |    11,348 |      40
+ 9   | HP2DFA | FJ09cg  |  0.2  |  78065 |    15,613 |      52
+ 10  | G8ORM  | IO93cu  |   5   |   2251 |    11,253 |       8
+
+==================================================
+3. TECHNICAL & ACTIVITY NOTES
+==================================================
+- **HP2DFA STATION**: LOGS 15,613 RAW SPOTS ACROSS 52
+  UNIQUE STATIONS, MAINTAINING OUTSTANDING QRP
+  EFFICIENCY FROM PANAMA AT 0.2 WATTS.
+- **NETWORK VOLUME**: HIGH GLOBAL RECEPTION ACTIVITY
+  CONTINUES WITH HEAVY TRAFFIC BEACONS SUCH AS
+  WW0WWV AND TI4JWC LEADING SPOT COUNTS.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

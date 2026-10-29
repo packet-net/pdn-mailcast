@@ -1,0 +1,109 @@
+From: DJ6UX@DB0HB.#HH.DEU.EU
+To: AGCW
+Type/Status: B$
+Date/Time: 26-Oct 19:34Z
+Bid: TNJ511_DB0HB
+Title: AGCW-Telegramm 44/26 vom 2026-10-26
+
+Body: 2993
+
+R:261026/2108Z 15256@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261026/2108Z 20536@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261026/2108Z 61435@EI2GYB.DGL.IRL.EURO LinBPQ6.0.25
+R:261026/2108Z 5823@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261026/2107Z 6360@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261026/2107Z 25838@VK2RZ.#SYD.NSW.AUS.OC LinBPQ6.0.25
+R:261026/2107Z 26124@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+R:261026/2104Z @:EA2RCF.EAVI.ESP.EU #:26008 [Vitoria] $:TNJ511_DB0HB
+R:261026/2058z @:SR1BSZ.SZ.POL.EU $:TNJ511_DB0HB
+R:261026/2104z @:SR6BBA.#DSL.POL.EU $:TNJ511_DB0HB
+R:261026/2106z @:SR6DWH.#DSL.POL.EU $:TNJ511_DB0HB
+R:261026/2103z @:OK1TOR.CZE.EU $:TNJ511_DB0HB
+R:261026/2102z @:OE2XZR.#OE2.AUT.EU $:TNJ511_DB0HB
+R:261026/2102z @:DB0FFL.#BAY.DEU.EU $:TNJ511_DB0HB
+R:261026/2042z @:CS5NRA.CTST.PRT.EU $:TNJ511_DB0HB
+R:261026/2042z @:DB0ALG.#NDS.DEU.EU $:TNJ511_DB0HB
+R:261026/2042z @:DK0MAV $:TNJ511_DB0HB
+R:261026/2042z @:DB0FC.#NDS.DEU.EU [JO52GG OP: DF2AU] DP6.00 $:TNJ511_DB0HB
+R:261026/1934z @:DB0HB.#HH.DEU.EU [HH-AIRPORT] DP6.00 $:TNJ511_DB0HB
+From: DJ6UX @ DB0HB.#HH.DEU.EU (Eddi)
+To:   AGCW @ WW 
+X-Info: Upload without password authentication
+
+Path: ehrhh!.POSTED!not-for-mail
+From: dj6ux@dj6ux.ampr.org (Edmund H. Ramm)
+Newsgroups: ampr.bbs.agcw
+Subject: AGCW-Telegramm 44/26 vom 2026-10-26
+Date: Mon, 26 Oct 2026 20:39:07 -0000 (UTC)
+Organization: Private Linux/68k site
+Message-ID: <11bodpb$fri$1@dj6ux.ampr.org>
+Reply-To: dj6ux@db0fhn.ampr.org (Edmund H. Ramm)
+Injection-Info: dj6ux.ampr.org;
+	logging-data="16242"; mail-complaints-to="usenet@dj6ux.ampr.org"
+User-Agent: nn/6.7.3
+Xref: ehrhh ampr.bbs.agcw:2032
+
+ge dr ops es swls = hpe conds gd to rcve msg wid 6 pts
+
+<KA>
+
+buelkau 44/26 ck 81/79 26 1700 =
+
+
+pt 1: neues mitglied =
+
+      4521 ea8dlr edwin =
+
+      hzl willkommen ===
+
+
+pt 2: c/s neu =
+
+      4509 ex do1edk nw dk1edk dirk =
+
+      congrats ===
+
+
+pt 3: silent key =
+
+      95 dl8ih willi =
+
+      in memoriam ===
+
+
+pt 4: diplomverleihung =
+
+      agcw trophy nr 94 an 2673 df4wx micha =
+
+      congrats ===
+
+
+pt 5: funkaktivitaet =
+
+      nov 01-02 09-09utc foc memorial day qso party ===
+
+
+pt 6: konteste =
+
+      okt 28    00-02utc skcc straight key sprint =
+      okt 28    20-21utc ukeicc 80m contest = 
+      nov 01    14-17utc hsc contest =
+      nov 01-02 14-08utc ermag classic exchange ===
+
+
++
+nw zap
+
+
+Das AGCW-Telegramm wird jeweils montags um 1800UTC auf 3563kHz +/- QRM
+von einer AGCW-Leitstation gesendet, anschliessend Bestaetigungsverkehr
+('ZAP'). Wer sich vor der Aussendung anmeldet, erhaelt eine Nummer, mit
+der er zum ZAP-Traffic aufgerufen wird. Meist wird ein Sonder-DOK vergeben.
+--------------------------------------------------------------------
+AGCW-DL * Arbeitsgemeinschaft Telegrafie * Activity Group Telegraphy
+
+-- 
+   dj6ux@db0fhn.ampr.org - dj6ux AT posteo DOT de - DJ6UX@DB0HB.#HH.DEU.EU
+                         QTH Hamburg-Bramfeld, FN31a
+
+

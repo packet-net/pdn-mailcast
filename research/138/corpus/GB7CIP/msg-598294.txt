@@ -1,0 +1,141 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 19-Oct-26 07:40
+Bid: 8470_GB7CIP
+Title: Cable Tester
+Path: 
+
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+From Brian G3YRH @GB7CAM.#12.GBR.EU       (Additions Jun 06)
+                  Co-ax cable tester
+                  ==================
+This tester detects steady short or intermittent open circuits. Momentary open
+circuits or steady short circuits trigger a buzzer.
+
+Schematic : Detection of intermittent discontinuities or steady shorts.
+                                                 
+        ---------------O-------/\/\/\----O----<<---E
+        |              |       R2 270    |         (COAX UNDER TEST)
+    ---------          |                 |   -<<--- (SHORT FAR END)
+   |        |          |                 |   |     F
+------      < R1     -----               |   |
+| BZ |      > 680     ---  9 V           |   |
+------      <        -----               |   |
+   |        |         ---                |   |
+   ----------          |                 |   |
+C       |              |                 |   |
+O--------              |                 |   |
+        |              |                 |   |
+      -----            |                 |   |
+      \   /            |                 |   |
+       \ /  2N1777     |                 |   |
+      -----            |                 |   |
+        | \            |  HIGH SIDE      |   |
+        |  \___________|_________________|___|_________
+        O              |nc                   |nc
+         \ B           |                     |   SEE NOTE 1
+ D        \____________|_____________________|_________
+O------O
+        A  S1              LOW SIDE
+
+NOTE 1: Alternative: Single wire under test or jumper to test internal
+        continuity of tester.
+
+BZ = Buzzer
+S1 = Switch
+2N1777 = Silicon Controlled Rectifier
+nc = No Connection
+RESISTANCES ARE IN OHMS.
+
+To test coaxial cable for intermittent discontinuities or steady shorts, place
+cable at points E & F, then short far end of coax.
+
+Details
+
+A simple, portable, lightweight testing circuit sounds a long duration alarm
+when it detects a steady short circuit or a momentary open circuit in a coaxial
+cable or other two conductor transmission line. The tester is sensitive to
+discontinuities that last 10uS or longer. Previously, there was no simple,
+portable instrument to detect momentary shorts or discontinuities. Such
+conventional instruments as ohmmeters & lamp or buzzer type continuity checkers
+give visible or audible indications of steady open or closed circuits only.
+
+To detect an intermittent open circuit in a coaxial cable, the far end of the
+cable is shorted by a jumper, and the tester is connected as shown in the upper
+portion of the figure, with the switch in position B. If the cable is in good
+condition, the high side terminal remains ungrounded, the silicon controlled
+rectifier remains off, and the buzzer does not sound. If an opening occurs in
+the centre conductor or shield of the coaxial cable, the current from the high
+side terminal to the low side terminal that would be otherwise shunted by the
+cable flows into and triggers the silicon controlled rectifier and thereby
+turns on the buzzer. Even if the coaxial cable starts to conducts again, the
+buzzer remains on until the silicon controlled rectifier is reset by turning
+the switch to position A. An intermittent discontinuity in a single wire (or an
+internal discontinuity in the tester) can be detected in this manner if no
+coaxial cable is connected and the wire or jumper is connected as shown in
+dashed lines. (See Note 1).
+To detect a steady short circuit, the jumper (At note 1) is removed. If the
+buzzer does not sound, there is a steady short circuit between the inner &
+outer conductors. If the buzzer does sound, then the cable is either good or
+open.
+The tester is used extensively for detecting intermittent open shorts in
+accelerometer & extensometer cables. The tester can also be used as an
+ordinary buzzer type continuity checker to detect steady or open circuits.
+For this purpose, the switch is set a position A and the probe leads are
+connected as shown by dashed lines in the lower portion of the figure (points
+C & D). In this case the silicon controlled rectifier is not part of the
+circuit, and the buzzer remains on only so long as the circuit under test#
+provides a conducting path.
+This work was done by Bobby L. Anderson of Rockwell International Corp. for
+Marshall Space Flight Centre. No further documentation is available.
+
+NASA Tech Briefs January 1990.
+    rgds Brian g3yrh@gb7cam
+-----------------------------------------------------------------------------
+
+By G8MNY
+One method I have seen & used for RF/AF cables, was to use an AF tone null
+system..
+
+ÚÄÄÄÄÄÄÄÄÄ¿                      ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿  ÚÄÄÄ¿
+³Low LevelÃÄÄo----------------oÄÄ´Deep 1kHz WayenÃÄÄ´ AFÃÄÂ¿/³Audible
+³Pure 1kHz³   Cable under test   ³  Bridge Notch ³  ³AMP³ ÀÙ\³Crackles
+³e.g. 10mV³    being flexed      ÀÄÄÂÄÄÄÄÄÄÄÄÄÂÄÄÙ  ÀÄÂÄÙ     & Pings
+ÀÄÄÄÄÄÄÄÄÄÙ                       Null      Phase    Gain
+
+This system can find these annoying intermittent faults before they are
+actually a hard fault somewhere in the cable. Faulting using a low level AC
+rather than DC, does not cause the intermittent fault to weld up the cable
+wires, so it does not hide the fault on testing.
+
+HOW IT WORKS
+The OSC applies a low level AF signal to the cable (10mV?). The far end of the
+cable is attached to the AF deep notch filter that can be adjusted with null
+depth & phase controls to completely null out the original signal.
+
+        SENT          RX FROM CABLE                   TO LS AFTER NOTCH
+Level³   ³             ³   ³ Tone + low level AM      ³  No
+     ³   ³             ³   ³  crackle sidebands       ³ Tone
+     ³   ³        -40dB´  /³\ & harmonics        -40dB´ /||\ Just fault noises
+     ÀÄÄÄÁÄÄÄÄÄ>f      ÀÄÄÄÁÄÄÄÁÄÄÄÁÄÄÄÁÄ>f           ÀÄÄÁÁÄÄÄÁÄÄÄÁÄÄÄÁÄ>f
+       1kHz              1kHz  Harmonics                 1kHz
+
+Any discontinuity in the cable signal will change the level slightly & that
+will produce low level AM sidebands & even harmonics. The AF amp boosts these
+so they can be clearly used while flexing the cable to locate the faulty part
+(end) of the cable. Replacement/repairs can then be done (shorten cable) if
+appropriate. [Try this out on lap screened Phono AF leads!! :-) ]
+
+Although this was a dedicated tester, it can be made up out of testgear you may
+have. e.g. AF Osc, AF Distortion meter, AF amp & LS.
+
+
+See my TECH buls on "Coax Faulting" "Coax Feeder Tests" & "A Versatile Pulse
+Tester".
+
+
+Why don't U send an interesting bul?
+
+73 de John G8MNY @ GB7CIP

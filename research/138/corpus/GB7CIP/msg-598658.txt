@@ -1,0 +1,34 @@
+From: HP2DFA
+To: INFO
+Type/Status: B$
+Date/Time: 23-Oct-26 02:31
+Bid: 5480_HP2DFA
+Title: TOP 10 WORLDWIDE EARTHQUAKES (24H 23-Oct)
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+======================================================================
+     WORLDWIDE SEISMIC REPORT - TOP 10 LARGEST EARTHQUAKES (24H)
+             AX.25 DATA NETWORK / ROUTE: INFO@WW
+======================================================================
+Capture Date: 23-Oct-2026 02:30 UTC
+Source: USGS Earthquake Hazards Program (earthquake.usgs.gov)
+----------------------------------------------------------------------
+
+TOP 10 EARTHQUAKES WORLDWIDE (LAST 24 HOURS UTC):
+MAG    LOCATION / REGION                      DEPTH     TIME (UTC)
+----------------------------------------------------------------------
+M 7.0  191 km ENE of Nagqu, China            18 km        14:33 UTC
+M 5.2  201 km ENE of Nagqu, China            10 km        15:12 UTC
+M 5.0  153 km S of Kokopo, Papua New Guinea  10 km        20:05 UTC
+M 5.0  207 km ENE of Nagqu, China            10 km        18:06 UTC
+M 4.9  104 km NNE of Hihifo, Tonga           23 km        19:06 UTC
+M 4.9  210 km ENE of Nagqu, China            10 km        16:21 UTC
+M 4.9  western Xizang                        10 km        15:45 UTC
+M 4.9  200 km NW of Port-Olry, Vanuatu       10 km        12:22 UTC
+M 4.9  85 km NNW of Curup, Indonesia         135 km       10:57 UTC
+M 4.8  269 km SSW of Severo-Kurilâsk, Russia 50 km        21:09 UTC
+
+======================================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 PANAMA NODE
+======================================================================

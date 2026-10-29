@@ -1,0 +1,76 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 20-Oct-26 02:50
+Bid: 5125_HP2DFA
+Title: NHC: Post-Tropical Cyclone Trudy Public Advisory Number 27
+Path: !VE3KPG!VE3CGR!DM4RW!HP2DFA!
+
+======================================================================
+               NATIONAL HURRICANE CENTER (NHC) BULLETIN - WW
+            Automated NOAA/NHC Real-Time Operational Broadcast
+======================================================================
+Title: Post-Tropical Cyclone Trudy Public Advisory Number 27
+Source: nhc.noaa.gov
+----------------------------------------------------------------------
+Issued at 800 PM MST Mon Oct 19 2026 000
+WTPZ31 KNHC 200233
+TCPEP1
+
+BULLETIN
+Post-Tropical Cyclone Trudy Advisory Number  27
+NWS National Hurricane Center Miami FL       EP212026
+800 PM MST Mon Oct 19 2026
+
+...TRUDY BECOMES A REMNANT LOW...
+...THIS IS THE FINAL NHC ADVISORY...
+
+
+SUMMARY OF 800 PM MST...0300 UTC...INFORMATION
+----------------------------------------------
+LOCATION...19.5N 108.0W
+ABOUT 160 MI...260 KM WSW OF CABO CORRIENTES MEXICO
+MAXIMUM SUSTAINED WINDS...35 MPH...55 KM/H
+PRESENT MOVEMENT...N OR 360 DEGREES AT 2 MPH...4 KM/H
+MINIMUM CENTRAL PRESSURE...1005 MB...29.68 INCHES
+
+
+WATCHES AND WARNINGS
+--------------------
+There are no coastal watches or warnings in effect.
+
+
+DISCUSSION AND OUTLOOK
+----------------------
+At 800 PM MST (0300 UTC), the center of Post-Tropical Cyclone Trudy
+was located near latitude 19.5 North, longitude 108.0 West. The
+post-tropical cyclone is drifting northward, but is expected to move
+slowly to the west-northwest over the next day or so until
+dissipation.
+
+Maximum sustained winds have decreased to near 35 mph (55 km/h) with
+higher gusts.
+
+The estimated minimum central pressure is 1005 mb (29.68 inches).
+
+
+HAZARDS AFFECTING LAND
+----------------------
+None.
+
+
+NEXT ADVISORY
+-------------
+This is the last public advisory issued by the National Hurricane
+Center on this system. For additional information on the remnant low
+please see High Seas Forecasts issued by the National Weather
+Service, under AWIPS header NFDHSFEPI, WMO header FZPN01 KWBC, and
+on the web at ocean.weather.gov/shtml/NFDHSFEPI.php
+
+
+$$
+Forecaster Evans/Papin
+======================================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA
+======================================================================

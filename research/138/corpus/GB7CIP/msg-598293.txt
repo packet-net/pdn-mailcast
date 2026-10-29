@@ -1,0 +1,47 @@
+From: G8MNY
+To: ATV
+Type/Status: B$
+Date/Time: 19-Oct-26 07:08
+Bid: 8469_GB7CIP
+Title: Hearing the ATV Buzz
+Path: 
+
+By G8MNY                                (New Jan 09)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Originally taken from my UK BATC's CQTV 163 "Tuning 70" of 8/93...
+
+Trying to beam up on weak fast scan ATV signals with tight beams on a TV mon is
+not that easy. Here is a way that greatly helps when you don't quiet know the
+beam heading (e.g. /P). It is of no use for digital TV modes!
+
+Take the recovered video and feed it to the TV audio stages (decent size LS or
+HiFi headphones!) after some CR filtering to remove the line timebase & treble
+noise.
+
+FM SOUND >ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄo  FM
+                        SWITCH \oÄÄÄÄÄÄÄÄ>AF AMP 
+  VIDEO  >ÄÄ6K8ÄÄÂÄÄ6K8ÄÄÄÂÄÄÄo  BUZZ     Volume?
+                 ³        ³      BEAM UP
+                === u1   === u1
+         ________³________³________
+
+This works by listening to the 50Hz buzz, as your ear/brain is a few dB better 
+than the TV sync stages. It also works on 10GHz/1255MHz FM TV just as well as
+AM mode.
+
+The extra 6k8 load on the 75ohm video line has no effect.
+    _
+Tx ³_picture         Rx °°°°°°°°°°°°°°°°°     As        /~\ 
+___³ Info   |_ _        °°°°±°°°°°°°±°°°°     AF _     /   'ú._._./\_
+ Þ°°°°°°°°°°° Þ°°°      ±°±±±±±±±±±±±±°±±         \   /              \   /
+                        °±°°°°°°°°°°°°±°°          ~-~   50Hz BUZZ    ~-~
+ <--- 20mS -->          °°°°°°°°°°°°°°°°°Noise
+
+This can work on any band including 70cms, although on AM a narrow band SSB/FM
+phone Rx may even better if the exact carrier frequency is known!
+
+
+Why don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

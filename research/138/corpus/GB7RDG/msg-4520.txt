@@ -1,0 +1,21 @@
+From: M7TAW
+To: MCAST
+Type/Status: BN
+Date/Time: 22-Oct 16:30Z
+Bid: 6295P0M7TAW
+Title: MCR M7TAW 2026-10-22
+
+R:261027/1402Z 15509@GB7IOW.#48.GBR.EURO LinBPQ6.0.26
+R:261022/1630Z 121@GB7PTR.#48.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.16.2 IO80qr wessex.zapto.org 2/2 0 0 0
+09 - 0 -5 +1.6 IU+PU 3 - 0.52 0.49 - p
+10 - 0 -3 +1.3 IU+PU 1 - 0.49 0.48 - p
+11 W3 2 - - IU+PU 1 - 0.2 0.17 - b
+12 W4 128 23 +1.8 IM+PG 2 - 0.42 0.24 - p
+13 - 0 - - IU+PU
+14 - 0 - - IU+PU
+15 - 0 - - IU+PU
+16 - 0 - - IU+PU
+
+

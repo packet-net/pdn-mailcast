@@ -1,0 +1,100 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 29-Oct-26 12:06
+Bid: 6285_HP2DFA
+Title: WSPR TOP 10 BEACONS DISTANCE/SPOTS OCT28
+Path: !VE3KPG!VE3CGR!VE2PKT!PY2BIL!HP2DFA!
+
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY TOTAL DISTANCE (OCTOBER 28-29, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR GLOBAL DISTANCE RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL BEACON LEADERBOARD ORDERED BY
+TOTAL ACCUMULATED DISTANCE (TOTAL KILOMETERS) FOR THE 24-HOUR
+PERIOD FROM OCTOBER 28 TO OCTOBER 29, 2026 (00:00 TO 00:00 UTC).
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY DISTANCE)
+==================================================
+RANK | CALL       | LOCATOR | WATTS | KPW    | TOTAL KM   | RAW SPOTS | UNIQ
+----- ------------ --------- ------- -------- ------------ ----------- ------
+ 1   | VK6XT      | OF88ji  |   5   |   3021 | 21,825,274 |    15,103 | 1,655
+ 2   | DP0GVN     | IB59ui  |   5   |   2246 | 18,236,917 |    11,231 | 1,361
+ 3   | VK2EFM     | QF56oq  |  10   |    370 | 17,797,912 |     3,700 | 1,409
+ 4   | VK2JPB     | QF59tl  |  0.2  |  41020 | 12,263,773 |     8,204 | 1,025
+ 5   | TI4JWC     | EK70wb  |   1   | 174882 | 11,021,155 |   174,882 | 2,045
+ 6   | EB1A       | IN53tf  |  0.5  | 218614 |  9,630,208 |   109,307 | 2,793
+ 7   | VK4TMH     | QG56fk  |   5   |    649 |  8,917,601 |     3,243 |   813
+ 8   | VK3NTB     | QF31cs  |   5   |    774 |  8,617,615 |     3,869 |   711
+ 9   | KK1D       | FN31vi  |   1   |  11728 |  8,067,196 |    11,728 | 2,124
+ 10  | TA4/G8SCU  | KM56vo  |   5   |   8704 |  8,032,901 |    43,521 | 1,915
+
+==================================================
+3. TECHNICAL & PROPAGATION NOTES
+==================================================
+- **DISTANCE BENCHMARK**: VK6XT LEADS WORLDWIDE WITH OVER
+  21.82 MILLION KM, CARRIED BY SIGNIFICANT PATHS ON 20M
+  (5.71M KM), 40M (5.47M KM), AND 30M (3.37M KM).
+- **ANTARCTIC BEACON**: DP0GVN (IB59ui) HOLDS RANK 2 WITH
+  18.23M KM TOTAL DISTANCE SPREAD ACROSS HF BANDS.
+- **QRP LINK EFFICIENCY**: VK2JPB ACHIEVED RANK 4 WITH
+  12.26M KM AND A REMARKABLE KPW OF 41,020 RUNNING JUST 0.2W.
+- **REGIONAL CENTRAL AMERICAN PRESENCE**: TI4JWC (EK70wb,
+  COSTA RICA) SECURED RANK 5 GLOBALLY WITH 11.02M KM,
+  174,882 RAW SPOTS, AND 174,882 KPW AT 1.0W.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+
+WSPRNET GLOBAL BEACON STATISTICS & RANKINGS BY SPOT COUNT (OCTOBER 28-29, 2026 UTC)
+
+DATABASE: v2.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR BEACON SPOT COUNT OVERVIEW
+==================================================
+OFFICIAL WSPRNET GLOBAL BEACON LEADERBOARD SORTED BY
+UNIQUE RECEPTIONS (#UNIQUE) AND TOTAL RAW PACKETS (#RAW)
+RECORDED OVER THE 24-HOUR UTC CYCLE ENDING OCTOBER 29, 2026.
+
+==================================================
+2. WSPR BEACONS LEADERBOARD (TOP 10 BY SPOTS)
+==================================================
+RANK | CALL       | LOCATOR | WATTS | KPW    | RAW SPOTS | DUPES | UNIQUES
+----- ------------ --------- ------- -------- ----------- ------- --------
+ 1   | EB1A       | IN53tf  |   1   | 109307 |   109,307 |  226  |  2,793
+ 2   | G4GCI      | IO90gu  |  10   |   2668 |    26,677 |   68  |  2,383
+ 3   | G3JKF      | JO00bs  |   2   |  18644 |    37,289 |   54  |  2,155
+ 4   | KK1D       | FN31vi  |   1   |  11728 |    11,728 |   30  |  2,124
+ 5   | TI4JWC     | EK70wb  |   1   | 174881 |   174,881 |  414  |  2,044
+ 6   | TA4/G8SCU  | KM56vo  |   5   |   8704 |    43,521 |   64  |  1,915
+ 7   | G4HSB      | IO94ll  |  0.2  | 383520 |    76,704 |  178  |  1,861
+ 8   | KF9KV      | EN52et  |   5   |   1603 |     8,013 |   10  |  1,771
+ 9   | WW0WWV     | DN70mq  |   1   | 257549 |   257,549 |  796  |  1,744
+ 10  | G8ORM      | IO93cu  |   5   |   2670 |    13,351 |   12  |  1,670
+
+==================================================
+3. TECHNICAL METRICS & PROPAGATION HIGHLIGHTS
+==================================================
+- **UNIQUE LISTENER LEADER**: EB1A HEADS THE GLOBAL LIST
+  LOGGING 2,793 UNIQUE RECEIVING STATIONS AND 109,307 RAW
+  SIGNALS DECODED WORLDWIDE.
+- **REGIONAL CENTRAL AMERICAN HIGHLIGHT**: TI4JWC (EK70wb,
+  COSTA RICA) SECURED 5TH PLACE WORLDWIDE WITH 2,044
+  UNIQUE STATIONS AND A REMARKABLE 174,881 RAW SPOT TALLY AT 1W.
+- **QRP LINK EFFICIENCY**: G4HSB PROVED EXCEPTIONAL SYSTEM
+  PERFORMANCE WITH 383,520 KPW RUNNING JUST 200 mW (0.2W),
+  DECIPHERED BY 1,861 UNIQUE RECEIVERS ACROSS THE GLOBE.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

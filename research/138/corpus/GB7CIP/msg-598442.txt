@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 20-Oct-26 17:25
+Bid: 5208_HP2DFA
+Title: EARTHQUAKE ALERT M5.4 - 192 km S of Burica, Panama
+Path: !DK0WUE!ZL2BAU!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.4+)       
+==================================================
+Event ID   : us6000u3nl
+Magnitude  : M 5.4
+Time (UTC) : 2026-10-20 17:05:48 UTC
+Depth      : 10.0 km
+Coordinates: 6.3226 Lat / -82.5693 Lon
+--------------------------------------------------
+Location:
+  192 km S of Burica, Panama
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3nl
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

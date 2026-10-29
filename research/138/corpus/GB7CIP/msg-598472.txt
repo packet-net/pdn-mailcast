@@ -1,0 +1,67 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 21-Oct-26 07:44
+Bid: 8648_GB7CIP
+Title: Towing & Reversing Bleeper
+Path: 
+
+By G8MNY                                      (New Sep 08)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Here is a circuit I used, originally based on a trailer indicator warning kit.
+
+WHAT IT DOES
+Normally it just beeps if there is a trailer lamp connected and an indicator is
+powered (UK tow regulation). I modified the original unit to also beep as an
+added safety feature, if I was reversing (with or without a trailer).
+
+                Flashing LED
+                     ///
+Connection from >ÄÄÂÄ´>ÃÄÄÂÄ´>ÃÄÄ¿
+Reversing Light    ³ +10u ³  D1  ³
+                   ÀÄÄ´ÃÄÄÙ      ³
+Connection from                  ³    Trailer 
+Flashing Right  >ÄÂÄÄÄ´>ÃÄÄÂÄÄÄÄÄ)ÄÄÄ>Pin 4
+Indicator         e\³ D2  100R   ³    RHS Ind
+                 PNPÃÄÄÄÄÄÄÙ     ³
+                   /³       D3   ³
+                  ÀÄÄÄÄÄÄÄÄÄ´>ÃÄÄ´
+Connection from                  ³    Trailer
+Flashing Left   >ÄÂÄÄÄ´>ÃÄÄÂÄÄÄÄÄ)ÄÄÄ>Pin 1
+Indicator         e\³ D4  100R   ³    LHS Ind
+                 PNPÃÄÄÄÄÄÄÙ     ³
+                   /³       D5   ³
+                  ÀÄÄÄÄÄÄÄÄÄ´>ÃÄÄ´
+                              ___³__
+                             ³ Small³
+                             ³Buzzer³
+                              ~~~³~~~  Trailer
+                                 ÃÄÄÄÄ>Pin 3
+                                _³_    Earth
+HOW IT WORKS
+The trailer lamps are powered via power diodes D2 & D4 (1N5401) and the voltage
+drop across these turns on either of the 2 small PNP transistor to power the
+small buzzer via a low power steering diode D3 or D5 diode (1N4001).
+
+The additional reversing beeper uses a flashing LED in series with buzzer and a
+diode to give the same effect, this time as a public warning. The 10uF
+capacitor is needed to stop the buzzer AC pulses affecting the LED internal
+timer.
+
+The flashing LED is the smallest flasher unit of its size and I have made use
+if it in several applications now.
+
+LOCATION
+This circuit is located at the rear, behind one of the lights clusters as it
+needs to be connected to both indicators and a reversing light feed, and be
+audible both in the driver and nearby pedestrians.
+
+
+Also see Fred G4VVQ's TECH bul "Towing Scoket For Caravans" that I put out.
+and my "Flashing LED lamp driver"
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

@@ -1,0 +1,48 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 19-Oct-26 06:38
+Bid: 8466_GB7CIP
+Title: A battery Zapper by ON4CBL
+Path: 
+
+Hi ALL                                         (updated May 11)
+Test equipment for 1.2v cell's: a principal plan.
+
+If you have a transformer 6V AC, 15-30 Amps max, and one power thyristor
+(50-100 Amps), you can make this plan for a safely recover old battery cells:
+
+ 2.5#                     |\ |
+ o-------A-------|--------| >|--------------------------o 2.5#
+6V AC   amps     |   Thy  |/ |\----|<|-. Diode 1n5401    |
+              no |   nc         +Tr    | K-A   1n4004    |
+                 o  /o-----/////-------|                 |
+                  /- push   10 ohm     |                 |
+                 |                     |                 |
+           1uF   |----||------o\       |                 | +
+          22uF   |--||------o    \o----|             ---------
+         100uF   |-----||---o    S1      Cell 1.2-1.5V  ---
+ 2.5#  220uF->>  |--||--------o                          | -
+6V AC              +  -                                  |
+ o-------------------------------------------------------o
+
+Mayby 12V AC for 9V battery types ?
+
+Set S1 for choice load time.
+Push the switch to left and hold, the thyristor gives a dc pulse to the
+cell. If the cel are hot, loses the pusher. Test the cel with a voltmeter.
+For Nicad and NiMh, do than a normal loading. Never use Li-ion cells on
+this equipment !
+
+Push the switch to the right (loosing it), the caps are now disscharged.
+Change the cell for the next one..The high current load a Alcaline in few
+seconds.. AAA 4sec, AA 8sec, A 15sec, D 30sec. ( For D 4x times pushing )
+The voltage is sowat 1.2V ( Nicad and Ni-Mh ) or 1.5 volt for alcalines.
+Alcalines that give 1.3-1.35v are not good for using ! One way, not 2x ..
+
+Greetings, 73 de Eric ON4CBL@ON0AR
+
+
+Why don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

@@ -1,0 +1,74 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:20
+Bid: 24147_N4SD
+Title: Space Weather 3-Day Forecast
+Path: !YT7MPB!N6RME!N0ARY!N2MH!N2MH4!WB4WPF!KA3VSP!N3MEL!N4SD!
+
+FXXX10 KWNP 241231
+DAYTDF
+
+:Product: 3-Day Forecast
+:Issued: 2026 Oct 24 1230 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             3-Day Forecast
+#
+A. NOAA Geomagnetic Activity Observation and Forecast
+
+The greatest observed 3 hr Kp over the past 24 hours was 4 (below NOAA
+Scale levels).
+The greatest expected 3 hr Kp for Oct 24-Oct 26 2026 is 3.67 (below NOAA
+Scale levels).
+
+NOAA Kp index breakdown Oct 24-Oct 26 2026
+
+             Oct 24       Oct 25       Oct 26
+00-03UT       2.00         3.00         2.33         
+03-06UT       1.33         3.33         2.00         
+06-09UT       0.67         3.67         2.00         
+09-12UT       2.00         3.33         2.00         
+12-15UT       1.00         3.67         2.00         
+15-18UT       0.67         3.00         2.00         
+18-21UT       1.33         3.33         2.00         
+21-00UT       1.33         3.00         2.33         
+
+Rationale: No G1 (Minor) or greater geomagnetic storms are expected.
+Active levels are expected on 25 Oct due to the possible glancing
+effects of the CME that left the Sun on 21 Oct combined with an
+anticipated impact of a high speed stream from a negative polarity
+coronal hole that is expected to become geoeffective.
+
+B. NOAA Solar Radiation Activity Observation and Forecast
+
+Solar radiation, as observed by NOAA GOES-18 over the past 24 hours, was
+below S-scale storm level thresholds.
+
+Solar Radiation Storm Forecast for Oct 24-Oct 26 2026
+
+              Oct 24  Oct 25  Oct 26
+S1 or greater    1%      1%      1%
+
+Rationale: No S1 (Minor) or greater solar radiation storms are expected.
+No significant active region activity favorable for radiation storm
+production is forecast.
+
+C. NOAA Radio Blackout Activity and Forecast
+
+No radio blackouts were observed over the past 24 hours.
+
+Radio Blackout Forecast for Oct 24-Oct 26 2026
+
+              Oct 24        Oct 25        Oct 26
+R1-R2           10%           10%           10%
+R3 or greater    1%            1%            1%
+
+Rationale: There is a slight chance for R1-R2 (Minor-Moderate) radio
+blackouts through 26 Oct.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

@@ -1,0 +1,93 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 26-Oct-26 04:53
+Bid: 5873_HP2DFA
+Title: WSPR TOP10 SPOTTER DISTANCE/SPOTS OCT25
+Path: !VE3KPG!VE2PKT!PY2BIL!HP2DFA!
+
+WSPRNET GLOBAL TOP SPOTTERS (REPORTERS) STATISTICS BY TOTAL DISTANCE (OCT 25-26, 2026)
+
+DATABASE: v3.1.0 (CLICKHOUSE) / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+==================================================
+1. WSPR SPOTTERS RANKINGS OVERVIEW
+==================================================
+THE OFFICIAL WSPRNET GLOBAL REPORT OF TOP-PERFORMING
+RECEPTION STATIONS (SPOTTERS) ORDERED BY TOTAL DISTANCE
+(TOTAL KILOMETERS) FOR THE RECENT 24-HOUR MONITORING
+PERIOD (OCTOBER 25-26, 2026) IS PRESENTED BELOW.
+
+==================================================
+2. WSPR SPOTTERS LEADERBOARD (TOP 10)
+==================================================
+RANK | CALL        | LOCATOR | TOTAL KM   | RAW SPOTS | UNIQUES
+----- ------------- --------- ------------ ----------- --------
+ 1   | VK5ARG      | PF95ht  | 14,376,141 |    16,844 |   1,185
+ 2   | EA8/DF4UE   | IL38bp  | 11,796,205 |    44,173 |   2,451
+ 3   | EA8BFK      | IL38bo  | 10,906,916 |    36,175 |   2,224
+ 4   | VK6PVL      | OF88bc  |  8,261,035 |     9,745 |     757
+ 5   | K3FEF       | FN21mh  |  8,050,690 |    35,400 |   1,942
+ 6   | KD2OM       | FN12gx  |  7,972,521 |    42,785 |   2,012
+ 7   | W1XP        | FN42fo  |  6,940,745 |    39,570 |   1,818
+ 8   | K6VZK       | DM13nh  |  6,840,554 |    46,477 |   1,725
+ 9   | VE6JY       | DO33or  |  6,685,044 |    30,525 |   1,652
+ 10  | N2YCH       | FN31jg  |  6,295,048 |    40,246 |   1,728
+
+==================================================
+3. TECHNICAL & RECEPTION NOTES
+==================================================
+- **TOP REPORTERS**: VK5ARG LEADS THE GLOBAL LEADERBOARD
+  SURPASSING 14.3 MILLION ACCUMULATED KILOMETERS, CLOSELY
+  FOLLOWED BY CANARY ISLANDS STATIONS.
+- **NETWORK UTILITY**: SPOTTER STATISTICS PROVIDE VITAL
+  INSIGHTS INTO GLOBAL HF PROPAGATION DYNAMICS AND PATHS.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+WSPRNET GLOBAL TOP SPOTTERS STATISTICS BY SPOT COUNT (OCTOBER 25-26, 2026)
+
+DATABASE: v4.0.0 / ARNE & ROB / SITE BY PHIL VK7JJ
+ISSUED VIA BPQ32 NODE HP2DFA-5 EN PANAMA
+
+==================================================
+1. WSPR SPOT COUNT RANKINGS OVERVIEW (REPORTERS)
+==================================================
+THE OFFICIAL WSPRNET GLOBAL REPORT OF TOP RECEPTION
+STATIONS (SPOTTERS) ORDERED BY RAW SPOT COUNT AND
+UNIQUE STATIONS FOR THE PERIOD OCTOBER 25-26, 2026,
+IS PRESENTED BELOW. TOTAL NETWORK SPOTS REACHED
+OVER 2.00 MILLION ENTRIES FOR THE MONITORING CYCLE.
+
+==================================================
+2. WSPR SPOTTERS LEADERBOARD (TOP 10 BY SPOTS)
+==================================================
+RANK | CALL        | LOCATOR | RAW SPOTS | DUPES | UNIQUES
+----- ------------- --------- ----------- ------- --------
+ 1   | EA8/DF4UE   | IL38bp  |    44,173 |     0 |   2,451
+ 2   | EA8BFK      | IL38bo  |    36,175 |     0 |   2,224
+ 3   | KD2OM       | FN12gx  |    42,785 |     0 |   2,012
+ 4   | K3FEF       | FN21mh  |    35,400 |     0 |   1,942
+ 5   | W1XP        | FN42fo  |    39,570 |     0 |   1,818
+ 6   | PD0OHW      | JO33lc  |    43,249 |     0 |   1,807
+ 7   | N2YCH       | FN31jg  |    40,246 |     0 |   1,728
+ 8   | K6VZK       | DM13nh  |    46,476 |     0 |   1,724
+ 9   | OE3GBB/Q    | JN87aq  |    41,020 |     0 |   1,703
+ 10  | OE3GBB/P    | JN87aq  |    40,421 |     0 |   1,669
+
+==================================================
+3. TECHNICAL & RECEPTION DENSITY NOTES
+==================================================
+- **TOP RECEPTION HUBS**: CANARY ISLANDS STATIONS
+  EA8/DF4UE AND EA8BFK LEAD UNIQUE STATION CAPTURES
+  ACROSS THE GLOBAL WSPR ECOSYSTEM.
+- **NETWORK VOLUME**: SURPASSING 2 MILLION PROCESSED
+  SPOTS HIGHLIGHTS ROBUST WORLDWIDE PROPAGATION.
+
+CREDITS & SOURCES: WSPRNET.ORG / ARNE, ROB & PHIL VK7JJ
+
+
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

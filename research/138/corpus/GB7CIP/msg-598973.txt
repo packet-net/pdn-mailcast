@@ -1,0 +1,55 @@
+From: G8MNY
+To: ATV
+Type/Status: B$
+Date/Time: 26-Oct-26 07:28
+Bid: 9149_GB7CIP
+Title: S-Video pin-out connections
+Path: 
+
+for the 4 pin miniature din out socket
+                ___
+
+             1 o   o 3
+
+            2 o     o 4
+                ___
+
+1 - Luminance signal
+2 - Luminance ground
+3 - Chromanance signal
+4 - Chromanance ground
+
+For S Video the normal "Composite" video signal that contains.. frame & line
+"Syncs" + the black & white "Luminance" Video + the "Chromanance" colour
+signal, is split into 2 components:- Luminance & sync, & a Chromance.
+
+The purpose of having 2 separated signals is to negate the need for filtering
+which always comes with some definition loss, & to stop cross colour problems
+caused by sharp edges & gratings in the Luminance Jamming the colour signal.
+------------------------------------------------------------------------------
+From: RZ6AVM@UA6ADV.H.KRD.RUS.EU
+Title        : S-Video TV card -- RCA
+    ________________________________________>  video
+    |                         |
+    |                       -----  470pf
+    |                       -----
+    |                         |
+    |                         |
+  3 o   4 o___________________I
+
+1 o       2 o_______________________________> GND
+
+                  OR
+
+  3 o   4 o_________________________________>  video
+ 
+1 o       2 o_______________________________>  GND
+
+  1. GND-Y   2. GND-C   3. Y   4. C
+
+73 - EVGENY, RZ6AVM @ UA6ADV
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

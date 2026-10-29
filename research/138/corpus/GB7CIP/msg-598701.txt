@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 23-Oct-26 14:24
+Bid: 5550_HP2DFA
+Title: EARTHQUAKE ALERT M5.2 - 50 km WNW of Malfa, Italy
+Path: !VE3KPG!VE3CGR!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.2+)       
+==================================================
+Event ID   : us6000u4dc
+Magnitude  : M 5.2
+Time (UTC) : 2026-10-23 13:55:36 UTC
+Depth      : 10.0 km
+Coordinates: 38.7787 Lat / 14.3150 Lon
+--------------------------------------------------
+Location:
+  50 km WNW of Malfa, Italy
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4dc
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,778 @@
+From: HP2DFA
+To: AMSAT
+Type/Status: B$
+Date/Time: 25-Oct-26 01:12
+Bid: 5738_HP2DFA
+Title: AMSAT: ANS-298 AMSAT News Service Weekly Bulletins
+Path: !VE3KPG!VE3CGR!PY2BIL!HP2DFA!
+
+==================================================
+        FULL AMSAT OFFICIAL BULLETIN - ENGLISH    
+==================================================
+Title : ANS-298 AMSAT News Service Weekly Bulletins
+--------------------------------------------------
+AMSAT News Service
+ANS-298October 25, 2026
+In this edition:
+* AMSAT Youth Initiative Featured in Florida News* ERMINAZ-2
+Satellites Receive OSCAR Numbers* Where Does Space Begin?* Falcon
+9 Launches Bandwagon-5 Rideshare Mission* Greek-Built Satellite
+Launched for Kazakh School* San Diego Balloon Launch Draws in
+High School Students* OsTrax Now Available for Windows, macOS,
+and Ubuntu* Changes to AMSAT TLE Distribution for Oct. 23, 2026*
+ARISS SSTV Event in Progress* ARISS News* AMSAT Ambassador
+Activities* Satellite Shorts from All Over
+The AMSATÂ® News Service bulletins are a free, weekly news and
+information service of AMSAT, The Radio Amateur Satellite
+Corporation.
+ANS publishes news related to Amateur Radio in Space including
+reports on the activities of a worldwide group of Amateur Radio
+operators who share an active interest in designing, building,
+launching and communicating through analog and digital Amateur
+Radio satellites.
+The news feed on https://www.amsat.org publishes news of Amateur
+Radio in Space as soon as our volunteers can post it.
+Please send any amateur satellite news or reports to: ans-editor
+[at] amsat.org
+You can sign up for free e-mail delivery of the AMSAT News
+Service Bulletins via the ANS List; to join this list see:
+https://mailman.amsat.org/postorius/lists/ans.amsat.org/
+
+AMSAT Youth Initiative Featured in Florida News
+The following article was published in the Main Street Daily News
+of Gainesville, Florida on October 12, 2026 under the headline,
+"2 Alachua County schools develop student-built technology to
+communicate with satellites":
+Two Alachua County schools are developing hands-on science,
+technology, engineering and mathematics (STEM) programs that
+could give students the opportunity to communicate with
+satellites orbiting Earth and, potentially, astronauts aboard the
+International Space Station (ISS).
+At the 44th annual conference of the Radio Amateur Satellite
+Corporation (AMSAT), held in Jacksonville, local educator Gordon
+Gibby presented the schoolsâ efforts on Oct. 9, according to a
+North Florida Amateur Radio Club (NFARC) press release. Students
+at Gainesville Christian Community School (GCCS) and The Rock
+School are learning the technical skills needed to build
+satellite-tracking systems and establish radio communications
+with spacecraft.
+
+Frank Karnauskas, N1UW, AMSAT Vice President &#8211; Development,
+who heads up the youth educational initiatives, giving a talk
+about their free available materials for youth. (Photo courtesy
+of the North Florida Amateur Radio Club.)
+AMSAT is a nonprofit, volunteer organization dedicated to
+advancing amateur radio satellite technology and education. Its
+resources and activities help make satellite communications a
+practical learning opportunity for students.
+Gainesville Christian Community School Expands Technology
+Curriculum
+At GCCS, mathematics teacher John Seppala is teaching a class of
+16 students, primarily at the middle-school level, using a
+textbook developed by the school that covers a broad range of
+practical technologies.
+The curriculum explores systems and skills used to maintain a
+home and vehicle, including electricity, electronics, 3D
+printing, small engines, plumbing, amateur radio and computers.
+Seppala is preparing to take the multiple-choice examination
+required to obtain his Federal Communications Commission (FCC)
+amateur radio license. Many of his students are expected to
+pursue licenses as well, potentially allowing them to participate
+in radio communications experiments and satellite operations.
+The Rock School Students Build Satellite-Tracking Station
+At The Rock School, 10 high school students have formed an
+Amateur Radio Satellite Club. Organized into six overlapping
+teams, the students are developing a robotic antenna-control
+system and radio station designed to track and communicate with
+low-Earth-orbit satellites and the ISS.
+The project combines electronics, mechanical engineering,
+computer programming and fabrication. Students are assembling a
+robotic control board, learning to solder electronic components
+and preparing to use a 3D printer to manufacture gears for the
+antennaâs elevation and rotation mechanism.
+Future steps include building the antenna support system with
+aluminum masts, U-bolts and high-gain antennas. Students are also
+studying independently for the FCC examinations required to
+obtain amateur radio licenses.
+âThis is exciting!â said Lacy Basford, the schoolâs academic
+adviser, in the release.
+Rather than purchasing a commercial antenna-rotator controller,
+students plan to build their own system using an Arduino Nano
+microcomputer and a custom-designed printed circuit board. They
+will adapt open-source software written by a U.S. amateur radio
+operator, manufacture mechanical components and assemble the
+system themselves.
+The project will bring together mathematics, electronics,
+software and mechanical design, allowing students to see how
+those disciplines work together in a functioning system.
+Potential Opportunity to Communicate With Astronauts
+Gibby hopes both schools will eventually be ready to apply to
+host a scheduled radio contact through Amateur Radio on the
+International Space Station (ARISS), an international educational
+initiative that connects students with astronauts through amateur
+radio.
+If selected, students could have the opportunity to ask questions
+of crew members aboard the ISS through a radio link. The process
+requires an educational proposal, technical preparation and
+formal selection, and both schools are in the early stages of
+developing their programs.
+Preparing for a potential contact involves more than learning to
+operate a radio. Students must understand orbital motion, radio-
+wave propagation, antenna direction, electronics and the
+challenges of maintaining a reliable communications link with a
+fast-moving spacecraft.
+Students Learn to Track Satellites and Account for Doppler Shift
+At the Jacksonville conference, participants demonstrated a life-
+sized, operational simulator of small amateur radio satellites.
+The simulator replicates aspects of a satellite radio system,
+including the Doppler shift that changes a signalâs apparent
+frequency as a satellite approaches and moves away from a ground
+station.
+The equipment can simulate several types of amateur radio
+satellites, including those that handle digital data, repeat
+voice transmissions and relay Morse code.
+The simulator could help students learn to recognize and
+compensate for Doppler shifts while tracking satellites overhead,
+maintaining communications as their apparent signal frequencies
+change. The experience connects classroom physics to a practical
+engineering challenge in satellite communications.
+Looking Beyond the International Space Station
+The conference also featured a presentation by Frank Bauer, an
+engineer and geologist who serves as ARISS executive director.
+Bauer discussed the organizationâs work supporting educational
+radio contacts with the ISS and its engagement with the future of
+human spaceflight.
+Communications with future space stations and, eventually, lunar
+facilities offer a longer-term source of inspiration for students
+learning radio technology. AMSAT Vice President Frank Karnauskas
+also discussed educational materials developed by AMSAT for young
+people.
+For students in Alachua County, the immediate goals are to build
+a functioning satellite-tracking station, earn amateur radio
+licenses and develop the technical and educational foundation
+needed to pursue an ARISS contact.
+Resources Available for Other Schools
+According to the release, Gibby said the projects could serve as
+models for other schools interested in incorporating practical
+engineering and space communications into their STEM programs.
+With volunteer support, open-source software, affordable
+microcomputers and student-built components, schools can offer
+meaningful technical experiences without relying entirely on
+expensive commercial systems.
+Resources for schools interested in amateur radio satellite
+communications and ARISS educational opportunities are available
+through the local Amateur Radio Emergency Service website at
+https://www.nf4rc.club/ariss-satellite-resources/.
+[ANS thanks the Main Street Daily News of Gainsville, Florida for
+their kind permission to re-publish this article. See the
+original at
+https://www.mainstreetdailynews.com/education/alachua-county-
+schools-develop-student-built-technology.]
+
+
+ERMINAZ-2 Satellites Receive OSCAR Numbers
+
+
+Three Pocket Qubes built by teams from AMSAT-DL in Germany were
+successfully launched on October 1 on a SpaceX Falcon 9 rideshare
+from Vandenberg Space Force Base in California. Developed by
+AMSAT-DL, the satellites, ERMINAZ-2V, -2U and -2X, carry pre-
+stored SSTV images and digipeater payloads. Two of the three
+satellites have now been officially designated as OSCARs &#8212;
+Orbiting Satellites Carrying Amateur Radio!
+Unexpectedly, the deployment sequence from UARX OSSIE-D Space Tug
+began on October 2, 2026, at 11:48 UTC. This was a big surprise,
+as UARX had stated that this was to be expected somewhere between
+7 or 31 days after launch and not earlier. Worse, the AMSAT-DL
+team was only informed on the evening of October 3 and thus lost
+two days of tracking and telemetry because nobody was listening.
+UARX later explained the early deployment as due to a technical
+problem.
+
+The PocketQubes ERMINAZ-2V, ERMINAZ-2X, and ERMINAZ-2U from
+AMSAT-Deutschland (AMSAT-DL for short) prior to their October 1
+launch. (Photo credit: AMSAT-DL)
+Nevertheless, ERMINAZ-2U and ERMINAZ-2V are now active and under
+control. On October 23, Drew Glasbrenner, KO4MA, AMSAT President
+and OSCAR Number Administrator, issued the following statement:
+"At the request of AMSAT-DL, AMSAT hereby designates ERMINAZ-2U
+and ERMINAZ-2V as AMSAT-OSCAR 129 (AO-129) and as AMSAT-OSCAR 130
+(AO-130). We congratulate AMSAT-DL, thank them for their
+contribution to the amateur satellite community, and wish them
+continued success on this and future projects."
+Unfortunately, ERMINAZ-2X remains silent. It might be stuck in
+the deployer or failed after deployment. Because of the important
+time missed after deployment, the cause of the failure is
+unknown.
+The team has been able to perform several tests on ERMINAZ-2U
+(AO-129) including activating the digipeater.Â See https://amsat-
+dl.org/en/erminaz-2-satellites-are-transmitting-their-first-
+signals for details.
+[ANS thanks Peter GÃ¼lzow, DB2OS, President of AMSAT-Deutschland
+e.V. and Drew Glasbrenner, KO4MA, AMSAT President and OSCAR
+Number Administrator for the above information.]
+
+
+Where Does Space Begin?
+There is no line where the atmosphere stops. It thins the way a
+beach gets wetter towards the sea, until at some point you are in
+the water and nobody can say exactly when that happened. So the
+edge of space is not something anyone discovered. It is something
+people chose, and they chose differently.
+For decades that disagreement cost almost nobody anything. It is
+starting to. Tourist rockets fly into the disputed band with
+paying passengers and come back down. Hypersonic military
+vehicles pass through it. The question of which number is right
+has turned into a question about astronaut wings, ticket sales
+and, eventually, sovereign airspace.
+Three numbers
+The familiar figure is 100 kilometres, the KÃ¡rmÃ¡n line. The FAI,
+the world air sports records body, uses it to separate aviation
+records from astronautics records. A 2023 FAI presentation by
+Nicolas BÃ©rend says the federation set it in 1960, with a group
+of scientists that included Theodore von KÃ¡rmÃ¡n, âfor separating
+aeronautics and astronautics recordsâ. The name came slightly
+earlier: Andrew G. Haley coined âKÃ¡rmÃ¡n lineâ in a 1957 paper
+after discussions with KÃ¡rmÃ¡n. That is what the 100 kilometre
+figure is, a records-keeping convention with a date on it.
+The American figure is 50 miles, about 80 kilometres. The US Air
+Force used it for its astronaut wings, and the Federal Aviation
+Administration used the same threshold for the commercial
+astronaut wings it handed out until it ended that programme after
+2021. In 2005 NASA gave civilian astronaut wings to three X-15
+pilots, retired NASA pilot Bill Dana and the families of the late
+John B. McKay and Joseph A. Walker, acknowledging âtheir flights
+above 264,000 feet altitudeâ. That is 50 miles. When those
+flights happened only the military had wings to hand out, so
+civilian pilots flew just as high and got no badge. Danaâs first
+flight into space took him 58.13 miles above the Mojave Desert on
+1 November 1966.
+The legal figure does not exist. The 1944 Chicago Convention
+gives every state complete and exclusive sovereignty over the
+airspace above its territory. The 1967 Outer Space Treaty says
+outer space is not subject to national appropriation. Neither
+treaty says where one ends and the other begins, a gap a 2017
+briefing to the UN space committeeâs legal subcommittee lays out
+plainly. The committee has had the item on its agenda since 1966.
+Inside it the USSR repeatedly proposed 100 or 110 kilometres and
+the United States rejected any definition at all. The
+subcommitteeâs 2026 draft report still carries âMatters relating
+to the definition and delimitation of outer spaceâ, sixty years
+on.
+What the physics says
+The scientific answer depends on what question is actually being
+asked. KÃ¡rmÃ¡n himself was blunt about this. In 1961 lectures
+quoted in the FAI presentation he said that where atmosphere ends
+and space begins âis a judiciary rather than a scientific
+problem,â and he proposed a range, 300,000 to 400,000 feet,
+roughly 91 to 122 kilometres, rather than a line. The 100
+kilometre figure was a round number inside that range.
+Jonathan McDowell, an astronomer who has worked at the Harvard-
+Smithsonian Center for Astrophysics, made the satellite case in a
+2018 paper in Acta Astronautica, âThe edge of space: Revisiting
+the Karman Lineâ, free to read on arXiv. He looked at the orbits
+of real satellites. An elliptical orbit whose lowest point sits
+at 100 kilometres can survive for long periods. A satellite whose
+lowest point drops below 80 kilometres is âhighly unlikely to
+complete its next orbitâ. That lowest point is the perigee.
+McDowell argues that this makes roughly 80 kilometres a useful
+boundary.
+Two other things happen to land in the same place. Meteors,
+moving much faster than satellites, usually break apart somewhere
+in the 70 to 100 kilometre range, a sign that the atmosphere
+starts to bite there. The mesopause, a boundary layer in the
+upper atmosphere, lies in the same broad region, though its
+height varies with latitude and season and is not fixed at 80
+kilometres. McDowell also notes that 80 kilometres falls within
+500 metres of the old 50-mile astronaut wings line. Those are
+separate ideas that land in roughly the same place. He suggests
+adopting exactly 80 kilometres as a better convention, one that
+fits what satellites actually do.
+Why the 20 kilometres now matter
+On 11 July 2021 Richard Branson flew on Virgin Galacticâs Unity
+22 to an apogee of about 86 kilometres. Nine days later Jeff
+Bezos flew on Blue Originâs New Shepard past 100. Two days before
+Bransonâs flight, Blue Origin posted that New Shepard was
+designed to fly above the KÃ¡rmÃ¡n line âso none of our astronauts
+have an asterisk next to their nameâ. By McDowellâs number, and
+by the US number, Bransonâs passengers went to space. By the
+FAIâs, they did not. Virgin Galactic has kept selling tickets in
+that gap ever since, even through its current pause in flights
+while it builds its next ships. The dispute is no longer about an
+X-15 pilotâs badge. It is about what a company can truthfully
+print on a brochure.
+The military version is less visible and more serious. For a
+vehicle passing over another country at 90 kilometres, an agreed
+boundary could help determine whether it had entered sovereign
+airspace. Neither an astronaut-wings rule nor an air sports
+convention settles that question. Nor would being in space put a
+weapon beyond the law: the Outer Space Treaty says activities
+there are carried out in accordance with international law,
+including the UN Charter. An agreed boundary could clarify the
+sovereignty question, although it would not by itself settle the
+legality of a weaponâs passage or use. It is the piece that is
+missing.
+[ANS thanks Space Daily and author Lachlan Brown for the above
+information. Read the full article at
+https://spacedaily.com/karman-line-100km-vs-50-miles/.]
+
+It's October! Time is running out for the 2026 President's Club
+Coin!Help Support GOLF and FoxPlus.
+
+Annual memberships start at only $120
+Join the AMSAT Presidentâs Club today and help Keep Amateur Radio
+in Space! https://www.amsat.org/join-the-amsat-presidents-club/
+
+Falcon 9 Launches Bandwagon-5 Rideshare Mission
+Following on from the successful Transporter 18 mission at the
+beginning of the month, SpaceXâs Falcon 9 vehicle launched an
+additional 32 rideshare payloads for the Bandwagon-5 mission on
+Tuesday, Oct. 20, delayed by a day due to unfavorable recovery
+weather.Â Falcon 9 lifted off from Space Launch Complex 40
+(SLC-40) at the Cape Canaveral Space Force Station in Florida. A
+one-hour launch window opens at 10:30 UTC, with the vehicle
+following a southeasterly trajectory to low-Earth orbit.
+SpaceXâs Transporter and Bandwagon rideshare missions allow small
+satellite companies and government and educational institutions
+to launch payloads of up to 50 kg for $350,000, significantly
+cheaper than a full Falcon 9 launch. This offers a more
+affordable and straightforward route to space for many companies.
+Alongside the rideshare payloads, SpaceX is launching the second
+of its Starfall capsules, which is mounted atop the satellite
+stack.
+SpaceX included its second Starfall capsule on the Bandwagon 5
+mission. The disk-shaped reentry vehicle can remain in space
+indefinitely and can reenter and be recovered by SpaceX at any
+time. The capsule measures 3.1 m in diameter and 0.75 m in
+height, has a mass of 2,100 kg, and can carry up to 1,000 kg of
+payload. SpaceX will use the vehicle for point-to-point cargo
+delivery and for transporting goods manufactured in microgravity.
+SpaceX will ultimately launch the capsules aboard its super-
+heavy-lift Starship, with multiple capsules likely to launch
+aboard the vehicle at one time.
+Exolaunch, a launch services and mission management provider, is
+manifesting 22 customer satellites on Bandwagon-5. Other payloads
+include multiple synthetic aperture radar (SAR) Earth observation
+satellites from ICEYE, two high-resolution SAR satellites from
+Capella Space, and two commercial SAR payloads from Umbra Space.
+SAR satellites use remote sensing to produce high-resolution
+imagery in any weather conditions, at any time of day. In
+addition to supporting military applications, SAR can also
+measure and observe Earthâs surface features in extreme detail.
+[ANS thanks the NASASpaceflight for the above information. Read
+the full article at
+https://www.nasaspaceflight.com/2026/10/bandwagon-5/.]
+
+
+LIMITED TIME OFFER!!!
+AMSAT is offering a limited-time promotion for new and renewing
+members that includes a free digital copy of Getting Started with
+Amateur Satellites. The promotion is being offered as AMSAT
+begins the 2026 membership year.
+
+Anyone who joins or renews their AMSAT membership during the
+promotional period will receive a download link for the latest
+edition of Getting Started with Amateur Satellites in their
+membership confirmation email. JOIN TODAY at
+https://launch.amsat.org/ (Remember! Students join for FREE!)
+
+
+
+
+Greek-Built Satellite Launched for Kazakh School
+It is past midnight in Kazakhstan when, 10,392 kilometres away, a
+SpaceX rocket lifts off through dense morning fog from Vandenberg
+Space Force Base in California carrying a satellite payload.
+Despite the late hour, some children in Kazakhstanâs capital
+Astana remain wide awake with excitement. The following day, the
+rocket will deploy an orbital system carrying a tiny Greek-built
+satellite on their behalf.
+Measuring just 5 x 5 x 5 centimetres â roughly the size of a
+Rubikâs Cube â the satellite was developed in Athens by
+programmers and engineers at the non-profit Libre Space
+Foundation (LSF).
+Founded by nine people in 2015, LSF develops open-source space
+technology and designs. It now employs around 25 people, about
+one-quarter of them women, as well as young people undertaking
+internships. The organisation has so far sent more than 10
+microsatellites, nanosatellites and picosatellites into space.
+One of its picosatellites launched on October 1 for a school in
+Astana, the capital and second-largest city of Kazakhstan.
+LSF was surprised when Kazakhstanâs Space Agency approached it
+directly after learning about its work at international
+conferences.
+âThey wanted an estimate of how much a âpocket-classâ satellite
+would cost for use in a school in Kazakhstan,â LSF vice president
+Eleftherios Kosmas told the Athens-Macedonian News Agency (AMNA).
+He said Kazakhstan appeared keen to gradually develop an
+independent space programme but had a limited budget, so
+officials decided to start with a school.
+LSF initially provided an engineering model designed only for
+laboratory testing and used it to train the students. It then
+built the satellite that eventually launched into orbit.
+âAs the father of a young girl, I understand how these children
+feel now that something of their own is travelling through
+space,â Kosmas said. The students will also be able to
+communicate with the satellite and observe how a ground station
+receives its signal under different signal configurations.
+The SpaceX rocket that launched during the early hours of October
+1-2 carried more than the tiny school satellite. It transported
+eight satellites in total, all of which carried the LSFâs
+signature in one way or another.
+Four additional SIDLOC picosatellites â part of a system for
+identifying and locating satellites and other space objects â
+were registered as Greek satellites.
+Three others belonged to AMSAT Deutschland, the German Amateur
+Radio Satellite Association. They used LSFâs open-source software
+and designs to build their own pocket satellites.
+
+LSF staff work in the clean room in Athens, Greece. (Photo
+credit: Greek City Times.)
+Until a few years ago, LSF operated from Abatiellou Street in
+Athens, in a former printing house that once produced maps.
+The organisation has since moved to Lenorman Street, near the
+Plato Academy, where it has again taken over a former printing
+facility.
+The new premises house the organisationâs offices as well as a
+clean room, where temperature, pressure, humidity and cleanliness
+remain under controlled conditions.
+The facility allows LSF to assemble circuit boards destined for
+space while protecting them from microscopic particles of dust
+that could compromise their operation.
+[ANS thanks the Greek City Times and author Kosta Papadopoulos
+for the above information. Read the full article at
+https://greekcitytimes.com/2026/10/08/greek-space-technology-
+sends-kazakh-school-into-space/.]
+
+
+
+AMSAT Remove Before Flight Key Tags Now Available Yes, These are
+the Real Thing!
+
+
+Your $20 Donation Goes to Help Fly a FoxPlus Satellite Includes
+First Class Postage (Sorry â U.S. Addresses Only) Order Today
+atÂ https://www.amsat.org/product/amsat-remove-before-flight-
+keychain
+
+
+
+
+San Diego Balloon Launch Draws in High School Students
+Members of the Mt. Carmel High School Amateur Radio Club in San
+Diego, California, used a high-altitude balloon launch October 17
+to generate interest among their fellow students and the
+community in amateur radio, science, technology, engineering and
+math. Members of the public were encouraged to track the balloon
+flight in real time using an app called Sondehub-Amateur, which
+displays telemetry from amateur radio high altitude balloon
+launches.
+
+Gayle Olson, K6GO, holding the weather balloon that would carry
+her call sign to an altitude of more than 17 miles from its
+launch at the San Diego Repeater Associationâs Hamtastic event on
+October 17. [Photo courtesy of Gayle Olson, K6GO]
+This flight, which carried the call sign K6GO, belonging to Gayle
+Olson, a volunteer for the ARRL Foundation Scholarship Committee
+and Maxim Society member, flew to an altitude of 17-1/2 miles
+before the balloon burst and the payload parachuted back to the
+ground in Julian, California, some 60 miles inland from its
+launch point on Fiesta Island.
+The launch was part of the San Diego Repeater Associationâs
+annual âHamtasticâ event, which brings together hams and clubs
+from throughout the region to get on the air, socialize, and
+demonstrate amateur radio to the public. The San Diego Repeater
+Association is an ARRL Affiliated Club.
+[ANS thanks The ARRL Letter for the above information.]
+
+
+
+OsTrax Now Available for Windows, macOS, and Ubuntu
+Avinstar, LLC has announced the general availability of OsTrax,
+an orbiting satellite tracking and operating platform for
+Windows, macOS and Ubuntu.
+Satellite communication presents one of the more interesting and
+involved opportunities using radio. The need to know when and
+where a satellite is at a given time, while carefully
+coordinating radios and antennas to communicate using the
+satellite presents many challenges.
+OsTrax addresses these challenges by incorporating a fresh,
+modern approach combined with a central satellite information
+repository to eliminate problems associated with obtaining
+accurate and timely satellite information. The result is more
+operating time with less effort.
+OsTrax is user customizable to create a personalized operating
+experience with full control of satellite selection and satellite
+pass control.
+OsTrax controls radios and antenna rotors based on the
+requirements of a satellite pass and communication type. Radios
+and rotor selections extend from legacy to current.
+Automatic updating of orbital elements and satellite profile
+information ensure the latest operating information is always
+available.
+User defined orbital elements and satellite profiles provide
+access opportunities for new or exploratory satellites and
+features.
+OsTrax enhances operating with simplified contact logging and
+advanced tools to determine future satellite pass predictions and
+perform satellite pass modeling.
+In addition to satellite tracking, OsTrax tracks the Sun and Moon
+with antenna rotor control.
+
+(Image credit: Jim McCullers, WA4CWI)
+Publication images are available at
+https://www.avinstar.com/ostrax/media/images
+The User Guide can be viewed at
+https://www.avinstar.com/ostrax/docs
+A fully functional trial license is available for 15 days for
+each operating system version.
+For more information, please view the OsTrax web site at
+https://www.ostrax.com or contact Jim McCullers at
+jmccullers@avinstar.com.
+OsTrax was created by Jim McCullers, WA4CWI, an Extra Class
+amateur radio operator licensed since 1961. OsTrax combines his
+interest and experience in satellite operation with his
+professional programming experience. He is the developer of
+SigTrax, the signal tracking toolkit available on the Apple App
+Store for iOS devices and the Google Play Store for Android
+devices.
+[ANS thanks Jim McCullers, WA4CWI, for the above information.]
+
+Changes to AMSAT TLE Distribution for Oct. 23, 2026
+Two Line Elements or TLEs, often referred to as Keplerian
+elements or keps in the amateur community, are the inputs to the
+SGP4 standard mathematical model of spacecraft orbits used by
+most amateur tracking programs. Weekly updates are completely
+adequate for most amateur satellites. TLE bulletin files are
+updated daily in the first hour of the UTC day. New bulletin
+files will be posted immediately after reliable elements become
+available for new amateur satellites. More information may be
+found at https://www.amsat.org/keplerian-elements-resources/.
+Bulletin format elementsÂ for all satellites of interest to radio
+amateurs.Â  This file is updated at least every 24 hours.Bare
+elementsÂ are derived from the bulletin, but contain no header or
+footer.Â  These data are used as input to theÂ AMSAT Pass
+PredictionsÂ page.
+This week there are no additions or deletions to the AMSAT TLE
+distribution.
+General Perturbations Data Support
+AMSAT is pleased to announce that modern forms of what are called
+General Perturbations data are being disseminated via modern
+formats including JSON, XML and KVN at
+https://newark192.amsat.org/gpdata/current/. The reason this
+change is being made is that we are running out of 5-digit
+catalog numbers and the TLE format is not viable for satellites
+launched after July of this year. See
+https://celestrak.org/NORAD/documentation/gp-data-formats.php for
+details.
+These data are presently considered in beta test for the next two
+months while hosted on the test server newark192.amsat.org, and
+we are very open to community feedback at webmaster at amsat.org.
+Testers may experience outages and errors while we make
+improvements. We intend to put this into production on our main
+web server in July as we expect that satellites launched after
+this summer will require one of the new formats to accommodate
+longer object numbers. AMSAT will continue to publish TLE
+bulletins for satellites launched before July 2026 indefinitely.
+[ANS thanks Joe Fitzgerald, KM1P, AMSAT Orbital Elements Manager,
+for the above information.]
+
+ARISS SSTV Event in Progress
+A series Slow-Scan Television (SSTV) transmissions from the
+International Space Station (ISS) is currently taking place, and
+will continue until Monday. Persons who uploadÂ  images they have
+received to the SSTV gallery at https://ariss-usa.org/ARISS_SSTV/
+will receive an event certificate. Because this activity does not
+involve transmitting to the ISS, but only receiving, no amateur
+radio license is required to participate. More information is
+available at https://ariss-usa.org/ARISS_SSTV/.
+
+[ANS thanks the ARISS for the above information.]
+
+Buying from DX Engineering?Add AMSATâs Getting Started With
+Amateur SatellitesÂ to your order.
+Available for $30 from DX Engineering (free shipping on most
+orders over $99)https://www.dxengineering.com/parts/amt-
+satellites
+
+ARISS News
+Amateurs and others around the world may listen in on contacts
+between amateurs operating in schools and allowing students to
+interact with astronauts and cosmonauts aboard the International
+Space Station. The downlink frequency on which to listen is
+145.800 MHz worldwide.
+Recently Completed Contacts
+Sarasota Military Academy, Sarasota, FL, direct via W4SMAThe ISS
+callsign was scheduled to be NA1SSThe scheduled crewmember was
+Luke Delaney, KJ5PPFThe ARISS mentors are KM4YHZ are W4NTRContact
+was successful: Thu 2026-10-22 16:25:17 UTC 23 degrees maximum
+elevationWatch for Livestream at
+https://www.facebook.com/SarasotaMilitaryAcademy/Â Congratulations
+to the Sarasota Military Academy, Luke, mentors KM4YHZ and W4NTR,
+and ground station W4SMA!
+Upcoming Contacts
+Paul Duke STEM High School, Norcross, GA, direct via KN4SIEThe
+ISS callsign is presently scheduled to be NA1SSThe scheduled
+crewmember is Joshua Kutryk, KJ5BFUThe ARISS mentor is
+K4RGKContact is go for Option #4: Mon 2026-10-26 13:11:42 UTC 39
+degrees maximum elevation
+Smile Of The Child &#8211; Smile Academy, Attica, Greece,
+telebridge via AB1OCThe ISS callsign is presently scheduled to be
+OR4ISSThe scheduled crewmember is Luke Delaney, KJ5PPFThe ARISS
+mentor is IKÃWGFContact is go for: Fri 2026-10-30 10:01:41 UTC 61
+degrees maximum elevationWatch for possible Livestream at:
+
+
+Greek https://www.hamogelo.gr/gr/el/ta-nea-mas/to-chamogelo-tou-
+paidiou-sindeei-mathites-me-ton-diethni-diastimiko-stathmo-
+iss/English https://www.hamogelo.gr/gr/en/ta-nea-mas/to-
+chamogelo-tou-paidiou-sindeei-mathites-me-ton-diethni-diastimiko-
+stathmo-iss/
+**********************************
+Many times, a school makes a last-minute decision to do a
+Livestream or runs into a last-minute glitch requiring a change
+of the URL, but we at ARISS may not get the URL in time for
+publication. You can always checkÂ https://live.ariss.org/Â to see
+if a school is Livestreaming.
+As always, if there is an EVA, a docking, or an undocking; the
+ARISS radios are turned off as part of the safety protocol.
+Also, some of the activities listed below are suspended until the
+completion of the SSTV event currently underway (see article
+above).
+The crossband repeater remains configured in the Columbus Module
+(145.990 MHz up {PL 67} & 437.800 MHz down). If a crewmember
+decides to pick up the microphone and turn up the volume, you may
+hear them on the airâso keep listening, as you never know when
+activity might occur.
+âKenwood D710GA in the Zvezda Service Module â Call sign RSÃISS.
+Please note weâre still in the process of troubleshooting and
+testing this radio. APRS is currently active on 437.825 MHz. Feel
+free to check out status reports atÂ https://ariss-
+usa.org/ARISS_APRS/.
+Ham TV is currently transmitting a test signal at 2395.00 MHz.
+For more information, see https://live.ariss.org/hamtv/
+Note, all times are approximate. It is recommended that you do
+your own orbital prediction or start listening about 10 minutes
+before the listed time.
+The latest information on the operation mode can be found
+atÂ https://www.ariss.org/current-status-of-iss-stations.html
+The latest list of frequencies in use can be found
+atÂ https://www.ariss.org/contact-the-iss.html
+[ANS thanks Charlie Sufana, AJ9N, one of the ARISS operation team
+mentors for the above information]
+
+Give Your Next Rove a Payload â Put Your Lunch into Orbit!
+Pack the rover dogs and hit the grid line with an all-newAMSAT
+Round Logo Metal Lunchbox.
+
+Keep Amateur Radio in Space â and your lunch in the box!
+https://www.zazzle.com/amsat_round_logo_metal_lunchbox-256761530568368967
+
+
+AMSAT Ambassador Activities
+AMSAT Ambassadors provide presentations, demonstrate
+communicating through amateur satellites, and host information
+tables at club meetings, hamfests, conventions, maker faires, and
+other events.
+
+November 7, 2026JARSfest (Johnston Amateur Radio Society
+Hamfest)The Farm at 95215 Batten Rd.Selma, NC
+27576https://jars.net/jarsfest-2026KF4EAG
+
+November 14, 2026Southern Arizona Fall HamfestOro Valley Amateur
+Radio ClubMarana Middle School11285 W. Grier Rd. Marana
+AZhttps://www.tucsonhamradio.org/hamfestN1UW
+
+Interested in becoming an AMSAT Ambassador? AMSAT Ambassadors
+provide presentations, demonstrate communicating through amateur
+satellites, and host information tables at club meetings,
+hamfests, conventions, maker faires, and other events. For more
+information go to:Â https://www.amsat.org/ambassador/
+[ANS thanks Bo Lowrey, W4FCL, Director â AMSAT Ambassador
+Program, for the above information]
+
+Satellite Shorts from All Over
+
++Â A Russian satellite just took a very close look at an American
+spacecraft in low Earth orbit. The snooping satellite, Kosmos
+2612, rendezvoused with ICEYE-X36, a commercial craft that
+observes our planet using synthetic aperture radar (SAR).Â The
+close encounter, which occurred between Oct. 15 and Oct. 19, was
+reported by Marco Langbroek and other satellite trackers, with
+Langbroek calling it "a worrisome cat-and-mouse game" in orbit.
+The rendezvous has garnered a lot of attention in space circles,
+because it was non-consensual and startlingly close; at one
+point, the two spacecraft may have been separated by just a few
+meters. There are about 80 ICEYE spacecraft in LEO at the moment.
+At least some ICEYE satellites provide imagery to Ukraine, which
+Russia invaded in February 2022 and continues to assault with
+ground troops and missile and drone attacks. (ANS thanks
+Space.com for the above information. See the full story at
+https://www.space.com/space-exploration/satellites/russian-
+satellite-plays-cat-and-mouse-with-a-commercial-us-satellite-
+likely-used-by-ukraine-but-why-the-risky-close-encounter.)
++ NASA finally released its Request for Proposals (RFP) for the
+next phase of its Commercial LEO Destinations (CLD) program on
+October 9, about ten days later than promised. The CLD is the
+program to replace the International Space Station (ISS) with a
+privately developed orbiting platform. Seeking proposals from
+industry by December 8, the agency said it would select at least
+two companies by next April for initial awards to continue work
+on their stations, with at least one later selected for full
+development. Companies developing commercial space stations have
+an array of challenges to overcome, from the ongoing NASA
+competition to securing outside investment and non-NASA customers
+to the technical issues of building a commercial space station.
+(ANS thanks The Space Review for the above information. Read the
+full story at https://www.thespacereview.com/article/5340/1.)
++ The space around Earth is turning into a junkyard. Researchers
+think a refundable deposit scheme could force satellite operators
+to clean up their act before a tipping point is reached. In a
+paper published last month in the journal Nature Communications,
+a group of scientists propose a scheme that would require
+satellite operators to post a bond of $200,000 before launch,
+refundable with interest upon the completion of a successful
+deorbit. Companies that fail to remove their junk would lose the
+money, which could go toward a shared pool funding active debris-
+removal missions. (ANS thanks Space.com for the above
+information. Read the full story at https://www.space.com/space-
+exploration/satellites/could-satellite-deorbit-deposits-prevent-
+a-space-debris-disaster.)
++ Online marketplace eBay has imposed new restrictions on
+listings of radio transmitting equipment in response to new FCC
+rules that took effect last week, but responded to ARRL, The
+National Association for Amateur RadioÂ®, that its new policy will
+not apply to gear that operates exclusively on amateur radio
+frequencies. The FCCâs rules are intended to use its equipment
+authorization program to protect against ânational security
+threats to the communications supply chainâ and cover a wide
+variety of products. However, in response to a request from ARRL
+for a clarification relating to amateur radio equipment that does
+not require FCC authorization, an eBay spokesperson indicated
+that the marketplace will not restrict sales of equipment that
+does not require an FCC ID. Amateur radio equipment, except for
+commercial HF amplifiers, continues to not require FCC
+authorization. (ANS thanks ARRL for the above information. Read
+the full story at https://www.arrl.org/news/ebay-restricts-
+listings-of-radio-equipment-but-exempts-ham-band-only-gear.)
+
+
+Join AMSAT today at https://launch.amsat.org/
+In addition to regular membership, AMSAT offers membership to:
+
+Societies (recognized groups, clubs or organization).
+Students are eligible for FREE membership up to age 25.
+Memberships are available for annual and lifetime terms.
+
+Contact info [at] amsat.org for additional membership
+information.
+73 and remember to help Keep Amateur Radio in Space!
+This week's ANS Editor,
+Mark Johns, KÃJM mjohns [at] amsat.org
+ANS is a service of AMSAT, the Radio Amateur Satellite
+Corporation, 712 H Street NE, Suite 1653, Washington, DC 20002.
+AMSAT is a registered trademark of the Radio Amateur Satellite
+Corporation.
+==================================================
+73 DE HP2DFA-5 / BPQ32 AMSAT MONITOR PANAMA
+==================================================

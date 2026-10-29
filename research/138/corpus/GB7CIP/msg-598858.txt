@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 25-Oct-26 02:43
+Bid: 5931-CX2SA
+Title: (M6.5) Bonin Islands, Japan region 27.8 139.6
+Path: !EI2GYB!K1AJD!VE3CGR!CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Bonin Islands, Japan region
+Geographic coordinates:           27.795N, 139.618E
+Magnitude:                        6.5
+Depth:                            492 km
+Universal Time (UTC):             25 Oct 2026  02:09:24
+Time near the Epicenter (1):      25 Oct 2026  11:09:24
+Time in your area (1):            24 Oct 2026  23:09:24
+Location with respect to nearby cities:
+728.6 km (451.7 mi) SSE of Kushimoto, Japan
+744.5 km (461.6 mi) SSE of ShingÅ«, Japan
+755.2 km (468.2 mi) SSE of Kumano, Japan
+765.6 km (474.7 mi) S of Shimoda, Japan
+805.6 km (499.5 mi) S of Shizuoka, Japan
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4r9
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4r9?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 25/10/2026 02:41:56 UTC
+________________________________________________________________

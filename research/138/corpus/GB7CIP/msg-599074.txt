@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 27-Oct-26 09:45
+Bid: 5997_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - 95 km NNE of Hihifo, Tonga
+Path: !VE3KPG!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us7000ttfc
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-27 09:07:45 UTC
+Depth      : 10.0 km
+Coordinates: -15.1739 Lat / -173.4094 Lon
+--------------------------------------------------
+Location:
+  95 km NNE of Hihifo, Tonga
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttfc
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 19-Oct-26 15:04
+Bid: 5068_HP2DFA
+Title: EARTHQUAKE ALERT M5.3 - 116 km WNW of HÃ¶fn, Iceland
+Path: !VE3KPG!VE3TOK!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.3+)       
+==================================================
+Event ID   : us6000u3ct
+Magnitude  : M 5.3
+Time (UTC) : 2026-10-19 14:44:24 UTC
+Depth      : 10.0 km
+Coordinates: 64.5774 Lat / -17.5136 Lon
+--------------------------------------------------
+Location:
+  116 km WNW of HÃ¶fn, Iceland
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3ct
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR
