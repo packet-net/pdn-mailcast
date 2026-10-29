@@ -143,7 +143,7 @@ The log lines start `retune:`, and the status page shows what it is doing and th
 
 ## Sharing a radio with LinBPQ
 
-If the radio on the receiver's sound card is also your LinBPQ packet radio (through QtSoundModem, say, with flrig controlling the rig), the receiver can borrow it for each slot. About a minute before each daylight slot it tells LinBPQ to stop transmitting on that radio's port, tunes the radio to USB on `dialKHz`, listens until 12 minutes after the slot starts, puts the radio back where it was, and only then lets LinBPQ transmit again.
+If the radio on the receiver's sound card is also your LinBPQ packet radio (through QtSoundModem, say, with flrig controlling the rig), the receiver can borrow it for each slot. About a minute before each daylight slot it tells LinBPQ to stop transmitting on that radio's port, tunes the radio to `dialKHz` in PKTUSB (plain USB on a radio without a data mode, which the log mentions), listens until 12 minutes after the slot starts, puts the radio back where it was, and only then lets LinBPQ transmit again.
 
 Add this to the config:
 
