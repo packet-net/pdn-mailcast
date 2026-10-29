@@ -157,7 +157,7 @@ Add this to the config:
 - `drainSeconds` in `bpq` (15 unless set, at most 40): how long to wait after LinBPQ stops before tuning, so that anything LinBPQ had already handed to the TNC goes out first.
 - If nothing else ever transmits on the radio, leave out `bpq` and say so instead: `"rig": { "rigctld": "127.0.0.1:4532", "dedicatedRadio": true }`.
 - If your own commands stop whatever else transmits on the radio (your modems, say), you can leave out `bpq` and use a `hooks` "before" command instead (see [Running your own commands around each slot](#running-your-own-commands-around-each-slot)). The receiver trusts it to keep the radio quiet while it is retuned, and doesn't retune for a slot whose "before" fails. The log says so at start-up.
-- The receiver sets the radio's filter for the slot, so leave `dialKHz` at 7052 rather than measuring your usual filter. Afterwards the radio goes back to the mode and width it was in; a radio with a separate width per data-mode filter (an IC-7300, say) keeps the 3000 Hz there.
+- The receiver sets the radio's filter for the slot, so leave `dialKHz` at 7052 rather than measuring your usual filter, unless the log says the radio would not take, or did not set, the 3000 Hz filter. Afterwards the radio goes back to the mode and width it was in; a radio with a separate width per data-mode filter (an IC-7300, say) keeps the 3000 Hz there.
 - With `rig` and none of these three, the receiver won't start.
 
 It only retunes when `audio` is the radio's sound card, never for a web SDR, and only when rigctld is answering.

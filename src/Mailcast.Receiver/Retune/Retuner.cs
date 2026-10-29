@@ -176,6 +176,8 @@ public sealed class Retuner : IAsyncDisposable
         };
         Rig.Problem += line =>
         {
+            // pdn-soundmodem's own config key; the receiver has no such setting.
+            line = line.Replace("; see \"rig\".\"passbandHz\"", "", StringComparison.Ordinal);
             _log(Ascii.Clean(line));
             NoteProblem(Ascii.Clean(line.StartsWith("rig: WARNING - ", StringComparison.Ordinal) ? "rig: " + line["rig: WARNING - ".Length..] : line));
         };
