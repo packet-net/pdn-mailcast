@@ -291,6 +291,7 @@ public sealed partial class RetunerTests
         Assert.Equal(RetuneStage.Tuned, s.Retuner.Stage);
         Assert.Equal(BulletinDialHz, s.Rig.DialHz);
         Assert.Equal("PKTUSB", s.Rig.Mode);
+        Assert.Equal(3000, s.Rig.PassbandHz);
         Assert.Equal("tuned", InterlockFile.Read(s.NotePath, 2)!.Stage);
         Assert.Contains("tuned to 7.052 MHz for the 12:00 UTC slot until 12:12 UTC; LinBPQ port 2 transmit off", s.Retuner.State, StringComparison.Ordinal);
 

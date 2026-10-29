@@ -29,8 +29,8 @@ public enum RetuneStage
 /// the port with PORTS, read its XMITOFF, write <see cref="InterlockFile"/>, send
 /// <c>XMITOFF port 1</c> and see LinBPQ confirm it; wait <see cref="BpqNodeSettings.DrainSeconds"/>
 /// for frames already with the TNC (XMITOFF only stops LinBPQ's own queue); check that rigctld
-/// reads PTT off; write the file again; then tune the rig to the dial in PKTUSB (which rig
-/// control turns into USB on a rig without a data mode) through
+/// reads PTT off; write the file again; then tune the rig to the dial in PKTUSB with a 3000 Hz
+/// filter (which rig control turns into USB, or the rig's normal width, on a rig without them) through
 /// pdn-soundmodem's <see cref="RigControl"/> until <see cref="After"/> past the slot's start
 /// (or a following slot's, when they are that close), checking LinBPQ every
 /// <see cref="WindowPoll"/> and at once when its session ends, and renewing the window every
@@ -155,7 +155,7 @@ public sealed class Retuner : IAsyncDisposable
         _bpq = config.Bpq;
         _dedicated = rig.DedicatedRadio;
         _owedPort = _bpq?.HfPort ?? 0;
-        _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "PKTUSB", 0);
+        _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "PKTUSB", 3000);
         _dialAt = dialAt;
         _file = InterlockFile.PathIn(config.StateDirectory);
         Endpoint = rig.Endpoint;
@@ -354,10 +354,10 @@ public sealed class Retuner : IAsyncDisposable
             _log(Window is not null
                 ? $"retune: the radio is retuned through pdn-soundmodem's receive window on {Window.Where} to dial {OnAir.Mhz(DialNow)} MHz for each slot; pdn-soundmodem holds its own transmitting meanwhile"
                 : _bpq is null && _dedicated
-                ? $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB (USB on a rig without it) for each slot; \"dedicatedRadio\" says nothing else transmits on it"
+                ? $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot; \"dedicatedRadio\" says nothing else transmits on it"
                 : _bpq is null
-                ? $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB (USB on a rig without it) for each slot; there is no \"bpq\", so the \"hooks\" are trusted to keep the radio quiet while it is retuned (it is not retuned for a slot whose \"before\" fails)"
-                : $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB (USB on a rig without it) for each slot, with LinBPQ port {_bpq.HfPort}'s transmit held off meanwhile through its node at {_bpq.Host}:{_bpq.Port} as {_bpq.User}");
+                ? $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot; there is no \"bpq\", so the \"hooks\" are trusted to keep the radio quiet while it is retuned (it is not retuned for a slot whose \"before\" fails)"
+                : $"retune: the radio is retuned through rigctld at {Endpoint} to dial {OnAir.Mhz(_tuning.DialHz)} MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot, with LinBPQ port {_bpq.HfPort}'s transmit held off meanwhile through its node at {_bpq.Host}:{_bpq.Port} as {_bpq.User}");
             Recover();
             if (_hooks is not null)
             {
