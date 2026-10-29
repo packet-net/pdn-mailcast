@@ -13,9 +13,9 @@ import os
 import re
 import sys
 
-HEADER = re.compile(r"^(From|To|Type/Status|Date/Time|Bid|Title|Body): ?(.*)$")
+HEADER = re.compile(r"^(From|To|Type/Status|Date/Time|Bid|Title|Body|Path): ?(.*)$")
 # Shown only to some users (e.g. a "Body: size" line, the full route on From:): not part of the bulletin.
-PER_USER = {"Type/Status", "Body"}
+PER_USER = {"Type/Status", "Body", "Path", "Date/Time"}
 ROUTE = re.compile(r"^R:\d{6}/\d{4}Z? ")
 
 

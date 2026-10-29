@@ -39,8 +39,9 @@ def strip_telnet(buf: bytes, sock: socket.socket) -> bytes:
     return bytes(out)
 
 
-# A BBS prompt ("de GB7NOT>") or a node prompt ("NOTTM:GB7NOT-2}") at the end of what has arrived.
-PROMPT = re.compile(rb"(de [A-Z0-9-]+>|[A-Z0-9]+:[A-Z0-9-]+\})\s*$")
+# A LinBPQ BBS prompt ("de GB7NOT>"), node prompt ("NOTTM:GB7NOT-2}") or FBB prompt
+# ("(1) GB7CIP BBS (H for help) >") at the end of what has arrived.
+PROMPT = re.compile(rb"(de [A-Z0-9-]+>|[A-Z0-9]+:[A-Z0-9-]+\}|\(\d+\) [A-Z0-9-]+ BBS \(H for help\) >)\s*$")
 
 
 def read_for(sock: socket.socket, seconds: float, until_prompt: bool = False) -> str:
@@ -61,7 +62,7 @@ def read_for(sock: socket.socket, seconds: float, until_prompt: bool = False) ->
                 break
         except socket.timeout:
             quiet += 0.5
-            if data and not until_prompt and quiet >= 2.0:
+            if data and not until_prompt and quiet >= float(os.environ.get("BPQ_QUIET") or 2):
                 break
     return data.decode("latin-1").replace("\r\n", "\n").replace("\r", "\n")
 
@@ -81,7 +82,7 @@ def main() -> int:
         out += read_for(s, 8)
         for c in cmds:
             s.sendall((c + "\r").encode())
-            waits = c.upper() not in ("B", "BYE")
+            waits = c.upper() not in ("B", "BYE") and not os.environ.get("BPQ_QUIET")
             out += f"\n>>> {c}\n" + read_for(s, 300 if waits else 10, until_prompt=waits)
     sys.stdout.write(out.replace(password, "********"))
     return 0
