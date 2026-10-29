@@ -1,0 +1,28 @@
+# Lab: GB7LAA (LinBPQ) -> GB7LAF (LinFBB 7.0.11) -> GB7LAB (LinBPQ), all over AXUDP.
+# GB7LAF runs with --network host + privileged because kernel AF_AX25 only exists in the init
+# network namespace (the host needs the ax25 module; Ubuntu 7.0 kernels still have it).
+name: lab138
+networks:
+  lab:
+    ipam:
+      config: [{subnet: 172.32.0.0/24, gateway: 172.32.0.1}]
+services:
+  laa:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.32.0.11}}
+    ports: ["127.0.0.1:18010:8010", "127.0.0.1:18011:8011"]
+    volumes: ["./state/laa:/data"]
+  lab:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.32.0.12}}
+    ports: ["127.0.0.1:28010:8010", "127.0.0.1:28011:8011"]
+    volumes: ["./state/lab:/data"]
+  laf:
+    image: lab138-fbb
+    build: ./fbb
+    network_mode: host
+    privileged: true
+    volumes: ["./fbb:/lab:ro"]
+    entrypoint: ["/lab/entrypoint.sh"]
