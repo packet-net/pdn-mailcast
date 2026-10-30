@@ -314,7 +314,7 @@ public class WaveformTests
         var day = new DateOnly(2026, 10, 6);
         using var state = new TempDirectory();
         using var output = new TempDirectory();
-        var options = new ScheduleOptions { SymbolSize = 240 };
+        var options = new ScheduleOptions();
         var store = new RotationStore(state.Path, Compression.Default, options, new MemoryJournal());
         store.Offer(Bulletins.Make(81, 1500), day);
         var slot = new DateTimeOffset(day.ToDateTime(new TimeOnly(12, 0), DateTimeKind.Utc));

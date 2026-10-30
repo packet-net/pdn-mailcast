@@ -15,9 +15,13 @@ namespace Packet.Mailcast;
 /// <para>One folder per bulletin under <c>bulletins/</c>, named from a hash of its BID in capitals:</para>
 /// <code>
 /// object.bin   the object's octets, exactly as coded
+/// envelope.bin the envelope object's octets, for a bulletin first offered since issue #142 (none for an older one)
 /// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi,
 ///              and FirstSlot once it has been carried
 /// </code>
+/// <para>
+/// A bulletin held from before the canonical form keeps its encoding and has no envelope; it is never coded again.
+/// </para>
 /// <para>
 /// A state without FirstSlot but with pieces sent comes from a daily head end before slots had
 /// times. Under the shares rule it counts as first carried at midnight UTC on its FirstSeen day;
@@ -103,7 +107,7 @@ public sealed class HeadEndStore
 
     /// <summary>
     /// Offers a bulletin. The first time a BID is offered it is compressed, coded and kept, with
-    /// <paramref name="seen"/> as its first-seen day and no first slot yet; later offers of the same BID return what
+    /// <paramref name="seen"/> as its first-seen day and no first slot yet, as a canonical bulletin with its envelope (issue #142); later offers of the same BID return what
     /// was kept, unchanged, whatever their content. Returns null if the bulletin is over
     /// <see cref="ScheduleOptions.MaxBulletinSize"/>.
     /// </summary>
@@ -115,16 +119,29 @@ public sealed class HeadEndStore
         {
             return existing.Carried;
         }
-        var serialized = bulletin.Serialize();
+        // First offer: the canonical bulletin and the envelope, from the message text exactly as the BBS gave it.
+        Bulletin shared = bulletin;
+        BulletinEnvelope? envelope = null;
+        if (!bulletin.Canonical)
+        {
+            (shared, envelope) = CanonicalForm.ToCanonicalBulletin(bulletin.Type, bulletin.From, bulletin.To, bulletin.At, bulletin.Bid, bulletin.Title,
+                Bulletin.TextEncoding.GetBytes(bulletin.MessageText));
+        }
+        var serialized = shared.Serialize();
         if (serialized.Length > _options.MaxBulletinSize)
         {
             return null;
         }
-        var transfer = TransferObject.ForBulletin(bulletin, _options.DictionaryId, _compression, _options.SymbolSize, _options.Alignment);
-        var carried = new CarriedBulletin(bulletin.Bid, bulletin.Title, serialized.Length, seen, transfer, 0);
+        var transfer = TransferObject.ForBulletin(shared, _options.DictionaryId, _compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
+        var envelopeObject = envelope is null ? null : TransferObject.ForEnvelope(envelope, _options.DictionaryId, _compression);
+        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, 0, Envelope: envelopeObject);
         var dir = Path.Combine(_bulletins, key);
         Directory.CreateDirectory(dir);
         DurableFile.WriteAtomically(Path.Combine(dir, "object.bin"), transfer.Bytes);
+        if (envelopeObject is not null)
+        {
+            DurableFile.WriteAtomically(Path.Combine(dir, "envelope.bin"), envelopeObject.Bytes);
+        }
         var entry = new Entry(dir, carried);
         SaveState(entry);
         _entries[key] = entry;
@@ -185,6 +202,17 @@ public sealed class HeadEndStore
         }
         foreach (var o in broadcast.Objects)
         {
+            if (o.EnvelopeFor is { } envelopeBid)
+            {
+                if (next.TryGetValue(o.Transfer.ObjectId, out uint envelopeNext)
+                    && _entries.TryGetValue(KeyOf(envelopeBid), out var holder)
+                    && holder.Carried.Envelope?.ObjectId == o.Transfer.ObjectId && envelopeNext > holder.Carried.EnvelopeNextEsi)
+                {
+                    holder.Carried = holder.Carried with { EnvelopeNextEsi = envelopeNext };
+                    SaveState(holder);
+                }
+                continue;
+            }
             if (o.Bid is null)
             {
                 // The directory: kept by object ID, which is a hash of its content.
@@ -287,6 +315,12 @@ public sealed class HeadEndStore
         text.Append(CultureInfo.InvariantCulture, $"Dictionary: {c.Transfer.DictionaryId}\n");
         text.Append("Oti: ").Append(Convert.ToHexStringLower(c.Transfer.Oti.ToBytes())).Append('\n');
         text.Append(CultureInfo.InvariantCulture, $"NextEsi: {c.NextEsi}\n");
+        if (c.Envelope is { } envelope)
+        {
+            text.Append("Envelope: ").Append(ObjectId.Format(envelope.ObjectId)).Append('\n');
+            text.Append("EnvelopeOti: ").Append(Convert.ToHexStringLower(envelope.Oti.ToBytes())).Append('\n');
+            text.Append(CultureInfo.InvariantCulture, $"EnvelopeNextEsi: {c.EnvelopeNextEsi}\n");
+        }
         if (c.FirstSlot is DateTimeOffset firstSlot)
         {
             text.Append(CultureInfo.InvariantCulture, $"FirstSlot: {firstSlot.UtcDateTime:yyyy-MM-ddTHH:mmZ}\n");
@@ -324,6 +358,23 @@ public sealed class HeadEndStore
             DateTimeOffset? firstSlot = fields.TryGetValue("FirstSlot", out var slotText)
                 ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
                 : nextEsi > 0 && _options.Budget is null ? BroadcastScheduler.Midnight(firstSeen) : null;
+            TransferObject? envelope = null;
+            uint envelopeNextEsi = 0;
+            var envelopePath = Path.Combine(dir, "envelope.bin");
+            if (File.Exists(envelopePath) && fields.TryGetValue("Envelope", out var envelopeId))
+            {
+                var envelopeOti = ObjectTransmissionInformation.Read(Convert.FromHexString(fields["EnvelopeOti"]));
+                var stored = TransferObject.FromStored(File.ReadAllBytes(envelopePath), ushort.Parse(fields["Dictionary"], CultureInfo.InvariantCulture), envelopeOti);
+                if (ObjectId.Format(stored.ObjectId) != envelopeId)
+                {
+                    _log?.Invoke($"head end store: envelope of {fields["Bid"]} does not match; sent without it");
+                }
+                else
+                {
+                    envelope = stored;
+                    envelopeNextEsi = uint.Parse(fields["EnvelopeNextEsi"], CultureInfo.InvariantCulture);
+                }
+            }
             var carried = new CarriedBulletin(
                 fields["Bid"],
                 fields["Title"],
@@ -331,7 +382,9 @@ public sealed class HeadEndStore
                 firstSeen,
                 transfer,
                 nextEsi,
-                firstSlot);
+                firstSlot,
+                envelope,
+                envelopeNextEsi);
             return new Entry(dir, carried);
         }
         catch (Exception e) when (e is FormatException or ArgumentException or KeyNotFoundException or OverflowException)

@@ -85,7 +85,7 @@ internal static class Samples
     {
         var carried = bulletins.Select(b =>
         {
-            var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, options.SymbolSize, options.Alignment);
+            var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
             return new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, DateOnly.FromDateTime(slot.UtcDateTime), transfer, 0, slot);
         }).ToList();
         var plan = BroadcastScheduler.Plan(carried, slot, seed, Compression.Default, options, mode: mode);

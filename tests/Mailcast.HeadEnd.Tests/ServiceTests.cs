@@ -133,7 +133,7 @@ public class ServiceTests
         Assert.Equal(SlotOutcome.Completed, second.Outcome);
         var sentTuesday = tuesday.Sent().ToList();
 
-        var all = sentMonday.Concat(sentTuesday).Where(f => plan.Broadcast!.Objects.Skip(1).Any(o => o.Transfer.ObjectId == f.Item1)).ToList();
+        var all = sentMonday.Concat(sentTuesday).Where(f => plan.Broadcast!.Objects.Where(o => o.Bid is not null).Any(o => o.Transfer.ObjectId == f.Item1)).ToList();
         Assert.Equal(all.Count, all.Distinct().Count());
 
         // Each bulletin's ESIs run on unbroken from 0: nothing was skipped, nothing repeated.
@@ -142,7 +142,7 @@ public class ServiceTests
             Assert.Equal(Enumerable.Range(0, group.Count()).Select(i => (uint)i), group.Select(f => f.Item2).Order());
         }
         var options = new ScheduleOptions();
-        foreach (var o in plan.Broadcast!.Objects.Skip(1))
+        foreach (var o in plan.Broadcast!.Objects.Where(o => o.Bid is not null))
         {
             int[] perDay = BroadcastScheduler.SymbolsPerCarrying(o.Transfer.SourceSymbols, options);
             Assert.Equal(perDay[0] + perDay[1], (int)o.NextEsi);
@@ -160,7 +160,7 @@ public class ServiceTests
             first.Store.Offer(Bulletins.Make(seed, 5000), Day1);
         }
         var whole = first.Planner.Plan(NoonOn(Day1));
-        var bulletinIds = whole.Broadcast!.Objects.Skip(1).Select(o => o.Transfer.ObjectId).ToHashSet();
+        var bulletinIds = whole.Broadcast!.Objects.Where(o => o.Bid is not null).Select(o => o.Transfer.ObjectId).ToHashSet();
         int plannedBulletinFrames = whole.Frames.Count(f => bulletinIds.Contains(f.ObjectId));
         var stopped = first.Run(Day1, stopAfter: TimeSpan.FromMinutes(2));
         Assert.Equal(SlotOutcome.Aborted, stopped.Outcome);
@@ -175,7 +175,8 @@ public class ServiceTests
         var rest = again.Planner.Plan(NoonOn(Day1));
         Assert.Equal(plannedBulletinFrames - sentBulletinFrames, rest.Frames.Count(f => bulletinIds.Contains(f.ObjectId)));
         Assert.True(rest.Broadcast!.Objects[0].FirstEsi > 0);
-        Assert.Equal(SlotOutcome.Completed, again.Run(Day1).Outcome);
+        var finished = again.Run(Day1);
+        Assert.True(finished.Outcome == SlotOutcome.Completed, $"{finished.Outcome}: {finished.Reason}");
         var all = first.Sent().Concat(again.Sent()).ToList();
         Assert.Equal(plannedBulletinFrames, all.Count(f => bulletinIds.Contains(f.Item1)));
         Assert.Equal(all.Count, all.Distinct().Count());
@@ -395,7 +396,7 @@ public class ServiceTests
         var leases = LeaseTimes(again);
         Assert.Single(leases);
         Assert.InRange(leases[0], At(12, 2), At(12, 3));
-        var bulletinIds = whole.Broadcast!.Objects.Skip(1).Select(o => o.Transfer.ObjectId).ToHashSet();
+        var bulletinIds = whole.Broadcast!.Objects.Where(o => o.Bid is not null).Select(o => o.Transfer.ObjectId).ToHashSet();
         var all = first.Sent().Concat(again.Sent()).ToList();
         Assert.Equal(all.Count, all.Distinct().Count());
         Assert.Equal(whole.Broadcast.BulletinFrames, all.Count(f => bulletinIds.Contains(f.Item1)));

@@ -58,7 +58,9 @@ public class OfflineTests
                 rebuilt.Add(result.Bulletin);
             }
         }
-        Assert.Equal(bulletins.OrderBy(b => b.Bid), rebuilt.OrderBy(b => b.Bid));
+        // Sent canonical (issue #142): the shared form of each bulletin, not the BBS copy.
+        var canonical = bulletins.Select(b => CanonicalForm.ToCanonicalBulletin(b.Type, b.From, b.To, b.At, b.Bid, b.Title, Bulletin.TextEncoding.GetBytes(b.MessageText)).Bulletin);
+        Assert.Equal(canonical.OrderBy(b => b.Bid), rebuilt.OrderBy(b => b.Bid));
     }
 }
 

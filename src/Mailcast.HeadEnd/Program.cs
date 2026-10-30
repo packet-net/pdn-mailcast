@@ -306,6 +306,10 @@ public static partial class Program
             });
 
         ScheduleOptions scheduleOptions = config.ToScheduleOptions() with { Signer = signer };
+        if (config.Schedule.SymbolSize is not null)
+        {
+            journal.Write("config: schedule.symbolSize is ignored, pieces are always 240 octets; remove it");
+        }
         SlotSettings settings = config.ToSlotSettings();
         Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);

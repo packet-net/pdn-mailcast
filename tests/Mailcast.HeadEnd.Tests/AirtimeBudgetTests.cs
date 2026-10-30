@@ -17,7 +17,7 @@ public class AirtimeBudgetTests(ITestOutputHelper output)
     [Fact]
     public void HourlyDefaults_AverageAboutThreeMinutesAnHour_AndTheWorstHourFitsTheHardStop()
     {
-        var options = ScheduleOptions.Hourly with { SymbolSize = 240 };
+        var options = ScheduleOptions.Hourly with { };
         var settings = new SlotSettings { Callsign = "M0LTE", MaxBurst = TimeSpan.FromSeconds(18), ToneLength = TimeSpan.FromSeconds(10) };
         var station = new FakeStation(new VirtualTime(DateTimeOffset.UnixEpoch), 4);
         var runner = new SlotRunner(settings, station, station, null, LinearAirtime.Measure("ms110d-wn4"), new MemoryJournal(), TimeProvider.System);
@@ -47,7 +47,7 @@ public class AirtimeBudgetTests(ITestOutputHelper output)
             while (next < arrivals.Count && arrivals[next].At <= slot)
             {
                 var b = arrivals[next++].Bulletin;
-                var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, options.SymbolSize, options.Alignment);
+                var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
                 held.Add(new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, DateOnly.FromDateTime(slot.UtcDateTime), transfer, 0));
                 if (slot >= start.AddDays(2))
                 {

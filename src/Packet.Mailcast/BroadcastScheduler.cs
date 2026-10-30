@@ -25,7 +25,9 @@ public sealed record BroadcastBulletin(Bulletin Bulletin, DateOnly FirstSeen, Da
 /// The start of the slot it was first carried in, or null while it has not been: the next slot
 /// planned is then its first.
 /// </param>
-public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnly FirstSeen, TransferObject Transfer, uint NextEsi, DateTimeOffset? FirstSlot = null);
+/// <param name="Envelope">The bulletin's envelope object (issue #142), sent in every slot that carries the bulletin; null for one held from before.</param>
+/// <param name="EnvelopeNextEsi">The first envelope ESI not yet sent.</param>
+public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnly FirstSeen, TransferObject Transfer, uint NextEsi, DateTimeOffset? FirstSlot = null, TransferObject? Envelope = null, uint EnvelopeNextEsi = 0);
 
 /// <summary>
 /// How slots are filled under the budget rule: each slot is filled up to an airtime budget with
@@ -132,12 +134,6 @@ public sealed record ScheduleOptions
     /// </summary>
     public int RememberDays { get; init; } = 14;
 
-    /// <summary>The RaptorQ symbol size.</summary>
-    public int SymbolSize { get; init; } = MailcastFrame.StandardSymbolSize;
-
-    /// <summary>The RaptorQ symbol alignment.</summary>
-    public int Alignment { get; init; } = MailcastFrame.StandardAlignment;
-
     /// <summary>
     /// The head end's directory signing key, or null to send directories unsigned. With one, each
     /// directory also lists every object's long hash (see <see cref="BroadcastDirectory"/>).
@@ -220,8 +216,9 @@ public sealed record ScheduleOptions
 /// <param name="SlotIndex">0 in the slot it was first carried in, then the slots since; the directory is always 0.</param>
 /// <param name="FirstEsi">The first ESI sent in this slot.</param>
 /// <param name="Count">How many symbols are sent in this slot, with consecutive ESIs.</param>
-/// <param name="Bid">The bulletin's BID, or null for the directory.</param>
-public sealed record ScheduledObject(TransferObject Transfer, int SlotIndex, uint FirstEsi, int Count, string? Bid = null)
+/// <param name="Bid">The bulletin's BID, or null for the directory and for an envelope.</param>
+/// <param name="EnvelopeFor">For a bulletin's envelope (issue #142), that bulletin's BID; null otherwise.</param>
+public sealed record ScheduledObject(TransferObject Transfer, int SlotIndex, uint FirstEsi, int Count, string? Bid = null, string? EnvelopeFor = null)
 {
     /// <summary>The first ESI for the object's next slot.</summary>
     public uint NextEsi => FirstEsi + (uint)Count;
@@ -590,7 +587,7 @@ public static class BroadcastScheduler
                 skipped.Add(bulletin);
                 continue;
             }
-            var transfer = TransferObject.ForBulletin(bulletin, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
+            var transfer = TransferObject.ForBulletin(bulletin, options.DictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
             uint first = options.Timetable?.Daylight is not null ? (uint)DueAt(transfer.SourceSymbols, firstSlot, slot, options, before: true)
                 : index == 0 ? 0 : (uint)DueBySlot(transfer.SourceSymbols, index - 1, options);
             carried.Add(new CarriedBulletin(bulletin.Bid, bulletin.Title, serialized.Length, firstSeen, transfer, first, firstSlot));
@@ -684,12 +681,13 @@ public static class BroadcastScheduler
             bulletins.Add((c, index));
             leftover.Add(options.Budget is { } r && Leftover(c, slot, r));
             entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind,
-                options.Signer is null ? null : ObjectId.LongHash(c.Transfer.DictionaryId, c.Transfer.Bytes)));
+                options.Signer is null ? null : ObjectId.LongHash(c.Transfer.DictionaryId, c.Transfer.Bytes),
+                c.Envelope is { } env ? new EnvelopeLink(env.ObjectId, ObjectId.LongHash(env.DictionaryId, env.Bytes)) : null));
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
         var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts, options.Details);
-        var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, options.SymbolSize, options.Alignment);
+        var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
         uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
 
         int[] counts;
@@ -755,6 +753,13 @@ public static class BroadcastScheduler
             directoryCap = current - 1;
         }
     }
+
+    /// <summary>
+    /// The frames of a bulletin's envelope for one slot: its K pieces (one, normally) with fresh ESIs
+    /// from <paramref name="firstEsi"/>, so that a listener who hears them all rebuilds it.
+    /// </summary>
+    private static IEnumerable<MailcastFrame> EnvelopeFrames(TransferObject envelope, uint firstEsi) =>
+        Enumerable.Range(0, envelope.SourceSymbols).Select(i => envelope.Frame(firstEsi + (uint)i));
 
     private static double Coverage(CarriedBulletin c, int more) => (c.NextEsi + (double)more) / c.Transfer.SourceSymbols;
 
@@ -841,12 +846,14 @@ public static class BroadcastScheduler
         }
         int directoryLength = directory.Frame(0).ToBytes().Length;
         var bulletinLengths = new List<int>();
+        var envelopeLengths = new List<int>(); // a carried bulletin's envelope goes in with its first piece
         bool Fits()
         {
             int directoryFrames = DirectoryFrames(directory, bulletinLengths.Count, options);
-            var all = new List<int>(directoryFrames + bulletinLengths.Count + extraLengths.Length);
+            var all = new List<int>(directoryFrames + bulletinLengths.Count + envelopeLengths.Count + extraLengths.Length);
             all.AddRange(Enumerable.Repeat(directoryLength, directoryFrames));
             all.AddRange(bulletinLengths);
+            all.AddRange(envelopeLengths);
             all.AddRange(extraLengths);
             return budget.Airtime(all) <= budget.Limit;
         }
@@ -873,6 +880,10 @@ public static class BroadcastScheduler
             while (queue.TryDequeue(out int i, out _))
             {
                 bulletinLengths.Add(lengths[i]);
+                if (counts[i] == 0 && bulletins[i].Envelope is { } envelope)
+                {
+                    envelopeLengths.AddRange(EnvelopeFrames(envelope, bulletins[i].EnvelopeNextEsi).Select(f => f.ToBytes().Length));
+                }
                 if (!Fits())
                 {
                     return counts;
@@ -906,6 +917,18 @@ public static class BroadcastScheduler
         // budget (issue #69's bigger floor made this reachable): never below one frame.
         int directoryFrames = Math.Max(1, Math.Min(DirectoryFrames(directoryObject, bulletinFrames, options), directoryFramesCap ?? int.MaxValue));
         scheduled.Insert(0, new ScheduledObject(directoryObject, 0, directoryFirst, directoryFrames));
+        // Each bulletin that sends pieces this slot repeats its envelope (issue #142), after the
+        // bulletins so that their interleaving is the same with or without envelopes.
+        int bulletinObjects = scheduled.Count - 1;
+        for (int i = 0; i < bulletins.Count; i++)
+        {
+            var (c, index) = bulletins[i];
+            if (counts[i] > 0 && c.Envelope is { } envelope)
+            {
+                scheduled.Add(new ScheduledObject(envelope, index, c.EnvelopeNextEsi, envelope.SourceSymbols, EnvelopeFor: c.Bid));
+            }
+        }
+        int envelopeFrames = scheduled.Skip(1 + bulletinObjects).Sum(s => s.Count);
 
         // Interleave the bulletins by position (i + u) / n, the leftover tier's turn after
         // everything else: its pieces of an object by 1 + (i - m + u) / (n - m), m the rest.
@@ -915,7 +938,7 @@ public static class BroadcastScheduler
         {
             double phase = rng.NextDouble();
             int n = scheduled[j].Count;
-            int m = Math.Min(main[j - 1], n);
+            int m = j <= bulletinObjects ? Math.Min(main[j - 1], n) : n;
             for (int i = 0; i < n; i++)
             {
                 order.Add((i < m ? (i + phase) / m : 1 + ((i - m + phase) / (n - m)), j, i));
@@ -928,7 +951,7 @@ public static class BroadcastScheduler
         });
 
         // Then the directory's frames at evenly spaced places, the first at place 0.
-        int totalFrames = bulletinFrames + directoryFrames;
+        int totalFrames = bulletinFrames + envelopeFrames + directoryFrames;
         var frames = new List<MailcastFrame>(totalFrames);
         int nextDirectory = 0;
         int nextBulletin = 0;

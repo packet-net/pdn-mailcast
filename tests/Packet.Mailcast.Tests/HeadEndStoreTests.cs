@@ -52,7 +52,7 @@ public class HeadEndStoreTests
             var plan = BroadcastScheduler.Plan(store.InRotation(today), today, day, compression, options);
             store.Commit(plan);
 
-            var bulletinIds = plan.Objects.Skip(1).Select(o => o.Transfer.ObjectId).Order().ToArray();
+            var bulletinIds = plan.Objects.Where(o => o.Bid is not null).Select(o => o.Transfer.ObjectId).Order().ToArray();
             if (day == 3)
             {
                 Assert.Empty(bulletinIds);
@@ -155,7 +155,7 @@ public class HeadEndStoreTests
                 }
             }
         }
-        Assert.Equal(bulletins.OrderBy(b => b.Bid), delivered.OrderBy(b => b.Bid));
+        Assert.Equal(bulletins.Select(TestBulletins.Canonical).OrderBy(b => b.Bid), delivered.OrderBy(b => b.Bid));
     }
 
     [Fact]
@@ -173,11 +173,11 @@ public class HeadEndStoreTests
 
         // A rerun the same day sends only what the first run did not, all of it with fresh ESIs.
         var rest = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default);
-        var bulletinIds = whole.Objects.Skip(1).Select(o => o.Transfer.ObjectId).ToHashSet();
+        var bulletinIds = whole.Objects.Where(o => o.Bid is not null).Select(o => o.Transfer.ObjectId).ToHashSet();
         var first = whole.Frames.Take(cut).Where(f => bulletinIds.Contains(f.ObjectId)).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToHashSet();
         var second = rest.Frames.Where(f => bulletinIds.Contains(f.ObjectId)).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToList();
         Assert.DoesNotContain(second, first.Contains);
-        Assert.Equal(whole.Objects.Skip(1).Sum(o => o.Count), first.Count + second.Count);
+        Assert.Equal(whole.Objects.Where(o => o.Bid is not null).Sum(o => o.Count), first.Count + second.Count);
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class HeadEndStoreTests
         var day2 = Day1.AddDays(1);
         var tomorrow = BroadcastScheduler.Plan(store.InRotation(day2), day2, 2, Compression.Default);
         var options = new ScheduleOptions();
-        foreach (var o in tomorrow.Objects.Skip(1))
+        foreach (var o in tomorrow.Objects.Where(o => o.Bid is not null))
         {
             var t = today.Objects.Single(x => x.Transfer.ObjectId == o.Transfer.ObjectId);
             int sentToday = sentEsis.Count(e => e.ObjectId == o.Transfer.ObjectId);

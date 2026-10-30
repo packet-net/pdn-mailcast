@@ -59,7 +59,7 @@ public class BudgetTests(ITestOutputHelper output)
         {
             if (!_held.ContainsKey(bulletin.Bid))
             {
-                var transfer = TransferObject.ForBulletin(bulletin, Options.DictionaryId, Compression.Default, Options.SymbolSize, Options.Alignment);
+                var transfer = TransferObject.ForBulletin(bulletin, Options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
                 _held[bulletin.Bid] = new CarriedBulletin(bulletin.Bid, bulletin.Title, bulletin.Serialize().Length, seen, transfer, 0);
             }
         }
@@ -106,7 +106,7 @@ public class BudgetTests(ITestOutputHelper output)
             "minute": 0, "everyMinutes": 60, "maxMinutes": 10, "toneSeconds": 10, "channelWaitSeconds": 120,
             "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 }
           },
-          "schedule": { "symbolSize": 240 {{(schedule.Length > 0 ? ", " + schedule : "")}} }
+          "schedule": { {{schedule}} }
         }
         """);
 
@@ -387,7 +387,7 @@ public class BudgetTests(ITestOutputHelper output)
     /// </summary>
     private static void Strand(string root, IEnumerable<Bulletin> bulletins, DateOnly seen)
     {
-        var shares = ScheduleOptions.HourlyDaylight with { SymbolSize = 240 };
+        var shares = ScheduleOptions.HourlyDaylight with { };
         var old = new HeadEndStore(root, Compression.Default, shares);
         foreach (var b in bulletins)
         {
@@ -411,7 +411,7 @@ public class BudgetTests(ITestOutputHelper output)
         var morning = new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero);
 
         // The shares rule counts them as first carried at midnight on 5 October, long out of rotation.
-        var shares = ScheduleOptions.HourlyDaylight with { SymbolSize = 240, Timetable = Gb7rdg().ToSlotTimetable() };
+        var shares = ScheduleOptions.HourlyDaylight with { Timetable = Gb7rdg().ToSlotTimetable() };
         Assert.Empty(new HeadEndStore(state.Path, Compression.Default, shares).InRotation(morning));
 
         // The budget rule has them back, from where they left off, through the head end's own store and planner.
@@ -453,11 +453,11 @@ public class BudgetTests(ITestOutputHelper output)
         // 14:00, so the shares rule had nothing to send and keyed nothing, not even the directory.
         var config = Gb7rdg();
         var first = new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero);
-        var shares = ScheduleOptions.HourlyDaylight with { SymbolSize = 240, Timetable = config.ToSlotTimetable() };
+        var shares = ScheduleOptions.HourlyDaylight with { Timetable = config.ToSlotTimetable() };
         var held = new List<CarriedBulletin>();
         foreach (var b in new[] { Bulletins.Make(51, 3000), Bulletins.Make(52, 7000) })
         {
-            var transfer = TransferObject.ForBulletin(b, shares.DictionaryId, Compression.Default, 240, shares.Alignment);
+            var transfer = TransferObject.ForBulletin(b, shares.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
             held.Add(new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, DateOnly.FromDateTime(first.UtcDateTime), transfer, (uint)BroadcastScheduler.SymbolsPerCarrying(transfer.SourceSymbols, shares)[0], first));
         }
         var ten = first.AddHours(1);
