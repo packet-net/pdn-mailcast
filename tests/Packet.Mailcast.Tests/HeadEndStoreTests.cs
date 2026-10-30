@@ -155,7 +155,9 @@ public class HeadEndStoreTests
                 }
             }
         }
-        Assert.Equal(bulletins.Select(TestBulletins.Canonical).OrderBy(b => b.Bid), delivered.OrderBy(b => b.Bid));
+        // Sent canonical (issue #142); without a signed directory no envelope is kept, so the receiver delivers the shared form.
+        static (string, string, string, string, string, string) Key(Bulletin b) => (b.Bid, b.From, b.To, b.At, b.Title, b.Body.Replace("\r\n", "\n").Trim('\n'));
+        Assert.Equal(bulletins.Select(TestBulletins.Canonical).Select(Key).Order(), delivered.Select(Key).Order());
     }
 
     [Fact]

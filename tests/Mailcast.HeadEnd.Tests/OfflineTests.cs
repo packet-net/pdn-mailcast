@@ -58,9 +58,8 @@ public class OfflineTests
                 rebuilt.Add(result.Bulletin);
             }
         }
-        // Sent canonical (issue #142): the shared form of each bulletin, not the BBS copy.
-        var canonical = bulletins.Select(b => CanonicalForm.ToCanonicalBulletin(b.Type, b.From, b.To, b.At, b.Bid, b.Title, Bulletin.TextEncoding.GetBytes(b.MessageText)).Bulletin);
-        Assert.Equal(canonical.OrderBy(b => b.Bid), rebuilt.OrderBy(b => b.Bid));
+        // Sent canonical with the envelope (issue #142); the receiver rebuilds the station's copy and adds its own routing line.
+        Assert.Equal(bulletins.Select(b => (b.Bid, b.Title, Body: b.Body.Replace("\r\n", "\n").Trim('\n'))).OrderBy(b => b.Bid), rebuilt.Select(b => (b.Bid, b.Title, Body: b.Body.Replace("\r\n", "\n").Trim('\n'))).OrderBy(b => b.Bid));
     }
 }
 
