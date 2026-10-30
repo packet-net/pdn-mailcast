@@ -135,6 +135,51 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
+    /// <summary>Every trusted key with its source and when it was last heard (issue #146).</summary>
+    public IReadOnlyList<KeyRow> KeyRows()
+    {
+        lock (_gate)
+        {
+            return _store.KeyRows();
+        }
+    }
+
+    /// <summary>Adds a key by hand (issue #146); the result says why not, or what it released.</summary>
+    public KeyChange AddKey(string? callsign, string? base64) => ChangeKeys(store => store.AddKey(callsign, base64));
+
+    /// <summary>Forgets a learnt or added key (issue #146).</summary>
+    public KeyChange ForgetKey(ulong keyId) => ChangeKeys(store => store.ForgetKey(keyId));
+
+    private KeyChange ChangeKeys(Func<ReceiverStore, KeyChange> change)
+    {
+        KeyChange result;
+        MailParts? parts;
+        lock (_gate)
+        {
+            try
+            {
+                result = change(_store);
+                _progress = (_store.Directory, _store.Progress());
+                _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
+        }
+        Publish(parts);
+        foreach (var released in result.Released)
+        {
+            Completed(released);
+        }
+        foreach (var delivered in result.Delivered)
+        {
+            _log($"bulletin released to the outbox: {Ascii.Clean(delivered.Bid)}");
+            BulletinReleased?.Invoke(delivered);
+        }
+        return result;
+    }
+
     /// <summary>Directories refused for naming a pinned station under another key (issue #178).</summary>
     public IReadOnlyList<KeyConflict> KeyConflicts()
     {

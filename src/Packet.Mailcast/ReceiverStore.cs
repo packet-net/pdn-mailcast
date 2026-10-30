@@ -568,6 +568,8 @@ public sealed partial class ReceiverStore
     /// </summary>
     private readonly Dictionary<ulong, (BroadcastDirectory Directory, DateTimeOffset HeardAt, DirectoryCheck Check)> _rejectedDirectories = [];
 
+    private bool _unsignedSaid;
+
     /// <summary>Where each known directory (see <see cref="_knownDirectories"/>) is kept, one file per object ID in hex, under the store's folder.</summary>
     public const string KnownDirectoriesFolder = "directories";
 
@@ -1574,7 +1576,16 @@ public sealed partial class ReceiverStore
             {
                 // Once per directory: it is marked done, so its repeats are not rebuilt again.
                 string why = $"directory {ObjectId.Format(instance.ObjectId)} for {directory.Date:yyyy-MM-dd} not used: {check.Reason}";
-                Log(why);
+                if (check.State != SignatureState.None)
+                {
+                    Log(why);
+                }
+                else if (!_unsignedSaid)
+                {
+                    // Every slot of an unsigned head end would say it again: once per run is enough.
+                    _unsignedSaid = true;
+                    Log("a directory with no signature is not used (the head end must sign its directories); said once per run");
+                }
                 MarkDone(instance);
                 RememberDirectory(instance.ObjectId, directory, check);
                 return new AcceptResult(FrameOutcome.RejectedDirectory, instance.ObjectId, Detail: why, Check: check);

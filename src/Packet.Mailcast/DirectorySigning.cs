@@ -103,8 +103,8 @@ public sealed class DirectorySigner
     }
 
     /// <summary>
-    /// A new key in the PEM form <c>openssl genpkey -algorithm ed25519</c> writes, for tests and
-    /// tools. A real head end's key is made with openssl, never by this.
+    /// A new key in the PEM form <c>openssl genpkey -algorithm ed25519</c> writes: what a head
+    /// end's key file holds (<see cref="CreateKeyFile"/>), and what tests use.
     /// </summary>
     public static string NewKeyPem()
     {
@@ -113,6 +113,34 @@ public sealed class DirectorySigner
         var pair = generator.GenerateKeyPair();
         byte[] der = PrivateKeyInfoFactory.CreatePrivateKeyInfo(pair.Private).GetDerEncoded();
         return new string(PemEncoding.Write("PRIVATE KEY", der)) + "\n";
+    }
+
+    /// <summary>
+    /// Makes a new key at <paramref name="path"/>, readable and writable by its owner only, and
+    /// returns true; does nothing and returns false if the file is already there (whatever it holds).
+    /// </summary>
+    public static bool CreateKeyFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        if (File.Exists(path))
+        {
+            return false;
+        }
+        try
+        {
+            var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+            if (!OperatingSystem.IsWindows())
+            {
+                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            }
+            using var stream = new FileStream(path, options);
+            stream.Write(Encoding.ASCII.GetBytes(NewKeyPem()));
+        }
+        catch (IOException) when (File.Exists(path))
+        {
+            return false; // made by someone else meanwhile
+        }
+        return true;
     }
 
     /// <summary>The 64-octet Ed25519 signature of <paramref name="message"/>.</summary>
@@ -213,7 +241,7 @@ public sealed class TrustedKey
 /// <summary>Whether a directory was signed, and what that means for the receiver.</summary>
 public enum SignatureState
 {
-    /// <summary>No signature: used exactly as before signing existed.</summary>
+    /// <summary>No signature: the directory is not used for anything (issue #146).</summary>
     None,
 
     /// <summary>A good signature by a trusted key.</summary>
@@ -230,16 +258,16 @@ public enum SignatureState
 public sealed record DirectoryCheck(SignatureState State, string? SignedBy = null, string? Reason = null)
 {
     /// <summary>The check of a directory with no signature.</summary>
-    public static DirectoryCheck NotSigned { get; } = new(SignatureState.None);
+    public static DirectoryCheck NotSigned { get; } = new(SignatureState.None, Reason: "it has no signature");
 
-    /// <summary>Whether the directory may be used: signed by a trusted key, or not signed at all.</summary>
-    public bool Usable => State != SignatureState.Rejected;
+    /// <summary>Whether the directory may be used: only when signed by a trusted key. An unsigned one is not used.</summary>
+    public bool Usable => State == SignatureState.Trusted;
 
     /// <summary>A few plain words: "signed by GB7RDG", "not signed", or "rejected: ...".</summary>
     public string Describe() => State switch
     {
         SignatureState.Trusted => $"signed by {SignedBy}",
-        SignatureState.None => "not signed",
+        SignatureState.None => "unsigned, not used",
         _ => $"rejected: {Reason}",
     };
 }

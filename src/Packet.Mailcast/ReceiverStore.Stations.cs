@@ -7,7 +7,8 @@ namespace Packet.Mailcast;
 /// <param name="Key">Its directory key.</param>
 /// <param name="PinnedAt">When it was learnt from the station's first signed directory; null for one built in or in <c>trustedKeys</c>.</param>
 /// <param name="FromTrustedKeys">Whether it was pinned because it is in <c>trustedKeys</c> (its label not a callsign): the pin goes when the key does.</param>
-public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false);
+/// <param name="Added">Whether it was added by hand on the status page (issue #146), not learnt on the air.</param>
+public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false, bool Added = false);
 
 /// <summary>
 /// A signed directory that named a station whose key is already pinned, under another key: it
@@ -59,6 +60,7 @@ public sealed partial class ReceiverStore
 
     // A station may hold several keys: GB7RDG's built-in one and a newer one in trustedKeys, say.
     private const string FromTrustedKeysMark = "trusted";
+    private const string AddedMark = "added";
 
     private readonly List<PinnedStation> _pins = [];
     private readonly Dictionary<string, KeyConflict> _conflicts = new(StringComparer.Ordinal);
@@ -117,7 +119,7 @@ public sealed partial class ReceiverStore
                 }
                 if (!_pins.Any(x => x.Key.KeyId == key.KeyId))
                 {
-                    _pins.Add(new PinnedStation(p[0], key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark));
+                    _pins.Add(new PinnedStation(p[0], key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark, p.Length >= 4 && p[3] == AddedMark));
                 }
             }
         }
@@ -143,7 +145,7 @@ public sealed partial class ReceiverStore
     private void WritePins(string what)
     {
         var lines = _pins.Where(x => x.PinnedAt is not null)
-            .Select(x => $"{x.Station}\t{Convert.ToBase64String(x.Key.PublicKey)}\t{x.PinnedAt!.Value.ToString("o", CultureInfo.InvariantCulture)}{(x.FromTrustedKeys ? "\t" + FromTrustedKeysMark : "")}\n");
+            .Select(x => $"{x.Station}\t{Convert.ToBase64String(x.Key.PublicKey)}\t{x.PinnedAt!.Value.ToString("o", CultureInfo.InvariantCulture)}{(x.FromTrustedKeys ? "\t" + FromTrustedKeysMark : x.Added ? "\t" + AddedMark : "")}\n");
         try
         {
             DurableFile.WriteAtomically(Path.Combine(_root, PinsFile), Bulletin.TextEncoding.GetBytes(string.Concat(lines)), flush: _options.FlushToDisk);

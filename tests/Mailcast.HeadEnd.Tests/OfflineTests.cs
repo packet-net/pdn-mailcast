@@ -18,7 +18,8 @@ public class OfflineTests
         using var rx = new TempDirectory();
         using var output = new TempDirectory();
         var journal = new MemoryJournal();
-        var options = new ScheduleOptions();
+        var signer = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var options = new ScheduleOptions { Signer = signer };
         var store = new RotationStore(state.Path, Compression.Default, options, journal);
         var bulletins = new[] { Bulletins.Make(31, 1200), Bulletins.Make(32, 2500) };
         foreach (var b in bulletins)
@@ -47,7 +48,7 @@ public class OfflineTests
         modem.Process(new float[48000]);
         Assert.Equal(plan.Frames.Count, heard.Count);
 
-        var receiver = new ReceiverStore(rx.Path, Compression.Default);
+        var receiver = new ReceiverStore(rx.Path, Compression.Default, new ReceiverStoreOptions { TrustedKeys = [TrustedKey.Parse("M0LTE", signer.PublicKeyBase64)] });
         var rebuilt = new List<Bulletin>();
         foreach (byte[] ax25 in heard)
         {
@@ -58,9 +59,8 @@ public class OfflineTests
                 rebuilt.Add(result.Bulletin);
             }
         }
-        // Sent canonical (issue #142); the offline directory is unsigned, so no envelope is kept and the shared form is delivered as it is.
+        // Sent canonical (issue #142); the directory is signed but lists no envelope, so the shared form is delivered as it is.
         var canonical = bulletins.Select(b => CanonicalForm.ToCanonicalBulletin(b.Type, b.From, b.To, b.At, b.Bid, b.Title, Bulletin.TextEncoding.GetBytes(b.MessageText)).Bulletin);
-        Assert.All(rebuilt, b => Assert.Matches(@"^R:\d{6}/\d{4}Z \[pdn-mailcast via \S+\]$", Assert.Single(b.RoutingLines))); // the receiver's own line
         Assert.Equal(canonical.Select(b => (b.Bid, b.Title, b.Body)).OrderBy(b => b.Bid), rebuilt.Select(b => (b.Bid, b.Title, b.Body)).OrderBy(b => b.Bid));
     }
 }

@@ -272,6 +272,20 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
     <div id="channelToday" class="muted">Nothing measured yet.</div>
   </section>
 
+  <section class="wide" id="keysBox">
+    <details id="keysDetails">
+      <summary><h2>Keys</h2> <span class="muted">who may sign the directories this receiver uses</span></summary>
+      <p class="muted">A directory is used only when a key below signed it. One with no signature is not used, and nor is one signed by a key not listed. A station's key is learnt the first time its signed directory is heard; forget a learnt key if it should not be trusted, and it is learnt again the next time that station's directory is heard. Keys from the config file (<code>trustedKeys</code>) are changed in the config file.</p>
+      <div id="keysTable" class="muted">Nothing yet.</div>
+      <form id="keysAdd" class="row">
+        <input id="keysCall" placeholder="Callsign" size="10" autocomplete="off" aria-label="Callsign">
+        <input id="keysKey" placeholder="Public key (base64)" size="48" autocomplete="off" aria-label="Public key in base64">
+        <button type="submit">Add key</button>
+      </form>
+      <div id="keysSaid" class="muted"></div>
+    </details>
+  </section>
+
   <section class="wide" id="globeBox" hidden>
     <details id="globeDetails">
       <summary><h2>Where it bounced</h2> <span class="muted">a globe of today's paths from the stations heard</span></summary>
@@ -949,6 +963,7 @@ async function refresh() {
   if (s.mailVersion !== mailVersion) refreshMail(s.mailVersion);
   $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
   schedule(s);
+  keysView(s);
   spectrogram(s);
   channel(s);
   globe(s);
@@ -1181,6 +1196,32 @@ function schedule(s) {
   tips.push("The log says what it hears: <code>journalctl -u pdn-mailcast-receiver</code>.");
   $("help").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
 }
+
+
+/* issue #146: the keys table, with forget and add */
+function keysView(s) {
+  const keys = s.stations.keys || [];
+  if (!keys.length) { $("keysTable").textContent = "No keys."; return; }
+  const when = t => t ? new Date(t).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "not heard";
+  $("keysTable").innerHTML = `<table><thead><tr><th>Station</th><th>Key ID</th><th>Source</th><th>Last heard</th><th></th></tr></thead><tbody>${keys.map(k =>
+    `<tr><td>${esc(k.station)}</td><td><code title="${esc(k.publicKey)}">${esc(k.keyId)}</code></td><td>${esc(k.source)}</td><td>${when(k.lastHeard)}</td><td>${k.canForget ? `<button type="button" class="keyForget" data-id="${esc(k.keyId)}">Forget</button>` : ""}</td></tr>`).join("")}</tbody></table>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest && e.target.closest(".keyForget");
+  if (!b) return;
+  b.disabled = true;
+  const r = await api("api/keys/forget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keyId: b.dataset.id }) });
+  $("keysSaid").textContent = r.ok ? "Forgotten. It is learnt again if its station's directory is heard." : r.error;
+  refresh();
+});
+$("keysAdd").addEventListener("submit", async e => {
+  e.preventDefault();
+  const r = await api("api/keys/add", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ station: $("keysCall").value, publicKey: $("keysKey").value }) });
+  $("keysSaid").textContent = r.ok ? "Added." : r.error;
+  if (r.ok) { $("keysCall").value = ""; $("keysKey").value = ""; }
+  refresh();
+});
 
 /* issue #178: listen, or not, at one advertised station's slots */
 document.addEventListener("click", async e => {
