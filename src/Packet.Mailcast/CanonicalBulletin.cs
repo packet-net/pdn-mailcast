@@ -293,6 +293,116 @@ public static class CanonicalForm
         return (ms.ToArray(), envelope.Title);
     }
 
+    /// <summary>The most octets of a title the canonical bulletin keeps; the full title is in the envelope.</summary>
+    public const int SharedTitleOctets = 59;
+
+    private static readonly Regex RouteTime = new(@"^R:(\d\d)(\d\d)(\d\d)/(\d\d)(\d\d)[Zz]? ", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Turns one station's copy of a bulletin into the shared canonical bulletin (a type 1
+    /// <see cref="Bulletin"/> with <see cref="Bulletin.Canonical"/> set) and that station's
+    /// envelope (issue #142). Every station that holds the bulletin makes the same canonical
+    /// bulletin from its own copy, as long as <see cref="Canonicalise"/> finds the same body.
+    /// </summary>
+    /// <remarks>
+    /// The title is the first <see cref="SharedTitleOctets"/> octets of the full title, less trailing
+    /// spaces and tabs, and any CR or LF in it (not allowed in a header) becomes a space. The date is the time on
+    /// the oldest routing line in the envelope's top (the last one there), read as UTC in year 20yy, or
+    /// 1970-01-01T00:00:00Z when there is none or its time is not a real one. The body is the canonical
+    /// body with each LF written as CR LF, or as it is for a <see cref="LineEnding.Raw"/> envelope. The
+    /// canonical bulletin has no routing lines, with one exception: a body line that looks like one
+    /// (R: and CR LF, which <see cref="Bulletin"/> would read as routing) is held there, which puts the same octets in
+    /// <see cref="Bulletin.MessageText"/>.
+    /// </remarks>
+    /// <param name="type">The message type, B for a bulletin.</param>
+    /// <param name="from">The sender's callsign.</param>
+    /// <param name="to">The addressee or category.</param>
+    /// <param name="at">The distribution, may be empty.</param>
+    /// <param name="bid">The bulletin ID.</param>
+    /// <param name="title">The full title.</param>
+    /// <param name="messageText">The text exactly as the BBS gave it, routing lines included.</param>
+    public static (Bulletin Bulletin, BulletinEnvelope Envelope) ToCanonicalBulletin(char type, string from, string to, string at, string bid, string title, ReadOnlySpan<byte> messageText)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+        var canonical = Canonicalise(messageText, title);
+        var envelope = canonical.Envelope;
+        var body = new List<byte>(canonical.Body.Length + 16);
+        foreach (var b in canonical.Body)
+        {
+            if (b == (byte)'\n' && envelope.LineEnding != LineEnding.Raw)
+            {
+                body.Add((byte)'\r');
+            }
+
+            body.Add(b);
+        }
+
+        string shared = title.Length > SharedTitleOctets ? title[..SharedTitleOctets] : title;
+        shared = shared.Replace('\r', ' ').Replace('\n', ' ').TrimEnd(' ', '\t');
+        var bulletin = Bulletin.FromMessageText(type, from, to, at, bid, shared, OldestRoutingTime(envelope.Top.Span), Bulletin.TextEncoding.GetString(body.ToArray()), canonical: true);
+        return (bulletin, envelope);
+    }
+
+    /// <summary>
+    /// The reverse of <see cref="ToCanonicalBulletin"/>: the station's message text and full title
+    /// from the canonical bulletin and that station's envelope (CR LF back to LF unless the envelope
+    /// is Raw, then <see cref="Rebuild"/>).
+    /// </summary>
+    /// <exception cref="ArgumentException">The bulletin's text does not rebuild: it is not canonical, or does not suit the envelope.</exception>
+    public static (byte[] MessageText, string Title) FromCanonicalBulletin(Bulletin canonical, BulletinEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(canonical);
+        ArgumentNullException.ThrowIfNull(envelope);
+        var text = Bulletin.TextEncoding.GetBytes(canonical.MessageText);
+        if (envelope.LineEnding != LineEnding.Raw)
+        {
+            using var ms = new MemoryStream(text.Length);
+            for (var i = 0; i < text.Length; i++)
+            {
+                if (text[i] == (byte)'\r' && i + 1 < text.Length && text[i + 1] == (byte)'\n')
+                {
+                    continue;
+                }
+
+                ms.WriteByte(text[i]);
+            }
+
+            text = ms.ToArray();
+        }
+
+        return Rebuild(text, envelope);
+    }
+
+    /// <summary>The time on the last routing line of <paramref name="top"/>, or the epoch if there is none or it is not a real time.</summary>
+    private static DateTimeOffset OldestRoutingTime(ReadOnlySpan<byte> top)
+    {
+        var epoch = DateTimeOffset.UnixEpoch;
+        Match? last = null;
+        foreach (var line in Bulletin.TextEncoding.GetString(top).Split('\n', '\r'))
+        {
+            var m = RouteTime.Match(line);
+            if (m.Success)
+            {
+                last = m;
+            }
+        }
+
+        if (last is null)
+        {
+            return epoch;
+        }
+
+        int Part(int group) => int.Parse(last.Groups[group].ValueSpan, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture);
+        try
+        {
+            return new DateTimeOffset(2000 + Part(1), Part(2), Part(3), Part(4), Part(5), 0, TimeSpan.Zero);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return epoch;
+        }
+    }
+
     private static List<Line> Split(ReadOnlySpan<byte> data)
     {
         var lines = new List<Line>();

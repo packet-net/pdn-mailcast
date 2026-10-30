@@ -156,12 +156,13 @@ The object's first byte flags what the object carries, so this traffic is marked
 | 2 | Directory |
 | 3 | DAPPS message (reserved) |
 | 4 | Propagation reading, one object per source (the ionosonde, and live PSK Reporter spots): a short record, not compressed, sent with dictionary 0 (see below) |
-| 5 to 111 | Unassigned; given out in this table |
+| 5 | Bulletin envelope (what one station's copy has besides the canonical bulletin), zstd with a dictionary, 240-byte pieces (see [below](#the-canonical-bulletin-and-its-envelope)) |
+| 6 to 111 | Unassigned; given out in this table |
 | 112 to 127 | Experiments; never assigned |
 
 Its top bit (128) says a metadata block follows the type byte: a 2-byte big-endian length, then that many bytes of the wrapper's own header, then the zstd frame. A reader skips a metadata block it does not understand. Types 1 and 2 are sent without one, exactly as before v0.3.0, so receivers already in the field read them unchanged.
 
-A receiver handles each object by its content type: bulletins go to the BBS as before, the directory is read, and from v0.6.0 the ionosonde's propagation reading is shown, and now PSK Reporter's beside it. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they drop as an object they cannot use, with a line in the log for each of its frames they hear, so it never reaches their BBS either.
+A receiver handles each object by its content type: bulletins go to the BBS as before, the directory is read, an envelope (type 5) is checked against the signed directory and kept, and from v0.6.0 the ionosonde's propagation reading is shown, and now PSK Reporter's beside it. A type it knows but does not handle (a DAPPS message, for now) is kept out of the BBS and logged once. A type it does not know is ignored without a word. Either way the object counts as done, so its later pieces are not collected. Receivers before v0.3.0 know only types 1 and 2 without metadata; anything else they drop as an object they cannot use, with a line in the log for each of its frames they hear, so it never reaches their BBS either.
 
 ### The ionosonde reading
 
@@ -225,6 +226,31 @@ In the common part a verdict is 0 unknown, 1 closed or 2 open (never 3), and the
 ### Bulletins
 
 A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`, `To`, `At`, `Bid`, `Date`, `Title`), an empty line, then the message text exactly as a forwarding partner would receive it, R: lines included. Readers ignore keys they don't know, so later versions can add some.
+
+### The canonical bulletin and its envelope
+
+Two head ends send interchangeable pieces only if they build byte-identical objects from one message (issue #142). A canonical bulletin is still content type 1, with one more header key after `Title`, `Canonical: 1`. Released receivers ignore the key and deliver it like any bulletin. It is made from a station's copy by `CanonicalForm.ToCanonicalBulletin` (rules in [canonical-form.md](canonical-form.md)):
+
+- `Title` is the first 59 bytes of the title, with trailing spaces and tabs removed. The full title is in the envelope.
+- `Date` is the time on the oldest routing line (the last `R:` line in the top of the copy), read as UTC, or `1970-01-01T00:00:00Z` if there is none.
+- The message text has no routing lines, and its body is the canonical body with each line feed written as CR LF, or the body as it is when the envelope says Raw.
+
+The envelope is the station's own part: the routing lines and anything else taken off the copy, the line-ending style and the full title, serialised as in canonical-form.md. It goes out as a content type 5 object (`TransferObject.ForEnvelope`): the serialised envelope, zstd compressed with the dictionary, cut into 240-byte pieces whatever the head end's piece size is. It is named like any object, by the hash of its dictionary ID and bytes, and is never combined with another station's, so its bytes need not match anyone else's.
+
+A receiver only keeps an envelope that a trusted signed directory lists, so a head end that sends envelopes without signing its directory gains nothing. The listing is one more field on the bulletin's own directory line, after `hash=`: `env=` then the envelope's 16 hex digit object ID, a semicolon and its 16 hex digit long hash (bytes 8 to 15 of the same SHA-256, as for `hash=`), lower case. It is inside the signature. Released readers ignore it like any field after the title, and a reader that finds it malformed ignores it too. An envelope heard before its directory is held until a directory lists it. A receiver that has the envelope can turn CR LF back into LF (unless Raw) and rebuild the station's copy exactly with `CanonicalForm.FromCanonicalBulletin`. This release only keeps envelopes; delivery does not use them yet, and a head end does not send them yet.
+
+### What counts as a format change
+
+Two sites combine their pieces only while all of these are the same. Any change to one is a format change:
+
+- the canonical rules (docs/canonical-form.md) and the canonical bulletin's fields above
+- the object serialisation (the bulletin header, the envelope serialisation, the content type octet)
+- the zstd version or settings (the output is pinned to zstd 1.5.7 as ZstdSharp 0.8.8 writes it; level 19, one thread, checksum, content size and dictionary ID on)
+- the dictionary (numbered, never changed once numbered)
+- the piece size (240 bytes)
+- the RaptorQ parameters (RFC 6330, one source block, one sub-block, alignment 4)
+
+Each is rolled out receivers first, then head ends. A receiver release that understands the new form comes first, and head ends switch to it only in a later release, and only for bulletins they newly take. A mismatch costs nothing but combining: two sites that differ send different objects for one BID, and a listener's BBS refuses the second copy by its BID.
 
 ### The directory
 

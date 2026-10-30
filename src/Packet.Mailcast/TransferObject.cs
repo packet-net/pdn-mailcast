@@ -24,6 +24,14 @@ public enum ObjectKind : byte
     /// <see cref="Propagation.IonoRecord"/>). Observe only, never for the BBS.
     /// </summary>
     Propagation = 4,
+
+    /// <summary>
+    /// The station's envelope for a canonical bulletin (issue #142): a serialised
+    /// <see cref="BulletinEnvelope"/>, zstd-compressed with a dictionary like a bulletin and cut
+    /// at <see cref="MailcastFrame.FixedSymbolSize"/>. Linked from the bulletin's directory entry
+    /// by <c>env=</c>. Never for the BBS by itself.
+    /// </summary>
+    Envelope = 5,
 }
 
 /// <summary>
@@ -60,6 +68,7 @@ public static class ContentType
         (byte)ObjectKind.Directory => "directory",
         (byte)ObjectKind.DappsMessage => "DAPPS message",
         (byte)ObjectKind.Propagation => "propagation reading",
+        (byte)ObjectKind.Envelope => "bulletin envelope",
         >= FirstExperimental and <= LastExperimental => $"experimental content type {type}",
         _ => $"unassigned content type {type}",
     };
@@ -153,6 +162,16 @@ public sealed class TransferObject
     {
         ArgumentNullException.ThrowIfNull(bulletin);
         return Pack((byte)ObjectKind.Bulletin, bulletin.Serialize(), null, dictionaryId, compression, symbolSize, alignment);
+    }
+
+    /// <summary>
+    /// Compresses and prepares a bulletin's envelope (content type 5), cut at the fixed piece size
+    /// <see cref="MailcastFrame.FixedSymbolSize"/> whatever the head end's own setting.
+    /// </summary>
+    public static TransferObject ForEnvelope(BulletinEnvelope envelope, ushort dictionaryId, Compression compression)
+    {
+        ArgumentNullException.ThrowIfNull(envelope);
+        return Pack((byte)ObjectKind.Envelope, envelope.Serialise(), null, dictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
     }
 
     /// <summary>Compresses and prepares a directory.</summary>

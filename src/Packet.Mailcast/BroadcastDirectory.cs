@@ -94,7 +94,45 @@ public sealed record StationAdvert(string Callsign, SlotTimetable Timetable, lon
 /// SHA-256, the ID being octets 0 to 7, as 16 lower-case hex digits,
 /// which a signed directory gives for every entry; null when the directory does not.
 /// </param>
-public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Size, string Bid, string Title, byte Type = (byte)ObjectKind.Bulletin, string? Hash = null);
+/// <param name="Envelope">
+/// The link to this bulletin's envelope object (issue #142), when the head end sends one;
+/// null otherwise. Written as <c>env=</c> and is inside what a signature covers.
+/// </param>
+public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Size, string Bid, string Title, byte Type = (byte)ObjectKind.Bulletin, string? Hash = null, EnvelopeLink? Envelope = null);
+
+/// <summary>
+/// Where a bulletin's envelope object is and what it must hash to: the envelope's object ID and
+/// its long hash (<see cref="Mailcast.ObjectId.LongHash"/>), as the <c>env=</c> field of the
+/// bulletin's directory entry.
+/// </summary>
+/// <param name="ObjectId">The envelope object's ID.</param>
+/// <param name="Hash">The envelope object's long hash, 16 lower-case hex digits.</param>
+public sealed record EnvelopeLink(ulong ObjectId, string Hash)
+{
+    /// <summary>The field name, with its equals sign.</summary>
+    public const string FieldName = "env=";
+
+    /// <summary>The field as written in a directory line: <c>env=</c>, the 16-digit ID, a semicolon, the 16-digit hash.</summary>
+    public string ToField() => FieldName + Mailcast.ObjectId.Format(ObjectId) + ";" + Hash;
+
+    /// <summary>Reads a field written by <see cref="ToField"/>; null if it is anything else.</summary>
+    public static EnvelopeLink? FromField(string field)
+    {
+        if (!field.StartsWith(FieldName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+        var parts = field[FieldName.Length..].Split(';');
+        if (parts.Length != 2 || !IsLowerHex(parts[0]) || !IsLowerHex(parts[1]) || !Mailcast.ObjectId.TryParse(parts[0], out ulong id))
+        {
+            return null;
+        }
+        return new EnvelopeLink(id, parts[1]);
+    }
+
+    /// <summary>Whether the text is 16 lower-case hex digits.</summary>
+    internal static bool IsLowerHex(string text) => text.Length == 16 && text.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
+}
 
 /// <summary>
 /// The list of objects in rotation on one day's broadcast, so that a receiver can tell how many
@@ -161,6 +199,13 @@ public sealed record DirectoryEntry(ulong ObjectId, ushort DictionaryId, int Siz
 /// receiver then takes a station's frequency, sideband and place from its own directory, and from
 /// the adverts for a station it has not heard. Earlier readers ignore all of them (none of the
 /// names starts with one they look for) and the signature still checks.
+/// </para>
+/// <para>
+/// From the release after v0.23.0 (issue #142) an entry for a canonical bulletin may also link its envelope object
+/// (content type 5), <c>env=</c>, the envelope's 16 hex digit object ID, a semicolon and its 16
+/// hex digit long hash (<see cref="EnvelopeLink"/>), after <c>hash=</c>. It is inside what a
+/// signature covers. Earlier readers ignore it like any field after the title (no name they look
+/// for starts with <c>env=</c>); a reader that finds it malformed ignores it too.
 /// </para>
 /// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
@@ -231,6 +276,10 @@ public sealed class BroadcastDirectory
             if (e.Hash is { } hash && !IsLongHash(hash))
             {
                 throw new ArgumentException($"Entry {e.Bid} has a hash that is not {ObjectId.ListedHashOctets * 2} lower-case hex digits.", nameof(entries));
+            }
+            if (e.Envelope is { } link && !IsLongHash(link.Hash))
+            {
+                throw new ArgumentException($"Entry {e.Bid} has an envelope hash that is not {ObjectId.ListedHashOctets * 2} lower-case hex digits.", nameof(entries));
             }
         }
         _signer = Entries.Count > 0 ? signer : null;
@@ -373,6 +422,10 @@ public sealed class BroadcastDirectory
             {
                 text.Append('\t').Append(HashField).Append(hash);
             }
+            if (e.Envelope is { } envelope)
+            {
+                text.Append('\t').Append(envelope.ToField());
+            }
             if (i == Entries.Count - 1 && _signer is { } signer)
             {
                 text.Append('\t').Append(KeyField).Append(KeyId.Format(signer.KeyId));
@@ -496,8 +549,9 @@ public sealed class BroadcastDirectory
                 keyText = parts[5..^1].LastOrDefault(f => f.StartsWith(KeyField, StringComparison.Ordinal))?[KeyField.Length..];
                 signedLength = lineStart + line.Length - parts[^1].Length - 1;
             }
+            var envelope = parts.Skip(5).Select(EnvelopeLink.FromField).FirstOrDefault(l => l is not null);
             lineStart += line.Length + 1;
-            entries.Add(new DirectoryEntry(objectId, dictionaryId, size, parts[3], parts[4], type, hash is not null && IsLongHash(hash) ? hash : null));
+            entries.Add(new DirectoryEntry(objectId, dictionaryId, size, parts[3], parts[4], type, hash is not null && IsLongHash(hash) ? hash : null, envelope));
             if (entries.Count == 1 && parts.Length > 5)
             {
                 schedule = SlotTimetable.FromFields(parts[5..]);

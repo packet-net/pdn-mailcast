@@ -122,4 +122,37 @@ public class BulletinTests
         Assert.Equal(TimeSpan.Zero, b.Date.Offset);
         Assert.Equal(When, Bulletin.Parse(b.Serialize()).Date);
     }
+
+    [Fact]
+    public void Canonical_IsWrittenAfterTitle_ReadBack_AndOldSerialisationsAreUnchanged()
+    {
+        var plain = Bulletin.FromMessageText('B', "G4ABC", "ALL", "WW", "12345_GB7RDG", "A title", When, "Hello.\r\n");
+        Assert.False(plain.Canonical);
+        Assert.DoesNotContain("Canonical", Encoding.Latin1.GetString(plain.Serialize()), StringComparison.Ordinal);
+        Assert.Equal("Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 12345_GB7RDG\nDate: 2026-10-01T12:34:56Z\nTitle: A title\n\nHello.\r\n",
+            Encoding.Latin1.GetString(plain.Serialize()));
+
+        var canonical = Bulletin.FromMessageText('B', "G4ABC", "ALL", "WW", "12345_GB7RDG", "A title", When, "Hello.\r\n", canonical: true);
+        Assert.Equal("Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 12345_GB7RDG\nDate: 2026-10-01T12:34:56Z\nTitle: A title\nCanonical: 1\n\nHello.\r\n",
+            Encoding.Latin1.GetString(canonical.Serialize()));
+        var back = Bulletin.Parse(canonical.Serialize());
+        Assert.True(back.Canonical);
+        Assert.Equal(canonical, back);
+        Assert.NotEqual(plain, canonical);
+        Assert.Equal(canonical.Serialize(), back.Serialize());
+        Assert.Equal(plain, Bulletin.Parse(plain.Serialize()));
+    }
+
+    [Theory]
+    [InlineData("Canonical: 0")]
+    [InlineData("Canonical: 2")]
+    [InlineData("Canonical: 1 ")]
+    [InlineData("Canonical: true")]
+    [InlineData("Canonical:")]
+    public void Canonical_IsSetOnlyByExactlyOne(string line)
+    {
+        var text = $"Type: B\nFrom: G4ABC\nTo: ALL\nAt: WW\nBid: 1_X\nDate: 2026-10-01T12:34:56Z\nTitle: t\n{line}\n\nbody\r\n";
+        Assert.False(Bulletin.Parse(Encoding.Latin1.GetBytes(text)).Canonical);
+        Assert.True(Bulletin.Parse(Encoding.Latin1.GetBytes(text.Replace(line, "Canonical:1"))).Canonical);
+    }
 }

@@ -46,6 +46,14 @@ public sealed class MailcastFrame
     /// </summary>
     public const int StandardSymbolSize = 940;
 
+    /// <summary>
+    /// The piece size the format fixes for every object a head end sends (issue #142): 240 octets,
+    /// a multiple of the alignment. Two head ends cut one object the same way only with the same
+    /// size, so a change is a format change (docs/design.md). The head end does not use it for
+    /// bulletins yet; <see cref="TransferObject.ForEnvelope"/> does.
+    /// </summary>
+    public const int FixedSymbolSize = 240;
+
     /// <summary>The symbol alignment the head end uses (RFC 6330 recommends 4).</summary>
     public const int StandardAlignment = 4;
 

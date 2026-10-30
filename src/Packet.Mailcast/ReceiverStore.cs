@@ -73,6 +73,14 @@ public enum FrameOutcome
     /// delivered, until a directory that is signed by a trusted key, or not signed, lists it.
     /// </summary>
     Withheld,
+
+    /// <summary>
+    /// The symbol completed a bulletin envelope (content type 5) that a trusted signed directory
+    /// lists through an <c>env=</c> field and whose hash matches: it is kept (see
+    /// <see cref="ReceiverStore.EnvelopesFor"/>) and nothing goes to the BBS. Last, so the values
+    /// before it are what they always were.
+    /// </summary>
+    CompletedEnvelope,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>
@@ -337,6 +345,7 @@ public sealed partial class ReceiverStore
     /// </summary>
     private readonly HashSet<ulong> _held = [];
     private readonly string _heldDir;
+    private readonly string _envelopeDir;
 
     /// <summary>Delivered bulletins already logged as not matching a signed listing, so each is said once.</summary>
     private readonly HashSet<ulong> _mismatchSaid = [];
@@ -360,6 +369,7 @@ public sealed partial class ReceiverStore
         _quarantine = Path.Combine(root, "quarantine");
         _stoppedDir = Path.Combine(root, "stopped");
         _heldDir = Path.Combine(root, "held");
+        _envelopeDir = Path.Combine(root, "envelopes");
         System.IO.Directory.CreateDirectory(_objects);
         System.IO.Directory.CreateDirectory(_doneDir);
         System.IO.Directory.CreateDirectory(_outbox);
@@ -1026,7 +1036,10 @@ public sealed partial class ReceiverStore
             }
         }
 
-        var ids = new HashSet<ulong>(fullest.Keys);
+        // Envelopes (issue #142) are not bulletins: they are linked from an entry's env= and never listed as rows.
+        var envelopeIds = new HashSet<ulong>(UsableDirectories().SelectMany(d => d.Directory.Entries).Where(e => e.Envelope is not null).Select(e => e.Envelope!.ObjectId));
+        var ids = new HashSet<ulong>(fullest.Where(kv => !envelopeIds.Contains(kv.Key) && !(kv.Value.Symbols.TryGetValue(0, out var first) && first.Length > 0 && (first[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)
+            && !(kv.Value.Withheld is { Length: > 0 } rebuilt && (rebuilt[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)).Select(kv => kv.Key));
         var withheld = new HashSet<ulong>(_instances.Values.Where(i => i.Withheld is not null).Select(i => i.ObjectId));
         foreach (var id in named.Keys)
         {
@@ -1108,6 +1121,7 @@ public sealed partial class ReceiverStore
             }
         }
         PruneKnownDirectories(now);
+        PruneEnvelopes(now);
         DropNoLongerSent(now);
         foreach (var instance in _instances.Values.ToList())
         {
@@ -1452,6 +1466,10 @@ public sealed partial class ReceiverStore
             }
             return new AcceptResult(FrameOutcome.CompletedIonosphere, instance.ObjectId, ContentType: type, Ionosphere: reading);
         }
+        if (type == (byte)ObjectKind.Envelope)
+        {
+            return FinishEnvelope(instance, data);
+        }
         if (type != (byte)ObjectKind.Bulletin && type != (byte)ObjectKind.Directory)
         {
             // Not for the BBS, whatever it is. Marked done so its later frames are ignored.
@@ -1563,6 +1581,142 @@ public sealed partial class ReceiverStore
         MailChanged();
         MarkDone(instance, longHash);
         return new AcceptResult(FrameOutcome.CompletedBulletin, instance.ObjectId, Bulletin: bulletin);
+    }
+
+    /// <summary>
+    /// Checks and keeps an envelope (issue #142). Admitted only when a trusted signed directory
+    /// lists it as some entry's <c>env=</c> and its long hash matches that; one that is not listed yet
+    /// is held, like a bulletin only a rejected directory lists, until a directory lists it. Nothing
+    /// goes to the BBS: delivery does not use envelopes yet.
+    /// </summary>
+    private AcceptResult FinishEnvelope(Instance instance, byte[] data)
+    {
+        BulletinEnvelope envelope;
+        try
+        {
+            var (_, content) = TransferObject.Unpack(data, instance.DictionaryId, _compression);
+            envelope = BulletinEnvelope.Parse(content);
+        }
+        catch (KeyNotFoundException)
+        {
+            Log($"object {ObjectId.Format(instance.ObjectId)} needs dictionary {instance.DictionaryId}, which this receiver does not have; skipped");
+            instance.ResetDecoder();
+            return new AcceptResult(FrameOutcome.UnknownDictionary, instance.ObjectId);
+        }
+        catch (Exception e) when (e is InvalidDataException or FormatException)
+        {
+            return Unusable(instance, "is an envelope that does not parse: " + e.Message);
+        }
+
+        string longHash = ObjectId.LongHash(instance.DictionaryId, data);
+        bool listed = false;
+        foreach (var (directory, check) in UsableDirectories())
+        {
+            if (check.State != SignatureState.Trusted)
+            {
+                continue;
+            }
+            foreach (var entry in directory.Entries)
+            {
+                if (entry.Envelope is not { } link || link.ObjectId != instance.ObjectId)
+                {
+                    continue;
+                }
+                listed = true;
+                if (string.Equals(link.Hash, longHash, StringComparison.Ordinal))
+                {
+                    System.IO.Directory.CreateDirectory(_envelopeDir);
+                    DurableFile.WriteAtomically(EnvelopePath(instance.ObjectId), envelope.Serialise(), _options.Time.GetUtcNow(), _options.FlushToDisk);
+                    MarkDone(instance, longHash);
+                    return new AcceptResult(FrameOutcome.CompletedEnvelope, instance.ObjectId, ContentType: (byte)ObjectKind.Envelope);
+                }
+            }
+        }
+        if (listed)
+        {
+            return Unusable(instance, "does not match the hash its signed directory lists for it, so it is not kept");
+        }
+        if (instance.Withheld is null)
+        {
+            instance.Withheld = data;
+            Log($"envelope {ObjectId.Format(instance.ObjectId)} is complete, but no good directory lists it yet: held");
+        }
+        return new AcceptResult(FrameOutcome.Withheld, instance.ObjectId, Detail: "held: no trusted signed directory lists this envelope yet");
+    }
+
+    private string EnvelopePath(ulong objectId) => Path.Combine(_envelopeDir, ObjectId.Format(objectId));
+
+    /// <summary>
+    /// Every envelope kept for a bulletin, one per station whose trusted signed directory (still
+    /// remembered) links one that has been heard and not pruned, in a fixed order (station name,
+    /// then envelope object ID). Empty when there is none. Delivery does not use them yet (issue #142).
+    /// </summary>
+    public IReadOnlyList<(string Station, BulletinEnvelope Envelope)> EnvelopesFor(ulong bulletinObjectId)
+    {
+        var found = new List<(string Station, ulong ObjectId, BulletinEnvelope Envelope)>();
+        foreach (var (directory, check) in UsableDirectories())
+        {
+            if (check.State != SignatureState.Trusted || directory.Find(bulletinObjectId)?.Envelope is not { } link)
+            {
+                continue;
+            }
+            string station = check.SignedBy ?? "";
+            if (found.Any(f => f.ObjectId == link.ObjectId && f.Station == station))
+            {
+                continue;
+            }
+            if (ReadEnvelope(link.ObjectId) is { } envelope)
+            {
+                found.Add((station, link.ObjectId, envelope));
+            }
+        }
+        return [.. found.OrderBy(f => f.Station, StringComparer.Ordinal).ThenBy(f => f.ObjectId).Select(f => (f.Station, f.Envelope))];
+    }
+
+    private BulletinEnvelope? ReadEnvelope(ulong envelopeObjectId)
+    {
+        string path = EnvelopePath(envelopeObjectId);
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+        try
+        {
+            return BulletinEnvelope.Parse(File.ReadAllBytes(path));
+        }
+        catch (Exception e) when (e is FormatException or IOException)
+        {
+            Log($"envelope {ObjectId.Format(envelopeObjectId)} unreadable, removed");
+            TryDelete(path);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Deletes kept envelopes older than the longest of <see cref="ReceiverStoreOptions.ArchiveRetention"/>,
+    /// <see cref="ReceiverStoreOptions.DoneRetention"/> and <see cref="ReceiverStoreOptions.PartialRetention"/>
+    /// (so archive.days 0 does not drop them within the hour), and forgets the done marker of each, so
+    /// a resend can bring it back.
+    /// </summary>
+    private void PruneEnvelopes(DateTimeOffset now)
+    {
+        if (!System.IO.Directory.Exists(_envelopeDir))
+        {
+            return;
+        }
+        var keep = new[] { _options.ArchiveRetention, _options.DoneRetention, _options.PartialRetention }.Max();
+        foreach (var file in System.IO.Directory.EnumerateFiles(_envelopeDir))
+        {
+            if (now - File.GetLastWriteTimeUtc(file) > keep)
+            {
+                TryDelete(file);
+                if (ObjectId.TryParse(Path.GetFileName(file), out ulong id) && _done.Remove(id))
+                {
+                    _doneHashes.Remove(id);
+                    TryDelete(DonePath(id));
+                }
+            }
+        }
     }
 
     private enum Admission
@@ -1684,13 +1838,17 @@ public sealed partial class ReceiverStore
     private List<Bulletin>? ReleaseWithheld(BroadcastDirectory directory)
     {
         List<Bulletin>? released = null;
-        foreach (var instance in _instances.Values.Where(i => i.Withheld is not null && directory.Find(i.ObjectId) is not null).ToList())
+        foreach (var instance in _instances.Values.Where(i => i.Withheld is not null && (directory.Find(i.ObjectId) is not null || directory.Entries.Any(e => e.Envelope?.ObjectId == i.ObjectId))).ToList())
         {
             if (!_instances.ContainsKey(instance.Key))
             {
                 continue;
             }
             var result = Finish(instance, instance.Withheld!);
+            if (result is { Outcome: FrameOutcome.CompletedEnvelope })
+            {
+                Log($"envelope {ObjectId.Format(instance.ObjectId)}, held back, is now listed by a good directory: kept");
+            }
             if (result is { Outcome: FrameOutcome.CompletedBulletin, Bulletin: { } bulletin })
             {
                 Log($"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}), held back, is now listed by a good directory: delivered");
