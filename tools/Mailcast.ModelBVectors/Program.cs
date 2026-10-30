@@ -32,7 +32,9 @@ else
 }
 
 var doc = ModelBVectors.Document(inputs);
-File.WriteAllText(output, doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n", new UTF8Encoding(false));
+// Always LF newlines, whatever the platform (the folder has eol=lf in .gitattributes).
+var json = doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true }).Replace("\r\n", "\n", StringComparison.Ordinal);
+File.WriteAllText(output, json + "\n", new UTF8Encoding(false));
 Console.WriteLine($"wrote {inputs.Count} cases to {output}");
 return 0;
 
@@ -66,15 +68,39 @@ static List<VectorInput> NewInputs(string root)
     inputs.Add(new VectorInput("fbb-origin-and-path", "A copy as FBB hands it over: an R: line and the Path line, then the From: and To: origin block and the body (body from research/138/corpus/GB7CIP/msg-598285.txt).",
         'B', cipHead["From"], cipHead["To"], "WW", cipHead["Bid"], L1(cipHead["Title"]), L1(fbb)));
 
-    inputs.Add(Make("eight-bit-and-ansi", "Octets above 127 (Latin-1 accents, a pound sign) and ANSI colour escapes, in the title as well.", "EIGHTBIT_G8BPQ", "Café £ ANSI test",
+    inputs.Add(Make("eight-bit-and-ansi", "Octets above 127 (Latin-1 accents, a pound sign) in the title and the body, and ANSI colour escapes in the body.", "EIGHTBIT_G8BPQ", "Café £ ANSI test",
         L1("R:261030/1000Z 1@GB7XXX.#1.GBR.EURO BPQ6.0.25\n\nCafé crème £5 üñîçødé\n\u001b[1;31mRED\u001b[0m and \u001b[32mgreen\u001b[0m text\nÿ\u0080\u009f end\n")));
 
     inputs.Add(Make("raw-mixed-line-endings", "A body that mixes CR LF, LF and lone CR line endings, so it is kept exactly as it is (Raw).", "RAWMIX_G8BPQ", "Mixed line endings",
         L1("first line\r\nsecond line\nthird line\rfourth line\r\n\r\nlast\n")));
 
-    inputs.Add(Make("title-60-characters", "A title of 60 characters whose 59th is a space: the shared title is cut to 59 and loses that space, the envelope keeps all 60.", "TITLE60_G8BPQ",
-        "0123456789012345678901234567890123456789012345678901234567 X",
+    inputs.Add(Make("title-60-characters", "A title of 60 characters whose 58th, 59th and 60th are all non-blank: the shared title keeps exactly the first 59 (cutting at 58 or 60 gives other bytes), the envelope keeps all 60.", "TITLE60_G8BPQ",
+        "0123456789012345678901234567890123456789012345678901234567XYZ",
         L1("A short body under a long title.\n")));
+
+    inputs.Add(Make("title-trailing-blanks", "A title whose cut at 59 octets ends in a space and a tab, which are trimmed from the shared title; the envelope keeps the whole title.", "TITLEWS_G8BPQ",
+        "012345678901234567890123456789012345678901234567890123456 \tZ tail",
+        L1("A short body under a title with blanks at the cut.\n")));
+
+    inputs.Add(Make("line-endings-crlf", "Every line ends in CR LF, routing lines included, and the oldest R: line has no zone letter (the newer one has a lower-case z).", "CRLF_G8BPQ", "CR LF body",
+        L1("R:261030/1100z @:GB7AAA.#1.GBR.EURO #:11 $:CRLF_G8BPQ\r\nR:261029/0930 @:GB7BBB.#2.GBR.EURO #:22 $:CRLF_G8BPQ\r\n\r\nFirst line.\r\nSecond line.\r\n\r\nFourth line.\r\n")));
+
+    inputs.Add(Make("line-endings-cr", "Every line ends in a lone CR (an old style of reader), routing lines included.", "CRONLY_G8BPQ", "Lone CR body",
+        L1("R:261030/1100Z @:GB7AAA.#1.GBR.EURO #:11 $:CRONLY_G8BPQ\rR:261028/2359Z @:GB7BBB.#2.GBR.EURO #:22 $:CRONLY_G8BPQ\r\rFirst line.\rSecond line.\r\rFourth line.\r")));
+
+    // Over 128 KB (zstd's block size), so the output has several blocks: GB7RDG corpus files one after another.
+    var big = new List<byte>();
+    foreach (var file in Directory.GetFiles(Path.Combine(root, "research", "138", "corpus", "GB7RDG"), "msg-*.txt").OrderBy(f => f, StringComparer.Ordinal))
+    {
+        if (big.Count > 131072 + 1024)
+        {
+            break;
+        }
+
+        big.AddRange(Corpus(file).Text);
+    }
+
+    inputs.Add(Make("large-over-128k", "A body over 128 KB made of GB7RDG corpus bulletins one after another, so zstd writes several blocks; only a few symbols are listed.", "BIG128K_G8BPQ", "Large body", [.. big]));
 
     // An envelope bigger than one 240 octet piece: many R: lines that do not compress.
     var rng = new Random(142);

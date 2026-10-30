@@ -50,7 +50,7 @@ public static class ModelBVectors
     /// <summary>The piece size every object is cut at.</summary>
     public const int PieceSize = MailcastFrame.FixedSymbolSize;
 
-    /// <summary>The encoding symbol IDs listed besides K-1, K and K+1: 0, 1000 and the largest, 2^24 - 1.</summary>
+    /// <summary>The encoding symbol IDs listed besides K-1, K and K+1: 0, 1000 and the largest, 2^24 - 1 (1000 is left out above 64 source symbols).</summary>
     public static readonly uint[] FixedEsis = [0, 1000, 16777215];
 
     /// <summary>The date written into the directory line (any date; it is not on the entry line).</summary>
@@ -89,7 +89,11 @@ public static class ModelBVectors
     /// <summary>The ESIs listed for an object of K source symbols, in order, without repeats.</summary>
     public static uint[] EsisFor(int k)
     {
-        var list = new SortedSet<uint>(FixedEsis) { (uint)(k - 1), (uint)k, (uint)(k + 1) };
+        // Large objects (more than 64 source symbols) list ESI 0, K-1, K, K+1 and the largest only, to keep the file small.
+        var list = k > 64 ? new SortedSet<uint>([0u, FixedEsis[^1]]) : new SortedSet<uint>(FixedEsis);
+        list.Add((uint)(k - 1));
+        list.Add((uint)k);
+        list.Add((uint)(k + 1));
         return [.. list];
     }
 

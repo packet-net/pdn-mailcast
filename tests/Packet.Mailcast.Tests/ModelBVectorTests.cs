@@ -44,7 +44,7 @@ public class ModelBVectorTests
     public void File_CoversTheListedInputs()
     {
         var names = Cases.Select(c => (string)c!["name"]!).ToArray();
-        Assert.Equal(8, names.Length);
+        Assert.Equal(12, names.Length);
         Assert.Equal(names.Length, names.Distinct().Count());
         Assert.Equal(ModelBVectors.PieceSize, (int)File.Value["pieceSize"]!);
         Assert.Equal(240, ModelBVectors.PieceSize);
