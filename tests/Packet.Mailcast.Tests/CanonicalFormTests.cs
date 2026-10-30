@@ -203,6 +203,58 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void AnsiEscapeSequences_AreContent_AtTheEdgesToo()
+    {
+        const string red = "\u001b[1;31m";
+        const string off = "\u001b[0m";
+        foreach (var text in new[] { red + "x" + off + "\r\nbody\r\n", red + "\r\nbody\r\n", "body\r\n" + off + "\r\n", "body\r\n" + off, off + "\r\n" + red + "\r\n" })
+        {
+            var c = Canon(text);
+            Assert.Contains("\u001b", L1.GetString(c.Body));
+            Assert.Equal(text.Replace("\r\n", "\n").TrimEnd('\n') + "\n", L1.GetString(c.Body));
+            RoundTrips(B(text), "t");
+        }
+    }
+
+    [Fact]
+    public void NonAsciiBytesAtTheEdges_AreNotWhitespace()
+    {
+        var bytes = new List<byte>();
+        for (var b = 0x80; b <= 0xFF; b++)
+        {
+            bytes.Add((byte)b);
+        }
+
+        foreach (var b in bytes)
+        {
+            var original = new byte[] { b, (byte)'\r', (byte)'\n', (byte)'x', (byte)'\r', (byte)'\n', b, (byte)'\r', (byte)'\n' };
+            var c = CanonicalForm.Canonicalise(original, "t");
+            Assert.Equal(new byte[] { b, (byte)'\n', (byte)'x', (byte)'\n', b, (byte)'\n' }, c.Body);
+            Assert.Empty(c.Envelope.Top.ToArray());
+            RoundTrips(original, "t");
+            // A lone such byte on its own line is a content line, not a blank one.
+            RoundTrips([b], "t");
+            Assert.Equal(new[] { b, (byte)'\n' }, CanonicalForm.Canonicalise([b], "t").Body);
+        }
+    }
+
+    [Fact]
+    public void Utf8SequencesAtTheEdges_OnlyAsciiSpaceAndTabAreTrimmed()
+    {
+        // U+00A0 (C2 A0), U+0085 (C2 85) and U+2003 (E2 80 83) are whitespace to Unicode but not here.
+        byte[] original = [.. B(" \t"), 0xC2, 0xA0, (byte)'\n', 0xE2, 0x80, 0x83, (byte)'\n', (byte)'x', (byte)'\n', 0xC2, 0x85, (byte)'\n', .. B("\t \n")];
+        var c = CanonicalForm.Canonicalise(original, "t");
+        Assert.Equal(new byte[] { (byte)' ', (byte)'\t', 0xC2, 0xA0, (byte)'\n', 0xE2, 0x80, 0x83, (byte)'\n', (byte)'x', (byte)'\n', 0xC2, 0x85, (byte)'\n' }, c.Body);
+        RoundTrips(original, "t");
+
+        // A multi-byte sequence split by the edge: the space before it goes to the envelope, the sequence stays whole.
+        var split = new byte[] { (byte)'\n', (byte)' ', 0xE2, 0x80, 0x83, (byte)'\n' };
+        var c2 = CanonicalForm.Canonicalise(split, "t");
+        Assert.Equal(new byte[] { (byte)' ', 0xE2, 0x80, 0x83, (byte)'\n' }, c2.Body);
+        RoundTrips(split, "t");
+    }
+
+    [Fact]
     public void FullTitle_IsKeptInTheEnvelope()
     {
         var title = new string('x', 100) + "é";

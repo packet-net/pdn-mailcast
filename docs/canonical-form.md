@@ -4,6 +4,8 @@ Copies of one bulletin held by different BBSes differ at the edges, not in the m
 
 Evidence for each rule is in `research/138/README.md` and `research/138/lab/FINDINGS.md`.
 
+Bytes are handled one to one (Latin-1), and only space and tab count as blank: ANSI escapes, 8-bit bytes, NBSP, NEL and UTF-8 sequences are content, wherever they sit.
+
 ## What is removed from the top
 
 Working down from the first line, repeating until none applies:
