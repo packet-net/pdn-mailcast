@@ -20,14 +20,19 @@ public sealed record BroadcastBulletin(Bulletin Bulletin, DateOnly FirstSeen, Da
 /// <param name="Size">The serialised bulletin's length, for the directory.</param>
 /// <param name="FirstSeen">The day the head end first saw it, which counts for <see cref="ScheduleOptions.RememberDays"/>.</param>
 /// <param name="Transfer">The compressed, coded object.</param>
-/// <param name="NextEsi">The first ESI not yet sent.</param>
+/// <param name="NextEsi">How many pieces have been sent: the first ESI not yet sent, or for a shuffled bulletin (<see cref="CarriedBulletin.Shuffle"/>) the count that maps to it.</param>
 /// <param name="FirstSlot">
 /// The start of the slot it was first carried in, or null while it has not been: the next slot
 /// planned is then its first.
 /// </param>
 /// <param name="Envelope">The bulletin's envelope object (issue #142), sent in every slot that carries the bulletin; null for one held from before.</param>
 /// <param name="EnvelopeNextEsi">The first envelope ESI not yet sent.</param>
-public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnly FirstSeen, TransferObject Transfer, uint NextEsi, DateTimeOffset? FirstSlot = null, TransferObject? Envelope = null, uint EnvelopeNextEsi = 0);
+/// <param name="Shuffle">The station's own piece order for this bulletin (issue #143), or null to send ESIs in sequence; <see cref="NextEsi"/> then counts pieces sent, and the ESI sent is the shuffle of the count.</param>
+public sealed record CarriedBulletin(string Bid, string Title, int Size, DateOnly FirstSeen, TransferObject Transfer, uint NextEsi, DateTimeOffset? FirstSlot = null, TransferObject? Envelope = null, uint EnvelopeNextEsi = 0, EsiShuffle? Shuffle = null)
+{
+    /// <summary>The ESI sent as this bulletin's count-th piece: the count itself, or its place in the station's own order (issue #143).</summary>
+    public uint EsiOf(uint count) => Shuffle?.Map(count) ?? count;
+}
 
 /// <summary>
 /// How slots are filled under the budget rule: each slot is filled up to an airtime budget with
@@ -214,13 +219,17 @@ public sealed record ScheduleOptions
 /// <summary>One object's part in a slot.</summary>
 /// <param name="Transfer">The object.</param>
 /// <param name="SlotIndex">0 in the slot it was first carried in, then the slots since; the directory is always 0.</param>
-/// <param name="FirstEsi">The first ESI sent in this slot.</param>
-/// <param name="Count">How many symbols are sent in this slot, with consecutive ESIs.</param>
+/// <param name="FirstEsi">The first ESI sent in this slot; for a shuffled bulletin, the count of pieces sent before it (the ESIs are <see cref="ScheduledObject.EsiOf"/> of the counts).</param>
+/// <param name="Count">How many symbols are sent in this slot, with consecutive ESIs (consecutive counts, when shuffled).</param>
 /// <param name="Bid">The bulletin's BID, or null for the directory and for an envelope.</param>
 /// <param name="EnvelopeFor">For a bulletin's envelope (issue #142), that bulletin's BID; null otherwise.</param>
-public sealed record ScheduledObject(TransferObject Transfer, int SlotIndex, uint FirstEsi, int Count, string? Bid = null, string? EnvelopeFor = null)
+/// <param name="Shuffle">The bulletin's piece order (issue #143), or null when its ESIs run in sequence.</param>
+public sealed record ScheduledObject(TransferObject Transfer, int SlotIndex, uint FirstEsi, int Count, string? Bid = null, string? EnvelopeFor = null, EsiShuffle? Shuffle = null)
 {
-    /// <summary>The first ESI for the object's next slot.</summary>
+    /// <summary>The ESI of the object's count-th piece: the count itself, or its place in the shuffled order (issue #143).</summary>
+    public uint EsiOf(uint count) => Shuffle?.Map(count) ?? count;
+
+    /// <summary>The first count for the object's next slot. With a <see cref="Shuffle"/> the ESIs are not consecutive; this is a count of pieces sent.</summary>
     public uint NextEsi => FirstEsi + (uint)Count;
 }
 
@@ -559,7 +568,7 @@ public static class BroadcastScheduler
     /// <summary>
     /// Plans a slot from bulletins alone, compressing each afresh and taking each one's first ESI
     /// as if every earlier slot had gone out whole. That gives the same frames as a head end that
-    /// keeps state, as long as the compression and options are unchanged; a real head end should
+    /// keeps state and has no station callsign (so nothing is shuffled), as long as the compression and options are unchanged; a real head end should
     /// use <see cref="HeadEndStore"/> and the other overload.
     /// </summary>
     public static SlotBroadcast Plan(IEnumerable<BroadcastBulletin> bulletins, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options = null)
@@ -842,7 +851,7 @@ public static class BroadcastScheduler
             room[i] = leftover[i] ? 0 : Math.Clamp(LeftoverSymbols(k, rule) - sent, 0, CapSymbols(k, rule));
             spare[i] = Math.Clamp(RetireSymbols(k, rule) - sent, 0, CapSymbols(k, rule));
             floor[i] = Math.Min(room[i], FloorSymbols(k, rule));
-            lengths[i] = c.Transfer.Frame(c.NextEsi).ToBytes().Length;
+            lengths[i] = c.Transfer.Frame(c.EsiOf(c.NextEsi)).ToBytes().Length;
         }
         int directoryLength = directory.Frame(0).ToBytes().Length;
         var bulletinLengths = new List<int>();
@@ -911,7 +920,7 @@ public static class BroadcastScheduler
         for (int i = 0; i < bulletins.Count; i++)
         {
             var (c, index) = bulletins[i];
-            scheduled.Add(new ScheduledObject(c.Transfer, index, c.NextEsi, counts[i], c.Bid));
+            scheduled.Add(new ScheduledObject(c.Transfer, index, c.NextEsi, counts[i], c.Bid, Shuffle: c.Shuffle));
         }
         int bulletinFrames = scheduled.Sum(s => s.Count);
         // Capped only when the budget rule's Plan loop finds even the directory alone over
@@ -969,7 +978,7 @@ public static class BroadcastScheduler
             else
             {
                 var o = order[nextBulletin++];
-                frames.Add(scheduled[o.Object].Transfer.Frame(scheduled[o.Object].FirstEsi + (uint)o.Index));
+                frames.Add(scheduled[o.Object].Transfer.Frame(scheduled[o.Object].EsiOf(scheduled[o.Object].FirstEsi + (uint)o.Index)));
             }
         }
 

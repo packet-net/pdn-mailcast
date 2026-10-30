@@ -16,7 +16,7 @@ namespace Packet.Mailcast;
 /// <code>
 /// object.bin   the object's octets, exactly as coded
 /// envelope.bin the envelope object's octets, for a bulletin first offered since issue #142 (none for an older one)
-/// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi,
+/// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi (a count of pieces sent), EsiOrder and EsiStation (shuffled bulletins, issue #143),
 ///              and FirstSlot once it has been carried
 /// </code>
 /// <para>
@@ -134,7 +134,9 @@ public sealed class HeadEndStore
         }
         var transfer = TransferObject.ForBulletin(shared, _options.DictionaryId, _compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
         var envelopeObject = envelope is null ? null : TransferObject.ForEnvelope(envelope, _options.DictionaryId, _compression);
-        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, 0, Envelope: envelopeObject);
+        // A bulletin taken now is sent in this station's own piece order (issue #143); with no station named, in sequence.
+        var shuffle = _options.Station is { } station ? EsiShuffle.For(station, transfer.ObjectId) : null;
+        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, 0, Envelope: envelopeObject, Shuffle: shuffle);
         var dir = Path.Combine(_bulletins, key);
         Directory.CreateDirectory(dir);
         DurableFile.WriteAtomically(Path.Combine(dir, "object.bin"), transfer.Bytes);
@@ -183,9 +185,11 @@ public sealed class HeadEndStore
         ArgumentNullException.ThrowIfNull(broadcast);
         ArgumentOutOfRangeException.ThrowIfNegative(framesSent);
         var next = new Dictionary<ulong, uint>();
+        // A shuffled bulletin (issue #143) moves on by count, not by ESI: the count behind each frame sent.
+        var shuffles = broadcast.Objects.Where(o => o.Shuffle is not null && o.Bid is not null).ToDictionary(o => o.Transfer.ObjectId, o => o.Shuffle!);
         foreach (var frame in broadcast.Frames.Take(framesSent))
         {
-            uint after = frame.EncodingSymbolId + 1;
+            uint after = (shuffles.TryGetValue(frame.ObjectId, out var shuffle) ? shuffle.Unmap(frame.EncodingSymbolId) : frame.EncodingSymbolId) + 1;
             if (!next.TryGetValue(frame.ObjectId, out uint known) || after > known)
             {
                 next[frame.ObjectId] = after;
@@ -317,6 +321,13 @@ public sealed class HeadEndStore
         text.Append(CultureInfo.InvariantCulture, $"Dictionary: {c.Transfer.DictionaryId}\n");
         text.Append("Oti: ").Append(Convert.ToHexStringLower(c.Transfer.Oti.ToBytes())).Append('\n');
         text.Append(CultureInfo.InvariantCulture, $"NextEsi: {c.NextEsi}\n");
+        if (c.Shuffle is { } shuffle)
+        {
+            // NextEsi counts pieces sent; the ESI sent is the keyed shuffle of the count. The callsign is kept so that a
+            // later change of the station's callsign never changes the order of a bulletin part sent.
+            text.Append("EsiOrder: shuffled\n");
+            text.Append("EsiStation: ").Append(shuffle.Station).Append('\n');
+        }
         if (c.Envelope is { } envelope)
         {
             text.Append("Envelope: ").Append(ObjectId.Format(envelope.ObjectId)).Append('\n');
@@ -381,6 +392,11 @@ public sealed class HeadEndStore
                     envelopeNextEsi = uint.Parse(fields["EnvelopeNextEsi"], CultureInfo.InvariantCulture);
                 }
             }
+            EsiShuffle? shuffle = null;
+            if (fields.TryGetValue("EsiOrder", out var order) && order == "shuffled")
+            {
+                shuffle = EsiShuffle.For(fields["EsiStation"], transfer.ObjectId);
+            }
             var carried = new CarriedBulletin(
                 fields["Bid"],
                 fields["Title"],
@@ -390,7 +406,8 @@ public sealed class HeadEndStore
                 nextEsi,
                 firstSlot,
                 envelope,
-                envelopeNextEsi);
+                envelopeNextEsi,
+                shuffle);
             return new Entry(dir, carried);
         }
         catch (Exception e) when (e is FormatException or ArgumentException or KeyNotFoundException or OverflowException)
