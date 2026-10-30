@@ -27,6 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The Model B vector file (issue #142) is the definition of the format; its builder is shared with the generator tool. -->
+    <None Include="Vectors\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\..\tools\Mailcast.ModelBVectors\ModelBVectors.cs" Link="ModelBVectors\ModelBVectors.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Packet.Mailcast\Packet.Mailcast.csproj" />
   </ItemGroup>
 
