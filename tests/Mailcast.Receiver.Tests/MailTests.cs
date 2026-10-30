@@ -455,7 +455,12 @@ public class MailTests
         using var _c = http;
         var (canonical, _) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "77_TEST", "A title",
             System.Text.Encoding.Latin1.GetBytes("R:261019/0850Z 77@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody.\r\n"));
-        await RebuildAsync(host.Intake, canonical);
+        var transfer = TransferObject.ForBulletin(canonical, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        for (uint i = 0; i < transfer.SourceSymbols; i++)
+        {
+            host.Intake.Offer(Ax25UiFrame.Build(Samples.Source, OnAir.Destination, transfer.Frame(i).ToBytes()));
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
         string id = ObjectId.Format(Assert.Single(host.Intake.Awaiting()).ObjectId);
         Assert.Empty(host.Intake.Pending());
 

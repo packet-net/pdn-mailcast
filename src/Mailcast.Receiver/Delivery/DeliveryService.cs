@@ -53,6 +53,7 @@ public sealed class DeliveryService
         _time = time;
         _log = log;
         intake.BulletinCompleted += _ => Nudge();
+        intake.BulletinReleased += _ => Nudge();
     }
 
     /// <summary>The last session's failure, or null if the last session worked.</summary>

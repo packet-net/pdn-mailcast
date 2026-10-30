@@ -143,11 +143,15 @@ public sealed class MailParts
 /// stopped sending, newly marked so (see <see cref="ReceiverStore.NoLongerSentRetention"/>); null if none.
 /// </param>
 /// <param name="Check">What the signature check of the directory found, for a directory completed, repeated or rejected.</param>
+/// <param name="Delivered">
+/// Canonical bulletins (issue #145) that left their wait for an envelope because of this frame (or the
+/// hourly clean-up it ran): already counted as completed when they completed, now in the outbox; null if none.
+/// </param>
 /// <param name="Released">
 /// Bulletins held back (<see cref="FrameOutcome.Withheld"/>) that this frame's directory
 /// (completed or repeated) lists, now delivered to the outbox; null if none.
 /// </param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null);
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null, IReadOnlyList<Bulletin>? Delivered = null);
 
 /// <summary>The directory heard most recently, and what its signature check found.</summary>
 /// <param name="Date">The directory's date.</param>
@@ -482,6 +486,8 @@ public sealed partial class ReceiverStore
             }
         }
         LoadKnownDirectories();
+        ReleaseExpiredAwaiting();
+        _delivered.Clear(); // in the outbox, which the delivery loop reads when it starts
         foreach (var (directory, _, check) in _knownDirectories.Values.OrderBy(k => k.Directory.Date).ThenBy(k => k.HeardAt))
         {
             NoteAdverts(directory, check);
@@ -693,6 +699,13 @@ public sealed partial class ReceiverStore
     /// <param name="heardFrom">The station this frame is taken to come from (the slot's station), or null if not known; counted per object to choose whose envelope to use (issue #145).</param>
     public AcceptResult Accept(ReadOnlySpan<byte> payload, string? heardFrom = null)
     {
+        var result = AcceptFrame(payload, heardFrom);
+        var delivered = TakeDelivered();
+        return delivered.Count > 0 ? result with { Delivered = delivered } : result;
+    }
+
+    private AcceptResult AcceptFrame(ReadOnlySpan<byte> payload, string? heardFrom)
+    {
         var now = _options.Time.GetUtcNow();
         if (now - _lastExpiry >= ExpiryInterval)
         {
@@ -728,7 +741,8 @@ public sealed partial class ReceiverStore
                 check = known.Check;
                 RememberDirectory(frame.ObjectId, known.Directory, known.Check);
                 stopped = CheckRotation(known.Directory, known.Check, now);
-                released = Merge(ReleaseWithheld(known.Directory), ReleaseAwaiting(known.Directory, known.Check));
+                released = ReleaseWithheld(known.Directory);
+                ReleaseAwaiting(known.Directory, known.Check);
                 SayMismatches(known.Directory, known.Check);
             }
             else if (_rejectedDirectories.TryGetValue(frame.ObjectId, out var rejected))
@@ -742,8 +756,6 @@ public sealed partial class ReceiverStore
         {
             return new AcceptResult(FrameOutcome.UnknownDictionary, frame.ObjectId);
         }
-        CountFrame(frame.ObjectId, heardFrom);
-
         string key = KeyOf(frame.ObjectId, frame.DictionaryId, frame.Oti);
         if (_unusable.Contains(key))
         {
@@ -758,6 +770,7 @@ public sealed partial class ReceiverStore
         }
         if (instance.Symbols.ContainsKey(frame.EncodingSymbolId))
         {
+            CountFrame(frame.ObjectId, heardFrom);
             return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
         }
         var symbol = frame.Symbol.ToArray();
@@ -772,6 +785,7 @@ public sealed partial class ReceiverStore
             System.IO.Directory.CreateDirectory(instance.Path);
             _instances.Add(key, instance);
         }
+        CountFrame(frame.ObjectId, heardFrom);
         DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), symbol, now, _options.FlushToDisk);
         instance.LastPiece = now;
         if (_stopped.ContainsKey(frame.ObjectId))
@@ -1130,7 +1144,7 @@ public sealed partial class ReceiverStore
         }
         foreach (var (id, when) in _done.ToList())
         {
-            if (now - when > _options.DoneRetention && !_outboxItems.ContainsKey(OutboxName(id)))
+            if (now - when > _options.DoneRetention && !_outboxItems.ContainsKey(OutboxName(id)) && !_awaiting.ContainsKey(id))
             {
                 File.Delete(DonePath(id));
                 _done.Remove(id);
@@ -1139,6 +1153,7 @@ public sealed partial class ReceiverStore
         }
         PruneKnownDirectories(now);
         PruneEnvelopes(now);
+        ReleaseExpiredAwaiting();
         DropNoLongerSent(now);
         foreach (var instance in _instances.Values.ToList())
         {
@@ -1555,7 +1570,7 @@ public sealed partial class ReceiverStore
             MarkDone(instance);
             var stopped = CheckRotation(directory, check, _options.Time.GetUtcNow());
             released.AddRange(ReleaseWithheld(directory) ?? []);
-            released.AddRange(ReleaseAwaiting(directory, check) ?? []);
+            ReleaseAwaiting(directory, check);
             SayMismatches(directory, check);
             return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped, Check: check, Released: released.Count > 0 ? released : null);
         }
@@ -1651,7 +1666,8 @@ public sealed partial class ReceiverStore
                     System.IO.Directory.CreateDirectory(_envelopeDir);
                     DurableFile.WriteAtomically(EnvelopePath(instance.ObjectId), envelope.Serialise(), _options.Time.GetUtcNow(), _options.FlushToDisk);
                     MarkDone(instance, longHash);
-                    return new AcceptResult(FrameOutcome.CompletedEnvelope, instance.ObjectId, ContentType: (byte)ObjectKind.Envelope, Released: ReleaseAwaiting(null, null));
+                    ReleaseAwaiting(null, null);
+                    return new AcceptResult(FrameOutcome.CompletedEnvelope, instance.ObjectId, ContentType: (byte)ObjectKind.Envelope);
                 }
             }
         }
@@ -1683,7 +1699,10 @@ public sealed partial class ReceiverStore
             {
                 continue;
             }
-            string station = check.SignedBy ?? "";
+            if (StationOf(directory, check) is not { } station)
+            {
+                continue;
+            }
             if (found.Any(f => f.ObjectId == link.ObjectId && f.Station == station))
             {
                 continue;
@@ -1872,9 +1891,9 @@ public sealed partial class ReceiverStore
             {
                 Log($"envelope {ObjectId.Format(instance.ObjectId)}, held back, is now listed by a good directory: kept");
             }
-            if (result is { Outcome: FrameOutcome.CompletedBulletin, Bulletin: { } bulletin })
+            if (result is { Outcome: FrameOutcome.CompletedBulletin or FrameOutcome.AwaitingEnvelope, Bulletin: { } bulletin })
             {
-                Log($"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}), held back, is now listed by a good directory: delivered");
+                Log($"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}), held back, is now listed by a good directory: {(result.Outcome == FrameOutcome.AwaitingEnvelope ? "taken" : "delivered")}");
                 (released ??= []).Add(bulletin);
             }
         }
@@ -1894,8 +1913,6 @@ public sealed partial class ReceiverStore
         Remove(instance);
         return new AcceptResult(FrameOutcome.Rejected, instance.ObjectId, Detail: detail);
     }
-
-    private static List<Bulletin>? Merge(List<Bulletin>? a, List<Bulletin>? b) => a is null ? b : b is null ? a : [.. a, .. b];
 
     private void MarkDone(Instance instance, string? hash = null)
     {
@@ -1947,6 +1964,10 @@ public sealed partial class ReceiverStore
         if (_stopped.ContainsKey(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
         {
             ForgetStopped(instance.ObjectId);
+        }
+        if (!_awaiting.ContainsKey(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
+        {
+            _heardFrames.Remove(instance.ObjectId);
         }
         if (_held.Contains(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
         {

@@ -215,6 +215,12 @@ public sealed class Intake : IAsyncDisposable
     public event Action<Bulletin>? BulletinCompleted;
 
     /// <summary>
+    /// A canonical bulletin (issue #145) that completed earlier has left its wait for an envelope and is
+    /// in the outbox. Not a new completion: <see cref="BulletinCompleted"/> fired when it completed.
+    /// </summary>
+    public event Action<Bulletin>? BulletinReleased;
+
+    /// <summary>
     /// A broadcast frame was heard, with the waveform it came on if the modem said, and how many
     /// bytes its information field held (raised on the worker).
     /// </summary>
@@ -478,7 +484,8 @@ public sealed class Intake : IAsyncDisposable
         Publish(parts);
         if (delivered is not null)
         {
-            BulletinCompleted?.Invoke(delivered);
+            _log($"bulletin released to the outbox: {Ascii.Clean(delivered.Bid)}");
+            BulletinReleased?.Invoke(delivered);
         }
         return delivered;
     }
@@ -616,7 +623,7 @@ public sealed class Intake : IAsyncDisposable
                     result = _store.Accept(payload.Span, HeardFrom?.Invoke());
                     givenUp = _store.TakeGivenUp();
                     if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary)
-                        || result.Released is not null)
+                        || result.Released is not null || result.Delivered is not null)
                     {
                         _progress = (_store.Directory, _store.Progress());
                     }
@@ -672,8 +679,9 @@ public sealed class Intake : IAsyncDisposable
                 Completed(bulletin);
                 break;
             case FrameOutcome.AwaitingEnvelope when result.Bulletin is { } waiting:
+                // Complete now (counted in this slot), whenever it is released to the outbox.
                 Interlocked.Increment(ref _framesStored);
-                _log($"bulletin complete: {Ascii.Clean(waiting.Bid)}, waiting for its station's details");
+                Completed(waiting);
                 break;
             case FrameOutcome.Withheld or FrameOutcome.RejectedDirectory:
                 // The store has said why, once.
@@ -743,6 +751,11 @@ public sealed class Intake : IAsyncDisposable
         foreach (var released in result.Released ?? [])
         {
             Completed(released);
+        }
+        foreach (var delivered in result.Delivered ?? [])
+        {
+            _log($"bulletin released to the outbox: {Ascii.Clean(delivered.Bid)}");
+            BulletinReleased?.Invoke(delivered);
         }
     }
 
