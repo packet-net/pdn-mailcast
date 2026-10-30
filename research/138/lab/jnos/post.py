@@ -10,6 +10,8 @@ P.OUT = os.path.join(H, "captured", "transcripts")
 
 def run(where, key):
     title, body, ending = B[key]
+    if os.environ.get("ENDING_HEX"): ending = bytes.fromhex(os.environ["ENDING_HEX"])
+    elif where == "laj" and ending == b"\x1a": ending = b"\x1a\r"
     s = P.S(38010); s.rd(1.5); P.GLOBAL[0] = s
     s.tx(b"user\r"); s.tx(b"user\r", 1.5)
     if where == "laa":
