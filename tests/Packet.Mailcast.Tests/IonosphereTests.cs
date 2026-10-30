@@ -426,12 +426,12 @@ public class IonosphereTests
 
     private static SlotBudget Frames(int frames) => new(TimeSpan.FromSeconds(frames), lengths => TimeSpan.FromSeconds(lengths.Count));
 
-    private static readonly ScheduleOptions Budgeted = ScheduleOptions.HourlyBudget with { SymbolSize = 240 };
+    private static readonly ScheduleOptions Budgeted = ScheduleOptions.HourlyBudget with { };
 
     private static CarriedBulletin Held(int seed, int size)
     {
         var b = TestBulletins.Make(seed, size);
-        var transfer = TransferObject.ForBulletin(b, Budgeted.DictionaryId, Compression.Default, Budgeted.SymbolSize, Budgeted.Alignment);
+        var transfer = TransferObject.ForBulletin(b, Budgeted.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
         return new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, new DateOnly(2026, 10, 5), transfer, 0);
     }
 

@@ -290,7 +290,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
     private sealed class FakeLink(FakeStation station) : IKissLink
     {
         private readonly Channel<ushort> _acks = Channel.CreateUnbounded<ushort>();
-        private readonly List<(ushort Id, int Generation)> _queued = [];
+        private readonly List<(ushort Id, int Generation, int Length)> _queued = [];
         private bool _transmitting;
         private bool _broken;
         private int _writes;
@@ -339,7 +339,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
                 throw new IOException("Broken pipe");
             }
             station.Frames.Add((station._time.GetUtcNow(), station.LeaseHeld, ax25.ToArray()));
-            _queued.Add((id, station._dropGeneration));
+            _queued.Add((id, station._dropGeneration, ax25.Length)); // the whole AX.25 frame, as the planner charges it
             if (!_transmitting)
             {
                 _transmitting = true;
@@ -374,8 +374,8 @@ public sealed class FakeStation : IStationApi, IKissConnector
                     station.Dropped += burst.Count;
                     continue;
                 }
-                await station.KeyAsync(TimeSpan.FromSeconds(station.SecondsPerBurst + (station.SecondsPerFrame * burst.Count)), $"burst of {burst.Count}", CancellationToken.None);
-                foreach (var (id, _) in burst)
+                await station.KeyAsync(TimeSpan.FromSeconds(station.SecondsPerBurst + (station.SecondsPerFrame / 1003.0 * burst.Sum(b => b.Length))), $"burst of {burst.Count}", CancellationToken.None);
+                foreach (var (id, _, _) in burst)
                 {
                     if (station.SilentAfterFrames is int quiet && _acked >= quiet)
                     {

@@ -58,7 +58,10 @@ public class OfflineTests
                 rebuilt.Add(result.Bulletin);
             }
         }
-        Assert.Equal(bulletins.OrderBy(b => b.Bid), rebuilt.OrderBy(b => b.Bid));
+        // Sent canonical (issue #142); the offline directory is unsigned, so no envelope is kept and the shared form is delivered as it is.
+        var canonical = bulletins.Select(b => CanonicalForm.ToCanonicalBulletin(b.Type, b.From, b.To, b.At, b.Bid, b.Title, Bulletin.TextEncoding.GetBytes(b.MessageText)).Bulletin);
+        Assert.All(rebuilt, b => Assert.Matches(@"^R:\d{6}/\d{4}Z \[pdn-mailcast via \S+\]$", Assert.Single(b.RoutingLines))); // the receiver's own line
+        Assert.Equal(canonical.Select(b => (b.Bid, b.Title, b.Body)).OrderBy(b => b.Bid), rebuilt.Select(b => (b.Bid, b.Title, b.Body)).OrderBy(b => b.Bid));
     }
 }
 

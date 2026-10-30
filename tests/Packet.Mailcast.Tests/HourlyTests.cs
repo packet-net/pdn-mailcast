@@ -40,7 +40,7 @@ public class HourlyTests
 
         public void Offer(Bulletin bulletin, DateOnly seen) =>
             _held[bulletin.Bid] = new CarriedBulletin(bulletin.Bid, bulletin.Title, bulletin.Serialize().Length, seen,
-                TransferObject.ForBulletin(bulletin, options.DictionaryId, Compression.Default, options.SymbolSize, options.Alignment), 0);
+                TransferObject.ForBulletin(bulletin, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment), 0);
 
         public SlotBroadcast Slot(DateTimeOffset slot)
         {
@@ -102,7 +102,7 @@ public class HourlyTests
         }
         Assert.Equal([0, 5, 10, 17, 25], carriedIn);
         Assert.Equal(Enumerable.Range(0, esis.Count).Select(i => (uint)i), esis);
-        int k = TransferObject.ForBulletin(bulletin, Hourly.DictionaryId, Compression.Default, Hourly.SymbolSize, Hourly.Alignment).SourceSymbols;
+        int k = TransferObject.ForBulletin(bulletin, Hourly.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment).SourceSymbols;
         Assert.Equal(BroadcastScheduler.SymbolsPerCarrying(k, Hourly).Sum(), esis.Count);
         Assert.True(BroadcastScheduler.SymbolsPerCarrying(k, Hourly)[0] >= Math.Ceiling(1.5 * k) + 2);
     }
@@ -125,15 +125,14 @@ public class HourlyTests
     }
 
     [Theory]
-    [InlineData(0.0, 1, 940)]
-    [InlineData(0.2, 2, 940)]
-    [InlineData(0.0, 3, 240)]
-    [InlineData(0.2, 1, 240)]
-    [InlineData(0.2, 2, 240)]
-    public void TheFirstSlotAlone_RebuildsEveryBulletinForAFreshReceiver(double loss, int seed, int symbolSize)
+    [InlineData(0.0, 1)]
+    [InlineData(0.2, 2)]
+    [InlineData(0.0, 3)]
+    [InlineData(0.2, 1)]
+    public void TheFirstSlotAlone_RebuildsEveryBulletinForAFreshReceiver(double loss, int seed)
     {
         using var rx = new TempDirectory();
-        var head = new Head(Hourly with { SymbolSize = symbolSize });
+        var head = new Head(Hourly);
         var bulletins = TestBulletins.Day(20 + seed, 16);
         foreach (var b in bulletins)
         {
@@ -153,18 +152,15 @@ public class HourlyTests
     }
 
     [Theory]
-    [InlineData(0, 940)]
-    [InlineData(1, 940)]
-    [InlineData(2, 940)]
-    [InlineData(0, 240)]
-    [InlineData(1, 240)]
-    [InlineData(2, 240)]
-    public void AWebSdrHearingEveryThirdSlot_RebuildsEveryBulletin(int phase, int symbolSize)
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AWebSdrHearingEveryThirdSlot_RebuildsEveryBulletin(int phase)
     {
         // A day's bulletins, one each hour; the receiver hears only slots with h % 3 == phase,
         // as a web SDR receiver listening to 8 slots a day does, and loses a tenth of those frames.
         using var rx = new TempDirectory();
-        var head = new Head(Hourly with { SymbolSize = symbolSize });
+        var head = new Head(Hourly);
         var bulletins = TestBulletins.Day(30, 24);
         var receiver = new ReceiverStore(rx.Path, Compression.Default, TestStores.Fast);
         var rebuilt = new HashSet<string>();
@@ -233,7 +229,7 @@ public class HourlyTests
         var rest = BroadcastScheduler.Plan(store.InRotation(Noon), Noon, 1, Compression.Default, Hourly, store.DirectoryNextEsi);
         var sent = whole.Frames.Take(cut).Select(f => (f.ObjectId, f.EncodingSymbolId)).ToHashSet();
         Assert.DoesNotContain(rest.Frames.Select(f => (f.ObjectId, f.EncodingSymbolId)), sent.Contains);
-        Assert.Equal(whole.BulletinFrames, sent.Count(f => whole.Objects.Skip(1).Any(o => o.Transfer.ObjectId == f.ObjectId)) + rest.BulletinFrames);
+        Assert.Equal(whole.BulletinFrames, sent.Count(f => whole.Objects.Where(o => o.Bid is not null).Any(o => o.Transfer.ObjectId == f.ObjectId)) + rest.BulletinFrames);
         store.Commit(rest);
 
         // An hour later nothing is due for them until their first repeat, five hours after the first slot.

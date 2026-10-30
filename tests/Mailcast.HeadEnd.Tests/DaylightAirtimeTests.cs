@@ -63,7 +63,7 @@ public class DaylightAirtimeTests(ITestOutputHelper output)
             while (next < arrivals.Count && arrivals[next].At <= slot)
             {
                 var b = arrivals[next++].Bulletin;
-                var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, options.SymbolSize, options.Alignment);
+                var transfer = TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
                 held.Add(new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, DateOnly.FromDateTime(slot.UtcDateTime), transfer, 0));
             }
             var plan = BroadcastScheduler.Plan(held.Where(c => BroadcastScheduler.InRotation(c, slot, options)), slot, 1, Compression.Default, options, id => directories.GetValueOrDefault(id));
@@ -132,7 +132,6 @@ public class DaylightAirtimeTests(ITestOutputHelper output)
 
     private static ScheduleOptions Gb7rdg(ScheduleOptions options) => options with
     {
-        SymbolSize = 240,
         Timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg),
     };
 

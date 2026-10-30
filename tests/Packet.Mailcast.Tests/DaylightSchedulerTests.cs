@@ -7,7 +7,7 @@ public class DaylightSchedulerTests
 {
     private static readonly SlotTimetable Gb7rdg = new(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
 
-    private static readonly ScheduleOptions FiveCarryings = ScheduleOptions.Hourly with { SymbolSize = 240, Timetable = Gb7rdg };
+    private static readonly ScheduleOptions FiveCarryings = ScheduleOptions.Hourly with { Timetable = Gb7rdg };
 
     private static DateTimeOffset T(string s) => DateTimeOffset.Parse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
 
@@ -60,7 +60,7 @@ public class DaylightSchedulerTests
             {
                 var b = arrivals[next++].Bulletin;
                 held.Add(new CarriedBulletin(b.Bid, b.Title, b.Serialize().Length, DateOnly.FromDateTime(slot.UtcDateTime),
-                    TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, options.SymbolSize, options.Alignment), 0));
+                    TransferObject.ForBulletin(b, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment), 0));
             }
             if (skipped?.Contains(slot) == true)
             {

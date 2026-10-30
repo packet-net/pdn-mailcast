@@ -38,6 +38,10 @@ internal static class TestBulletins
 
     private static readonly string[] Calls = ["G4ABC", "M0XYZ", "LU9DCE", "HP2DFA", "KC2NJV", "GB7RDG", "M9YYY", "F6FBB"];
 
+    /// <summary>The shared canonical form a head end sends a bulletin as (issue #142).</summary>
+    public static Bulletin Canonical(Bulletin b) =>
+        CanonicalForm.ToCanonicalBulletin(b.Type, b.From, b.To, b.At, b.Bid, b.Title, Bulletin.TextEncoding.GetBytes(b.MessageText)).Bulletin;
+
     public static Bulletin Make(int seed, int bodySize, DateTimeOffset? date = null)
     {
         var rng = new Random(seed);

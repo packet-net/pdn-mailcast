@@ -84,9 +84,6 @@ public class ConfigTests
     [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "colour": "blue"}""", "colour")]
     [InlineData("""{"station": {"apiKey": "k"}, "callsign": "NOT A CALL"}""", "not an AX.25 callsign")]
     [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "flex": {"enabled": true}}""", "flex")]
-    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 250}}""", "symbolSize")]
-    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 32}}""", "symbolSize")]
-    [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 1000}}""", "symbolSize")]
     public void Parse_RefusesWhatCannotWork(string json, string mentions)
     {
         var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(json));
@@ -261,12 +258,14 @@ public class DaylightConfigTests
 public class SymbolSizeTests
 {
     [Fact]
-    public void A_Symbol_Size_Reaches_The_Scheduler_And_The_Default_Is_Unchanged()
+    public void An_Old_Symbol_Size_Still_Loads_And_Is_Ignored()
     {
-        var small = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"symbolSize": 240}}""");
-        Assert.Equal(240, small.ToScheduleOptions().SymbolSize);
-        var standard = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}}""");
-        Assert.Equal(Packet.Mailcast.MailcastFrame.StandardSymbolSize, standard.ToScheduleOptions().SymbolSize);
+        foreach (int size in new[] { 240, 250, 32, 1000 })
+        {
+            var config = HeadEndConfig.Parse("{\"callsign\": \"M0LTE\", \"station\": {\"apiKey\": \"k\"}, \"schedule\": {\"symbolSize\": " + size + "}}");
+            Assert.Equal(size, config.Schedule.SymbolSize);
+            BroadcastScheduler.Validate(config.ToScheduleOptions());
+        }
     }
 }
 
