@@ -154,13 +154,17 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void OpenBcm_TitleOverflowLine_IsDroppedOnlyForAFullTitle()
+    public void OpenBcm_TitleOverflowLine_IsLeftAlone()
     {
-        const string text = "R:261030/0136z @:GB7LAM.#99.GBR.EU [OpenBCM] x\nFrom: G0LAB @ GB7LAM\nTo:   LABTST @ WW\nX-Info: No login password\n\nthe rest of the title\nReal body\n";
-        var full = new string('t', CanonicalForm.OpenBcmTitleLimit);
-        Assert.Equal("Real body\n", Body(text, full));
-        Assert.Equal("the rest of the title\nReal body\n", Body(text, "short"));
-        RoundTrips(B(text), full);
+        const string text = "R:261030/0136z @:GB7LAM.#99.GBR.EU [OpenBCM] x\nFrom: G0LAB @ GB7LAM\nTo:   LABTST @ WW\n\nthe rest of the title\nReal body\n";
+        Assert.Equal("the rest of the title\nReal body\n", Body(text, new string('t', 80)));
+    }
+
+    [Fact]
+    public void OpenBcm_RealCorpusBlock_WithCallNameSuffixAndTrailingSpace_IsDropped()
+    {
+        const string text = "R:261026/2104z @:SR6BBA.#DSL.POL.EU $:TNJ511_DB0HB\nFrom: DJ6UX @ DB0HB.#HH.DEU.EU (Eddi)\nTo:   AGCW @ WW \n\nHello\n";
+        Assert.Equal("Hello\n", Body(text));
     }
 
     [Fact]
@@ -271,6 +275,57 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
     public void Envelope_Malformed_IsRejected(byte[] data) => Assert.Throws<FormatException>(() => BulletinEnvelope.Parse(data));
 
     [Fact]
+    public void Envelope_OverlongLength_IsRejected()
+    {
+        Assert.Throws<FormatException>(() => BulletinEnvelope.Parse(new byte[] { 1, 0, 0x80, 0x00, 0, 0 }));
+        Assert.Throws<FormatException>(() => BulletinEnvelope.Parse(new byte[] { 1, 0, 0x81, 0x00, 0, 0 }));
+    }
+
+    [Fact]
+    public void Envelope_EveryAcceptedInput_ReserialisesToItself()
+    {
+        var rng = new Random(143);
+        var accepted = 0;
+        for (var n = 0; n < 200000; n++)
+        {
+            byte[] data;
+            if (n % 2 == 0)
+            {
+                data = new byte[rng.Next(0, 12)];
+                for (var k = 0; k < data.Length; k++)
+                {
+                    data[k] = rng.Next(3) == 0 ? (byte)rng.Next(256) : (byte)rng.Next(4);
+                }
+
+                if (data.Length > 0 && rng.Next(2) == 0)
+                {
+                    data[0] = 1;
+                }
+            }
+            else
+            {
+                data = new BulletinEnvelope(new byte[rng.Next(0, 200)], new byte[rng.Next(0, 5)], new string('t', rng.Next(0, 4)), (LineEnding)rng.Next(4)).Serialise();
+                data[rng.Next(data.Length)] = (byte)rng.Next(256);
+            }
+
+            BulletinEnvelope e;
+            try
+            {
+                e = BulletinEnvelope.Parse(data);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            accepted++;
+            Assert.Equal(data, e.Serialise());
+        }
+
+        Assert.True(accepted > 1000);
+    }
+
+    [Fact]
     public void Rebuild_BodyWithoutFinalLineFeed_IsRejected() =>
         Assert.Throws<ArgumentException>(() => CanonicalForm.Rebuild(B("abc"), new BulletinEnvelope([], [], "t", LineEnding.Lf)));
 
@@ -298,7 +353,7 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
                 }
             }
 
-            RoundTrips(B(sb.ToString()), rng.Next(3) == 0 ? new string('x', CanonicalForm.OpenBcmTitleLimit) : "title");
+            RoundTrips(B(sb.ToString()), rng.Next(3) == 0 ? new string('x', 80) : "title");
         }
     }
 

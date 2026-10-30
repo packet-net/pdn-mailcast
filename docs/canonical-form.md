@@ -9,12 +9,12 @@ Evidence for each rule is in `research/138/README.md` and `research/138/lab/FIND
 Working down from the first line, repeating until none applies:
 
 1. Blank lines (nothing, or only spaces and tabs).
-2. A run of routing lines `R:yymmdd/hhmm[Zz] ...` (LinBPQ, FBB `@:` form, XRouter and openBCM alike).
+2. A run of routing lines `R:yymmdd/hhmm[Zz] ...` (the zone letter is optional because Sally writes `R:261024/2145 @:...`, seen in the corpus) (LinBPQ, FBB `@:` form, XRouter and openBCM alike).
 3. A `Path: ...` line and the lines after it that start with a space or tab (FBB's reader output).
 4. Once routing has been seen, one origin block, after which the top stops:
    - FBB: a blank line, `From: CALL@HROUTE`, `To  : X@ROUTE` (two spaces before the colon), blank line.
    - XRouter: `Date: Thu, 29 Oct 2026 23:58:25 +0000`, `From: a <b>`, `To: x`, `Subject: ...`, `Message-ID: ...`, blank line.
-   - openBCM: `From: X @ Y`, `To:   X @ Y` (three spaces), an optional `X-Info: ...`, blank line; and when the title is exactly 80 characters (openBCM's limit), the next line as well, which is the title overflow.
+   - openBCM: `From: X @ Y` (optionally followed by ` (Name)`), `To:   X @ Y` (three spaces after the colon, an optional trailing space), an optional `X-Info: ...`, blank line. openBCM's title overflow line is not recognised: every copy keeps it in the body, so it already matches.
 
 Anything that does not match exactly stays, so an author's own `From:` line, a `To:` with one space, or an `R:` line after the body has started is never touched. A leading `R:` block typed by the author cannot be told from routing and is removed; it is in the envelope, so nothing is lost.
 
@@ -42,4 +42,4 @@ The content lines, each followed by one LF, so it is empty or ends with LF.
 | bottom | LEB128 length, then bytes | exactly what was removed below it (starts with the last content line's ending) |
 | title | LEB128 length, then bytes | the full title, Latin-1 |
 
-Lengths are unsigned LEB128 (7 bits per byte, low group first, high bit set when more follow). A typical envelope is under 200 bytes. Rebuild is: top, then the canonical body with its final LF dropped and the remaining LFs turned back into the recorded line ending, then bottom.
+Lengths are unsigned LEB128 (7 bits per byte, low group first, high bit set when more follow), in their shortest form: a reader rejects redundant zero groups, so an envelope has exactly one encoding and one hash. A typical envelope is a few hundred bytes (routing lines of about 55 bytes each). Rebuild is: top, then the canonical body with its final LF dropped and the remaining LFs turned back into the recorded line ending, then bottom.

@@ -156,6 +156,11 @@ public sealed class BulletinEnvelope : IEquatable<BulletinEnvelope>
             length |= (long)(b & 0x7F) << shift;
             if ((b & 0x80) == 0)
             {
+                if (b == 0 && shift > 0)
+                {
+                    throw new FormatException("The envelope has a non-minimal length.");
+                }
+
                 break;
             }
         }
@@ -186,9 +191,6 @@ public sealed record CanonicalBulletin(byte[] Body, BulletinEnvelope Envelope);
 /// <remarks>The rules and the envelope serialisation are described in docs/canonical-form.md.</remarks>
 public static class CanonicalForm
 {
-    /// <summary>The longest title openBCM stores; a title of exactly this length may have spilled into the first body line.</summary>
-    public const int OpenBcmTitleLimit = 80;
-
     private static readonly Regex RouteLine = new(@"^R:\d{6}/\d{4}[Zz]? ", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex PathLine = new(@"^Path: ", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex FbbFrom = new(@"^From: \S+@\S+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -198,8 +200,8 @@ public static class CanonicalForm
     private static readonly Regex XrTo = new(@"^To: \S+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex XrSubject = new(@"^Subject:( .*)?$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex XrMessageId = new(@"^Message-ID: \S+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    private static readonly Regex BcmFrom = new(@"^From: \S+ @ \S+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    private static readonly Regex BcmTo = new(@"^To:   \S+ @ \S+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex BcmFrom = new(@"^From: \S+ @ \S+( \([^()]*\))?$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex BcmTo = new(@"^To:   \S+ @ \S+ ?$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex BcmInfo = new(@"^X-Info: .*$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly record struct Line(int Start, int TextEnd, int Next, string Text, bool LoneCr = false);
@@ -419,7 +421,7 @@ public static class CanonicalForm
             return i + 6;
         }
 
-        // openBCM: From: X @ Y, "To:   X @ Y", optional X-Info, blank; then a title overflow line if the title is full.
+        // openBCM: From: X @ Y, "To:   X @ Y", optional X-Info, blank.
         if (At(i, BcmFrom) && At(i + 1, BcmTo))
         {
             var k = i + 2;
@@ -430,13 +432,7 @@ public static class CanonicalForm
 
             if (Blank(k))
             {
-                k++;
-                if (title.Length == OpenBcmTitleLimit && k < lines.Count && lines[k].Text.Length > 0)
-                {
-                    k++;
-                }
-
-                return k;
+                return k + 1;
             }
         }
 
