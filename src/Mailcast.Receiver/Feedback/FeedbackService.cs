@@ -37,6 +37,9 @@ public sealed record FeedbackSources
     /// <summary>The channel measurement for a slot (by its scheduled start), if there is one.</summary>
     public Func<DateTimeOffset, ReportChannel?> Channel { get; init; } = _ => null;
 
+    /// <summary>How many objects were another copy of a bulletin already delivered on a UTC day, per station (issue #147).</summary>
+    public Func<DateOnly, IReadOnlyDictionary<string, int>> OtherCopies { get; init; } = _ => new Dictionary<string, int>();
+
     /// <summary>The receiver's locator, from the position a web SDR reports (6 characters, or 4 if that is all it gives); null for a sound card.</summary>
     public Func<string?> Locator { get; init; } = () => null;
 
@@ -182,11 +185,26 @@ public sealed class FeedbackService
     {
         lock (_gate)
         {
-            return Figures(_seen.Values.Where(s => DateOnly.FromDateTime(s.Slot.UtcDateTime) == day), _sources.OwnStation());
+            return Figures(_seen.Values.Where(s => DateOnly.FromDateTime(s.Slot.UtcDateTime) == day), _sources.OwnStation(), _sources.OtherCopies(day));
         }
     }
 
-    internal static IReadOnlyList<ReportStation> Figures(IEnumerable<SlotRecord> slots, string own) =>
+    internal static IReadOnlyList<ReportStation> Figures(IEnumerable<SlotRecord> slots, string own, IReadOnlyDictionary<string, int>? otherCopies = null)
+    {
+        otherCopies = otherCopies is null ? null : new Dictionary<string, int>(otherCopies, StringComparer.OrdinalIgnoreCase);
+        var figures = FiguresOf(slots, own, otherCopies).ToList();
+        // A station that sent another copy but has no slot noted still gets its line.
+        foreach (var (station, count) in (otherCopies ?? new Dictionary<string, int>()).OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            if (count > 0 && !figures.Any(f => string.Equals(f.Station, station, StringComparison.OrdinalIgnoreCase)))
+            {
+                figures.Add(new ReportStation(station, 0, 0, 0, 0, null, null, count));
+            }
+        }
+        return figures;
+    }
+
+    private static IEnumerable<ReportStation> FiguresOf(IEnumerable<SlotRecord> slots, string own, IReadOnlyDictionary<string, int>? otherCopies) =>
     [
         .. slots.GroupBy(s => s.Station ?? own, StringComparer.OrdinalIgnoreCase)
             .OrderBy(g => string.Equals(g.Key, own, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
@@ -198,7 +216,8 @@ public sealed class FeedbackService
                 g.Sum(s => s.Frames),
                 g.Sum(s => s.Completed),
                 Median(g.Where(s => s.SnrDb is not null).Select(s => s.SnrDb!.Value)) is { } snr ? Math.Round(snr) : null,
-                Median(g.Where(s => s.Channel?.VirtualHeightKm is not null).Select(s => s.Channel!.VirtualHeightKm!.Value)) is { } km ? Math.Round(km) : null)),
+                Median(g.Where(s => s.Channel?.VirtualHeightKm is not null).Select(s => s.Channel!.VirtualHeightKm!.Value)) is { } km ? Math.Round(km) : null,
+                otherCopies is not null ? otherCopies.GetValueOrDefault(g.Key) : null)),
     ];
 
     private static double? Median(IEnumerable<double> values)
@@ -690,7 +709,7 @@ public sealed class FeedbackService
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
             new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count);
-        return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, own));
+        return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, own, _sources.OtherCopies(record.Day)));
     }
 
     /// <summary>

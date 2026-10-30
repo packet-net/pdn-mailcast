@@ -53,6 +53,10 @@ public sealed record ReportSlot(
 /// <param name="Completed">Bulletins rebuilt while those slots were the one tracked.</param>
 /// <param name="SnrDb">The median tone signal to noise over the slots with a tone, dB; null if none.</param>
 /// <param name="VirtualHeightKm">The median virtual height over the slots with a channel measurement, km; null if none.</param>
+/// <param name="OtherCopies">
+/// Issue #147: how many objects heard from this station that day were another copy of a bulletin
+/// already delivered (same BID, a different object). Null when not known, such as from a report that predates it.
+/// </param>
 public sealed record ReportStation(
     string Station,
     int Listened,
@@ -60,7 +64,8 @@ public sealed record ReportStation(
     int Frames,
     int Completed,
     double? SnrDb = null,
-    double? VirtualHeightKm = null);
+    double? VirtualHeightKm = null,
+    int? OtherCopies = null);
 
 /// <summary>
 /// A listener's daily feedback report: what one receiver heard of GB7RDG's slots in a UTC day,
@@ -100,7 +105,9 @@ public sealed record ReportStation(
 /// <c>-</c> for one not measured. The slot lines stay the report's own station's. A reader that
 /// predates these stops at the first line that does not start with a digit, so it never sees
 /// them; a reader ignores fields after the eighth on a station line, and lines it does not know
-/// after the station lines.</para>
+/// after the station lines. The ninth field (issue #147) is how many objects heard from that
+/// station that day were another copy of a bulletin already delivered, <c>-</c> when not known;
+/// a station line with eight fields or fewer has none (the receiver's feedback service always writes it; <c>-</c>, or no field, reads as not known).</para>
 /// </remarks>
 public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHeader Header, IReadOnlyList<ReportSlot> Slots, IReadOnlyList<ReportStation>? Stations = null)
 {
@@ -249,7 +256,7 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
     private static string StationLine(ReportStation s)
     {
         var c = CultureInfo.InvariantCulture;
-        return $"{StationTag} {Token(s.Station)} {s.Listened.ToString(c)} {s.Heard.ToString(c)} {s.Frames.ToString(c)} {s.Completed.ToString(c)} {Number(s.SnrDb, 0, "0")} {Number(s.VirtualHeightKm, 0, "0")}";
+        return $"{StationTag} {Token(s.Station)} {s.Listened.ToString(c)} {s.Heard.ToString(c)} {s.Frames.ToString(c)} {s.Completed.ToString(c)} {Number(s.SnrDb, 0, "0")} {Number(s.VirtualHeightKm, 0, "0")}{(s.OtherCopies is { } n ? " " + n.ToString(c) : "")}";
     }
 
     private static bool IsStationLine(string line) =>
@@ -267,7 +274,8 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             throw new FormatException($"The station line \"{line}\" does not have slot, frame and bulletin counts.");
         }
         return new ReportStation(f[1], listened, heard, frames, completed,
-            f.Length > 6 ? Double(f[6]) : null, f.Length > 7 ? Double(f[7]) : null);
+            f.Length > 6 ? Double(f[6]) : null, f.Length > 7 ? Double(f[7]) : null,
+            f.Length > 8 && TryInt(f[8], out int copies) ? copies : null); // a later version's ninth field that is not a count reads as not known
     }
 
     private static ReportHeader ParseHeader(string line)

@@ -1563,6 +1563,9 @@ public sealed class StatusPage : IAsyncDisposable
             withheld = h.Withheld,
         }).ToList();
         var (newestCheck, lastHeard) = _host.Intake.DirectoryChecks();
+        // Issue #147: other copies of a delivered bulletin, shown as one short line under it.
+        var copies = _host.Intake.OtherCopies().ToLookup(c => c.Bid, StringComparer.OrdinalIgnoreCase);
+        var shownFor = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // once per BID, not under every row with it
         return new
         {
             total = mail.Count,
@@ -1585,7 +1588,7 @@ public sealed class StatusPage : IAsyncDisposable
             offset,
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
-            items = mail.Page(offset, limit).Select(m => MailView(m, signatures.GetValueOrDefault(m.ObjectId))).ToList(),
+            items = mail.Page(offset, limit).Select(m => MailView(m, signatures.GetValueOrDefault(m.ObjectId), shownFor.Add(m.Bid) ? copies[m.Bid] : [])).ToList(),
             // The newest directory in use: "signed by GB7RDG" or "not signed"; and, when the
             // directory heard most recently was not used, why.
             signature = newestCheck?.Describe(),
@@ -1618,7 +1621,7 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>One bulletin for the list: what it is, where it is, what the BBS has said, and
     /// (issue #73) its delivery history, for the reader to show when it is opened.</summary>
-    private object MailView(Packet.Mailcast.MailEntry m, string? signature)
+    private object MailView(Packet.Mailcast.MailEntry m, string? signature, IEnumerable<Packet.Mailcast.OtherCopy> otherCopies)
     {
         string status, statusShort;
         DeliveryRecord? last = null;
@@ -1670,6 +1673,8 @@ public sealed class StatusPage : IAsyncDisposable
             delivered = m.Waiting ? (DateTimeOffset?)null : m.Time,
             // As HeldBulletin.Signature: "signed by GB7RDG" only once its own hash matched; null once no directory remembered names it.
             signature,
+            // Issue #147: "other copy from G8BPQ, not needed", one short line each, under the bulletin.
+            otherCopies = otherCopies.Select(c => new { from = c.Station, time = c.Time, text = c.Station is null ? "other copy, not needed" : "other copy from " + c.Station + ", not needed" }).ToList(),
             // Issue #73: every answer this session remembers for this BID, oldest first, for the
             // reader to show as "what the BBS said" each time it was offered.
             attempts = _host.Ledger.History(m.Bid).Select(r => new

@@ -455,6 +455,12 @@ public sealed class Intake : IAsyncDisposable
     /// </summary>
     public Func<string?>? HeardFrom { get; set; }
 
+    /// <summary>Other copies of bulletins already delivered (issue #147), newest first.</summary>
+    public IReadOnlyList<OtherCopy> OtherCopies() => _store.OtherCopies;
+
+    /// <summary>How many other copies were recognised on a UTC day, per station (issue #147).</summary>
+    public IReadOnlyDictionary<string, int> OtherCopyCounts(DateOnly day) => _store.OtherCopyCounts(day);
+
     /// <summary>Canonical bulletins complete and waiting for their station's envelope (issue #145).</summary>
     public IReadOnlyList<AwaitingBulletin> Awaiting()
     {
@@ -682,6 +688,10 @@ public sealed class Intake : IAsyncDisposable
                 // Complete now (counted in this slot), whenever it is released to the outbox.
                 Interlocked.Increment(ref _framesStored);
                 Completed(waiting);
+                break;
+            case FrameOutcome.CompletedOtherCopy:
+                // Issue #147: the store has logged the one line; not a bulletin to deliver, and not a failure.
+                Interlocked.Increment(ref _framesStored);
                 break;
             case FrameOutcome.Withheld or FrameOutcome.RejectedDirectory:
                 // The store has said why, once.

@@ -197,6 +197,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
             PskReporter = () => Intake.PskReporter,
+            OtherCopies = Intake.OtherCopyCounts,
             Channel = slot => ChannelSummary.From(ChannelWatch.History.LastOrDefault(r => r.Slot == slot)),
             Locator = () => ChannelSummary.Locator(Place),
             Audio = () => ReportAudio.For(AudioSource.Parse(Config.Audio)),
