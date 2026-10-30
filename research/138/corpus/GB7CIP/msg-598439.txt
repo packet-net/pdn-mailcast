@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 20-Oct-26 17:06
+Bid: 5803-CX2SA
+Title: (M5.0) northern Sumatra, Indonesia 4.0 96.0
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           northern Sumatra, Indonesia
+Geographic coordinates:           4.000N,  95.993E
+Magnitude:                        5.0
+Depth:                            75 km
+Universal Time (UTC):             20 Oct 2026  16:29:39
+Time near the Epicenter (1):      20 Oct 2026  23:29:39
+Time in your area (1):            20 Oct 2026  13:29:39
+Location with respect to nearby cities:
+21.7 km (13.5 mi) SW of Meulaboh, Indonesia
+98.0 km (60.8 mi) WNW of Blangpidie, Indonesia
+138.3 km (85.7 mi) SSW of Reuleuet, Indonesia
+153.1 km (94.9 mi) S of Sigli, Indonesia
+185.5 km (115.0 mi) SSE of Banda Aceh, Indonesia
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3nc
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3nc?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 20/10/2026 17:05:34 UTC
+________________________________________________________________

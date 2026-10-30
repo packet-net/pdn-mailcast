@@ -1,0 +1,75 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:21
+Bid: 24166_N4SD
+Title: Space Weather Forecast Discussion
+Path: !YT7MPB!N6RME!N0ARY!KE6JJJ!KQ6UP!K5DAT!WW6Q!W9GM!KA3BVJ!KA3VSP!N4SD!
+
+FXXX12 KWNP 250031
+DAYDIS
+
+:Product: Forecast Discussion
+:Issued: 2026 Oct 25 0030 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# http://www.swpc.noaa.gov/wwire.html
+#
+#             Forecast Discussion
+#
+Solar Activity
+
+.24 hr Summary...
+Solar activity continued at low levels with only low-level C-class
+activity observed. Region 4560 (N13W72, Fai/beta-gamma) was the only
+remaining spotted region on the disk and was mostly quiet as it rotated
+towards the W limb.
+
+No new Earth-directed CMEs were observed in available coronagraph
+imagery.
+
+.Forecast...
+Solar activity is expected to remain at low levels through 27 Oct, with
+a slight chance for isolated M-class flares (R1-R2, Minor-Moderate).
+
+Energetic Particle
+
+.24 hr Summary...
+The greater than 2 MeV electron flux reached high levels, with a peak
+flux of 3,259 pfu observed. The greater than 10 MeV proton flux remained
+steady at background levels.
+
+.Forecast...
+The greater than 2 MeV electron flux is expected to continue reaching
+high levels through 27 Oct. The greater than 10 MeV proton flux is
+anticipated to persist at background levels through 27 Oct.
+
+Solar Wind
+
+.24 hr Summary...
+Solar wind parameters returned to nominal levels. Total magnetic field
+strength (Bt) below 5 nT. No significant periods of southward Bz were
+observed. Solar wind speeds steadily declined from ~425 km/s to ~350
+km/s by the end of the UT day. Phi angle became variable after 24/1240
+UTC.
+
+.Forecast...
+Enhanced solar wind conditions are likely on 25-26 Oct due to combined
+influences of a small, negative polarity CH HSS and possible glancing
+CME effects from the 21 Oct eruptions. Nominal conditions are expected
+over 27 Oct.
+
+Geospace
+
+.24 hr Summary...
+The geomagnetic field was quiet.
+
+.Forecast...
+Periods of active conditions, with a chance for G1 (Minor) storming, are
+possible on 25 Oct due to combined effects from a negative polarity
+coronal hole and potential glancing CME impacts. Mostly quiet conditions
+are likely on 26-27 Oct.
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM

@@ -1,0 +1,28 @@
+From: KQ6UP
+To: ASTRO
+Type/Status: BN
+Date/Time: 08-Oct 18:03Z
+Bid: 27208_KM6JTD
+Title: Anyone Into Astronomy?
+
+R:261009/0924Z 4005@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261009/0851Z 14549@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261009/0850Z 48681@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261009/0850Z 4004@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261009/0850Z 41984@VE3QBZ.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261009/0850Z 37521@N6CTA.#SCA.CA.USA.NOAM LinBPQ6.0.24
+R:261009/0849Z 29260@KN6YLK.#SCA.CA.USA.NOAM LinBPQ6.0.24
+R:261008/1751Z 50811@AB6MV.#SCA.CA.USA.NOAM LinBPQ6.0.24
+R:261008/1803Z @:KM6JTD.#SCA.CA.USA.NOAM #:27208 [Grand Terrace, CA]
+
+From: KQ6UP@KM6JTD.#SCA.CA.USA.NOAM
+To  : ASTRO@WW
+
+Just curious how many folks on the packet BBS system are
+interested in topics pertaining to astronomy.  I miss
+actual bulletins with people discussing things instead of
+just auto-generated bulletins.
+
+-73 de Chris KQ6UP
+
+

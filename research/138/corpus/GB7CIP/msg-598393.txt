@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 20-Oct-26 03:52
+Bid: 5128_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - Pagan region, Northern Mariana Isla
+Path: !GB7BED!GB7OSW!VE3CGR!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us6000u3jd
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-20 02:54:15 UTC
+Depth      : 129.4 km
+Coordinates: 18.2529 Lat / 146.0345 Lon
+--------------------------------------------------
+Location:
+  Pagan region, Northern Mariana Islands
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3jd
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

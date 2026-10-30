@@ -1,0 +1,151 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 20-Oct-26 06:55
+Bid: 8574_GB7CIP
+Title: Old Car Dynamos
+Path: 
+
+By G8MNY                                         (Updated Sep 09)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Here is a simplified circuit.
+                                ÚÄ¿
+             ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍµ ÆÍÍÑÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+  RECTIFY \ <¼     OVER CURRENT ÀÄÙ  ³ ÚÄ¿VOLTAGE  fuse                   º
+   RELAY    \o     RELAY (OPTIONAL)  ÀÄ´ ÃÄÄÄÄÄÄÄÄÄo/oÄÄ>HEADLIGHT FEED   º
+    Make     º                         ÀÄÙBOOST Coil               Fuse   º
+             ÇÄÄÄÄÄÄÄÂÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÂÄÄÄ0ÄÄÄÂÄÄÄÄo \oÄÄÄo\oÄÄÄ¶
+             º      100R  ³ OVER-       ³       ³  Ign IGN   Ign          º
+   RECTIFYÚÄÄÐÄÄ¿    ³  \<Ù VOLTAGE     ³       ³ Lamp CCT   SW         ÄÄÐÄÄ
+    RELAY ÀÄÄÒÄÄÙ    ³   \o RELAY       ³       ³                Battery ÛÛÛ
+  (I coil)   º       ÀÄÄÄ´  BREAK       ³       ³                        _º_
+             º           ³              ³       ³    OVER-              ////
+       THICK º      THIN ³    RECTIFYÚÄÄÁÄÄ¿ ÚÄÄÁÄÄ¿VOLTAGE
+        WIRE º      WIRE ³     RELAY ÀÄÄÂÄÄÙ ÀÄÄÂÄÄÙ RELAY
+            _±_          ³   (12V coil) ³       ³    (16V)
+           /   \  DYNAMO )              ³       ³
+          Armature       ) Field        ³       ³
+Commutators\___/0R1      ) Winding      ³       ³
+ & Brushes   ±           )  4R          ³       ³
+             ÀÄÄÄÄÂÄÄÄÄÄÄÙ              ÀÄÄÂÄÄÄÄÙ
+                 _³_                      _³_
+                ////                     ////
+
+The DC dynamo was the original generator, it is very similar to a motor in
+construction, but with electromagnets for the magnetic field. They use an
+external control box to reduce the exciting field magnet to regulate the DC
+output. The relays in the control box generally have a voltage coil as well as
+a current coil.
+
+Dynamos on bicycles are actually permanent magnet AC Alternators and not
+"Dynamos" at all.
+
+Dynamo batteries are designed for higher voltages and withstand more over-
+charging than other batteries. Basically the battery has far more lead and
+water in it, and is about twice a heavy as a modern one.
+
+In the 70s all Car Dynamos were superseded by higher capacity Alternators with
+integral Rectifiers & Regulators, they have many advantages over dynamos,
+e.g. output at low revs, good regulation, resulting in only starting work for
+the battery and hence smaller batteries.
+
+WARNING LAMP
+On turning the ignition switch on, the dash board lamp puts a few mA through
+the armature & field winding. Because the dynamo has not self excited it's
+output voltage is well below the battery voltage & the lamp lights up.
+
+EXCITING VOLTAGE
+When the engine speed is enough (1500 RPM) the low level exciting current plus
+residual magnetic field in the rotor is enough to start the build up the
+generated voltage.
+
+RECTIFY RELAY
+When the dynamo voltage reaches 12V the RECTIFY RELAY operates, connecting
+the dynamo to the battery. If this fails to happen after say the dynamo has
+been replaced or worked on, the field winding should be flashed to the battery
+for a second or so to refresh the residual field.
+N.B. Dynamos can be used on +ve or -ve earth systems, only the residue field &
+rotation direction determines which!
+
+When the engine RPM drops below excitation drop out speed (800 RPM) the RECTIFY
+RELAY releases because there is a 2nd thick high current winding that will
+cancel the relay operate condition when the dynamo draws reverse current by
+acting as a motor.
+
+VOLTAGE REGULATING.
+There are 2 types of regulator a 2 relay & 3 relay. They are really much the
+same in operation. When the dynamo voltage reaches 16V the OVER-VOLTAGE relay
+momentarily operates breaking the current in the dynamo field winding. This
+reduces the dynamos output to the point were this relay is constantly breaking
+the current to maintain the voltage. On breaking the field winding current, the
+back EMF is dumped into a resistor (e.g. 100R 3W) to stop sparking.
+
+CURRENT LIMITING.
+Regulators with 3 relays have one for OVER-CURRENT with just a thick high
+current winding, like the OVER-VOLTAGE RELAY this also breaks the dynamo's
+field winding current to limit the current to a safe level say 20 Amps for that
+dynamo rating.
+
+HEADLIGHT BOOST.
+When the headlamps are on, it is common practice to boost the dynamo output
+voltage to allow for wiring losses. This is done by supplying the headlight
+power via a few turns of thick wire wound around the OVER VOLTAGE RELAY. The
+OVER-CURRENT RELAY may also have a current boost headlight winding to push the
+rating up to say 28 Amps at night, when it is assumed the operating temperature
+is cooler for the dynamo.
+
+FAULTING DYNAMO SYSTEMS.
+If there is no charging (e.g. ign lamp stays on).
+
+With ignition OFF, disconnect the 2 Dynamo connections. Using a car headlamp
+bulb from battery to :-
+1/ Armature terminal, Lamp should light brightly (same as an earth)
+                                                         If not Brushes faulty.
+
+2/ Turn dynamo around slowly (hand crank engine), lamp may flicker but never go
+   out!                              If not Brushes/Commutator/Armature faulty.
+
+3/ Field winding. Lamp should dimly light.
+                        If not check connections. If brightly check for shorts.
+  
+If all OK dynamo should be OK. Now use the headlamp bulb to earth and the 2
+leads off the dynamo test the regulator with the ignition ON, connect lamp to:-
+
+4/ The thick Lead, Lamp should not light. If it does RECTIFY RELAY contact
+                             welded closed! Disconnect battery and break apart.
+
+5/ With lamp still on thick lead, manually operate RECTIFY RELAY. Lamp should
+   light fully.                        If it does not check terminals & wiring.
+
+6/ Connect lamp to thin lead, manually operate RECTIFY RELAY. Lamp should light
+   fully.    If it does not check for dirt OVER VOLTAGE RELAY contact, and if
+             3 relay type the OVER CURRENT RELAY contact. Also check wiring.
+
+7/ With the lamp still on the thin lead, manually operate both RECTIFY & OVER-
+   VOLTAGE RELAYS. Lamp should go out (or very dim). If not check adjustment
+   of OVER-VOLTAGE RELAY contact.
+
+8/ If 3 relay type repeat 7 but with RECTIFY & OVER CURRENT RELAYS operated.
+   Result should be same.
+
+If 4-8 are OK the regulator it should be working. Reconnect the dynamo and
+retest to see it you have cleared an intermittent or dirty connector fault.
+
+REGULATOR ADJUSTMENT.
+A/ RECTIFY RELAY spring adjustment, should be set to operate @ 12.5V and
+   release @ 12V. 
+
+B/ OVER-VOLTAGE RELAY contact adjustment should be set to give 16V at full revs
+   on a charged battery with no loads (other than ignition).
+
+C/ OVER-CURRENT RELAY if fitted, with a low ohm/clip on DC ammeter in circuit.
+   Connect a separate heavy load across the battery (not existing headlights!)
+   to hold the battery voltage down (eg. a 30A load of 6x 5A headlamps). Rev up
+   and adjust relay contact for the maximum current for the dynamo rating
+   (normally stamped on casing).
+
+
+Why Don't U send an interesting bul>
+
+73 De John, G8MNY @ GB7CIP

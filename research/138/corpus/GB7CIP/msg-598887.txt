@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 25-Oct-26 10:49
+Bid: 5952-CX2SA
+Title: (M5.4) New Guinea, Papua New Guinea -4.4 143.1
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           New Guinea, Papua New Guinea
+Geographic coordinates:           4.364S, 143.084E
+Magnitude:                        5.4
+Depth:                            72 km
+Universal Time (UTC):             25 Oct 2026  10:30:28
+Time near the Epicenter (1):      25 Oct 2026  21:30:28
+Time in your area (1):            25 Oct 2026  07:30:28
+Location with respect to nearby cities:
+33.7 km (20.9 mi) ESE of Ambunti, Papua New Guinea
+108.7 km (67.4 mi) SW of Wewak, Papua New Guinea
+207.1 km (128.4 mi) NNW of Mendi, Papua New Guinea
+208.4 km (129.2 mi) NW of Mount Hagen, Papua New Guinea
+271.6 km (168.4 mi) SE of Vanimo, Papua New Guinea
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4tq
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4tq?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 25/10/2026 10:48:33 UTC
+________________________________________________________________

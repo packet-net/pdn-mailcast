@@ -1,0 +1,25 @@
+From: KF5JRV
+To: TODAY
+Type/Status: B$
+Date/Time: 29-Oct-26 08:20
+Bid: 34106_KF5JRV
+Title: Today in History - Oct 29
+Path: !VK2RZ!VE3CGR!KF5JRV!
+
+On October 29, 1969, researchers at the University of California, Los Angeles, successfully send the Stanford Research Institute a first-of-its-kind electronic message on ARPANET, the forerunner of the modern internet.
+
+At the time, what we now call the internet began as a rudimentary experimental computer network, commissioned and funded by the Advanced Research Projects Agency (ARPA) of the U.S. Department of Defense. After Russia launched its space satellite Sputnik, President Dwight D. Eisenhower created ARPA in 1958 to step up scientific research and aid in the development of technologies with possible national defense applications.
+
+Around the time of ARPANETâs creation, UCLA Professor of Computer Science Leonard Kleinrock was working on developing an information transfer technology called "packet switching," which broke information into smaller bundles that were easier to transmit and could be reassembled on the receiving end. It would become foundational technology for powering the internet.
+
+In a 1999 interview with UCLAâs Daily Bruin, Kleinrock said his research started it all. "I was the inventor of Internet technology."
+
+ARPANET launched in the fall of 1969. UCLA became its first "node" in early September, when it received and installed the networking hardware necessary to route information to the network's second node: the Stanford Research Institute. That fateful first message, according to Kleinrock, was supposed to be the word âlogin.â But the system crashed after the first two letters. So, it ultimately consisted of just two letters: L and O.
+
+By early December, ARPANET had added two more nodes, including the University of California at Santa Barbara and the University of Utah. Slowly, it opened the network more broadly, first in other universities like Harvard and the University College of London and then in the corporate world. By 1993, the technology once accessed by scientists was now available to the publicâand the internet was born.
+
+
+73 de Scott KF5JRV
+
+Pmail: KF5JRV@KF5JRV.#NWAR.AR.USA.NA
+Email KF5JRV@gmail.com

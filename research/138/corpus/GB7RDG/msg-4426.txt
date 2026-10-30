@@ -1,0 +1,45 @@
+From: G8MNY
+To: IBM
+Type/Status: B$
+Date/Time: 26-Oct 07:33Z
+Bid: 9151_GB7CIP
+Title: IBM Video Connections
+
+R:261026/0733Z @:GB7CIP.#32.GBR.EURO #:9151 [Caterham Surrey GBR] $:9151_GB7CIP
+
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To  : IBM@WW
+
+                      PC to video display unit pinouts.
+                      =================================
+        VGA             NEC           EGA         CGA           MDA
+     (Ana RGB)      (Dig RGBI)    (Dig RGBI)  (Dig RGBI)     (Hercules)
+ 1   R - out        Intensity     Ground      Ground         Ground
+ 2   G - out        R             R'          Ground         Ground
+ 3   B - out        G             R           R              N.C.
+ 4   mon ID bit 2   B             G           G              N.C.
+ 5   Ground         Ground        B           B              N.C.
+ 6   R - return     Ground        G'          Intensity      Intensity
+ 7   G - return     h-sync (+)    B'          N.C.(vid)      Video
+ 8   B - return     v-sync (-)    h-sync (+)  h-sync (+)     h-sync (+)
+ 9   no pin                       v-sync (-)  v-sync (-)     v-sync (-)
+10   sync return
+11   mon ID bit 0
+12   mon ID bit 1
+13   h-sync
+14   v-sync
+15   reserved
+NOTES                                         Vid on Phono
+
+
+9 PIN LAYOUT          15 PIN LAYOUT
+1  2  3  4  5         11 12 13 14 -
+ 6  7  8  9            6  7  8  - 10
+                      1  2  3  4  5
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP
+
+

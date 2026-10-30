@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 25-Oct-26 19:05
+Bid: 5968-CX2SA
+Title: (M5.2) Afghanistan-Tajikistan-Pakistan region 36.3 71.1
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Afghanistan-Tajikistan-Pakistan region
+Geographic coordinates:           36.274N,  71.103E
+Magnitude:                        5.2
+Depth:                            110 km
+Universal Time (UTC):             25 Oct 2026  17:44:24
+Time near the Epicenter (1):      25 Oct 2026  22:14:24
+Time in your area (1):            25 Oct 2026  14:44:24
+Location with respect to nearby cities:
+59.6 km (37.0 mi) SW of AshkÄsham, Afghanistan
+67.8 km (42.0 mi) SW of Ishqoshim, Tajikistan
+69.8 km (43.3 mi) SSE of Jurm, Afghanistan
+96.1 km (59.6 mi) N of PÄrÅ«n, Afghanistan
+104.5 km (64.8 mi) SSE of Fayzabad, Afghanistan
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4va
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4va?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 25/10/2026 19:04:17 UTC
+________________________________________________________________

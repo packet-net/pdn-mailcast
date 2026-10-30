@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 20-Oct-26 23:41
+Bid: 5808-CX2SA
+Title: (M5.1) south of the Fiji Islands -25.5 179.5
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           south of the Fiji Islands
+Geographic coordinates:           25.545S, 179.528E
+Magnitude:                        5.1
+Depth:                            517 km
+Universal Time (UTC):             20 Oct 2026  23:24:27
+Time near the Epicenter (1):      21 Oct 2026  12:24:27
+Time in your area (1):            20 Oct 2026  20:24:27
+Location with respect to nearby cities:
+716.9 km (444.5 mi) SW of Houma, Tonga
+727.0 km (450.8 mi) SW of Nukuâalofa, Tonga
+730.8 km (453.1 mi) SW of âOhonua, Tonga
+828.2 km (513.5 mi) S of Suva, Fiji
+834.3 km (517.2 mi) S of Nasinu, Fiji
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3r3
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3r3?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 20/10/2026 23:40:51 UTC
+________________________________________________________________

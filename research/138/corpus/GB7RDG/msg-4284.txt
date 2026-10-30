@@ -1,0 +1,108 @@
+From: DJ6UX@DB0HB.#HH.DEU.EU
+To: AGCW
+Type/Status: B$
+Date/Time: 19-Oct 19:24Z
+Bid: TN65VL_DB0HB
+Title: AGCW-Telegramm 43/26 vom 2016-10-19
+
+Body: 2992
+
+R:261019/2036Z 14987@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261019/2036Z 19954@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261019/2036Z 38897@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261019/2035Z 3407@VE3KPG.#ECON.ON.CAN.NOAM BPQ6.0.26
+R:261019/2033Z @:GB7CIP.#32.GBR.EURO #:8523 [Caterham Surrey GBR]
+R:261019/2028z @:SR1BSZ.SZ.POL.EU $:TN65VL_DB0HB
+R:261019/2036z @:SR6DWH.#DSL.POL.EU $:TN65VL_DB0HB
+R:261019/2033z @:OK1TOR.CZE.EU $:TN65VL_DB0HB
+R:261019/2033z @:OE2XZR.#OE2.AUT.EU $:TN65VL_DB0HB
+R:261019/2033z @:DB0FFL.#BAY.DEU.EU $:TN65VL_DB0HB
+R:261019/2031z @:CS5NRA.CTST.PRT.EU $:TN65VL_DB0HB
+R:261019/2031z @:DB0ALG.#NDS.DEU.EU $:TN65VL_DB0HB
+R:261019/2031z @:DK0MAV $:TN65VL_DB0HB
+R:261019/2031z @:DB0FC.#NDS.DEU.EU [JO52GG OP: DF2AU] DP6.00 $:TN65VL_DB0HB
+R:261019/1924z @:DB0HB.#HH.DEU.EU [HH-AIRPORT] DP6.00 $:TN65VL_DB0HB
+From: DJ6UX @ DB0HB.#HH.DEU.EU (Eddi)
+To:   AGCW @ WW 
+X-Info: Upload without password authentication
+
+Path: ehrhh!.POSTED!not-for-mail
+From: dj6ux@dj6ux.ampr.org (Edmund H. Ramm)
+Newsgroups: ampr.bbs.agcw
+Subject: AGCW-Telegramm 43/26 vom 2016-10-19
+Date: Mon, 19 Oct 2026 20:28:45 -0000 (UTC)
+Organization: Private Linux/68k site
+Message-ID: <11b5uht$fbc$1@dj6ux.ampr.org>
+Reply-To: dj6ux@db0fhn.ampr.org (Edmund H. Ramm)
+Injection-Info: dj6ux.ampr.org;
+	logging-data="15724"; mail-complaints-to="usenet@dj6ux.ampr.org"
+User-Agent: nn/6.7.3
+Xref: ehrhh ampr.bbs.agcw:2031
+
+ge dr ops es swls = hpe conds gd to rcve msg wid 6 pts
+
+<KA>
+
+hanau 43/26 ck 116/112 19 1700 =
+
+
+pt 1: mitgliederbewegungen =
+
+      nil ===
+
+
+pt 2: ergebnis agcw vhf-contest sep =
+
+      kl a: 1. dj3ce/p, 2. dl2za,   3. dl2lqc/p =
+      kl b: 1. dl2yds,  2. dl3tu/p, 3. dk2gz =
+      kl c: 1. ol7c,    2. dl8qs,   3. hb9cln =
+
+      congrats ===
+
+
+pt 3: ergebnis agcw uhf-contest sep =
+
+      kl a: 1. dj3ce/p, 2. dl3ias, 3. dh7ffe =
+      kl b: 1. dk2gz,   2. df7dj,  3. pd8md =
+      kl c: 1. dl8qs,   2. dl2om,  3. df7rg =
+
+      congrats ===
+
+
+pt 4: grimeton radio =
+
+      saq qrv 17.2khz okt 24 1230utc, 1245utc, 1300utc =
+
+      ds info sm6nm ===
+
+
+pt 5: funkaktivitaet =
+
+      okt 21 00-24utc foc straight key event =
+
+
+pt 6: konteste =
+
+      okt 20    19-2030utc agcw schlackertastenabend =
+      okt 20    19-20utc agcw/ntc freundschafts qso-party =
+      okt 24-25 00-24utc extreme cw world-wide challenge ===
+
+
++
+nw zap
+
+
+Das AGCW-Telegramm wird jeweils montags um 1800UTC auf 3563kHz +/- QRM
+von einer AGCW-Leitstation gesendet, anschliessend Bestaetigungsverkehr
+('ZAP'). Wer sich vor der Aussendung anmeldet, erhaelt eine Nummer, mit
+der er zum ZAP-Traffic aufgerufen wird. Meist wird ein Sonder-DOK vergeben.
+--------------------------------------------------------------------
+AGCW-DL * Arbeitsgemeinschaft Telegrafie * Activity Group Telegraphy
+
+-- 
+   dj6ux@db0fhn.ampr.org - dj6ux AT posteo DOT de - DJ6UX@DB0HB.#HH.DEU.EU
+                         QTH Hamburg-Bramfeld, FN31a
+
+
+
+

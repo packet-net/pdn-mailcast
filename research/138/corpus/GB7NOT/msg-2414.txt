@@ -1,0 +1,11 @@
+From: G8BPQ
+To: MCAST
+Type/Status: BF
+Date/Time: 19-Oct 16:54Z
+Bid: 62928WG8BPQ
+Title: MCR G8BPQ 2026-10-19
+
+MCR1 0.16.2 IO92kx sc 2/2 3:AUD1,RIG2 0 0
+09 W4 30 8 -0.8 IM+PU 2 - 0.32 0.27 - p
+
+

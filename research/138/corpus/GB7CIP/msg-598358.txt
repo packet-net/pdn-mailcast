@@ -1,0 +1,325 @@
+From: NK5LA
+To: ALL
+Type/Status: B$
+Date/Time: 20-Oct-26 01:19
+Bid: 4647_NS2B
+Title: PCL NET SCRIBE OCT 19 2026
+Path: !VE3KPG!VE3CGR!WG0A!N2MH4!NS2B!
+
+PCL NET SCRIBE OCT 19 2026
+
+NK5LA, Daryl, Arkansas (Net Control/Scribe)
+N6UTC, Endaf, California (Early Checkin)
+K0WAV, Scott, Arkansas (Short Time)
+KC2NJV, Wayne, New York (One Rounder)
+NS2B, Bob, New York (Sysop)
+KX4AC, Carl, Arizona
+VA7RBP, Rick, Canada
+
+**
+
+GE All, and welcome to the Oct. 19, 2026 PCL 
+Net. Early checkin from Endaf, N6UTC...and 
+Scott, K0WAV.
+
+Net order is Daryl, Wayne, Bob (NY), Carl, 
+Rick, and whoever else shows up.
+
+NK5LA:
+
+I won't be here next week, due to having a 
+nuclear chemical stress test and an 
+echocardiogram done next Monday...so, Bob 
+(NY), will take the net for me. I plan to be 
+back for Election Eve, but I'll be happy when 
+all of that is over. The ones who are sad are
+all the losers (obviously), the radio and TV
+stations, the billboard companies, the print 
+publications, and the sign and decal shops, 
+when all that business goes away. I hope to 
+go early voting this week...as I'd rather 
+not stand in line on Election Day.
+
+The day before Election Eve is the time change 
+back to Standard Time. Most net times won't 
+change, but UTC Time is an hour later. For 
+nets that run on UTC Time, and if you observe 
+the time change, your net checkin time will 
+be an hour earlier. I was going to rework the 
+D-Star, D-Rats, and Echolink Net lists to have 
+all 4 US Time Zones, but with "The Sunshine Act" 
+still stalled in the "do-nothing-Congress" (that 
+is normal for them), and other areas making time
+changes as well, I may just leave it alone, or 
+create one with just UTC Time...since the contests 
+are on that, anyway.
+
+I'm to do a license exam session this Saturday.
+I have 3 going for Technician, and 1 for General. 
+It will be our last session until spring, as the 
+winter may be active with El Nino...but we need 
+rainfall more than anything else right now. High 
+to Extreme Fire Danger and burn bans cover the 
+region. It was in the 40s here at sunrise over 
+the weekend.
+
+QSO One is really becoming the Swiss Army Knife 
+for ham radio, cheaper than the SharkRF OpenSpot 
+4 Pro and the M1KE. I'm set up on it, but haven't 
+used it for nets as of yet. I'm a "spark subscriber" 
+at $3 a month, and it's worth it...but being on a 
+fixed income, the cheapskate option was my only 
+choice. I also have several other ham radio apps 
+on my Android phone, but you can email me if you'd 
+like a list of them.
+
+GE Wayne, how was your week??
+
+**
+
+KC2NJV:
+
+GE all... The only "exciting" thing happening this 
+week is maybe, just maybe get my antennas will get 
+fixed. 
+
+Otherwise, it was 40 degrees around 7am this morning.
+Getting ready for the NYC Marathon, I'm the co-captain 
+of mile 13.1 (1/2 way mark)... a day that starts at 
+4am (6am at the mile marker) and goes to around 4PM. 
+For others, the day is shorter or nearly 24 hours 
+long...
+
+Enjoy your week....73, Wayne Kc2NJV
+
+**
+
+NK5LA:
+
+Wayne, I hope you can get the antenna fixed, and 
+sounds like fall has arrived. GL with that NYC 
+Marathon...the Arkansas Traveler 100 mile run was 
+in early October. The main repeater they were using 
+failed, so they had to scramble for communications, 
+as it was a 24 hour event. Thanks for being here.
+
+GE Bob, how was your week?? >>>
+
+**
+
+NS2B: 
+
+GE All.
+
+Good week here! WX has been warm the last couple 
+of days. 20M has been hoppin' for a change.
+
+Upgraded the node to the last release and it didn't 
+immediately die! Of course it may yet! hihi
+
+And made a discovery that was less than intuitive 
+for me. Like many of you, I have a number of computers 
+around here that aren't boat anchors - good quantities 
+of ram, storage and fast processors, but Microsoft in 
+their wisdom has deemed them unfit for Windows 11. I'm 
+not opposed to going to Linux, as it's actually my 
+favorite OS, so all of them have gone to Linux. BUT - 
+if you load the latest VirtualBox on your Linux machine, 
+it will confidently load and run Windows 11!! So I have 
+a Windows 11 virtual machine running that'll eventually 
+take over radio programming duties from my Windows 10 
+virtual machine.
+
+Still working on Hamword.
+
+And, that's it for me! BTU Daryl >>>
+
+**
+
+NK5LA:
+
+Bob (NY), first FB on the weather, 20 meters, and Hamword. 
+Of course, you've jinxed the node for next week (hi hi). 
+
+To the deal on Linux and W11, so much for Bill Gates 
+saying that "640K of RAM ought to be enough for anybody" 
+(hi hi). GL with that setup.
+
+GE Carl, how was your week?? >>>
+
+**
+
+KX4AC:
+
+GE All And good luck with that stress test, Daryl. I had 
+one a couple of years ago, and man it was a workout!
+
+I missed last week because we had a date with The 
+Mouse (Disney), and we had a lot of fun. There is a lot 
+more in Anaheim than I remember from the last time I was 
+at Disney back in the 80s. We had a terrific view of the 
+fireworks from our hotel room, so did not have to stay 
+all day just to see them. Very tiring, but I did better 
+with all the walking than I thought I would.
+
+The weather in Phoenix is getting nice for a change. A 
+little chilly in the morning and not too hot in the 
+afternoon. Peak high today was around 91, which is not 
+too bad and is very nice the rest of the day.
+
+I am working on new antennas for VHF and UHF. I had 
+trouble hitting a repeater a couple of weeks ago and 
+discovered that my J poles were way out of tune. Not 
+sure how or when that happened, but I need to work 
+on that.
+
+I am trying to setup a vertical dipole and setup 
+something that lets me keep it inside (because of 
+the HOA) most of the time, but take it outside if 
+I really want the best performance.
+
+Have not started HAMWORD yet this week, but plenty 
+of time left to go.
+
+I am looking forward to the time change. We don't 
+change, but it will make for a better schedule for 
+this net in relation to my daily NTS net.
+
+That's about it for this week. Sorry about the typos. 
+I am using telnet tonight and the backspace seems to 
+work differently.  Oh, well.
+
+Back to net >>>
+
+**
+
+NK5LA:
+
+Carl, your only typos were talking about me and the 
+stress test. A fellow ham who had one of those said 
+"you feel like you have been shot". At least I'm not 
+crazy on consuming caffeine, but I have to lay off 
+all of that the day before, then fast beforehand. 
+
+As for the Disneyland trip, FB. I don't see how 
+folks can go to the amusement parks, etc., anymore. 
+I too, prefer standard time...hope you can get 
+things worked out with those antennas.
+
+GE Rick, hope you have a good Thanksgiving...how 
+are things with you?? >>>
+
+**
+
+VA7RBP: 
+
+Good evening Daryl and all on the NET.
+
+We went to the coast between Oct 5 and 9, for
+Arlene's class of 73 grad reunion and to visit 
+with family and friends while there. The grad 
+thing went well, the only people I knew were 
+one of our bride's maids and an old girlfriend...
+it was pretty good!
+
+Last week, nothing exciting went on... I got the 
+latest COVID and FLU shots and the associated 
+aches from that, but it didn't last long.
+
+We have our provincial election on Saturday, but 
+we went and did the advance voting this past 
+Saturday. Our Granddaughter is working at the 
+polling station.. they sure grow up fast...
+
+The weather here is starting to cool off, we had 
+30F yesterday morning, 41 this morning, and highs 
+are mid-forties. Starting to see snow on the high 
+peaks. 
+
+Radio wise, propagation has been poor, on 40M in 
+the mornings, and a bit better on 20M around noon.
+
+At the moment, I am working on our club AGM 
+financial report... what a pain!!!
+
+Thanksgiving was great! I think we attended three 
+dinners!
+
+OK, that's all I have, so BTU Daryl >>>
+
+**
+
+NK5LA:
+
+Rick, first, FB on the class reunion and family 
+visit. I'm to get my flu shot in mid-November, 
+but stopped doing covid shots a few years back, 
+as it drained my energy. 
+
+At least my polling place is only a mile away, so 
+the Lyft ride is cheaper, if I have to wait. I know 
+about those reports...I have to prepare one for my 
+QCWA Chapter soon. Sounds like you did some good 
+eating...that's the main holiday activity (hi hi).
+
+That'll do it for round 1, back to the top for final 
+comments.
+
+Wayne said he was a 1 rounder, so we'll move on.
+
+Bob (NY), thanks for the use of the BBS, and for 
+being here for me next week. Anything else?? >>>
+
+**
+
+NS2B: 
+
+Nope, all done here - everyone have a good week - 73 >>>
+
+**
+
+NK5LA:
+
+Take care, Bob. I'll let you know how things went.
+
+Carl, anything else?? >>>
+
+**
+
+KX4AC: 
+
+Nothing else from Phoenix. Good luck with that stress 
+test. 73 to all >>>
+
+**
+
+NK5LA:
+
+Thanks, Carl. I thought those were common with waiting 
+in the ER and the Dr's office (hi hi).
+
+Rick, anything else?? >>>
+
+**
+
+VA7RBP: 
+
+Nope, thanks Bob for the use of the BBS, everyone have 
+a great week, stay sane, and 73 until next time, 
+BTU Daryl >>>
+
+**
+
+NK5LA:
+
+Take care, Rick. See you next time.
+
+That'll do it for tonight's net. I'll post the scribe 
+in the morning, as I have other stuff to do before some 
+more nets. 
+
+I'll see everyone in 2 weeks. 73 and GN DE NK5LA >>>
+
+
+
+Daryl Stout, NK5LA, Little Rock, Arkansas

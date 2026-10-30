@@ -1,0 +1,16 @@
+7 BF G0LAB 1793326374 LABTST@WW AE3FD2607LAX &:G0LAB
+lab t04_trailing_ws
+R:261030/0212Z @:GB7LAX.#99.GBR.EURO [] #:7 XrLin505p
+Date: Fri, 30 Oct 2026 02:12:54 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t04_trailing_ws
+Message-ID: <AE3FD2607LAX>
+
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.

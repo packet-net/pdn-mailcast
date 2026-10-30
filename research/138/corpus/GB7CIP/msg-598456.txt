@@ -1,0 +1,94 @@
+From: HP2DFA
+To: WSPR
+Type/Status: B$
+Date/Time: 21-Oct-26 00:57
+Bid: 5235_HP2DFA
+Title: TOP10  WSPR SPOTTERS DISTANCE/SPOTS OCT20
+Path: !VE3KPG!VE3CGR!LU9DCE!KC2NJV!PY2BIL!HP2DFA!
+
+WORLDWIDE WSPR PROPAGATION RECEIVER STATIONS TOP 10 DISTANCE SUMMARY (V3.1.0)
+
+TECHNICAL PROPAGATION AND RECEPTION NETWORK BULLETIN
+TOTAL KILOMETERS, RAW SPOTS, AND UNIQUE SPOTS STATISTICS (PAST 24 HOURS UTC)
+VALID: 20-OCT-2026 ONWARDS
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+======================================================================
+1. GENERAL SUMMARY & HIGHLIGHTS
+======================================================================
+THE FOLLOWING IS THE UPDATED TOP 10 WORLDWIDE RANKING OF RECEIVING STATIONS
+(SPOTTERS) SORTED BY TOTAL ACCUMULATED KILOMETERS OF DECODED WSPR SIGNALS OVER
+THE PAST 24 HOURS UTC (VERSION 3.1.0).
+
+======================================================================
+2. TOP 10 SPOTTER STATIONS TABLE BY DISTANCE
+======================================================================
+RANK | REPORTER    | LOCATOR | TOTAL KM    | RAW SPOTS | UNICS | TOP MAIN BANDS
+----- ------------- --------- ------------- ----------- ------- ------------------
+  1  | VK5ARG      | PF95ht  |  16,767,027 |    18,496 | 1,337 | 20M, 30M, 40M, 17M
+  2  | EA8/DF4UE   | IL38bp  |  12,199,274 |    48,802 | 2,471 | 20M, 15M, 30M, 17M
+  3  | KD2OM       | FN12gx  |   9,953,955 |    55,969 | 2,427 | 20M, 15M, 30M, 17M
+  4  | EA8BFK      | IL38bo  |   9,949,777 |    32,857 | 2,019 | 20M, 15M, 30M, 17M
+  5  | K3FEF       | FN21mh  |   9,706,922 |    43,606 | 2,266 | 20M, 15M, 30M, 17M
+  6  | VK6PVL      | OF88bc  |   9,538,597 |    10,730 |   874 | 20M, 30M, 40M, 17M
+  7  | ON5KQ       | JO10os  |   8,537,022 |    61,953 | 2,217 | 20M, 15M, 30M, 17M
+  8  | W1XP        | FN42fo  |   8,484,923 |    45,410 | 2,142 | 20M, 15M, 30M, 17M
+  9  | VK4EMM      | QG62lr  |   8,020,321 |     8,999 |   758 | 20M, 30M, 40M, 17M
+ 10  | N2YCH       | FN31jg  |   7,949,078 |    51,181 | 2,058 | 20M, 15M, 30M, 17M
+
+======================================================================
+3. TECHNICAL ANALYSIS & RECEPTION HIGHLIGHTS
+======================================================================
+- OCEANIA DISTANCE LEAD: AUSTRALIAN STATION VK5ARG MAINTAINS THE TOP GLOBAL SPOT
+  WITH OVER 16.76 MILLION KM ACCUMULATED VIA LONG-HAUL DX PATHS.
+- MACARONESIAN & NORTH AMERICAN RECEPTION: CANARY ISLANDS STATIONS (EA8/DF4UE,
+  EA8BFK) EXCEED 9.9 MILLION KM, SUSTAINING MASSIVE DECODE VOLUMES CONCENTRATED
+  HEAVILY ON THE 20M, 15M, AND 30M BANDS.
+
+CREDITS & SOURCES: ARNE / ROB / PHIL VK7JJ
+
+
+WORLDWIDE WSPR PROPAGATION RECEIVER STATIONS TOP 10 SPOT COUNT SUMMARY (V4.0.0)
+
+TECHNICAL PROPAGATION AND RECEPTION NETWORK BULLETIN
+RAW SPOTS, DUPLICATES, AND UNIQUE SPOT STATISTICS (PAST 24 HOURS UTC)
+VALID: 20-OCT-2026 ONWARDS
+ISSUED VIA BPQ32 NODE HP2DFA-5 IN PANAMA
+
+======================================================================
+1. GENERAL SUMMARY & NETWORK TOTALS
+======================================================================
+THE FOLLOWING IS THE UPDATED TOP 10 WORLDWIDE RANKING OF RECEIVING STATIONS
+(SPOTTERS) BY DECODED WSPR BEACON VOLUME (VERSION 4.0.0).
+- TOTAL RAW SPOTS LOGGED            : 4,964,491
+- TOTAL DUPLICATES FILTERED         :     6,460
+- TOTAL UNIQUE SPOTS CAPTURED       :   242,523
+- ACTIVE REPORTING STATIONS         : 200 STATIONS IN GENERAL TABLE
+
+======================================================================
+2. TOP 10 SPOTTER STATIONS TABLE (SPOT COUNT)
+======================================================================
+RANK | REPORTER    | LOCATOR | RAW SPOTS | DUPES | UNICS | TOP BANDS (UNIQUE)
+----- ------------- --------- ----------- ------- ------- ------------------
+  1  | EA8/DF4UE   | IL38bp  |    48,802 |     0 | 2,471 | 20M, 15M, 30M, 17M
+  2  | KD2OM       | FN12gx  |    55,926 |     0 | 2,426 | 20M, 15M, 30M, 17M
+  3  | K3FEF       | FN21mh  |    43,606 |     0 | 2,266 | 20M, 15M, 30M, 17M
+  4  | ON5KQ       | JO10os  |    61,953 |     0 | 2,217 | 20M, 30M, 15M, 17M
+  5  | W1XP        | FN42fo  |    45,407 |     0 | 2,141 | 20M, 15M, 30M, 17M
+  6  | N2YCH       | FN31jg  |    51,181 |     0 | 2,058 | 20M, 15M, 30M, 17M
+  7  | KX4AZ/T     | EN74gc  |    49,588 |     0 | 2,036 | 20M, 15M, 30M, 17M
+  8  | EA8BFK      | IL38bo  |    32,825 |     0 | 2,018 | 20M, 15M, 30M, 17M
+  9  | PD0OHW      | JO33lc  |    49,907 |     0 | 1,970 | 20M, 15M, 30M, 17M
+ 10  | VE6JY       | DO33or  |    39,362 |   758 | 1,918 | 20M, 15M, 17M, 30M
+
+======================================================================
+3. TECHNICAL ANALYSIS & RECEPTION HIGHLIGHTS
+======================================================================
+- UNIQUE SPOT LEADERSHIP: CANARY ISLANDS STATION EA8/DF4UE CLAIMS THE GLOBAL LEAD
+  IN UNIQUE STATIONS DECODED WITH 2,471 UNIQUE SPOTS.
+- MASSIVE RAW DECODE VOLUMES: ON5KQ AND KD2OM LEAD RAW DECODES SURPASSING
+  55,000 REPORTS EACH, HEAVILY CONCENTRATED ON THE 20M, 15M, AND 30M BANDS.
+
+CREDITS & SOURCES: ARNE / ROB / PHIL VK7JJ
+NODE CONTACT MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 NODE PANAMA

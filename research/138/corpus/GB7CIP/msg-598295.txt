@@ -1,0 +1,108 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 19-Oct-26 07:45
+Bid: 8471_GB7CIP
+Title: Reforming Caps
+Path: 
+
+By G8MNY                                   (Updated May 15)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Electrolytic capacitors are formed by repeatedly apply a formation voltage that
+corrodes the anode of the pure aluminium foil, to make a very thin insulating
+oxide layer.
+               ³ -
+          _____³_____
+          Electrolyte
+          ÍÍÍÍÍÑÍÍÍÍÍ Oxide
+               ³ +    Layer
+
+This thin layer is the reason the capacitance value is so high (1000x) compared
+to other types of the same size. The oxide layer's thickness is proportional to
+the operating voltage. The electrolyte is a WET salt solution (Borax) in a
+porous tissue used to initially keep the foils apart. If the electrolyte dries
+out the capacitance value often decreases by >100 times & the ESR (Equivalent
+Series Resistance) goes very high too. Failed capacitors often look pregnant
+after high pressure has occurred.
+
+NEED FOR REFORMING
+The problem is that over time if the capacitor is not exercised to the
+formation voltage, the layer shrinks in thickness and the capacitor will need
+reforming to safely work at its rated voltage. Failure to do refoming means DC
+current continues to pass and the capacitor heats up & may explode!
+
+Noticeable reforming occurs in some applications like a photographic flashgun
+every time the capacitor is 1st used after a few days, and it takes much longer
+to charge up as formation current is flowing. After each flash the recharge is
+quicker.
+
+Volts  Reforming_ flash     _flash      . flash
+    ³     . - ~  ³ 1     .-~ ³ 2       / ³ 3
+    ³  ./'       ³      /    ³        /  ³
+    ³./          ³    ./     ³      ./   ³
+    ÀÁÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄÄÄÄÄ>Time
+
+But for larger power capacitors in PSUs, the formation voltage will be some 10%
+greater than the rated voltage, so when the formation voltage (voltage the
+oxide layer will withstand) is too low, much higher currents will flow and heat
+up the capacitor. To reform the layer the capacitor must be charged and
+discharged sometimes repeatedly. Hence on unused kit it is wise to power up
+briefly for a few seconds, then let the HTs drop to zero and re-power.
+
+POWERING UP REFORMING
+If kit has not been used for many years, then some reforming can be done by
+briefly repeatedly powering on (until HT appears) for a few seconds, then
+powering off for a few minutes. Do this a couple of times for each year of non
+uses and you will avoid the capacitor or valve rectifier blowing up.
+
+REFORMING CAPS
+For new caps that may have been stored for a while the same applies. Here is a
+reforming circuit I have used for high voltage electrolytics.
+
+230V    1uF 400V        Charge   Discharge
+MAINS ÄÂÄÄ´ÃÄÄÂÄÄÄ´>ÃÄÄÄÄÄÄÄÄo | oÄÄÄÄÄÄÄÄÄÄÄÄ¿
+ AC    ³      ³  1N4007        |              ³
+       ÀÄ1MêÄÄ´              + ÃÄÄÄÄÄÄÄ¿      ³
+              ³        CAP   __³__    _³_    (X) 2x 15W
+       1N4007_³_       220uF ÄÄÂÄÄ  / VOLT\   ³  240V
+             /_\       400V    ³    \METER/  (X) LAMPS
+NEUTRAL       ³                ³      ~³~     ³
+   ÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÁÄÄÄÄÄÄÙ
+The 1uF limits the charging current to a max of 75mA, but the peak voltage can
+be +650V, so an eye on the meter is needed! THIS IS A HIGH VOLTAGE MAINS
+CIRCUIT! Take safety precautions!
+
+For lower voltage high value Caps, use a variable voltage bench PSU to do the
+same thing.
+
+REFORMING
+Apply charging current until voltage rise nearly stops (e.g. current stays
+flowing), then discharge the capacitor.
+
+Volts                                          Reached        Formed to
+    ³     Charge Discharge Cycles               rated V          __ +10%
+400V´                             ___           .ÄÄÄ¿         .ú'  ³
+    ³            ___         _.-"~   ³       .-'    ³       ú'     ³
+    ³      _.,-'~   ³      -'        ³     -'       ³     ú' Rated ³
+    ³_.,-'~         ³   .-'          ³   -'         ³   ú' C value ³
+    ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÁÄÄÄÄÄÄÄÄÄÄÄÁÄÄÁÄÄÄÄÄÄÄÄÄÄÄÁÄÄ>Time
+             C a p   v a l u e   d e c r e a s e s  ->
+
+Repeat the charge discharge cycles and something like a 10% voltage increase
+will be seen for each. Repeat the cycles until the voltage is about 10% higher
+than the rated value is achieved. Anymore than that will risk insulation
+failure and or a drop in the rated capacitance value.
+
+NON POLAR TYPES
+These are really just 2 electrolytic capacitors in series in one can. So a
+middle foil is needed in manufacture to make the 2 caps, but not wired to the
+outside world. Because of this no direct reforming can be done again, but using
+them on AC solves this, as long as the do not get hot! Typically used in a
+rotator controller, for low voltage motor phase split capacitors that must have
+a high C value, as the voltage is low.
+
+
+Why Don't U send an Interesting Bul?
+
+73 De John, G8MNY @ GB7CIP

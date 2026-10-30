@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 21-Oct-26 19:39
+Bid: 5834-CX2SA
+Title: (M5.0) Reykjanes Ridge 57.2 -34.0
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Reykjanes Ridge
+Geographic coordinates:           57.159N,  33.997W
+Magnitude:                        5.0
+Depth:                            10 km
+Universal Time (UTC):             21 Oct 2026  19:06:07
+Time near the Epicenter (1):      21 Oct 2026  17:06:07
+Time in your area (1):            21 Oct 2026  16:06:07
+Location with respect to nearby cities:
+731.2 km (453.3 mi) ESE of Nanortalik, Greenland
+796.8 km (494.0 mi) SE of Qaqortoq, Greenland
+983.8 km (610.0 mi) SW of ReykjanesbÃ¦r, Iceland
+984.3 km (610.3 mi) SW of KeflavÃ­k, Iceland
+1010.9 km (626.7 mi) SW of HafnarfjÃ¶rÃ°ur, Iceland
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3x2
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3x2?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 21/10/2026 19:38:58 UTC
+________________________________________________________________

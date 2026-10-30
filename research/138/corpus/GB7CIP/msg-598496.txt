@@ -1,0 +1,325 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 21-Oct-26 11:46
+Bid: 25584_LU9DCE
+Title: ARCHLINUX UPDATES 21-OCT
+Path: !VK2RZ!VE3CGR!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+GNOME-APPLETS 3.58.0-2 X86_64
+
+SMALL APPLICATIONS FOR THE GNOME PANEL
+
+========================================
+
+LIBREWOLF 158.0.1_1-1 X86_64
+
+COMMUNITY-MAINTAINED FORK OF FIREFOX, FOCUSED ON PRIVACY, SECURITY AND
+FREEDOM
+
+========================================
+
+DUX-GOP 2.0.0-1 X86_64
+
+SYSTEM MONITORING CLI + REST API
+
+========================================
+
+XH 0.26.3-1 X86_64
+
+FRIENDLY AND FAST TOOL FOR SENDING HTTP REQUESTS
+
+========================================
+
+GIT-ANNEX 10.20261020-1 X86_64
+
+MANAGE FILES WITH GIT, WITHOUT CHECKING THEIR CONTENTS INTO GIT
+
+========================================
+
+PYTHON-FASTAPI 0.156.6-1 ANY
+
+FASTAPI FRAMEWORK, HIGH PERFORMANCE, EASY TO LEARN, FAST TO CODE,
+READY FOR PRODUCTION
+
+========================================
+
+PYTHON-PYTHON-PKCS11 0.10.1-1 X86_64
+
+PKCS#11/CRYPTOKI SUPPORT FOR PYTHON
+
+========================================
+
+DART-SASS 1.106.0-1 X86_64
+
+SASS MAKES CSS FUN AGAIN
+
+========================================
+
+DOLT 1:2.5.1-1 X86_64
+
+GIT FOR DATA! A VERSION CONTROLLED RELATIONAL DATABASE
+
+========================================
+
+BUILDKIT 0.34.1-1 X86_64
+
+A TOOLKIT FOR CONVERTING SOURCE CODE TO BUILD ARTIFACTS IN A
+REPEATABLE MANNER
+
+========================================
+
+F3D 4.0.0-1 X86_64
+
+A FAST AND MINIMALIST 3D VIEWER
+
+========================================
+
+SYNCTHING-RELAYSRV 2.1.7-1 X86_64
+
+RELAY SERVER FOR SYNCTHING
+
+========================================
+
+SYNCTHING-DISCOSRV 2.1.7-1 X86_64
+
+DISCOVERY SERVER FOR SYNCTHING
+
+========================================
+
+SYNCTHING 2.1.7-1 X86_64
+
+OPEN SOURCE CONTINUOUS REPLICATION / CLUSTER SYNCHRONIZATION THING
+
+========================================
+
+LUAJIT 2.1.1792527110+95F931C-1 X86_64
+
+JUST-IN-TIME COMPILER AND DROP-IN REPLACEMENT FOR LUA 5.1
+
+========================================
+
+GITHUB-CLI 2.102.1-1 X86_64
+
+THE GITHUB CLI
+
+========================================
+
+JSMOL 16.5.5-1 ANY
+
+A JAVASCRIPT 3D VIEWER FOR CHEMICAL STRUCTURES
+
+========================================
+
+JMOL 16.5.5-1 ANY
+
+A JAVA 3D VIEWER FOR CHEMICAL STRUCTURES
+
+========================================
+
+LUA54-STD-NORMALIZE 3-1 ANY
+
+LUA-STDLIB PROJECTS NORMALIZED LUA FUNCTIONS LIBRARY
+
+========================================
+
+LUA53-STD-NORMALIZE 3-1 ANY
+
+LUA-STDLIB PROJECTS NORMALIZED LUA FUNCTIONS LIBRARY
+
+========================================
+
+LUA52-STD-NORMALIZE 3-1 ANY
+
+LUA-STDLIB PROJECTS NORMALIZED LUA FUNCTIONS LIBRARY
+
+========================================
+
+LUA51-STD-NORMALIZE 3-1 ANY
+
+LUA-STDLIB PROJECTS NORMALIZED LUA FUNCTIONS LIBRARY
+
+========================================
+
+LUA-STD-NORMALIZE 3-1 ANY
+
+LUA-STDLIB PROJECTS NORMALIZED LUA FUNCTIONS LIBRARY
+
+========================================
+
+OPENJDK21-SRC 21.0.13.U9-1 X86_64
+
+OPENJDK JAVA 21 SOURCES
+
+========================================
+
+OPENJDK21-DOC 21.0.13.U9-1 X86_64
+
+OPENJDK JAVA 21 DOCUMENTATION
+
+========================================
+
+OPENJDK17-SRC 17.0.21.U9-1 X86_64
+
+OPENJDK JAVA 17 SOURCES
+
+========================================
+
+OPENJDK17-DOC 17.0.21.U9-1 X86_64
+
+OPENJDK JAVA 17 DOCUMENTATION
+
+========================================
+
+JRE21-OPENJDK-HEADLESS 21.0.13.U9-1 X86_64
+
+OPENJDK JAVA 21 HEADLESS RUNTIME ENVIRONMENT
+
+========================================
+
+JRE21-OPENJDK 21.0.13.U9-1 X86_64
+
+OPENJDK JAVA 21 FULL RUNTIME ENVIRONMENT
+
+========================================
+
+JRE17-OPENJDK-HEADLESS 17.0.21.U9-1 X86_64
+
+OPENJDK JAVA 17 HEADLESS RUNTIME ENVIRONMENT
+
+========================================
+
+JRE17-OPENJDK 17.0.21.U9-1 X86_64
+
+OPENJDK JAVA 17 FULL RUNTIME ENVIRONMENT
+
+========================================
+
+JDK21-OPENJDK 21.0.13.U9-1 X86_64
+
+OPENJDK JAVA 21 DEVELOPMENT KIT
+
+========================================
+
+JDK17-OPENJDK 17.0.21.U9-1 X86_64
+
+OPENJDK JAVA 17 DEVELOPMENT KIT
+
+========================================
+
+SPEEDCRUNCH 1.1.0-1 X86_64
+
+SIMPLE BUT POWERFUL CALCULATOR USING QT
+
+========================================
+
+IPROUTE2 7.3.0-1 X86_64
+
+IP ROUTING UTILITIES
+
+========================================
+
+QT6-DECLARATIVE 6.12.0-2 X86_64
+
+CLASSES FOR QML AND JAVASCRIPT LANGUAGES
+
+========================================
+
+NOTO-FONTS-EMOJI 1:2.057-1 ANY
+
+GOOGLE NOTO COLOR EMOJI FONT
+
+========================================
+
+BAZEL 9.3.1-1 X86_64
+
+CORRECT, REPRODUCIBLE, AND FAST BUILDS FOR EVERYONE
+
+========================================
+
+MISE 2026.10.17-1 X86_64
+
+THE FRONT-END TO YOUR DEV ENV
+
+========================================
+
+SING-BOX 1.14.3-3 X86_64
+
+THE UNIVERSAL PROXY PLATFORM
+
+========================================
+
+CHROMIUM 155.0.8059.84-1 X86_64
+
+A WEB BROWSER BUILT FOR SPEED, SIMPLICITY, AND SECURITY
+
+========================================
+
+V2RAY-DOMAIN-LIST-COMMUNITY 20261021011254-1 ANY
+
+A LIST OF DOMAINS TO BE USED AS GEOSITES FOR ROUTING PURPOSE IN
+PROJECT V
+
+========================================
+
+SING-GEOSITE-RULE-SET 20261020022354-1 ANY
+
+GEOSITE RULE SETS FOR SING-BOX
+
+========================================
+
+LIBJODYCODE 4.2-1 X86_64
+
+SHARED CODE USED BY SEVERAL UTILITIES WRITTEN BY JODY BRUCHON
+
+========================================
+
+LIBGDM 51.1.1-1 X86_64
+
+DISPLAY MANAGER AND LOGIN SCREEN - SUPPORT LIBRARY
+
+========================================
+
+GDM 51.1.1-1 X86_64
+
+DISPLAY MANAGER AND LOGIN SCREEN
+
+========================================
+
+STALWART 0.16.27-1 X86_64
+
+STALWART MAIL AND COLLABORATION SERVER
+
+========================================
+
+ROOTLESSKIT 3.3.0-1 X86_64
+
+NATIVE "FAKE ROOT" FOR IMPLEMENTING ROOTLESS CONTAINERS
+
+========================================
+
+PROMETHEUS-SSL-EXPORTER 2.9.2-1 X86_64
+
+PROMETHEUS EXPORTER FOR TLS CERTIFICATES
+
+========================================
+
+JSON-SCHEMA-VALIDATOR 2.4.1-1 X86_64
+
+JSON SCHEMA VALIDATOR FOR JSON FOR MODERN C++
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

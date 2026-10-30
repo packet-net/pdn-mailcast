@@ -1,0 +1,57 @@
+From: F6BVP
+To: FBB
+Type/Status: B$
+Date/Time: 23-Oct 11:11Z
+Bid: 23758_F6BVP
+Title:  LinFBB 7.0.14 released
+
+R:261024/0251Z @:GB7CIP.#32.GBR.EURO #:8910 [Caterham Surrey GBR] $:23758_F6BVP
+R:261024/0251Z 20291@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261024/0251Z 21786@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+R:261023/1111Z @:F6BVP.FRPA.FRA.EU #:23758 [Paris] $:23758_F6BVP
+
+From: F6BVP@F6BVP.FRPA.FRA.EU
+To  : FBB@WW
+
+ all,
+
+  LinFBB 7.0.14, the Linux version of the FBB BBS software, is
+  available. It fixes the forwarding with a partner BBS in two cases.
+
+  1. A line of 80 characters or more in forward.sys, or in an
+     included .fwd file (a long comment is enough), overflowed a
+     buffer in xfbbd. On F6BVP-1 it set the forward time-out of one
+     partner BBS to zero: every forward session with it was cut a
+     few milliseconds after the connection, with "*** Timeout !!".
+     Long lines are now cut to 79 characters.
+
+  2. A connection script with several steps (connect to a node,
+     then send the BBS command) could fail: the welcome banner was
+     sent instead of the next step. The channel time-out is now set
+     before each outgoing forward connection.
+
+  The "S" lines of the forward files are also bounded to the size
+  of their buffers.
+
+  In service since 17-20 October on four BBS: F6BVP-1, F6CNB-1,
+  F3KT-8 and F6KKR-1, with hourly forwards to a BPQ mailbox in
+  Canada.
+  Built on Raspberry Pi (armv7l, aarch64) and PC, with no error.
+
+  Upgrading: the configuration files do not change. Replace the
+  programs (xfbbd at least) and restart the BBS.
+
+  Download: Files section of the linfbb project on SourceForge,
+  fbb-7.0.14.tar.gz or fbb-7.0.14.tar.bz2.
+  SHA-256 of fbb-7.0.14.tar.gz:
+  fc3ff6d7049b84cb11185aa0083fcd7df0c56f14f51700d5e57958a83249edcb
+
+  Debian: testing and unstable have 7.013, the package for 7.0.14
+  is on its way.
+
+  Questions and reports are welcome, by packet or by e-mail.
+
+  73 de Bernard, F6BVP
+  bernard.f6bvp@gmail.com
+
+

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 29-Oct-26 08:14
+Bid: 6257_HP2DFA
+Title: EARTHQUAKE ALERT M6.4 - southeast of Easter Island
+Path: !VK2RZ!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M6.4+)       
+==================================================
+Event ID   : us7000ttxz
+Magnitude  : M 6.4
+Time (UTC) : 2026-10-29 07:49:50 UTC
+Depth      : 10.0 km
+Coordinates: -36.4058 Lat / -98.0489 Lon
+--------------------------------------------------
+Location:
+  southeast of Easter Island
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttxz
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

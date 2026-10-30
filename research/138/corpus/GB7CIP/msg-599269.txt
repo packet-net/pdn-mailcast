@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 22:29
+Bid: 6211_HP2DFA
+Title: EARTHQUAKE ALERT M5.7 - 276 km WSW of Tual, Indonesia
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.7+)       
+==================================================
+Event ID   : us7000ttua
+Magnitude  : M 5.7
+Time (UTC) : 2026-10-28 22:06:44 UTC
+Depth      : 128.1 km
+Coordinates: -6.3958 Lat / 130.3764 Lon
+--------------------------------------------------
+Location:
+  276 km WSW of Tual, Indonesia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttua
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

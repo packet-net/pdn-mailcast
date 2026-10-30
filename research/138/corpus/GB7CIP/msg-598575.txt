@@ -1,0 +1,209 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 22-Oct-26 08:42
+Bid: 8751_GB7CIP
+Title: Coded Orthogonal Freq Div Mux
+Path: 
+
+By G8MNY                                 (Updated Nov 08)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Not knowing too much about it personally, here is some technical thoughts on
+transmitting this mode as I see it.
+
+This Transmission mode is used for broadcasting e.g. DAB (1536 carriers) DRM &
+DTV-B Freeview TV (1707 or 6817 carriers now, incompatible 8k after 2013?)
+
+It uses multiple carriers all phase modulated e.g. Quadrature Phase Shift
+Keying.
+
+ ³ ³ ³ ³ ³ ³ ³ ³        QPSK      90ø            /\     /\     /\
+ ³ ³ ³ ³ ³ ³ ³ ³       on each 0øÄÅÄ180ø        |  |   |  |   |  |
+ÄÁÄÁÄÁÄÁÄÁÄÁÄÁÄÁÄ>F    carrier   270ø        \ /    \ /    \ /
+Even carrier spacing           Vectors      ÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄ
+                                        Each carrier sidebands nearly touch
+                                         dependent on symbol rate (baud)
+
+How electrically efficient is this mode? We know it is the best mode for
+bandwidth use, as it can use all the channel space right up to the edge
+compared to the less information/bandwidth efficiency of a single carrier QPSK
+mode such as Digital Sat.
+          _
+        /~ ~\             |~~~~~~~~~~~~~|
+       |     |            ³    COFDM    ³
+   _.-" QPSK  "-._        ³   CARRIERS  ³
+ÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÄ    ÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÄÅÄ
+  Mux Channel Width      Mux Channel Width
+     e.g. 30MHz              e.g. 8MHz
+
+But there are problems, as any hams using PSK31 with just 2 carriers will tell
+you. The PA linearity is far more important than for speech amplitude modes let
+alone FM.
+
+POWER OF 2 CARRIERS (e.g. PSK31)
+With a PA say capable of 100W RMS/PEP that is 200W RF crest power, then one
+would intuitively think it could handle 2 carriers of 50W, but it CANNOT...
+
+CREST           CREST V    CREST           CREST V    CREST           CREST V
+POWER            @ 50ê     POWER            @ 50ê     POWER            @ 50ê
+200 ´    ..-..    Ã 100    200 ´             Ã 100    200 ´             Ã 100
+100 ´ .-~     ~-. Ã 70     100 ´    ..-..    Ã 70     100 ´             Ã 70
+ 50 ´/ 100W PEP  \Ã 50      50 ´ .-~     ~-. Ã 50      50 ´    ..-..    Ã 50
+ 25 ´  100W RMS   Ã 35      25 ´/  50W PEP  \Ã 35      25 ´ .-~     ~-. Ã 35
+ 12 ´             Ã 25      12 ´   50W RMS   Ã 25      12 ´/  25W PEP  \Ã 25
+  6 ´             Ã 17       6 ´             Ã 17       6 ´   25W RMS   Ã 17
+
+As you can see from the above a 100W carrier has a crest of 200W and a peak
+volt of 100V in 50ê. These are say the Max PA limits in my example.
+
+Now consider the 50W carrier, it peaks 70V and to add another 50W carrier will
+need another 70V, for both you need 140V, but that is more than this PA can do.
+Only 2x 25W can be fitted in, that is 50V + 50V is OK. e.g. 50W mean 100W PEP.
+
+Note that with two 25W carriers a typical meter will read something between
+50W & 100W due to the slow detector time constants. A true RMS meter (heating
+effect type) will read 50W, and a proper peak reading meter 100W (scope
+display).
+
+MORE CARRIERS
+With 4 equal carriers, the maximum power is again quartered to 6.5W each, or
+25W mean, but still 100W PEP (200W crest) is needed to handle the in phase
+peaks of the 4 carriers.
+
+  ÄÄÄ´     Â    ÃÄÄÄ     ³  /³\
+   Â       ³             Á   |
+   ³            `\       ³   |
+    _    ÃÄÄÄ     `-     Á  100V
+   /'             ³      ³   |
+  '      ÃÄÄÄ     Á      Á   |    _
+   ÃÄÄÄ    ³      Â      ³   ³   25V
+           Á      ³      Á  \|/   -
+  42V     50V    17V   100V Peak
+  17W     25W    2.5W  100W PEP
+The carriers can be at any phase angle, on 4 different frequencies & quadrature
+phase angle modulated, but at some time the vectors will all add up in phase.
+
+So it can be seen that ten 10V peak carriers can be used on this amp of 100V
+max. e.g. 10x 1W or 10W mean. (a 10V Peak carrier in 50R is 1W)
+
+From this the mean power must go down by the number of carriers, & each carrier
+power must go down by that number squared.
+
+                PA MAX PEP                                    PA MAX PEP
+ MEAN POWER = --------------       And each CARRIER POWER =  -------------- 2
+              No of CARRIERS                                (No of Carriers)
+
+BROADCAST
+For DAB for example with 1536 carriers, means a 1kW amp could only do 651mW
+mean power, but still peaking 1kW PEP, and each carrier would only have a power
+420uW, YES MICRO WATTS for no clipping!
+
+For DTV with 6817 carriers spread over 8MHz, a 33kW PEP amp could only do 4.85W
+mean power, and each carrier would be 710uW, but still 33kW PEP when all the
+carriers occasionally are in phase! This may only be for the odd RF half cycle,
+but distortion will occur if these levels are exceeded!
+
+So a very large Tx aerial gain and large PA are need to get this Tx mode to
+give a respectable ERP.
+
+This actually is a similar case to the old telecomms "SSB coax systems" where
+1000s of phone channels were put down one amplified coax. Again large amps were
+needed and AGC systems to protect them from peak overdrive, as more phone calls
+were made, a reduced signal to noise occurred on each channel.
+
+SPECTRUM GROWTH
+With PA mixing due to non linearity the intermodulation product just GROW the
+spectrum like this with an amp run to the 1dB (10%) compression point..
+
+                                 |~~~~~~~~~~~~|
+                                 ³   COFDM    ³
+                        -20dB?   ³  CARRIERS  ³   -20dB?
+                    ÚÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄ¿
+          -45dB?    ³ 2nd order  ³ in channel ³  2nd order ³  -45dB?
+        ____________³  product   ³ distortion ³   product  ³___________
+ÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÅÄÄ
+>-70dB?   2 Channels    Adjacent      Channel                           >-70dB?
+          away QRM     channel QRM    e.g.8MHz
+
+It is very difficult to run a high power RF amplifier efficiently and very
+linearly at the same time!
+
+I have been told the broadcast PAs are not run at a linear drive level at all,
+but driven until the spectrum growth/data error rate due to peaks hard
+clipping is troublesome! E.g. as the drive level is increased, 1st the out of
+channel mix products increase (2nd 3rd 4th etc.) then eventually there is
+enough inband mix products to cause the Rx bit error rate to go up.
+
+RF FILTERING
+Of course added RF filters either in PA stage or after a broadband PA, may
+reduce the apparent growth, but will not affect unwanted in channel distortion
+sidebands present in the passband from causing errors.
+
+³       /~~"-"~"-"~~\
+³      |             |
+³     |               |
+³    |                 |
+³ _./                   \._
+ÅÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÂÄ
+            8MHz
+
+With COFDM linear phase or amplitude flatness of the filter is not too
+important (this why it is fairly immune to signal path ghosts), as long as each
+or most carriers can be decoded in their own narrow bandwidth, all is OK.
+
+However signal to noise is important, especially from its own cross modulation
+QRM. RF channel filtering only cleans up adjacent channel mixing products, not
+in channel products.
+
+Added losses & possible filter flash over must be a problem with peak powers
+1000s of times greater than the mean if this approach is used.
+
+AVOIDING IN PHASE
+Because there is a serious PA overload problem if all or even most of the
+carries add up in phase, the coder software may be designed to alter/restrict
+the data that could cause this, but data options and data bandwidth loss or a
+time overhead will result if the method is used.
+
+PA EFFICIENCY
+It should be clear that amplifying all the carriers in 1 PA is not a wise way
+of going about multiple carrier transmission if there is to be no clipping.
+Ideally each carrier could have a linear PA (needed for QPSK) and a loss free
+RF directional coupler/adder used. But the short term cost of this complexity
+is excessive, and the system flexibility (no of carriers) will be hardware
+fixed.
+
+Comment from Andy GM7HUD:-
+In reality EER is used with non-linear amplifiers for real QRO solutions. In
+addition the I & Q components can be low level amplified to clipping and then
+filtered before that signal is passed to the linear PA stages. This can gain an
+extra 2dB in performance. Filtering the components before the main PA will
+results in a higher BER at the receiver due to in-band self QRM, but the coding
+used by the modulation scheme is normally robust enough to cope with this.
+
+OLD ANALOGUE TV PAs
+For main QRO stations these use a separate PA for the FM sound and a Linear PA
+for the Video. The video PA is also high level (current) modulated with line
+syncs to improve efficiency. The travelling wave type PA tube (several types)
+often have annular target anode rings of different HT voltages that greatly
+improving overall efficiency.
+
+Using the TV PA efficiency definition of PEP/MEAN DC, efficiency of over 100%
+are common on the average picture content (not a black screen)! So you can get
+33kW PEP from a 33kW UHF amp and it needs < 33kW of DC!
+
+With this design of QRO PA, the main problem being the regrowth of unwanted
+lower sideband of the TV VSB signal. This is normally dealt with by a water
+cooled suckout filter in the PA tank circuit. As the sound carriers are added
+in with directional couplers after the linear PA there is no mixing problems.
+
+ANALOGUE & DIGITAL TV Co-existing
+With a clean QRO analogue Tx the adjacent channel emissions are generally very
+low something like > -60dBc. This has allowed the QRP digital TV signals to
+exist on adjacent QRO analogue channels providing the Rx is linear. The reverse
+is not possible, e.g. QRO Digital with QRP analogue adjacent!
+
+
+Why Don't U send an Interesting Bul?
+
+73 De John, G8MNY @ GB7CIP

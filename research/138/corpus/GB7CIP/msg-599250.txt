@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 15:31
+Bid: 6181_HP2DFA
+Title: EARTHQUAKE ALERT M5.5 - 5 km ESE of Asahi, Japan
+Path: !VE3KPG!VE2PKT!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.5+)       
+==================================================
+Event ID   : us7000ttpe
+Magnitude  : M 5.5
+Time (UTC) : 2026-10-28 15:07:52 UTC
+Depth      : 41.4 km
+Coordinates: 35.7015 Lat / 140.7059 Lon
+--------------------------------------------------
+Location:
+  5 km ESE of Asahi, Japan
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttpe
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

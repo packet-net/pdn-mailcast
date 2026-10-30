@@ -1,0 +1,53 @@
+From: KC2NJV@KC2NJV.#NASS.NY.USA.NOAM
+To: EMGSVC
+Type/Status: B$
+Date/Time: 25-Oct 13:00Z
+Bid: 16613_KC2NJV
+Title: EMERGENCY SERVICES NEWS
+
+Body: 2361
+
+R:261025/1301Z 15200@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261025/1301Z 20436@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261025/1301Z 5685@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261025/1301Z 6201@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261025/1300Z 16613@KC2NJV.#NASS.NY.USA.NOAM LinBPQ6.0.26
+
+           _____ __  __ _____ ____   ____ _____ _   _  ______   __
+          | ____|  \/  | ____|  _ \ / ___| ____| \ | |/ ___\ \ / /
+          |  _| | |\/| |  _| | |_) | |  _|  _| |  \| | |    \ V / 
+          | |___| |  | | |___|  _ <| |_| | |___| |\  | |___  | |  
+          |_____|_|  |_|_____|_| \_\\____|_____|_| \_|\____| |_|  
+                                                                  
+               ____  _____ ______     _____ ____ _____ ____  
+              / ___|| ____|  _ \ \   / /_ _/ ___| ____/ ___| 
+              \___ \|  _| | |_) \ \ / / | | |   |  _| \___ \ 
+               ___) | |___|  _ < \ V /  | | |___| |___ ___) |
+              |____/|_____|_| \_\ \_/  |___\____|_____|____/ 
+                                                             
+                        _   _ _______        ______  
+                       | \ | | ____\ \      / / ___| 
+                       |  \| |  _|  \ \ /\ / /\___ \ 
+                       | |\  | |___  \ V  V /  ___) |
+                       |_| \_|_____|  \_/\_/  |____/ 
+                                                     
+----------------------------------------------------------------------------
+[01] Calif. county to bid out ambulance contract for first time in 80 years
+     San Luis Ambulance, the county?s exclusive provider since 1945, will
+     compete against a Paso Robles-led public-private partnership proposal
+     as county supervisors prepare a Request for Proposal update
+     Link: https://www.ems1.com/ems-management/calif-county-to-bid-out-
+     ambulance-contract-for-first-time-in-80-years
+ 
+[02] Mich. fire departments win $698,000 grant for cardiac monitors
+     North Oakland County Fire Authority, Oxford, Holly and Groveland
+     Township will use the regional grant to replace 15 aging cardiac
+     monitors
+     Link: https://www.ems1.com/ems-grant-center/mich-fire-departments-
+     win-698-000-grant-for-cardiac-monitors
+ 
+----------------------------------------------------------------------------
+Till next time...
+Wayne, KC2NJV
+
+

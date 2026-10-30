@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 24-Oct-26 20:58
+Bid: 5720_HP2DFA
+Title: EARTHQUAKE ALERT M5.3 - 101 km SSE of Vilyuchinsk, Russia
+Path: !GB7BED!K1AJD!VE3CGR!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.3+)       
+==================================================
+Event ID   : us6000u4pa
+Magnitude  : M 5.3
+Time (UTC) : 2026-10-24 20:35:04 UTC
+Depth      : 70.2 km
+Coordinates: 52.1565 Lat / 159.1963 Lon
+--------------------------------------------------
+Location:
+  101 km SSE of Vilyuchinsk, Russia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4pa
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

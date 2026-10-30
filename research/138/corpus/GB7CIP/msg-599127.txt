@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6040_HP2DFA
+Title: EARTHQUAKE ALERT M5.4 - 128 km S of Pundong, Indonesia
+Path: !GB7COW!GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.4+)       
+==================================================
+Event ID   : us7000ttgf
+Magnitude  : M 5.4
+Time (UTC) : 2026-10-27 14:44:00 UTC
+Depth      : 10.0 km
+Coordinates: -9.1162 Lat / 110.3305 Lon
+--------------------------------------------------
+Location:
+  128 km S of Pundong, Indonesia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttgf
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

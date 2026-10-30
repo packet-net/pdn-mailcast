@@ -1,0 +1,12 @@
+7 BF G0LAB 1793321381 LABTST@WW 5_GB7LAA-1 &:GB7LAA
+lab t04_trailing_ws
+R:261030/0049Z @:GB7LAX.#99.GBR.EURO [] #:7 XrLin505p
+R:261030/0049Z 5@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.

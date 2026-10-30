@@ -1,0 +1,68 @@
+From: IW2OHX@IW2OHX.ILOM.ITA.EU
+To: INFO
+Type/Status: B$
+Date/Time: 19-Oct 08:48Z
+Bid: 13141_IW2OHX
+Title: Re: LinBPQPages: a web alternative for LinBPQ messaging
+
+Body: 2114
+
+R:261019/0850Z 14961@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261019/0850Z 49399@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261019/0849Z 5340@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261019/0849Z @:PI8ZTM.#ZH1.NLD.EURO #:61207 [Den Haag] $:13141_IW2OHX
+R:261019/0848Z 13141@IW2OHX.ILOM.ITA.EU BPQ6.0.25
+
+Hi all,
+
+I would like to promote this new BPQ Console interface:
+
+https://git.tilaro.net/alberto/bpq_gui.git
+
+developed by IU2EUG.
+There's much more than reading BBS bulettins from the GUI. 
+Have fun!
+Marco
+73 de iw2ohx
+
+--- LW6DIO ---
+> R:261014/0621Z 49019@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+> R:261014/0620Z 19514@GB7BED.#21.GBR.EU LinBPQ6.0.25
+> R:261014/0620Z 4413@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+> R:261014/0620Z 24877@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+> R:261014/0611Z @:LU4ECL.LP.BA.ARG.SOAM #:6413 [LA PLATA] FBB7.00e $:1796_LW6DIO
+> R:261014/0611Z 1796@LW6DIO.VDM.BA.ARG.SOAM LinBPQ6.0.25
+> 
+> LinBPQPages is a web application to read and compose messages on a LinBPQ
+> BBS. Born as a sister project to LinFBBPages, it had two goals: to make the
+> mailbox of the BBS available on the web without exposing the administrative
+> tools, and to provide a REST API to integrate external services and agents.
+> 
+> Instead of the built-in LinBPQ web, it offers a responsive interface focused
+> only on messaging: paginated message list and search, reading of private
+> messages and bulletins with attachments, and browsing and downloading of
+> decoded 7+ files. It is available in English and Spanish.
+> 
+> How it works: it reads the instance files directly (DIRMES.SYS, Mail/,
+> linmail.cfg and HTML/7plus/), and its only write is an append to
+> Mail/Import/mail.in when composing a message. It is written in Go using only
+> the standard library, with an embedded frontend, and builds in minutes.
+> 
+> The article covers the details, the full API, the security considerations and
+> the roadmap.
+> 
+> Full article:
+> https://locosporlaradio.com.ar/linbpq-pages/
+> 
+> 73,
+> Luis LW6DIO
+> bbs.locosporlaradio.com.ar
+> 
+> 
+> 
+> 
+> [End of Message #12814 from LW6DIO]
+>
+
+
+

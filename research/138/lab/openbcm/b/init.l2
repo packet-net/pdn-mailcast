@@ -1,0 +1,13 @@
+; openBCM layer 2 for the #138 lab: two AXUDP partners (LAA, LAB), no kernel AX.25
+dcall    gb7lam-8
+monitor  4
+mselect  0
+mcalls   -0
+assign axip
+peer   172.34.0.11
+port   10094
+txport 10093
+assign axip
+peer   172.34.0.12
+port   10095
+txport 10093

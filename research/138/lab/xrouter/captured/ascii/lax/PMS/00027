@@ -1,0 +1,12 @@
+27 BF G0LAB 1793326794 LABTST@WW AE3FECA27LAX &:G0LAB
+lab t14_crlf_body
+R:261030/0219Z @:GB7LAX.#99.GBR.EURO [] #:27 XrLin505p
+Date: Fri, 30 Oct 2026 02:19:55 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t14_crlf_body
+Message-ID: <AE3FECA27LAX>
+
+crlf one
+crlf two
+crlf three

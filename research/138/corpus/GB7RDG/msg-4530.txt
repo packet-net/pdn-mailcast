@@ -1,0 +1,105 @@
+From: KC2NJV@KC2NJV.#NASS.NY.USA.NOAM
+To: EMGSVC
+Type/Status: B$
+Date/Time: 29-Oct 13:00Z
+Bid: 16941_KC2NJV
+Title: EMERGENCY SERVICES NEWS
+
+Body: 4890
+
+R:261029/1303Z 15363@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261029/1302Z 20745@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261029/1302Z 39226@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261029/1302Z 4109@VE3KPG.#ECON.ON.CAN.NOAM BPQ6.0.26
+R:261029/1301Z 6759@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261029/1301Z 26378@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+R:261029/1300Z 16941@KC2NJV.#NASS.NY.USA.NOAM LinBPQ6.0.26
+
+           _____ __  __ _____ ____   ____ _____ _   _  ______   __
+          | ____|  \/  | ____|  _ \ / ___| ____| \ | |/ ___\ \ / /
+          |  _| | |\/| |  _| | |_) | |  _|  _| |  \| | |    \ V / 
+          | |___| |  | | |___|  _ <| |_| | |___| |\  | |___  | |  
+          |_____|_|  |_|_____|_| \_\\____|_____|_| \_|\____| |_|  
+                                                                  
+               ____  _____ ______     _____ ____ _____ ____  
+              / ___|| ____|  _ \ \   / /_ _/ ___| ____/ ___| 
+              \___ \|  _| | |_) \ \ / / | | |   |  _| \___ \ 
+               ___) | |___|  _ < \ V /  | | |___| |___ ___) |
+              |____/|_____|_| \_\ \_/  |___\____|_____|____/ 
+                                                             
+                        _   _ _______        ______  
+                       | \ | | ____\ \      / / ___| 
+                       |  \| |  _|  \ \ /\ / /\___ \ 
+                       | |\  | |___  \ V  V /  ___) |
+                       |_| \_|_____|  \_/\_/  |____/ 
+                                                     
+----------------------------------------------------------------------------
+[01] N.M. hospital denies ransom payment after cyberattack diverts
+ambulances
+     Ransomware group Byod claims it accessed 36,000 systems and patient
+     data, but UNM Health officials say the attack only hit end-user
+     devices, not core servers, as the FBI conducts a forensic analysis
+     following Monday?s two-hour ambulance diversion
+     Link: https://www.ems1.com/cybersecurity/n-m-hospital-denies-ransom-
+     payment-after-cyberattack-diverts-ambulances
+ 
+[02] Fla. county seeks harsh sentence for air ambulance chief?s drug cover-
+up
+     The former Trauma Star captain convicted of covering up the chief
+     flight nurse?s theft of fentanyl and other painkillers faces up to 68
+     years in prison, as Monroe County officials warn a light sentence would
+     discourage future whistleblowers
+     Link: https://www.ems1.com/legal/fla-county-seeks-harsh-sentence-for-
+     air-ambulance-chiefs-drug-cover-up
+ 
+[03] Pa. first responders rescue 3-year-old boy from septic tank
+     The boy held onto a rope for about 25 minutes while standing knee-deep
+     in sewage after falling through a foot-wide vent pipe opening at
+     Hickman Sanitation Company in West Chester
+     Link: https://www.ems1.com/rescue/pa-first-responders-rescue-3-year-
+     old-boy-from-septic-tank
+ 
+[04] High-speed train collision kills over 60 in Spain
+     A rail control center mistakenly ordered one high-speed train to resume
+     movement while others were stalled, sending it slamming into a
+     stationary train at up to 200 km/h, marking Spain?s second major rail
+     disaster this year
+     Link: https://www.ems1.com/international/high-speed-train-collision-
+     kills-over-60-in-spain
+ 
+[05] The EMS Pulse: Medics weigh in on the schedule that makes an EMS career
+sustainable
+     Medics split between 24-hour rotations with long breaks and shorter
+     shifts, while many say pay, overtime and staffing matter more than any
+     schedule
+     Link: https://www.ems1.com/ems-management/the-ems-pulse-medics-weigh-
+     in-on-the-schedule-that-makes-an-ems-career-sustainable
+ 
+[06] Gun regulation activist arrested for spray-painting 9/11 Memorial
+     The man caused more than $2,550 in damage after spray-painting his
+     website across victim panels at the memorial?s north pool, an act he
+     filmed and posted to Instagram before his arrest
+     Link: https://www.ems1.com/9-11/gun-regulation-activist-arrested-for-
+     spray-painting-9-11-memorial
+ 
+[07] When the mood is the emergency
+     Managing depression, mania and agitation in the field
+     Link: https://www.ems1.com/behavioral-health/when-the-mood-is-the-
+     emergency
+ 
+[08] Pa. law eases youth fire, EMS restrictions
+     Gov. Josh Shapiro signed House Bill 2014, letting 14- and 15-year-old
+     volunteers train until 10 p.m. on weekends and summer breaks instead of
+     9 p.m. and ride in emergency vehicles to calls, aiming to ease
+     scheduling barriers amid a sharp decline in the state?s volunteer EMS
+     and fire ranks
+     Link: https://www.ems1.com/legislation-funding/pa-law-eases-youth-fire-
+     ems-restrictions
+ 
+----------------------------------------------------------------------------
+Till next time...
+Wayne, KC2NJV
+
+
+
+

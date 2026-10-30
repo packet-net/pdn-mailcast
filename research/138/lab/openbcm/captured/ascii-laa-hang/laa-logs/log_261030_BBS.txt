@@ -1,0 +1,453 @@
+261030 01:59:09 !          Mail Starting
+261030 01:59:21 ?          Msg 1 Routing Trace To SYSOP Via 
+261030 01:59:21 ?          Routing Trace Type P TO SYSOP VIA  Route On (null) (null) (null) (null) (null)
+261030 01:59:21 ?          Routing Trace - No Match
+261030 01:59:21 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 01:59:21 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 01:59:21 >G0LAB     Hello G0LAB. Latest Message is 1, Last listed is 0
+261030 01:59:21 >G0LAB     de GB7LAA-1>
+261030 01:59:23 <G0LAB     SB LABTST @ WW
+261030 01:59:23 >G0LAB     Enter Title (only):
+261030 01:59:26 <G0LAB     lab t01_plain
+261030 01:59:26 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 01:59:28 <G0LAB     Plain bulletin.
+261030 01:59:28 <G0LAB     Second line.
+261030 01:59:29 <G0LAB     Third line.
+261030 01:59:29 <G0LAB     /EX
+261030 01:59:29 ?G0LAB     Msg 2 Routing Trace To LABTST Via WW
+261030 01:59:29 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 01:59:29 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 01:59:29 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 01:59:29 ?G0LAB     Routing Trace - No Match
+261030 01:59:29 >G0LAB     Message: 2 Bid:  2_GB7LAA-1 Size: 44
+261030 01:59:29 >G0LAB     de GB7LAA-1>
+261030 01:59:31 <G0LAB     B
+261030 01:59:31 >G0LAB     
+261030 01:59:32 |G0LAB     G0LAB Disconnected
+261030 01:59:36 |GB7LAM    Connecting to BBS GB7LAM
+261030 01:59:36 <GB7LAM    *** CONNECTED 
+261030 01:59:36 >GB7LAM    C 2 GB7LAM-8
+261030 01:59:36 <GB7LAM    LAA:GB7LAA} Connected to GB7LAM-8
+261030 01:59:37 <GB7LAM    [OpenBCM-1.13-38-g65b7-AB1D1FHMRW$]
+261030 01:59:37 <GB7LAM    >
+261030 01:59:37 >GB7LAM    [BPQ-6.0.25.28-IHJM$]
+261030 01:59:37 <GB7LAM    >
+261030 01:59:37 >GB7LAM    SB LABTST @ WW < G0LAB $2_GB7LAA-1
+261030 01:59:38 <GB7LAM    OK
+261030 01:59:38 >GB7LAM    lab t01_plain
+261030 01:59:38 >GB7LAM    R:261030/0159Z 2@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+261030 01:59:38 >GB7LAM    
+261030 01:59:38 >GB7LAM    /ex
+261030 02:00:14 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:00:14 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:00:14 >G0LAB     Hello G0LAB. Latest Message is 2, Last listed is 0
+261030 02:00:14 >G0LAB     de GB7LAA-1>
+261030 02:00:17 <G0LAB     SB LABTST @ WW
+261030 02:00:17 >G0LAB     Enter Title (only):
+261030 02:00:19 <G0LAB     lab t02_from_line
+261030 02:00:19 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:00:21 <G0LAB     From the desk of the lab
+261030 02:00:22 <G0LAB     From nobody Thu Oct 29 20:00:00 2026
+261030 02:00:22 <G0LAB       From indented
+261030 02:00:22 <G0LAB     from lower
+261030 02:00:23 <G0LAB     End.
+261030 02:00:23 <G0LAB     /EX
+261030 02:00:23 ?G0LAB     Msg 3 Routing Trace To LABTST Via WW
+261030 02:00:23 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:00:23 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:00:23 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:00:23 ?G0LAB     Routing Trace - No Match
+261030 02:00:23 >G0LAB     Message: 3 Bid:  3_GB7LAA-1 Size: 99
+261030 02:00:23 >G0LAB     de GB7LAA-1>
+261030 02:00:25 <G0LAB     B
+261030 02:00:25 >G0LAB     
+261030 02:00:26 |G0LAB     G0LAB Disconnected
+261030 02:01:08 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:01:08 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:01:08 >G0LAB     Hello G0LAB. Latest Message is 3, Last listed is 0
+261030 02:01:08 >G0LAB     de GB7LAA-1>
+261030 02:01:11 <G0LAB     SB LABTST @ WW
+261030 02:01:11 >G0LAB     Enter Title (only):
+261030 02:01:13 <G0LAB     lab t03_from_to_top
+261030 02:01:13 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:01:16 <G0LAB     From: G0FAKE@GB7XXX.#1.GBR.EURO
+261030 02:01:16 <G0LAB     To  : ALL@WW
+261030 02:01:16 <G0LAB     Body after fake header lines.
+261030 02:01:17 <G0LAB     /EX
+261030 02:01:17 ?G0LAB     Msg 4 Routing Trace To LABTST Via WW
+261030 02:01:17 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:01:17 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:01:17 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:01:17 ?G0LAB     Routing Trace - No Match
+261030 02:01:17 >G0LAB     Message: 4 Bid:  4_GB7LAA-1 Size: 78
+261030 02:01:17 >G0LAB     de GB7LAA-1>
+261030 02:01:18 <G0LAB     B
+261030 02:01:18 >G0LAB     
+261030 02:01:20 |G0LAB     G0LAB Disconnected
+261030 02:02:02 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:02:02 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:02:02 >G0LAB     Hello G0LAB. Latest Message is 4, Last listed is 0
+261030 02:02:02 >G0LAB     de GB7LAA-1>
+261030 02:02:04 <G0LAB     SB LABTST @ WW
+261030 02:02:04 >G0LAB     Enter Title (only):
+261030 02:02:06 <G0LAB     lab t04_trailing_ws
+261030 02:02:06 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:02:09 <G0LAB     trailing space   
+261030 02:02:09 <G0LAB     trailing tab	
+261030 02:02:09 <G0LAB     	tab at start
+261030 02:02:10 <G0LAB     mid	tab
+261030 02:02:10 <G0LAB     space-only line follows
+261030 02:02:10 <G0LAB        
+261030 02:02:10 <G0LAB     end.
+261030 02:02:11 <G0LAB     /EX
+261030 02:02:11 ?G0LAB     Msg 5 Routing Trace To LABTST Via WW
+261030 02:02:11 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:02:11 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:02:11 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:02:11 ?G0LAB     Routing Trace - No Match
+261030 02:02:11 >G0LAB     Message: 5 Bid:  5_GB7LAA-1 Size: 94
+261030 02:02:11 >G0LAB     de GB7LAA-1>
+261030 02:02:13 <G0LAB     B
+261030 02:02:13 >G0LAB     
+261030 02:02:14 |G0LAB     G0LAB Disconnected
+261030 02:02:57 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:02:57 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:02:57 >G0LAB     Hello G0LAB. Latest Message is 5, Last listed is 0
+261030 02:02:57 >G0LAB     de GB7LAA-1>
+261030 02:03:00 <G0LAB     SB LABTST @ WW
+261030 02:03:00 >G0LAB     Enter Title (only):
+261030 02:03:02 <G0LAB     lab t05_blank_first
+261030 02:03:02 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:03:05 <G0LAB     
+261030 02:03:05 <G0LAB     first line above is blank
+261030 02:03:05 <G0LAB     
+261030 02:03:05 <G0LAB     
+261030 02:03:06 <G0LAB     two blank lines above this one.
+261030 02:03:06 <G0LAB     /EX
+261030 02:03:06 ?G0LAB     Msg 6 Routing Trace To LABTST Via WW
+261030 02:03:06 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:03:06 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:03:06 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:03:06 ?G0LAB     Routing Trace - No Match
+261030 02:03:06 >G0LAB     Message: 6 Bid:  6_GB7LAA-1 Size: 66
+261030 02:03:06 >G0LAB     de GB7LAA-1>
+261030 02:03:08 <G0LAB     B
+261030 02:03:08 >G0LAB     
+261030 02:03:09 |G0LAB     G0LAB Disconnected
+261030 02:03:52 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:03:52 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:03:52 >G0LAB     Hello G0LAB. Latest Message is 6, Last listed is 0
+261030 02:03:52 >G0LAB     de GB7LAA-1>
+261030 02:03:54 <G0LAB     SB LABTST @ WW
+261030 02:03:54 >G0LAB     Enter Title (only):
+261030 02:03:56 <G0LAB     lab t06_long_lines
+261030 02:03:56 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:03:59 <G0LAB     L79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+261030 02:03:59 <G0LAB     L80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+261030 02:03:59 <G0LAB     L100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+261030 02:03:59 <G0LAB     L255 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+261030 02:04:00 <G0LAB     L256 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+261030 02:04:00 <G0LAB     L300 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+261030 02:04:00 <G0LAB     L600 abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+261030 02:04:00 <G0LAB     end.
+261030 02:04:01 <G0LAB     /EX
+261030 02:04:01 ?G0LAB     Msg 7 Routing Trace To LABTST Via WW
+261030 02:04:01 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:04:01 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:04:01 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:04:01 ?G0LAB     Routing Trace - No Match
+261030 02:04:01 >G0LAB     Message: 7 Bid:  7_GB7LAA-1 Size: 7057
+261030 02:04:01 >G0LAB     de GB7LAA-1>
+261030 02:04:03 <G0LAB     B
+261030 02:04:03 >G0LAB     
+261030 02:04:04 |G0LAB     G0LAB Disconnected
+261030 02:04:50 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:04:50 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:04:50 >G0LAB     Hello G0LAB. Latest Message is 7, Last listed is 0
+261030 02:04:50 >G0LAB     de GB7LAA-1>
+261030 02:04:52 <G0LAB     SB LABTST @ WW
+261030 02:04:52 >G0LAB     Enter Title (only):
+261030 02:04:54 <G0LAB     T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+261030 02:04:54 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:04:57 <G0LAB     title is 40 chars exactly.
+261030 02:04:58 <G0LAB     /EX
+261030 02:04:58 ?G0LAB     Msg 8 Routing Trace To LABTST Via WW
+261030 02:04:58 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:04:58 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:04:58 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:04:58 ?G0LAB     Routing Trace - No Match
+261030 02:04:58 >G0LAB     Message: 8 Bid:  8_GB7LAA-1 Size: 28
+261030 02:04:58 >G0LAB     de GB7LAA-1>
+261030 02:04:59 <G0LAB     B
+261030 02:04:59 >G0LAB     
+261030 02:05:00 |G0LAB     G0LAB Disconnected
+261030 02:05:41 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:05:41 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:05:41 >G0LAB     Hello G0LAB. Latest Message is 8, Last listed is 0
+261030 02:05:41 >G0LAB     de GB7LAA-1>
+261030 02:05:44 <G0LAB     SB LABTST @ WW
+261030 02:05:44 >G0LAB     Enter Title (only):
+261030 02:05:46 <G0LAB     T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+261030 02:05:46 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:05:49 <G0LAB     title is 60 chars exactly.
+261030 02:05:49 <G0LAB     /EX
+261030 02:05:49 ?G0LAB     Msg 9 Routing Trace To LABTST Via WW
+261030 02:05:49 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:05:49 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:05:49 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:05:49 ?G0LAB     Routing Trace - No Match
+261030 02:05:49 >G0LAB     Message: 9 Bid:  9_GB7LAA-1 Size: 28
+261030 02:05:49 >G0LAB     de GB7LAA-1>
+261030 02:05:51 <G0LAB     B
+261030 02:05:51 >G0LAB     
+261030 02:05:52 |G0LAB     G0LAB Disconnected
+261030 02:06:33 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:06:33 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:06:33 >G0LAB     Hello G0LAB. Latest Message is 9, Last listed is 0
+261030 02:06:33 >G0LAB     de GB7LAA-1>
+261030 02:06:36 <G0LAB     SB LABTST @ WW
+261030 02:06:36 >G0LAB     Enter Title (only):
+261030 02:06:38 <G0LAB     T100 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+261030 02:06:38 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:06:40 <G0LAB     title is 100 chars.
+261030 02:06:41 <G0LAB     /EX
+261030 02:06:41 ?G0LAB     Msg 10 Routing Trace To LABTST Via WW
+261030 02:06:41 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:06:41 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:06:41 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:06:41 ?G0LAB     Routing Trace - No Match
+261030 02:06:41 >G0LAB     Message: 10 Bid:  10_GB7LAA-1 Size: 21
+261030 02:06:41 >G0LAB     de GB7LAA-1>
+261030 02:06:43 <G0LAB     B
+261030 02:06:43 >G0LAB     
+261030 02:06:44 |G0LAB     G0LAB Disconnected
+261030 02:07:25 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:07:25 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:07:25 >G0LAB     Hello G0LAB. Latest Message is 10, Last listed is 0
+261030 02:07:25 >G0LAB     de GB7LAA-1>
+261030 02:07:28 <G0LAB     SB LABTST @ WW
+261030 02:07:28 >G0LAB     Enter Title (only):
+261030 02:07:30 <G0LAB     café title £
+261030 02:07:30 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:07:32 <G0LAB     latin1: café naïve £ ° þ Àß end
+261030 02:07:33 <G0LAB     high: €‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ
+261030 02:07:33 <G0LAB     end.
+261030 02:07:34 <G0LAB     /EX
+261030 02:07:34 ?G0LAB     Msg 11 Routing Trace To LABTST Via WW
+261030 02:07:34 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:07:34 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:07:34 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:07:34 ?G0LAB     Routing Trace - No Match
+261030 02:07:34 >G0LAB     Message: 11 Bid:  11_GB7LAA-1 Size: 79
+261030 02:07:34 >G0LAB     de GB7LAA-1>
+261030 02:07:35 <G0LAB     B
+261030 02:07:35 >G0LAB     
+261030 02:07:36 |G0LAB     G0LAB Disconnected
+261030 02:08:19 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:08:19 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:08:19 >G0LAB     Hello G0LAB. Latest Message is 11, Last listed is 0
+261030 02:08:19 >G0LAB     de GB7LAA-1>
+261030 02:08:21 <G0LAB     SB LABTST @ WW
+261030 02:08:21 >G0LAB     Enter Title (only):
+261030 02:08:23 <G0LAB     cafÃ© Â£ Â° â€” title
+261030 02:08:23 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:08:26 <G0LAB     utf8: cafÃ© naÃ¯ve Â£ Â° â‚¬ â€” â€“ â€¦ æ—¥æœ¬
+261030 02:08:26 <G0LAB     end.
+261030 02:08:27 <G0LAB     /EX
+261030 02:08:27 ?G0LAB     Msg 12 Routing Trace To LABTST Via WW
+261030 02:08:27 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:08:27 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:08:27 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:08:27 ?G0LAB     Routing Trace - No Match
+261030 02:08:27 >G0LAB     Message: 12 Bid:  12_GB7LAA-1 Size: 55
+261030 02:08:27 >G0LAB     de GB7LAA-1>
+261030 02:08:28 <G0LAB     B
+261030 02:08:28 >G0LAB     
+261030 02:08:29 |G0LAB     G0LAB Disconnected
+261030 02:09:11 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:09:11 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:09:11 >G0LAB     Hello G0LAB. Latest Message is 12, Last listed is 0
+261030 02:09:11 >G0LAB     de GB7LAA-1>
+261030 02:09:14 <G0LAB     SB LABTST @ WW
+261030 02:09:14 >G0LAB     Enter Title (only):
+261030 02:09:16 <G0LAB     lab t12_no_final_newline
+261030 02:09:16 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:09:19 <G0LAB     line one
+261030 02:09:19 <G0LAB     line two
+261030 02:10:50 <G0LAB     last line without newlineB
+261030 02:10:50 ?G0LAB     Msg 13 Routing Trace To LABTST Via WW
+261030 02:10:50 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:10:50 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:10:50 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:10:50 ?G0LAB     Routing Trace - No Match
+261030 02:10:50 >G0LAB     Message: 13 Bid:  13_GB7LAA-1 Size: 49
+261030 02:10:50 >G0LAB     de GB7LAA-1>
+261030 02:10:53 <G0LAB     B
+261030 02:10:53 >G0LAB     
+261030 02:10:54 |G0LAB     G0LAB Disconnected
+261030 02:13:00 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:13:00 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:13:00 >G0LAB     Hello G0LAB. Latest Message is 13, Last listed is 0
+261030 02:13:00 >G0LAB     de GB7LAA-1>
+261030 02:13:02 <G0LAB     SB LABTST @ WW
+261030 02:13:02 >G0LAB     Enter Title (only):
+261030 02:13:05 <G0LAB     lab t13_ends_blank_lines
+261030 02:13:05 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:13:07 <G0LAB     text
+261030 02:13:07 <G0LAB     
+261030 02:13:08 <G0LAB     
+261030 02:13:08 <G0LAB     
+261030 02:13:09 <G0LAB     /EX
+261030 02:13:09 ?G0LAB     Msg 14 Routing Trace To LABTST Via WW
+261030 02:13:09 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:13:09 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:13:09 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:13:09 ?G0LAB     Routing Trace - No Match
+261030 02:13:09 >G0LAB     Message: 14 Bid:  14_GB7LAA-1 Size: 12
+261030 02:13:09 >G0LAB     de GB7LAA-1>
+261030 02:13:10 <G0LAB     B
+261030 02:13:10 >G0LAB     
+261030 02:13:11 |G0LAB     G0LAB Disconnected
+261030 02:13:22 |GB7LAM    GB7LAM Disconnected
+261030 02:13:27 |GB7LAM    Connecting to BBS GB7LAM
+261030 02:13:27 <GB7LAM    *** CONNECTED 
+261030 02:13:27 >GB7LAM    C 2 GB7LAM-8
+261030 02:13:28 <GB7LAM    LAA:GB7LAA} Connected to GB7LAM-8
+261030 02:13:28 <GB7LAM    [OpenBCM-1.13-38-g65b7-AB1D1FHMRW$]
+261030 02:13:28 <GB7LAM    >
+261030 02:13:28 >GB7LAM    [BPQ-6.0.25.28-IHJM$]
+261030 02:13:28 <GB7LAM    >
+261030 02:13:28 >GB7LAM    SB LABTST @ WW < G0LAB $2_GB7LAA-1
+261030 02:13:29 <GB7LAM    OK
+261030 02:13:29 >GB7LAM    lab t01_plain
+261030 02:13:29 >GB7LAM    R:261030/0213Z 2@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+261030 02:13:29 >GB7LAM    
+261030 02:13:29 >GB7LAM    /ex
+261030 02:13:53 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:13:53 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:13:53 >G0LAB     Hello G0LAB. Latest Message is 14, Last listed is 0
+261030 02:13:53 >G0LAB     de GB7LAA-1>
+261030 02:13:56 <G0LAB     SB LABTST @ WW
+261030 02:13:56 >G0LAB     Enter Title (only):
+261030 02:13:58 <G0LAB     lab t14_crlf_body
+261030 02:13:58 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:14:01 <G0LAB     crlf one
+261030 02:14:01 <G0LAB     crlf two
+261030 02:14:01 <G0LAB     crlf three
+261030 02:14:02 <G0LAB     /EX
+261030 02:14:02 ?G0LAB     Msg 15 Routing Trace To LABTST Via WW
+261030 02:14:02 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:14:02 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:14:02 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:14:02 ?G0LAB     Routing Trace - No Match
+261030 02:14:02 >G0LAB     Message: 15 Bid:  15_GB7LAA-1 Size: 32
+261030 02:14:02 >G0LAB     de GB7LAA-1>
+261030 02:14:03 <G0LAB     B
+261030 02:14:03 >G0LAB     
+261030 02:14:04 |G0LAB     G0LAB Disconnected
+261030 02:14:47 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:14:47 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:14:47 >G0LAB     Hello G0LAB. Latest Message is 15, Last listed is 0
+261030 02:14:47 >G0LAB     de GB7LAA-1>
+261030 02:14:49 <G0LAB     SB LABTST @ WW
+261030 02:14:49 >G0LAB     Enter Title (only):
+261030 02:14:51 <G0LAB     lab t15_lf_body
+261030 02:14:51 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:14:55 <G0LAB     lf onelf twolf three/EX
+261030 02:16:25 <G0LAB     B
+261030 02:16:28 <G0LAB     B
+261030 02:16:29 |G0LAB     G0LAB Disconnected
+261030 02:18:34 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:18:34 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:18:34 >G0LAB     Hello G0LAB. Latest Message is 15, Last listed is 0
+261030 02:18:34 >G0LAB     de GB7LAA-1>
+261030 02:18:37 <G0LAB     SB LABTST @ WW
+261030 02:18:37 >G0LAB     Enter Title (only):
+261030 02:18:39 <G0LAB     lab t16_dot_line
+261030 02:18:39 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:18:42 <G0LAB     before
+261030 02:18:42 <G0LAB     .
+261030 02:18:42 <G0LAB     after
+261030 02:18:42 <G0LAB     ..
+261030 02:18:43 <G0LAB     after2
+261030 02:18:43 <G0LAB     /EX
+261030 02:18:43 ?G0LAB     Msg 16 Routing Trace To LABTST Via WW
+261030 02:18:43 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:18:43 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:18:43 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:18:43 ?G0LAB     Routing Trace - No Match
+261030 02:18:43 >G0LAB     Message: 16 Bid:  16_GB7LAA-1 Size: 30
+261030 02:18:43 >G0LAB     de GB7LAA-1>
+261030 02:18:45 <G0LAB     B
+261030 02:18:45 >G0LAB     
+261030 02:18:46 |G0LAB     G0LAB Disconnected
+261030 02:19:29 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:19:29 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:19:29 >G0LAB     Hello G0LAB. Latest Message is 16, Last listed is 0
+261030 02:19:29 >G0LAB     de GB7LAA-1>
+261030 02:19:31 <G0LAB     SB LABTST @ WW
+261030 02:19:31 >G0LAB     Enter Title (only):
+261030 02:19:34 <G0LAB     lab t17_r_lines
+261030 02:19:34 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:19:36 <G0LAB     R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25
+261030 02:19:36 <G0LAB     R:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F
+261030 02:19:36 <G0LAB     
+261030 02:19:37 <G0LAB     body after R lines.
+261030 02:19:37 <G0LAB     R:261029/1000Z mid-body R line 9@X.#3.GBR.EURO
+261030 02:19:37 <G0LAB     end.
+261030 02:19:38 <G0LAB     /EX
+261030 02:19:38 ?G0LAB     Msg 17 Routing Trace To LABTST Via WW
+261030 02:19:38 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:19:38 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:19:38 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:19:38 ?G0LAB     Routing Trace - No Match
+261030 02:19:38 >G0LAB     Message: 17 Bid:  17_GB7LAA-1 Size: 176
+261030 02:19:38 >G0LAB     de GB7LAA-1>
+261030 02:19:40 <G0LAB     B
+261030 02:19:40 >G0LAB     
+261030 02:19:41 |G0LAB     G0LAB Disconnected
+261030 02:20:24 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:20:24 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:20:24 >G0LAB     Hello G0LAB. Latest Message is 17, Last listed is 0
+261030 02:20:24 >G0LAB     de GB7LAA-1>
+261030 02:20:26 <G0LAB     SB LABTST @ WW
+261030 02:20:26 >G0LAB     Enter Title (only):
+261030 02:20:29 <G0LAB     lab t19_gt_from_and_misc
+261030 02:20:29 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:20:31 <G0LAB     >From already escaped
+261030 02:20:31 <G0LAB     ~ tilde line
+261030 02:20:31 <G0LAB     /EX-ish line: /EXIT
+261030 02:20:32 <G0LAB     # hash
+261030 02:20:32 <G0LAB     end.
+261030 02:20:33 <G0LAB     /EX
+261030 02:20:33 ?G0LAB     Msg 18 Routing Trace To LABTST Via WW
+261030 02:20:33 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:20:33 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:20:33 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:20:33 ?G0LAB     Routing Trace - No Match
+261030 02:20:33 >G0LAB     Message: 18 Bid:  18_GB7LAA-1 Size: 72
+261030 02:20:33 >G0LAB     de GB7LAA-1>
+261030 02:20:34 <G0LAB     B
+261030 02:20:34 >G0LAB     
+261030 02:20:35 |G0LAB     G0LAB Disconnected
+261030 02:21:18 |G0LAB     Incoming Connect from G0LAB on Port 1 Freq 0 Mode Packet 1200
+261030 02:21:18 >G0LAB     [BPQ-6.0.25.28-B2FWIHJM$]
+261030 02:21:18 >G0LAB     Hello G0LAB. Latest Message is 18, Last listed is 0
+261030 02:21:18 >G0LAB     de GB7LAA-1>
+261030 02:21:20 <G0LAB     SB LABTST @ WW
+261030 02:21:20 >G0LAB     Enter Title (only):
+261030 02:21:23 <G0LAB     lab t20_ctrl_chars
+261030 02:21:23 >G0LAB     Enter Message Text (end with /ex or ctrl/z)
+261030 02:21:25 <G0LAB     bell: esc:[0m ff: nul-free
+261030 02:21:25 <G0LAB     end.
+261030 02:21:26 <G0LAB     /EX
+261030 02:21:26 ?G0LAB     Msg 19 Routing Trace To LABTST Via WW
+261030 02:21:26 ?G0LAB     Routing Trace. Check if reached correct area My HA is #99.GBR.EURO
+261030 02:21:26 ?G0LAB     Routing Trace Type B (Flood) TO LABTST VIA WW Route On WW (null) (null) (null) (null)
+261030 02:21:26 ?G0LAB     Routing Trace HR WW (null) (null) (null) (null) Matches BBS GB7LAM
+261030 02:21:26 ?G0LAB     Routing Trace - No Match
+261030 02:21:26 >G0LAB     Message: 19 Bid:  19_GB7LAA-1 Size: 37
+261030 02:21:26 >G0LAB     de GB7LAA-1>
+261030 02:21:28 <G0LAB     B
+261030 02:21:28 >G0LAB     
+261030 02:21:29 |G0LAB     G0LAB Disconnected

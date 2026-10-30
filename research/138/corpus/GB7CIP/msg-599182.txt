@@ -1,0 +1,225 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 28-Oct-26 09:31
+Bid: 9358_GB7CIP
+Title: Watson 'Hunter' Counter Mods
+Path: 
+
+By G8MNY                              (Update Nov 16)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+I have bought a damaged one of these small 3GHz handheld counters, and I went
+about repairing and upgrading it as there were a lot of components and switch
+options possable that were missing on this bottom of the range model.
+
+On point about this counter, it does now actually count what it shows and at
+VHF-UHF the resolution (what it counts) may be in 4 8 16 32 64 or 100Hz steps
+depending on what the prescaller system is doing.
+
+MODIFICATIONS DONE (in order of importance!)
+1/ Add UHF clipping diodes across the BNC socket.
+2/ Stop LCD rubbing marks from the lens casing. (and future smashed LCD) 
+3/ Add bargraph signal meter.
+4/ Add low battery indicator.
+5/ Add gate time push button, to give 0.1s 2s 1s & 5s gate times.
+6/ Add "no prescaler" RF path to read 1 - 30MHz.
+
+With 5 & 6 you can read 1MHz - 30MHz down to 0.1Hz & 30MHz - 3GHz down to 10Hz.
+But calibrating the crystal osc to high accuracy even short term is not easy.
+
+There is only 2 other features according to the LCD graphics..
+  a) switchable filter
+  b) a period timer.
+I did not understand the wiring for a) and I don't think the PCB supports b).
+
+Be warned it as all very small Surface Mounted Devices! So other than the input
+clipper protection and LCD case modifications, I do not recommend the other
+modifications unless you are fairly competent with soldering SMD components on
+a busy SMD board!
+
+            O R I G I N A L                         M O D I F I E D
+   .³~~³.                      DC          .³~~³.                      DC
+ ÚÄÄÁÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿   ÚÄÄÁÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+ ³                                   ³   ³                                   ³
+ ³                                   ³   ³                                   ³
+ ³ WATSON Hunter                 o   ³   ³ WATSON Hunter                 o   ³
+ ³-----------------------------------³   ³-----------------------------------³
+ ³| Frequency         PRESCALE HOLD |³   ³| Frequency         PRESCALE HOLD |³
+ ³|                              MHz|³   ³|                              MHz|³
+ ³|[] [] [] [] [] [] [] [] [] []    |³   ³|[] [] [] [] [] [] [] [] [] []    |³
+ ³|[].[].[].[].[].[].[].[].[].[].   |³   ³|[].[].[].[].[].[].[].[].[].[].   |³
+ ³|                                 |³   ³|                   _ - = ð ~  ÚÄ¿|³
+ ³|                                 |³   ³| signal    _ - ð ~ ð ð ð ð ð  ³X³|³
+ ³|                                 |³   ³| _ - = ð ~ ð ð ð ð ð ð ð ð ð  ÀÄÙ|³
+ ³-----------------------------------³   ³-----------------------------------³
+ ³ 10MHz-3GHz/50ê Frequency Counter  ³   ³ 1 MHz-3GHz/50ê Frequency Counter  ³
+ ³   Power                        Cal³   ³   Power  Pre                   Cal³
+ ³     On                 Hold     0 ³   ³    On   Scale      Hold   Time  0 ³
+ ³     []                 ³__³       ³   ³    []    []        ³__³   ³__³    ³
+ ³                                   ³   ³                                   ³
+ ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ   ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+\³/___  ____  ___  _______  ___     \³/___  ___    ____    ___  _________  ___
+ À´PreÃ´ö100Ã´ ö8ÆµCounterÃ´LCD³     À´LimÃ´Pre³ o´ö100´o ³ ö8Æµ Counter Ã´LCD³
+  ÀÄÄÄÙÀÄÄÄÄÙ³ö16³ÀÄÄÄÂÄÄÄÙÀÄÄÄÙ      ÀÄÄÄÙÀÄÂÄÙ\oÀÄÄÄÄÙo/³ö16³ÀÂÄÂÄÄÂÄÄÂÙÀÄÄÄÙ
+             ÀÄÄÄÙ  Hold                   ÚÄÁÄ¿ ³ÚÄÄÄ¿ ³ ÀÄÄÄÙ ³ ³ Batt³
+                                           ³Det³ À´AmpÃÄÙ       ³Hold  Time
+                                           ÀÄÂÄÙ  ÀÄÄÄÙ         ³
+                                             ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+FRONT END FAULT
+The fault was a blown up front end SMD MIMIC (A06), as there is NO input
+protection fitted!
+
+As I could not find a replacement device to hand, I used a scrap cellphone
+preamp SMD NPN and made up an amp with just an additional bias R (22K). This
+NPN fitted over the 4 pad A06 OK, with the bias SMD 22K (selected to give the
+same current as the 2nd A06 stage) and placed over the NPN. It all worked well
+and a QRP 2400MHz Tx was measured OK with the search aerial alongside.
+
+          ORIGINAL                           REPAIRED
+      ÚÄ´ÃÄÄÄÂÄÄ+5V                   ÚÄÄ´ÃÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄ+5V
+      ³    100R        °°    °°       ³              100R        °°    °°
+      ³      ³         In    Gnd      ³          ÚÄ22KÄÅÄ´ÃÄ>U2   B  unused
+    (o)Ä´ÃÄ´>ÁÄ´ÃÄ>U2               (o)ÄÄÂÄÄÄÂÄ´ÃÁÄÄÄ´<
+   BNC³   U1º          Gnd   Out      ³ _³_ _³_       e³          E     C
+      ³     º          °°    °°       ³ \_/ /_\        ³         °°    °°
+      ÀÄÄÄÄÄÐÄÄÄÄÄ     PCB PADS       ÀÄÄÁÄÄÄÁÄÄÄÄÄÄÄÄÄÁÄÄÄ      PCB PADS
+
+1/ To reduce the chance of a re-occurrence, I added 2 UHF clipping diodes wired
+across the BNC socket. 1N4148 diodes will do if you have no better.
+
+2/ I had heard of someone breaking the display, this makes the unit a total
+write off!
+Looking at my display, I could see tell tail marks (lines) where the LCD had
+been rubbed by the sharp case lens metal stamping edge.
+
+         C_L_E_A_R__P_L_A_S_T_I_C
+ =======<________________________>============
+ Embossed`========ð           ð=='
+  Metal Case      ^sharp edges^
+                 °°°°°°°°°°°°°°°°°LCD
+ ________________³__________XTAL_³__________PCB
+
+To remove the sharp edges, use a small modelling knife held parallel to the
+case so that the lens can't be damaged. Then firmly drag the blade over the
+raised edges, scraping off the sharpest part of the edge. Go all around the
+raised lens stamping edge, make sure that there are no proud part that could
+put concentrated pressure onto the LCD glass. (e.g. when dropped)
+
+3/ To make the bargraph display work, add a uhf diode to half of D2. I used a
+schottky one across just 2 of the 3 SMD diode pads. Note DIODE Polarity! Also
+add a 1n instead of adjacent missing R.
+
+       ÄÄÄÂÄÄ+5V                         °°Ä¿
+      U2 100R                              _³_
+ Ä´ÃÄÂÄ´>ÄÁÄÄ´ÃÄ>U3 Prescaler       °°  D2 /_\
+    _³_                                     ³
+    /_\D2                       oÄÄÄÄÂÄÄÄ°°ÄÙ
+     ÀÄÄÄÂÄÄÄ>U9 IC                 °°  PCB PADS
+        ===1n                     1nÄÁÄ
+         Á                          ÄÂÄ
+                                    °°
+
+3/ By moving the HOLD push button from mounting holes "SW6" to the left over-
+lapping "SW4" holes, there is then room to fit an identical button in "SW7"
+position.  (  ( () ) ()   )
+            SW4SW5 SW6 SW7
+
+Then you can get the counter to change the gate time from the default 0.2S to
+the 3 others possible times and hence the display resolution.
+
+You then have to file the existing case button hole to a long slot. This is
+quite simple to do with a set of sharp needle files, but time consuming! I then
+cut and filed an ally blank to between the buttons and glued that in place.
+
+
+4/ This needs 1 small preset pot, 1 SMD NPN (L-4), 2 SMD Rs, and a zener.
+Looking at the circuit I found the zener needs a series R to work properly, and
+I selected one on test to make my pot have useful setting range.
+
+                 _____           SW2     D1
+   +5V <ÄÂÄÄÄÂÄÄ´78L05ÃÄÄÄÄÄÄÂÄÄÄÄÄo\ÄÄÂÄ´<ÃÄÄÄo+ 9-12V
+         ³   ³  ³ U10 ³     100K       X   ÚÄv_Û
+         ³  10K ÀÄÄÂÄÄÙ  ZD1_³_      +_³_  ³   ³Switched
+         ³  R32    ³    2.7V/_\'      _Ü_  ³   ³Power
+    U9<ÄÄ)ÄÄÄ´     ³         ³         Ü   ³   ³Jack
+         ³    \³   ³   R31   ³         ³   ³   ³
+         ³  Q7 ÃÄÄÄ)ÄÄÄ10kÄÄÄ´         X   ³   ³
+         ³   e/³   ³         ³         ÃÄÄÄÙ   ³
+      C1===  ³     ³    LOW VR1       R2       ³
+     100u³   ³     ³   BATT 22K       56R      ³
+        ÄÁÄÄÄÁÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÙ
+
+The battery does not give > 5V, so the regulator is not actually regulating
+when on battery supply! I suspect there should be more than 4 AA cells (but no
+room) if the supply needed to be properly regulated for more accurate work the
+5x AAA Nicads might work better! The counter is actually quite accurate for its
+simple uncompensated xtal system.
+
+There is a danger if connecting the counter to an earthed supply while having
+the BNC connected to other earthed kit. This is because the nicad battery
+charging is via a negative change power switch arrangement. During insertion
+the 12V will be placed across the 5V battery until the switch breaks the
+negative battery lead. This may only last a very short time but currents >5A
+can flow and could damage leads, PCB track and eventually the battery! [good
+for battery for a few seconds :-) ]
+
+               LAYOUT        BNC
+      DC                   .³~~³.
+ ÚÄÂÄÂÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÁÄÄÁÂÄÄÂÄ¿
+ ³o³ ³  ³  VR1  ____       ³____³  ³o³  U1 & U2  Input Preamps
+ ³~  ³  ³      ³ U7 ³           U1  ~³
+ ³   ÀÄÄÙ      ÀÄÄÄÄÙ                ³  U3  3GHz ö100 Prescaler
+ ³                            D2 U2  ³
+ ³                                   ³  U4 & Q3  No Prescaler bypass amps
+ ³  ÚÄÄÄÄÄÄÄÄ¿   ____            __  ³
+ ³  ³        ³  ³ U6 ³      U4 ;³U3³:³  U5  Gated ö8 & ö16 prescaler
+ ³  ³   U9   ³  ÀÄÄÄÄÙ         'ÀÄÄÙ'³
+ ³  ³        ³          Q2           ³  U6  Overflow Counter decoder
+ ³  ÀÄÄÄÄÄÄÄÄÙ  ÃÁÁÁÁÁ´      Q1      ³
+ ³ X1           ³ U5  ³           _  ³  U7  Gate pulse counter
+ ³        Q7    TTTTTTT         :³_³]³
+ ³                               U10 ³  U9  Counter IC & display driver
+ ³                                ___³
+ ³                           Batt³___³  U10  5V regulator
+ ³_                                 _³
+ ³o³                               ³o³  X1  4.19407MHz Crystal
+ ÀÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÙ
+
+5/ A far more complex modification is to add the 2 HF amplifiers, missing for
+the no prescaler mode, and move/add the missing switches to control it.
+
+ +5VÄÄÄÄÂ      7,3,2ÚÄÄÄÄÄÄÂÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+      100R      ÚÄÄÄÁÄÄÄ¿100R  6K2  ____       ³
+   ÄÄ´>ÄÅÄÄ´ÃÂÄÄ´U3 ö100ÃÄÄÁÄ´ÃÄÁÄ´< Q1 ÃÄ330RÄ)ÄÄÄÄÂÄ+5V
+   U2º  ³    ³ 1ÀÄÄÄÂÄÄÄÙ4        e³    ³      o    ³       oÄÄÄ>U9
+     Ð  ³   100K   5³7             Á    ³      o <ÄÄÙSW3ÚÄÄ>o
+        ³    Á      Á  ÚÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄ)ÄÄÄÄÄÄÙ        Á
+        ³             R13    R14        ³  1,7,9ÚÄÄ+5V
+        R      ÚÄÄÄÄ¿ 310R   100K   ____³ ÚÄÄÄÄÄÁÄ¿11
+       2K2    100K  ÃÄÄÁÄÄÄ´ÃÄÁÄÄÄ´< Q3 ÀÄ´ U5 ö8 ÃÄÄÄ>IC U9
+        ÀÄÄÄ´ÃÄÁÄÄ´<     C12      e³     2³   ö16 ÃÄÄÄ>COUNTER
+           C9    U4 ³e             Á      ÀÂÄÄÄÄÄÄÙ12
+                    Á                      Á3,4,5,6
+
+Again instead of a mimic amp U4 I used a biased HF NPN (L-4). But I found that
+I had to add a series R of 2K2 to C9 so that it did not load U2's output to
+pre-scaler IC U3. I re-used the changeover power switch SW2, as the SW3
+changeover and I found a smaller make switch for the SW2 power switch. Again I
+had to make new hole in the case for SW3, & drilled then filed a matching
+rectangular hole.
+
+N.B. Below 1MHz the counter software stops the display from counting. And there
+are tricks done in the count, so the resolution is not that displayed! eg. at
+10MHz there are only 0.4Hz steps on the 10 sec gate, not 0.1Hz.
+
+
+See other tech buls "Old Venner Counter Type TSA3334", "PIC Freq Counter Mods",
+"Marconi Counter Type 2434A", "198kHz Off Air Standard", & "Off Air Lock for
+Ref Osc" & "Calibrating Frequency".
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

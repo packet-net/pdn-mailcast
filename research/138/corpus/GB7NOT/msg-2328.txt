@@ -1,0 +1,100 @@
+From: DJ6UX
+To: AGCW
+Type/Status: BN
+Date/Time: 12-Oct 17:54Z
+Bid: TMT317_DB0HB
+Title: AGCW-Telegramm 42/26 vom 2026-10-12
+
+R:261012/2031Z 4098@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261012/1904Z 14724@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261012/1904Z 19412@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261012/1904Z 4265@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261012/1904Z 17559@F1UBL.FRPA.FRA.EURO LinBPQ6.0.24
+R:261012/1903Z 8403@F5KEQ.FPDL.FRA.EU LinBPQ6.0.24
+R:261012/1903Z @:F3KT.#44.FPDL.FRA.EU #:48415 [Pont Saint Martin] LFBB7.0.11
+R:261012/1903z @:OK0NBR.SP.BRA.SOAM $:TMT317_DB0HB
+R:261012/1858z @:SR1BSZ.SZ.POL.EU $:TMT317_DB0HB
+R:261012/1906z @:SR6DWH.#DSL.POL.EU $:TMT317_DB0HB
+R:261012/1903z @:OK1TOR.CZE.EU $:TMT317_DB0HB
+R:261012/1903z @:OE2XZR.#OE2.AUT.EU $:TMT317_DB0HB
+R:261012/1903z @:DB0FFL.#BAY.DEU.EU $:TMT317_DB0HB
+R:261012/1901z @:CS5NRA.CTST.PRT.EU $:TMT317_DB0HB
+R:261012/1901z @:DB0ALG.#NDS.DEU.EU $:TMT317_DB0HB
+R:261012/1901z @:DK0MAV $:TMT317_DB0HB
+R:261012/1900z @:DB0FC.#NDS.DEU.EU [JO52GG OP: DF2AU] DP6.00 $:TMT317_DB0HB
+R:261012/1754z @:DB0HB.#HH.DEU.EU [HH-AIRPORT] DP6.00 $:TMT317_DB0HB
+From: DJ6UX @ DB0HB.#HH.DEU.EU (Eddi)
+To:   AGCW @ WW 
+X-Info: Upload without password authentication
+
+Path: ehrhh!.POSTED!not-for-mail
+From: dj6ux@dj6ux.ampr.org (Edmund H. Ramm)
+Newsgroups: ampr.bbs.agcw
+Subject: AGCW-Telegramm 42/26 vom 2026-10-12
+Date: Mon, 12 Oct 2026 18:58:14 -0000 (UTC)
+Organization: Private Linux/68k site
+Message-ID: <11ajak6$dl7$1@dj6ux.ampr.org>
+Reply-To: dj6ux@db0fhn.ampr.org (Edmund H. Ramm)
+Injection-Info: dj6ux.ampr.org;
+	logging-data="13991"; mail-complaints-to="usenet@dj6ux.ampr.org"
+User-Agent: nn/6.7.3
+Xref: ehrhh ampr.bbs.agcw:2029
+
+ge dr ops es swls = hpe conds gd to rcve msg wid 5 pts
+
+<KA>
+
+hamburg 42/26 ck 83/79 12 1700 =
+
+
+pt 1: silent key =
+
+      2661 lz2vp george =
+
+      in memoriam ===
+
+
+pt 2: agcw bug es cootie zwischenstand sep =
+
+      dj6ux 1139, dl1gbz 280, dl1dxl 168, dl0mur 126, dg5cw 28 =
+
+      congrats ===
+
+
+pt 3: agcw fsa zwischenstand sep =
+
+      kl 1: dj6ux 1818 =
+      kl 2: dl1gbz 249, dl1dxl 191, dl0mur 72, oh7qr 24 =
+
+      congrats ===
+
+
+pt 4: eucw leiterspiel zwischenstand sep =
+
+      1. dj6ux, 2. f5poj, 3. f4gou =
+
+      congrats ===
+
+
+pt 5: konteste =
+
+      okt 16    18-22utc lz open contest =
+      okt 17-18 15-15utc stew perry topband distance challenge ===
+
+
++
+nw zap
+
+
+Das AGCW-Telegramm wird jeweils montags um 1800UTC auf 3563kHz +/- QRM
+von einer AGCW-Leitstation gesendet, anschliessend Bestaetigungsverkehr
+('ZAP'). Wer sich vor der Aussendung anmeldet, erhaelt eine Nummer, mit
+der er zum ZAP-Traffic aufgerufen wird. Meist wird ein Sonder-DOK vergeben.
+--------------------------------------------------------------------
+AGCW-DL * Arbeitsgemeinschaft Telegrafie * Activity Group Telegraphy
+
+-- 
+   dj6ux@db0fhn.ampr.org - dj6ux AT posteo DOT de - DJ6UX@DB0HB.#HH.DEU.EU
+                         QTH Hamburg-Bramfeld, FN31a
+
+

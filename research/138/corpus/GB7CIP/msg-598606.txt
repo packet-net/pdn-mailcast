@@ -1,0 +1,43 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 22-Oct-26 17:30
+Bid: 25704_LU9DCE
+Title: EARTHQUAKES 22-OCT
+Path: !VK2RZ!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-22 08:06 - 4.6 - 49 KM NE OF YIGO VILLAGE, GUAM
+2026-10-22 07:49 - 4.8 - BALLENY ISLANDS REGION
+2026-10-22 05:23 - 4.8 - 86 KM S OF KOKOPO, PAPUA NEW GUINEA
+2026-10-22 04:44 - 4.8 - REYKJANES RIDGE
+2026-10-22 03:35 - 4.6 - 97 KM SW OF EL PALMARCITO, MEXICO
+2026-10-21 21:58 - 5.0 - REYKJANES RIDGE
+2026-10-21 21:38 - 5.3 - REYKJANES RIDGE
+2026-10-21 20:34 - 4.9 - 68 KM NNW OF KHORIXAS, NAMIBIA
+2026-10-21 19:06 - 5.0 - REYKJANES RIDGE
+2026-10-21 18:41 - 5.0 - 198 KM WNW OF PORT-OLRY, VANUATU
+2026-10-21 18:40 - 4.7 - 202 KM WNW OF PORT-OLRY, VANUATU
+2026-10-21 18:12 - 5.1 - SOUTH OF AFRICA
+2026-10-21 17:19 - 4.6 - 208 KM SE OF SEVERO-KURILSK, RUSSIA
+2026-10-21 15:22 - 4.9 - 208 KM WNW OF PORT-OLRY, VANUATU
+2026-10-21 14:56 - 5.0 - 194 KM WNW OF PORT-OLRY, VANUATU
+2026-10-21 14:40 - 4.7 - 33 KM NE OF SHIZUNAI-FURUKAWACHO, JAPAN
+2026-10-21 14:35 - 4.9 - 207 KM WNW OF PORT-OLRY, VANUATU
+2026-10-21 12:03 - 4.5 - 158 KM S OF FALSE PASS, ALASKA
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

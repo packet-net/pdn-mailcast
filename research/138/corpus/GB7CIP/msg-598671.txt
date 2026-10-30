@@ -1,0 +1,52 @@
+From: G8MNY
+To: IBM
+Type/Status: B$
+Date/Time: 23-Oct-26 06:58
+Bid: 8847_GB7CIP
+Title: Diskette Drive Connector
+Path: 
+
+34 Pin connector   Diskette/Fixed Disk
+                      DRV   CRD
+SIGNAL DESCRIPTION    PIN DIRECTION
+Ground - Odd Numbers  1-33  -
+Reduced Write          2    <
+Reserved               4    -
+Drive Select 3         6    <
+Index                  8    >
+Drive Select 0        10    <
+Drive Select 1        12    <
+Drive Select 2        14    <
+Motor On              16    <
+Direction Select      18    <
+Step                  20    <
+Write Data            22    <
+Write Gate            24    <
+Track 00              26    >
+Write Protect         28    >
+Read Data             30    >
+Side 1 Select         32    <
+Diskette Change       34    >
+
+The d/drive is a Citezen OPDA-12A.
+The Atari has a 14 pin socket as follows...
+SIGNAL DESCRIPTION   PIN
+Read data             1
+Side 0 select         2
+Logic ground          3
+Index pulse           4
+Drive 0 select        5
+Drive 1 select        6
+Logic ground          7
+Motor on              8
+Direction in          9
+Step                 10
+Write data           11
+Write gate           12
+Track 00             13
+Write protect.       14
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

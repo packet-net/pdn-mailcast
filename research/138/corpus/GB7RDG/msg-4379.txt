@@ -1,0 +1,159 @@
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To: 425DXN
+Type/Status: B$
+Date/Time: 23-Oct 16:16Z
+Bid: 425CAL1851
+Title: [425ENG] 425 DX News 1851 Cal
+
+Body: 10160
+
+R:261023/1617Z 15133@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261023/1616Z 20257@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261023/1616Z 61198@EI2GYB.DGL.IRL.EURO LinBPQ6.0.25
+R:261023/1616Z 5471@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261023/1616Z 5915@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261023/1616Z @:CX2SA.SAL.URY.SOAM #:5890 [Salto] FBB7.00e $:425CAL1851
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : 425DXN@WW
+
+24 October 2026                                          A.R.I. DX Bulletin
+                                   No 1851
+
+                          ===========================
+                          *** 4 2 5  D X  N E W S ***
+                          *******   CALENDAR  *******
+                          ===========================
+                           Edited by  I1JQJ & IK1ADH
+                         Direttore  Responsabile I2VGW
+
+PERIOD           CALL                                                   REF
+till  24/10      J88PI: Bequia Island (NA-025)                         1850
+till  26/10      8J7SPO: special callsign                              1839
+till  26/10      GM4AFF/p and GM5E: Shetland Islands (EU-012)          1849
+till  26/10      TA0/DL7UCX: Marmara Island (AS-201)                   1851
+till  26/10      V63SC and V640FSM: Pohnpei (OC-010), Micronesia       1850
+till  27/10      C6AQQ: New Providence (NA-001), Bahamas               1849
+till  27/10      CT9/DF7EE and CQ3W: Madeira (AF-014)                  1850
+till  27/10      J79A, J79BH, J79FJ, J79N, J75A: Dominica (NA-101)     1849
+till  27/10      J79FS: Dominica (NA-101)                              1850
+till  27/10      PJ4/DH8BQA and PJ4Y: Bonaire (SA-006)                 1848
+till  28/10      3B9/M0CFW and 3B9KW: Rodrigues Island (AF-017)        1849
+till  28/10      GB80CV: special callsign (England)                    1847
+till  28/10      J45PO and SX5P: Dodecanese (EU-001)                   1849
+till  28/10      NV1U/HR9 and HQ9X: Roatan Island (NA-057)             1849
+till  29/10      5W0ZP: Samoa (OC-097)                                 1850
+till  29/10      7P8GE: Lesotho                                        1839
+till  29/10      T88CZ, T88DK, T88ED, T88MB: Koror (OC-009), Palau     1850
+till  29/10      XX9TXN: Macao                                         1851
+till  30/10      OR80AF: special callsign                              1847
+till  30/10      YJ0CA: Efate (OC-035), Vanuatu                        1851
+till  31/10      9N7XT: Nepal                                          1849
+till  31/10      C50A: Gambia                                          1851
+till  31/10      II4NTTI: special callsign                             1809
+till  31/10      LZ936BA: special callsign                             1809
+till  31/10      S9R: Sao Tome (AF-023)                                1847
+till  31/10      SP1550SK: special callsign                            1807
+till  31/10      VK9WX: Willis Island (OC-007)                         1837
+till  31/10      ZW50B: special callsign                               1849
+October          HF0PAS: South Shetland Islands (AN-010)               1825
+till  01/11      TM8R: special callsign (France)                       1851
+till  02/11      JD1BQP: Chichijima (AS-031), Ogasawara                1849
+till  03/11      LR7DSY and LT7DSY: special callsigns                  1850
+till  04/11      C5R: Gambia                                           1847
+till  10/11      PA50JT: special callsign                              1803
+till  15/11      OR82CLM: special callsign                             1848
+till  16/11      E51MWA: Manihiki (OC-014), North Cook Islands         1851
+till  18/11      5H3MB: Tanzania                                       1844
+till  20/11      H44MS: Solomon Islands (OC-047)                       1847
+till  25/11      7P8EA: Lesotho                                        1850
+till  30/11      VK1AX: Deal Island (OC-195)                           1846
+till  02/12      TZ4AM: Mali                                           1849
+till  31/12      9A44FF: special callsign                              1808
+till  31/12      9A69AA: special callsign                              1809
+till  31/12      CT100REP: special callsign                            1810
+till  31/12      DA100LH, DL100LH, DK100LH: special callsigns          1808
+till  31/12      DA100TV and DL100TV: special callsigns                1808
+till  31/12      DA125RH: special callsign                             1845
+till  31/12      DB100FT: special callsign                             1807
+till  31/12      DB70DLRS: special callsign                            1830
+till  31/12      DL25WIKI: special callsign                            1807
+till  31/12      DQ30GDXF: special callsign                            1836
+till  31/12      DR170TESLA: special callsign                          1826
+till  31/12      EM50AR: special callsign                              1811
+till  31/12      EO210WLP and EM70WWW: special callsigns               1843
+till  31/12      GB50PUNK: special callsign                            1809
+till  31/12      LU1DMZ/Z and LU1ZA: South Orkney Islands (AN-008)     1818
+till  31/12      LZ75HSC: special callsign                             1818
+till  31/12      OT26B: special callsign                               1821
+till  31/12      PG75HSC: special callsign                             1824
+till  31/12      SO100LKK, SP100LKK, SQ100LKK: special callsigns       1833
+till  31/12      SP0LKK, 3Z100LKK, HF100LKK, SN100LKK: special calls   1833
+till  31/12      TF80IRA: special callsign                             1842
+till  31/12      YT170TESLA: special callsign                          1814
+till  31/12      ZL100AA: special callsign                             1823
+till  December   VK0TBC: Casey Station, Antarctica                     1812
+till  29/01 2027 8J70JARE: special callsign                            1825
+till  ??/??      ZB2FTY: special callsign                              1830
+24/10-12/11      9N/S57MK: Nepal                                       1851
+24/10-29/10      OX3LX: Christian IV Island (NA-151)                   1851
+26/10-08/11      CN1UNI: special callsign                              1851
+27/10-31/10      TC29TC: special callsign                              1851
+28/10-30/10      5Z4GO/p: Wasini Island (AF-067)                       1850
+28/10-06/11      V47JA: St. Kitts (NA-104)                             1851
+28/10-09/11      6W/I2YSB and 6W/IK2HKT: Senegal                       1846
+30/10-05/11      YJ0SP: Efate (OC-035), Vanuatu                        1851
+30/10-06/11      V26JJ: Antigua (NA-100)                               1850
+30/10-12/11      KH8A: Pago Pago (OC-045), American Samoa              1845
+31/10-06/11      J3/N9GB: Grenada (NA-024)                             1851
+31/10-11/11      9X5KM: Rwanda                                         1851
+31/10-14/11      FW3GT: Futuna Island (OC-118)                         1849
+31/10-15/11      ZZ5UNO: special callsign                              1851
+October          JW5MUA: Bear Island (EU-027)                          1848
+October          TU5KOP: Cote d'Ivoire                                 1851
+October          VY0ZOO: Southampton Island (NA-007)                   1849
+01/11-08/11      Z68MU, Z68WW, Z66IPA: Kosovo                          1851
+01/11-30/11      II4GCLB: special callsign                             1809
+01/11-30/11      SP1234KK: special callsign                            1807
+01/11-31/12      LZ911TD: special callsign                             1809
+04/11-11/11      D44PX: Boa Vista (AF-086), Cape Verde                 1851
+04/11-03/12      OT5IDPD: special callsign                             1845
+10/11-19/11      C8K: Mozambique                                       1823
+11/11-23/11      3X4U: Guinea                                          1847
+14/11-22/11      E51A: Rarotonga (OC-013), South Cook Islands          1848
+15/11-22/11      HD4W: Cojimies Island (SA-056)                        1848
+16/11-04/12      VK9XY: Christmas Island (OC-002)                      1844
+17/11-30/11      C56XA: Gambia                                         1849
+23/11-15/03 2027 HR5/F2JD: Honduras                                    1847
+November         DP1POL: Neumayer Station III, Antarctica (AN-016)     1851
+November         JW5MUA: Bear Island (EU-027)                          1848
+November         KC4/W1WCN: McMurdo Station, Antarctica (AN-011)       1851
+November         VY0ZOO: Igloolik (NA-174)                             1849
+November         XR0Z: Alejandro Selkirk Island (SA-101)               1849
+01/12-31/12      II4SLRI: special callsign                             1809
+01/12-31/12      SP1835JK: special callsign                            1807
+December         DP1POL: Neumayer Station III, Antarctica (AN-016)     1851
+December         KC4/W1WCN: McMurdo Station, Antarctica (AN-011)       1851
+January     2027 DP1POL: Neumayer Station III, Antarctica (AN-016)     1851
+Jan-Mar     2017 KC4/W1WCN: McMurdo Station, Antarctica (AN-011)       1851
+05/02-04/05 2027 H44MS: Solomon Islands (OC-047)                       1847
+February    2027 3Y0L: Peter I Island (AN-004)                         1847
+12/03-26/03 2027 VP0SG: South Georgia Island (AN-007)                  1841
+13/11-23/11 2027 XU7X: Koh Rong Island (AS-133), Cambodia              1840
+
+***************************************************************************
+
+               425 DX NEWS HOME PAGE: https://www.425dxn.org/
+
+***************************************************************************
+
+                                Direttore Responsabile
+                                Gabriele Villa,  I2VGW
+                    Giornalista Professionista - Tessera n. 071675
+                           Ordine Nazionale dei Giornalisti
+                                     Roma, Italia
+
+***************************************************************************
+
+
+

@@ -1,0 +1,132 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 29-Oct-26 09:41
+Bid: 9509_GB7CIP
+Title: PIC Freq Counter Mods
+Path: 
+
+By G8MNY                                 (Updated Feb 09)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+After making a PIC frequency counter from EI9GQ's design in October 2006
+Radcom, as an "on the night club construction contest", I found some faults
+with it/the club kit provided.
+
+USELESS PREAMP
+The original circuit has very poor gain up to 1V RMS input was needed to get
+the 4V p-p logic level needed to drive the PIC properly. I could not discover
+exactly why, it was not just the biasing, as the HF frequency response was
+also very poor!
+
+So I replaced the supposedly 550MHz BF199, for a 500MHz 2N2369A and rebiased it
+to give the best input sensitivity (around 18k base to collector).
+
+I also protected it from overload (when the display goes funny and needs
+repowering to reboot the PIC) with 2 back to back signal diodes on the input
+BNC socket. And I increased the LF range by changing the 470pF input cap to a
+10nF so that frequencies down to 1kHz could be measured (software disabled
+below that!)
+                               ÚÄÄÄ+5V
+                              560R             Frequency      Sensitivity
+        Protection        ÚÄÄÄÄ´                1kHz - 10kHz     100mV
+        Diode            18K   ÃÄ270RÄ>PIC     10kHz - 10MHz      10mV
+BNC     Clipping     10n  ³  ³/                10MHz - 30MHz     100mV
+I/P  o)ÄÄÂÄÄÄÂÄÄÄÄÄÄÄÄ´ÃÄÄÁÄÄ´2N2369A          30MHz - 45MHz     600mV
+Socket³ _³_ _³_  open        ³\e
+      ³ \_/ /_\  wires         ³
+      ÀÄÄÁÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄ
+       2x 1N4148          PIC PCB
+
+FREQUENCY ACCURACY
+On the construction day, all the kits read a 10MHz reference about 1.5kHz high.
+This meant the 10.240MHz timebase crystal has to be slowed down. EI9GQ'a write
+up mentions the 2 fixed 22pF caps need to be selected for your crystal. I
+changed my original crystal for a recovered surplus one (different batch) and
+again had the same frequency. So I swapped the 22pF caps for slighty larger
+values, but I found the best result was to add a small ceramic 22pF across the
+crystal. This gave a nice +/- 200Hz range @ 10MHz on the fine Cal trimmer.
+
+       PIC
+    ³ 10.240 ³
+    ÃÄÄ´[]ÃÄÄ´
+    ³        ÃÄÄÄ¿
+    ÃÄÄÄ´ÃÄÄÄ´   ³\
+    ³  22pF  ³   ³/\
+   ===      === === Cal
+22pF³    22pF³  /³ Trimmer
+  ÄÄÁÄÄÄÄÄÄÄÄÁÄÄÄÁÄÄ
+
+As there is no temperature compensation of the reference crystal, I also tried
+some negative temperature 22pF caps, but these would not tune on frequency for
+me! :-(
+
+SOFTWARE PRECALLER
+I did find that there is a software problem affecting the accuracy when the
+counter uses its software selected PIC prescaller. Eg. if you calibrate the
+counter at say 4MHz and retest it at 40MHz, there is a small under read error
+of greater than 10x of the count. This may be due to the software loosing some
+counts cycles when it does its cleaver stuff counting buffer over loads etc.
+But normal counters also connected, behave quite normally on this test.
+
+BOXING UP
+I found a second hand plastic box that was just big enough (120 x 65 x 40mm),
+as the smaller plastic and diecast ones I had were all too small.
+
+I mounted the display with 6BA stand off pillars that were exactly the same
+depth as the LCD display, but I had to drill out the metric PCB holes to 6BA
+clearance.
+                 display cut out
+      ====================================
+     ³³    [] |~~~~~~~~LCD~~~~~~~~| []   ³³     []=threaded stand off pillars
+     ³³heat===========================   ³³
+     ³³sink--screen---                   ³³ Input
+POWER³³ reg===========     room for      ³³ BNC
+JACK o)         PIC         nicads       ((o)
+      =====================================
+                   Box Bottom
+
+I then stacked the PIC PCB with long 6BA bolts on that. But that was actually a
+mistake and I needed a double insulated screening plate between the 2 PCBs with
+6BA nut separators, to stop the display crosstalk noise from upsetting the
+counter reading.
+
+POWERING
+I added a series idiot diode on the 12V feed and initially a heatsinked the
+regulator as I was powering bright backlight LED from 5V.
+
+But later I used a small nicad battery option with no LED, but charging via the
+LED. PCB track cuts were needed for this circuit arrangement.
+
+        2x  1N4001            ____ +5.0V               ON/OFF
++12V o)ÄÂÄ´>ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄ´7805ÃÄÄÄÄ¿ N.O. relay   SWITCH
+      ³ ³                ===  ~~³~      ÄÄÄÄÄÄoÄÄÄÄÄÄÄo\______+5V to
+      ³ À´>ÃÄÂÄÄÄÄÄÄ¿     ÀÄÄÄÄÄ´      ³ N.C.              ³   PCB
+      ³   ÚÄÄÁÄÄ¿   ³           Á      ³                  ===
+     33R  ³Small³  _³_ Charge          ³                   Á
+      ³   ³ 5V  ³  \_/=Backlight       ³
+      ³   ³Relay³   ³  LED             ³
+      ³   ÀÄÄÂÄÄÙ   ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ+4.8 to 5.5V
+      ³      ÀÄÄÄÄÄÄ´
+      ³           +_³_ NICADS
+      ³             Ü    4x
+      ³             ³  220mA/H
+      ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+When the relay is released with no 12V, power comes from the wired in nicads.
+
+Charging is through the Relay & the bright LCD display LED, & is enough current
+to recharge in 24 hrs. Also running the LED only from 12V via a 1W 33R to the
+nicad battery instead of the original 10R from 5V will remove the need for a
+regulator heatsink.
+
+
+See other tech buls "Watson 'Hunter' Counter Mods", "Old Venner Counter Type
+TSA3334", "Marconi Counter Type 2434A", "198kHz Off Air Standard", "Off Air
+Lock for Ref Osc" & "Calibrating Frequency".
+
+
+
+Why don't U send an interesting bul?
+
+73 de John G8MNY @ GB7CIP

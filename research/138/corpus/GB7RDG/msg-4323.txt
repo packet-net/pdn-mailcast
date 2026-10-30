@@ -1,0 +1,52 @@
+From: K7EK
+To: HERMES
+Type/Status: B$
+Date/Time: 22-Oct 21:39Z
+Bid: 368_K7EK_A
+Title: Mercury Modem v1.9.20 is available
+
+R:261022/2148Z @:GB7CIP.#32.GBR.EURO #:8797 [Caterham Surrey GBR] $:368_K7EK_A
+R:261022/2148Z 20187@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261022/2148Z 5383@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261022/2147Z 21487@N3HYM.#FRDK.MD.USA.NOAM BPQ6.0.25
+R:261022/2139Z 368@K7EK.KY.#NOKY.KY.USA.NOAM BPQ6.0.26
+
+
+---
+
+Warning
+
+Mercury v1.9.20 does not connect to Mercury 1.9.19 or any older version
+over the air, in either direction. The connect frames have a new packet
+type, and the versions refuse each other cleanly: nothing stays keyed.
+Upgrade every station you talk to at once. Read RELEASE-1.9.20.md
+before upgrading.
+
+---
+
+All stations are urged to upgrade immediately to insure compatibility with those 
+running v1.9.20. 
+
+K7EK's BPQ32 system is now running the new version. See https://www.qrz.com/db/K7EK 
+for a  current list of my frequencies and services offered. Stations within range are 
+welcome to test Mercury Modem with my system.
+
+Download Mercury Modem here:
+
+https://github.com/Rhizomatica/mercury/releases/
+
+All users are requested to report their findings, good and bad, to the Mercury Modem devs on 
+the Hermes-General Mercury mailing list. See:
+
+https://lists.riseup.net/www/info/hermes-general
+
+I look forward to observing stations testing Mercury Modem v1.9.20. Thanks for reading.
+
+Best regards,
+
+Gary, K7EK
+
+
+
+
+

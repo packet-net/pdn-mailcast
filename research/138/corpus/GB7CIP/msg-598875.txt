@@ -1,0 +1,92 @@
+From: G8MNY
+To: IBM
+Type/Status: B$
+Date/Time: 25-Oct-26 08:24
+Bid: 9051_GB7CIP
+Title: 25 Pin D-Type Parallel Port
+Path: 
+
+CENTRONIC                    IBM 25W                 (Updated May 04)
+ Pin        Signal             Pin
+  1        Data Strobe          1
+  2        DATA 1               2               25Way Plug Rear
+  3        DATA 2               3         13                         1
+  4        DATA 3               4         \ x x x x x x x x x x x x x /
+  5        DATA 4               5          \ x x x x x x x x x x x x /
+  6        DATA 5               6          25                       14
+  7        DATA 6               7
+  8        DATA 7               8
+  9        DATA 8               9
+  10       ACK                 10            36Way Centronic Plug rear
+  11       BUSY                11      18                                 1
+  12       PAPER END           12    \  x x x x x x x x x x x x x x x x x x  /
+  13       SELECT              13     \ x x x x x x x x x x x x x x x x x x /
+  14,16    0V   (AUTO FEED?)   14      36                                19
+  17       Ground
+  18       +5V
+  19-30    0V Returns        10-23
+  31       INPUT PRIME (INIT)  16
+  32       FAULT               15
+  33       0V                18 & 25
+  36       SELECT IN           17
+
+****************Parallel Port Input & Output**************************
+There are 3, 8 bit Ports Connected to the Parallel Printer Port At the Back of
+your PC. This can be used quite easily for Imputing & Outputting Data to & from
+the PC. Not all bits are settable so you will have to read the ports & Mask off
+the Input data using AND & OR Functions.
+
+Port &H378
+
+These Pins are Outputs Only But their current settings may be read back using
+Most Modern BASICs.
+
+The Basic Command to Output Data onto these Pins is
+
+Value%=21 (or whatever you require) OUT &H378,Value
+
+The Data Output is Latched, IE once Written it stays there until overwritten by
+new data.
+
+Pin   Name     Port     Bit    Direction
+2              &H378    0 >      Out    Current status
+3              &H378    1 >      Out       of these
+4              &H378    2 >      Out    Pins may also
+5              &H378    3 >      Out       be read
+6              &H378    4 >      Out    Back Using BASIC
+7              &H378    5 >      Out       command
+8              &H378    6 >      Out    X%=INP(378)
+9              &H378    7 >      Out    Print X%
+**********************  Port  &H37A  ************************
+1     Strobe   &H37A    0  >     OUT    To Output Data
+14    Auto     &H37A    1  >     OUT    onto these Pins
+16    Init     &H37A    2  >     OUT    Use the same command
+17    Slct In  &H37A    3  >     OUT    But Port is 37A
+5
+4     Int En
+**********************  Port  &H379  ************************
+These Pins may be used for Input, Port Number is &H379
+13    Slct     &H379    4  <     IN     These Pins may be
+11    Busy     &H379    7  <     IN     Used for I/P to PC
+12    PE       &H379    5  <     IN     using X%=INP(&H379)
+10    ACK      &H379    6  <     IN     Print X%
+15    Error    &H379    3  <     IN
+**************************************************************
+Pins 18 to 25 are Ground Pins
+**************************************************************
+Sending a 1 to Bit 4 of Port &H37A will enable the Printer card interrupt.
+This interrupt triggers when Pin 10 goes from Hi to lo. Sending a 0 to Bit 4 of
+Port &H37A will disable the Printer card interrupt.
+
+Writing data to these ports causes Printing Problems afterwards. Either switch
+PC Off the On or Use Sleep Command before Printing.
+
+------------------------------------------------------------------------------
+Michel, F5AAJ @ F6KDS says for the status, you have to read &H378 (I wrote
+X%=INP(378). You can use, too, PRINT (INP(&H378)). Idem, for the output on a
+port, you can write OUT &H378,21 or OUT &H378,&H15, by example...
+
+
+Why Don't U send an interesting bul? 
+
+73 De John, G8MNY @ GB7CIP

@@ -1,0 +1,250 @@
+From: CX2SA
+To: 425DXN
+Type/Status: B$
+Date/Time: 23-Oct-26 16:15
+Bid: 425WW1851
+Title: [425ENG] 425 DX News 1851
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : 425DXN@WW
+
+24 October 2026                                           A.R.I. DX Bulletin
+                                   No 1851
+
+                         ===========================
+                         *** 4 2 5  D X  N E W S ***
+                         ****  DX  INFORMATION  ****
+                         ===========================
+                          Edited by  I1JQJ & IK1ADH
+                        Direttore Responsabile  I2VGW
+
+9N     - Matjaz, S57MK will be active as 9N/S57MK  from Nepal between 24 Oc-
+         tober and 12 November. He will be QRV for a few days from Kathmandu
+         and then while trekking in the  Mount Kanchenjunga area.  Typically
+         he operates FT8 and runs 10-15 watts.
+9X     - Alain, F8FUA will be active holiday style as 9X5KM from Rwanda from
+         31 October  to 11 November.  He will operate  CW, SSB, and  digital
+         modes on various bands.  QSL via LoTW, or via home call (direct and
+         bureau). QSOs will be uploaded to Club Log.
+C5     - Darko, E70A is active as C50A from the Gambia until 31 October.  He
+         operates SSB, CW and FT8 on the HF bands, 6 metres, and QO-100. QSL
+         QSL via home call. [TNX The Daily DX]
+CN     - Special event station  CN1UNI  will be active  from 26 October to 8
+         November to mark Unity Day.  King Mohammed VI has declared 31 Octo-
+         ber a national holiday  to celebrate Morocco's  national unity  and
+         territorial integrity, following the UN Security Council's approval
+         of a resolution supporting its autonomy plan for the disputed West-
+         ern Sahara region. QSL via the address on qrz.com.
+D4     - Giovanni, IZ2DPX will be active as  D44PX from  Boa Vista (AF-086),
+         Cape Verde on 4-11 November.  He will operate  SSB, FT8 and FT4  on
+         60-6 metres. QSL via Club Log's OQRS, or via home call.
+DL_ant - Felix, DL5XL expects to be active again as DP1POL from the Neumayer
+         Station III,  Antarctica  (AN-016)  between  November  and February
+         2027. He operates mainly CW on the HF bands, with some digimode and
+         SSB activity. QSL via DL1ZBO.
+E5_nc  - E51MWA is active again from  Manihiki (OC-014),  North Cook Islands
+         until 16 November. There is one station, primarily operated by Rob,
+         N7QT, who plans  "extensive CW activity"  in the coming days.  [TNX
+         The Daily DX]
+F      - The  Association des Radio Amateurs de la Cote d'Emeraude is active
+         as  TM8R  until 1 November to promote the  13th Route du Rhum,  the
+         3000-mile single-handed transatlantic yacht race between Saint-Malo
+         (France) and  Pointe-a-Pitre (Guadeloupe). QSL via Club Log's OQRS,
+         LoTW, or via F5BNJ.
+J3     - Greg, N9GB  will be active  holiday style as  J3/N9GB  from Grenada
+         (NA-024) from  31 October to 6 November.  He will operate mainly CW
+         and SSB, with some FT8,  on 40-6 metres.  QSL via EB7DX  and  LoTW.
+         [TNX The Daily DX]
+KC4    - Joe, W1WCN is currently stationed at McMurdo Station on Ross Island
+         (AN-011),  Antarctica  for the  2026-27 austral  summer season.  He
+         plans to be QRV as KC4/W1WCN from indicatively mid-November through
+         March as time allows.  Operations will cover  20, 15, and 10 metres
+         using SSB, CW, and FT8. QSL via LoTW and eQSL. [TNX DX World]
+OX     - Bo, OZ1DJJ will be active again as  OX3LX from  Christian IV Island
+         (NA-151) on  24-29 October.  Reaching the island  requires  a heli-
+         copter, making access highly dependent on weather conditions.  Con-
+         sequently, travel dates may change without notice. In his free time
+         he will be QRV on various bands, including "some of the low bands".
+         QSL via Club Log's OQRS, LoTW, or via OZ0J.
+PY     - Members of the  Uniao dos Radioamadores do Litoral do Parana  (UNO)
+         will be active as ZZ5UNO between 31 October and 15 November to com-
+         memorate Brazilian Radioamateur Day.  Electronic  certificates  and
+         QSLs will be available,  paper  QSL cards  will not be issued.  See
+         https://www.qrz.com/db/ZZ5UNO for more information.  The Dia do Ra-
+         dioamador Brasileiro  marks the anniversary of the entry into force
+         of the first Brazilian Amateur Radio regulations (5 November 1924).
+TA     - Ben, DL7UCX will be active as  TA0/DL7UCX  from Marmara Island (AS-
+         201) on 23-26 October. He operates CW on 40-12 metres. QSL via home
+         call; QSOs will be uploaded to Club Log and LoTW. [TNX DXNL]
+TA     - Celebrating the anniversary of the  proclamation of the Republic of
+         Turkiye (29 October 1923), members of the YM1KE Radio Club  will be
+         active as  TC29TC  on 27-31 October.  They will operate CW, SSB and
+         digital modes on various bands. QSL via LoTW, eQSL and QRZ Logbook.
+TU     - F5ANZ, F4DLM, F4VXY, and F4ICE  are currently in Yopougon,  Cote d'
+         Ivoire  to bring  the Radio Club de Provins's  (https://f6kop.com/)
+         long coveted project to life: setting up the TU5KOP club station at
+         the National Institute for the Promotion of the  Blind (INIPA). "We
+         want to give these  young people  the opportunity  to discover  our
+         passion,  to communicate,  to learn, to open up to the world, and -
+         why not - to become  fully fledged  radio amateurs  in the future",
+         F6KOP's President says.  Preceded by a  brief activity  in January,
+         the current operations began on 21 October, with QSOs being made on
+         SSB, CW, and FT8. Keep an eye out for TU5KOP during the upcoming CQ
+         WW DX SSB Contest.
+V4     - Once again John, W5JON will be active as V47JA from  St. Kitts (NA-
+         104) between 28 October and 6 November. He will operate SSB and FT8
+         on various bands. QSL via LoTW, or direct only to W5JON.
+XX9    - Alberto, VR2XAN will be active as  XX9TXN from Macao on 23-29 Octo-
+         ber,  including a  single-band entry  in the  CQ WW DX SSB Contest.
+         Outside the contest  he will be QRV on various bands,  with a focus
+         on 160, 80 and 40 metres. QSL via IV3SKB. [TNX NG3K]
+YJ     - Chris, VK2YUS has been again as YJ0CA from  Efate (OC-035), Vanuatu
+         since 20 October, and will remain there until 30 October.  He oper-
+         ates SSB only on 40-10 metres, typically between 21 and 10 UTC. QSL
+         direct to home call.
+         Steve, VK2SP will be active holiday style as  YJ0SP  from Efate be-
+         tween 30 October and 5 November.  He plans  to be QRV on  40,   20,
+         15, 12, 10,and 6 metres. QSL via eQSL and QRZ.
+Z6     - Milan, S58MU  and  Silvo, S50X  will be active as  Z68MU and Z68WW,
+         respectively, from Gjilan, Kosovo on 1-8 November. During the IPARC
+         Contest (7-8 November) they will be using Z66IPA. QSL for all call-
+         signs via S58MU, direct or bureau.
+
+CQ WW DX SSB CONTEST ---> The following stations have announced their parti-
+cipation in this year's event (24-25 October, https://cqww.com/rules.htm):
+
+ZONE   CALL          CATEGORY     COUNTRY               QSL
+-------------------------------------------------------------
+01     W1AW/KL7      M/2          Alaska               LoTW
+05     FP/WF2A       SOAB LP      St.Pierre & Miquelon LoTW
+07     HP1Z          M/S          Panama               LoTW
+07     HQ9X          SO           Honduras
+08     8P5A          SOAB HP      Barbados             LoTW
+08     C6AQQ         SOSB 15m     Bahamas              LoTW
+08     J62K          M/2          St. Lucia            LoTW
+08     J75A          M/2          Dominica             LoTW
+08     J79FS         SO           Dominica             DH5FS
+08     KP4AA         M/S          Puerto Rico          LoTW
+08     NP4DX         SOAB HP      Puerto Rico          M0OXO
+08     TO1O          SOSB 20m     St. Martin           LoTW
+08     V26B          M/M          Antigua              LoTW
+08     V47T          M/S HP       St. Kitts            W2RQ
+09     9Z4BM         SOAB         Trinidad & Tobago    9Z4BM
+09     FY5FY         SOSB 80m     French Guiana        LoTW
+09     FY5KE         SOSB 15m     French Guiana        LoTW
+09     P40L          M/S          Aruba                WA3FRP
+09     P40W          SOAB         Aruba                LoTW
+09     PJ2T          M/?          Curacao              LoTW
+09     PJ4G          M/S          Bonaire              K4BAI
+09     PJ4K          M/2          Bonaire              KU9C
+09     PJ4Y          SO           Bonaire              LoTW
+09     PZ5DX         SOAB LP      Suriname             LoTW
+10     HD1A                       Ecuador              LoTW
+10     HD8R          SOAB HP      Galapagos            M0OXO
+13     CW5W          SOAB         Uruguay              LoTW
+14     GM5E          SOAB         Shetland Isls        LoTW
+14     GW8X          SOSB 40m     Wales                G4FJK
+14     MJ/TA1HZ      SO           Jersey               LoTW
+14     MM1U          M/S          Scotland             LoTW
+15     Z68XX         M/?          Kosovo               DL2JRM
+15     ZA/OK5D       SOSB 40m     Albania              OK1DTP
+19     RC0F          SOSB 20m     AS Russia            LoTW
+20     C41X          SO           Cyprus               M0OXO
+20     SX5P          M/M          Dodecanese           ON4PO
+20     TC2E          M/S          Turkey               LoTW
+20     TC7TR         M/S          Turkey               LoTW
+21     A44A          M/M          Oman                 LoTW
+22     AT26HFI                    India                LoTW
+24     B4S           M/2          China                LoTW
+24     XX9TXN        SOSB         Macao                IV3SKB
+26     E2A           M/M          Thailand             LoTW
+27     4F1A          M/S          Philippines          4F1EBD
+27     AH2R          M/?          Guam                 LoTW
+28     7A2A          M/S          Indonesia            LoTW
+28     V85RH         SOAB HP      Brunei               LoTW
+28     YB0ECT        SO           Indonesia            W2FB
+31     KH6J          M/M          Hawaii               LoTW
+33     CQ3W          SO           Madeira              LoTW
+33     IH9/OK1M      SOAB LP      AF Italy             OK1M
+35     C5R           M/S          Gambia               YT3PL
+37     5Z4A          SO           Kenya                M0URX
+37     7Q6UJ         M/?          Malawi               LoTW
+39     3B9KW         SOAB HP      Rodrigues            LoTW
+
+Do not forget to give a look at the Announced Operations listing maintained
+by Bill, NG3K  at https://www.ng3k.com/Misc/cqs2026.html -  good contest to
+you all!
+
+                         ===========================
+                         *** 4 2 5  D X  N E W S ***
+                         ****  GOOD TO KNOW ... ****
+                         ===========================
+                          Edited by  I1JQJ & IK1ADH
+                        Direttore Responsabile  I2VGW
+
+Access to the main functions of www.425dxn.org is provided by the 425DXN App
+for Android. It is available on Google Play - free of charge, no ads. Enjoy!
+
+3DA0GY: QRT ---> The main goal of  LA9GY's three-week  3DA0GY expedition  to
+eSwatini [425DXN 1850]  was  "to rack up a ton of CW contacts  and  hand out
+some juicy multiplier points in the upcoming CQWW SSB contest". However, the
+operation was cut short when his six-month-old SDR radio  "simply refused to
+transmit";  extensive troubleshooting with friends in Norway  and remote as-
+sistance from the Flexradio helpdesk failed. Morten pivoted to wildlife pho-
+tography for the remainder of the trip.
+
+YASME EXCELLENCE AWARD ---> Established  in  2008  by  the  Yasme Foundation
+(https://www.yasme.org/), the Excellence Award  is presented to  individuals
+and groups who, through their own service, creativity, effort and dedication
+have made a significant contribution to amateur radio.  The contribution may
+be in recognition of technical, operating or organizational achievement,  as
+all three are necessary for  amateur radio to grow and  prosper.
+The latest recipient, announced on 18 October, is the Reverse Beacon Network
+team (https://www.reversebeacon.net/): Felipe Ceglia  (PY1NB, founder), Nick
+Sinanis  (F5VIH),  Mark Glenn (K7MJG),  Dave Pascoe (KM3T, founder and owner
+of LiveATC.NET),  Pete Smith (N4ZR),  Dick Williams (W3OA), and  Chris White
+(WX7V).
+The award "recognizes the contributions to amateur radio by the team in sup-
+port of a global, volunteer-operated network  of automated amateur radio re-
+ceiver stations (SDR skimmers) that listen to radio bands  and report who is
+transmitting  in near-real time.  The network is  invaluable for propagation
+testing, antenna comparisons,  contest operating,  and results adjudication.
+The network typically has 250 active nodes around the world measuring a sta-
+tion's frequency, signal strength, signal to noise radio,  and sending speed
+which is then reported live to a central RBN database".
+
+----------------------------------------------------------------------------
+
+QSLs received direct  or through  managers: 4L5P, 4O/DL6RY, 5P9Z/p (EU-171),
+7X5CY, 7Z1VD, 8Q7PR, 9K2GR, 9M8A, A99AA,  BI4JJO, CN2NE, CT9/UR9IDX,  EA6VQ,
+EP5TJS,  FK8HA, HB0/WE9G,  HH2JR, HP/WE9G, J38DX,  JA8COE/8 (AS-147), JT1CS,
+KG6DX, KL7DG,  OG0C, OG50YL, OJ0Z, S79VU, TK5K, TK5SI (EU-104), V26K, VP8LP,
+XX9TXN, YS/WE9G, Z61DX, Z66SP, ZD9BV, ZF2OO.
+
+****************************************************************************
+
+               425 DX NEWS HOME PAGE: https://www.425dxn.org/
+
+****************************************************************************
+
+               425 DX News is a free of charge weekly bulletin
+      edited by Mauro Pregliasco, I1JQJ and Valeria Pregliasco, IK1ADH
+
+            Its contents may be used, reproduced and distributed
+                        in part or full provided that
+               "425 DX News" or "425DXN" receive proper credit
+
+          Contributors are invited to send their DX information to
+              Mauro Pregliasco, I1JQJ  (i1jqj.mauro@gmail.com)
+                      The deadline is 12 UTC on Fridays
+
+****************************************************************************
+
+                           Direttore Responsabile
+                            Gabriele Villa, I2VGW
+               Giornalista Professionista - Tessera n. 071675
+                      Ordine Nazionale dei Giornalisti
+                                Roma, Italia
+
+****************************************************************************

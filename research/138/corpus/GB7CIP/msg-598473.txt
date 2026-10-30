@@ -1,0 +1,101 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 21-Oct-26 07:53
+Bid: 8649_GB7CIP
+Title: Casting Lead Throwing Weights
+Path: 
+
+By G8MNY                                (new Jul 09)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+The other day setting up an HF aerials for a club demo station, I broke one of
+my lead throwing weights after it hit concrete ground too hard.....
+
+TWIRLING (Slingless shot)
+This method uses stronger line & heavier weight. A weight > 100gm, e.g. a 200gm
+plumb bob is tied to nylon cord (make sure the fixing is very good and will not
+pull out!) and you twirl this around in a vertical manner in line with the
+target with a metre or so of line. Your hand needs protection and a leather
+glove must be worn. As there is danger of 'miss fire' is you let go at the
+wrong time, make sure other people and cars etc. are well clear!
+
+ M E D I U M   twirl dia
+  S I Z E D      . Ú .                     Your strength timing and skill
+   T R E E     .      o.                   are more important. Make sure
+     ||        v  ()/'. `ú.                the line is going to pay out
+     ||         . Å³ .^    `ú.             freely and that you are not
+     ||          /  \    Line laid out     going to get entangled.
+
+I have put lines into trees at 18M with this method. Due to the heavy weight,
+tree grabbing of the line is not a problem, except for miss fires where the
+shot has to be pulled out from the wrong branch etc. In that case beware of
+knotting the cord around a branch!
+
+Often a high shot is best coming down in the tree if you can't reach the other
+side of the tree!
+
+=============================================================================
+
+The original weight was 1.5cm square cross section 4cm long with point ends and
+had an embedded copper looped end, This soon came out, so I drilled a hole..
+ _________                    _________
+/         ~Ä__........       /    hole.~-_........
+\_________.ÄWire  cord       \_________.Ä
+
+And of course this is where it broke.
+
+So I had to recast the lead                      ³    ³
+weight, but what could I use                     ³ally³
+a mold? I found a piece of                       ³    ³
+spare ally aerial boom was                       ³mold³
+just the right size, but it                      ³    ³
+need one end temporally                          ³    ³
+blocked up. This I did with                      ³____³
+some a steel plate, folded &                     ³Ý  Þ³
+ground to make a good tight fit.               ±±³   Þ³±±  Bench
+                                              ±± steel  ±± Vice
+                                              ±±  plug  ±±
+
+  Hammer                      Holding the lead remains in
+  RodÛ                        pliers I heated them with a
+  ³  Û ³Mold                  blow lamp and let them drip
+  ³  Û ³                      molten lead into the mold.
+  ³²²²²³                      When cool, I removed the
+  ³²L²²³                      steel plug, but found the
+  ³²E²²³                      lead was well stuck the mold.
+ ±±²A²²±±  Bench              I hammed it out with the vice
+±± ²D²² ±± Vice               support just the mold edge.
+±± ²²²² ±±
+
+However the 1st attempt was poor with the cold lead not bonding well and little
+bit came out, not 1 strong solid piece!
+
+For the 2nd attempt I warmed the mold up as I melted the scrap bits and also
+added solder flux, this encouraged the molten lead casting to adhere to itself
+better.
+
+I repeated the previous removal scheme but used a much bigger punch rod so as
+not to flatten (wedge) the lead in the mold. I found centre of the piece looked
+good, but the ends were poor. As I wanted rounded end (to slip through trees
+easily) I went about hot reshaping the ends.
+
+The trick I soon found was to judge the     Paper /~~\
+temperature were the lead was just soft     Towel ²²²²  Blow
+enough to push around, but not drip off.          ²L²²  Lamp
+The thick paper towel was OK for this             ²E²²
+unless you got it in the flame!                 ±±²A²²±±  Bench
+Once in shape, smoothing off the surface       ±± ²D²² ±± Vice
+was just a quick pass of the hot frame         ±± ²²²² ±±
+to just wet the surface.
+
+I was pleased with the result, not a masterpiece, but good and strong enough to
+take another drilled hole and possibly a few more drops onto concrete!
+
+
+See my TECH bul on "Tree Antenna Sky Hooks"
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

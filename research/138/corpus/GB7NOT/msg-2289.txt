@@ -1,0 +1,36 @@
+From: KQ6UP
+To: ASTRO
+Type/Status: BN
+Date/Time: 10-Oct 13:18Z
+Bid: TMP0UUKJ6FQP
+Title: Re^2: Anyone Into Astronomy
+
+R:261011/0922Z 4050@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261011/0833Z 14654@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261011/0833Z 19312@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261011/0833Z 4102@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261011/0832Z 4276@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261011/0832Z 42167@VE3QBZ.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261011/0832Z 37680@N6CTA.#SCA.CA.USA.NOAM LinBPQ6.0.24
+R:261011/0831Z 29397@KN6YLK.#SCA.CA.USA.NOAM LinBPQ6.0.24
+R:261010/1302Z 50934@AB6MV.#SCA.CA.USA.NOAM LinBPQ6.0.24
+R:261010/1325z @:N6NN.#SCA.CA.USA.NOAM [Grand Terrace] DP6.15 $:TMP0UUKJ6FQP
+R:261010/1319Z 16195@KQ6UP.#SCA.CA.USA.NOAM BPQ6.0.25
+R:261010/1318z @:KJ6FQP.#SCA.CA.USA.NOAM [Grand Terrace] DP6.15 $:TMP0UUKJ6FQP
+From: KQ6UP @ KJ6FQP.#SCA.CA.USA.NOAM (Chris)
+To:   ASTRO @ WW 
+Reply-To: KQ6UP @ KQ6UP.#SCA.CA.USA.NOAM
+
+I purchased a Tamaya Jupiter sextant a few months ago
+and been trying my hand at backyard celestial navagation.
+I use a bowl of molasses as an artificial horizon.  It
+has excellent properties for that as it is so viscous the
+wind does not affect it, and it has excellent contrast
+being a dark liquid.
+
+I also have a vintage Celestron C8 that I take out for
+eclipses.
+
+-73 de Chris KQ6UP
+
+

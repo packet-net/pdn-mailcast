@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6042-CX2SA
+Title: (M5.4) Mariana Islands region 12.7 142.9
+Path: !GB7COW!GB7BED!K1AJD!VE3CGR!CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Mariana Islands region
+Geographic coordinates:           12.698N, 142.943E
+Magnitude:                        5.4
+Depth:                            91 km
+Universal Time (UTC):             27 Oct 2026  23:14:17
+Time near the Epicenter (1):      28 Oct 2026  10:14:17
+Time in your area (1):            27 Oct 2026  20:14:17
+Location with respect to nearby cities:
+197.5 km (122.5 mi) WSW of Merizo Village, Guam
+217.6 km (134.9 mi) WSW of Tamuning, Guam
+217.6 km (134.9 mi) WSW of Tamuning-Tumon-Harmon Village, Guam
+217.9 km (135.1 mi) WSW of Mangilao Village, Guam
+224.7 km (139.3 mi) WSW of Dededo Village, Guam
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttke
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttke?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 27/10/2026 23:44:16 UTC
+________________________________________________________________

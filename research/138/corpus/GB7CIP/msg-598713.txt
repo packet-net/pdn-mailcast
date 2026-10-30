@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 23-Oct-26 16:34
+Bid: 5891-CX2SA
+Title: (M5.1) near the east coast of Honshu, Japan 40.4 142.6
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           near the east coast of Honshu, Japan
+Geographic coordinates:           40.416N, 142.572E
+Magnitude:                        5.1
+Depth:                            38 km
+Universal Time (UTC):             23 Oct 2026  16:07:52
+Time near the Epicenter (1):      24 Oct 2026  03:07:52
+Time in your area (1):            23 Oct 2026  13:07:52
+Location with respect to nearby cities:
+72.8 km (45.1 mi) ENE of Noda, Japan
+72.8 km (45.2 mi) ENE of Kuji, Japan
+91.4 km (56.7 mi) E of Hachinohe, Japan
+101.0 km (62.6 mi) NNE of Miyako, Japan
+145.0 km (89.9 mi) ENE of Morioka, Japan
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4e2
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4e2?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 23/10/2026 16:33:44 UTC
+________________________________________________________________

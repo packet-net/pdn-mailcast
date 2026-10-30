@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 21-Oct-26 21:41
+Bid: 5835-CX2SA
+Title: (M5.0) Vanuatu -14.2 165.5
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Vanuatu
+Geographic coordinates:           14.180S, 165.462E
+Magnitude:                        5.0
+Depth:                            10 km
+Universal Time (UTC):             21 Oct 2026  18:41:05
+Time near the Epicenter (1):      22 Oct 2026  05:41:05
+Time in your area (1):            21 Oct 2026  15:41:05
+Location with respect to nearby cities:
+198.1 km (122.8 mi) WNW of Port-Olry, Vanuatu
+228.3 km (141.5 mi) W of Sola, Vanuatu
+235.6 km (146.1 mi) NW of Luganville, Vanuatu
+498.1 km (308.8 mi) NW of Port-Vila, Vanuatu
+769.8 km (477.3 mi) NNW of WÃ©, New Caledonia
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3xx
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3xx?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 21/10/2026 21:40:39 UTC
+________________________________________________________________

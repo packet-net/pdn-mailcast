@@ -1,0 +1,100 @@
+; --- mailbox ---
+boxaddress GB7LAM.#99.GBR.EU
+boxheader OpenBCM
+sysopcall GB7LAM
+guestcall off
+savebroken 0
+infopath info
+userpath user
+fspath off
+fsbmail 1
+remerase 1
+maxbids 8388608
+; --- packet interface ---
+mycall GB7LAM-8
+fwdssid 8
+ax25k_if off
+; --- tcp/ip interface ---
+http_port 8080
+ftp_port 8021
+smtp_port 8025
+pop3_port 8110
+nntp_port 8119
+telnet_port 4719
+serv_port 8123
+radio_port 0
+nopopsmtp 0
+httpaccount 0
+httpguestfirst 0
+httpttypw 0
+httpshowsysopcall 1
+httprobots 1
+unsecurettypw 0
+internetmailgate off
+; --- timers ---
+infolife 999
+userlife 999
+oldestfwd 30
+oldestbeacon 1
+fwdtimeout 60
+usrtimeout 0
+autofwdtime 0
+holdtime 0
+; --- logging ---
+tracelevel 1
+fwdtrace 0
+tcpiptrace 0
+eraselog 0
+; --- system ---
+disable 0
+sfonly 0
+usvsense 0
+watchdog 6
+timeslot 2
+ttymode off
+dosinput 0
+addlinuxsystemuser 0
+; --- user constraints ---
+paclen 0
+minpaclen 40
+maxpaclen 256
+mailbeacon 1
+altboardinfo 0
+timeoutwarning 1
+nounknownroute 0
+asklogin 0
+smoothheader 0
+userquota 0
+maxlogins 0
+userpw 1
+readlock 0
+createboard 1
+nopurge 0
+ltquery 0
+m_filter off
+; --- server ---
+maillistserv 0
+maillistsender 0
+pocsaglistserv 0
+tellmode 2
+oldumail 0
+defswaplf 2
+; --- user defaults ---
+defstatus 0
+deffbbcheckmode 0
+defprompt (%b)-->
+defcmd D
+defhelp 2
+deflines 0
+deflf 0
+defidir ADEKLMWYZ
+defudir ADKLMTWYZ
+defilist ABDJQTWXY
+defulist ABDJQTWXY
+defiread ABDEILMPRTUWYZ
+defuread ABDEILMPRTUWYZ
+defcheck ABDEJLMWXY
+defps 
+defrea 0
+defhold 0
+defhttpsurface 1

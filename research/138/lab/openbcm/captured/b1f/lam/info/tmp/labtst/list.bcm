@@ -1,0 +1,38 @@
+0QU15N1<G0LAB >LABTST  ~GB7LAA@WW    $2_GB7LAA-1  #999%!%!!K|B!!!!!!!!!!!!!!!-lab t01_plain                                   
+0QU15O0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM001#999%!$!!J|B!!!!!!!!!!!!!!!-lab t01_plain                                   
+0QU1621<G0LAB >LABTST  ~GB7LAA@WW    $3_GB7LAA-1  #999%!'!!€|B!!!!!!!!!!!!!!!-lab t02_from_line                               
+0QU1680<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM002#999%!&!!|B!!!!!!!!!!!!!!!-lab t02_from_line                               
+0QU16H1<G0LAB >LABTST  ~GB7LAA@WW    $4_GB7LAA-1  #999%!%!!m|B!!!!!!!!!!!!!!!-lab t03_from_to_top                             
+0QU16L0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM003#999%!$!!l|B!!!!!!!!!!!!!!!-lab t03_from_to_top                             
+0QU1711<G0LAB >LABTST  ~GB7LAA@WW    $5_GB7LAA-1  #999%!)!!y|B!!!!!!!!!!!!!!!-lab t04_trailing_ws                             
+0QU1750<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM004#999%!(!!x|B!!!!!!!!!!!!!!!-lab t04_trailing_ws                             
+0QU17I1<G0LAB >LABTST  ~GB7LAA@WW    $6_GB7LAA-1  #999%!'!!_|B!!!!!!!!!!!!!!!-lab t05_blank_first                             
+0QU17I2<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM005#999%!&!!^|B!!!!!!!!!!!!!!!-lab t05_blank_first                             
+0QU17Q1<G0LAB >LABTST  ~GB7LAA@WW    $7_GB7LAA-1  #999%!*!X+|B!!!!!!!!!!!!!!!-lab t06_long_lines                              
+0QU1820<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM006#999%!)!X*|B!!!!!!!!!!!!!!!-lab t06_long_lines                              
+0QU18G2<G0LAB >LABTST  ~GB7LAA@WW    $8_GB7LAA-1  #999%!#!!=|B!!!!!!!!!!!!!!!-T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa        
+0QU18G0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM007#999%!"!!<|B!!!!!!!!!!!!!!!-T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa        
+0QU18P1<G0LAB >LABTST  ~GB7LAA@WW    $9_GB7LAA-1  #999%!#!!=|B!!!!!!!!!!!!!!!-T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+0QU18T0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM008#999%!"!!<|B!!!!!!!!!!!!!!!-T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+0QU1981<G0LAB >LABTST  ~GB7LAA@WW    $10_GB7LAA-1 #999%!#!!6|B!!!!!!!!!!!!!!!-T100 ccccccccccccccccccccccccccccccccccccccccccc
+0QU19C0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM009#999%!#!!J|B!!!!!!!!!!!!!!!-T100 ccccccccccccccccccccccccccccccccccccccccccc
+0QU19M1<G0LAB >LABTST  ~GB7LAA@WW    $11_GB7LAA-1 #999%!%!!n|B!!!!!!!!!!!!!!!-café title £                                    
+0QU19P0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00A#999%!$!!m|B!!!!!!!!!!!!!!!-café title £                                    
+0QU1A51<G0LAB >LABTST  ~GB7LAA@WW    $12_GB7LAA-1 #999%!$!!W|B!!!!!!!!!!!!!!!-cafÃ© Â£ Â° â€” title                           
+0QU1A80<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00B#999%!#!!V|B!!!!!!!!!!!!!!!-cafÃ© Â£ Â° â€” title                           
+0QU1B81<G0LAB >LABTST  ~GB7LAA@WW    $13_GB7LAA-1 #999%!%!!N|B!!!!!!!!!!!!!!!-lab t12_no_final_newline                        
+0QU1BE0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00C#999%!$!!M|B!!!!!!!!!!!!!!!-lab t12_no_final_newline                        
+0QU1CH1<G0LAB >LABTST  ~GB7LAA@WW    $14_GB7LAA-1 #999%!&!!*|B!!!!!!!!!!!!!!!-lab t13_ends_blank_lines                        
+0QU1CJ0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00D#999%!%!!)|B!!!!!!!!!!!!!!!-lab t13_ends_blank_lines                        
+0QU1CS1<G0LAB >LABTST  ~GB7LAA@WW    $15_GB7LAA-1 #999%!%!!?|B!!!!!!!!!!!!!!!-lab t14_crlf_body                               
+0QU1D20<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00E#999%!$!!>|B!!!!!!!!!!!!!!!-lab t14_crlf_body                               
+0QU1F61<G0LAB >LABTST  ~GB7LAA@WW    $16_GB7LAA-1 #999%!'!!;|B!!!!!!!!!!!!!!!-lab t16_dot_line                                
+0QU1FD0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00G#999%!&!!:|B!!!!!!!!!!!!!!!-lab t16_dot_line                                
+0QU1FN1<G0LAB >LABTST  ~GB7LAA@WW    $17_GB7LAA-1 #  2%!%!!j|B!!!!!!!!!!!!!!!-lab t17_r_lines                                 
+0QU1FQ0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00H#999%!'!"K|B!!!!!!!!!!!!!!!-lab t17_r_lines                                 
+0QU1HO1<G0LAB >LABTST  ~GB7LAA@WW    $18_GB7LAA-1 #999%'B$=b|B!!!!!!!!!!!!!!!-lab t18_very_long                               
+0QU1I00<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00I#999%'A$=a|B!!!!!!!!!!!!!!!-lab t18_very_long                               
+0QU1JS1<G0LAB >LABTST  ~GB7LAA@WW    $19_GB7LAA-1 #999%!'!!e|B!!!!!!!!!!!!!!!-lab t19_gt_from_and_misc                        
+0QU1K30<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00J#999%!&!!d|B!!!!!!!!!!!!!!!-lab t19_gt_from_and_misc                        
+0QU1KH1<G0LAB >LABTST  ~GB7LAA@WW    $20_GB7LAA-1 #999%!$!!E|B!!!!!!!!!!!!!!!-lab t20_ctrl_chars                              
+0QU1KG0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00K#999%!#!!D|B!!!!!!!!!!!!!!!-lab t20_ctrl_chars                              

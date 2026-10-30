@@ -1,0 +1,27 @@
+From: KC2NJV
+To: NEWS
+Type/Status: B$
+Date/Time: 22-Oct-26 13:48
+Bid: 16308_KC2NJV
+Title: Critical security issue affecting PHP
+Path: !GB7COW!GB7BED!N2MH4!DK0WUE!ZL2BAU!KC2NJV!
+
+From: https://www.ncsc.gov.uk/news/critical-security-issue-affecting-php
+
+
+The NCSC is encouraging UK organisations to take immediate action to mitigate a security issue affecting PHP (CVE-2026-109618 and CVE-2026-109619).
+
+What has happened?
+PHP has published a security update to address a critical security issue that may allow attackers to execute commands on any web server running PHP.
+
+PHP (PHP Hypertext Preprocessor) is a widely used server-side scripting language designed for web development. It runs on a web server to generate dynamic page content, interact with databases, and handle backend application logic before delivering the final HTML output to a user's browser. PHP is also used in a range of other products.
+
+The security issue could allow an attacker to trigger an out-of-memory (OOM) condition in PHP that results in memory corruption. Under certain conditions, this corruption could be exploited to achieve unauthenticated remote code execution. This security issue has now been fixed.
+
+CVE-2026-109618: Out-of-memory handling can interrupt PHP while internal request data is only partially initialized. Request cleanup may then treat the invalid data as valid.
+CVE-2026-109619: Request-owned internal state can survive after its backing memory has been freed. A later request handled by the same worker may use that stale state before normal initialization resets it.
+The full PHP security advisory provides more details regarding the fixed security issue.
+
+The NCSC will continue to monitor for any impact on UK organisations.
+
+73 de KC2NJV

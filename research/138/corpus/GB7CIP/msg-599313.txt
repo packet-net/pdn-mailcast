@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 29-Oct-26 03:50
+Bid: 6236_HP2DFA
+Title: EARTHQUAKE ALERT M5.7 - 82 km NE of Kiunga, Papua New Guine
+Path: !VE3KPG!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.7+)       
+==================================================
+Event ID   : us7000ttw5
+Magnitude  : M 5.7
+Time (UTC) : 2026-10-29 03:26:42 UTC
+Depth      : 10.0 km
+Coordinates: -5.6991 Lat / 141.9018 Lon
+--------------------------------------------------
+Location:
+  82 km NE of Kiunga, Papua New Guinea
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttw5
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

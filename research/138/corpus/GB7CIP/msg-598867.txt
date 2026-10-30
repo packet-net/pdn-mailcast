@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 25-Oct-26 04:15
+Bid: 5939-CX2SA
+Title: (M5.2) eastern New Guinea region, Papua New Guinea
+Path: !I0OJJ!EA2RCF!CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           eastern New Guinea region, Papua New Guinea
+Geographic coordinates:           6.174S, 147.166E
+Magnitude:                        5.2
+Depth:                            80 km
+Universal Time (UTC):             25 Oct 2026  03:29:11
+Time near the Epicenter (1):      25 Oct 2026  14:29:11
+Time in your area (1):            25 Oct 2026  00:29:11
+Location with respect to nearby cities:
+63.6 km (39.4 mi) NNE of Lae, Papua New Guinea
+127.9 km (79.3 mi) NNE of Bulolo, Papua New Guinea
+138.0 km (85.6 mi) NNE of Wau, Papua New Guinea
+185.5 km (115.0 mi) SE of Madang, Papua New Guinea
+197.2 km (122.3 mi) E of Goroka, Papua New Guinea
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4s5
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4s5?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 25/10/2026 04:12:46 UTC
+________________________________________________________________

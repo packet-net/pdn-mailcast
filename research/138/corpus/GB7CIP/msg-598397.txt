@@ -1,0 +1,161 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 20-Oct-26 06:48
+Bid: 8573_GB7CIP
+Title: Car Alternators
+Path: 
+
+By G8MNY                                      (Updated Sep 09)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Here is a typical circuit.
+
+                       OUTPUT RAIL                                 Thick Lead
+            ÚÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÂÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+            ³       ³       ³  Exciter Rail   Regulator         LAMP        º
+3x 3A   ÚÄÄÄ(ÄÄÄÂÄÄÄ(ÄÄÄÂÄÄÄ)ÄÄÄÄÂÄÄÄÄÂÄÄÄÄÄÄÄÄÂÄÄÄÄÂÄÄÂÄÄÄÄÂÄÄÄÄ0ÄÄÂÄÄo\oÄÄ¶
+diodes _³_  ³  _³_  ³  _³_  ³   _³_   e\³  e   ³    ³  ³    ³ thin  ³  IGN  º
+       /_\ _³_ /_\ _³_ /_\ _³_  /_\  PNPÃÄÄ\³  ³   1K  ³    ³ lead  ³ SWITCHº
+        ³  / \  ³  / \  ³  / \   ³  T4 /³   ÃÄÄ)ÄÄÄÄ´  ³    ³       ³       º
+        ³ ÀÄÂÄÙ ³ ÀÄÂÄÙ ³ ÀÄÂÄÙ  ÀÄÄÄÄÁÄÂÄÄ/³  ³    ³  ³   6K8    Other     º
+        ÀÄÄÄ´   ÀÄÄÄ´   ÀÄÄÄ´           ³  T3  ³    ³  ³    ³     Loads     º
+  0R1 ÚÄÄÄÄÄ´       ³       ³     BRUSH Û      ³    ³  ³    ³             ÄÄÐÄÄ
+ _()))) AC1 ³       ³       ³ Slip Ring O     1K    ³  ³    ³              ÛÛÛ
+³           ³       ³       ³           ³      ³  ³/    \³  ³      BATTERY  º
+³ 0R1 ÚÄÄÄÄÄ)ÄÄÄÄÄÄÄ´       ³   ROTARY  ³      ÃÄÄ´T2  T1ÃÄÄ´              _º_
+³_()))) AC2 ³       ³       ³    FIELD  ³      ³  ³\e  e/³  ³             ////
+³           ³       ³       ³  WINDING  ³      ³    ³__³    ³
+³ 0R1 ÚÄÄÄÄÄ)ÄÄÄÄÄÄÄ)ÄÄÄÄÄÄÄ´     ())))))   5V_³_    ³      ³
+³_()))) AC3_³_     _³_     _³_    ³ 6R        /_\'   ³      ³
+Star       / \     / \     / \    O Slip Ring  ³    2K7    4K7
+connected ÀÄÂÄÙ   ÀÄÂÄÙ   ÀÄÂÄÙ   Û BRUSH      ³     ³      ³
+3 phase     ÀÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÁÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄ¿
+stator      6x 80A power diodes              Ref   Comparator _³_
+windings.    For high current                                ////
+             3 phase bridge.
+
+The modern car AC Alternator with its integral rectifiers & Regulator took over
+from the old DC Dynamo & intergrated regulator box in the 1970s after the high
+current Silicon diode became readily available. The main advantage is a much
+higher current output for the size, this is due to the heavy output winding now
+being on the stationary outside stator. Other advantages are better regulation
+& output at low revs (tick over), enabling a smaller light weight low capacity
+starting type battery to be used.   
+
+WARNING LAMP
+Turning the ignition switch on, the dash board lamp puts a few mA of current
+through the Rotary field winding (6R), because the voltage on the exciting rail
+is lower than 14.5V, the lamp lights up.
+
+When the engine is running this low level exciting current plus residual
+magnetic field in the rotor is enough to build up the generated voltage in the
+3 stator star connected windings. This is high enough to overcome the 3 phase
+bridge voltage drop (1.4V) and continuously increases the excitor rail voltage
+until the regulator cuts in at 14.5V. The lamp goes out.
+
+If the lamp goes open circuit then the alternator may not self excite until
+very high engine revs are used. This could cause damage to the alternator or
+car electrics if the regulator is a bit slow in it's action!
+
+REGULATOR
+The voltage regulator compares the excitor rail voltage, not the actual battery
+voltage, as other than the difference in the top 3 diode losses the voltages
+should be the same. In this circuit a sample of the voltage is attenuated to
+about 5V and compared by NPN T1 & T2 a longtail pair, with a 5V reference. When
+the sample is less than 5V, T2 is on & turns on PNP power darlington to
+increase the exciting field winding current. T4 & T3 are protected from back
+emf with a diode across them or to earth. When the sample is above 14.5V the
+reverse happens and the excitation is reduced.
+
+All this happens in a fraction of a second, as the engine RPM can be as low as
+500 revs (due to belt pulleys 1500 on the alternator) and the alternator
+regulator will be at max excitation 12V @ 2A through field winding, giving
+about 10-20A only @ 13V to the battery. While a second later the engine could
+be at 7000 RPM (21000 on the alternator) and the output would try to rise the
+voltage to 360V @ 500A if the regulator failed to cut the excitation current
+down to 1/14th of what it was!
+
+ALTERNATOR WHINE
+It is common for alternators to have 2 or more pairs of poles on the rotor and
+matching the sets of load windings. The battery current is fed with pulses of
+current from the 3 phase rectifier.
+From the above example the AC ripple frequency across the battery at tickover
+will be 1500/60 x 4 x 6 = 300Hz rising to 14 times this @ full revs 4200Hz.
+So it is easy to see why it takes only a small amount of these communications
+frequencies across the battery to affect a Radio/Tranciever etc. The cure is
+NOT to add C across the many Farads of battery, but to put an iron cored choke
+(of a few turns) in series with the radio, assuming the radio has a C inside it
+anyway.
+
+ BATTERYÄÄoÄoÄÄ(((()ÄÄÄÄÂÄÄ Rig C
+         Fuse  ÍÍÍÍÍ   === 1000uF
+              > 10mH    ÃÄÄ
+              < 0.01R  _³_
+                      ////
+
+REGULATOR FAILURE
+Regulator failure, either results in no charging, or excessive charging causing
+damage/symptoms usually in this order:-
+a) Fan belt squealing noises when engine is revved up.
+b) Blowing many car lamps.
+c) Blowing up the battery.
+d) Snapping the fan belt once a new battery is fitted!
+
+A new/replacement regulator is a fiddly thing to fit, but may only cost a tiny
+fraction of a replacement alternator, if you can find a matching regulator that
+is!
+
+REMOTE SENSE
+On larger alternators it is usual to have remote sense. This can give 2
+advantages:-
+1/ True Battery voltage sensing ignoring the lead losses.
+2/ Output current limiting to protect the alternator.
+
+   ..... up to 2.4V of Drop ........>
+ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+  :      Sense Lead ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ´
+ \:/                ³   LAMP         ³Battery
+ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄ)ÄÄÄÄ0ÄÄÄÄo\oÄÄÄÄ´Post
+               ³    ³         IGN    ³
+              6K8  6K8      SWITCH   ³
+          D1   ³    ³                ³
+   T1\³  ÚÄ´<ÃÄ´    ³              ÄÄÁÄÄ
+      ÃÄÄ´     ³    ³       Battery ÛÛÛ
+     /³  ÀÄ´<ÃÄ)ÄÄÄÄ´                ³
+          D2   ³    ³               _³_
+              3K9  4K7             ////
+ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄ¿
+                       _³_
+                      ////
+There are 2 attenuator samples, the normal internal excitor voltage, as well as
+a lead sending the actual battery voltage. The 2 attenuators are slightly
+different permitting 14.5V on the battery terminals or 16.9V on the internal
+sensor.
+
+When there is more than 1 volt drop across the battery lead/high current diodes
+(compared to the internal diodes) then D1 will conduct to reduce the alternator
+voltage. 1.4V drop across the thick battery charging lead may represent the
+safe 60A current limit of the alternator.
+
+Using D1 & D2 steering diodes rather than just resistive adding both inputs is
+important so that the alternator does not blow up if remote sense lead is
+disconnected!
+------------------------------------------------------------------------------
+
+Tony, G8TBF says, on some alternators there is an additional output terminal
+connected to the star point of the main winding. This is used for automatic
+choke - it feeds a heater winding next to a bimetal coil in the (carburettor)
+choke assembly. (In effect, it's a regulated feed at half the alternator output
+voltage, as long as the engine is running).
+On cars with this system, a failure of an alternator rectifier diode messes up
+the choke operation!
+If one of the positive o/p diodes goes open circuit, the star point voltage
+rises significantly and the choke goes off far too quickly. Likewise, if a
+diode on the ground side fails, the star point goes low and the choke stays on
+way too long, if it goes off at all...
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

@@ -1,0 +1,23 @@
+From: NC8Q
+To: PKTNET
+Type/Status: B$
+Date/Time: 28-Oct-26 14:19
+Bid: 53526_NC8Q
+Title: Chuck, NC8Q, Dayton, EM79wq
+Path: !YT7MPB!N6RME!N0ARY!N2MH!K5DAT!N3MEL!NC8Q!
+
+PACKET CHECK-IN October 2026
+CHECK-IN REPORT (PACKET ASCII)
+STATUS / TYPE : EXERCISE         SERVICE: AMATEUR
+DATE / TIME   : 10/21/26 09:24   EXERCISE ID: PKTNET
+TO            : N3MEL
+FROM          : NC8Q             CONTACT: Chuck
+INITIAL OPS   : NC8Q
+SESSION INFO  : BAND: SHF        MODE: Mesh (AREDN)
+LOCATION      : Home
+COORDINATES   : LAT: 39.384       LON: -84.142
+MGRS / GRID   : MGRS: ?                GRID: EM79wq
+COMMENTS:
+Used form: https://www.tprfn.net/net-check-in
+but without that form's ASCII art.
+NORMAL OPERATIONS - NO TRAFFIC

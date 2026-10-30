@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 20:15
+Bid: 6205_HP2DFA
+Title: EARTHQUAKE ALERT M5.3 - 159 km WNW of Tobelo, Indonesia
+Path: !GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.3+)       
+==================================================
+Event ID   : us7000tttl
+Magnitude  : M 5.3
+Time (UTC) : 2026-10-28 19:56:47 UTC
+Depth      : 35.0 km
+Coordinates: 2.4277 Lat / 126.7587 Lon
+--------------------------------------------------
+Location:
+  159 km WNW of Tobelo, Indonesia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tttl
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

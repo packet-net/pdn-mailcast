@@ -1,0 +1,149 @@
+From: CX2SA
+To: 425DXN
+Type/Status: BN
+Date/Time: 16-Oct 17:23Z
+Bid: 425CAL1850
+Title: [425ENG] 425 DX News 1850 Cal
+
+R:261016/2056Z 4203@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261016/1724Z 14882@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261016/1724Z 19717@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261016/1724Z 4714@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261016/1723Z 4986@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261016/1723Z 46739@VA3BAL.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261016/1723Z 21017@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+R:261016/1723Z @:CX2SA.SAL.URY.SOAM #:5671 [Salto] FBB7.00e $:425CAL1850
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : 425DXN@WW
+
+17 October 2026                                          A.R.I. DX Bulletin
+                                   No 1850
+
+                          ===========================
+                          *** 4 2 5  D X  N E W S ***
+                          *******   CALENDAR  *******
+                          ===========================
+                           Edited by  I1JQJ & IK1ADH
+                         Direttore  Responsabile I2VGW
+
+PERIOD           CALL                                                   REF
+till  17/10      FW1P: Wallis Island (OC-054)                          1848
+till  18/10      3D2HM: Yasawa Islands (OC-156)                        1850
+till  18/10      7T5E: Algeria                                         1850
+till  18/10      KH8/AG4ZP: American Samoa                             1849
+till  20/10      LG5LG and SJ9WL: Morokulien (Norway & Sweden)         1849
+till  20/10      S21HRG: special callsign                              1849
+till  20/10      VP2MAU, VP2MBJ, VP2MBK: Montserrat (NA-103)           1849
+till  20/10      VP2MAW: Montserrat (NA-103)                           1849
+till  20/10      VP2MBL, VP2MBM, VP2MBN: Montserrat (NA-103)           1849
+till  21/10      H49A: Guadalcanal (OC-047), Solomon Islands           1831
+till  25/10      6O2M: Somalia                                         1847
+till  26/10      8J7SPO: special callsign                              1839
+till  27/10      J79FS: Dominica (NA-101)                              1850
+till  27/10      PJ4/DH8BQA and PJ4Y: Bonaire (SA-006)                 1848
+till  28/10      GB80CV: special callsign (England)                    1847
+till  29/10      7P8GE: Lesotho                                        1839
+till  30/10      OR80AF: special callsign                              1847
+till  30/10      ZA/AE5X: Albania                                      1848
+till  31/10      II4NTTI: special callsign                             1809
+till  31/10      LZ936BA: special callsign                             1809
+till  31/10      SP1550SK: special callsign                            1807
+till  31/10      VK9WX: Willis Island (OC-007)                         1837
+till  31/10      ZW50B: special callsign                               1849
+October          HF0PAS: South Shetland Islands (AN-010)               1825
+till  02/11      3DA0GY: eSwatini (Swaziland)                          1850
+till  04/11      C5R: Gambia                                           1847
+till  10/11      PA50JT: special callsign                              1803
+till  15/11      OR82CLM: special callsign                             1848
+till  20/11      H44MS: Solomon Islands (OC-047)                       1847
+till  30/11      VK1AX: Deal Island (OC-195)                           1846
+till  31/12      9A44FF: special callsign                              1808
+till  31/12      9A69AA: special callsign                              1809
+till  31/12      CT100REP: special callsign                            1810
+till  31/12      DA100LH, DL100LH, DK100LH: special callsigns          1808
+till  31/12      DA100TV and DL100TV: special callsigns                1808
+till  31/12      DA125RH: special callsign                             1845
+till  31/12      DB100FT: special callsign                             1807
+till  31/12      DB70DLRS: special callsign                            1830
+till  31/12      DL25WIKI: special callsign                            1807
+till  31/12      DQ30GDXF: special callsign                            1836
+till  31/12      DR170TESLA: special callsign                          1826
+till  31/12      EM50AR: special callsign                              1811
+till  31/12      EO210WLP and EM70WWW: special callsigns               1843
+till  31/12      GB50PUNK: special callsign                            1809
+till  31/12      LU1DMZ/Z and LU1ZA: South Orkney Islands (AN-008)     1818
+till  31/12      LZ75HSC: special callsign                             1818
+till  31/12      OT26B: special callsign                               1821
+till  31/12      PG75HSC: special callsign                             1824
+till  31/12      SO100LKK, SP100LKK, SQ100LKK: special callsigns       1833
+till  31/12      SP0LKK, 3Z100LKK, HF100LKK, SN100LKK: special calls   1833
+till  31/12      TF80IRA: special callsign                             1842
+till  31/12      YT170TESLA: special callsign                          1814
+till  31/12      ZL100AA: special callsign                             1823
+till  December   VK0TBC: Casey Station, Antarctica                     1812
+till  29/01 2027 8J70JARE: special callsign                            1825
+till  ??/??      ZB2FTY: special callsign                              1830
+16/10-25/11      7P8EA: Lesotho                                        1850
+17/10-24/10      J88PI: Bequia Island (NA-025)                         1850
+17/10-27/10      J79A, J79BH, J79FJ, J79N, J75A: Dominica (NA-101)     1849
+17/10-31/10      S9R: Sao Tome (AF-023)                                1847
+17/10-02/11      JD1BQP: Chichijima (AS-031), Ogasawara                1849
+18/10-22/10      3D2HM: Nadi (OC-016), Fiji                            1850
+18/10-28/10      NV1U/HR9 and HQ9X: Roatan Island (NA-057)             1849
+18/10-18/11      5H3MB: Tanzania                                       1844
+19/10-28/10      J45PO and SX5P: Dodecanese (EU-001)                   1849
+19/10-29/10      5W0ZP: Samoa (OC-097)                                 1850
+20/10-27/10      CT9/DF7EE and CQ3W: Madeira (AF-014)                  1850
+20/10-28/10      3B9/M0CFW and 3B9KW: Rodrigues Island (AF-017)        1849
+20/10-03/11      LR7DSY and LT7DSY: special callsigns                  1850
+21/10-29/10      T88CZ, T88DK, T88ED, T88MB: Koror (OC-009), Palau     1850
+22/10-26/10      GM4AFF/p and GM5E: Shetland Islands (EU-012)          1849
+22/10-26/10      V63SC and V640FSM: Pohnpei (OC-010), Micronesia       1850
+22/10-27/10      C6AQQ: New Providence (NA-001), Bahamas               1849
+22/10-02/12      TZ4AM: Mali                                           1849
+23/10-31/10      9N7XT: Nepal                                          1849
+28/10-30/10      5Z4GO/p: Wasini Island (AF-067)                       1850
+28/10-09/11      6W/I2YSB and 6W/IK2HKT: Senegal                       1846
+30/10-06/11      V26JJ: Antigua (NA-100)                               1850
+30/10-12/11      KH8A: Pago Pago (OC-045), American Samoa              1845
+31/10-14/11      FW3GT: Futuna Island (OC-118)                         1849
+October          JW5MUA: Bear Island (EU-027)                          1848
+October          VY0ZOO: Southampton Island (NA-007)                   1849
+01/11-30/11      II4GCLB: special callsign                             1809
+01/11-30/11      SP1234KK: special callsign                            1807
+01/11-31/12      LZ911TD: special callsign                             1809
+04/11-03/12      OT5IDPD: special callsign                             1845
+10/11-19/11      C8K: Mozambique                                       1823
+11/11-23/11      3X4U: Guinea                                          1847
+14/11-22/11      E51A: Rarotonga (OC-013), South Cook Islands          1848
+15/11-22/11      HD4W: Cojimies Island (SA-056)                        1848
+16/11-04/12      VK9XY: Christmas Island (OC-002)                      1844
+17/11-30/11      C56XA: Gambia                                         1849
+23/11-15/03 2027 HR5/F2JD: Honduras                                    1847
+November         JW5MUA: Bear Island (EU-027)                          1848
+November         VY0ZOO: Igloolik (NA-174)                             1849
+November         XR0Z: Alejandro Selkirk Island (SA-101)               1849
+01/12-31/12      II4SLRI: special callsign                             1809
+01/12-31/12      SP1835JK: special callsign                            1807
+05/02-04/05 2027 H44MS: Solomon Islands (OC-047)                       1847
+February    2027 3Y0L: Peter I Island (AN-004)                         1847
+12/03-26/03 2027 VP0SG: South Georgia Island (AN-007)                  1841
+13/11-23/11 2027 XU7X: Koh Rong Island (AS-133), Cambodia              1840
+
+***************************************************************************
+
+               425 DX NEWS HOME PAGE: https://www.425dxn.org/
+
+***************************************************************************
+
+                                Direttore Responsabile
+                                Gabriele Villa,  I2VGW
+                    Giornalista Professionista - Tessera n. 071675
+                           Ordine Nazionale dei Giornalisti
+                                     Roma, Italia
+
+***************************************************************************
+
+
+

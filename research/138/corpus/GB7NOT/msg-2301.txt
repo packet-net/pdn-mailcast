@@ -1,0 +1,33 @@
+From: KC2NJV
+To: MESH
+Type/Status: BN
+Date/Time: 12-Oct 05:00Z
+Bid: 15446_KC2NJV
+Title: MESH NEWS
+
+R:261012/0540Z 4076@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261012/0501Z 14683@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261012/0501Z 48866@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261012/0500Z 4325@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+R:261012/0500Z 24675@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+R:261012/0500Z 15446@KC2NJV.#NASS.NY.USA.NOAM LinBPQ6.0.25
+
+      __  __ _____ ____  _   _            _   _ _______        ______  
+     |  \/  | ____/ ___|| | | |          | \ | | ____\ \      / / ___| 
+     | |\/| |  _| \___ \| |_| |  _____   |  \| |  _|  \ \ /\ / /\___ \ 
+     | |  | | |___ ___) |  _  | |_____|  | |\  | |___  \ V  V /  ___) |
+     |_|  |_|_____|____/|_| |_|          |_| \_|_____|  \_/\_/  |____/ 
+                                                                       
+----------------------------------------------------------------------------
+[01] Signed Channel Messages: know who really sent it, and see only the
+people you know
+     MeshOS can now sign your channel messages and check everyone else's. A
+     tick shows who really sent each one, and one switch hides everything
+     your contacts did not send, the way direct messages already work.
+     Link: https://www.meshcore.co.uk/blog/signed-messages.html
+ 
+----------------------------------------------------------------------------
+Till next time...
+Wayne, KC2NJV
+
+

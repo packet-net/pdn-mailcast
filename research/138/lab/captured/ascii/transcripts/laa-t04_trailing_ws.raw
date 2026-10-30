@@ -1,0 +1,15 @@
+<<<ÿûÿûuser:>>>[[user]]<<<password:>>>[[user]]<<<
+Connected to GB7LAA's Telnet Server
+
+>>>[[BBS]]<<<LAA:GB7LAA} Connected to BBS
+[BPQ-6.0.25.28-B2FWIHJM$]
+Hello G0LAB. Latest Message is 4, Last listed is 0
+de GB7LAA-1>
+>>>[[SB LABTST @ WW]]<<<Enter Title (only):
+>>>[[lab t04_trailing_ws]]<<<Enter Message Text (end with /ex or ctrl/z)
+>>>[[trailing space   ]][[trailing tab	]][[	tab at start]][[mid	tab]][[space-only line follows]][[   ]][[end.]]<<<>>>[[/EX]]<<<Message: 5 Bid:  5_GB7LAA-1 Size: 94
+de GB7LAA-1>
+>>>
+[[B]]<<<*** Disconnected from Stream 1
+Disconnected from Node - Telnet Session kept
+>>>

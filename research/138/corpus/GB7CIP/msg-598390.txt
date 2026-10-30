@@ -1,0 +1,34 @@
+From: HP2DFA
+To: INFO
+Type/Status: B$
+Date/Time: 20-Oct-26 02:31
+Bid: 5123_HP2DFA
+Title: TOP 10 WORLDWIDE EARTHQUAKES (24H 20-Oct)
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+======================================================================
+     WORLDWIDE SEISMIC REPORT - TOP 10 LARGEST EARTHQUAKES (24H)
+             AX.25 DATA NETWORK / ROUTE: INFO@WW
+======================================================================
+Capture Date: 20-Oct-2026 02:30 UTC
+Source: USGS Earthquake Hazards Program (earthquake.usgs.gov)
+----------------------------------------------------------------------
+
+TOP 10 EARTHQUAKES WORLDWIDE (LAST 24 HOURS UTC):
+MAG    LOCATION / REGION                      DEPTH     TIME (UTC)
+----------------------------------------------------------------------
+M 6.0  186 km NW of Port-Olry, Vanuatu       10 km        07:49 UTC
+M 5.7  203 km WNW of Port-Olry, Vanuatu      10 km        18:55 UTC
+M 5.7  198 km NW of Port-Olry, Vanuatu       10 km        18:52 UTC
+M 5.4  196 km NW of Port-Olry, Vanuatu       10 km        10:40 UTC
+M 5.4  184 km WNW of Port-Olry, Vanuatu      10 km        08:12 UTC
+M 5.3  116 km WNW of HÃ¶fn, Iceland           10 km        14:44 UTC
+M 5.3  188 km NW of Port-Olry, Vanuatu       10 km        07:55 UTC
+M 5.2  211 km WNW of Port-Olry, Vanuatu      10 km        08:21 UTC
+M 5.1  South Sandwich Islands region         101 km       17:45 UTC
+M 5.0  205 km NW of Port-Olry, Vanuatu       10 km        00:38 UTC
+
+======================================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 PANAMA NODE
+======================================================================

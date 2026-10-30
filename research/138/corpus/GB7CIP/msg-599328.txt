@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 29-Oct-26 08:15
+Bid: 6095-CX2SA
+Title: (M6.4) southeast of Easter Island -36.4 -98.0
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           southeast of Easter Island
+Geographic coordinates:           36.406S,  98.049W
+Magnitude:                        6.4
+Depth:                            10 km
+Universal Time (UTC):             29 Oct 2026  07:49:51
+Time near the Epicenter (1):      29 Oct 2026  01:49:51
+Time in your area (1):            29 Oct 2026  04:49:51
+Location with respect to nearby cities:
+1485.7 km (921.1 mi) SE of Hanga Roa, Chile
+2169.3 km (1344.9 mi) W of Lebu, Chile
+2172.8 km (1347.2 mi) WNW of Ancud, Chile
+2186.8 km (1355.8 mi) WNW of Castro, Chile
+2200.6 km (1364.3 mi) WNW of Valdivia, Chile
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttxz
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttxz?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 29/10/2026 08:14:27 UTC
+________________________________________________________________

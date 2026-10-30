@@ -1,0 +1,26 @@
+From: W6KWF
+To: TECH
+Type/Status: BN
+Date/Time: 13-Oct 22:37Z
+Bid: 55547_N0ARY
+Title: PK-88 TNC Mods
+
+R:261014/0807Z 4125@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261013/2243Z @:GB7CIP.#32.GBR.EURO #:7911 [Caterham Surrey GBR] $:55547_N0ARY
+R:261013/2243Z 19492@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261013/2243Z 38691@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261013/2242z @:N2MH.#NNJ.NJ.USA.NOAM [via AREDN Mesh] jnos 2.0p $:55547_N0ARY
+R:261013/2237z @:N0ARY.#NCA.CA.USA.NOAM [San Jose, CA] #:55547 $:55547_N0ARY
+
+I put together a list of all the mods I do to the AEA PK-88 TNC when
+I buy a new one. I thought this list would be useful to others than
+myself:
+
+https://blog.thelifeofkenneth.com/2026/09/pk88-hardware-mods.html
+
+Kenneth, W6KWF
+
+
+
+
+

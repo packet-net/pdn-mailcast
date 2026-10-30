@@ -1,0 +1,59 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 20-Oct-26 06:58
+Bid: 8575_GB7CIP
+Title: Delayed Interior Car Lamp
+Path: 
+
+By G8MNY                                   (Correction Jan 10)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Here is a circuit I used, originally based on a Maplin kit.
+
+WHAT IT DOES
+It holds on the interior light for 20-30 seconds after opening the door, but
+immediately turns it off if the Ignition Switch is turned on, or the car Alarm
+is armed.
+                                               ÂÄ+12V
+                                             Lamp
+                                               ³ 1A
+                       ÚÄÄÄÄ1MÄÄÄÂÄÄÄÄÄÄÄÄÂÄÄ>Ä´
+             D1        ³         ³        ³    ³
+Arm Alarm +>Ä´>ÃÄ¿     ÃÄÄÄ´>ÃÄÄÄ´        ³    ³
+                 ÃÄ4K7Ä´   D3   4K7       ³    ³
+ Ignition +>Ä´>ÃÄÙ     ³     ____³    ____³    ³
+             D2        ³   ³/    ³  ³/ T2 ³    ³
+                       ÃÄÄÄ´ T1  ÃÄÄ´ TAB ³    o /Door
+                      3K3  ³\e ³/   ³\e ³/      / Switch
+                    C  ³+    ÀÄ´      ÀÄ´      ³
+                   47u===      ³\e      ³\e    ³
+                    6V ÀÄÄÄÄÄÄÄÄÄÁÄÄÄÂÄÄÄÄÙ    ³
+                                    _³_       _³_
+HOW IT WORKS
+C is normally charged up to 1.2V & T1 darlington held on by the current through
+the 1M, T2 power darlington (or VMOS FET) is held off.
+
+Opening the door the lamp lights and C is discharged through D3 turning off T1.
+
+Now on closing the door T2 is held mostly on (1.5V drop) through the 4K7 until
+the C is charged up to 1.2V via the 1M. At C = 1.2V T1 is again turned on and
+T2 turned off. The addition of the 3K3 makes this a snappier action keeping
+T2's heating down.
+
+If either the Ignition or Alarm circuits are powered while C is less than 1.2V
+it will very quickly charge up and the light extinguished.
+
+LOCATION
+This circuit does not need power itself, only an earth, so the location is not
+too critical. If switched power lines like the Ignition and Alarm are at risk
+with this addition, consider putting a 4K7 in series with each wire so that
+accidental shorts to earth can't harm anything.
+
+Note this circuit draws about 2.2mA all the time, and although a very small
+current it may add to other loads on a parked car battery!
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

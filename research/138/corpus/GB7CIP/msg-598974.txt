@@ -1,0 +1,66 @@
+From: G8MNY
+To: ATV
+Type/Status: B$
+Date/Time: 26-Oct-26 07:31
+Bid: 9150_GB7CIP
+Title: SCART Video Connections
+Path: 
+
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Not all pins have to be connected. There are different standards....
+
+Type U (universal) - provides connections to all 21 pins.
+
+Type V (video) - provides all connections excluding audio pins (3,1,6,2&4).
+
+Type C ( composite video & audio ) - provides all connections excluding
+       RGB Video & Blanking pins (15,13,11,9,7,5,16&18).
+
+Type A (audio) - provides all connections excluding Video pins
+                 (19,20,17,15,13,11,9,7,5,16&18)
+       ________________________________
+SOCKET \ 20 18 16 14 12 10  8  6  4  2 ³
+ VIEW 21³ 19 17 15 13 11  9  7  5  3  1³
+        ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+
+Pin  Name     Description            Size of Signal          Impedance
+ 1   AOR      Audio Out Right          0.5V RMS                 <1kê
+ 2   AIR      Audio In Right           0.5V RMS                 >10kê
+ 3   AOL      Audio Out Left + Mono    0.5V RMS                 <1kê
+ 4   AGND     Audio Ground
+ 5   BGND     RGB Blue Ground
+ 6   AIL      Audio In Left + Mono     0.5V RMS                 >10kê
+ 7   B        RGB Blue In              0.7V Pk                    75ê
+ 8   SWTCH    Audio/RGB switch/16:9  0-2V TV / 5-8V AV 4:3 / 9.5-12V AV 16:9
+ 9   G GND    RGB Green Ground
+10   CLKOUT   Data 2: Clockpulse Out          (Unavailable ??)
+11   G        RGB Green In             0.7V Pk                    75ê
+12   DATA     Data 1: Data Out        (Unavailable ??)
+13   R GND    RGB Red Ground
+14   DATAGND  Data Ground
+15   R        RGB Red In/Chrominance   0.7V pk 0.3V burst         75ê
+16   BLNK     Blanking/Comp-RGB        1-3V RGB, 0-0.4V Composite 75ê
+17   VGND     Composite Video Ground
+18   BLNKGND  Blanking Signal Ground
+19   VOUT     Composite Video Out / Lum Y  1V Pk                  75ê
+20   VIN      Composite In / Lum Y         1V Pk                  75ê
+21   SHIELD   Ground/Shield (Chassis)
+
+Cables with 1 overall screen only usable @ 50cm MAX length & will suffer some
+crosstalk.
+Some cables have 30ê lapped screened AF cable for video & give colour problems
+as the screen is quite in inductive at 4.3MHz, proper full mesh crossed braided
+screens should be used for all 75ê signal cables.
+             
+"S" input 15+20, crosstalk @ 4.43MHz in log cables causes fine patterning!
+
+WARNING
+Some VCRs (expensive JVCs) blow internal pcb fuse if the SWITCH tally wire is
+shorted to ground! So watch those floating around bare screens inside the SCART
+plug! 
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

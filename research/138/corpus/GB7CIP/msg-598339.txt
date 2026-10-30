@@ -1,0 +1,37 @@
+From: HP2DFA
+To: DX
+Type/Status: B$
+Date/Time: 19-Oct-26 18:01
+Bid: 5085_HP2DFA
+Title: DX BULLETIN: Active DXpeditions 19 Oct
+Path: !GB7BED!K1AJD!LU9DCE!PY2BIL!HP2DFA!
+
+==================================================
+      DAILY ACTIVE DXPEDITIONS BULLETIN - DX      
+==================================================
+Issue Date : 2026-10-19 18:00 UTC
+Source     : NG3K Announced DX Operations
+--------------------------------------------------
+CALLSIGN     ENTITY / LOCATION        DATES       
+--------------------------------------------------
+C5R			  [s  Gambia                   Oct01-Nov04 
+H44MS			    Solomon Is               Oct03-Nov20 
+6O2M			  [  Somalia                  Oct05-Oct25 
+H49A			  [  Solomon Is               Oct07-Oct21 
+VP2MAW			   Montserrat               Oct10-Oct20 
+3D2HM			    Fiji                     Oct10-Oct22 
+V47FWX			   St Kitts &amp; Nevis     Oct13-Oct20 
+3DA0GY			   eSwatini                 Oct15-Nov02 
+S21HRG			   Bangladesh               Oct16-Oct20 
+7P8GE			    Lesotho                  Oct16-Oct29 
+VP9 [spots]  Bermuda                  Oct17-Oct20 
+J88PI			    St Vincent &amp; Grenad  Oct17-Oct24 
+S9R			  [s  Sao Tome &amp; Principe  Oct17-Oct31 
+JD1BQP			   Ogasawara                Oct17-Nov02 
+HR9 [spots]  Honduras                 Oct18-Oct20 
+--------------------------------------------------
+Info: Check local DX Cluster (144.930 MHz) for spots
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 DX MONITOR PANAMA
+==================================================

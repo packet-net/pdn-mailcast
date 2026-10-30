@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 29-Oct-26 05:35
+Bid: 6245_HP2DFA
+Title: EARTHQUAKE ALERT M5.6 - South Sandwich Islands region
+Path: !GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.6+)       
+==================================================
+Event ID   : us7000ttx0
+Magnitude  : M 5.6
+Time (UTC) : 2026-10-29 05:06:48 UTC
+Depth      : 10.0 km
+Coordinates: -60.3419 Lat / -28.0139 Lon
+--------------------------------------------------
+Location:
+  South Sandwich Islands region
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttx0
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

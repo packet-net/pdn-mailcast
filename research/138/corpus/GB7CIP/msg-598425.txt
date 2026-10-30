@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 20-Oct-26 13:06
+Bid: 5795-CX2SA
+Title: UPDATED: (M5.0) Alaska Peninsula 54.6 -160.3
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Alaska Peninsula
+Geographic coordinates:           54.609N, 160.329W
+Magnitude:                        5.0
+Depth:                            35 km
+Universal Time (UTC):             20 Oct 2026  10:40:41
+Time near the Epicenter (1):      20 Oct 2026  02:40:41
+Time in your area (1):            20 Oct 2026  07:40:41
+Location with respect to nearby cities:
+81.7 km (50.6 mi) S of Sand Point, Alaska
+958.9 km (594.5 mi) SW of Anchorage, Alaska
+979.7 km (607.4 mi) SW of Eagle River, Alaska
+993.6 km (616.1 mi) SW of Knik-Fairview, Alaska
+1638.3 km (1015.7 mi) WSW of Juneau, Alaska
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3lf
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3lf?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 20/10/2026 13:05:27 UTC
+________________________________________________________________

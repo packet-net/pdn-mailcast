@@ -1,0 +1,26 @@
+From: KF7PSM@KE0GB.#SECO.CO.USA.NOAM
+To: PACKET
+Type/Status: B$
+Date/Time: 19-Oct 23:33Z
+Bid: 15897_KE0GB
+Title: QRV on 10 Meters
+
+Body: 591
+
+R:261019/2351Z 14988@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261019/2350Z 19958@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261019/2350Z 38899@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261019/2350Z 21257@N3HYM.#FRDK.MD.USA.NOAM BPQ6.0.25
+R:261019/2350Z 12820@W9GM.#SWWI.WI.USA.NOAM BPQ6.0.26
+R:261019/2333Z 15897@KE0GB.#SECO.CO.USA.NOAM LinBPQ6.0.25
+
+KF7PSM and N7WDZ will be QRV on 10 Meters for the next week as
+a test. Hopefully someone can connect to our -1 nodes and leave
+us a msg. We are on 28.140 USB, 1600/1800 ax.25 packet.
+N7WDZ is standard ax.25 and KF7PSM is fx.25.
+
+73 de KF7PSM
+
+
+
+

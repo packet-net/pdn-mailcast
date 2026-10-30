@@ -1,0 +1,20 @@
+From: M0NVK
+To: MCAST
+Type/Status: BN
+Date/Time: 22-Oct 07:49Z
+Bid: 6293F5M0NVK
+Title: MCR M0NVK 2026-10-20
+
+R:261022/0749Z 15370@GB7IOW.#48.GBR.EURO LinBPQ6.0.26
+
+MCR1 0.16.2 IO90hr sdrconnect 0/0 1791:AUD1791 0 0
+09 - 0 - - IU+PU
+10 - 0 - - IU+PU
+11 - 0 - - IU+PU
+12 - 0 - - IU+PU
+13 - 0 - - IU+PU
+14 - 0 - - IU+PU
+15 - 0 - - IU+PU
+16 - 0 - - IU+PU
+
+

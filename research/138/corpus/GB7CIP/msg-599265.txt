@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 20:28
+Bid: 6073-CX2SA
+Title: (M5.3) Molucca Sea 2.4 126.8
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Molucca Sea
+Geographic coordinates:           2.428N, 126.759E
+Magnitude:                        5.3
+Depth:                            35 km
+Universal Time (UTC):             28 Oct 2026  19:56:48
+Time near the Epicenter (1):      29 Oct 2026  03:56:48
+Time in your area (1):            28 Oct 2026  16:56:48
+Location with respect to nearby cities:
+159.2 km (98.7 mi) WNW of Tobelo, Indonesia
+193.9 km (120.2 mi) NNW of Ternate, Indonesia
+207.0 km (128.4 mi) NNW of Sofifi, Indonesia
+211.7 km (131.3 mi) ENE of Bitung, Indonesia
+236.8 km (146.8 mi) ENE of Manado, Indonesia
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000tttl
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000tttl?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 28/10/2026 20:27:38 UTC
+________________________________________________________________

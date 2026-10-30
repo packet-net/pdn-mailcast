@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 00:24
+Bid: 5736_HP2DFA
+Title: EARTHQUAKE ALERT M5.3 - 44 km ESE of Miyazaki, Japan
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.3+)       
+==================================================
+Event ID   : us6000u4qq
+Magnitude  : M 5.3
+Time (UTC) : 2026-10-24 23:59:36 UTC
+Depth      : 10.0 km
+Coordinates: 31.8226 Lat / 131.8730 Lon
+--------------------------------------------------
+Location:
+  44 km ESE of Miyazaki, Japan
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4qq
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

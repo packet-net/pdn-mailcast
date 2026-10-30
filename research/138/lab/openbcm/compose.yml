@@ -1,0 +1,28 @@
+# Lab: GB7LAA (LinBPQ) -> GB7LAM (openBCM 1.x) -> GB7LAB (LinBPQ), AXUDP on a bridge.
+name: lab138m
+networks:
+  lab:
+    ipam:
+      config: [{subnet: 172.34.0.0/24, gateway: 172.34.0.1}]
+services:
+  laa:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.34.0.11}}
+    ports: ["127.0.0.1:51010:8010"]
+    volumes: ["./state/laa:/data"]
+  lab:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.34.0.12}}
+    ports: ["127.0.0.1:52010:8010"]
+    volumes: ["./state/lab:/data"]
+  lam:
+    image: lab138-bcm
+    tty: true
+    stdin_open: true
+    working_dir: /bcm
+    command: ["tmux", "new-session", "-s", "b", "-x", "160", "-y", "50", "bcm"]
+    networks: {lab: {ipv4_address: 172.34.0.13}}
+    ports: ["127.0.0.1:54719:4719"]
+    volumes: ["./state/lam:/bcm"]

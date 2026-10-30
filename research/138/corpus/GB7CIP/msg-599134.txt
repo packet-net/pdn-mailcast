@@ -1,0 +1,133 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6053_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (27-Oct 11:30Z)
+Path: !GB7COW!GB7BED!GB7OSW!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+000
+AXNT20 KNHC 271615
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1815 UTC Tue Oct 27 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_12Z.gif'>1200 UT
+1615 UTC.
+
+...SPECIAL FEATURES...
+
+Gale Warning: A tight pressure gradient between a strong ridge over
+the eastern United States and a stationary front extending from
+31N60W to a 1008 mb low pres system over the NW Bahamas continues
+to support a large area of strong to gale-force NE winds and rough
+to very rough seas across the waters north of the front and west
+of the low. Scattered to numerous showers and thunderstorms are
+associated with these features, more concentrated from 22N to 29N
+between 70W and 74W. Abundant tropical moisture will remain in
+place in this area, favoring periods of locally heavy rain over
+parts of eastern Cuba, Hispaniola and the Bahamas during the next
+few days, resulting in localized flooding.
+
+Strong high pressure will remain over the eastern United States
+during the next few days. Winds will diminish below gale-force by
+this evening. However, fresh to strong winds and rough to very
+rough seas in NE swell will persist to the north of the front
+through the workweek and into the upcoming weekend, gradually
+diminishing. Mariners are urged to remain alert to these dangerous
+marine conditions and take the necessary precautions to avoid
+these affected areas.
+
+Please, see the latest NWS High Seas Forecast issued by the
+National Hurricane Center at website
+https:<a href='https://www.nhc.noaa.gov/text/MIAHSFAT2.shtml'>www.nh
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough reaches the Atlantic through the coast of
+Guinea near 11N15W and continues to 10N20W. The ITCZ extends from
+10N20W to 09N40W to northern Guyana near 07.5N60W. Scattered
+moderate convection is noted from 06N to 10N between 30W and 50W,
+and from 08N to 13N between 50W and 60W.
+
+...GULF OF AMERICA...
+
+High pressure over the eastern of the United States extends a
+ridge across the Gulf waters promoting fresh to strong NE winds
+and seas of 5 to 8 ft across the eastern Gulf waters, including
+the Straits of Florida and Yucatan channel. Moderate or weaker
+winds and moderate seas prevail elsewhere.
+
+For the forecast, a tight pressure gradient between a strong
+ridge over the eastern United States and a complex weather system
+over the Bahamas will force fresh to strong NE to E winds and
+rough seas over the E Gulf into Thu. Winds and seas will gradually
+diminish late this week into the weekend. Elsewhere, gentle to
+moderate winds and moderate seas will prevail through the forecast
+period.
+
+...CARIBBEAN SEA...
+
+Showers and thunderstorms are currently affecting Hispaniola and
+the Caribbean adjacent waters as well as western Venezuela,
+including Lake Maracaibo, and northern Colombia. This convective
+activity is ahead of an upper-level trough extending from eastern
+Cuba to the SW Caribbean. A weak 1010 mb low is analyzed over the
+Cayman Islands. Visible <a href='/satellite.php'>satellite imagery</
+swirl of low clouds associated with this low. A surface trough
+extends from the low center to near 12N82W. Moderate to fresh
+northerly winds and seas of 3 to 5 ft are found N of 16N and W of
+the low/trough. Higher seas of 6 to 8 ft are occurring in the
+Yucatan Channel due to fresh to strong NE winds in the SE Gulf of
+America. Elsewhere, mainly moderate E to SE winds and moderate
+seas are seen E of 72W while light to gentle winds and slight seas
+prevail between 72W and 82W.
+
+For the forecast, the surface trough will gradually weaken through
+the middle of the week. Seas up to 8 ft in N to NE swell will contin
+to propagate through the Yucatan Channel into this afternoon. Winds
+and seas will diminish in the W Caribbean Wed. Otherwise, moderate
+to locally fresh trade winds in the E Caribbean will continue over
+the next few days, gradually extending westward this week and into
+the upcoming weekend.
+
+...ATLANTIC OCEAN...
+
+A Gale Warning is in effect for the SW North Atlantic. Please, see
+the Special Features section above for more information.
+
+A stationary front extends from 31N60W to a 1008 mb low pres system
+over the NW Bahamas. The pressure gradient between the front and
+strong high pressure over the eastern of United States continues
+to support a large area of strong to gale-foce winds N of the
+low/front. Fresh to strong N winds and moderate to locally rough
+seas are occurring between the Bahamas and SE Florida. South of
+the front, moderate to fresh southerly winds and rough seas are
+evident west of 65W. Farther east, another stationary front is
+analyzed and extends from 31N30W to 29N40W to 31N45W. Light to
+gentle winds are near the front. Rough seas are found behind this
+boundary. The remainder of the Atlantic forecast area is under the
+influence of a broad subtropical ridge centered NE of the Azores.
+Moderate to locally fresh easterly winds and seas of 4 to 7 ft
+are observed south of 22N. Elsewhere, moderate or weaker winds and
+moderate seas prevail.
+
+For the forecast west of 55W, the portion of the front east of
+62W is expected to move southeastward as a cold front through Thu
+while a stationary front will persist over the waters N of 27N and
+W of 62W. A high pressure center will remain over the SE United
+States during this time. Gale-force winds will diminish by this
+evening. However, fresh to strong winds and rough to very rough
+seas in NE swell will persist to the north of the front through
+the forecast period, gradually diminishing.
+
+$$
+GR

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 20-Oct-26 11:01
+Bid: 5161_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - 81 km S of Sand Point, Alaska
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us6000u3lf
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-20 10:40:40 UTC
+Depth      : 35.0 km
+Coordinates: 54.6088 Lat / -160.3291 Lon
+--------------------------------------------------
+Location:
+  81 km S of Sand Point, Alaska
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3lf
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

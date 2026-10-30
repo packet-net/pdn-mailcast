@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 24-Oct-26 02:51
+Bid: 5600_HP2DFA
+Title: EARTHQUAKE ALERT M7.2 - 200 km W of Sola, Vanuatu
+Path: !VK2RZ!VE3CGR!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M7.2+)       
+==================================================
+Event ID   : attne4d5
+Magnitude  : M 7.2
+Time (UTC) : 2026-10-24 02:31:53 UTC
+Depth      : 10.0 km
+Coordinates: -13.8000 Lat / 165.7000 Lon
+--------------------------------------------------
+Location:
+  200 km W of Sola, Vanuatu
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/attne4d5
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

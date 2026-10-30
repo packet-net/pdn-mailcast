@@ -1,0 +1,68 @@
+From: VA2OM@VA2OM.#TRV.QC.CAN.NOAM
+To: SOLAR
+Type/Status: B$
+Date/Time: 19-Oct 09:16Z
+Bid: 21282_VE2PKT
+Title: Solar and Geomagnetic Activity
+
+Body: 2268
+
+R:261019/0917Z 14963@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261019/0917Z 49401@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261019/0917Z 5342@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261019/0916Z 21282@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+
+ 
+:Product: Weekly Highlights and Forecasts
+:Issued: 2026 Oct 19 0141 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# https://www.swpc.noaa.gov/content/subscription-services
+#
+#                Weekly Highlights and Forecasts
+#
+Highlights of Solar and Geomagnetic Activity
+12 - 18 October 2026
+
+Solar activity reached moderate levels on 16 Oct when Region 4551
+(S15, L=102, class/area=Eki/620 on 15 Oct) produced an M1.3 flare
+(R1-Minor) at 16/1542 UTC, the largest flare of the week. Solar
+activity was at low levels with C-class flare activity throughout
+the remainder of the period. No Earth-directed CMEs were observed. 
+
+No proton events were observed at geosynchronous orbit.
+
+The greater than 2 MeV electron flux at geosynchronous orbit reached
+high levels on 16 Oct, with normal to moderate levels observed
+throughout the remainder of the week. 
+
+The geomagnetic field was at quiet to unsettled levels on 12-15 and
+17 Oct, with active levels observed on 16 Oct, due primarily to
+negative polarity CH HSS influences. Quiet conditions were observed
+on 18 Oct. 
+
+Forecast of Solar and Geomagnetic Activity
+19 October - 14 November 2026
+
+Solar activity is expected to predominately low with M-class flare
+probabilities ranging between a slight chance to a chance throughout
+the outlook period. 
+
+No proton events are expected at geosynchronous orbit.
+
+The greater than 2 MeV electron flux at geosynchronous orbit is
+expected to reach high levels on 23-27 Oct and 01-04 Nov, with
+normal to moderate levels likely the prevail throughout the
+remainder of the period. 
+
+Geomagnetic field activity is likely to reach G1 (Minor) storm
+levels on 19-20 Oct and 31 Oct-01 Nov, with active conditions likely
+on 21 and 24 Oct and 09 Nov, due to CH HSS influences. Quiet and
+quiet to unsettled levels are expected to prevail throughout the
+remainder of the outlook period. 
+  
+ 
+ 73 de VA2OM, SYSOP of VE2PKT
+ 
+
+

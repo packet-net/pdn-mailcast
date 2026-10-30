@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 07:06
+Bid: 6120_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - 205 km SSE of Vilyuchinsk, Russia
+Path: !GB7BED!K1AJD!VE3CGR!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us7000ttmb
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-28 06:12:47 UTC
+Depth      : 10.0 km
+Coordinates: 51.2258 Lat / 159.5373 Lon
+--------------------------------------------------
+Location:
+  205 km SSE of Vilyuchinsk, Russia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttmb
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

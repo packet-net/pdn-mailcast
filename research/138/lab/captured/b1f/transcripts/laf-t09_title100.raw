@@ -1,0 +1,22 @@
+<<<ÿûÿûuser:>>>[[user]]<<<password:>>>[[user]]<<<
+Connected to GB7LAA's Telnet Server
+
+>>>[[C 2 GB7LAF-1]]<<<LAA:GB7LAA} Connected to GB7LAF-1
+[FBB-7.0.11-AB1FHMRX$]
+GB7LAF BBS, QTH IO91WM.
+Hello Lab, you are now on channel 1.
+Here are 16 active messages, 116 is last message and 
+80 is the last you have listed.
+
+Assigned channels:
+Ch. 1    (AXUDP) :  G0LAB-0  - Thu 29/10/26 21:17
+
+(1) GB7LAF BBS (H for help) >
+>>><<<>>>[[SB LABTST @ WW]]<<<Enter the title for this message to LABTST : 
+>>>[[T100 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc]]<<<Enter the text for this message, end with Ctrl-Z or /EX on a blank line) : 
+>>>[[title is 100 chars.]]<<<>>>[[/EX]]<<<Message # 117 is sent @ GB7LAB  Bid: 117_GB7LAF  Size: 20 bytes
+(1) GB7LAF BBS (H for help) >
+>>>
+[[B]]<<<*** Disconnected from Stream 2
+Disconnected from Node - Telnet Session kept
+>>>

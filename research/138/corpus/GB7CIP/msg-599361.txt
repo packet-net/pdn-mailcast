@@ -1,0 +1,92 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 29-Oct-26 17:48
+Bid: 6327_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (29-Oct 12:45Z)
+Path: !GB7BED!DM4RW!HP2DFA!
+
+000
+AXNT20 KNHC 291732
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1815 UTC Thu Oct 29 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_12Z.gif'>1200 UT
+1700 UTC.
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough reaches the Atlantic through the coast of
+Africa near 12N16W and continues to 08N26W. The ITCZ extends from
+08N26W to 08.5N39W, where it is broken by a surface trough. The
+ITCZ then resumes from 08N43W to 08N60W. Scattered moderate
+convection is noted from 05N to 13N between 15W and 36W.
+
+...GULF OF AMERICA...
+
+High pressure over the Tennessee Valley extends a ridge across
+the Gulf. The pressure gradient tightens over the eastern half of
+the Gulf due to the presence of a stationary front N of the
+Bahamas and a trough near the Yucatan Peninsula. This is
+resulting in moderate to fresh NE winds E of 93W along with
+moderate to locally rough seas. Moderate or weaker winds prevail W
+of 93W.
+
+For the forecast, a tight pressure gradient between a high
+pressure system over the Tennessee Valley and troughs over the
+southern Gulf will continue to support moderate to fresh NE to E
+winds and moderate seas in the E Gulf into Mon. Looking ahead,
+expect fresh SE to S winds over much of the eastern Gulf through
+late Mon between high pressure over the western Atlantic and a
+cold front moving through the Southern Plains.
+
+...CARIBBEAN SEA...
+
+The passage of a stationary front over the SW N Atlantic waters is
+supporting a weak gradient over the Caribbean waters W of 76W,
+thus leading to light to gentle winds and slight seas. Moderate to
+fresh trades and moderate seas are elsewhere. A surface trough
+extending from the Windward Passage into the central Caribbean is
+supporting scattered showers and isolated thunderstorms N of 15N
+between 70W and 76W.
+
+For the forecast, moderate to locally fresh trade winds will
+continue south of 15N through the eastern, central and portions of
+the SW Caribbean through Sun night. Light to gentle breezes are
+forecast elsewhere into early next week.
+
+...ATLANTIC OCEAN...
+
+A tight pressure gradient between a high pressure system over the
+NW Atlantic and a stationary front extending across the offshore
+zones N of 27N to a 1012 mb low N of the Bahamas. Fresh to strong
+NE winds and rough seas prevail N of the front and W of 60W.
+Scattered showers and isolated thunderstorms are occurring along
+and N of the front between 50W and 75W, as well as along a pre-
+frontal trough analyzed along 70-71W. The aforementioned
+stationary front connects to a cold front near 29N35W and extends
+NE to 31N30W. Scattered showers and tstms are N of 25N and ahead
+of the front to 23W. Moderate to fresh winds are E of 60W and
+behind the front with seas of 6-8 ft. Otherwise, moderate or
+weaker winds and moderate seas are elsewhere.
+
+For the forecast west of 55W, A stationary front extends east to
+west along roughly 29N to a 1012 mb low pressure area centered
+near the northern Bahamas, then southwestward to the Florida
+Straits. Scattered to numerous tstms are active along a trough
+near 70W north of 22N. Fresh to strong NE to E winds and rough
+seas will persist north of the front into next week as the low
+pressure moves northeastward to past Bermuda and the newly
+reinforced front moves to the southeast then stalls along 24N.
+
+$$
+Adams

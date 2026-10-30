@@ -1,0 +1,39 @@
+From: G8MNY
+To: IBM
+Type/Status: B$
+Date/Time: 24-Oct-26 09:04
+Bid: 8942_GB7CIP
+Title: IBM XT/AT Keyboard connections
+Path: 
+
+5 Pin DIN Looking at Plug Pins      Function
+or Computer socket cons.
+
+           5 3 4                   1 CLOCK
+          2     1                  2 DATA
+                                   3 RESET (not)
+             ^                     4 GND
+                                   5 +VE (e.g. 12V feeding keyboard +5V Reg)
+
+NB. AT & XT keyboard use quite different data code sets, so some early
+keyboards had a switch to change over between these. The encoding is not only
+different per key, but the AT one sends 1 code for key down & another code for
+key release, whereas the XT ones just keep repeating the keydown code.
+------------------------------------------------------------------------------
+PS2 Modifications.
+Fitting a normal DIN on a keyboard cable in place of the PS/2-type connection.
+Which avoids the expense of an adapter.
+
+Keyboard End                 PS/2 DIN connection        5-pin DIN
+looking into the plug          Function
+_ _ _ _ _ _    1 NC            1 Data                    1 Brn
+1 2 3 4 5 6    2 White         2 No Connection           2 Wh
+               3 Black         3 Ground                  3 NC
+               4 Brown         4 5V DC                   4 Bk
+               5 Red           5 Clock                   5 Red
+               6 NC            6 No Connection
+
+
+Why Don't U send an interesting bul?
+
+73 De John, G8MNY @ GB7CIP

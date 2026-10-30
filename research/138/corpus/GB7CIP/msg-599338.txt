@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 29-Oct-26 10:38
+Bid: 6103-CX2SA
+Title: (M5.1) Andaman Islands, India region 13.4 91.7
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Andaman Islands, India region
+Geographic coordinates:           13.379N,  91.659E
+Magnitude:                        5.1
+Depth:                            10 km
+Universal Time (UTC):             29 Oct 2026  08:49:42
+Time near the Epicenter (1):      29 Oct 2026  14:49:42
+Time in your area (1):            29 Oct 2026  05:49:42
+Location with respect to nearby cities:
+218.4 km (135.4 mi) NNW of Bamboo Flat, India
+223.3 km (138.4 mi) NNW of Port Blair, India
+500.7 km (310.4 mi) SW of Pathein, Burma (Myanmar)
+510.5 km (316.5 mi) SW of Mawlamyinegyunn, Burma (Myanmar)
+515.7 km (319.7 mi) SW of Bogale, Burma (Myanmar)
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000tty7
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000tty7?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 29/10/2026 10:37:43 UTC
+________________________________________________________________

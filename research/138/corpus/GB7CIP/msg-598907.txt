@@ -1,0 +1,34 @@
+From: LA3RIA
+To: WX
+Type/Status: B$
+Date/Time: 25-Oct-26 13:08
+Bid: 410366LA3RIA
+Title: WX REPORT
+Path: !GB7COW!
+
+From: LA3RIA@GB7COW.#44.GBR.EU
+To  : WX@WW
+
+
+FROM: LA3RIA@GB7COW.#44.GBR.EURO
+TO  : WX@WW
+
+13:56 25.10.2026
+
+Temperature & Weather
+Weather 	Light rain
+Temperature 	7 °C
+Dewpoint 	5 °C
+Rel. humidity 	87%
+Wind chill 	2 °C
+Kp-index 	0 (0-9)
+Today the sun rises at 07:20 and sets at 16:38. This applies to
+Oslo-Gardermoen 
+
+
+
+
+73 - MUSHTAQ, LA3RIA @ GB7COW
+
+Message timed: 14:05 on 2026-Oct-25
+Message sent using WinPack-Telnet V6.80

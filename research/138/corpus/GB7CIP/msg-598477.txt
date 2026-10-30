@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 21-Oct-26 08:57
+Bid: 5817-CX2SA
+Title: (M5.2) Philippine Islands region 13.0 125.6
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Philippine Islands region
+Geographic coordinates:           13.030N, 125.590E
+Magnitude:                        5.2
+Depth:                            10 km
+Universal Time (UTC):             21 Oct 2026  08:37:41
+Time near the Epicenter (1):      21 Oct 2026  16:37:41
+Time in your area (1):            21 Oct 2026  05:37:41
+Location with respect to nearby cities:
+69.0 km (42.8 mi) NE of Cabatuan, Philippines
+80.6 km (50.0 mi) NE of Laoang, Philippines
+88.4 km (54.8 mi) NE of Pambujan, Philippines
+118.9 km (73.7 mi) ENE of Catarman, Philippines
+352.7 km (218.7 mi) NNE of Cebu City, Philippines
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3t6
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3t6?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 21/10/2026 08:56:14 UTC
+________________________________________________________________

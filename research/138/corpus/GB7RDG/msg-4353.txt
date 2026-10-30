@@ -1,0 +1,47 @@
+From: G8MNY
+To: IBM
+Type/Status: B$
+Date/Time: 24-Oct 09:02Z
+Bid: 8941_GB7CIP
+Title: ISA I/O card pin out..
+
+R:261024/0902Z @:GB7CIP.#32.GBR.EURO #:8941 [Caterham Surrey GBR] $:8941_GB7CIP
+
+From: G8MNY@GB7CIP.#32.GBR.EURO
+To  : IBM@WW
+
+From Harry M1BYT @ GB7FCR.#16.GBR.EU
+
+Stand peering in at an empty 8 Bit ISA card slot on a motherboard, via the gap
+where the metal bracket goes on the case......
+
++++++++++
+I       I Ground
+I       I Clock Osc.
+I       I +5V           
+Several pins
+missed out
+in the middle
+I       I Ground
+I       I +12V
+I       I Card SelectD
+I       I -12v
+I       I DRQ 2
+I       I -5V
+I       I IRQ2
+I       I +5V
+I       I Reset DRV
+I       I Ground
++++++++++
+Metal End Bracket
+
+You should be able to confirm you are looking at it the right way, by looking
+at the power supply rails on any ISA card. These will likely be thicker than
+the data & other tracks leading to the card edge connector.
+
+
+Why Don't U send an Interesting Bul?>
+
+73 de John G8MNY @ GB7CIP
+
+

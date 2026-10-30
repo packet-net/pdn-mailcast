@@ -1,0 +1,29 @@
+<<<ÿûÿûuser:>>>[[user]]<<<password:>>>[[user]]<<<
+Connected to GB7LAA's Telnet Server
+
+>>>[[C 2 GB7LAF-1]]<<<LAA:GB7LAA} Connected to GB7LAF-1
+[FBB-7.0.11-AB1FHMRX$]
+GB7LAF BBS, QTH IO91WM.
+Hello Lab, you are now on channel 1.
+Here are 17 active messages, 117 is last message and 
+80 is the last you have listed.
+
+Assigned channels:
+Ch. 1    (AXUDP) :  G0LAB-0  - Thu 29/10/26 22:11
+Ch. 4    (AXUDP) : GB7LAA-1  - Thu 29/10/26 22:00
+
+(2) GB7LAF BBS (H for help) >
+>>><<<>>>[[SB LABTST @ WW]]<<<Enter the title for this message to LABTST : 
+>>>[[lab t19_gt_from_and_misc]]<<<Enter the text for this message, end with Ctrl-Z or /EX on a blank line) : 
+>>>[[>From already escaped]][[~ tilde line]][[/EX-ish line: /EXIT]][[# hash]][[end.]]<<<Message # 118 is sent @ GB7LAB  Bid: 118_GB7LAF  Size: 35 bytes
+(2) GB7LAF BBS (H for help) >
+Software F6FBB V7.0.11 (Linux) - 18 active messages - Last message is #118
+(2) GB7LAF BBS (H for help) >
+*** Error : [END.] is not a valid command.
+(2) GB7LAF BBS (H for help) >
+>>>[[/EX]]<<<>>><<<*** Error : Your answer is incorrect.
+(2) GB7LAF BBS (H for help) >
+>>>
+[[B]]<<<*** Disconnected from Stream 2
+Disconnected from Node - Telnet Session kept
+>>>

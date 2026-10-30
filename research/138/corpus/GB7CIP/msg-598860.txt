@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 02:45
+Bid: 5741_HP2DFA
+Title: EARTHQUAKE ALERT M6.5 - Bonin Islands, Japan region
+Path: !SR1BSZ!EA2RCF!LU9DCE!VE3CGR!VE2PKT!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M6.5+)       
+==================================================
+Event ID   : us6000u4r9
+Magnitude  : M 6.5
+Time (UTC) : 2026-10-25 02:09:23 UTC
+Depth      : 492.4 km
+Coordinates: 27.7953 Lat / 139.6184 Lon
+--------------------------------------------------
+Location:
+  Bonin Islands, Japan region
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4r9
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

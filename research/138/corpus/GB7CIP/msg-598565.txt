@@ -1,0 +1,34 @@
+From: HP2DFA
+To: INFO
+Type/Status: B$
+Date/Time: 22-Oct-26 02:35
+Bid: 5360_HP2DFA
+Title: TOP 10 WORLDWIDE EARTHQUAKES (24H 22-Oct)
+Path: !GB7BED!K1AJD!LU9DCE!PY2BIL!HP2DFA!
+
+======================================================================
+     WORLDWIDE SEISMIC REPORT - TOP 10 LARGEST EARTHQUAKES (24H)
+             AX.25 DATA NETWORK / ROUTE: INFO@WW
+======================================================================
+Capture Date: 22-Oct-2026 02:30 UTC
+Source: USGS Earthquake Hazards Program (earthquake.usgs.gov)
+----------------------------------------------------------------------
+
+TOP 10 EARTHQUAKES WORLDWIDE (LAST 24 HOURS UTC):
+MAG    LOCATION / REGION                      DEPTH     TIME (UTC)
+----------------------------------------------------------------------
+M 5.3  Reykjanes Ridge                       10 km        21:38 UTC
+M 5.2  68 km NE of Cabatuan, Philippines     10 km        08:37 UTC
+M 5.1  south of Africa                       10 km        18:12 UTC
+M 5.1  164 km NE of Lospalos, Timor Leste    122 km       07:44 UTC
+M 5.0  Reykjanes Ridge                       10 km        21:58 UTC
+M 5.0  Reykjanes Ridge                       10 km        19:06 UTC
+M 5.0  198 km WNW of Port-Olry, Vanuatu      10 km        18:41 UTC
+M 5.0  194 km WNW of Port-Olry, Vanuatu      10 km        14:56 UTC
+M 4.9  68 km NNW of Khorixas, Namibia        10 km        20:34 UTC
+M 4.9  208 km WNW of Port-Olry, Vanuatu      10 km        15:22 UTC
+
+======================================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 PANAMA NODE
+======================================================================

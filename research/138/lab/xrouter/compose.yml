@@ -1,0 +1,24 @@
+# Lab: GB7LAA (LinBPQ) -> GB7LAX (XRouter PMS, PMSTYPE=4) -> GB7LAB (LinBPQ), AXUDP on a bridge.
+name: lab138x
+networks:
+  lab:
+    ipam:
+      config: [{subnet: 172.32.0.0/24, gateway: 172.32.0.1}]
+services:
+  laa:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.32.0.11}}
+    ports: ["127.0.0.1:18010:8010"]
+    volumes: ["./state/laa:/data"]
+  lab:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.32.0.12}}
+    ports: ["127.0.0.1:28010:8010"]
+    volumes: ["./state/lab:/data"]
+  lax:
+    image: ghcr.io/packethacking/xrouter:505p-amd64
+    networks: {lab: {ipv4_address: 172.32.0.13}}
+    ports: ["127.0.0.1:18024:23"]
+    volumes: ["./state/lax:/data"]

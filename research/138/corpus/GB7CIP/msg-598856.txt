@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 02:16
+Bid: 5740_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - 166 km WNW of Port-Olry, Vanuatu
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us6000u4r3
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-25 01:46:23 UTC
+Depth      : 10.0 km
+Coordinates: -14.3846 Lat / 165.6863 Lon
+--------------------------------------------------
+Location:
+  166 km WNW of Port-Olry, Vanuatu
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4r3
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

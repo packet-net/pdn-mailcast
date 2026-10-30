@@ -1,0 +1,14 @@
+34 BF G0LAB 1793327019 LABTST@WW AE3FFAB34LAX &:G0LAB
+lab t19_gt_from_and_misc
+R:261030/0223Z @:GB7LAX.#99.GBR.EURO [] #:34 XrLin505p
+Date: Fri, 30 Oct 2026 02:23:40 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t19_gt_from_and_misc
+Message-ID: <AE3FFAB34LAX>
+
+>From already escaped
+~ tilde line
+/EX-ish line: /EXIT
+# hash
+end.

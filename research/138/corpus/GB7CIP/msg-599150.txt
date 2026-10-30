@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6045-CX2SA
+Title: (M5.2) Mindanao, Philippines 5.6 125.3
+Path: !GB7COW!GB7BED!K1AJD!VE3CGR!PI8ZTM!CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Mindanao, Philippines
+Geographic coordinates:           5.608N, 125.305E
+Magnitude:                        5.2
+Depth:                            45 km
+Universal Time (UTC):             28 Oct 2026  01:11:55
+Time near the Epicenter (1):      28 Oct 2026  09:11:55
+Time in your area (1):            27 Oct 2026  22:11:55
+Location with respect to nearby cities:
+6.6 km (4.1 mi) NW of Balangonan, Philippines
+26.5 km (16.4 mi) SSE of Glan, Philippines
+40.0 km (24.8 mi) S of Malapatan, Philippines
+47.6 km (29.5 mi) S of Lun PequeÃ±o, Philippines
+111.2 km (69.0 mi) SSE of Koronadal, Philippines
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttlc
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttlc?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 28/10/2026 01:35:41 UTC
+________________________________________________________________

@@ -1,0 +1,176 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 19-Oct-26 07:56
+Bid: 8472_GB7CIP
+Title: 2nd Car Battery for /M & /P
+Path: 
+
+By G8MNY                                         (Updated Apr 08)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Here are 4 options to consider when adding a 2nd battery for /M or /P work etc.
+N.B. steering diodes for charging is not usable due to the voltage losses,
+unless you use 15V alternators!
+
+
+1/ NON SWITCHED SYSTEM
+                 300A start wire (e.g. 60A mains tails)
+   ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+ Start      ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¶
+ Relay      ³50A wire                         ÌÍÍÍÍÍÍ» Fuses
+   º        ³        ign   ign   Fuse   50A   º      ÇÄoÄoÄÄ> Rig
+   º        ³ ÚÄÄÄÄÄÄÄ0ÄÄÄÄo\ÄÄÄÄoÄoÄÄÄÄÄÄÄÄÄÄ¶      ÇÄoÄoÄÄ> PAs
+Starter  Alternator  lamp   sw   Box   Wire ÄÄÐÄÄ  ÄÄÐÄÄ
+   ³        ³                                °°°    °°° 2nd Start
+   ÀÄÄÄÄÄÄÄÄÁÄÄÍÍÍÍÍÍÍÍÍÍ»             Start  º      º  Battery
+     Engine     Earth   _º_          Battery _º_    _º_ 30AH
+     Earth      Strap  ////            30AH ////   ////
+                          Chassis Earths
+
+There is a problem when joining batteries, as the start battery voltage drops
+to 10V or less on starting, any paralleled battery and wiring must be capable
+of the start currents, if left connected during starting. Indeed there is some
+merit in just going for a cheap identical start battery as a 2nd battery...
+
+Advantages:-
+a) Easy to replace/swap start battery as they age
+b) Doubles discharge capacity
+c) Aids starting, so both batteries can be run flatter and they will start OK
+d) Shared starting current gives much longer battery life
+e) Simple no switching
+f) Second start type battery more easily charged from alternator than a deep
+   cycle one.
+
+Disadvantages:-
+g) Leaving a small load on the system will eventually exhaust both batteries!
+h) Thick paralleling unfused lead needed
+i) Battery failure detection a problem
+
+
+2/ CHARGING SWITCHED SYSTEM
+                      300A start wire
+   ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»      charge
+ Start    ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¶ 30A  relay
+ Relay    ³50A wire            ign  ign                ÇÄoÄoÄÄo\Ä¿ Fuses
+   º      ³                    lamp  sw   Fuse  50A    º Fuse    ÃÄoÄoÄÄ> Rig
+   º      ³ ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄ0ÄÄÄÄo\ÄÄÄÄoÄoÄÄÄÄÄÄÄÄÄ¶         ÃÄoÄoÄÄ> PAs
+Starter Alternator       ÚÄÄÄÄÁÄÄÄÄÄÄÄ¿   Box  Wire  ÄÄÐÄÄ     ÄÄÁÄÄ
+   ³      ³              ³charge relay³               °°°       °°° Aux
+   ÀÄÄÄÄÄÄÁÄÄÍÍÍÍÍÍÍÍÍÍ» ÀÄÄÄÄÂÄÄÄÄÄÄÄÙ         Start  º         ³  Battery
+     Engine   Earth   _º_    _³_              Battery _º_       _³_ 110AH
+     Earth    Strap  ////   ////                30AH ////      ////
+                         Chassis Earths
+
+This system needs a method to operate the charge relay only when the battery is
+being charged. Using the above circuit the alternator function needs to be
+checked to see if relay affects the exciting action (it should not).
+
+Advantages:-
+a) No high starting currents over charging lead
+b) Thinner paralleling charging lead
+c) Paralleling lead can be fused
+d) Large Deep Cycle Aux battery shown here
+e) Relay only operated once per engine start cycle
+
+Disadvantages:-
+f/ Electronic Control box may be needed if the relay upsets Alternator
+g/ No starting aid, but jumper starting possible if leads are thick enough
+h/ Deep cycle Aux battery will be difficult to charge up with long thin lead
+   and may need proper long refreshing charges to maintain fully charge.
+
+
+3/ VOLTAGE SWITCHED SYSTEM
+                      300A start wire
+   ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»            voltage
+ Start     ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¶ 30A         relay
+ Relay     ³50A wire                          ÇÄo-oÄÄÄÄÂÄÄÄÄÄo\Ä¿ Fuses
+   º       ³          ign  ign   Fuse  50A    º Fuse   ³        ÃÄoÄoÄÄ> Rig
+   º       ³ ÚÄÄÄÄÄÄÄÄÄ0ÄÄÄÄo\ÄÄÄÄo-oÄÄÄÄÄÄÄÄÄ¶    ÚÄÄÄÁÄÄÄ¿    ÃÄoÄoÄÄ> PAs
+Starter Alternator   lamp   sw   Box   Wire ÄÄÐÄÄ  ³Voltage³  ÄÄÁÄÄ
+   ³       ³                                 °°°   ³ Relay ³   °°° Aux
+   ÀÄÄÄÄÄÄÄÁÄÄÍÍÍÍÍÍÍÍÍÍ»              Start  º    ÀÄÄÄÂÄÄÄÙ    ³  Battery
+     Engine    Earth   _º_           Battery _º_      _³_      _³_ 100AH
+     Earth     Strap  ////             30AH ////     ////     ////
+                          Chassis Earths
+
+The relay here has an electronic voltage detector that operates it when the 1st
+battery is @ 13V and also releases it below 13V! e.g. there must be no
+hysteresis.
+
+Advantages:-
+a) Very simple to connect
+b) No high starting currents over charging lead
+c) Thinner paralleling charging lead can be fused
+d) Deep Cycle Aux battery
+
+Disadvantages:-
+e) Electronic Control box is needed to drive relay, with special attention to
+   the problem of relay oscillation when the Aux battery is connected.
+f) No starting aid, but jumper starting possible if leads thick enough.
+g) Deep cycle Aux battery can be difficult to charge up on long thin lead and
+   may need proper long refreshing charges to maintain full charge.
+h) Relay prone to pitting as it will often be switching current.
+
+
+4/ IGNITION SWITCHED SYSTEM
+                       300A start wire (e.g. 60A mains tails)
+   ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»  Ign on
+ Start      ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¶  Relay
+ Relay      ³50A wire                                  ÌÍÍÍo\Í» Fuses
+   º        ³        ign           ign   Fuse   50A    º      ÇÄo-oÄÄ> Rig
+   º        ³ ÚÄÄÄÄÄÄÄ0ÄÄÄÄÄÄÄÄÂÄÄÄÄo\ÄÄÄÄo-oÄÄÄÄÄÄÄÄÄÄ¶      ÇÄo-oÄÄ> PAs
+Starter  Alternator  lamp   ÚÄÄÁÄÄ¿ sw    Box   Wire ÄÄÐÄÄ  ÄÄÐÄÄ
+   ³        ³               ³relay³                   °°°    °°°
+   ÀÄÄÄÄÄÄÄÄÁÄÄÍÍÍÍÍÍÍÍÍÍ»  ÀÄÄÂÄÄÙ             Start  º      º  Aux
+     Engine     Earth   _º_   _³_                 Bat _º_    _º_ Bat
+     Earth      Strap  ////  ////               30AH ////   //// 110AH
+                       Chassis Earths
+
+This system has some of the advantages of the above ones:-
+
+Advantages:-
+a) Aids starting, so both batteries can be run flatter and still start.
+b) Shared starting gives longer start battery life.
+c) Fairly simple high current contactor switching.
+d) Second battery slightly easier to charge from alternator (less lead loss)
+e) Large capacity deep cycle aux battery can still aid starting OK.
+
+Disadvantages:-
+f) Thick paralleling unfused lead.
+g) High current contactor type relay needed (200A peak rated)
+h) Start battery failure detection a slight problem.
+
+REFRESH CHARGING
+With the switched battery systems if the vehicle is not used a lot, and if the
+second battery is a deep cycle type, then occasional charging with a regulated
+mains charger for at least 24 hours is recommended to keep the batteries tip
+top. Check acid specific gravity with a battery hydrometer to see condition of
+the batteries.
+
+SAFETY
+a) Make sure the battery polarity is correct!
+b) Disconnect battery earth first to make +ve connections, as this is safer if
+   using spanners in confined areas where they are liable to short out.
+   Reprogram car radio e.g. make sure U have security Numbers before you start!
+   The same goes for some type of engine management systems, read handbook.
+c) For your garage, put a sign by the car battery that there is a 2nd battery!
+d) Use short runs of suitable gauge wire, remember @ 12V volts are easily lost.
+e) Protect wire though bulkheads from chafing damage with suitable grommets.
+f) Use suitable fuses. (no nails/ally foil).
+g) Make sure 2nd battery fastenings are secure (e.g. in case of accident).
+h) Be aware of explosive hydrogen build up on batteries, always "BLOW AWAY"
+   gases before risk of sparks from connecting leads & crock clips etc!
+i) Acid makes holes in clothes, wash any splashes immediately. In eyes wash
+   immediately and seek medical help.
+j) 12V Electrical fires are best stopped with a pair of cutters!
+k) Molten copper is HOT and stays hot. Use water on red hot leads.
+l) Use RCDs protected mains on outdoor leads for charging/soldering etc.
+m) Take extra precaution if gas soldering leads/connectors on/near vehicles!
+o) If you are wiring -ve directly to battery then fusing the -ve to rig
+   protects against faulty battery earth straps!
+
+
+Why Don't U send an Interesting bul?
+
+73 De John, G8MNY @ GB7CIP

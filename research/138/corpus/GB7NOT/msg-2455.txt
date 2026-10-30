@@ -1,0 +1,63 @@
+From: VA2OM
+To: SOLAR
+Type/Status: BN
+Date/Time: 26-Oct 09:16Z
+Bid: 22058_VE2PKT
+Title: Latest solar radio flux report
+
+R:261026/1052Z 4427@GB7RDG.#42.GBR.EURO LinBPQ6.0.26
+R:261026/0917Z 15227@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261026/0916Z 20494@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261026/0916Z 39123@N2MH4.#SENC.NC.USA.NOAM LinBPQ6.0.24
+R:261026/0916z @:N2MH.#NNJ.NJ.USA.NOAM [via AREDN Mesh] jnos 2.0p $:22058_VE2PKT
+R:261026/0916Z 22058@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+
+ 
+:Product: 27-day Space Weather Outlook Table 27DO.txt
+:Issued: 2026 Oct 26 0118 UTC
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# https://www.swpc.noaa.gov/content/subscription-services
+#
+#      27-day Space Weather Outlook Table
+#                Issued 2026-10-26
+#
+#   UTC      Radio Flux   Planetary   Largest
+#  Date       10.7 cm      A Index    Kp Index
+2026 Oct 26      88           5          2
+2026 Oct 27      84           5          2
+2026 Oct 28      84           5          2
+2026 Oct 29      84           5          2
+2026 Oct 30      84           5          2
+2026 Oct 31      84          30          5
+2026 Nov 01      84          20          4
+2026 Nov 02      82          10          3
+2026 Nov 03      82           5          2
+2026 Nov 04      82           5          2
+2026 Nov 05      82          10          3
+2026 Nov 06      82          10          3
+2026 Nov 07      82          10          3
+2026 Nov 08      84           5          2
+2026 Nov 09      84          15          4
+2026 Nov 10      82          10          3
+2026 Nov 11      82          10          3
+2026 Nov 12      80          10          3
+2026 Nov 13      80           5          2
+2026 Nov 14      80           5          2
+2026 Nov 15      80           5          2
+2026 Nov 16      80          10          3
+2026 Nov 17      80          20          4
+2026 Nov 18      80          20          4
+2026 Nov 19      80          10          3
+2026 Nov 20      80           5          2
+2026 Nov 21      80           5          2
+
+ 
+ 
+ 73 de VA2OM, SYSOP of VE2PKT 
+ 
+
+
+
+
+

@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 24-Oct-26 21:16
+Bid: 5925-CX2SA
+Title: (M5.3) off the east coast of the Kamchatka Peninsula, Russia
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           off the east coast of the Kamchatka Peninsula, Russia
+Geographic coordinates:           52.157N, 159.196E
+Magnitude:                        5.3
+Depth:                            70 km
+Universal Time (UTC):             24 Oct 2026  20:35:05
+Time near the Epicenter (1):      25 Oct 2026  08:35:05
+Time in your area (1):            24 Oct 2026  17:35:05
+Location with respect to nearby cities:
+101.6 km (63.0 mi) SSE of Vilyuchinsk, Russia
+108.1 km (67.0 mi) SSE of Petropavlovsk-Kamchatsky, Russia
+127.4 km (79.0 mi) SSE of Yelizovo, Russia
+475.7 km (295.0 mi) SSW of Klyuchi, Russia
+976.3 km (605.3 mi) SSE of Magadan, Russia
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u4pa
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4pa?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 24/10/2026 21:15:05 UTC
+________________________________________________________________

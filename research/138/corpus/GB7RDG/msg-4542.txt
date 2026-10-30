@@ -1,0 +1,52 @@
+From: IW2OHX@IW2OHX.ILOM.ITA.EU
+To: BBS
+Type/Status: B$
+Date/Time: 29-Oct 18:49Z
+Bid: 19_IW2OHX
+Title: IW2OHX BBS: new forwarding partners and routes
+
+Body: 1550
+
+R:261029/1850Z 15374@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261029/1849Z 20759@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261029/1849Z 6141@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261029/1849Z 6777@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261029/1849Z 47248@WG0A.#MSP.MN.USA.NOAM LinBPQ6.0.26
+R:261029/1849Z 22030@N3HYM.#FRDK.MD.USA.NOAM BPQ6.0.25
+R:261029/1849Z 19@IW2OHX.ILOM.ITA.EU BPQ6.0.25
+
+
+Hello all,
+
+IW2OHX BBS (IW2OHX.ILOM.ITA.EU, Bollate/Milano, JN45) has updated its
+mail forwarding. New AX.25/AXUDP partners in Italy have joined, and the
+personal mail routing has been reorganised.
+
+PERSONAL MAIL - where IW2OHX sends it
+  Italy, by region:
+    ILOM -> IU2EUG    IUMB -> IW0QMN    IEMR -> IU4JRU
+    ILIG -> IR1UAW    ITOS -> IK5NJM    IMAR -> IW6CAE
+    all other ITA regions and @ITA.EU -> IW0QMN
+  Europe, by country:
+    GBR -> GB7CIP     NLD -> PI8LAP     FRA -> F3KT
+    CZE -> OK0PBR     UKR -> UT1HZM     IRL -> EI2GYB
+    SRB -> YU7BPQ     DEU -> DK0WUE
+    all other European countries -> GB7CIP
+  North America (NOAM) -> N3HYM
+  Asia, Africa, South America, Oceania -> GB7CIP
+
+BULLETINS
+  @WW and @EU   flooded to all partners
+  @ITA          now flooded to all Italian partners (IW0QMN, IW6CAE,
+                IR1UAW, IK5NJM, IU4JRU, IU7DTL, IK7IJR, IU2EUG)
+  @ALLUS @ARRL @AMSAT -> N3HYM
+
+Sysops forwarding to us: for Lombardy (ILOM) and the rest of Italy
+please route via IW2OHX.ILOM.ITA.EU.
+
+Corrections, or a request for a new forwarding link:
+SP IW2OHX @ IW2OHX.ILOM.ITA.EU
+
+73 de Marco, IW2OHX
+
+

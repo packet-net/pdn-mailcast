@@ -1,0 +1,115 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 28-Oct-26 09:20
+Bid: 9357_GB7CIP
+Title: Calibrating Frequency
+Path: 
+
+By G8MNY                                      (Updated Jun 20)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+HF
+For broadband Rx it is fairly straight forward, you just select a standard
+frequency station at say 5 10 or 15MHz can be heard (weak at times) and adjust
+the dial tuning to read that frequency, then adjust a calibrate control
+(internal) until a zero beat is heard or estimated in SSB mode. Sometimes a
+known offset such as 1kHz is needed, then you can compare LSB & USB and adjust
+for the same pitch. Other HF broadcast stations can be used, but they are not
+all so accurate. For more accurate work calibration of a HF Tx harmonic against
+a VHF beacon can be used, see below.
+
+VHF
+The accuracy becomes more important for some modes and the same procedure can
+be done with a good beacon. The rebuilt UK 2M beacon GB3VHF starts its 60th
+year of operation in located at Fairseat on the North Downs in Kent, the beacon
+is on 144.430MHz at a height of 205m ASL. See www.gb3vhf.co.uk. It is typically
+only ñ 1 Hz error off air, as it is locked to GPS satellite reference, this
+could easily be more than 100x better than your frequency counter! It Tx 17
+seconds of blank carrier every 2 mins, enough to zero beat to 1 Hz by ear
+(allowing for VHF flutter).
+
+144.430000 \³/ ÚÄÄÄÄÄÄÄÄÄÄ¿    ÚÄÄÄÄÄÄÄÄÄ¿
+      MHz   ³  ³ VHF  SSB ³ AF ³Frequency³
+            ÀÄÄ´144.429 RxÃÄÄÄÄ´ Counter ³   
+               ÀÄÄÄÄÄÄÄÄÄÄÙ    ÀÄÄÄÄÄÄÄÄÄÙ
+              Rx Calibrated to give 1kHz
+
+COUNTER CALIBRATION
+Many hams use a frequency counter for setting up/checking rig frequencies. Here
+is a method of transfuring the high calibration accuracy of a beacon like
+GB3VHF to a frequency counter.
+
+Ref Signal
+   2m                   Stray Tx
+  \³/                      \³/
+ÚÄÄÁÄÄ¿        ÚÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄ¿   RF    ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+³ VHF ³        ³  VHF  ÃÄ´DUMMY³ pick up ³   FREQ COUNTER   ³
+³ Rx  ³        ³ CW Tx ³ ³LOAD ÃÄÄÄÄÄÄÄÄÄ´ BEING CALIBRATED ³
+ÀÄÄÂÄÄÙ        ÀÄÄÄÄÄÄÄÙ ÀÄÄÄÄÄÙ        /ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+   | AF       [or a good Sig gen]      | for AF Note
+   À - - - - - - - - - - - - - - - - - Ù frequency
+
+This assumes you have access to a Rx (ideally AM mode, but FM/CW/SSB will do)
+that can Rx the beacon. And a CW Tx or a harmonic of one!
+
+This is a 2 step method, so if the Rx is always running the error in the middle
+CW Tx kit can be monitored and kept to a minimum.
+
+  STEP1
+1/ Adjust the stray signal emission if you can to be a similar strength to the
+   beacon.
+
+2/ Adjust the CW Tx to zero beat with the beacon, or if not, to a known
+   measured AF beat note high or low off the beacon.
+
+  STEP2
+3/ With the counter now measuring the CW Tx, adjust the counter's cal trimmer
+   to read either the beacon frequency or the beacon +/- AF offset. If using a
+   harmonic of a CW Tx, do the maths to calculate the true Tx frequency &
+   calibrate the counter to read that.
+
+EXAMPLE
+Using say a 28MHz 1kHz step synth Rig as the CW Tx that the 5th harmonic can't
+be zero beated on the 144.430MHz beacon....
+
+Ref Signal
+2m 144.430              Stray Tx x5
+   \³/                    144.43
+ÚÄÄÄÁÄÄÄ¿      ÚÄÄÄÄÄÄÄÄ¿ ÚÄÄÄÄÄ¿   RF    ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+³ VHF Rx³      ³ 10m HF ÃÄ´DUMMY³ pick up ³   FREQ COUNTER   ³
+³ AM/FM ³      ³ CW Tx  ³ ³LOAD ÃÄÄÄÄÄÄÄÄÄ´ BEING CALIBRATED ³
+ÀÄÄÄÂÄÄÄÙ      ³ 28.886 ³ ÀÄÄÄÄÄÙ        /ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
+    | AF       ÀÄÄÄÄÄÄÄÄÙ               |  AF Note frequency
+    À - - - - - - - - - - - - - - - - - Ù  say + 450Hz.
+
+ A/ Determin if the beat note is due to Tx being too high or too low, by tuning
+    the Tx higher does the beat note increase, the Tx is high, if it lowers in
+    pitch Tx is lower than beacon.
+
+ B/ Measure the beat note on the counter, say it is + 450Hz
+
+ C/ Calculate actual Tx frequency, 28.886 +(450/5) = 28,886,090Hz
+
+ D/ Measure the Tx freq on counter & adjust it's trimmer to read 28.886090 MHz
+
+ E/ Recheck the beat frequency has not altered. Repeat if it has.
+ 
+DRIFT
+Without a PLL to an external reference most crystal controlled equipment is
+only about ñ 10ppm over a modest temperature range or long term. Temperature
+compensated oscillators are better, where temperature variation on other
+components is allowed to compensate for the crystal oscillator temperature
+drift. Short term improvements of 5x are possible (ñ 2 ppm). Some kit may even
+have a crystal oven to eliminate temperature drift altogether, these give quite
+a noticeable warm up delay, & consume power, but drift can easily be 10x - 100x
+better than an uncompensated crystal oscillator.
+
+See my related buls on "Crystal Drift Compensation", "Simple Crystal Oven",
+"198kHz Off Air Standard", "Off air lock for ref osc" "Comparing Off Air Freq
+Standards" & "Marconi Counter Type 2432A". 
+
+
+Why don't U send an interesting bul?
+
+73 de John, G8MNY @ GB7CIP

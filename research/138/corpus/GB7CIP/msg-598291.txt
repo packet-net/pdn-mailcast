@@ -1,0 +1,266 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 19-Oct-26 06:51
+Bid: 8467_GB7CIP
+Title: BHI Noise Eliminating DSP LS
+Path: 
+
+By G8MNY                             (Updated Aug 23)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+A few years ago I bought several of these BHI NES LS, after reading the Dec
+2002 Radcom Article by G4HCL, and hearing one actually demonstrated at a rally.
+The demo is what really sold it to me. I also went to a ham club where 1 of the
+3 man company, gave a talk on it's development and the trials and tribulations
+of getting the product out. It was interesting to learn that the dedicated IC
+used was designed for noise elimination on fitted car phone microphones and not
+on Rx noise, and it has now gone out of production in favour of an improved IC.
+
+The units have quite amazing performance, compared to other DSP types, don't be
+fooled by the little amplified speaker box and it's relatively high cost, it
+really is the state of the art surface mount 64 pin Digital Signal Processing
+noise reduction unit running at 16MHz. Other models and PCB rig upgrades not
+tested by me, but I assume they are much the same and based on the same IC.
+
+        On Off    Volume
+          n         n                        n          n
+    /~~~~~~~~~~~~~~~~~~~~~\            /~~~~~~~~~~~~~~~~~~~~~\
+   ³                   LED ³       Ext³                       ³
+Ú¿ ³                       ³ Ú¿     LS³        Level      DC  ³
+³³³³     Loud Speaker      ³³³³       ³ I/P     DIL       (ù) ³
+ÀÙ³³                       ³³ÀÙ       ³ Lead o  """"          ³
+  ³³                       ³³         ³                       ³
+  ³ \_____________________/ ³          \_____________________/
+  ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ                    REAR
+
+It has 8 levels of noise reduction set up on the rear DIL switch, as well as
+an input volume control (does same as Rig Volume!) and a noise reduction on/off
+switch that also lights a red/green LED visible through the speaker grill. The
+unit is powered by the usual 2.3mm DC connector (+ in the middle) and it has a
+series idiot diode for protection as well as a 12V regulator. In the OFF mode
+the unit is just an amplified speaker, with the time delay, frequency response
+and input impedance seen below. In the ON mode there is software AGC as well as
+the effective noise and tone eliminating function.
+
+Here are some performance figures I measured from my one...
+  AUTOMATIC NOISE & TONE REDUCTION
+   DIL        SSB        1kHz
+ SETTING     NOISE *     TONE         COMMENTS 
+   1 Min      9 dB       4 dB  Best no DSP artefacts setting
+   2         11 dB       5 dB
+   3         12 dB       6 dB  Best all round SSB setting
+   4         13 dB       8 dB
+   5         16 dB      16 dB
+   6         19 dB      21 dB
+   7         24 dB      25 dB
+   8 Max     33 dB      65 dB  Hi artefacts, no squelch needed mode.
+
+* Noise & Tones was measured on a flat averaging analogue meter.
+
+As with all DSPs, as the wanted Signal gets close to the noise level in its
+narrow digital samples the unit makes more errors trying to remove the noise.
+  
+At setting 8 MAX there is no need to use a SQUELCH on FM, in fact a chopping
+squelch is unhelpful as the DSP retraining time for the noise change causes
+the noise to jumps on and fade off. The only problem using it at max under
+noisy conditions, is knowing when an over has occurred as you are left with
+almost silence, just the DSP remnants musical tones peaking at -33dB.
+
+FREQUENCY RESPONSE (external Hi Z connections) 25Hz - 4.5KHz @ -3dB. Which
+makes it quite acceptable for non HiFi Broadcast Radio signals. A bigger
+external LS is needed to hear any bass!
+
+INPUT IMPEDANCE is 10k Ohms. (20k on cheaper model)
+
+TIME DELAY was 27mS, which I guess is the time to go from Analogue to Digital
+and back to Analogue.
+
+In the off mode the audio still goes Analogue-Digital-Analogue but without any
+noise processing, you still get the frequency filtering due to the 12kHz sample
+rate, e.g. a 6kHz turnover frequency and filtering that gives -3dB @ 4.5kHz.
+The processor clocks at 16MHz. Higher clock rates (I tested up to 55MHz) give
+proportional higher frequency responses, but after about 32MHz (-3dB @9MHz)
+much of the improvement was lost in unwanted musical effects.
+
+IN USE
+I found that you soon get used to the musical artefacts (like digital phones)
+that the highest level of DSP gives you on very noise signals, as these are
+much preferred to normal very noisy audio. At moderate eliminating levels,
+moderate noise reduction occurs and the recovered speech is more like normal.
+With extremely noisy weak signals (0dB S/N) the recovery process starts to fail
+& little usable audio comes through, at these levels straining with the normal
+signal MAY JUST be better.
+
+The tone reduction feature may be of specific interest to HF/VHF operators who
+have computer birdies etc. on channel. This unit can automatically eliminate
+carriers by up to 65dB if needed in under a couple of seconds, allowing weaker
+Dx to be worked underneath, although the tone will slightly reappear on speech
+peaks or changing noise floor.
+
+There is a software AF AGC both on processing and non processing modes so too
+loud a level with cause this to give the odd "click" on heavy AGC action.
+
+ON CW as long as the wanted signal is stronger than others in the Rx passband
+normal CW will be heard totally noise free. Slow Morse having longer than 1 sec
+CW elements will be attenuated are the DSP action tries to remove it. Also
+strong signals may have clicky starts again as the DSP gets it wrong.
+
+ON AM/SSB/FM there is little difference in the audio quality just much reduced
+background noise. With music, there is a tendency to eliminate all but the
+loudest instruments.
+
+WITH TV SOUND
+On sports commentary, the background crowd noise is well reduced, making the
+commentator's voice stand out rather than be drowned out, something deaf people
+may find very useful. For HIFI use I did try higher clocks up to 55MHz where it
+gave flat response to 15kHz, but the artefacts became quite noticeable. However
+with 32MHz clock a reasonable 9kHz treble compromise sounded OK to me.
+
+HAM ATV SOUND
+I have to listen to several channels at a time when using 23cms ATV repeater
+GB3HV :- 144.75 FM talkback locally, 5.5MHz subcarrier carrying Engineering
+sound 144.75 Rx @ GB3HV, as well as 6MHz subcarrier HiFi Sound. So using
+several of the cheaper NES boxes is a option for me.
+
+THE PROBLEMS
+My main gripe with the unit is the use of a tiny DIL switch to control the
+depth of noise reduction. Although the maker suggest most people leave this set
+at level (cheaper model). This should really have been a easy access BCD switch
+as off mode is useful in tuning in SSB. I have done this modification to the
+cheaper model, as well as increased the 100uF LS cap to u and made the unit
+operate as a dumb LS when there is no power.
+
+Other problems are slight RFI from the unit if used close to your Rx aerial,
+(e.g. when using Handhelds). And it has slight susceptibility to alternator
+whine when /M on Tx, this is down to the series diode & 12V reg not doing
+anything as there is no voltage headroom!
+
+Also be aware when running from same PSU as HF rig, as a few mV drop on rig
+earth lead, will appear in LS input lead & sound like Tx RFI in the LS. In
+that case try no PSU earth to LS, only LS earth from rig.
+
+For more information on the unit see www.bhinstruments.co.uk or see the RADCOM
+article.
+
+(P.S. I have no commercial interest in this product/co, this is just my)
+(personal experiences of these units, that I hope others may be interested in.)
+
+MY MODIFICATIONS
+Five modifications can all be done to the cheapest unit WITHOUT the on off
+processing switch, DIL processing level preset switch or volume control.
+
+ A/ Add centre speaker 10 way noise processing level & in/out control switch.
+ B/ Add dual Green ON & Red through mode dual LED.
+ C/ Add no power LS only mode (uses a DIL relay).
+ D/ Improve LF LS output, change 100u for 470u.
+ E/ Add 2 External LS sockets, one with switched LS.
+ 
+ /~~~~~~~~~~~~~~~~~~~~~\
+³         3 2 1      LED³Switched Ext LS jack
+³       4 /~~~\Min      ³
+³        ³     ³        ³
+³       5 \___/Out      ³
+³        6 7  Max       ³Unswitched Ext LS jack (e.g. H/Phone)
+ \_____________________/
+
+Tools needed:
+             10mm Punch (10mm drill body & a metal hole)
+             LED & 3.5mm Jack holes can be made with soldering iron/drill.
+             Anti Static earthed soldering iron.
+             Use Anti Static handling precautions.
+Parts Needed:
+             BCD 10 position switch (RS cat 327-938)
+             Small shrouded skirt knob.
+             15cm of 5 way coloured ribbon wire.
+             Dil 11V C/O reed Relay, & metal screen.
+             Dual colour LED (-ve common).
+             Small PNP transistor.
+             2x 3.5mm surface mounting jack socket.
+             Small 470uF 10V cap.
+             Several colours of thin connecting wire.
+
+DIAGRAM OF A MODIFIED UNIT
+                          C24    C26     +3.3V   ___   +12V  ___    D3  14-25V
+               0VÂÄÄÂÄÄÂÄÄÄÂÄÄÄÄÄÄÂ0V  ÚÄÄÄÂÄÂÄÄ´U3 ÃÂÄÄÄÄÂÄ´U1 ÃÄÂÄ´<ÃÄ(o
+      Rotary    E³ M³ N³  ===    ===   ³   ³ ³  ÀÄÂÄÙ³C17 ³ ÀÄÂÄÙ ³     ³
+    BCD Switch   o  o  o   ÃÄ´[]ÃÄ´    ³C12³===10u³ ===   ³   ³  ===C14 ³
+               1D\2B\4I\   ³ 16  R11   ³u1===³C11 ³  ³10u ³   ³   ³10u  ³
+                 ³  ³  ³   ³ MHz 4k7   ³   ÀÄÁÄÄÄÄÁÄÄÁÄÄÄÄ)ÄÄÄÁÄÄÄÁÄÄÄÄÄÁ0V
+In     R4      ÚÄÁÄÄÁÄÄÁÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄÄ¿ 10u      2³\ÃÄÄÄÄ¿ 470u
+Ä¿ C5ÚÄ1KÄÂÄÄÂÄ´ LSB  MSB     osc      + AF>ÃÄ´ÃÄ10KÄÂÄÄ´ `>ÄÄÄ)Ä´ÃÄv  _\to LS
+10K ===   ³ 10K³>AF                         ³C20  R7 ³  ³/'³ 8 ³C23  /' /Jacks
+ ÃÄÄÄÙu1  ³ R1 ³   Noise Eliminating SM IC  ³        ³  1³ ³3 _³___  o   & LS
+ ³       === ÀÄ´                            Ã¿      R8   ³ ³4³relay³ ³
+10K     1n³    ÀÂÄÄÄÄÂÄÄÄÄÄÄÄÂÄÄÄÄÄÂÄÄÄÂÄÄÄÂÙ³      1K   ³ ³5 ~³~~~  ³
+ ³      C8³ C3ÚÄÅÄL2 ÃÄL4  C7ÃÄ¿  ===  ³   ³ ³       ³  ===³10 ³  AF no DC
+ ³        ³u1===³10u===u1 u1===³10u³C15³C27³ 0J2     ³4u7³ ³11 ³  bypass
+ ³        ³   ³===C4 ³C6     ³===C2³u1===u1³ ³       ³   ³ ³12 ³  from input
+ÄÁÄÄÄÄÄÄÄÄÁÄÄÄÁÄÁÄÄÄÄÁÄÄÄÄÄÄÄÁÄÁÄÄÄÁÄÄÄÁÄÄÂÁÄ)ÄÄÄÄÄÄÄÁÄÄÄÁÄÁ0V ³1N
+                                          ³  ³                 ³4148 // Gn On
+                                    BCD   o  ³        eÚÄÄÄÄÄÄÄÁ´>ÃÄ´>Ã¿Rd off
+                                  10 way 8J\_ÃÄÄ12KÄÄ´< PNP        Dual³LED
+                                                       ÀÄÄÄÄÄÄÄÄÄÄÄÄ´>ÃÁo0V
+Method:                                                              \\
+1/ Remove the warranty label, these mods will invalidate it anyway!
+
+2/ Unscrew case & carefully remove LS & PCB.
+
+3/ Remove front Grill & cloth, punch out central switch hole in grill & cloth.
+
+4/ Cut off switch legs to not foul speaker. With a hot iron quickly wire up the
+   switch tag remains to the ribbon, forming the ribbon from next to the grill.
+   brown-D, red-B, orange-I, yellow-J, green-E-F-M
+
+5/ Make LED whole in top RH corner of plastic baffle (in one of the moulding
+   weakness), and make hole for LED common to go to green switch common and
+   wire up.
+
+6/ Make ribbon recess slot in LS baffle bottom, reassemble LS front checking
+   LS is not fouled, glue ribbon into slot.
+
+7/ Wire ribbon to PCB pad, brown on the RHS, red next left, orange next left,
+   leaving spare pad on LHS. Connect green to any of the 3 pad grounds.
+   Yellow wire take to component side and wire to the bottom connection of J2
+   with a 10K resistor in the hole as well.
+
+8/ Power up and connect a noisy source and test the function of switch, making
+   sure you don't short out anything. There should be fully anti-clockwise max
+   noise reduction function with 8 steps to min, the ninth step is no noise
+   reduction, step 10 is max reduction again. Then disconnect supply.
+
+9/ Connect a bare solid wire to pin 14 of the LM380 IC (+12V reg) glue the DIL
+   relay on top of this IC. Wire thick lead to relay coil, the other end of the
+   coil wire to a PNP transistor emitter and also a diode anode. Wire the PNP
+   base to the free end of the 10k (step 7). (Note step 13 when wiring to the
+   relay.)
+
+10/Change the LS cap C23 from 100uF to 470uF. Make sure it does not foul the
+   pillar hole.
+
+11/Wire up the PNP collector to the red LED and wire up the diode cathode to
+   the green LEDs respectfully. Retest, the Red LED should only light on step 9
+   function, green otherwise.
+
+12/Wire up the LS live connections via the relay to switch to through on power
+   off. Picking up external input on bottom of input attenuator P1 r.h.s. R.
+   (Note step 13 when wiring to the relay.)
+   Test that the relay puts LS signal though when the power is off & unit
+   functions correctly when powered.
+
+13/Assemble and checking nothing fouls. Test for LS magnet - relay interaction.
+   If there is (e.g. not switching audio on power on/off) make a magnetic
+   shield for the relay, e.g. cut & bend a steel lamination or tin can, to rap
+   around the LS side of the relay. Also try a lamination strip shield taped to
+   the LS magnet.
+
+14/Make 2 holes for an external LS 3.5mm jack sockets on the LHS by the upper
+   and lower pillars leaving just enough room to clear the pillar but still
+   clear the LS! Wire one up to up from the relay/Amp and 2nd to cut of off the
+   LS.
+
+
+See my Tech Bul on "Antenna Noise Canceller No 4", "Rig DC Power & RF Hazards".
+
+Y don't U send an interesting bul?
+
+73 de John G8MNY @ GB7CIP

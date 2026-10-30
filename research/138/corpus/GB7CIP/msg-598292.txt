@@ -1,0 +1,149 @@
+From: G8MNY
+To: ATV
+Type/Status: B$
+Date/Time: 19-Oct-26 07:04
+Bid: 8468_GB7CIP
+Title: Black & Burst Sync Buffer
+Path: 
+
+By G8MNY                        (CQTV 2001, new to Packet Feb 05)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+WHATS IT FOR?
+When genlocking video sources together sometimes there is cable or camera
+crosstalk from the genlock source feed when distributed with ordinary video as
+the genlock source. This circuit will solve that problem while still allowing
+the use of a non genlock camera as the genlock source master rather than the
+use of a PAL colour SPG.
+
+This 6 transistor circuit (4 PNP & 2 NPN) is a precision vision buffer amp, or
+sync black & burst stripper amp, providing 3 outputs. It uses no hard to find
+or obsolete ICs that many video projects need, indeed many constructors will
+find all the bits are in their junk box. All transistors can be 100mA general
+purpose silicon small signal types as transistor performance has mainly been
+designed out of this circuit.
+
+Construction can be UGLY, MATRIX or PCB, but be careful if using Stripboard as
+the paralleled inductance lines can cause instability!
+
+CIRCUIT
+              2x amp       Sync Sep    DC clamp       Video Amp
+         ÚÄÄÄÂÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÂÄÄÄÂÄ<+12-15V
+         ³   ³     R6         ³/e         R12           R15  R17  ³
+         ³   R4    22R     ÚÄÄ´ T3        2K7          470R  3R3 +³680u
+         ³  470R    ³      ³  ³\       ÚÄÄÄ´  Phase2     ³    ³  ===
+        R2   ³    ³/e      ³    ³     _³_  ³  VC2        ³  ³/e  _³_
+        1M   ÃÄÄÄÄ´    C2  ³    ³     /_\  ³ 100p/\      ÃÄÄ´T6
+         ³   ³ T2 ³\   u1  ³    ³      ³   ³ ÚÄ´ÃÄÄ¿     ³  ³\ +    R18
+         ³   ³      ÃÄÄ´ÃÄÄ´    ³      ³   ³ ³/    ³     ³    ÃÄ´ÃÄÂÄ68RÄ(o
+Video    ³   ³      ³+     ³    ³      ³   ³ ³ R14 ³   ³/     ³1500³ 
+In &     ³ ³/       ÃÄÄ´ÃÄÄ)ÄÄÄÄ)ÄÄÄÄÄÄÁÄÄÄ)ÄÁÄ4K7ÂÁÄÄÄ´T5    ³ uF ÃÄ68RÄ(o 
+ o)ÄÂÄ´ÃÄÅÄ´T1    470R C3  ³    ³          ³      ³    ³\e    ³    ³ R19
+ o)Ä´ u1 ³ ³\e     R7 4u7  ³    ³          ³    ³/e      ÃÄÄÄÄÙ    ÀÄ68RÄ(o
+ out³    ³   ÃÄÄÄÄÄÄ´      ³    ÃÄÄÄÄÂÄÄÄÄÄ)ÄÄÄÄ´T4      ³           R20
+   75R  R3  100R    R8     ³   2K2  10K    ³    ³\      R16
+    R1  M39  R5    330R    R9  R10  R11    ÃÄÄÄÄÄÄ´     180R 1/2W
+SW1 o    ³ /\³ VC1  ³/\    1M   ³    ³ /\ R13     ³+     ³
+Term/'   ³  ===100 100R    ³ n27³   VR2   2K7    ===C6   ³
+    ³    ³   ³\pF /VR1     ³ C5===  /22K   ³      ³4u7   ³
+    ÀÄÄÄÄÁÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÁÄÄÄÄ)ÄÄÄÄÄÁÂÄÄÄÄÄÁÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄ¿
+           Phase1  Gain          Sync³ SW2  ³                    _³_
+                                 CompÀÄ/'oÄÄÙ
+HOW IT WORKS
+The video input can be looped through or terminated with R1 (this can be made
+from 2x 150R in parallel if needed). Vision is fed to a high input impedance
+(>200k) transistor amp T1 & T2 with a gain of just over 2. The low value of
+pull up resistor R4 & the use of the PNP emitter resistor R6, ensure very good
+colour linearity. Presets VR1 and VC1 set the gain & colour phase (delay) of
+the amp.
+
+The 2V P-P video feeds a lightly biased T3 PNP transistor to make a sync
+stripper stage. Its collector is high during syncs and VR2, R11 & C5 form a
+sync & colour burst timing window that will operate the blanking stage T4 PNP
+transistor during picture time. Resistor R10 in series with C5 lets fast sync
+rise time edges through. Mode switch SW2 will allows composite or black & burst
+modes by disabling the blanking stage. Capacitor C5 can be omitted if the
+colour burst is not wanted.
+
+The amplified video also feeds through C3, then it is clamped at 0.6V below
+from the half supply rail with D1. Using a 2V P-P video level this point sets
+the black video level to approximately the bias rail with standard sync
+amplitude of the genlock source without the need for a proper black level
+clamp. When the collector of T3 is 0.5V more negative than the half rail
+(during picture time) T4 is turned on, shorting out the picture video that has
+gone through R14 & VC2 to the half rail.
+
+Transistors T5 & T6 make up a unity gain video buffer amp, with a low value of
+pull down resistor R16 to provide good syncs while driving 3 loads. Again a low
+value of pull up resistor R15 & the use of the PNP emitter resistor R17, ensure
+very good video & colour linearity. VC2 trimmer sets the HF gain & colour
+phase. Good LF performance is ensured with a large value output C7 & each of
+the 3 output source impedances will be very close to the ideal 75R with the use
+of 68R as the feeding resistors.
+
+WAVEFORMS
+               ÚÄÄ¿
+             __³YeÃÄÄ¿
+            ³Wh³__³CyÃÄÄ¿
+            ³  ³  ³__³GnÃÄÄ¿
+            ³  ³__³  ³__³MaÃÄÄ¿
+      Colour³     ³__³  ³__³RdÃÄÄ¿
+       Burst³        ³__³  ³__³Bl³
+Line    ÚÄ¿ ³Video input³__³  ³__³Bk     BurstÚÄ¿       No Picture
+Sync   _³ ³_³  100% Colour ³__³  ³__         _³ ³________________________
+   ³  ³ ³ ³ .         Bars    ³__³  ³    ³  ³ ³ ³      Video Output      ³
+   ³  ³ ÀÄÙ .                       ³    ³  ³ ÀÄÙ    Sync, burst & Black ³
+   ³  ³     .                       ³    ³  ³                            ³
+   ÀÄÄÙ     .                       À    ÀÄÄÙ                            À
+   .        .                       .
++12V__      .                       .     __
+   ³  \     . T3 Sync Seperator     .    ³  ³      T4 Blanking current
+   ³   `.   .     Waveform          .   .³..³____........................
+...³.....`........................... Clamp Diode³         ___...---'''
+---'       `------------------------'   Current  |...---'''
+           T4 Blanking Transistor on
+
+SETTING UP
+The circuit should draw about 35mA from 12-14V DC anything wildly different
+should be investigated. Using an oscilloscope check the 2x amplifier is working
+OK. Then in black & burst mode, check the sync separator output, it should have
+inverted line syncs from 12V to 6V with a lazy back edge. Check at frame rate
+that there is no LF problems with the syncs.
+
+Scoping the output buffer (T6 Collector) you should have just syncs & burst
+with no picture content at about 6V DC. Adjust the burst window preset VR2 so
+that blanking starts just after the burst. In composite mode there should be
+around 2V P-P. Terminate all the outputs into 75ê & check that the buffer amp
+output stays nearly constant (showing that the buffer amp has nearly zero R
+output impedance). Scope the output on one of the terminations, & adjust gain
+preset VR1 for unity overall gain of the circuit. Also check at frame rate that
+there are no LF droop problems.
+
+Colour phase is best set up with a colour bar source and a vectorscope using
+identical leads. Adjust the 2 HF phase presets for best phase & amplitude match
+on the vector display. It will be seen that the two presets do have slightly
+different effects & by alternate tweeks the correct phase & amplitude can be
+obtained. Switching to black & burst mode the phase of the bursts should not
+alter.
+
+But for those without a vectorscope & colour bars, adequate phase setup can be
+done by subtraction comparison using an evenly lit brightly coloured card in
+front of a colour camera & a dual beam scope with channel subtraction.
+Calibrate the scope by probing the video input with both probes and adjusting
+the timebase & gains to show a single colourful line. Put the scope into
+subtract mode, and tweek channel gains & scope probes adjustments to produce
+the best nulled out blank line. Now move a probe to one of the terminated
+outputs and adjust the 2 HF phase presets for best burst & colour picture
+carrier null.
+
+IN USE
+In composite mode the buffer amp works as well as can be expected. In the back
+& burst mode the video blanking is only approx at the black level & will depend
+on source sync levels. The exact amount of picture vision left after blanking
+may depend on the component layout. Both of these should not have any affect on
+the kit being genlocked.
+
+
+Why Don't U send an interesting bul?
+
+73 de John G8MNY @ GB7CIP

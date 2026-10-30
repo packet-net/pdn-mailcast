@@ -1,0 +1,23 @@
+From: NS2B
+To: ALL
+Type/Status: B$
+Date/Time: 27-Oct-26 00:53
+Bid: 5298_NS2B
+Title: PCL Packet Net Summary for Oct 26, 2026
+Path: !VE3KPG!VE3CGR!VE7ASS!VA7RBP!NS2B!
+
+PCL Packet Net Summary for Oct 26, 2026
+
+Checkins:
+
+NS2B	Bob	Penfield, NY	(sysop/nco)
+NK5LA	Daryl	Little Rock, AR	(courtesy check)
+K0WAV	Scott	Berryville, AR	(in and out)
+KC2NJV	Wayne	Bellmore, NY
+KX4AC	Carl	Glendale, AZ
+VA7RBP	Rick	Castlegar, BC
+
+Commentary:
+
+finally got antennas up, NYC marathon, state fair, a better antenna,
+packet node, weather, bugs, financial report, election

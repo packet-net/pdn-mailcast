@@ -1,0 +1,55 @@
+From: PA2SNK
+To: TECH
+Type/Status: BN
+Date/Time: 14-Oct 20:27Z
+Bid: 213-PA2SNK
+Title: Re^2: PK-88 TNC Mods
+
+R:261014/2354Z 4151@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261014/2031Z 14803@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261014/2031Z 19562@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261014/2031Z 4496@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261014/2031Z 4713@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.26
+R:261014/2030Z @:PI8ZTM.#ZH1.NLD.EURO #:60942 [Den Haag] $:213-PA2SNK
+R:261014/2030z @:DK0WUE.#BAY.DEU.EU $:213-PA2SNK
+R:261014/2027Z @:PD0LPM.#FRL.NLD.EURO #:55723 [Joure] $:213-PA2SNK
+
+From: PA2SNK@PD0LPM.#FRL.NLD.EURO
+To  : TECH@WW
+
+ÍÍ[Message No. 10319 Send on 13-10-2026 at 42:08:56 Lt by PA2SNK Danny]ÍÍÍÍÍÍÍÍ
+
+Tsthost MsgFilter v1.06c-OlnSoft
+ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¶Toplogo creator (c) 1997-1998 by PD0OLNºÄÄÄÄÄÄ
+
+>R:261013/2243Z @:PD0LPM.#FRL.NLD.EURO #:55664 [Joure] $:55547_N0ARY
+>R:261013/2243Z 4580@VE3CGR.#SCON.ON.CAN.NOAM LinBPQ6.0.25
+>R:261013/2243Z 37137@VE1LG.#KING.NS.CAN.NOAM LinBPQ6.0.24
+>R:261013/2242Z 20723@VE2PKT.#TRV.QC.CAN.NOAM LinBPQ6.0.25
+>R:261013/2242z @:N2MH.#NNJ.NJ.USA.NOAM [via AREDN Mesh] jnos 2.0p $:55547_N0ARY
+>R:261013/2237z @:N0ARY.#NCA.CA.USA.NOAM [San Jose, CA] #:55547 $:55547_N0ARY
+>
+>I put together a list of all the mods I do to the AEA PK-88 TNC when
+>I buy a new one. I thought this list would be useful to others than
+>myself:
+>
+>https://blog.thelifeofkenneth.com/2026/09/pk88-hardware-mods.html
+>
+>Kenneth, W6KWF
+>
+>
+>
+
+Hi Kenneth,
+
+Thanks  for  sharing,  the power supply mod is nice and i think apliable on
+evry tnc modem..
+
+
+73 de Danny PA2SNK
+
+ÍÍ[Pc:Fujitsu Litebook Tnc:Kenwood Trx:Kenwood THD75 Ant:duckie]ÍÍÍÍÍÍÍÍ
+ÍÍ[PA2SNK@PI8SNK.#FRL.NLD.EURO Sneek,Friesland JO23TA Holland]ÍÍÍÍÍÍÍÍÍ
+/ACK
+
+

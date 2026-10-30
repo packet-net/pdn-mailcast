@@ -1,0 +1,28 @@
+<<<
+Xrouter v505p
+
+Callsign: >>>[[G0LAB]]<<<
+Password: >>>[[user]]<<<GB7LAX XRouter lab
+>>>[[BBS]]<<<
+GB7LAX:LAX} Connected to BBS
+[XR-505p-BFHM$]
+Welcome to GB7LAX BBS
+You have 0 new messages
+Please use the 'NH' command to set your 'home' BBS.
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+>>>[[NP 0]]<<<Pagination is OFF
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+>>>[[SB LABTST @ WW]]<<<To: LABTST @ WW
+Enter subject (or empty line to abort):
+>>>[[lab t17_r_lines]]<<<
+Enter message, ending ctrl-Z or /EX (/QQ to abort)
+>>>[[R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25]][[R:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F]][[]][[body after R lines.]][[R:261029/1000Z mid-body R line 9@X.#3.GBR.EURO]][[end.]]<<<>>>[[/EX]]<<<
+*** Message 33 saved
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+>>>[[B]]<<<  - Logged off
+
+GB7LAX:LAX} Welcome back
+>>>

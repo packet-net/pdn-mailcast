@@ -1,0 +1,33 @@
+From: KF7PSM
+To: PACKET
+Type/Status: B$
+Date/Time: 27-Oct 17:47Z
+Bid: 16201_KE0GB
+Title: Packet with Tandy Color Computer
+
+R:261028/0513Z @:GB7CIP.#32.GBR.EURO #:9342 [Caterham Surrey GBR] $:16201_KE0GB
+R:261027/1750z @:I0OJJ.ITA.EU [Rome] $:16201_KE0GB
+R:261027/1750z @:N2NOV.#RICH.NY.USA.NOAM $:16201_KE0GB
+R:261027/1749z @:K7EK.#NOKY.KY.USA.NOAM $:16201_KE0GB
+R:261027/1748Z 59130@K5DAT.#NEWI.WI.USA.NOAM LinBPQ6.0.26
+R:261027/1747Z 16201@KE0GB.#SECO.CO.USA.NOAM LinBPQ6.0.25
+
+>From kf7psm%ke0gb.#seco.co.usa.noam@i0ojj.ampr.org Tue Oct 27 18:50:22 2026
+Received: from i0ojj.ampr.org by i0ojj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA17070996 ; Tue, 27 Oct 2026 18:50:22 +0100
+Message-Id: <16201_KE0GB@n2nov.bbs>
+>From: kf7psm@ke0gb.#seco.co.usa.noam
+X-JNOS-User-Port: Circuit  (ARECS:N2NOV-7 N2NOV-7)  -> Sending message
+
+A good friend and packeteer Gene N7WDZ has written a nice terminal
+program for the Tandy Color Computer 3 for interfacing with his
+TNC via the serial port. He has published the code for anyone
+>àn ¦aðto use or modify on his github page.
+to use or modify on his github page.
+https://github.com/tremors834/picoterm 
+
+73 KF7PSM
+
+
+
+

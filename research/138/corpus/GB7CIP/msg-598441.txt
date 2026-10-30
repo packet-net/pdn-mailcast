@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 20-Oct-26 17:25
+Bid: 5804-CX2SA
+Title: (M5.4) south of Panama 6.3 -82.6
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           south of Panama
+Geographic coordinates:           6.323N,  82.569W
+Magnitude:                        5.4
+Depth:                            10 km
+Universal Time (UTC):             20 Oct 2026  17:05:48
+Time near the Epicenter (1):      20 Oct 2026  12:05:48
+Time in your area (1):            20 Oct 2026  14:05:48
+Location with respect to nearby cities:
+192.1 km (119.1 mi) S of Burica, Panama
+218.6 km (135.5 mi) S of Puerto Armuelles, Panama
+227.7 km (141.2 mi) S of Pedregal, Panama
+233.3 km (144.6 mi) S of David, Panama
+233.8 km (145.0 mi) S of Las Lomas, Panama
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3nl
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3nl?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 20/10/2026 17:24:19 UTC
+________________________________________________________________

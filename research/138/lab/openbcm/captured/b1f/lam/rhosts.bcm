@@ -1,0 +1,4 @@
+; lab: the docker bridge gateway (host-side admin telnet) is trusted
+172.34.0.1
+localhost
+127.0.0.1

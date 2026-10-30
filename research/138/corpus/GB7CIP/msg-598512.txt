@@ -1,0 +1,131 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 21-Oct-26 17:46
+Bid: 5319_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (21-Oct 12:45Z)
+Path: !GB7BED!DM4RW!HP2DFA!
+
+000
+AXNT20 KNHC 211740
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1815 UTC Wed Oct 21 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_12Z.gif'>1200 UT
+1730 UTC.
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough axis enters the Atlantic through the coast of
+The Gambia near 13N17W, and continues west-southwestward to
+08N31W, where it transitions to the ITCZ to 08N40W and to
+near 09N51W. Scattered moderate convection is within 60 nm
+of the trough between the coast of Africa and 17W. Similar
+activity is within 60 nm south of the trough between 24W-27W.
+
+...GULF OF AMERICA...
+
+A trough is in the SW Gulf from near 21N95W to 18N94W. Scattered
+showers and isolated thunderstorms are within 60 nm west of the
+trough from 19N to 21N, and within 90 nm east of the trough south
+of 19N. Another trough extends from near Corpus Christi to 27N96W
+and to 24N96.5W. Isolated showers and thunderstorms are within 30
+nm east of the trough from 27N to 28N. Fresh to strong northwest
+winds are west of the SW Gulf trough as high pressure southward
+over Mexico. Seas with these winds are about 8 to 9 ft. Broad high
+pressure is elsewhere over the basin, with the resultant pressure
+gradient generally allowing for moderate to fresh northeast to
+east winds east of about 94W, and gentle to moderate northeast
+winds elsewhere west of 94W. Seas are mostly in the moderate
+range.
+
+For the forecast, the fresh to strong winds west of the SW Gulf
+will diminish to fresh speeds late tonight. A tightening pressure
+gradient between the ridge and a low pressure forecast to develop
+near the Bahamas will bring fresh to strong northeast winds and
+moderate to rough seas over the eastern Gulf Fri night into Sat.
+These marine conditions will spread westward to the central Gulf
+Sat night through Sun night. Seas are expected to build to around
+13 ft with these winds over the southeastern Gulf.
+
+...CARIBBEAN SEA...
+
+Scattered to numerous showers and thunderstorms are persistent
+offshore Colombia to near 13N between 73W and 77W. High pressure
+north of the area and a nearby stationary frontal boundary support
+moderate to fresh NE winds and seas of 2-4 ft in the waters north
+of 20N. Moderate to fresh trades along with seas of 3 to 5 ft are
+found from 11.5N to 16N and east of 80W. Elsewhere, light to
+gentle winds and seas of 2 to 4 ft prevail.
+
+For the forecast, a weak pressure gradient across the basin will
+promote gentle to moderate winds through Fri. The pressure
+gradient between a developing low pressure near the Bahamas and
+Atlantic high pressure will induce moderate to fresh east to
+southeast winds over the eastern Caribbean beginning Fri night.
+This weather pattern will also produce gentle to moderate
+northerly winds over the western part of the basin, with the
+exception of moderate to fresh northeast winds in the Yucatan
+Channel, and mainly light to gentle winds over the central
+Caribbean. These marine conditions are forecast to last through
+the upcoming weekend.
+
+...ATLANTIC OCEAN...
+
+A stationary front is analyzed from 31N64W to 27N70W and to the
+central Bahamas and to central Cuba. Scattered showers are
+occurring near this boundary. Ahead of it, a trough extends from
+near 26N68W to 23N72W and to the Windward Passage. Numerous
+moderate convection is seen from 22N to 27N between 66W and 72W.
+Overnight scatterometer data highlighted moderate to fresh
+north to northeast winds behind the front. Seas over these waters
+are in the 8 to 13 ft range per latest satellite altimeter data
+and buoy observations. Farther east, weak low pressure of 1012 mb
+is near 28N57W. It is along a NW to SE oriented trough that
+extends from near 3163W to the low and continues southeastward to
+near 24N54W. The combination of these features with a broad upper-
+level trough in the vicinity will continue to result in a large
+area of numerous to isolated strong convection over the waters
+from 22N to 30N between 45W and 57W. Moderate to fresh southerly
+winds along with moderate seas are east of the surface trough.
+
+Meanwhile, well east of the Lesser Antilles, an area of scattered
+showers and a few thunderstorms is from 12N to 17N between 47W
+and 54W. Isolated showers are from 13N to 18N between 38W and 47W.
+To the NE, a trough extends from 30N24W to 22N23W. No deep
+convection is noted with this feature. Latest scatterometer data
+shows light to gentle northeast to east winds within 180 nm either
+side of the trough from 22N to 24N and moderate to fresh northeast
+to east winds north of 24N between 16W and 34W. Seas over these
+waters are 5 to 7 ft. The remainder of the tropical Atlantic east
+of about 55W is under the influence of strong high pressure
+ridging, with the parent high center of 1031 mb located to the
+north of the Azores. The related pressure gradient is maintaining
+moderate or weaker winds along with moderate seas.
+
+For the forecast west of 55W, moderate to fresh N to NE winds and
+NE swell persist west of a stationary front that extends from
+near Bermuda to the central Bahamas and to central Cuba. Winds
+will diminish to gentle to moderate speeds later today while seas
+will slowly subside across the waters W of 65W and NE of the
+Bahamas through Fri. A tightening pressure gradient will develop
+beginning late on Fri as high pressure builds southward over the
+western Atlantic and low pressure develops near the Bahamas along
+a remnant frontal trough. This setup is expected to induce
+widespread fresh to strong northeast to east winds and rough to
+very rough seas, with winds likely reaching gale-force over the
+waters roughly NW of a line from near 31N60W to the northern
+Bahamas on Sun. Mariners should monitor the latest marine
+forecasts, and have avoidance plans in place.
+
+$$
+Aguirre

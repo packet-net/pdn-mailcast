@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 26-Oct-26 10:54
+Bid: 5900_HP2DFA
+Title: EARTHQUAKE ALERT M5.5 - 283 km E of Levuka, Fiji
+Path: !VE3KPG!VE2PKT!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.5+)       
+==================================================
+Event ID   : us6000u4yr
+Magnitude  : M 5.5
+Time (UTC) : 2026-10-26 10:13:01 UTC
+Depth      : 641.8 km
+Coordinates: -18.2830 Lat / -178.0109 Lon
+--------------------------------------------------
+Location:
+  283 km E of Levuka, Fiji
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4yr
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,323 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 26-Oct-26 11:47
+Bid: 26085_LU9DCE
+Title: ARCHLINUX UPDATES 26-OCT
+Path: !GB7BED!K1AJD!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+ZETTLR 4.9.0-1 X86_64
+
+A MARKDOWN EDITOR FOR THE 21ST CENTURY
+
+========================================
+
+GIT-GRAPH 0.8.1-1 X86_64
+
+SHOW CLEAR GIT GRAPHS ARRANGED FOLLOWING DIFFERENT BRANCHING MODEL
+
+========================================
+
+UDNS 0.7-1 X86_64
+
+STUB DNS RESOLVER LIBRARY WITH ABILITY TO PERFORM BOTH SYNCRONOUS AND
+ASYNCRONOUS DNS QUERIES
+
+========================================
+
+LLDPD 1.0.23-1 X86_64
+
+802.1AB IMPLEMENTATION (LLDP) TO HELP YOU LOCATE NEIGHBORS
+
+========================================
+
+OPENTOFU 1.13.2-1 X86_64
+
+LETS YOU DECLARATIVELY MANAGE YOUR CLOUD INFRASTRUCTURE
+
+========================================
+
+MITMPROXY 12.3.1-1 ANY
+
+SSL-CAPABLE MAN-IN-THE-MIDDLE HTTP PROXY
+
+========================================
+
+PYTHON-SSE-STARLETTE 3.6.0-1 ANY
+
+SSE PLUGIN FOR STARLETTE
+
+========================================
+
+PYTHON-PYTEST-ASYNCIO 1.4.1-1 ANY
+
+PYTEST SUPPORT FOR ASYNCIO.
+
+========================================
+
+COFFEESCRIPT 2.7.1-1 ANY
+
+COFFEESCRIPT IS A LITTLE LANGUAGE THAT COMPILES INTO JAVASCRIPT
+
+========================================
+
+MATE-APPLETS 1.28.1-4 X86_64
+
+APPLETS FOR MATE PANEL
+
+========================================
+
+MATE-CONTROL-CENTER 1.28.2-2 X86_64
+
+THE CONTROL CENTER FOR MATE
+
+========================================
+
+SUGAR 0.122-1 ANY
+
+SUGAR GTK SHELL
+
+========================================
+
+SUGAR-TOOLKIT-GTK3 0.122-1 X86_64
+
+SUGAR GTK LIBRARY
+
+========================================
+
+SUGAR-DATASTORE 0.122-1 X86_64
+
+SUGAR DATASTORE SERVICE
+
+========================================
+
+SUGAR-ARTWORK 0.122-1 ANY
+
+SUGAR ICONS AND THEMES
+
+========================================
+
+PYTHON-CALDAV 3.6.0-1 ANY
+
+CALDAV (RFC4791) CLIENT LIBRARY FOR PYTHON
+
+========================================
+
+PYTHON-DBUS-DOCS 1.5.1-1 X86_64
+
+DEVELOPER DOCUMENTATION FOR DBUS-PYTHON
+
+========================================
+
+PYTHON-DBUS 1.5.1-1 X86_64
+
+PYTHON BINDINGS FOR D-BUS
+
+========================================
+
+GRAPHS 2.0.8-1 X86_64
+
+TOOL TO PLOT AND MANIPULATE DATA
+
+========================================
+
+GNOME-SHELL-EXTENSION-DESKTOP-ICONS-NG 51.1.1-1 ANY
+
+DESKTOP ICONS EXTENSION FOR GNOME SHELL
+
+========================================
+
+LIBSOUP3-DOCS 3.8.1-1 X86_64
+
+HTTP CLIENT/SERVER LIBRARY FOR GNOME (DOCUMENTATION)
+
+========================================
+
+LIBSOUP3 3.8.1-1 X86_64
+
+HTTP CLIENT/SERVER LIBRARY FOR GNOME
+
+========================================
+
+MATE-PANEL 1.28.7-3 X86_64
+
+THE MATE PANEL
+
+========================================
+
+MATE-UTILS 1.28.3-2 X86_64
+
+COMMON MATE UTILITIES FOR VIEWING DISK USAGE, LOGS AND FONTS, TAKING
+SCREENSHOTS, MANAGING DICTIONARIES AND SEARCHING FILES
+
+========================================
+
+LIB32-LLVM-LIBS 1:23.1.4-1 X86_64
+
+LLVM RUNTIME LIBRARIES (32-BIT)
+
+========================================
+
+LIB32-LLVM 1:23.1.4-1 X86_64
+
+COMPILER INFRASTRUCTURE (32-BIT)
+
+========================================
+
+LIB32-CLANG 23.1.4-1 X86_64
+
+C LANGUAGE FAMILY FRONTEND FOR LLVM (32-BIT)
+
+========================================
+
+WASI-LIBC++ABI 23.1.4-1 X86_64
+
+LOW LEVEL SUPPORT FOR THE LLVM C++ STANDARD LIBRARY (WASI)
+
+========================================
+
+WASI-LIBC++ 23.1.4-1 X86_64
+
+LLVM C++ STANDARD LIBRARY (WASI)
+
+========================================
+
+WASI-COMPILER-RT 23.1.4-1 X86_64
+
+COMPILER RUNTIME LIBRARIES FOR CLANG (WASI)
+
+========================================
+
+THUNDERBIRD-I18N-ZH-TW 158.0.1-1 X86_64
+
+CHINESE (TRADITIONAL) LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-ZH-CN 158.0.1-1 X86_64
+
+CHINESE (SIMPLIFIED) LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-VI 158.0.1-1 X86_64
+
+VIETNAMESE LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-UZ 158.0.1-1 X86_64
+
+UZBEK LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-UK 158.0.1-1 X86_64
+
+UKRAINIAN LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-TR 158.0.1-1 X86_64
+
+TURKISH LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-TH 158.0.1-1 X86_64
+
+THAI LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-SV-SE 158.0.1-1 X86_64
+
+SWEDISH LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-SR 158.0.1-1 X86_64
+
+SERBIAN LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-SQ 158.0.1-1 X86_64
+
+ALBANIAN LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-SL 158.0.1-1 X86_64
+
+SLOVENIAN LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-SK 158.0.1-1 X86_64
+
+SLOVAK LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-RU 158.0.1-1 X86_64
+
+RUSSIAN LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-RO 158.0.1-1 X86_64
+
+ROMANIAN LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-RM 158.0.1-1 X86_64
+
+ROMANSH LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-PT-PT 158.0.1-1 X86_64
+
+PORTUGUESE (PORTUGAL) LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-PT-BR 158.0.1-1 X86_64
+
+PORTUGUESE (BRAZILIAN) LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-PL 158.0.1-1 X86_64
+
+POLISH LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-PA-IN 158.0.1-1 X86_64
+
+PUNJABI (INDIA) LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+THUNDERBIRD-I18N-NN-NO 158.0.1-1 X86_64
+
+NORWEGIAN (NYNORSK) LANGUAGE PACK FOR THUNDERBIRD
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

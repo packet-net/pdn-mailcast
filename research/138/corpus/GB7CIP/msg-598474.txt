@@ -1,0 +1,69 @@
+From: G8MNY
+To: TECH
+Type/Status: B$
+Date/Time: 21-Oct-26 07:57
+Bid: 8650_GB7CIP
+Title: Coax Faulting
+Path: 
+
+By G8MNY                                     (New Aug 10)
+(8 Bit ASCII graphics use code page 437 or 850, Terminal Font)
+
+Here is a simple practical method of finding a short on a long run of coax. It
+assumes a temporary test wire can be run from end to end & that the coax inner
+and outer are continuous, resistive damage in the outer or a corroded short
+(as wired below) will not affect the measurements.
+
+CONNECTIONS
+                     Faulty shorted coax
+       Car    __________________________________
+   ÚÄÄLampÄÂÄ()_________________________________)ÄÂÄÄÄ¿
+ 12V       ³ /                                  \ ³   ³
+Floating   V1                                    V2   ³
+   ³__________________________________________________³
+                    Test wire
+
+Here it is assumed the inner is OK and it has constant resistance per length.
+(if this is not true see "DAMAGED INNER" below) 
+
+The 12V supply must be floating so it can be reversed and have no currents to
+earth.
+
+The lamp wattage sets a suitable current down the inner conductor so that at
+least a few 100mV will be across it. (this may need 5A for thick LDF cables
+etc.)  
+
+CIRCUIT
+                        Faulty shorted coax
+       Car  
+   ÚÄÄLampÄÂÄÄÄÄÄÄÄÄÄR1ÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄR2ÄÄÄÄÄÂÄÄÄ¿
+   ³       ³            Corrosion_Ü_battery       ³   ³
+   ³       ³  ____________________³_____________  ³   ³
+ 12V       ³ /         No current in outer      \ ³   ³
+Floating   V1                                    V2   ³
+   ³__________________________________________________³
+                    Test wire
+
+With a sensitive DMV measure V1 & V2, then reverse the 12V polarity and repeat.
+Average the readings at each end (ignore polarity) to cancel any corrosion
+voltage at the short.
+
+Now the total inner conductor voltage drop is just V1+V2
+
+                             V1
+And the fault position is  ÄÄÄÄÄ  x  Length,  from the lamp end.
+                           V1+V2
+
+DAMAGED INNER
+If the inner is damaged more than the outer (water corrosion) then make the
+outer the current carrier.
+
+
+See TECH buls on "Cable Tester", "Coax Feeder Tests" & "A Versatile Pulse
+Tester".
+
+
+
+Why don't U send an interesting bul?
+
+73 de John G8MNY @ GB7CIP

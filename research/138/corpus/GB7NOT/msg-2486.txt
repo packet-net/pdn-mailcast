@@ -1,0 +1,278 @@
+From: G4TNU
+To: NEWS
+Type/Status: BF
+Date/Time: 10-Oct 21:26Z
+Bid: 39195G4TNU
+Title: RSGB Main News - 11 Oct 2026
+
+R:261028/1439Z 4505@GB7RDG.#42.GBR.EURO LinBPQ6.0.26
+R:261010/2127Z @:GB7CIP.#32.GBR.EURO #:7580 [Caterham Surrey GBR] $:39195G4TNU
+R:261010/2126Z @:GB7CIP.#32.GBR.EURO [Caterham, IO91WH] Linux mailgw-0.3.1.8
+R:261010/2126Z @:GB7CIP.#32.GBR.EURO $:39195G4TNU
+T:From: G4TNU@GB7CIP.#32.GBR.EURO <g4tnu@gb7ipf.ampr.org>
+T:Newsgroups: ampr.news.uk
+T:Message-Id: <G1_341621_G4TNU@gb7ipf.ampr.org>
+
+RSGB Main News for Sunday 11 October 2026
+
+The Headlines:
+
+â¢ Join the RSGB 2026 Convention livestream
+* The RSGB has shared a list of JOTA stations
+* Start planning your Youngsters On The Air Month activity
+
+
+The second day of the RSGB 2026 Convention is well underway with a 
+great line-up of lectures. If you aren't able to attend the event in 
+person this year, you can catch up with the livestream on the 
+Society's YouTube channel via youtube.com/thersgb  The livestreams 
+for both days will remain available for everyone to watch and offer a 
+programme full of engaging speakers to help you learn, connect and be 
+inspired. In Sunday's programme, you can hear an update on the latest 
+developments in the microwave community with Heather Nickalls, M0HMO 
+and Brian Coleman, G4NNS. You'll also be able to find out the results 
+of the 12th of August 2026 eclipse propagation experimet, which was 
+led by Steve Nichols, G0KYA and the RSGB Propagation Studies 
+Committee. Whether you've attended the Convention in person or 
+watched the livestream, the Society would love to hear what you loved 
+most about the event. Share your feedback by going to 
+rsgb.org/feedback  for those who have attended the event and 
+rsgb.org/livestream-feedback  for those who watched the event online.
+
+The RSGB Youth Champion for Scouts, Sam McCutchion, M0UEL has shared 
+a list of special event stations that will be active for Jamboree on 
+the Air next weekend, the 16th to 18th of October. You can view the 
+list by going to rsgb.org/jota  and selecting the âJOTA Stations on 
+the Air' link on the righthand side of the page. Thank you to 
+everyone who has responded to the RSGB's call so far. If you would 
+like to be added to the list, send a summary of your station name, 
+call sign and any other relevant information to 
+youthchampion.scouts<at>rsgb.org.uk  by Wednesday the 14th of 
+October. If you're not involved with a JOTA station, listen out for 
+them on the air and encourage the young operators.
+
+December isÂ Youngsters On The Air Month, providing young radio 
+amateurs across the UK with the chance to operate using special event 
+station GB26YOTA. The activity is a special IARU initiative that 
+encourages young amateur radio operators to get on the air, make 
+contacts around the world, and showcase amateur radio to other young 
+people. As GB26YOTA is a special event call sign, you will need a 
+Full licensee on site to supervise the operators. If you're not a 
+Full licensee, get together with others and have a group event. 
+Clubs, schools, universities, youth groups and individuals can all 
+apply to host the special event station and are encouraged to start 
+planning now. You can find details of the application process, 
+eligibility requirements, operating slots and call sign allocations 
+by going to rsgb.org/yota-month Â Make sure you don't miss out on 
+being part of the team helping to make YOTA Month the best yet!
+
+TX Factor has released a National Hamfest 2026 edition of its popular 
+amateur radio show. In this special episode, Bob McCreadie, G0FGX 
+chats with Dominic, M0BLF from Camb-Hams whilst operating QO-100. Bob 
+discovers more about the proposed new rig release from Icom and 
+updates you on a r Srfuture repeater upgrade from Yaesu. Bob meets 
+key personnel from the RSGB to learn more about the Society's 
+membership strategies and some changes in the way the Society meets 
+and greets visitors at major shows and conventions such as Hamfest 
+and Dayton. There will be much more coverage and news from Hamfest in 
+future episodes. TX Factor is sponsored by the RSGB and the latest 
+episode can be found by visiting txfactor.co.uk
+
+Are you looking for some spooky family fun for Halloween? You can 
+plan a visit to Bletchley Park and the RSGB National Radio Centre to 
+discover top secret clues and solve a mystery. You'll be tasked with 
+solving codes, ciphers and puzzles to reveal secrets along the way. 
+You can find out more by going to the âWhat's on' section of the 
+Bletchley Park website at bletchleypark.org.uk  RSGB members can get 
+free access to the historic site by downloading a voucher at 
+rsgb.org/bpvoucher
+
+
+And now for details of Rallies and Events
+
+The annual Hornsea ARC Rally takes place today, the 11th, at 
+Driffield Showground, YO25 9FB. Doors open at 10am, For full details, 
+call Les on 01377 252 393.
+
+Essex CW Amateur Radio Club's Boot Camp and CWÂ Conference is on 
+Saturday, the 24th of October at the 3rd Witham Scout and Guide HQ. 
+If you are interested in attending and have not registered, email 
+info<at>essexcw.org.uk  There is one place left on the Boot Camp, 
+which will be allocated on a first-come, first-served basis. Booking 
+for online CW on the Club's Beginners, Improvers and Advanced classes 
+is now open. Doors open at 8.30am for registration. The meetings 
+begin at 9am. The day will finish around 4.20pm. For more details, 
+visit essexcw.uk
+
+On Sunday, the 25th of October, Galashiels Radio Rally and Open Day 
+takes place at The Volunteer Hall, St Johns Street, Galashiels, 
+TD1 3JX. Doors open at 11.15am, with access for the disabled from 
+11am. Admission is GBP 3. There will be Bring and buy, refreshments 
+and traders. For more information, visit galaradioclub.co.uk
+
+Also on Sunday, the 25th of October, Holsworthy Amateur Radio Club 
+Autumn Rally takes place at Kivells Livestock Market, EX22 7FA from 
+10am. For details, visit tinyurl.com/holsrally26
+
+
+Now the Special Events news
+
+Members of the Cray Valley Radio Society are operating special 
+callsign GB80CVÂ until the 28th of October to celebrate the club's 
+80th anniversary. Visit cvrs.uk/cvrs80 for detailed information on 
+the Oak Anniversary Award. QSL via Logbook of the World.
+
+8J7SPOÂ isÂ theÂ specialÂ callsignÂ commemoratingÂ theÂ JapanÂ SportÂ Associati
+on's 80th Japan Games and the 25th National Sports Festival for 
+People with Disabilities. Look out for activity until the 26th of 
+October. QSOs will be uploaded to Club Log and confirmed 
+automatically via the bureau. 
+
+TheÂ BelgianÂ AirÂ ForceÂ AmateurÂ RadioÂ AssociationÂ is active until the 
+30th of October to celebrate the Air Force's 80th anniversary. Listen 
+for activity on the HF bands using CW, SSB and digital modes. All the 
+details, including eQSLs and awards, are at bafara80.be
+
+
+Now the DX news
+
+Jacek,Â SP9FIHÂ isÂ activeÂ asÂ FW1PÂ fromÂ WallisÂ Island, OC-054Â until 
+Saturday, the 17th of October. He operatesÂ mainlyÂ FT8,Â onÂ the 
+80,Â 20,Â 15Â andÂ 10m bands, QSL via Club Log's OQRS.
+
+Sands,Â VK4WXWÂ hasÂ returnedÂ toÂ WillisÂ Island, OC-007Â andÂ will be 
+stationed at the Australian Bureau of Meteorology's weather 
+monitoring facility until late October or early November. He 
+operatesÂ SSBÂ andÂ FT8Â onÂ the 40,Â 20,Â 15 and 10m bands with a vertical 
+antenna. QSL via M0OXO's OQRS.
+
+Lui,Â YT3PL,Â Luc,Â F5RAVÂ andÂ Darko,Â E70AÂ willÂ beÂ activeÂ on various 
+bands and modes as C5R from The Gambia until the 4th of November, 
+including an entry in the CQ WW DX SSB Contest.  QSL direct to YT3PL 
+and logsearch on Club Log.
+
+
+Now the Contest news
+
+The RSGB 432MHz FMAC Contest on Tuesday, the 13th of October runs 
+from 1800UTC to 1855UTC. Using FM on the 70cm band, the exchange is 
+signal report, serial number and locator.
+
+Also on Tuesday the 13th of October, the RSGB 432MHz UK Activity 
+Contest runs from 1900UTC to 2130UTC. Using all modes on 432MHz, the 
+exchange is signal report, serial number and locator.
+
+The RSGB 432MHz FT8 Activity four-hour Contest runs from 1700UTC to 
+2100UTC on Wednesday, the 14th of October. Using FT8 on 432MHz, the 
+exchange is signal report and four-character locator. The RSGB 432MHz 
+FT8 Activity two-hour Contest is also on Wednesday the 14th of 
+October, from 1900UTC to 2100UTC. Using FT8 on 432MHz, the exchange 
+is signal report and four-character locator.
+
+The RSGB HF Autumn Series DATA Contest is on Wednesday the 14th of 
+October, from 1900UTC to 2030UTC. Using RTTY and PSK63 on the 80m 
+band, the exchange is signal report and serial number.
+
+On Thursday the 15th of October, the RSGB 70MHz UKAC Contest runs 
+from 1900UTC to 2130UTC. Using all modes on 70MHz, the exchange is 
+signal report, serial number and locator.
+
+The Worked All Germany Contest runs from 1500UTC on Saturday, the 
+17th of October to 1500UTC on Sunday the 18th of October. Using CW 
+and SSB on the 80m to 10m bands, the exchange is signal report and 
+serial number.
+
+
+Now the Propagation news, compiled by G0KYA, G3YLA and G4BAO on 
+Wednesday, the 7th of October 2026.
+
+As we head further into October, the maximum usable frequencies 
+available are slowly starting to climb. We are seeing 21MHz doing 
+quite well, with 24MHz often coming into play. This should improve as 
+the month goes on. 
+
+This last week was characterised by relatively quiet geomagnetic 
+conditions at times, but with a lowish Solar Flux Index. The Kp index 
+hit four and five on the fourth and fifth but has otherwise been 
+quiet, often in the ones and twos.
+
+HF conditions have been adequate rather than outstanding. 80 metres 
+has proved useful during the RSGB's Autumn Series of contests, often 
+with good loud signals from around the UK and further afield from 
+Austria, Germany and the Netherlands.
+
+There have been some good highlights further up the bands, including 
+hearing the 4S7B NCDXF beacon on 14.100MHz well after dark on Monday 
+the 5th of October and the 4U1UN beacon on 21.150MHz during the late 
+afternoon.
+
+If you wish to work the eastern seaboard of the USA on 10 metres, 
+look between 1300 and 1700UTC, with perhaps FT8 or CW being the most 
+likely modes at this time.
+
+There is plenty of DX to be worked next week, including 6O2M in 
+Somalia, H49A on the Solomon Islands, C5R in The Gambia and FW1P, 
+Wallis Island. From next weekend, also look for 3DAOGY in Eswatini, 
+S21HRG in Bangladesh and S9R on Sao Tome.
+
+The solar flux index climbed from 92 to 113 on Wednesday, the 7th of 
+October, which is a help. The question is, where does it go from here?
+Next week, the SWPC forecasts the SFI will be in the range of 90 to 
+105. Geomagnetic conditions are forecast to be good, with a maximum 
+Kp index of two. As always, this is subject to no CMEs or coronal 
+holes, so keep an eye on solarham.com  for daily updates. This 
+weekend may see unsettled geomagnetic conditions thanks to two large 
+coronal holes.
+
+
+And now the VHF and up propagation news from G3YLA and G4BAO.
+
+We have moved into the season of autumn changeability with 
+alternating unsettled weather. Rain scatter is possible on the GHz 
+bands as is the traditional Tropo that comes from areas of high 
+pressure and temperature inversions.  
+
+The bulk of the period up to the end of next week is firmly in the 
+unsettled domain with some potentially active lows passing close to 
+the UK with perhaps some very strong winds in northern areas. So rain 
+scatter is likely to be an option at times.
+
+There is a signal in the weather models that we could see a big high 
+developing at the end of next week, with Tropo returning to many 
+areas.
+
+The meteor scatter prospects are slightly lifted by the Draconids, 
+which peaked on Thursday the 8th of October, and then the slow climb 
+to the Orionids later in the month on Wednesday the 21st of October, 
+which are the debris from Comet Halley and usually the better of the 
+two showers.
+
+We have recently been having the occasional peak in the Kp index to 
+around 4 or 5, which is just enough to give us a reason to look out 
+for aurora. Although not really where we need it for a good radio 
+aurora, this is definitely a hint to check the Kp index.
+
+The surprise out-of-season Sporadic-E on Monday, the 5th of October, 
+when the FoEs reached just over 10MHz, was a reminder that guidelines 
+about the span of the season are just that, and other externally 
+forced events can and do happen. It is not easy to give exact reasons 
+for that event, but a sudden increase in meteor input can play a 
+regional role if other triggers like jet streams are also present. 
+EME now, and Moon declination is negative and falling to minimum on 
+Friday the 16th of October, so Moon windows are shortening and peak 
+Moon elevation is falling. Path losses are rising as we approach 
+apogee, also on the 16th. 
+
+The Sun and Moon were close over the weekend of Saturday the 10th of 
+October, so expect high sky noise, then moderate, becoming high again 
+as the week progresses.
+
+And that's all from the propagation team this week.
+
+
+And that's the end of the main news for this week prepared by the
+Radio Society of Great Britain.  Items for inclusion in subsequent
+bulletins can be emailed to  radcom<at>rsgb.org.uk to arrive by
+10:00 on the Thursday before transmission.
+
+

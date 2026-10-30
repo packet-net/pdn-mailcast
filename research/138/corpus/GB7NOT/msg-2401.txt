@@ -1,0 +1,41 @@
+From: KF7PSM
+To: PACKET
+Type/Status: BN
+Date/Time: 17-Oct 20:16Z
+Bid: 15863_KE0GB
+Title: Pocket Pico TNC
+
+R:261017/2103Z 4224@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261017/2022Z 14917@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261017/2022Z 19804@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261017/2022Z 60817@EI2GYB.DGL.IRL.EURO LinBPQ6.0.25
+R:261017/2022Z 4830@K1AJD.#AUG.GA.USA.NOAM LinBPQ6.0.25
+R:261017/2021Z 25246@LU9DCE.TOR.BA.ARG.SOAM LinBPQ6.0.25
+R:261017/2021Z 49783@W0ARP.#NCO.CO.USA.NOAM LinBPQ6.0.25
+R:261017/2021Z 11723@KN6VV.#NCO.CO.USA.NOAM BPQ6.0.25
+R:261017/2021Z 10369@K0ZIA.#SECO.CO.USA.NOAM BPQ6.0.25
+R:261017/2016Z 15863@KE0GB.#SECO.CO.USA.NOAM LinBPQ6.0.25
+
+As you may well know our Pocket Pic TNC Project was featured on Hackaday!
+https://hackaday.com/2026/09/25/pi-pico-recreates-the-heathkit-pocket-packet/
+
+Gene N7WDZ also has a nice page on the build.
+https://n7wdz.com/project-pocket-pico-tnc.html
+
+In any case we decided it was time to try and produce some firmware for the pocket pico so it could operate on HF as well as HF APRS or NETWORK 105 ax25 Packet.
+
+We have been testing the latest code and it seems to be working pretty well.
+Anyone with a pico can test it, you can grab the .uf2 file to flash your
+pico with the HF version here:
+https://github.com/pfiliberti/pico_tnc/tree/pocketpicohf
+
+Also we have updated the vhf version to correct a possible problem where the pico could possibly hang with the PTT stuck on. If you are operating a pico I would suggest
+to get the latest firmware and update it. It can be found here: 
+https://github.com/pfiliberti/pico_tnc
+
+
+
+Thanks again es 73!
+Peter KF7PSM
+
+

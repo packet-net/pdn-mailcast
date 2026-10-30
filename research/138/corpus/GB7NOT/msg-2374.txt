@@ -1,0 +1,104 @@
+From: DJ6UX
+To: AGCW
+Type/Status: BN
+Date/Time: 15-Oct 12:26Z
+Bid: TMY7V4_DB0HB
+Title: EuCW Snakes & Ladders 2026/0
+
+R:261015/1342Z 4161@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261015/1338Z @:GB7CIP.#32.GBR.EURO #:8100 [Caterham Surrey GBR]
+R:261015/1333z @:SR1BSZ.SZ.POL.EU $:TMY7V4_DB0HB
+R:261015/1341z @:SR6DWH.#DSL.POL.EU $:TMY7V4_DB0HB
+R:261015/1338z @:OK1TOR.CZE.EU $:TMY7V4_DB0HB
+R:261015/1337z @:OE2XZR.#OE2.AUT.EU $:TMY7V4_DB0HB
+R:261015/1337z @:DB0FFL.#BAY.DEU.EU $:TMY7V4_DB0HB
+R:261015/1334z @:CS5NRA.CTST.PRT.EU $:TMY7V4_DB0HB
+R:261015/1334z @:DB0ALG.#NDS.DEU.EU $:TMY7V4_DB0HB
+R:261015/1334z @:DK0MAV $:TMY7V4_DB0HB
+R:261015/1332z @:DB0FC.#NDS.DEU.EU [JO52GG OP: DF2AU] DP6.00 $:TMY7V4_DB0HB
+R:261015/1226z @:DB0HB.#HH.DEU.EU [HH-AIRPORT] DP6.00 $:TMY7V4_DB0HB
+From: DJ6UX @ DB0HB.#HH.DEU.EU (Eddi)
+To:   AGCW @ WW 
+X-Info: Upload without password authentication
+
+Path: ehrhh!.POSTED!not-for-mail
+From: dj6ux@dj6ux.ampr.org (Edmund H. Ramm)
+Newsgroups: ampr.bbs.agcw
+Subject: EuCW Snakes & Ladders 2026/09
+Date: Thu, 15 Oct 2026 13:31:11 -0000 (UTC)
+Organization: Private Linux/68k site
+Message-ID: <11aqkiv$4q0$1@dj6ux.ampr.org>
+Reply-To: dj6ux@db0fhn.ampr.org (Edmund H. Ramm)
+Injection-Info: dj6ux.ampr.org;
+	logging-data="4928"; mail-complaints-to="usenet@dj6ux.ampr.org"
+User-Agent: nn/6.7.3
+Xref: ehrhh ampr.bbs.agcw:2030
+
+Snakes & Ladders, Edition 2016
+
+Results for the third month of the second semester of 2026
+
+Received were 35 logs containing 1071 valid QSOs into 260 locator squares.
+
+Among these squares, we had 101 candidate ladders (each with 1 QSO
+only) from which the following 20 were randomly selected as ladders:
+
+     HP94 IL28 IN61 IN62 JM19 JN03 JN07 JN23 JO58 JO73
+     JO94 KM29 KN05 KN26 KN32 KN33 KN77 KO73 KP33 LO48
+     
+Furthermore we had 63 candidate snakes (each with more than 5 QSOs), of which
+the following 6 were randomly selected as snakes:
+
+     IO81 IO93 JN66 JO30 JO40 JO43 
+
+This leads to the following scores:
+
+Call    Name     Total score|      1|      2|      3|      4|      5|      6|
+============================|=======|=======|=======|=======|=======|=======|
+DJ6UX   Eddi            1165|    436|    387|    342|
+DL0MUR  Martin           264|    197|     67|      0|
+DL1DHM  Hanns            118|     36|     52|     30|
+DL1DXL  Lothar           257|    105|    101|     51|
+DL1GBZ  Martin           634|    103|    301|    230|
+DL1HBL  Claus             68|     26|     40|      2|
+DL3GJ   Greg               6|      0|      3|      3|
+DM4RW   Robert             9|      0|      0|      9|
+F4GOU   Tom              736|    252|    287|    197|
+F5IYJ   Philippe          10|      0|      0|     10|
+F5LKK   Serge             35|     24|     11|      0|
+F5NSO   Francois         102|     50|     36|     16|
+F5POJ   Philippe        1051|    279|    438|    334|
+F8EHJ   Herve            105|     27|     54|     24|
+G0DJA   David             13|     11|      0|      2|
+G0UBE   John              26|     16|      2|      8|
+G3PCL   Michael            6|      4|      0|      2|
+G3XVL   Chris              1|      0|      1|      0|
+G4KKU   Andy              86|     33|     20|     33|
+I0YQX   Italo              3|      0|      0|      3|
+I2CZQ   Peter            428|     86|    149|    193|
+I3JUK   Giuseppe         187|     87|      0|    100|
+I5ECW   Vanni             56|     14|     25|     17|
+IK1WNO  Enrico            82|     15|     37|     30|
+IK5WOB  Fabrizio         103|     14|     32|     57|
+IN3FHE  Helga             15|      4|      7|      4|
+IU2KBN  Paolo            181|     25|     45|    111|
+IZ2FME  Michele          114|     27|     64|     23|
+IZ5BBS  Renato           441|    161|    132|    148|
+IZ5JLW  Lele              76|     30|     13|     33|
+IZ7EBY  Tony             166|      0|     94|     72|
+M0KTZ   Enzo             192|      0|    100|     92|
+M5ABN   Pete              72|     33|     16|     23|
+MM0UMH  Les               97|     28|     17|     52|
+OH7QR   Erkki             89|     27|     35|     27|
+OK2BMA  Pavel             31|      6|     12|     13|
+PA7RA   Rien             320|    105|     98|    117|
+PG4I    Joop              96|     36|     45|     15|
+============================|=======|=======|=======|=======|=======|=======|
+
+Thanks for participating, good luck and hopefully I'll see you back next month.
+
+vy73,
+DM4RW mgr S&L
+
+
+

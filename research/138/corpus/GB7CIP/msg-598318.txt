@@ -1,0 +1,321 @@
+From: LU9DCE
+To: NEWS
+Type/Status: B$
+Date/Time: 19-Oct-26 11:47
+Bid: 25382_LU9DCE
+Title: ARCHLINUX UPDATES 19-OCT
+Path: !VE3KPG!VE3CGR!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+ONEFETCH 3.1.0-1 X86_64
+
+GIT REPOSITORY SUMMARY ON YOUR TERMINAL
+
+========================================
+
+LINUX-API-HEADERS 7.3-1 X86_64
+
+KERNEL HEADERS SANITIZED FOR USE IN USERSPACE
+
+========================================
+
+LUAJIT 2.1.1792349434+DD3B243-1 X86_64
+
+JUST-IN-TIME COMPILER AND DROP-IN REPLACEMENT FOR LUA 5.1
+
+========================================
+
+APPARMOR 5.0.2-2 X86_64
+
+MANDATORY ACCESS CONTROL (MAC) USING LINUX SECURITY MODULE (LSM)
+
+========================================
+
+ZNC 1.10.3-2 X86_64
+
+AN IRC BOUNCER WITH MODULES & SCRIPTS SUPPORT
+
+========================================
+
+XMMS2 0.9.7-4 X86_64
+
+X-PLATFORM MUSIC MULTIPLEXING SYSTEM 2
+
+========================================
+
+WEECHAT 4.10.1-2 X86_64
+
+FAST, LIGHT AND EXTENSIBLE IRC CLIENT (CURSES UI)
+
+========================================
+
+UWSGI-PLUGIN-ZABBIX 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (ZABBIX PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-WEBDAV 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (WEBDAV PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-RACK 2.0.31-4 X86_64
+
+RUBY RACK PLUGIN
+
+========================================
+
+UWSGI-PLUGIN-PYTHON 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (PYTHON PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-PYPY 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (PYPY PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-PSGI 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (PERL PSGI PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-PHP-LEGACY 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (PHP LEGACY PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-PHP 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (PHP PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-NOTFOUND 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (NOTFOUND PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-MONO 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (MONO PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-LUA51 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (LUA PLUGIN)
+
+========================================
+
+UWSGI-PLUGIN-CGI 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES (CGI PLUGIN)
+
+========================================
+
+UWSGI 2.0.31-4 X86_64
+
+A FULL STACK FOR BUILDING HOSTING SERVICES
+
+========================================
+
+SUBVERSION 1.14.5-6 X86_64
+
+A MODERN CONCURRENT VERSION CONTROL SYSTEM
+
+========================================
+
+SPAMASSASSIN 4.0.2-3 X86_64
+
+A MAIL FILTER TO IDENTIFY SPAM
+
+========================================
+
+RXVT-UNICODE-TERMINFO 9.31-10 X86_64
+
+TERMINFO FILES FOR URXVT
+
+========================================
+
+RXVT-UNICODE 9.31-10 X86_64
+
+UNICODE ENABLED RXVT-CLONE TERMINAL EMULATOR (URXVT)
+
+========================================
+
+RUBY-MARISA 0.3.1-2 X86_64
+
+RUBY LANGUAGE BINDING FOR MARISA
+
+========================================
+
+RUBY-LIBGUESTFS 1.60.1-2 X86_64
+
+ACCESS AND MODIFY VIRTUAL MACHINE DISK IMAGES - RUBY SUPPORT
+
+========================================
+
+RRDTOOL 1.11.0-2 X86_64
+
+DATA LOGGING AND GRAPHING APPLICATION
+
+========================================
+
+RAZOR 2.88-2 X86_64
+
+A DISTRIBUTED, COLLABORATIVE, SPAM DETECTION AND FILTERING NETWORK
+
+========================================
+
+PYTHON-MARISA 0.3.1-2 X86_64
+
+PYTHON LANGUAGE BINDING FOR MARISA
+
+========================================
+
+PYTHON-LIBGUESTFS 1.60.1-2 X86_64
+
+ACCESS AND MODIFY VIRTUAL MACHINE DISK IMAGES - PYTHON SUPPORT
+
+========================================
+
+POSTGRESQL-OLD-UPGRADE 17.11-3 X86_64
+
+OLDER POSTGRESQL FOR MIGRATING MAJOR VERSIONS WITH PG_UPGRADE
+
+========================================
+
+POSTGRESQL-LIBS 18.6-4 X86_64
+
+SOPHISTICATED OBJECT-RELATIONAL DBMS - CLIENT BINARIES AND LIBRARIES
+
+========================================
+
+POSTGRESQL-DOCS 18.6-4 X86_64
+
+SOPHISTICATED OBJECT-RELATIONAL DBMS - HTML DOCUMENTATION
+
+========================================
+
+POSTGRESQL 18.6-4 X86_64
+
+SOPHISTICATED OBJECT-RELATIONAL DBMS
+
+========================================
+
+PORK 0.99.8.1-26 X86_64
+
+CONSOLE-BASED AOL INSTANT MESSENGER & IRC CLIENT
+
+========================================
+
+POLYMAKE 4.15-15 X86_64
+
+OPEN SOURCE SOFTWARE FOR RESEARCH IN POLYHEDRAL GEOMETRY
+
+========================================
+
+PHP-LIBGUESTFS 1.60.1-2 X86_64
+
+ACCESS AND MODIFY VIRTUAL MACHINE DISK IMAGES - PHP SUPPORT
+
+========================================
+
+PERL-YAML-SYCK 1.47-2 X86_64
+
+FAST, LIGHTWEIGHT YAML LOADER AND DUMPER
+
+========================================
+
+PERL-YAML-LIBYAML 0.910.0-2 X86_64
+
+PERL YAML SERIALIZATION USING XS AND LIBYAML
+
+========================================
+
+PERL-XS-PARSE-KEYWORD 0.49-2 X86_64
+
+XS FUNCTIONS TO ASSIST IN PARSING KEYWORD SYNTAX
+
+========================================
+
+PERL-XML-PARSER 2.59-2 X86_64
+
+EXPAT-BASED XML PARSER MODULE FOR PERL
+
+========================================
+
+PERL-XML-LIBXSLT 2.003000-4 X86_64
+
+INTERFACE TO THE GNOME LIBXSLT LIBRARY
+
+========================================
+
+PERL-XML-LIBXML 2.0213-2 X86_64
+
+INTERFACE TO THE LIBXML LIBRARY
+
+========================================
+
+PERL-XAPIAN 2.1.0-1 X86_64
+
+PERL BINDINGS FOR XAPIAN
+
+========================================
+
+PERL-VARIABLE-MAGIC 0.65-2 X86_64
+
+ASSOCIATE USER-DEFINED MAGIC TO VARIABLES FROM PERL.
+
+========================================
+
+PERL-UNIX-SYSLOG 1.1-21 X86_64
+
+INTERFACE TO SYSLOG FUNCTIONS IN A C-LIBRARY
+
+========================================
+
+PERL-UNICODE-STRING 2.10-11 X86_64
+
+STRING OF UNICODE CHARACTERS FOR PERL (UCS2/UTF16)
+
+========================================
+
+PERL-UNICODE-LINEBREAK 2019.001-10 X86_64
+
+UAX #14 UNICODE LINE BREAKING ALGORITHM
+
+========================================
+
+PERL-TK-TABLEMATRIX 1.29-6 X86_64
+
+DISPLAY DATA IN TABLESPREADSHEET FORMAT
+
+========================================
+
+PERL-TK 804.036-9 X86_64
+
+A GRAPHICAL USER INTERFACE TOOLKIT FOR PERL
+
+========================================
+
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

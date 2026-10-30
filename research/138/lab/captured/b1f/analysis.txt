@@ -1,0 +1,302 @@
+
+## t01_plain (posted on GB7LAA)
+posted : 41 bytes 33bae6a0
+laa: #2 bid=2_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=44 tlen=13 title='lab t01_plai'
+   file 44 bytes sha1=e61a7c98 body=b'Plain bulletin.\r\nSecond line.\r\nThird line.\r\n'
+laf: #101 bid=2_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=99 tlen=13 title='lab t01_plai'
+   file 99 bytes sha1=67640c0a body=b'R:261029/2111Z 2@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nPlain bulletin.\r\nSecond line.\r\nThird line.\r\n'
+lab: #1 bid=2_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=166 tlen=13 title='lab t01_plai'
+   file 166 bytes sha1=8f739b62 body=b'R:261029/2112Z @:GB7LAF.#99.GBR.EURO #:101 [Labtown] $:2_GB7LAA-1\r\nR:261029/2111Z 2@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nPlain bulletin.\r\nSecond line.\r\nThird line.\r\n'
+
+## t01_plain (posted on GB7LAF)
+posted : 41 bytes 33bae6a0
+laf: #102 bid=102_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=41 tlen=13 title='lab t01_plai'
+   file 44 bytes sha1=e61a7c98 body=b'Plain bulletin.\r\nSecond line.\r\nThird line.\r\n'
+lab: #2 bid=102_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=165 tlen=13 title='lab t01_plai'
+   file 165 bytes sha1=88e1604d body=b'R:261029/2112Z @:GB7LAF.#99.GBR.EURO #:102 [Labtown] $:102_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nPlain bulletin.\r\nSecond line.\r\nThird line.\r\n'
+
+## t02_from_line (posted on GB7LAA)
+posted : 94 bytes 442a7439
+laa: #3 bid=3_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=99 tlen=17 title='lab t02_from'
+   file 99 bytes sha1=0c5641ca body=b'From the desk of the lab\r\nFrom nobody Thu Oct 29 20:00:00 2026\r\n  From indented\r\nfrom lower\r\nEnd.\r\n'
+laf: #104 bid=3_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=154 tlen=17 title='lab t02_from'
+   file 154 bytes sha1=9b705dca body=b'R:261029/2112Z 3@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nFrom the desk of the lab\r\nFrom nobody Thu Oct 29 20:00:00 2026\r\n  From indented\r\nfrom lower\r\nEnd.\r\n'
+lab: #4 bid=3_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=221 tlen=17 title='lab t02_from'
+   file 221 bytes sha1=bfe5a586 body=b'R:261029/2113Z @:GB7LAF.#99.GBR.EURO #:104 [Labtown] $:3_GB7LAA-1\r\nR:261029/2112Z 3@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nFrom the desk of the lab\r\nFrom nobody Thu Oct 29 20:00:00 2026\r\n  From indented\r\nfrom lower\r\nEnd.\r\n'
+
+## t02_from_line (posted on GB7LAF)
+posted : 94 bytes 442a7439
+laf: #103 bid=103_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=94 tlen=17 title='lab t02_from'
+   file 99 bytes sha1=0c5641ca body=b'From the desk of the lab\r\nFrom nobody Thu Oct 29 20:00:00 2026\r\n  From indented\r\nfrom lower\r\nEnd.\r\n'
+lab: #3 bid=103_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=220 tlen=17 title='lab t02_from'
+   file 220 bytes sha1=94d491af body=b'R:261029/2112Z @:GB7LAF.#99.GBR.EURO #:103 [Labtown] $:103_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nFrom the desk of the lab\r\nFrom nobody Thu Oct 29 20:00:00 2026\r\n  From indented\r\nfrom lower\r\nEnd.\r\n'
+
+## t03_from_to_top (posted on GB7LAA)
+posted : 75 bytes ee911d6b
+laa: #4 bid=4_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=78 tlen=19 title='lab t03_from'
+   file 78 bytes sha1=234dc9bc body=b'From: G0FAKE@GB7XXX.#1.GBR.EURO\r\nTo  : ALL@WW\r\nBody after fake header lines.\r\n'
+laf: #106 bid=4_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=133 tlen=19 title='lab t03_from'
+   file 133 bytes sha1=2df8a815 body=b'R:261029/2113Z 4@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nFrom: G0FAKE@GB7XXX.#1.GBR.EURO\r\nTo  : ALL@WW\r\nBody after fake header lines.\r\n'
+lab: #6 bid=4_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=200 tlen=19 title='lab t03_from'
+   file 200 bytes sha1=89d316f1 body=b'R:261029/2114Z @:GB7LAF.#99.GBR.EURO #:106 [Labtown] $:4_GB7LAA-1\r\nR:261029/2113Z 4@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nFrom: G0FAKE@GB7XXX.#1.GBR.EURO\r\nTo  : ALL@WW\r\nBody after fake header lines.\r\n'
+
+## t03_from_to_top (posted on GB7LAF)
+posted : 75 bytes ee911d6b
+laf: #105 bid=105_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=75 tlen=19 title='lab t03_from'
+   file 78 bytes sha1=234dc9bc body=b'From: G0FAKE@GB7XXX.#1.GBR.EURO\r\nTo  : ALL@WW\r\nBody after fake header lines.\r\n'
+lab: #5 bid=105_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=199 tlen=19 title='lab t03_from'
+   file 199 bytes sha1=0d6cfb38 body=b'R:261029/2113Z @:GB7LAF.#99.GBR.EURO #:105 [Labtown] $:105_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nFrom: G0FAKE@GB7XXX.#1.GBR.EURO\r\nTo  : ALL@WW\r\nBody after fake header lines.\r\n'
+
+## t04_trailing_ws (posted on GB7LAA)
+posted : 87 bytes 7bfe142a
+laa: #5 bid=5_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=94 tlen=19 title='lab t04_trai'
+   file 94 bytes sha1=c0e4fddd body=b'trailing space   \r\ntrailing tab\t\r\n\ttab at start\r\nmid\ttab\r\nspace-only line follows\r\n   \r\nend.\r\n'
+laf: #107 bid=5_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=149 tlen=19 title='lab t04_trai'
+   file 149 bytes sha1=b5192fd9 body=b'R:261029/2113Z 5@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntrailing space   \r\ntrailing tab\t\r\n\ttab at start\r\nmid\ttab\r\nspace-only line follows\r\n   \r\nend.\r\n'
+lab: #7 bid=5_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=216 tlen=19 title='lab t04_trai'
+   file 216 bytes sha1=586943f2 body=b'R:261029/2114Z @:GB7LAF.#99.GBR.EURO #:107 [Labtown] $:5_GB7LAA-1\r\nR:261029/2113Z 5@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntrailing space   \r\ntrailing tab\t\r\n\ttab at start\r\nmid\ttab\r\nspace-only line follows\r\n   \r\nend.\r\n'
+
+## t04_trailing_ws (posted on GB7LAF)
+posted : 87 bytes 7bfe142a
+laf: #108 bid=108_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=87 tlen=19 title='lab t04_trai'
+   file 94 bytes sha1=c0e4fddd body=b'trailing space   \r\ntrailing tab\t\r\n\ttab at start\r\nmid\ttab\r\nspace-only line follows\r\n   \r\nend.\r\n'
+lab: #8 bid=108_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=215 tlen=19 title='lab t04_trai'
+   file 215 bytes sha1=1fbf8e4f body=b'R:261029/2114Z @:GB7LAF.#99.GBR.EURO #:108 [Labtown] $:108_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\ntrailing space   \r\ntrailing tab\t\r\n\ttab at start\r\nmid\ttab\r\nspace-only line follows\r\n   \r\nend.\r\n'
+
+## t05_blank_first (posted on GB7LAA)
+posted : 61 bytes d54061a1
+laa: #6 bid=6_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=66 tlen=19 title='lab t05_blan'
+   file 66 bytes sha1=74e661bb body=b'\r\nfirst line above is blank\r\n\r\n\r\ntwo blank lines above this one.\r\n'
+laf: #110 bid=6_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=121 tlen=19 title='lab t05_blan'
+   file 121 bytes sha1=eed434fd body=b'R:261029/2114Z 6@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\n\r\nfirst line above is blank\r\n\r\n\r\ntwo blank lines above this one.\r\n'
+lab: #10 bid=6_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=188 tlen=19 title='lab t05_blan'
+   file 188 bytes sha1=6363a588 body=b'R:261029/2115Z @:GB7LAF.#99.GBR.EURO #:110 [Labtown] $:6_GB7LAA-1\r\nR:261029/2114Z 6@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\n\r\nfirst line above is blank\r\n\r\n\r\ntwo blank lines above this one.\r\n'
+
+## t05_blank_first (posted on GB7LAF)
+posted : 61 bytes d54061a1
+laf: #109 bid=109_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=61 tlen=19 title='lab t05_blan'
+   file 66 bytes sha1=74e661bb body=b'\r\nfirst line above is blank\r\n\r\n\r\ntwo blank lines above this one.\r\n'
+lab: #9 bid=109_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=187 tlen=19 title='lab t05_blan'
+   file 187 bytes sha1=89bcabab body=b'R:261029/2114Z @:GB7LAF.#99.GBR.EURO #:109 [Labtown] $:109_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\n\r\nfirst line above is blank\r\n\r\n\r\ntwo blank lines above this one.\r\n'
+
+## t06_long_lines (posted on GB7LAA)
+posted : 7049 bytes cc863202
+laa: #7 bid=7_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=7056 tlen=18 title='lab t06_long'
+   file 7056 bytes sha1=4858a439 body=b'L79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n255 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'...
+laf: #112 bid=7_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=7111 tlen=18 title='lab t06_long'
+   file 7111 bytes sha1=b06a7341 body=b'R:261029/2115Z 7@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nL79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n255 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'...
+lab: #12 bid=7_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=7178 tlen=18 title='lab t06_long'
+   file 7178 bytes sha1=192e5dfd body=b'R:261029/2116Z @:GB7LAF.#99.GBR.EURO #:112 [Labtown] $:7_GB7LAA-1\r\nR:261029/2115Z 7@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nL79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n255 xxxxxxxx'...
+
+## t06_long_lines (posted on GB7LAF)
+posted : 7049 bytes cc863202
+laf: #111 bid=111_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=7049 tlen=18 title='lab t06_long'
+   file 7057 bytes sha1=ed4e64ee body=b'L79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL255 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'...
+lab: #11 bid=111_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=7178 tlen=18 title='lab t06_long'
+   file 7178 bytes sha1=74e04306 body=b'R:261029/2115Z @:GB7LAF.#99.GBR.EURO #:111 [Labtown] $:111_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nL79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nL255 xxxxxxxx'...
+
+## t07_title40 (posted on GB7LAA)
+posted : 27 bytes d31272f6
+laa: #8 bid=8_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=28 tlen=40 title='T40 aaaaaaaa'
+   file 28 bytes sha1=929744b5 body=b'title is 40 chars exactly.\r\n'
+laf: #114 bid=8_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=83 tlen=40 title='T40 aaaaaaaa'
+   file 83 bytes sha1=2fcef2f8 body=b'R:261029/2116Z 8@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntitle is 40 chars exactly.\r\n'
+lab: #14 bid=8_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=150 tlen=40 title='T40 aaaaaaaa'
+   file 150 bytes sha1=a6b6b99a body=b'R:261029/2117Z @:GB7LAF.#99.GBR.EURO #:114 [Labtown] $:8_GB7LAA-1\r\nR:261029/2116Z 8@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntitle is 40 chars exactly.\r\n'
+
+## t07_title40 (posted on GB7LAF)
+posted : 27 bytes d31272f6
+laf: #113 bid=113_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=27 tlen=40 title='T40 aaaaaaaa'
+   file 28 bytes sha1=929744b5 body=b'title is 40 chars exactly.\r\n'
+lab: #13 bid=113_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=149 tlen=40 title='T40 aaaaaaaa'
+   file 149 bytes sha1=0fcadadc body=b'R:261029/2116Z @:GB7LAF.#99.GBR.EURO #:113 [Labtown] $:113_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\ntitle is 40 chars exactly.\r\n'
+
+## t08_title60 (posted on GB7LAA)
+posted : 27 bytes e671b4ca
+laa: #9 bid=9_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=28 tlen=59 title='T60 bbbbbbbb'
+   file 28 bytes sha1=6d75cd31 body=b'title is 60 chars exactly.\r\n'
+laf: #115 bid=9_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=83 tlen=59 title='T60 bbbbbbbb'
+   file 83 bytes sha1=b1b095dc body=b'R:261029/2116Z 9@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntitle is 60 chars exactly.\r\n'
+lab: #15 bid=9_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=150 tlen=59 title='T60 bbbbbbbb'
+   file 150 bytes sha1=abb048ee body=b'R:261029/2117Z @:GB7LAF.#99.GBR.EURO #:115 [Labtown] $:9_GB7LAA-1\r\nR:261029/2116Z 9@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntitle is 60 chars exactly.\r\n'
+
+## t08_title60 (posted on GB7LAF)
+posted : 27 bytes e671b4ca
+laf: #116 bid=116_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=27 tlen=60 title='T60 bbbbbbbb'
+   file 28 bytes sha1=6d75cd31 body=b'title is 60 chars exactly.\r\n'
+lab: #16 bid=116_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=149 tlen=60 title='T60 bbbbbbbb'
+   file 149 bytes sha1=bc9857cc body=b'R:261029/2117Z @:GB7LAF.#99.GBR.EURO #:116 [Labtown] $:116_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\ntitle is 60 chars exactly.\r\n'
+
+## t09_title100 (posted on GB7LAA)
+posted : 20 bytes 2058d0f5
+laa: #10 bid=10_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=21 tlen=59 title='T100 ccccccc'
+   file 21 bytes sha1=5774478a body=b'title is 100 chars.\r\n'
+laf: #118 bid=10_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=77 tlen=59 title='T100 ccccccc'
+   file 77 bytes sha1=0d53bac6 body=b'R:261029/2117Z 10@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntitle is 100 chars.\r\n'
+lab: #18 bid=10_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=145 tlen=59 title='T100 ccccccc'
+   file 145 bytes sha1=d43c5271 body=b'R:261029/2118Z @:GB7LAF.#99.GBR.EURO #:118 [Labtown] $:10_GB7LAA-1\r\nR:261029/2117Z 10@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntitle is 100 chars.\r\n'
+
+## t09_title100 (posted on GB7LAF)
+posted : 20 bytes 2058d0f5
+laf: #117 bid=117_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=20 tlen=60 title='T100 ccccccc'
+   file 21 bytes sha1=5774478a body=b'title is 100 chars.\r\n'
+lab: #17 bid=117_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=142 tlen=60 title='T100 ccccccc'
+   file 142 bytes sha1=eea17ba4 body=b'R:261029/2117Z @:GB7LAF.#99.GBR.EURO #:117 [Labtown] $:117_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\ntitle is 100 chars.\r\n'
+
+## t10_latin1 (posted on GB7LAA)
+posted : 76 bytes 9539d7de
+laa: #11 bid=11_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=79 tlen=12 title='café title £'
+   file 79 bytes sha1=96e4bd12 body=b'latin1: caf\xe9 na\xefve \xa3 \xb0 \xfe \xc0\xdf end\r\nhigh: \x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\r\nend.\r\n'
+laf: #120 bid=11_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=135 tlen=12 title='café title £'
+   file 135 bytes sha1=a370267a body=b'R:261029/2117Z 11@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nlatin1: caf\xe9 na\xefve \xa3 \xb0 \xfe \xc0\xdf end\r\nhigh: \x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\r\nend.\r\n'
+lab: #20 bid=11_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=203 tlen=12 title='café title £'
+   file 203 bytes sha1=7cca65e7 body=b'R:261029/2119Z @:GB7LAF.#99.GBR.EURO #:120 [Labtown] $:11_GB7LAA-1\r\nR:261029/2117Z 11@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nlatin1: caf\xe9 na\xefve \xa3 \xb0 \xfe \xc0\xdf end\r\nhigh: \x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\r\nend.\r\n'
+
+## t10_latin1 (posted on GB7LAF)
+posted : 76 bytes 9539d7de
+laf: #119 bid=119_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=76 tlen=12 title='café title £'
+   file 79 bytes sha1=96e4bd12 body=b'latin1: caf\xe9 na\xefve \xa3 \xb0 \xfe \xc0\xdf end\r\nhigh: \x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\r\nend.\r\n'
+lab: #19 bid=119_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=200 tlen=12 title='café title £'
+   file 200 bytes sha1=2471e775 body=b'R:261029/2118Z @:GB7LAF.#99.GBR.EURO #:119 [Labtown] $:119_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nlatin1: caf\xe9 na\xefve \xa3 \xb0 \xfe \xc0\xdf end\r\nhigh: \x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\r\nend.\r\n'
+
+## t11_utf8 (posted on GB7LAA)
+posted : 53 bytes a7f431ba
+laa: #12 bid=12_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=55 tlen=21 title='cafÃ© Â£ Â° '
+   file 55 bytes sha1=a0d4aa21 body=b'utf8: caf\xc3\xa9 na\xc3\xafve \xc2\xa3 \xc2\xb0 \xe2\x82\xac \xe2\x80\x94 \xe2\x80\x93 \xe2\x80\xa6 \xe6\x97\xa5\xe6\x9c\xac\r\nend.\r\n'
+laf: #121 bid=12_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=111 tlen=21 title='cafÃ© Â£ Â° '
+   file 111 bytes sha1=413eace2 body=b'R:261029/2118Z 12@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nutf8: caf\xc3\xa9 na\xc3\xafve \xc2\xa3 \xc2\xb0 \xe2\x82\xac \xe2\x80\x94 \xe2\x80\x93 \xe2\x80\xa6 \xe6\x97\xa5\xe6\x9c\xac\r\nend.\r\n'
+lab: #21 bid=12_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=179 tlen=21 title='cafÃ© Â£ Â° '
+   file 179 bytes sha1=751bd07a body=b'R:261029/2119Z @:GB7LAF.#99.GBR.EURO #:121 [Labtown] $:12_GB7LAA-1\r\nR:261029/2118Z 12@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nutf8: caf\xc3\xa9 na\xc3\xafve \xc2\xa3 \xc2\xb0 \xe2\x82\xac \xe2\x80\x94 \xe2\x80\x93 \xe2\x80\xa6 \xe6\x97\xa5\xe6\x9c\xac\r\nend.\r\n'
+
+## t11_utf8 (posted on GB7LAF)
+posted : 53 bytes a7f431ba
+laf: #122 bid=122_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=53 tlen=21 title='cafÃ© Â£ Â° '
+   file 55 bytes sha1=a0d4aa21 body=b'utf8: caf\xc3\xa9 na\xc3\xafve \xc2\xa3 \xc2\xb0 \xe2\x82\xac \xe2\x80\x94 \xe2\x80\x93 \xe2\x80\xa6 \xe6\x97\xa5\xe6\x9c\xac\r\nend.\r\n'
+lab: #22 bid=122_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=176 tlen=21 title='cafÃ© Â£ Â° '
+   file 176 bytes sha1=fa0243df body=b'R:261029/2119Z @:GB7LAF.#99.GBR.EURO #:122 [Labtown] $:122_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nutf8: caf\xc3\xa9 na\xc3\xafve \xc2\xa3 \xc2\xb0 \xe2\x82\xac \xe2\x80\x94 \xe2\x80\x93 \xe2\x80\xa6 \xe6\x97\xa5\xe6\x9c\xac\r\nend.\r\n'
+
+## t12_no_final_newline (posted on GB7LAA)
+posted : 43 bytes cbe4f0b5
+laa: #13 bid=13_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=49 tlen=24 title='lab t12_no_f'
+   file 49 bytes sha1=7fc6676a body=b'line one\r\nline two\r\nlast line without newline\rB\r\n'
+laf: #123 bid=13_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=105 tlen=24 title='lab t12_no_f'
+   file 106 bytes sha1=3dab084d body=b'R:261029/2119Z 13@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nline one\r\nline two\r\nlast line without newline\r\nB\r\n'
+lab: #23 bid=13_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=174 tlen=24 title='lab t12_no_f'
+   file 174 bytes sha1=f30fbc01 body=b'R:261029/2121Z @:GB7LAF.#99.GBR.EURO #:123 [Labtown] $:13_GB7LAA-1\r\nR:261029/2119Z 13@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nline one\r\nline two\r\nlast line without newline\r\nB\r\n'
+
+## t12_no_final_newline (posted on GB7LAF)
+posted : 43 bytes cbe4f0b5
+laf: #124 bid=124_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=44 tlen=24 title='lab t12_no_f'
+   file 47 bytes sha1=8766469e body=b'line one\r\nline two\r\nlast line without newline\r\n'
+lab: #24 bid=124_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=168 tlen=24 title='lab t12_no_f'
+   file 168 bytes sha1=ae9b713a body=b'R:261029/2122Z @:GB7LAF.#99.GBR.EURO #:124 [Labtown] $:124_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nline one\r\nline two\r\nlast line without newline\r\n'
+
+## t13_ends_blank_lines (posted on GB7LAA)
+posted : 8 bytes a3d320bc
+laa: #14 bid=14_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=12 tlen=24 title='lab t13_ends'
+   file 12 bytes sha1=e296e358 body=b'text\r\n\r\n\r\n\r\n'
+laf: #125 bid=14_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=68 tlen=24 title='lab t13_ends'
+   file 68 bytes sha1=a6c62011 body=b'R:261029/2122Z 14@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntext\r\n\r\n\r\n\r\n'
+lab: #25 bid=14_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=136 tlen=24 title='lab t13_ends'
+   file 136 bytes sha1=df81ae15 body=b'R:261029/2123Z @:GB7LAF.#99.GBR.EURO #:125 [Labtown] $:14_GB7LAA-1\r\nR:261029/2122Z 14@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ntext\r\n\r\n\r\n\r\n'
+
+## t13_ends_blank_lines (posted on GB7LAF)
+posted : 8 bytes a3d320bc
+laf: #126 bid=126_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=8 tlen=24 title='lab t13_ends'
+   file 12 bytes sha1=e296e358 body=b'text\r\n\r\n\r\n\r\n'
+lab: #26 bid=126_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=133 tlen=24 title='lab t13_ends'
+   file 133 bytes sha1=f9477297 body=b'R:261029/2123Z @:GB7LAF.#99.GBR.EURO #:126 [Labtown] $:126_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\ntext\r\n\r\n\r\n\r\n'
+
+## t14_crlf_body (posted on GB7LAA)
+posted : 32 bytes 5a1194c7
+laa: #15 bid=15_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=32 tlen=17 title='lab t14_crlf'
+   file 32 bytes sha1=5a1194c7 body=b'crlf one\r\ncrlf two\r\ncrlf three\r\n'
+laf: #127 bid=15_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=88 tlen=17 title='lab t14_crlf'
+   file 88 bytes sha1=f7188749 body=b'R:261029/2123Z 15@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ncrlf one\r\ncrlf two\r\ncrlf three\r\n'
+lab: #27 bid=15_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=156 tlen=17 title='lab t14_crlf'
+   file 156 bytes sha1=0f6f8fe2 body=b'R:261029/2124Z @:GB7LAF.#99.GBR.EURO #:127 [Labtown] $:15_GB7LAA-1\r\nR:261029/2123Z 15@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\ncrlf one\r\ncrlf two\r\ncrlf three\r\n'
+
+## t14_crlf_body (posted on GB7LAF)
+posted : 32 bytes 5a1194c7
+laf: #128 bid=128_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=29 tlen=17 title='lab t14_crlf'
+   file 32 bytes sha1=5a1194c7 body=b'crlf one\r\ncrlf two\r\ncrlf three\r\n'
+lab: #28 bid=128_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=153 tlen=17 title='lab t14_crlf'
+   file 153 bytes sha1=b5802fd0 body=b'R:261029/2124Z @:GB7LAF.#99.GBR.EURO #:128 [Labtown] $:128_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\ncrlf one\r\ncrlf two\r\ncrlf three\r\n'
+
+## t16_dot_line (posted on GB7LAA)
+posted : 25 bytes 7b3ab278
+laa: #16 bid=16_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=30 tlen=16 title='lab t16_dot_'
+   file 30 bytes sha1=07f53060 body=b'before\r\n.\r\nafter\r\n..\r\nafter2\r\n'
+laf: #129 bid=16_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=86 tlen=16 title='lab t16_dot_'
+   file 86 bytes sha1=fc004c20 body=b'R:261029/2127Z 16@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nbefore\r\n.\r\nafter\r\n..\r\nafter2\r\n'
+lab: #29 bid=16_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=154 tlen=16 title='lab t16_dot_'
+   file 154 bytes sha1=fbdf8e5f body=b'R:261029/2128Z @:GB7LAF.#99.GBR.EURO #:129 [Labtown] $:16_GB7LAA-1\r\nR:261029/2127Z 16@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nbefore\r\n.\r\nafter\r\n..\r\nafter2\r\n'
+
+## t16_dot_line (posted on GB7LAF)
+posted : 25 bytes 7b3ab278
+laf: #130 bid=130_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=25 tlen=16 title='lab t16_dot_'
+   file 30 bytes sha1=07f53060 body=b'before\r\n.\r\nafter\r\n..\r\nafter2\r\n'
+lab: #30 bid=130_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=151 tlen=16 title='lab t16_dot_'
+   file 151 bytes sha1=58d4d25e body=b'R:261029/2128Z @:GB7LAF.#99.GBR.EURO #:130 [Labtown] $:130_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nbefore\r\n.\r\nafter\r\n..\r\nafter2\r\n'
+
+## t17_r_lines (posted on GB7LAA)
+posted : 170 bytes c52c937f
+laa: #17 bid=17_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=176 tlen=15 title='lab t17_r_li'
+   file 176 bytes sha1=549b2520 body=b'R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25\r\nR:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F\r\n\r\nbody after R lines.\r\nR:261029/1000Z mid-body R line 9@X.#3.GBR.EURO\r\nend.\r\n'
+laf: #132 bid=17_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=230 tlen=15 title='lab t17_r_li'
+   file 230 bytes sha1=9a735087 body=b'R:261029/2128Z 17@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\nR:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25\r\nR:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F\r\n\r\nbody after R lines.\r\nR:261029/1000Z mid-body R line 9@X.#3.GBR.EURO\r\nend.\r\n'
+lab: #32 bid=17_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=298 tlen=15 title='lab t17_r_li'
+   file 298 bytes sha1=8fe2b48c body=b'R:261029/2129Z @:GB7LAF.#99.GBR.EURO #:132 [Labtown] $:17_GB7LAA-1\r\nR:261029/2128Z 17@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\nR:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25\r\nR:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F\r\n\r\nbody after R lines.\r\nR:261029/1000Z mid-body R line 9@X.#3.GBR.EURO\r\nend.\r\n'
+
+## t17_r_lines (posted on GB7LAF)
+posted : 170 bytes c52c937f
+laf: #131 bid=F bbsfrom='G0LAB' via='WW' from=G0LAB to=LABTST hdrsize=170 tlen=15 title='lab t17_r_li'
+   file 176 bytes sha1=549b2520 body=b'R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25\r\nR:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F\r\n\r\nbody after R lines.\r\nR:261029/1000Z mid-body R line 9@X.#3.GBR.EURO\r\nend.\r\n'
+lab: #31 bid=F bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=234 tlen=15 title='lab t17_r_li'
+   file 234 bytes sha1=dc0de8ec body=b'R:261029/2129Z @:GB7LAF.#99.GBR.EURO #:131 [Labtown] $:F\r\nR:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25\r\nR:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F\r\n\r\nbody after R lines.\r\nR:261029/1000Z mid-body R line 9@X.#3.GBR.EURO\r\nend.\r\n'
+
+## t18_very_long (posted on GB7LAA)
+posted : 52800 bytes 466381b6
+laa: #18 bid=18_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=53601 tlen=17 title='lab t18_very'
+   file 53601 bytes sha1=562d8b7a body=b'0001 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0002 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0003 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0004 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0005 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0006 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.'...
+laf: #133 bid=18_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=53657 tlen=17 title='lab t18_very'
+   file 53657 bytes sha1=12261e19 body=b'R:261029/2129Z 18@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\n0001 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0002 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0003 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0004 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0005 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0006 0123'...
+lab: #33 bid=18_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=53725 tlen=17 title='lab t18_very'
+   file 53725 bytes sha1=ecb2b76a body=b'R:261029/2131Z @:GB7LAF.#99.GBR.EURO #:133 [Labtown] $:18_GB7LAA-1\r\nR:261029/2129Z 18@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\n0001 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0002 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0003 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0004 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0005 012'...
+
+## t18_very_long (posted on GB7LAF)
+posted : 52800 bytes 466381b6
+laf: #135 bid=135_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=50630 tlen=17 title='lab t18_very'
+   file 51400 bytes sha1=053b8a4e body=b'0001 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0002 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0003 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0004 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0005 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0006 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.'...
+lab: #35 bid=135_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=51521 tlen=17 title='lab t18_very'
+   file 51521 bytes sha1=b6171b61 body=b'R:261029/2135Z @:GB7LAF.#99.GBR.EURO #:135 [Labtown] $:135_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\n0001 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0002 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0003 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0004 0123456789abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUV.\r\n0005 012345'...
+
+## t19_gt_from_and_misc (posted on GB7LAA)
+posted : 67 bytes e74ec2b4
+laa: #19 bid=19_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=72 tlen=24 title='lab t19_gt_f'
+   file 72 bytes sha1=5207f629 body=b'>From already escaped\r\n~ tilde line\r\n/EX-ish line: /EXIT\r\n# hash\r\nend.\r\n'
+laf: #134 bid=19_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=128 tlen=24 title='lab t19_gt_f'
+   file 128 bytes sha1=1bb8e78a body=b'R:261029/2133Z 19@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\n>From already escaped\r\n~ tilde line\r\n/EX-ish line: /EXIT\r\n# hash\r\nend.\r\n'
+lab: #34 bid=19_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=196 tlen=24 title='lab t19_gt_f'
+   file 196 bytes sha1=e78e7a64 body=b'R:261029/2135Z @:GB7LAF.#99.GBR.EURO #:134 [Labtown] $:19_GB7LAA-1\r\nR:261029/2133Z 19@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\n>From already escaped\r\n~ tilde line\r\n/EX-ish line: /EXIT\r\n# hash\r\nend.\r\n'
+
+## t19_gt_from_and_misc (posted on GB7LAF)
+posted : 67 bytes e74ec2b4
+
+## t20_ctrl_chars (posted on GB7LAA)
+posted : 35 bytes 4045730d
+laa: #20 bid=20_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=37 tlen=18 title='lab t20_ctrl'
+   file 37 bytes sha1=5c24eef9 body=b'bell:\x07 esc:\x1b[0m ff:\x0c nul-free\r\nend.\r\n'
+laf: #136 bid=20_GB7LAA-1 bbsfrom='GB7LAA' via='WW' from=G0LAB to=LABTST hdrsize=93 tlen=18 title='lab t20_ctrl'
+   file 93 bytes sha1=9681e425 body=b'R:261029/2135Z 20@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nbell:\x07 esc:\x1b[0m ff:\x0c nul-free\r\nend.\r\n'
+lab: #36 bid=20_GB7LAA-1 bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=161 tlen=18 title='lab t20_ctrl'
+   file 161 bytes sha1=7c105ef0 body=b'R:261029/2136Z @:GB7LAF.#99.GBR.EURO #:136 [Labtown] $:20_GB7LAA-1\r\nR:261029/2135Z 20@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25\r\n\r\nbell:\x07 esc:\x1b[0m ff:\x0c nul-free\r\nend.\r\n'
+
+## t20_ctrl_chars (posted on GB7LAF)
+posted : 35 bytes 4045730d
+laf: #137 bid= bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=35 tlen=18 title='lab t20_ctrl'
+   file 37 bytes sha1=5c24eef9 body=b'bell:\x07 esc:\x1b[0m ff:\x0c nul-free\r\nend.\r\n'
+laf: #137 bid=137_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=35 tlen=18 title='lab t20_ctrl'
+   file 37 bytes sha1=5c24eef9 body=b'bell:\x07 esc:\x1b[0m ff:\x0c nul-free\r\nend.\r\n'
+lab: #37 bid=137_GB7LAF bbsfrom='' via='WW' from=G0LAB to=LABTST hdrsize=158 tlen=18 title='lab t20_ctrl'
+   file 158 bytes sha1=baa5b4d5 body=b'R:261029/2136Z @:GB7LAF.#99.GBR.EURO #:137 [Labtown] $:137_GB7LAF\r\n\r\nFrom: G0LAB@GB7LAF.#99.GBR.EURO\r\nTo  : LABTST@WW\r\n\r\nbell:\x07 esc:\x1b[0m ff:\x0c nul-free\r\nend.\r\n'

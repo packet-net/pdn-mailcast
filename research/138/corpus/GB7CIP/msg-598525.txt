@@ -1,0 +1,34 @@
+From: HP2DFA
+To: SOLAR
+Type/Status: B$
+Date/Time: 21-Oct-26 21:46
+Bid: 5338_HP2DFA
+Title: SOLAR WX: Space Weather Message Code: ALTK04
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+==================================================
+    NOAA SPACE WEATHER ALERT BULLETIN - SOLAR     
+==================================================
+Source: NOAA Space Weather Prediction Center (SWPC)
+Product ID : K04A
+Issue Time : 2026-10-21 21:30:28.363
+--------------------------------------------------
+Space Weather Message Code: ALTK04
+Serial Number: 2693
+Issue Time: 2026 Oct 21 2130 UTC
+ALERT: Geomagnetic K-index of 4
+Threshold Reached: 2026 Oct 21 2059 UTC
+Synoptic Period: 1800-2100
+Active Warning: YES
+Comment:
+NOAA Space Weather Scale descriptions can be found at
+www.swpc.noaa.gov/noaa-scales-explanation
+Potential Impacts: Area of impact primarily poleward of 65
+degrees Geomagnetic Latitude.
+Induced Currents - Weak power grid fluctuations can occur.
+Aurora - Aurora may be visible at high latitudes such as Canada
+and Alaska.
+==================================================
+MAIL: HP2DFA@GMAIL.COM / HP2DFA-5@BPQ32
+73 DE HP2DFA-5 / BPQ32 SOLAR MONITOR PANAMA
+==================================================

@@ -1,0 +1,51 @@
+From: IU2EUG
+To: BBS
+Type/Status: BN
+Date/Time: 16-Oct 13:56Z
+Bid: 2648_IU2EUG
+Title: IU2EUG - BBS, chat and Winlink over VARA HF
+
+R:261016/1532Z 4188@GB7RDG.#42.GBR.EURO LinBPQ6.0.25
+R:261016/1518Z @:GB7CIP.#32.GBR.EURO #:8218 [Caterham Surrey GBR] $:2648_IU2EUG
+R:261016/1518Z 19706@GB7BED.#21.GBR.EU LinBPQ6.0.25
+R:261016/1517Z 49213@GB7OSW.#16.GBR.EU LinBPQ6.0.25
+R:261016/1511Z 12991@IW2OHX.ILOM.ITA.EU BPQ6.0.25
+R:261016/1356Z 2648@IU2EUG.ILOM.ITA.EU BPQ6.0.25
+
+Hello everyone,
+Introducing ALNODE, the IU2EUG BPQ node located in Senago (MI), Italy,
+Maidenhead locator JN45NN. Sysop: Alberto, IU2EUG.
+
+RADIO ACCESS
+Modem: VARA HF, 2300 Hz bandwidth, USB mode.
+Radio display frequencies (dial):
+  40 metres:  7,050,000 Hz (7.050 MHz)
+  20 metres: 14,122,000 Hz (14.122 MHz)
+
+The node scans between these two frequencies; it does not monitor both
+at the same time. If a connection attempt fails, please try again during
+a later listening window on the same band.
+
+Scheduled radio availability: daily from 07:00 until midnight,
+Italian local time (CET/CEST: UTC+01:00 in winter, UTC+02:00 in summer).
+
+SERVICES
+  IU2EUG-7   ALNODE - node access and commands
+  IU2EUG-11  ALBBS  - BBS, personal messages and bulletins
+  IU2EUG-12  ALBCHT - inter-node chat
+  IU2EUG            - Winlink access through RMS
+
+The node menu also provides ARICHAT (Ari Limbiate chat)
+and DXC (DX Cluster).
+
+The BBS exchanges bulletins with the IW2OHX node. Further distribution
+depends on the forwarding rules of the BBS stations involved.
+Other BBS sysops interested in establishing a direct forwarding link
+for bulletin exchange are welcome to contact me at tilaro.albertoÃ§gmail.com 
+to coordinate frequencies, connection schedules and forwarding routes.
+
+Connection tests, reception reports and messages to the sysop via
+BBS are also welcome.
+
+73 de Alberto, IU2EUG
+

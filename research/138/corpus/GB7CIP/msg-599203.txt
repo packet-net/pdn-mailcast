@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 28-Oct-26 12:17
+Bid: 6161_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - Reykjanes Ridge
+Path: !VK2RZ!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us7000ttnk
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-28 11:56:17 UTC
+Depth      : 10.0 km
+Coordinates: 58.3556 Lat / -32.2398 Lon
+--------------------------------------------------
+Location:
+  Reykjanes Ridge
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttnk
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

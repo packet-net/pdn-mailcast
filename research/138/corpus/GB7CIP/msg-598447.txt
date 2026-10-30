@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 20-Oct-26 18:57
+Bid: 5805-CX2SA
+Title: (M5.1) Azores Islands, Portugal 38.0 -26.3
+Path: !CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           Azores Islands, Portugal
+Geographic coordinates:           37.958N,  26.259W
+Magnitude:                        5.1
+Depth:                            10 km
+Universal Time (UTC):             20 Oct 2026  18:07:18
+Time near the Epicenter (1):      20 Oct 2026  17:07:18
+Time in your area (1):            20 Oct 2026  15:07:18
+Location with respect to nearby cities:
+39.3 km (24.4 mi) W of Mosteiros, Portugal
+57.3 km (35.5 mi) WNW of Ponta Delgada, Portugal
+64.9 km (40.2 mi) WNW of Lagoa, Portugal
+114.1 km (70.7 mi) SE of Angra do HeroÃ­smo, Portugal
+1028.3 km (637.6 mi) WNW of CÃ¢mara de Lobos, Portugal
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 6000u3p1
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3p1?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 20/10/2026 18:56:05 UTC
+________________________________________________________________

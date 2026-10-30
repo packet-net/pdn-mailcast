@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 26-Oct-26 05:45
+Bid: 5876_HP2DFA
+Title: EARTHQUAKE ALERT M5.0 - 45 km NNW of Ende, Indonesia
+Path: !SR1BSZ!OK0NBR!OK2PEN!VE3CGR!GB7OSW!GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.0+)       
+==================================================
+Event ID   : us6000u4y1
+Magnitude  : M 5.0
+Time (UTC) : 2026-10-26 04:53:40 UTC
+Depth      : 10.0 km
+Coordinates: -8.4430 Lat / 121.5729 Lon
+--------------------------------------------------
+Location:
+  45 km NNW of Ende, Indonesia
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4y1
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

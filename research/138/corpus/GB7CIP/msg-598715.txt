@@ -1,0 +1,47 @@
+From: LU9DCE
+To: EQUAKE
+Type/Status: B$
+Date/Time: 23-Oct-26 17:31
+Bid: 25808_LU9DCE
+Title: EARTHQUAKES 23-OCT
+Path: !GB7BED!K1AJD!VE3CGR!LU9DCE!
+
+            __    _  _  ___  ____   ___  ____    ____  ____  ____
+           (  )  / )( \/ _ \(    \ / __)(  __)  (  _ \(  _ \/ ___)
+           / (_/\) \/ (\__  )) D (( (__  ) _)    ) _ ( ) _ (\___ \
+           \____/\____/(___/(____/ \___)(____)  (____/(____/(____/
+
+                PACKET RADIO STATION - BUENOS AIRES (GF05OM)
+                      PYTHON SCHEDULED NEWSLETTERS (PSN)
+                     COPYRIGHT 2026 - EDUARDO A. CASTILLO
++----------------------------------------------------------------------------+
+
+        TIME       MAG                  PLACE
+-----------------------------------------------------------------------------
+2026-10-23 02:45 - 4.5 - 58 KM SW OF ATOCHA, BOLIVIA
+2026-10-23 02:17 - 4.5 - 18 KM NNW OF YONGNING, CHINA
+2026-10-23 00:09 - 4.5 - 102 KM W OF SAN ANTONIO DE LOS COBRES,
+ARGENTINA
+2026-10-22 21:37 - 4.6 - 49 KM S OF OLLAGUE, CHILE
+2026-10-22 21:09 - 4.8 - 269 KM SSW OF SEVERO-KURILSK, RUSSIA
+2026-10-22 20:05 - 5.0 - 153 KM S OF KOKOPO, PAPUA NEW GUINEA
+2026-10-22 19:06 - 4.9 - 104 KM NNE OF HIHIFO, TONGA
+2026-10-22 18:06 - 5.0 - 207 KM ENE OF NAGQU, CHINA
+2026-10-22 17:21 - 4.8 - 39 KM NE OF SHIKOTAN, RUSSIA
+2026-10-22 16:57 - 4.7 - 190 KM ENE OF NAGQU, CHINA
+2026-10-22 16:51 - 4.8 - 144 KM SSW OF OHONUA, TONGA
+2026-10-22 16:50 - 4.5 - 203 KM ENE OF NAGQU, CHINA
+2026-10-22 16:45 - 4.6 - 193 KM NE OF NAGQU, CHINA
+2026-10-22 16:21 - 4.9 - 210 KM ENE OF NAGQU, CHINA
+2026-10-22 15:45 - 4.9 - WESTERN XIZANG
+2026-10-22 15:27 - 4.7 - 139 KM ENE OF KASHGAR, CHINA
+2026-10-22 15:12 - 5.2 - 201 KM ENE OF NAGQU, CHINA
+2026-10-22 14:33 - 7.0 - 191 KM ENE OF NAGQU, CHINA
+2026-10-22 12:22 - 4.9 - 200 KM NW OF PORT-OLRY, VANUATU
+2026-10-22 10:57 - 4.9 - 85 KM NNW OF CURUP, INDONESIA
+2026-10-22 10:07 - 4.6 - 11 KM W OF ASHKASHAM, AFGHANISTAN
+
+-----------------------------------------------------------------------------
+
++----------------------------------------------------------------------------+
+  PYTHON PREPROCESSOR - DEVELOPED BY LU9DCE - VERSION 1.1 - LU9DCE.KOZOW.COM

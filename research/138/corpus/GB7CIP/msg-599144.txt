@@ -1,0 +1,45 @@
+From: CX2SA
+To: EQUAKE
+Type/Status: B$
+Date/Time: 28-Oct-26 05:08
+Bid: 6041-CX2SA
+Title: (M5.4) south of Java, Indonesia -9.1 110.3
+Path: !GB7COW!GB7BED!K1AJD!VE3CGR!CX2SA!
+
+From: CX2SA@CX2SA.SAL.URY.SOAM
+To  : EQUAKE@WW
+
+                     == PRELIMINARY REPORT ==
+Event type:                       Earthquake 
+Region:                           south of Java, Indonesia
+Geographic coordinates:           9.116S, 110.331E
+Magnitude:                        5.4
+Depth:                            10 km
+Universal Time (UTC):             27 Oct 2026  14:44:01
+Time near the Epicenter (1):      27 Oct 2026  21:44:01
+Time in your area (1):            27 Oct 2026  11:44:01
+Location with respect to nearby cities:
+128.8 km (79.8 mi) S of Pundong, Indonesia
+129.1 km (80.0 mi) S of Bambanglipuro, Indonesia
+130.5 km (80.9 mi) S of Srandakan, Indonesia
+130.8 km (81.1 mi) SSW of Wonosari, Indonesia
+145.5 km (90.2 mi) S of Yogyakarta, Indonesia
+
+ADDITIONAL PARAMETERS
+________________________________
+event ID                     :  us 7000ttgf
+
+This event has been reviewed by a seismologist
+(1) Nominal Standard Time; local and daylight savings time zone may differ.
+For subsequent updates, maps, and technical information, see:
+https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttgf?utm_medium=email&utm_source=ENS&utm_campaign=realtime
+or https://earthquake.usgs.gov/
+
+National Earthquake Information Center
+U.S. Geological Survey
+
+________________________________________________________________
+
+Automatic packet bulletin created ONLY for magnitudes 5.00 or up
+received from www.usgs.gov by cx2sa.net: 27/10/2026 21:17:45 UTC
+________________________________________________________________

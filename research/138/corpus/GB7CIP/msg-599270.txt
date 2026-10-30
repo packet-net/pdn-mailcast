@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 29-Oct-26 00:28
+Bid: 6225_HP2DFA
+Title: EARTHQUAKE ALERT M5.4 - 109 km ENE of Luganville, Vanuatu
+Path: !VE3KPG!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.4+)       
+==================================================
+Event ID   : us7000ttvf
+Magnitude  : M 5.4
+Time (UTC) : 2026-10-29 00:08:20 UTC
+Depth      : 10.0 km
+Coordinates: -15.1213 Lat / 168.0994 Lon
+--------------------------------------------------
+Location:
+  109 km ENE of Luganville, Vanuatu
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us7000ttvf
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

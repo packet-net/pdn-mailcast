@@ -1,0 +1,113 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 23-Oct-26 10:05
+Bid: 5516_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (23-Oct 05:00Z)
+Path: !VE3KPG!VE3CGR!KB5YZB!W0ARP!HP2DFA!
+
+000
+AXNT20 KNHC 230950
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1215 UTC Fri Oct 23 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_06Z.gif'>0600 UT
+0930 UTC.
+
+...SPECIAL FEATURES...
+
+Heavy Rainfall in the North Caribbean: A broad upper-level
+trough extends from the United States into the NW Caribbean,
+while deep moisture convergence is ongoing at lower levels in the
+southern Caribbean. A broad plume of very moist air will interact
+with the upper level trough in the NW Caribbean, sustaining
+moisture into Hispaniola, Jamaica, Cuba, and the Bahamas over the
+next several days. Low-level winds will also lead to moist onshore
+flow entering along the southern coasts of east Cuba and Haiti,
+where heavy precipitation is expected through Sunday. Expect the
+heaviest precipitation to occur across all other aforementioned
+areas on Sat and Sun. Heavy rainfall will raise concerns for
+dangerous and life-threatening flash flooding.
+
+Please refer to your local weather services and the International
+Desk at the Weather Prediction Center for more information.
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough extends off the coast of Africa near 13N16W
+and extends to 07N30W. The ITCZ extends from 07N35W to 05N52W.
+Scattered moderate convection is noted from 08N to 11N between
+17W and 20W.
+
+...GULF OF AMERICA...
+
+A tight gradient between 1020 mb high pressure off Louisiana and a
+trough over the northwest Caribbean is supporting moderate to
+fresh NE winds and 4-6 ft seas across the eastern Gulf this
+morning. Light to gentle NE to E winds and 1-3 ft seas are noted
+over the western Gulf.
+
+For the forecast, a tightening pressure gradient between the high
+pressure and a low pressure forecast to develop near the Bahamas
+will bring fresh to strong NE winds and rough seas over the
+eastern Gulf, including the Florida Straits, tonight through early
+next week.
+
+...CARIBBEAN SEA...
+
+An upper level trough over NW Caribbean supports scattered to
+numerous showers and thunderstorms over the north-central
+Caribbean. A weak pressure gradient over the area is generating
+moderate or weaker winds, and slight to moderate seas, over the
+basin.
+
+For the forecast, scattered to numerous showers and thunderstorms
+over the north-central Caribbean and Windward Passage will
+prevail through Sat. Meanwhile, a broad trough over the central
+and western Caribbean will support light winds and slight to
+moderate seas west of 75W through Sat, and moderate to fresh E to
+SE winds and moderate seas east of 75W. Fresh N to NE winds
+across the western Caribbean with building seas west of 80W are
+expected by early next week as high pressure builds north of the
+area. Expect rough seas and large swell across the Yucatan Channel
+Mon and Tue. Little change is expected elsewhere.
+
+...ATLANTIC OCEAN...
+
+Scattered showers and thunderstorms are active east of the
+northern Bahamas, and west of a trough reaching from 31N60W to
+the central Bahamas. Gentle to moderate breezes persist east of
+50W, although a tongue of large N swell continues to move into
+the waters between 70W, with 7 to 9 ft wave heights. Waves are 5-7
+ft elsewhere west of 560W. Scattered showers and thunderstorms
+are active near another surface trough is noted along 50W north of
+25N, and within 90 nm east of a trough along 32W from 10N to 18N.
+Elsewhere, broad ridging centered on 1030 mb high pressure near
+the Azores is maintaining fresh to strong SE to S winds and 6-8
+ft seas north of 27N between 45W and 50W, and moderate to fresh E
+winds and 5-7 ft seas elsewhere.
+
+For the forecast west of 55W, large northerly swell will continue
+to propagate across the forecast region W of 65W and NE of the
+Bahamas through Fri. A tightening pressure gradient will develop
+beginning late Fri as high pressure builds southward over the
+western Atlantic and low pressure deepens near the Bahamas along a
+trough or developing frontal boundary. This setup is expected to
+induce widespread fresh to strong NE to E winds and rough to very
+rough seas, with winds likely reaching gale-force over much of the
+waters north of 27N and W of 60W Sat night through Sun night.
+Mariners are urged to remain alert to these dangerous marine
+conditions, and take the necessary precautions to avoid the
+affected areas.
+
+$$
+Christensen

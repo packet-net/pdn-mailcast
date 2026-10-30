@@ -1,0 +1,91 @@
+From: HP2DFA
+To: NHC
+Type/Status: B$
+Date/Time: 22-Oct-26 09:22
+Bid: 5389_HP2DFA
+Title: NHC: TROPICAL WEATHER DISCUSSION (22-Oct 04:15Z)
+Path: !VE3KPG!VE3TOK!VE3CGR!PI8ZTM!DM4RW!HP2DFA!
+
+325
+AXNT20 KNHC 220910
+TWDAT
+
+Tropical Weather Discussion
+NWS National Hurricane Center Miami FL
+1215 UTC Thu Oct 22 2026
+
+Tropical Weather Discussion for North America, Central America
+Gulf of America, Caribbean Sea, northern sections of South
+America, and Atlantic Ocean to the African coast from the
+Equator to 31N. The following information is based on satellite
+imagery, weather observations, radar and meteorological analysis.
+
+Based on <a href='https://www.nhc.noaa.gov/tafb/USA_06Z.gif'>0600 UT
+0900 UTC.
+
+...MONSOON TROUGH/ITCZ...
+
+The monsoon trough reaches the Atlantic through the coast of
+Guinea-Bissau near 11N15W and continues southwestward to 08N25W.
+A surface trough is analyzed from 16N24W to 06N29W. The ITCZ
+extends from 08N32W to 07N57W. A few showers and isolated
+thunderstorms are noted from 11N to 15N between 21W and 25W.
+
+...GULF OF AMERICA...
+
+A surface trough extends from southern Texas to the SW Gulf and
+the southern Yucatan peninsula. Scattered showers and isolated
+thunderstorms are occurring south of 20N over the far southwest
+Gulf near this trough. High pressure dominates the remainder of
+the basin allowing for generally dry conditions. Gentle to
+moderate NE winds persist across the basin, south of high pressure
+centered over the mid Mississippi Valley. Seas are 2 to 4 ft over
+the eastern Gulf, and 3 to 5 ft over the central and western Gulf.
+
+For the forecast, high pressure over the eastern of the United
+States supports moderate to locally fresh NE to E winds across the
+Gulf. A tightening pressure gradient between the high pressure
+and a low pressure forecast to develop near the Bahamas will bring
+fresh to strong NE winds and rough to very rough seas over the
+eastern Gulf Fri night into Sat. These marine conditions will
+spread westward to the central Gulf Sat night through early next
+week.
+
+...CARIBBEAN SEA...
+
+Scattered showers and thunderstorms are active across the central
+Caribbean, and over the northwest Caribbean. Moderate E to SE
+winds and 2-4 ft are noted over the eastern Caribbean. Moderate NE
+winds and 3-5 ft seas are in the Yucatan Channel. Light to gentle
+breezes and slight seas are noted elsewhere.
+
+For the forecast, a broad trough over the central and western
+Caribbean will support light breezes and slight to moderate seas
+west of 75W through Sat, and moderate to fresh E to SE winds and
+moderate seas east of 75W. Looking ahead, expect fresh N to NE
+winds across the western Caribbean with building seas west of 80W
+early next week as high pressure builds north of the area. Little
+change is expected elsewhere.
+
+...ATLANTIC OCEAN...
+
+A trough reaches from Bermuda to western Cuba. Farther north,
+Subtropical Storm Josephine is off New Jersey. While this is too
+far north to have any impact on winds over the discussion area south
+of 31N, N swell of 8 to 11 ft generated in part by Josephine is
+moving into the region as far south as 27N west of 75W. Clusters
+of showers and thunderstorms are active north of 20N and west of
+45W, mainly near the trough and another trough reaching from
+31N58W to 25N50W. Moderate to fresh SE winds and 6-8 ft seas are
+ongoing within 90 nm east of this trough. Gentle to moderate winds
+and 5-7 ft seas are noted elsewhere across the basin.
+
+For the forecast west of 55W, a tightening pressure gradient will
+develop beginning late Fri as high pressure builds southward over
+the western Atlantic and low pressure deepens near the Bahamas
+along a trough or developing frontal boundary. This setup is
+expected to induce widespread fresh to strong NE to E winds and
+rough to very rough seas, with winds likely reaching gale- force
+over the waters north of 28N between 65W and 75W on Sun. Mariners
+should monitor the latest marine forecasts, and have avoidance
+plans in place.$$ Christensen

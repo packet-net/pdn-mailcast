@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 25-Oct-26 18:02
+Bid: 5846_HP2DFA
+Title: EARTHQUAKE ALERT M5.2 - 59 km SW of AshkÄsham, Afghanistan
+Path: !GB7BED!K1AJD!LU9DCE!W0ARP!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.2+)       
+==================================================
+Event ID   : us6000u4va
+Magnitude  : M 5.2
+Time (UTC) : 2026-10-25 17:44:23 UTC
+Depth      : 110.0 km
+Coordinates: 36.2740 Lat / 71.1025 Lon
+--------------------------------------------------
+Location:
+  59 km SW of AshkÄsham, Afghanistan
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u4va
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

@@ -1,0 +1,23 @@
+From: HP2DFA
+To: EQUAK
+Type/Status: B$
+Date/Time: 20-Oct-26 07:01
+Bid: 5137_HP2DFA
+Title: EARTHQUAKE ALERT M5.1 - 263 km WSW of Yanglong, China
+Path: !GB7BED!DM4RW!HP2DFA!
+
+==================================================
+       USGS SEISMIC ALERT BULLETIN (M5.1+)       
+==================================================
+Event ID   : us6000u3ka
+Magnitude  : M 5.1
+Time (UTC) : 2026-10-20 06:41:23 UTC
+Depth      : 10.0 km
+Coordinates: 37.9037 Lat / 95.6436 Lon
+--------------------------------------------------
+Location:
+  263 km WSW of Yanglong, China
+--------------------------------------------------
+Info: https://earthquake.usgs.gov/earthquakes/eventpage/us6000u3ka
+==================================================
+73 DE HP2DFA-5 / BPQ32 SEISMIC MONITOR

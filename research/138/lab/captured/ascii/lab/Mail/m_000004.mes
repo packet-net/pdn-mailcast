@@ -1,0 +1,12 @@
+R:261029/2147Z @:GB7LAF.#99.GBR.EURO #:104 [Labtown] $:104_GB7LAF
+
+From: G0LAB@GB7LAF.#99.GBR.EURO
+To  : LABTST@WW
+
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.

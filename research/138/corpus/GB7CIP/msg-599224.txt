@@ -1,0 +1,33 @@
+From: N4SD
+To: SPACWX
+Type/Status: B$
+Date/Time: 28-Oct-26 14:20
+Bid: 24122_N4SD
+Title: Space Weather Message Code: ALTK04
+Path: !YT7MPB!N6RME!N0ARY!N2MH!K5DAT!NS2B!N3IP!KA3VSP!N4SD!
+
+WOXX13 KWNP 232001
+ALTK04
+
+Space Weather Message Code: ALTK04
+Serial Number: 2694
+Issue Time: 2026 Oct 23 1955 UTC
+
+ALERT: Geomagnetic K-index of 4 
+Threshold Reached: 2026 Oct 23 1953 UTC
+Synoptic Period: 1800-2100
+Active Warning: YES
+
+Comment: 
+www.swpc.noaa.gov/noaa-scales-explanation
+Potential Impacts: Area of impact primarily poleward of 65 degrees Geomagnetic Latitude.
+Induced Currents - Weak power grid fluctuations can occur.
+Aurora - Aurora may be visible at high latitudes such as Canada and Alaska.
+
+# Issued by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Recent messages, data, and help at http://swpc.noaa.gov/alerts/
+# Send questions to SWPC.Webmaster@noaa.gov
+
+------
+Received by NOAA Satellite Downlink at N4SD
+More Info: N4SD@N4SD.#TIDE.VA.USA.NOAM
