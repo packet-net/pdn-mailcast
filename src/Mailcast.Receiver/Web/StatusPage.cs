@@ -2087,7 +2087,7 @@ public sealed class StatusPage : IAsyncDisposable
         }
         _log($"keys: a key was added from the web page ({context.Request.RemoteEndPoint?.Address})");
         _host.Delivery.Nudge();
-        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { added = true })).ConfigureAwait(false);
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { added = true, note = result.Note })).ConfigureAwait(false);
     }
 
     /// <summary>POST /api/keys/forget: forgets a learnt or added key (issue #146).</summary>

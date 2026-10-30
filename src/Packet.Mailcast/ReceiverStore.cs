@@ -430,7 +430,13 @@ public sealed partial class ReceiverStore
         if (File.Exists(scheduleFile))
         {
             var lines = Bulletin.TextEncoding.GetString(File.ReadAllBytes(scheduleFile)).Split('\n');
-            if (lines.Length >= 2
+            if (lines.Length < 3 || lines[2].Trim() != ScheduleTrustedMark)
+            {
+                // Kept before unsigned directories were refused (issue #146), so an unsigned one may have set it.
+                Log("schedule.txt was not set by a signed directory, so it is dropped; the config's slots stand until one is heard");
+                File.Delete(scheduleFile);
+            }
+            else if (lines.Length >= 2
                 && DateOnly.TryParseExact(lines[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var heard)
                 && SlotTimetable.FromFields(lines[1].Split('\t')) is { } timetable)
             {
@@ -574,7 +580,13 @@ public sealed partial class ReceiverStore
     /// </summary>
     private readonly Dictionary<ulong, (BroadcastDirectory Directory, DateTimeOffset HeardAt, DirectoryCheck Check)> _rejectedDirectories = [];
 
-    private bool _unsignedSaid;
+    private readonly HashSet<string> _unsignedSaid = new(StringComparer.Ordinal);
+
+    private const string ScheduleTrustedMark = "signed";
+
+    private void WriteSchedule(DateOnly date, SlotTimetable schedule) =>
+        DurableFile.WriteAtomically(Path.Combine(_root, "schedule.txt"), Bulletin.TextEncoding.GetBytes(
+            date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\n" + string.Join('\t', schedule.ToFields()) + "\n" + ScheduleTrustedMark + "\n"), flush: _options.FlushToDisk);
 
     /// <summary>Where each known directory (see <see cref="_knownDirectories"/>) is kept, one file per object ID in hex, under the store's folder.</summary>
     public const string KnownDirectoriesFolder = "directories";
@@ -1586,11 +1598,10 @@ public sealed partial class ReceiverStore
                 {
                     Log(why);
                 }
-                else if (!_unsignedSaid)
+                else if (_unsignedSaid.Add(directory.Station ?? ""))
                 {
-                    // Every slot of an unsigned head end would say it again: once per run is enough.
-                    _unsignedSaid = true;
-                    Log("a directory with no signature is not used (the head end must sign its directories); said once per run");
+                    // Every slot of an unsigned head end would say it again: once per station is enough.
+                    Log($"directory from {(directory.Station is { Length: > 0 } named ? named : "an unnamed station")} has no signature, not used (said once per station)");
                 }
                 MarkDone(instance);
                 RememberDirectory(instance.ObjectId, directory, check);
@@ -1608,8 +1619,7 @@ public sealed partial class ReceiverStore
             {
                 if (schedule != HeardSchedule || directory.Date != HeardScheduleDate)
                 {
-                    DurableFile.WriteAtomically(Path.Combine(_root, "schedule.txt"), Bulletin.TextEncoding.GetBytes(
-                        directory.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\n" + string.Join('\t', schedule.ToFields()) + "\n"), flush: _options.FlushToDisk);
+                    WriteSchedule(directory.Date, schedule);
                 }
                 HeardSchedule = schedule;
                 HeardScheduleDate = directory.Date;

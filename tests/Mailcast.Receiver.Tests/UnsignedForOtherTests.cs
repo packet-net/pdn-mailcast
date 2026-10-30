@@ -39,4 +39,24 @@ public class UnsignedDirectoryRefusedTests
         Assert.All(said, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
         Assert.Null(intake.HeardSchedule);
     }
+
+    [Fact]
+    public async Task AReceiverHost_WithTheProductionRule_UsesNoUnsignedDirectory_AndKeepsTheConfigsSlots()
+    {
+        using var dir = new TempDirectory();
+        var config = new ReceiverConfig { Audio = "wav:/nonexistent.wav", StateDirectory = dir.Path, Bbs = new BbsSettings { Port = 8011, Login = "Q0CAST", Password = "x" } };
+        var log = new List<string>();
+        await using var host = new ReceiverHost(config, TimeProvider.System, log.Add, refuseUnsigned: true);
+        var before = host.Schedule;
+        foreach (byte[] frame in Samples.Frames([Samples.Bulletin(1)]))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+        Assert.Null(host.Intake.DirectoryChecks().Newest);
+        Assert.Equal("unsigned, not used", host.Intake.DirectoryChecks().LastHeard!.Check.Describe());
+        Assert.False(host.ScheduleFromDirectory);
+        Assert.Equal(before, host.Schedule);
+        Assert.Empty(host.Intake.Pending());
+    }
 }

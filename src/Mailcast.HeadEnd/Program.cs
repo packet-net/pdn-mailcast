@@ -35,15 +35,46 @@ public static partial class Program
         try
         {
             bool made = DirectorySigner.CreateKeyFile(KeyPath);
+            if (made)
+            {
+                HandOverToServiceUser(KeyPath);
+            }
             var signer = DirectorySigner.LoadIfPresent(KeyPath)!;
             Console.WriteLine($"{(made ? "made the signing key" : "the signing key is already there")} at {KeyPath}");
             Console.WriteLine(DescribeSigning(signer, KeyPath));
             return 0;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
+        catch (FormatException e)
         {
-            Console.Error.WriteLine($"pdn-mailcast-headend: the signing key at {KeyPath}: {Ascii.Plain(e.Message)}");
+            Console.Error.WriteLine($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}");
             return 1;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"pdn-mailcast-headend: the signing key at {KeyPath}: {Ascii.Plain(e.Message)}; run it with sudo");
+            return 1;
+        }
+    }
+
+    // Run as root, the new key is made the service user's, so the service can read it.
+    private static void HandOverToServiceUser(string path)
+    {
+        if (OperatingSystem.IsWindows() || Environment.UserName != "root")
+        {
+            return;
+        }
+        try
+        {
+            using var chown = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("chown", ["pdn-mailcast-headend:pdn-mailcast-headend", path]) { RedirectStandardError = true });
+            chown?.WaitForExit(5000);
+            if (chown is { ExitCode: not 0 })
+            {
+                Console.Error.WriteLine($"pdn-mailcast-headend: could not give {path} to the service user; run: chown pdn-mailcast-headend:pdn-mailcast-headend {path}");
+            }
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"pdn-mailcast-headend: could not give {path} to the service user: {Ascii.Plain(e.Message)}");
         }
     }
 
@@ -130,7 +161,7 @@ public static partial class Program
         {
             if (!offline)
             {
-                await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; fix it, or move it away and run: pdn-mailcast-headend --make-key");
+                await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; fix it, or move it away and run: sudo pdn-mailcast-headend --make-key");
                 return 2;
             }
             await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; this run's directories are unsigned");
@@ -139,7 +170,7 @@ public static partial class Program
         if (signer is null && !offline)
         {
             // Receivers do not use an unsigned directory, so a head end without a key would send nothing useful.
-            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: no signing key at {KeyPath}; make one with: pdn-mailcast-headend --make-key");
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: no signing key at {KeyPath}; make one with: sudo pdn-mailcast-headend --make-key");
             return 2;
         }
 

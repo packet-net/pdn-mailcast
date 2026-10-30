@@ -320,7 +320,7 @@ Every head end signs every directory it sends. Receivers refuse an unsigned dire
 The package makes the key when it is installed (and on an upgrade, if there is none), in `/etc/pdn-mailcast-headend/signing-key.pem`, readable by the service only. It never replaces a key. To make one by hand, or to see the public key again:
 
 ```
-sudo -u pdn-mailcast-headend pdn-mailcast-headend --make-key
+sudo pdn-mailcast-headend --make-key
 ```
 
 A key made with `openssl genpkey -algorithm ed25519` works the same: put it at that path, owned by `pdn-mailcast-headend`, mode 0600.

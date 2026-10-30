@@ -119,4 +119,56 @@ public class KeysTableTests
         Assert.Null(restarted.ForgetKey(other.KeyId).Error);
         Assert.DoesNotContain(Open(dir, time).KeyRows(), r => r.Key.KeyId == other.KeyId);
     }
+
+    [Fact]
+    public void Forget_UndoesWhatItsDirectoriesGave_AndTheSameDirectoryIsLearntAgain()
+    {
+        using var dir = new TempDirectory();
+        var time = Clock();
+        var store = Open(dir, time);
+        var learnt = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var advert = new StationAdvert("G8BPQ", new SlotTimetable(new TimeOnly(0, 30), 60), 7_053_800, Sideband.Usb);
+        var a = Small(1);
+        var withAdvert = new BroadcastDirectory(Day, [new DirectoryEntry(a.ObjectId, a.DictionaryId, 400, "1_TEST", "Bulletin", Hash: ObjectId.LongHash(a.DictionaryId, a.Bytes))],
+            new SlotTimetable(TimeOnly.MinValue, 60), "ms110d-wn4", learnt, station: "G4NEW", adverts: [advert]);
+        Assert.Equal(FrameOutcome.CompletedDirectory, Feed(store, withAdvert).Outcome);
+        Assert.NotEmpty(store.Adverts());
+        Assert.NotNull(store.Directory);
+
+        Assert.Null(store.ForgetKey(learnt.KeyId).Error);
+        Assert.Empty(store.Adverts());
+        Assert.Null(store.Directory);
+
+        // The very same directory, heard again, is rebuilt, checked and learnt again.
+        Assert.Equal(FrameOutcome.CompletedDirectory, Feed(store, withAdvert).Outcome);
+        Assert.Contains(store.KeyRows(), r => r.Key.KeyId == learnt.KeyId && r.Source == KeySource.Learnt);
+        Assert.NotEmpty(store.Adverts());
+    }
+
+    [Fact]
+    public void Add_ForACallsignThatHasAKey_SaysBothAreTrusted_AndClearsItsConflict()
+    {
+        using var dir = new TempDirectory();
+        var store = Open(dir, Clock());
+        var second = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        // A directory naming GB7RDG under another key is a conflict.
+        Feed(store, Directory(second, "GB7RDG", Small(1)));
+        Assert.NotEmpty(store.KeyConflicts);
+        var change = store.AddKey("GB7RDG", second.PublicKeyBase64);
+        Assert.Null(change.Error);
+        Assert.Equal($"GB7RDG already has key {KeyId.Format(TrustedKey.Gb7rdg.KeyId)}; both are now trusted.", change.Note);
+        Assert.Empty(store.KeyConflicts);
+    }
+
+    [Fact]
+    public void ScheduleFile_NotSetByASignedDirectory_IsDroppedAtStart()
+    {
+        using var dir = new TempDirectory();
+        File.WriteAllText(Path.Combine(dir.Path, "schedule.txt"), "2026-10-29\n00:00/60\n");
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, new ReceiverStoreOptions { FlushToDisk = false, Time = Clock(), Log = log.Add });
+        Assert.Null(store.HeardSchedule);
+        Assert.False(File.Exists(Path.Combine(dir.Path, "schedule.txt")));
+        Assert.Contains(log, l => l.Contains("schedule.txt was not set by a signed directory", StringComparison.Ordinal));
+    }
 }

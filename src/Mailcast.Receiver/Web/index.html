@@ -1218,7 +1218,7 @@ $("keysAdd").addEventListener("submit", async e => {
   e.preventDefault();
   const r = await api("api/keys/add", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ station: $("keysCall").value, publicKey: $("keysKey").value }) });
-  $("keysSaid").textContent = r.ok ? "Added." : r.error;
+  $("keysSaid").textContent = r.ok ? (r.body && r.body.note ? "Added. " + r.body.note : "Added.") : r.error;
   if (r.ok) { $("keysCall").value = ""; $("keysKey").value = ""; }
   refresh();
 });

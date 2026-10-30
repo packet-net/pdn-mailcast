@@ -31,7 +31,8 @@ public sealed record KeyRow(string Station, TrustedKey Key, KeySource Source, Da
 /// <param name="Error">Why it was refused, or null when it was done.</param>
 /// <param name="Released">Bulletins newly complete because a held directory is now good.</param>
 /// <param name="Delivered">Bulletins newly in the outbox for the same reason.</param>
-public sealed record KeyChange(string? Error, IReadOnlyList<Bulletin> Released, IReadOnlyList<Bulletin> Delivered)
+/// <param name="Note">Something to tell the operator although it was done, or null.</param>
+public sealed record KeyChange(string? Error, IReadOnlyList<Bulletin> Released, IReadOnlyList<Bulletin> Delivered, string? Note = null)
 {
     internal static KeyChange Refused(string why) => new(why, [], []);
 }
@@ -95,13 +96,22 @@ public sealed partial class ReceiverStore
             return KeyChange.Refused($"Key {KeyId.Format(key.KeyId)} is already trusted.");
         }
         var now = _options.Time.GetUtcNow();
+        string? note = null;
+        if (KeyRows().FirstOrDefault(r => string.Equals(r.Station, station, StringComparison.Ordinal)) is { } had)
+        {
+            note = $"{station} already has key {KeyId.Format(had.Key.KeyId)}; both are now trusted.";
+        }
+        foreach (string conflicted in _conflicts.Where(c => c.Value.HeardKeyId == key.KeyId).Select(c => c.Key).ToList())
+        {
+            _conflicts.Remove(conflicted);
+        }
         _pins.Add(new PinnedStation(station, key, now, Added: true));
         UpdateKeys();
         Log($"key {KeyId.Format(key.KeyId)} added for {station} from the page");
         _newPin = true;
         WritePins(station + "'s key");
         var released = AfterNewPin() ?? [];
-        return new KeyChange(null, released, TakeDelivered());
+        return new KeyChange(null, released, TakeDelivered(), note);
     }
 
     /// <summary>
@@ -132,13 +142,50 @@ public sealed partial class ReceiverStore
             {
                 _knownDirectories.Remove(id);
                 TryDelete(Path.Combine(_root, KnownDirectoriesFolder, ObjectId.Format(id) + ".txt"));
+                // Not done any more: a repeat of it is rebuilt, checked again and, if its key comes back, learnt again.
+                _done.Remove(id);
+                _doneHashes.Remove(id);
+                TryDelete(DonePath(id));
             }
         }
-        if (Directory?.SigningKeyId == keyId)
+        bool heldGone = Directory?.SigningKeyId == keyId;
+        if (heldGone || Directory is null)
         {
-            Directory = null;
-            NewestCheck = null;
-            TryDelete(Path.Combine(_root, "directory.txt"));
+            // The newest directory still usable takes its place.
+            var best = _knownDirectories.Values.OrderBy(k => k.Directory.Date).ThenBy(k => k.HeardAt).Select(k => ((BroadcastDirectory, DirectoryCheck)?)(k.Directory, k.Check)).LastOrDefault();
+            if (best is { } next)
+            {
+                Directory = next.Item1;
+                NewestCheck = next.Item2;
+                DurableFile.WriteAtomically(Path.Combine(_root, "directory.txt"), next.Item1.Serialize(), flush: _options.FlushToDisk);
+            }
+            else
+            {
+                Directory = null;
+                NewestCheck = null;
+                TryDelete(Path.Combine(_root, "directory.txt"));
+            }
+        }
+
+        // What the forgotten key's directories gave: adverts, and GB7RDG's timetable, from the ones left.
+        _adverts.Clear();
+        _beyondCap.Clear();
+        foreach (var (directory, check) in UsableDirectories().OrderBy(d => d.Directory.Date))
+        {
+            NoteAdverts(directory, check);
+        }
+        var timetable = UsableDirectories()
+            .Where(d => d.Directory.Schedule is not null && StationOf(d.Directory, d.Check) == BuiltInStation)
+            .OrderBy(d => d.Directory.Date).Select(d => ((DateOnly, SlotTimetable)?)(d.Directory.Date, d.Directory.Schedule!)).LastOrDefault();
+        if (timetable is { } t)
+        {
+            WriteSchedule(t.Item1, t.Item2);
+            (HeardScheduleDate, HeardSchedule) = (t.Item1, t.Item2);
+        }
+        else
+        {
+            TryDelete(Path.Combine(_root, "schedule.txt"));
+            (HeardScheduleDate, HeardSchedule) = (null, null);
         }
         WritePins("a forgotten key");
         Log($"key {KeyId.Format(keyId)} of {pin.Station} forgotten from the page");

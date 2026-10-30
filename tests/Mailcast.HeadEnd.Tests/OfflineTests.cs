@@ -49,19 +49,25 @@ public class OfflineTests
         Assert.Equal(plan.Frames.Count, heard.Count);
 
         var receiver = new ReceiverStore(rx.Path, Compression.Default, new ReceiverStoreOptions { TrustedKeys = [TrustedKey.Parse("M0LTE", signer.PublicKeyBase64)] });
-        var rebuilt = new List<Bulletin>();
+        var delivered = new List<Bulletin>();
         foreach (byte[] ax25 in heard)
         {
             Assert.Equal(Station.Ax25Ui.Encode("MCAST", "M0LTE", []).AsSpan(0, 16).ToArray(), ax25[..16]);
             var result = receiver.Accept(ax25.AsSpan(16));
-            if (result.Bulletin is not null)
-            {
-                rebuilt.Add(result.Bulletin);
-            }
+            delivered.AddRange(result.Delivered ?? []);
         }
-        // Sent canonical (issue #142); the directory is signed but lists no envelope, so the shared form is delivered as it is.
-        var canonical = bulletins.Select(b => CanonicalForm.ToCanonicalBulletin(b.Type, b.From, b.To, b.At, b.Bid, b.Title, Bulletin.TextEncoding.GetBytes(b.MessageText)).Bulletin);
-        Assert.Equal(canonical.Select(b => (b.Bid, b.Title, b.Body)).OrderBy(b => b.Bid), rebuilt.Select(b => (b.Bid, b.Title, b.Body)).OrderBy(b => b.Bid));
+        // Sent canonical (issue #142) by a signed directory that links no envelope, so each is delivered bare:
+        // the receiver's own routing line, then the original R: line exactly, with the body and title.
+        Assert.Equal(bulletins.Length, delivered.Count);
+        foreach (var original in bulletins)
+        {
+            var got = Assert.Single(delivered, b => b.Bid == original.Bid);
+            Assert.Equal(2, got.RoutingLines.Count);
+            Assert.Matches(@"^R:\d{6}/\d{4}Z \[pdn-mailcast via \S+\]$", got.RoutingLines[0]);
+            Assert.Equal(original.RoutingLines[0], got.RoutingLines[1]);
+            Assert.Equal(original.Title, got.Title);
+            Assert.Equal(original.Body.TrimStart('\r', '\n'), got.Body.TrimStart('\r', '\n'));
+        }
     }
 }
 

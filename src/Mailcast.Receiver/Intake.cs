@@ -161,6 +161,7 @@ public sealed class Intake : IAsyncDisposable
                 result = change(_store);
                 _progress = (_store.Directory, _store.Progress());
                 _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
+                _heardSchedule = _store.HeardSchedule;
             }
             finally
             {
@@ -168,6 +169,7 @@ public sealed class Intake : IAsyncDisposable
             }
         }
         Publish(parts);
+        KeysChanged?.Invoke();
         foreach (var released in result.Released)
         {
             Completed(released);
@@ -249,9 +251,12 @@ public sealed class Intake : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(directory);
         lock (_gate)
         {
-            return _store.StationOf(directory, directory.Check(_store.DirectoryKeys));
+            return _store.StationOf(directory, _store.PeekCheck(directory));
         }
     }
+
+    /// <summary>A key was added or forgotten from the page: what is followed may have changed.</summary>
+    public event Action? KeysChanged;
 
     /// <summary>A directory gave a timetable different from the one held (raised on the worker).</summary>
     public event Action<SlotTimetable>? ScheduleHeard;

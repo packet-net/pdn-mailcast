@@ -202,6 +202,13 @@ public sealed partial class ReceiverStore
     /// The directory's signature against <see cref="DirectoryKeys"/>; an unsigned directory is
     /// refused, not used for anything (issue #146), unless a test says otherwise.
     /// </summary>
+    /// <summary>What <see cref="CheckDirectory"/> finds, without pinning a key or noting a conflict.</summary>
+    public DirectoryCheck PeekCheck(BroadcastDirectory directory)
+    {
+        ArgumentNullException.ThrowIfNull(directory);
+        return CheckSignature(directory);
+    }
+
     private DirectoryCheck CheckSignature(BroadcastDirectory directory)
     {
         var check = directory.Check(DirectoryKeys);

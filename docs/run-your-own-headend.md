@@ -37,7 +37,7 @@ Pick a time no other mailcast station on your frequency uses. GB7RDG sends on th
 
 ## The signing key
 
-Every head end signs its directories, and receivers use none that are unsigned. The package makes your key when you install it, so there is nothing to do. The journal's `signing:` line gives your public key (or run `sudo -u pdn-mailcast-headend pdn-mailcast-headend --make-key` to see it again). The service will not start without the key. Keep the private key safe and backed up: a new key means telling every listener again.
+Every head end signs its directories, and receivers use none that are unsigned. The package makes your key when you install it, so there is nothing to do. The journal's `signing:` line gives your public key (or run `sudo pdn-mailcast-headend --make-key` to see it again). The service will not start without the key. Keep the private key safe and backed up: a new key means telling every listener again.
 
 ## Getting heard
 

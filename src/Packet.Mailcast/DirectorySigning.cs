@@ -135,6 +135,7 @@ public sealed class DirectorySigner
             }
             using var stream = new FileStream(path, options);
             stream.Write(Encoding.ASCII.GetBytes(NewKeyPem()));
+            stream.Flush(true);
         }
         catch (IOException) when (File.Exists(path))
         {
