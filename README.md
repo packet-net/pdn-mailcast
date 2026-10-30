@@ -39,6 +39,8 @@ dotnet run --project tools/RaptorQ.InteropExport -- tests/Mailcast.RaptorQ.Tests
 cargo run --release --manifest-path tools/raptorq-vectors/Cargo.toml -- check /tmp/ours.json
 ```
 
+`tools/Mailcast.ModelBVectors` writes the Model B vector file (`tests/Packet.Mailcast.Tests/Vectors/model-b-v1.json`, the definition of the format); `tools/raptorq-vectors/reproduce_model_b.py` reproduces it independently with libzstd 1.5.7 and the raptorq crate (needs python-zstandard and cargo): `python3 tools/raptorq-vectors/reproduce_model_b.py`.
+
 To retrain the dictionary from a copy of a LinBPQ store (`DIRMES.SYS` and `Mail/`):
 
 ```
