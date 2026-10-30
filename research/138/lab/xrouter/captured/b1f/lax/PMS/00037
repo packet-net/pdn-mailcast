@@ -1,11 +1,10 @@
-37 BF G0LAB 1793319607 LABTST@WW AE3E2B737LAX &:G0LAB
-lab t20_ctrl_chars
-R:261030/0020Z @:GB7LAX.#99.GBR.EURO [] #:37 XrLin505p
-Date: Fri, 30 Oct 2026 00:20:08 +0000
-From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
-To: labtst@ww
-Subject: lab t20_ctrl_chars
-Message-ID: <AE3E2B737LAX>
+37 BF G0LAB 1793322487 LABTST@WW 19_GB7LAA-1 &:GB7LAA
+lab t19_gt_from_and_misc
+R:261030/0108Z @:GB7LAX.#99.GBR.EURO [] #:37 XrLin505p
+R:261030/0107Z 19@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
 
-bell: esc:[0m ff: nul-free
+>From already escaped
+~ tilde line
+/EX-ish line: /EXIT
+# hash
 end.

@@ -19,7 +19,7 @@ Enter subject (or empty line to abort):
 >>>[[lab t04_trailing_ws]]<<<
 Enter message, ending ctrl-Z or /EX (/QQ to abort)
 >>>[[trailing space   ]][[trailing tab	]][[	tab at start]][[mid	tab]][[space-only line follows]][[   ]][[end.]]<<<>>>[[/EX]]<<<
-*** Message 7 saved
+*** Message 8 saved
 
 [0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
 >>>[[B]]<<<  - Logged off

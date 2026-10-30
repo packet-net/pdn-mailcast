@@ -1,7 +1,8 @@
-20 BF G0LAB 1793318628 LABTST@WW 13_GB7LAA-1 &:GB7LAA
-cafÃ© Â£ Â° â€” title
-R:261030/0003Z @:GB7LAX.#99.GBR.EURO [] #:20 XrLin505p
-R:261030/0003Z 13@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+20 BF G0LAB 1793321592 LABTST@WW 11_GB7LAA-1 &:GB7LAA
+café title £
+R:261030/0053Z @:GB7LAX.#99.GBR.EURO [] #:20 XrLin505p
+R:261030/0052Z 11@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
 
-utf8: cafÃ© naÃ¯ve Â£ Â° â‚¬ â€” â€“ â€¦ æ—¥æœ¬
+latin1: café naïve £ ° þ Àß end
+high: €‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ
 end.

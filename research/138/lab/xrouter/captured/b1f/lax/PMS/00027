@@ -1,7 +1,11 @@
-27 BF G0LAB 1793318920 LABTST@WW 16_GB7LAA-1 &:GB7LAA
+27 BF G0LAB 1793321815 LABTST@WW AE3EB5727LAX &:G0LAB
 lab t14_crlf_body
-R:261030/0008Z @:GB7LAX.#99.GBR.EURO [] #:27 XrLin505p
-R:261030/0008Z 16@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+R:261030/0056Z @:GB7LAX.#99.GBR.EURO [] #:27 XrLin505p
+Date: Fri, 30 Oct 2026 00:56:55 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t14_crlf_body
+Message-ID: <AE3EB5727LAX>
 
 crlf one
 crlf two

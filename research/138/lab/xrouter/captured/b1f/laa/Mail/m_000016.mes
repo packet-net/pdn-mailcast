@@ -1,3 +1,5 @@
-crlf one
-crlf two
-crlf three
+before
+.
+after
+..
+after2

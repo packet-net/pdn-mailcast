@@ -1,14 +1,16 @@
-8 BF G0LAB 1793318442 LABTST@WW AE3DE2A08LAX &:G0LAB
-lab t05_blank_first
-R:261030/0000Z @:GB7LAX.#99.GBR.EURO [] #:8 XrLin505p
-Date: Fri, 30 Oct 2026 00:00:43 +0000
+8 BF G0LAB 1793321394 LABTST@WW AE3E9B208LAX &:G0LAB
+lab t04_trailing_ws
+R:261030/0049Z @:GB7LAX.#99.GBR.EURO [] #:8 XrLin505p
+Date: Fri, 30 Oct 2026 00:49:55 +0000
 From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
 To: labtst@ww
-Subject: lab t05_blank_first
-Message-ID: <AE3DE2A08LAX>
+Subject: lab t04_trailing_ws
+Message-ID: <AE3E9B208LAX>
 
-
-first line above is blank
-
-
-two blank lines above this one.
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.

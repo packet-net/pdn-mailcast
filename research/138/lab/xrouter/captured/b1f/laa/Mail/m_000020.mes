@@ -1,5 +1,2 @@
->From already escaped
-~ tilde line
-/EX-ish line: /EXIT
-# hash
+bell: esc:[0m ff: nul-free
 end.

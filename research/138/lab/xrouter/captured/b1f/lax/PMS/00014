@@ -1,6 +1,10 @@
-14 BF G0LAB 1793318539 LABTST@WW 10_GB7LAA-1 &:GB7LAA
-T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-R:261030/0002Z @:GB7LAX.#99.GBR.EURO [] #:14 XrLin505p
-R:261030/0002Z 10@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+14 BF G0LAB 1793321496 LABTST@WW AE3EA1814LAX &:G0LAB
+T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+R:261030/0051Z @:GB7LAX.#99.GBR.EURO [] #:14 XrLin505p
+Date: Fri, 30 Oct 2026 00:51:37 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Message-ID: <AE3EA1814LAX>
 
-title is 60 chars exactly.
+title is 40 chars exactly.
