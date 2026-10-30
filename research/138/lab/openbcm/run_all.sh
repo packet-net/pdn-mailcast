@@ -8,7 +8,10 @@ rm -rf captured/transcripts
 for k in $(ls ../bulletins/*.title | xargs -n1 basename | sed 's/\.title//'); do
   # the 53 kB bulletin takes over an hour in plain ASCII forwarding at these link settings; skipped in the ascii variant
   [ "$V" = ascii ] && [ $k = t18_very_long ] && continue
-  python3 -I post.py laa $k; python3 -I post.py lam $k
+  # in the ascii variant LinBPQ's end-of-message marker (/ex, lower case) is not recognised by openBCM's ascii receiver and the session hangs,
+  # so only openBCM-origin bulletins are posted there
+  [ "$V" = ascii ] || python3 -I post.py laa $k
+  python3 -I post.py lam $k
 done
 prev=""; same=0
 for i in $(seq 1 30); do

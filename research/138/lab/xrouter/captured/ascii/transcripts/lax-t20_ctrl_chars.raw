@@ -19,7 +19,7 @@ Enter subject (or empty line to abort):
 >>>[[lab t20_ctrl_chars]]<<<
 Enter message, ending ctrl-Z or /EX (/QQ to abort)
 >>>[[bell: esc:[0m ff: nul-free]][[end.]]<<<>>>[[/EX]]<<<
-*** Message 38 saved
+*** Message 36 saved
 
 [0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
 >>>[[B]]<<<  - Logged off
