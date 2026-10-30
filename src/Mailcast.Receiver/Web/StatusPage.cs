@@ -300,6 +300,9 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/mail/resend", "POST"):
                     await ResendAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/mail/deliver-now", "POST"):
+                    await DeliverNowAsync(context).ConfigureAwait(false);
+                    break;
                 case ("/api/bbs/test", "POST"):
                     await TestBbsAsync(context).ConfigureAwait(false);
                     break;
@@ -1571,6 +1574,14 @@ public sealed class StatusPage : IAsyncDisposable
             alreadyHad = mail.AlreadyHad,
             refused = mail.Refused,
             partial,
+            // Issue #145: complete canonical bulletins waiting for their station's details.
+            awaiting = _host.Intake.Awaiting().Select(a => new
+            {
+                id = Packet.Mailcast.ObjectId.Format(a.ObjectId),
+                bid = a.Bulletin.Bid,
+                title = a.Bulletin.Title,
+                since = a.Since,
+            }).ToList(),
             offset,
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
@@ -1774,6 +1785,30 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>The resend form: which bulletin, by its object ID.</summary>
     internal sealed record ResendForm(string? Id);
+
+    /// <summary>POST /api/mail/deliver-now: delivers a canonical bulletin that is waiting for its station's details at once (issue #145).</summary>
+    private async Task DeliverNowAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<ResendForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        if (form?.Id is not { } id || !Packet.Mailcast.ObjectId.TryParse(id, out ulong objectId))
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Say which bulletin, by its id." })).ConfigureAwait(false);
+            return;
+        }
+        var delivered = _host.Intake.DeliverNow(objectId);
+        if (delivered is null)
+        {
+            await RespondAsync(context, 404, "application/json", JsonSerializer.Serialize(new { error = "That bulletin is not waiting for its station's details." })).ConfigureAwait(false);
+            return;
+        }
+        _log($"mail: {Ascii.Clean(delivered.Bid)} delivered at once from the web page ({context.Request.RemoteEndPoint?.Address})");
+        _host.Delivery.Nudge();
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { delivered = true, bid = delivered.Bid }, ReceiverConfig.JsonLine)).ConfigureAwait(false);
+    }
 
     private async Task ResendAsync(HttpListenerContext context)
     {

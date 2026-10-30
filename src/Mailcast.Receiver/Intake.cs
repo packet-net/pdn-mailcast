@@ -443,6 +443,46 @@ public sealed class Intake : IAsyncDisposable
         return held;
     }
 
+    /// <summary>
+    /// The station a frame being handled is taken to come from (the slot's station), for choosing
+    /// whose envelope to use (issue #145). Called on the intake worker; null result if not known.
+    /// </summary>
+    public Func<string?>? HeardFrom { get; set; }
+
+    /// <summary>Canonical bulletins complete and waiting for their station's envelope (issue #145).</summary>
+    public IReadOnlyList<AwaitingBulletin> Awaiting()
+    {
+        lock (_gate)
+        {
+            return _store.Awaiting();
+        }
+    }
+
+    /// <summary>Delivers a waiting canonical bulletin at once (issue #145); null if none is waiting by that ID.</summary>
+    public Bulletin? DeliverNow(ulong objectId)
+    {
+        Bulletin? delivered;
+        MailParts? parts;
+        lock (_gate)
+        {
+            try
+            {
+                delivered = _store.DeliverNow(objectId);
+                _progress = (_store.Directory, _store.Progress());
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
+        }
+        Publish(parts);
+        if (delivered is not null)
+        {
+            BulletinCompleted?.Invoke(delivered);
+        }
+        return delivered;
+    }
+
     /// <summary>Puts an archived bulletin back in the outbox, to be offered to the BBS again.</summary>
     public (ResendOutcome Outcome, Bulletin? Bulletin) Resend(ulong objectId)
     {
@@ -573,7 +613,7 @@ public sealed class Intake : IAsyncDisposable
             {
                 try
                 {
-                    result = _store.Accept(payload.Span);
+                    result = _store.Accept(payload.Span, HeardFrom?.Invoke());
                     givenUp = _store.TakeGivenUp();
                     if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary)
                         || result.Released is not null)
@@ -630,6 +670,10 @@ public sealed class Intake : IAsyncDisposable
             case FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin:
                 Interlocked.Increment(ref _framesStored);
                 Completed(bulletin);
+                break;
+            case FrameOutcome.AwaitingEnvelope when result.Bulletin is { } waiting:
+                Interlocked.Increment(ref _framesStored);
+                _log($"bulletin complete: {Ascii.Clean(waiting.Bid)}, waiting for its station's details");
                 break;
             case FrameOutcome.Withheld or FrameOutcome.RejectedDirectory:
                 // The store has said why, once.
