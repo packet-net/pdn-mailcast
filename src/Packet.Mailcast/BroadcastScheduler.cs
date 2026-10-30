@@ -20,7 +20,7 @@ public sealed record BroadcastBulletin(Bulletin Bulletin, DateOnly FirstSeen, Da
 /// <param name="Size">The serialised bulletin's length, for the directory.</param>
 /// <param name="FirstSeen">The day the head end first saw it, which counts for <see cref="ScheduleOptions.RememberDays"/>.</param>
 /// <param name="Transfer">The compressed, coded object.</param>
-/// <param name="NextEsi">The first ESI not yet sent.</param>
+/// <param name="NextEsi">How many pieces have been sent: the first ESI not yet sent, or for a shuffled bulletin (<see cref="CarriedBulletin.Shuffle"/>) the count that maps to it.</param>
 /// <param name="FirstSlot">
 /// The start of the slot it was first carried in, or null while it has not been: the next slot
 /// planned is then its first.
@@ -568,7 +568,7 @@ public static class BroadcastScheduler
     /// <summary>
     /// Plans a slot from bulletins alone, compressing each afresh and taking each one's first ESI
     /// as if every earlier slot had gone out whole. That gives the same frames as a head end that
-    /// keeps state, as long as the compression and options are unchanged; a real head end should
+    /// keeps state and has no station callsign (so nothing is shuffled), as long as the compression and options are unchanged; a real head end should
     /// use <see cref="HeadEndStore"/> and the other overload.
     /// </summary>
     public static SlotBroadcast Plan(IEnumerable<BroadcastBulletin> bulletins, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions? options = null)
