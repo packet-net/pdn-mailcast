@@ -411,6 +411,25 @@ public class CanonicalDeliveryTests
     }
 
     [Fact]
+    public void OnAClockWithFractionsOfASecond_BareDeliveryAndTheBackstopAtOpenStillWork()
+    {
+        using var dir = new TempDirectory();
+        var time = Clock();
+        time.Advance(TimeSpan.FromMilliseconds(123));
+        var store = Open(dir.Path, time);
+        var m = MakeCanonical(21);
+        Feed(store, m.Bulletin);
+        Assert.Equal(new DateTimeOffset(2026, 10, 30, 9, 0, 0, TimeSpan.Zero), store.DeliverNow(m.Bulletin.ObjectId)!.Date);
+
+        var m2 = MakeCanonical(22);
+        Feed(store, m2.Bulletin);
+        time.Advance(TimeSpan.FromHours(49));
+        var reopened = Open(dir.Path, time);
+        Assert.Empty(reopened.Awaiting());
+        Assert.Equal(2, reopened.Pending().Count);
+    }
+
+    [Fact]
     public void AFullTitleThatWillNotSerialise_KeepsTheRebuiltTextAndOnlyCleansTheTitle()
     {
         using var dir = new TempDirectory();

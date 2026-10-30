@@ -245,7 +245,8 @@ public sealed partial class ReceiverStore
 
         var now = _options.Time.GetUtcNow();
         string? via = null;
-        var date = item.Since;
+        // Whole seconds, as a bulletin's date must be; a real clock has fractions.
+        var date = item.Since.AddTicks(-(item.Since.Ticks % TimeSpan.TicksPerSecond));
         string text = canonical.MessageText;
         string title = canonical.Title;
         bool withEnvelope = false;
