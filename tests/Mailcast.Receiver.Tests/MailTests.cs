@@ -445,6 +445,39 @@ public class MailTests
     }
 
     [Fact]
+    public async Task DeliverNow_IsOfferedForAWaitingCanonicalBulletin_NeedsThePagePassword_AndDeliversItBare()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Start);
+        var (host, page, http, log) = await StartAsync(dir.Path, time, password: "letmein");
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        var (canonical, _) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "77_TEST", "A title",
+            System.Text.Encoding.Latin1.GetBytes("R:261019/0850Z 77@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody.\r\n"));
+        await RebuildAsync(host.Intake, canonical);
+        string id = ObjectId.Format(Assert.Single(host.Intake.Awaiting()).ObjectId);
+        Assert.Empty(host.Intake.Pending());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync("api/mail")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsJsonAsync("api/mail/deliver-now", new { id })).StatusCode);
+        Assert.Single(host.Intake.Awaiting());
+
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String("any:letmein"u8.ToArray()));
+        var list = await http.GetFromJsonAsync<JsonElement>("api/mail");
+        var row = Assert.Single(list.GetProperty("awaiting").EnumerateArray());
+        Assert.Equal(id, row.GetProperty("id").GetString());
+        Assert.Equal("77_TEST", row.GetProperty("bid").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/mail/deliver-now", new { id = "../outbox" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("api/mail/deliver-now", new { id })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.PostAsJsonAsync("api/mail/deliver-now", new { id })).StatusCode);
+        var delivered = Assert.Single(host.Intake.Pending());
+        Assert.Matches(@"^R:\d{6}/\d{4}Z @:Q0CAST \[pdn-mailcast via \S+\]\r\n", delivered.MessageText);
+        Assert.Empty((await http.GetFromJsonAsync<JsonElement>("api/mail")).GetProperty("awaiting").EnumerateArray());
+        Assert.Contains(log, l => l.Contains("delivered at once from the web page", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task MailList_IsNewestFirst_AndPaged()
     {
         using var dir = new TempDirectory();

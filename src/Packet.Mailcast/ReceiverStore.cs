@@ -1610,7 +1610,7 @@ public sealed partial class ReceiverStore
     /// Checks and keeps an envelope (issue #142). Admitted only when a trusted signed directory
     /// lists it as some entry's <c>env=</c> and its long hash matches that; one that is not listed yet
     /// is held, like a bulletin only a rejected directory lists, until a directory lists it. Nothing
-    /// goes to the BBS: delivery does not use envelopes yet.
+    /// goes to the BBS by itself.
     /// </summary>
     private AcceptResult FinishEnvelope(Instance instance, byte[] data)
     {
@@ -1672,7 +1672,7 @@ public sealed partial class ReceiverStore
     /// <summary>
     /// Every envelope kept for a bulletin, one per station whose trusted signed directory (still
     /// remembered) links one that has been heard and not pruned, in a fixed order (station name,
-    /// then envelope object ID). Empty when there is none. Delivery does not use them yet (issue #142).
+    /// then envelope object ID). Empty when there is none.
     /// </summary>
     public IReadOnlyList<(string Station, BulletinEnvelope Envelope)> EnvelopesFor(ulong bulletinObjectId)
     {
