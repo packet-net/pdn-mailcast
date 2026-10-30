@@ -1,0 +1,28 @@
+<<<
+Xrouter v505p
+
+Callsign: >>>[[G0LAB]]<<<
+Password: >>>[[user]]<<<GB7LAX XRouter lab
+>>>[[BBS]]<<<
+GB7LAX:LAX} Connected to BBS
+[XR-505p-BFHM$]
+Welcome to GB7LAX BBS
+You have 0 new messages
+Please use the 'NH' command to set your 'home' BBS.
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+>>>[[NP 0]]<<<Pagination is OFF
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+>>>[[SB LABTST @ WW]]<<<To: LABTST @ WW
+Enter subject (or empty line to abort):
+>>>[[lab t03_from_to_top]]<<<
+Enter message, ending ctrl-Z or /EX (/QQ to abort)
+>>>[[From: G0FAKE@GB7XXX.#1.GBR.EURO]][[To  : ALL@WW]][[Body after fake header lines.]]<<<>>>[[/EX]]<<<
+*** Message 5 saved
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+>>>[[B]]<<<  - Logged off
+
+GB7LAX:LAX} Welcome back
+>>>

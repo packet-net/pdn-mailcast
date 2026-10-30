@@ -10,6 +10,8 @@ P.OUT = os.path.join(H, "captured", "transcripts")
 
 def run(where, key):
     title, body, ending = B[key]
+    if os.environ.get("ENDING_HEX"): ending = bytes.fromhex(os.environ["ENDING_HEX"])
+    elif where == "lax" and ending == b"\x1a": ending = b"\x1a\r"   # XRouter ignores a bare Ctrl-Z; it needs the line ended
     port = 18010 if where == "laa" else 18024
     s = P.S(port); s.rd(1.5); P.GLOBAL[0] = s
     if where == "laa":

@@ -8,6 +8,14 @@ rm -rf captured/transcripts
 for k in $(ls ../bulletins/*.title | xargs -n1 basename | sed 's/\.title//'); do
   python3 -I post.py laa $k; python3 -I post.py lax $k
 done
+# LinBPQ sometimes never forwards a message that was entered while its forward session was open; repost any LAA bulletin XRouter lacks
+sleep 120
+for k in $(ls ../bulletins/*.title | xargs -n1 basename | sed 's/\.title//'); do
+  t=$(cat ../bulletins/$k.title | head -c 30)
+  if [ -f ../bulletins/$k.body ] && ! grep -l "_GB7LAA-1 &:GB7LAA" state/lax/PMS/0* 2>/dev/null | xargs -r grep -l -F "$t" >/dev/null 2>&1; then
+    if [ $k != t15_lf_body ]; then echo "reposting $k on laa"; python3 -I post.py laa $k; fi
+  fi
+done
 mkdir -p captured/$V; rm -rf captured/$V/transcripts; mv captured/transcripts captured/$V/transcripts
 prev=""; same=0
 for i in $(seq 1 60); do

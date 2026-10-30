@@ -1,0 +1,10 @@
+35 BF G0LAB 1793319570 LABTST@WW 20_GB7LAA-1 &:GB7LAA
+lab t19_gt_from_and_misc
+R:261030/0019Z @:GB7LAX.#99.GBR.EURO [] #:35 XrLin505p
+R:261030/0019Z 20@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+>From already escaped
+~ tilde line
+/EX-ish line: /EXIT
+# hash
+end.

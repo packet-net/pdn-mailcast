@@ -11,8 +11,10 @@ attach axudp axa 256 10.77.0.11 GB7LAJ 10094 10094
 attach axudp axb 256 10.77.0.12 GB7LAJ 10095 10095
 ax25 maxframe 4
 ax25 paclen 236
-mbox haddress .#99.GBR.EURO
+mbox haddress GB7LAJ.#99.GBR.EURO
 mbox qth Labtown
 mbox trace on
 start ax25
+start smtp
+start forward
 start telnet 2323

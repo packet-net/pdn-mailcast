@@ -1,0 +1,14 @@
+3 BF G0LAB 1793318339 LABTST@WW AE3DDC303LAX &:G0LAB
+lab t02_from_line
+R:261029/2358Z @:GB7LAX.#99.GBR.EURO [] #:3 XrLin505p
+Date: Thu, 29 Oct 2026 23:58:59 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t02_from_line
+Message-ID: <AE3DDC303LAX>
+
+From the desk of the lab
+From nobody Thu Oct 29 20:00:00 2026
+  From indented
+from lower
+End.

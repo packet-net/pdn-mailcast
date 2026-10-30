@@ -1,0 +1,10 @@
+12 BF G0LAB 1793318510 LABTST@WW AE3DE6E12LAX &:G0LAB
+T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+R:261030/0001Z @:GB7LAX.#99.GBR.EURO [] #:12 XrLin505p
+Date: Fri, 30 Oct 2026 00:01:50 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Message-ID: <AE3DE6E12LAX>
+
+title is 40 chars exactly.
