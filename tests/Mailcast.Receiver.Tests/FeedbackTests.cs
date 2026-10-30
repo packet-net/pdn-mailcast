@@ -201,7 +201,7 @@ public class FeedbackTests
         Assert.Equal(4, lines.Length);
         Assert.Equal($"{Slots[1]:HH} - 0 - - -", lines[1]);
         Assert.Equal($"{Slots[2]:HH} - 7 - - IM+PG 2 1.9/-17 0.35 0.21 287 b", lines[2]);
-        Assert.Equal("S GB7RDG 2 1 7 0 - 287", lines[3]);
+        Assert.Equal("S GB7RDG 2 1 7 0 - 287 0", lines[3]);
     }
 
     /// <summary>
@@ -724,7 +724,7 @@ public class FeedbackTests
 
         var figures = service.StationFigures(Day);
         Assert.Equal(["GB7RDG", "G8BPQ"], figures.Select(f => f.Station));
-        Assert.Equal(new ReportStation("G8BPQ", 2, 1, 40, 2, 9, null), figures[1]);
+        Assert.Equal(new ReportStation("G8BPQ", 2, 1, 40, 2, 9, null, 0), figures[1]);
         Assert.Equal(Slots.Count, figures[0].Listened);
         Assert.Equal(Slots.Count, figures[0].Heard);
 

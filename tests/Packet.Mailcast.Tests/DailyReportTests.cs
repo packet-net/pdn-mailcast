@@ -325,6 +325,20 @@ public class DailyReportTests
     }
 
     [Fact]
+    public void StationLine_CarriesTheOtherCopyCountAsItsNinthField_AndAnEightFieldLineHasNone()
+    {
+        var report = FullDay() with { Stations = [new ReportStation("GB7RDG", 9, 9, 1540, 17, -14, 287, 3), new ReportStation("G8BPQ", 4, 0, 0, 0, null, null, 0), new ReportStation("M0XYZ", 1, 1, 5, 0)] };
+        Assert.Contains("S GB7RDG 9 9 1540 17 -14 287 3\r\n", report.Body, StringComparison.Ordinal);
+        Assert.Contains("S M0XYZ 1 1 5 0 - -\r\n", report.Body, StringComparison.Ordinal);
+        var back = DailyReport.Parse(report.Title, report.Body);
+        Assert.Equal(report.Stations, back.Stations);
+
+        // A line from before this has eight fields: not known, and it still reads.
+        var old = DailyReport.Parse(report.Title, FullDay().Body + "S G8BPQ 4 3 212 6 -14 290\r\n");
+        Assert.Null(Assert.Single(old.Stations!).OtherCopies);
+    }
+
+    [Fact]
     public void StationLine_IgnoresFieldsPastTheEighth_AndLinesItDoesNotKnow()
     {
         string body = FullDay().Body + "S G8BPQ 4 3 212 6 -14 290 future more\r\nX something else\r\nS GB7RDG 1 1 1 1\r\n";

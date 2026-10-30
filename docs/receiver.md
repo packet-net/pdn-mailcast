@@ -364,8 +364,8 @@ The report goes once a day, 30 minutes after GB7RDG's last slot. Another station
 A receiver that follows more than one station adds a summary for each, after the slot lines (a receiver following only GB7RDG writes one for it too). The header and the slot lines stay GB7RDG's own, the station the report goes to, so a reader from before this reads the same report as ever:
 
 ```
-S GB7RDG 9 9 1540 17 -14 287
-S G8BPQ 4 3 212 6 -12 -
+S GB7RDG 9 9 1540 17 -14 287 0
+S G8BPQ 4 3 212 6 -12 - 2
 ```
 
 1. `S`.
@@ -376,8 +376,9 @@ S G8BPQ 4 3 212 6 -12 -
 6. Bulletins rebuilt while those slots were the one tracked.
 7. The median tone SNR, dB, over the slots with a tone, or `-`.
 8. The median virtual height, km, over the slots with a channel measurement, or `-`.
+9. Other copies: how many objects heard from that station that day carried a bulletin already delivered (same BID, a different object). Absent from a report that predates it. A receiver counts one as soon as a directory lists it, or it completes, after the bulletin has gone to the BBS; it is then dropped, and the status page shows it as one line under the bulletin ("other copy from G8BPQ, not needed").
 
-The format stays `MCR1`: a reader from before station lines stops at the first line that does not start with a digit and ignores the rest, which is how it skips these (it would refuse a new format number). A reader should ignore anything after the eighth field of a station line, and any line it does not know after the station lines. `DailyReport.Parse` puts them in `Stations`. GB7RDG's receipt line (see above) is still only about whether GB7RDG got your report.
+The format stays `MCR1`: a reader from before station lines stops at the first line that does not start with a digit and ignores the rest, which is how it skips these (it would refuse a new format number). A reader should ignore anything after the ninth field of a station line (and the ninth, if it is not a number), and any line it does not know after the station lines. `DailyReport.Parse` puts them in `Stations`. GB7RDG's receipt line (see above) is still only about whether GB7RDG got your report.
 
 ## The receiver's login on your BBS
 

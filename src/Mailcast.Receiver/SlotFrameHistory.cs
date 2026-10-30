@@ -65,6 +65,7 @@ public sealed record HeardPiece(DateTimeOffset Heard, uint? Esi, PieceStatus Sta
                 $"directory for {dir.Date:yyyy-MM-dd}",
             FrameOutcome.RejectedDirectory when result.Check is { } check => $"directory not used: {check.Reason}",
             FrameOutcome.CompletedEnvelope => "bulletin envelope",
+            FrameOutcome.CompletedOtherCopy when result.Bulletin is { } copy => $"bulletin {copy.Bid}, another copy",
             FrameOutcome.CompletedIonosphere => "propagation reading (ionosonde)",
             FrameOutcome.CompletedPskReporter => "propagation reading (PSK Reporter)",
             FrameOutcome.CompletedUnhandled or FrameOutcome.CompletedUnknown when result.ContentType is { } type =>

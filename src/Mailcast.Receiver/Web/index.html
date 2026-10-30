@@ -1333,6 +1333,7 @@ function mailRow(m) {
   if (m.completed) st.append(timeLine("completed", m.completed));
   if (m.signature) st.append(el("div", m.signature, "muted"));
   if (!m.waiting) st.append(timeLine(m.verdict === "refused" ? "refused by BBS" : "delivered to BBS", m.delivered));
+  for (const c of m.otherCopies || []) st.append(el("div", c.text, "muted"));
   const cell = td(null, null, "Status");
   cell.append(st);
   tr.append(cell);

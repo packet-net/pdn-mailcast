@@ -88,6 +88,13 @@ public enum FrameOutcome
     /// <see cref="ReceiverStore.DeliverNow"/> is called. <see cref="AcceptResult.Bulletin"/> is the canonical form.
     /// </summary>
     AwaitingEnvelope,
+
+    /// <summary>
+    /// The symbol completed a bulletin whose BID was already delivered under another object ID
+    /// (issue #147): another copy of the same bulletin. Nothing goes to the BBS; the object is
+    /// marked done and counted (<see cref="ReceiverStore.OtherCopies"/>). It is not a failure.
+    /// </summary>
+    CompletedOtherCopy,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>
@@ -432,6 +439,7 @@ public sealed partial class ReceiverStore
         }
         LoadOutbox();
         LoadAwaiting();
+        LoadOtherCopies();
         _archive = new MailArchive(Path.Combine(root, "archive"), _quarantine, _options.ArchiveRetention, _options.ArchiveMaxBytes, _options.Time, _options.FlushToDisk, Log, CountRead);
         Publish(CaptureMail()!);
         var ionosphereFile = Path.Combine(root, IonosphereFile);
@@ -743,6 +751,7 @@ public sealed partial class ReceiverStore
                 stopped = CheckRotation(known.Directory, known.Check, now);
                 released = ReleaseWithheld(known.Directory);
                 ReleaseAwaiting(known.Directory, known.Check);
+                MarkOtherCopies();
                 SayMismatches(known.Directory, known.Check);
             }
             else if (_rejectedDirectories.TryGetValue(frame.ObjectId, out var rejected))
@@ -844,10 +853,22 @@ public sealed partial class ReceiverStore
         ArgumentException.ThrowIfNullOrEmpty(bid);
         try
         {
-            foreach (var held in _outboxItems.Values.Where(o => string.Equals(o.Bulletin.Bid, bid, StringComparison.OrdinalIgnoreCase)).ToList())
+            // Issue #147: with two outbox files for one BID (two objects carrying the same bulletin), the BBS
+            // answered once. The oldest is the bulletin; any other, or any when an earlier copy was delivered, is another copy.
+            bool final = verdict is BbsVerdict.Accepted or BbsVerdict.AlreadyHad;
+            ulong? kept = final ? DeliveredObject(bid) : null;
+            foreach (var held in _outboxItems.Values.Where(o => string.Equals(o.Bulletin.Bid, bid, StringComparison.OrdinalIgnoreCase)).OrderBy(o => o.Written).ThenBy(o => o.Name, StringComparer.Ordinal).ToList())
             {
+                if (final && held.ObjectId is ulong copyId && kept is ulong keptId && keptId != copyId)
+                {
+                    File.Delete(Path.Combine(_outbox, held.Name));
+                    _outboxItems.Remove(held.Name);
+                    NoteOtherCopy(copyId, held.Bulletin.Bid, keptId, StationOfObject(copyId));
+                    continue;
+                }
                 if (held.ObjectId is ulong id)
                 {
+                    kept ??= final ? id : null;
                     try
                     {
                         _archive.Add(id, held.Serialized, held.Bulletin, verdict, detail, held.Written); // on disk before the outbox file goes
@@ -871,6 +892,10 @@ public sealed partial class ReceiverStore
         }
         finally
         {
+            if (verdict is BbsVerdict.Accepted or BbsVerdict.AlreadyHad)
+            {
+                MarkOtherCopies();
+            }
             MailChanged();
         }
     }
@@ -1006,6 +1031,10 @@ public sealed partial class ReceiverStore
         var result = new List<ObjectProgress>(Directory.Entries.Count);
         foreach (var entry in Directory.Entries)
         {
+            if (_otherCopies.ContainsKey(entry.ObjectId))
+            {
+                continue; // issue #147: another copy of a delivered bulletin is not progress
+            }
             if (_done.ContainsKey(entry.ObjectId))
             {
                 result.Add(new ObjectProgress(entry, true, 0, 0));
@@ -1074,7 +1103,7 @@ public sealed partial class ReceiverStore
         var withheld = new HashSet<ulong>(_instances.Values.Where(i => i.Withheld is not null).Select(i => i.ObjectId));
         foreach (var id in named.Keys)
         {
-            if (_done.ContainsKey(id))
+            if (_done.ContainsKey(id) && !_otherCopies.ContainsKey(id))
             {
                 ids.Add(id);
             }
@@ -1149,6 +1178,7 @@ public sealed partial class ReceiverStore
                 File.Delete(DonePath(id));
                 _done.Remove(id);
                 _doneHashes.Remove(id);
+                ForgetOtherCopy(id);
             }
         }
         PruneKnownDirectories(now);
@@ -1571,6 +1601,7 @@ public sealed partial class ReceiverStore
             var stopped = CheckRotation(directory, check, _options.Time.GetUtcNow());
             released.AddRange(ReleaseWithheld(directory) ?? []);
             ReleaseAwaiting(directory, check);
+            MarkOtherCopies();
             SayMismatches(directory, check);
             return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped, Check: check, Released: released.Count > 0 ? released : null);
         }
@@ -1605,6 +1636,11 @@ public sealed partial class ReceiverStore
                 return new AcceptResult(FrameOutcome.Withheld, instance.ObjectId, Detail: "held: only a directory that failed its signature check lists it");
             default:
                 break;
+        }
+
+        if (CompletedOtherCopy(instance, bulletin) is { } other)
+        {
+            return other;
         }
 
         if (bulletin.Canonical)
