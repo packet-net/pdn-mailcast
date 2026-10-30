@@ -1,0 +1,9 @@
+#!/bin/bash
+# capture.sh DEST - copy the stores of laa, lab (LinBPQ) and lam (openBCM working dir) into DEST
+set -eu
+cd "$(dirname "$0")"
+D=$1; docker run --rm -v "$PWD/$D:/d" debian:stable-slim sh -c "rm -rf /d/laa /d/lab /d/lam" 2>/dev/null || true; mkdir -p $D/laa $D/lab $D/lam
+for n in laa lab; do
+  docker run --rm -v "$PWD/state/$n:/s:ro" -v "$PWD/$D/$n:/o" debian:stable-slim sh -c 'cp -a /s/Mail /s/DIRMES.SYS /s/WFBID.SYS /s/linmail.cfg /o/ 2>/dev/null; cp -a /s/logs /o/; chmod -R a+rX /o'
+done
+docker run --rm -v "$PWD/state/lam:/s:ro" -v "$PWD/$D/lam:/o" debian:stable-slim sh -c 'cp -a /s/. /o/; chmod -R a+rX /o'

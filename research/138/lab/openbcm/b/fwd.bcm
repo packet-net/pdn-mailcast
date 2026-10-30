@@ -1,0 +1,4 @@
+; GB7LAM forwards everything it holds in bulletins for WW to GB7LAB; GB7LAA is a reverse partner (it dials us)
+GB7LAB - GB7LAB-1 1
+ WW
+GB7LAA
