@@ -26,6 +26,7 @@ namespace Packet.Mailcast;
 /// Bid: 12345_GB7RDG
 /// Date: 2026-10-01T12:34:56Z
 /// Title: Title text
+/// Canonical: 1            (optional, only in a canonical bulletin; see below)
 ///
 /// R:261001/1234Z ...      message text: routing lines, each ended by CR LF, then the body
 /// </code>
@@ -33,6 +34,14 @@ namespace Packet.Mailcast;
 /// The seven keys above are required, each once. A reader ignores keys it does not know, so
 /// later versions can add header lines without breaking older receivers. The key is everything
 /// before the first colon and the value everything after it, less one space if there is one.
+/// </para>
+/// <para>
+/// <c>Canonical: 1</c> (issue #142) says the bulletin is the shared form that every head end
+/// makes identically from one message (<see cref="CanonicalForm.ToCanonicalBulletin"/>): a
+/// title cut to 59 octets, a date taken from the message's own oldest routing line, no
+/// routing lines of the head end's BBS, and CR LF line ends. Released readers ignore the key
+/// and deliver it as any bulletin. Written after Title, only when set; read back only when the
+/// value is exactly 1.
 /// </para>
 /// </remarks>
 public sealed class Bulletin : IEquatable<Bulletin>
@@ -53,7 +62,8 @@ public sealed class Bulletin : IEquatable<Bulletin>
     /// <param name="date">When the bulletin was created, in whole seconds.</param>
     /// <param name="routingLines">The R: lines, newest first, without their line endings.</param>
     /// <param name="body">The text after the routing lines, exactly as received.</param>
-    public Bulletin(char type, string from, string to, string at, string bid, string title, DateTimeOffset date, IEnumerable<string> routingLines, string body)
+    /// <param name="canonical">Whether this is the shared canonical form (the <c>Canonical: 1</c> key).</param>
+    public Bulletin(char type, string from, string to, string at, string bid, string title, DateTimeOffset date, IEnumerable<string> routingLines, string body, bool canonical = false)
     {
         if (type < 'A' || type > 'Z')
         {
@@ -92,6 +102,7 @@ public sealed class Bulletin : IEquatable<Bulletin>
         Date = date.ToUniversalTime();
         RoutingLines = lines;
         Body = body;
+        Canonical = canonical;
     }
 
     /// <summary>The message type, B for a bulletin.</summary>
@@ -121,6 +132,9 @@ public sealed class Bulletin : IEquatable<Bulletin>
     /// <summary>The text after the routing lines.</summary>
     public string Body { get; }
 
+    /// <summary>Whether this is the shared canonical form, which carries <c>Canonical: 1</c> (issue #142).</summary>
+    public bool Canonical { get; }
+
     /// <summary>The message text as a partner receives it: each routing line and CR LF, then the body.</summary>
     public string MessageText => string.Concat(RoutingLines.Select(l => l + "\r\n")) + Body;
 
@@ -128,7 +142,7 @@ public sealed class Bulletin : IEquatable<Bulletin>
     /// Creates a bulletin from message text as stored or forwarded, taking the leading lines that
     /// start with R: and end with CR LF as the routing lines.
     /// </summary>
-    public static Bulletin FromMessageText(char type, string from, string to, string at, string bid, string title, DateTimeOffset date, string messageText)
+    public static Bulletin FromMessageText(char type, string from, string to, string at, string bid, string title, DateTimeOffset date, string messageText, bool canonical = false)
     {
         ArgumentNullException.ThrowIfNull(messageText);
         var lines = new List<string>();
@@ -139,7 +153,7 @@ public sealed class Bulletin : IEquatable<Bulletin>
             lines.Add(messageText[position..end]);
             position = end + 2;
         }
-        return new Bulletin(type, from, to, at, bid, title, date, lines, messageText[position..]);
+        return new Bulletin(type, from, to, at, bid, title, date, lines, messageText[position..], canonical);
     }
 
     /// <summary>Whether the text starts with a complete routing line: R:, no bare CR or LF, then CR LF.</summary>
@@ -164,6 +178,10 @@ public sealed class Bulletin : IEquatable<Bulletin>
         text.Append("Bid: ").Append(Bid).Append('\n');
         text.Append("Date: ").Append(Date.UtcDateTime.ToString(DateFormat, CultureInfo.InvariantCulture)).Append('\n');
         text.Append("Title: ").Append(Title).Append('\n');
+        if (Canonical)
+        {
+            text.Append("Canonical: 1\n");
+        }
         text.Append('\n');
         text.Append(MessageText);
         return TextEncoding.GetBytes(text.ToString());
@@ -217,7 +235,7 @@ public sealed class Bulletin : IEquatable<Bulletin>
         }
         try
         {
-            return FromMessageText(fields["Type"][0], fields["From"], fields["To"], fields["At"], fields["Bid"], fields["Title"], date, text[position..]);
+            return FromMessageText(fields["Type"][0], fields["From"], fields["To"], fields["At"], fields["Bid"], fields["Title"], date, text[position..], fields.TryGetValue("Canonical", out var flag) && flag == "1");
         }
         catch (ArgumentException e)
         {
@@ -236,7 +254,8 @@ public sealed class Bulletin : IEquatable<Bulletin>
         && Title == other.Title
         && Date == other.Date
         && RoutingLines.SequenceEqual(other.RoutingLines)
-        && Body == other.Body;
+        && Body == other.Body
+        && Canonical == other.Canonical;
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => Equals(obj as Bulletin);
