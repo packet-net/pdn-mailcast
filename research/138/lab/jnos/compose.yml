@@ -1,0 +1,29 @@
+# Lab: GB7LAA (LinBPQ) -> GB7LAJ (JNOS 2.0q) -> GB7LAB (LinBPQ), AXUDP on a bridge.
+name: lab138j
+networks:
+  lab:
+    ipam:
+      config: [{subnet: 172.33.0.0/24, gateway: 172.33.0.1}]
+services:
+  laa:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.33.0.11}}
+    ports: ["127.0.0.1:38010:8010"]
+    volumes: ["./state/laa:/data"]
+  lab:
+    image: m0lte/linbpq:latest
+    command: ["mail"]
+    networks: {lab: {ipv4_address: 172.33.0.12}}
+    ports: ["127.0.0.1:48010:8010"]
+    volumes: ["./state/lab:/data"]
+  laj:
+    image: lab138-jnos
+    tty: true
+    stdin_open: true
+    command: ["/jnos/start.sh"]
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun"]
+    networks: {lab: {ipv4_address: 172.33.0.13}}
+    ports: ["127.0.0.1:38023:2323"]
+    volumes: ["./state/laj:/jnos"]

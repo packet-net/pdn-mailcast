@@ -1,0 +1,18 @@
+# GB7LAJ: JNOS 2.0q in the #138 forwarding lab
+hostname laj.ampr.org
+ip address [10.77.0.2]
+attach tun tun0 1500 0
+ifconfig tun0 ipaddress 10.77.0.2
+ifconfig tun0 netmask 255.255.255.0
+ifconfig tun0 mtu 1500
+ax25 mycall GB7LAJ
+ax25 bbscall GB7LAJ
+attach axudp axa 256 10.77.0.11 GB7LAJ 10094 10094
+attach axudp axb 256 10.77.0.12 GB7LAJ 10095 10095
+ax25 maxframe 4
+ax25 paclen 236
+mbox haddress .#99.GBR.EURO
+mbox qth Labtown
+mbox trace on
+start ax25
+start telnet 2323
