@@ -81,6 +81,13 @@ public enum FrameOutcome
     /// before it are what they always were.
     /// </summary>
     CompletedEnvelope,
+
+    /// <summary>
+    /// The symbol completed a canonical bulletin (issue #145) that has no envelope yet: it is
+    /// kept, not delivered, until an envelope arrives, no directory lists it any more, or
+    /// <see cref="ReceiverStore.DeliverNow"/> is called. <see cref="AcceptResult.Bulletin"/> is the canonical form.
+    /// </summary>
+    AwaitingEnvelope,
 }
 
 /// <summary>What became of a request to offer an archived bulletin to the BBS again.</summary>
@@ -136,11 +143,15 @@ public sealed class MailParts
 /// stopped sending, newly marked so (see <see cref="ReceiverStore.NoLongerSentRetention"/>); null if none.
 /// </param>
 /// <param name="Check">What the signature check of the directory found, for a directory completed, repeated or rejected.</param>
+/// <param name="Delivered">
+/// Canonical bulletins (issue #145) that left their wait for an envelope because of this frame (or the
+/// hourly clean-up it ran): already counted as completed when they completed, now in the outbox; null if none.
+/// </param>
 /// <param name="Released">
 /// Bulletins held back (<see cref="FrameOutcome.Withheld"/>) that this frame's directory
 /// (completed or repeated) lists, now delivered to the outbox; null if none.
 /// </param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null);
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null, IReadOnlyList<Bulletin>? Delivered = null);
 
 /// <summary>The directory heard most recently, and what its signature check found.</summary>
 /// <param name="Date">The directory's date.</param>
@@ -242,6 +253,12 @@ public sealed record ReceiverStoreOptions
 
     /// <summary>Where the store says what it threw away and why. Plain ASCII.</summary>
     public Action<string>? Log { get; init; }
+
+    /// <summary>
+    /// The callsign the receiver logs in to its BBS with, for the R: line it puts on a canonical
+    /// bulletin (issue #145). Read at each delivery. Null or empty leaves the call out.
+    /// </summary>
+    public Func<string?>? DeliveryCall { get; init; }
 
     /// <summary>The clock, for expiry.</summary>
     public TimeProvider Time { get; init; } = TimeProvider.System;
@@ -414,6 +431,7 @@ public sealed partial class ReceiverStore
             }
         }
         LoadOutbox();
+        LoadAwaiting();
         _archive = new MailArchive(Path.Combine(root, "archive"), _quarantine, _options.ArchiveRetention, _options.ArchiveMaxBytes, _options.Time, _options.FlushToDisk, Log, CountRead);
         Publish(CaptureMail()!);
         var ionosphereFile = Path.Combine(root, IonosphereFile);
@@ -468,6 +486,8 @@ public sealed partial class ReceiverStore
             }
         }
         LoadKnownDirectories();
+        ReleaseExpiredAwaiting();
+        _delivered.Clear(); // in the outbox, which the delivery loop reads when it starts
         foreach (var (directory, _, check) in _knownDirectories.Values.OrderBy(k => k.Directory.Date).ThenBy(k => k.HeardAt))
         {
             NoteAdverts(directory, check);
@@ -675,7 +695,16 @@ public sealed partial class ReceiverStore
     }
 
     /// <summary>Offers one received frame payload (an AX.25 UI frame's information field).</summary>
-    public AcceptResult Accept(ReadOnlySpan<byte> payload)
+    /// <param name="payload">The frame's information field.</param>
+    /// <param name="heardFrom">The station this frame is taken to come from (the slot's station), or null if not known; counted per object to choose whose envelope to use (issue #145).</param>
+    public AcceptResult Accept(ReadOnlySpan<byte> payload, string? heardFrom = null)
+    {
+        var result = AcceptFrame(payload, heardFrom);
+        var delivered = TakeDelivered();
+        return delivered.Count > 0 ? result with { Delivered = delivered } : result;
+    }
+
+    private AcceptResult AcceptFrame(ReadOnlySpan<byte> payload, string? heardFrom)
     {
         var now = _options.Time.GetUtcNow();
         if (now - _lastExpiry >= ExpiryInterval)
@@ -713,6 +742,7 @@ public sealed partial class ReceiverStore
                 RememberDirectory(frame.ObjectId, known.Directory, known.Check);
                 stopped = CheckRotation(known.Directory, known.Check, now);
                 released = ReleaseWithheld(known.Directory);
+                ReleaseAwaiting(known.Directory, known.Check);
                 SayMismatches(known.Directory, known.Check);
             }
             else if (_rejectedDirectories.TryGetValue(frame.ObjectId, out var rejected))
@@ -726,7 +756,6 @@ public sealed partial class ReceiverStore
         {
             return new AcceptResult(FrameOutcome.UnknownDictionary, frame.ObjectId);
         }
-
         string key = KeyOf(frame.ObjectId, frame.DictionaryId, frame.Oti);
         if (_unusable.Contains(key))
         {
@@ -741,6 +770,7 @@ public sealed partial class ReceiverStore
         }
         if (instance.Symbols.ContainsKey(frame.EncodingSymbolId))
         {
+            CountFrame(frame.ObjectId, heardFrom);
             return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
         }
         var symbol = frame.Symbol.ToArray();
@@ -755,6 +785,7 @@ public sealed partial class ReceiverStore
             System.IO.Directory.CreateDirectory(instance.Path);
             _instances.Add(key, instance);
         }
+        CountFrame(frame.ObjectId, heardFrom);
         DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), symbol, now, _options.FlushToDisk);
         instance.LastPiece = now;
         if (_stopped.ContainsKey(frame.ObjectId))
@@ -1113,7 +1144,7 @@ public sealed partial class ReceiverStore
         }
         foreach (var (id, when) in _done.ToList())
         {
-            if (now - when > _options.DoneRetention && !_outboxItems.ContainsKey(OutboxName(id)))
+            if (now - when > _options.DoneRetention && !_outboxItems.ContainsKey(OutboxName(id)) && !_awaiting.ContainsKey(id))
             {
                 File.Delete(DonePath(id));
                 _done.Remove(id);
@@ -1122,6 +1153,7 @@ public sealed partial class ReceiverStore
         }
         PruneKnownDirectories(now);
         PruneEnvelopes(now);
+        ReleaseExpiredAwaiting();
         DropNoLongerSent(now);
         foreach (var instance in _instances.Values.ToList())
         {
@@ -1538,6 +1570,7 @@ public sealed partial class ReceiverStore
             MarkDone(instance);
             var stopped = CheckRotation(directory, check, _options.Time.GetUtcNow());
             released.AddRange(ReleaseWithheld(directory) ?? []);
+            ReleaseAwaiting(directory, check);
             SayMismatches(directory, check);
             return new AcceptResult(FrameOutcome.CompletedDirectory, instance.ObjectId, Directory: directory, NoLongerSent: stopped, Check: check, Released: released.Count > 0 ? released : null);
         }
@@ -1574,6 +1607,11 @@ public sealed partial class ReceiverStore
                 break;
         }
 
+        if (bulletin.Canonical)
+        {
+            return Await(instance, bulletin, longHash);
+        }
+
         var written = _options.Time.GetUtcNow();
         string name = OutboxName(instance.ObjectId);
         DurableFile.WriteAtomically(Path.Combine(_outbox, name), content, written, _options.FlushToDisk); // flushes the outbox folder too
@@ -1587,7 +1625,7 @@ public sealed partial class ReceiverStore
     /// Checks and keeps an envelope (issue #142). Admitted only when a trusted signed directory
     /// lists it as some entry's <c>env=</c> and its long hash matches that; one that is not listed yet
     /// is held, like a bulletin only a rejected directory lists, until a directory lists it. Nothing
-    /// goes to the BBS: delivery does not use envelopes yet.
+    /// goes to the BBS by itself.
     /// </summary>
     private AcceptResult FinishEnvelope(Instance instance, byte[] data)
     {
@@ -1628,6 +1666,7 @@ public sealed partial class ReceiverStore
                     System.IO.Directory.CreateDirectory(_envelopeDir);
                     DurableFile.WriteAtomically(EnvelopePath(instance.ObjectId), envelope.Serialise(), _options.Time.GetUtcNow(), _options.FlushToDisk);
                     MarkDone(instance, longHash);
+                    ReleaseAwaiting(null, null);
                     return new AcceptResult(FrameOutcome.CompletedEnvelope, instance.ObjectId, ContentType: (byte)ObjectKind.Envelope);
                 }
             }
@@ -1649,7 +1688,7 @@ public sealed partial class ReceiverStore
     /// <summary>
     /// Every envelope kept for a bulletin, one per station whose trusted signed directory (still
     /// remembered) links one that has been heard and not pruned, in a fixed order (station name,
-    /// then envelope object ID). Empty when there is none. Delivery does not use them yet (issue #142).
+    /// then envelope object ID). Empty when there is none.
     /// </summary>
     public IReadOnlyList<(string Station, BulletinEnvelope Envelope)> EnvelopesFor(ulong bulletinObjectId)
     {
@@ -1660,7 +1699,10 @@ public sealed partial class ReceiverStore
             {
                 continue;
             }
-            string station = check.SignedBy ?? "";
+            if (StationOf(directory, check) is not { } station)
+            {
+                continue;
+            }
             if (found.Any(f => f.ObjectId == link.ObjectId && f.Station == station))
             {
                 continue;
@@ -1849,9 +1891,9 @@ public sealed partial class ReceiverStore
             {
                 Log($"envelope {ObjectId.Format(instance.ObjectId)}, held back, is now listed by a good directory: kept");
             }
-            if (result is { Outcome: FrameOutcome.CompletedBulletin, Bulletin: { } bulletin })
+            if (result is { Outcome: FrameOutcome.CompletedBulletin or FrameOutcome.AwaitingEnvelope, Bulletin: { } bulletin })
             {
-                Log($"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}), held back, is now listed by a good directory: delivered");
+                Log($"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}), held back, is now listed by a good directory: {(result.Outcome == FrameOutcome.AwaitingEnvelope ? "taken" : "delivered")}");
                 (released ??= []).Add(bulletin);
             }
         }
@@ -1874,6 +1916,10 @@ public sealed partial class ReceiverStore
 
     private void MarkDone(Instance instance, string? hash = null)
     {
+        if (!_awaiting.ContainsKey(instance.ObjectId))
+        {
+            _heardFrames.Remove(instance.ObjectId);
+        }
         WriteDone(instance.ObjectId, hash);
         foreach (var other in _instances.Values.Where(i => i.ObjectId == instance.ObjectId).ToList())
         {
@@ -1918,6 +1964,10 @@ public sealed partial class ReceiverStore
         if (_stopped.ContainsKey(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
         {
             ForgetStopped(instance.ObjectId);
+        }
+        if (!_awaiting.ContainsKey(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
+        {
+            _heardFrames.Remove(instance.ObjectId);
         }
         if (_held.Contains(instance.ObjectId) && !_instances.Values.Any(i => i.ObjectId == instance.ObjectId))
         {

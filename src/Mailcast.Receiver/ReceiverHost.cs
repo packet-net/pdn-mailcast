@@ -35,10 +35,15 @@ public sealed class ReceiverHost : IAsyncDisposable
             ArchiveRetention = TimeSpan.FromDays(config.Archive.Days),
             ArchiveMaxBytes = config.Archive.MaxMegabytes * 1024L * 1024,
             TrustedKeys = config.AllTrustedKeys,
+            DeliveryCall = () => Ascii.Clean(Config.Bbs.Login).ToUpperInvariant(),
         });
         Intake.Sources = config.AcceptedSources;
         Ledger = new DeliveryLedger(config.StateDirectory);
         Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Followed);
+        // Issue #145: the station whose slot the frame arrives in, from the schedule at the time (as the slot tracker places it).
+        Intake.HeardFrom = () => Followed is not { } followed ? null
+            : followed.OneStation ? followed.Stations[0].Station
+            : followed.StationAt(followed.LatestStart(time.GetUtcNow() + SlotTracker.ClockAllowance));
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
         Delivery = new DeliveryService(Intake, new SwitchableSession(this), Ledger, time, log);
         Intake.FrameHeard += Slots.OnFrame;

@@ -215,6 +215,12 @@ public sealed class Intake : IAsyncDisposable
     public event Action<Bulletin>? BulletinCompleted;
 
     /// <summary>
+    /// A canonical bulletin (issue #145) that completed earlier has left its wait for an envelope and is
+    /// in the outbox. Not a new completion: <see cref="BulletinCompleted"/> fired when it completed.
+    /// </summary>
+    public event Action<Bulletin>? BulletinReleased;
+
+    /// <summary>
     /// A broadcast frame was heard, with the waveform it came on if the modem said, and how many
     /// bytes its information field held (raised on the worker).
     /// </summary>
@@ -443,6 +449,47 @@ public sealed class Intake : IAsyncDisposable
         return held;
     }
 
+    /// <summary>
+    /// The station a frame being handled is taken to come from (the slot's station), for choosing
+    /// whose envelope to use (issue #145). Called on the intake worker; null result if not known.
+    /// </summary>
+    public Func<string?>? HeardFrom { get; set; }
+
+    /// <summary>Canonical bulletins complete and waiting for their station's envelope (issue #145).</summary>
+    public IReadOnlyList<AwaitingBulletin> Awaiting()
+    {
+        lock (_gate)
+        {
+            return _store.Awaiting();
+        }
+    }
+
+    /// <summary>Delivers a waiting canonical bulletin at once (issue #145); null if none is waiting by that ID.</summary>
+    public Bulletin? DeliverNow(ulong objectId)
+    {
+        Bulletin? delivered;
+        MailParts? parts;
+        lock (_gate)
+        {
+            try
+            {
+                delivered = _store.DeliverNow(objectId);
+                _progress = (_store.Directory, _store.Progress());
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
+        }
+        Publish(parts);
+        if (delivered is not null)
+        {
+            _log($"bulletin released to the outbox: {Ascii.Clean(delivered.Bid)}");
+            BulletinReleased?.Invoke(delivered);
+        }
+        return delivered;
+    }
+
     /// <summary>Puts an archived bulletin back in the outbox, to be offered to the BBS again.</summary>
     public (ResendOutcome Outcome, Bulletin? Bulletin) Resend(ulong objectId)
     {
@@ -573,10 +620,10 @@ public sealed class Intake : IAsyncDisposable
             {
                 try
                 {
-                    result = _store.Accept(payload.Span);
+                    result = _store.Accept(payload.Span, HeardFrom?.Invoke());
                     givenUp = _store.TakeGivenUp();
                     if (result.Outcome is not (FrameOutcome.NotAFrame or FrameOutcome.AlreadyComplete or FrameOutcome.Duplicate or FrameOutcome.UnknownDictionary)
-                        || result.Released is not null)
+                        || result.Released is not null || result.Delivered is not null)
                     {
                         _progress = (_store.Directory, _store.Progress());
                     }
@@ -630,6 +677,11 @@ public sealed class Intake : IAsyncDisposable
             case FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin:
                 Interlocked.Increment(ref _framesStored);
                 Completed(bulletin);
+                break;
+            case FrameOutcome.AwaitingEnvelope when result.Bulletin is { } waiting:
+                // Complete now (counted in this slot), whenever it is released to the outbox.
+                Interlocked.Increment(ref _framesStored);
+                Completed(waiting);
                 break;
             case FrameOutcome.Withheld or FrameOutcome.RejectedDirectory:
                 // The store has said why, once.
@@ -699,6 +751,11 @@ public sealed class Intake : IAsyncDisposable
         foreach (var released in result.Released ?? [])
         {
             Completed(released);
+        }
+        foreach (var delivered in result.Delivered ?? [])
+        {
+            _log($"bulletin released to the outbox: {Ascii.Clean(delivered.Bid)}");
+            BulletinReleased?.Invoke(delivered);
         }
     }
 

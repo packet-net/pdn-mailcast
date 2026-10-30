@@ -1298,6 +1298,28 @@ function partialRow(p) {
   tr.append(cell);
   return tr;
 }
+/* Issue #145: a complete canonical bulletin waiting for its station's details; "Deliver now" sends it at once. */
+function awaitingRow(a) {
+  const tr = el("tr");
+  const bidCell = td(a.bid, "num", "BID");
+  tr.append(bidCell, td("-", null, "From"), td("-", null, "To"), td("-", null, "@"), td(a.title || "", null, "Title"),
+    td("-", "num", "Date"), td("-", "num", "Size"));
+  const cell = td(null, null, "Status");
+  const st = el("div");
+  st.append(badgeEl("waiting", "Complete, waiting for its station's details", "warn"));
+  st.append(el("div", "Waiting for its station's details", "muted"));
+  const b = el("button", "Deliver now");
+  b.type = "button";
+  b.addEventListener("click", async () => {
+    b.disabled = true;
+    const r = await api("api/mail/deliver-now", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: a.id }) });
+    if (r.ok) { mailOffset = 0; refreshMail(); refresh(); } else b.disabled = false;
+  });
+  st.append(b);
+  cell.append(st);
+  tr.append(cell);
+  return tr;
+}
 function mailRow(m) {
   const tr = el("tr", null, "pick" + (viewing === m.id ? " open" : ""));
   tr.dataset.id = m.id;
@@ -1351,11 +1373,12 @@ async function refreshMail(version) {
   // Issue #73: part-received rows always on top of the first page; the paged archive and outbox
   // (mail.items) follow, on every page, exactly as "Mail" ordered them before.
   const partial = mailOffset === 0 ? mail.partial : [];
-  if (!mail.items.length && !partial.length) { box.className = "muted"; box.textContent = "Nothing held yet."; $("pager").hidden = true; return; }
+  const awaiting = mailOffset === 0 ? (mail.awaiting || []) : [];
+  if (!mail.items.length && !partial.length && !awaiting.length) { box.className = "muted"; box.textContent = "Nothing held yet."; $("pager").hidden = true; return; }
   box.className = "";
   const table = el("table"), head = el("tr");
   for (const h of ["BID", "From", "To", "@", "Title", "Date", "Size", "Status"]) head.append(el("th", h));
-  table.append(head, ...partial.map(partialRow), ...mail.items.map(mailRow));
+  table.append(head, ...partial.map(partialRow), ...awaiting.map(awaitingRow), ...mail.items.map(mailRow));
   box.replaceChildren(table);
   $("pager").hidden = mail.total <= PAGE;
   $("mailPage").textContent = `${mailOffset + 1} to ${Math.min(mail.total, mailOffset + PAGE)} of ${mail.total}`;
