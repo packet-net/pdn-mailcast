@@ -165,8 +165,8 @@ public class EnvelopeObjectTests
         var result = Feed(store, eo);
         Assert.Equal(FrameOutcome.CompletedEnvelope, result.Outcome);
         Assert.Equal((byte)5, result.ContentType);
-        Assert.Equal(envelope, store.EnvelopeFor(bulletin.ObjectId));
-        Assert.Null(store.EnvelopeFor(bulletin.ObjectId ^ 1));
+        Assert.Equal(envelope, Assert.Single(store.EnvelopesFor(bulletin.ObjectId)).Envelope);
+        Assert.Empty(store.EnvelopesFor(bulletin.ObjectId ^ 1));
         Assert.True(store.IsComplete(eo.ObjectId));
         Assert.Equal(FrameOutcome.AlreadyComplete, store.Accept(eo.Frame(0).ToBytes()).Outcome);
         Assert.Empty(store.Mail.NewestFirst);
@@ -174,7 +174,7 @@ public class EnvelopeObjectTests
 
         // Durable: a reopened store still has it, and the bulletin still delivers as always.
         var again = Open(dir.Path, time);
-        Assert.Equal(envelope, again.EnvelopeFor(bulletin.ObjectId));
+        Assert.Equal(envelope, Assert.Single(again.EnvelopesFor(bulletin.ObjectId)).Envelope);
         Assert.Equal(FrameOutcome.CompletedBulletin, Feed(again, bulletin).Outcome);
     }
 
@@ -188,13 +188,13 @@ public class EnvelopeObjectTests
         var eo = TransferObject.ForEnvelope(MakeEnvelope(6), ZstdDictionary.Gb7rdg1Id, Compression.Default);
 
         Assert.Equal(FrameOutcome.Withheld, Feed(store, eo).Outcome);
-        Assert.Null(store.EnvelopeFor(bulletin.ObjectId));
+        Assert.Empty(store.EnvelopesFor(bulletin.ObjectId));
         Assert.DoesNotContain(store.HeldBulletins(), h => h.ObjectId == eo.ObjectId);
         Assert.Single(log, l => l.StartsWith("envelope ", StringComparison.Ordinal) && l.Contains("held", StringComparison.Ordinal));
 
         var released = Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo)));
         Assert.Equal(FrameOutcome.CompletedDirectory, released.Outcome);
-        Assert.NotNull(store.EnvelopeFor(bulletin.ObjectId));
+        Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
         Assert.True(store.IsComplete(eo.ObjectId));
         Assert.All(log, l => Assert.True(l.All(c => c < 128), l));
     }
@@ -211,21 +211,21 @@ public class EnvelopeObjectTests
         var wrong = Entry(bulletin, eo) with { Envelope = new EnvelopeLink(eo.ObjectId, "0000000000000000") };
         Feed(store, DirectoryFrames(Signer, wrong));
         Assert.Equal(FrameOutcome.Rejected, Feed(store, eo).Outcome);
-        Assert.Null(store.EnvelopeFor(bulletin.ObjectId));
+        Assert.Empty(store.EnvelopesFor(bulletin.ObjectId));
 
         // Listed only by an untrusted key's directory, or an unsigned one: held, never kept.
         using var dir2 = new TempDirectory();
         var store2 = Open(dir2.Path, Clock());
         Feed(store2, DirectoryFrames(Stranger, Entry(bulletin, eo)));
         Assert.Equal(FrameOutcome.Withheld, Feed(store2, eo).Outcome);
-        Assert.Null(store2.EnvelopeFor(bulletin.ObjectId));
+        Assert.Empty(store2.EnvelopesFor(bulletin.ObjectId));
         Feed(store2, DirectoryFrames(null, Entry(bulletin, eo)));
-        Assert.Null(store2.EnvelopeFor(bulletin.ObjectId));
+        Assert.Empty(store2.EnvelopesFor(bulletin.ObjectId));
         Assert.False(store2.IsComplete(eo.ObjectId));
     }
 
     [Fact]
-    public void KeptEnvelopes_AreRemovedWithTheArchiveRetention()
+    public void KeptEnvelopes_AreRemovedAfterTheLongestRetention_AndCanComeBack()
     {
         using var dir = new TempDirectory();
         var time = Clock();
@@ -234,13 +234,122 @@ public class EnvelopeObjectTests
         var eo = TransferObject.ForEnvelope(MakeEnvelope(8), ZstdDictionary.Gb7rdg1Id, Compression.Default);
         Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo)));
         Feed(store, eo);
-        Assert.NotNull(store.EnvelopeFor(bulletin.ObjectId));
+        Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
 
         time.Advance(TimeSpan.FromDays(29));
         store.Expire();
-        Assert.NotNull(store.EnvelopeFor(bulletin.ObjectId));
+        Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
         time.Advance(TimeSpan.FromDays(2));
         store.Expire();
         Assert.Empty(Directory.GetFiles(Path.Combine(dir.Path, "envelopes")));
+        Assert.False(store.IsComplete(eo.ObjectId));
+        Assert.Equal(FrameOutcome.CompletedEnvelope, Feed(store, eo).Outcome);
+        Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
+    }
+
+    [Fact]
+    public void WithArchiveDaysZero_EnvelopesAreKeptForTheDoneRetention_ThenForgottenAndResendable()
+    {
+        using var dir = new TempDirectory();
+        var time = Clock();
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, TrustedKeys = [Trusted], ArchiveRetention = TimeSpan.Zero });
+        var bulletin = Small(9);
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(9), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo)));
+        Feed(store, eo);
+
+        time.Advance(TimeSpan.FromMinutes(61));
+        store.Expire();
+        Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
+        Assert.True(store.IsComplete(eo.ObjectId));
+
+        time.Advance(TimeSpan.FromDays(15));
+        store.Expire();
+        Assert.Empty(Directory.GetFiles(Path.Combine(dir.Path, "envelopes")));
+        Assert.False(store.IsComplete(eo.ObjectId));
+        Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo)));
+        Assert.Equal(FrameOutcome.CompletedEnvelope, Feed(store, eo).Outcome);
+        Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
+    }
+
+    [Fact]
+    public void EnvelopesFor_ReturnsEveryHeldEnvelope_WithTheStationThatLinkedIt()
+    {
+        using var dir = new TempDirectory();
+        var time = Clock();
+        var signer2 = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, TrustedKeys = [Trusted, TrustedKey.Parse("TESTB", signer2.PublicKeyBase64)] });
+        var bulletin = Small(10);
+        var ea = TransferObject.ForEnvelope(MakeEnvelope(10), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eb = TransferObject.ForEnvelope(MakeEnvelope(11), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Feed(store, DirectoryFrames(Signer, Entry(bulletin, ea)));
+        Feed(store, DirectoryFrames(signer2, Entry(bulletin, eb)));
+
+        Assert.Equal(FrameOutcome.CompletedEnvelope, Feed(store, eb).Outcome);
+        var only = Assert.Single(store.EnvelopesFor(bulletin.ObjectId));
+        Assert.Equal("TESTB", only.Station);
+        Assert.Equal(MakeEnvelope(11), only.Envelope);
+
+        Assert.Equal(FrameOutcome.CompletedEnvelope, Feed(store, ea).Outcome);
+        var both = store.EnvelopesFor(bulletin.ObjectId);
+        Assert.Equal(["TEST", "TESTB"], both.Select(b => b.Station));
+        Assert.Equal([MakeEnvelope(10), MakeEnvelope(11)], both.Select(b => b.Envelope));
+    }
+
+    [Fact]
+    public void AnEnvelopeRebuiltFromRepairPiecesAlone_IsNotListedAsABulletin()
+    {
+        using var dir = new TempDirectory();
+        var store = Open(dir.Path, Clock());
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(12), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        AcceptResult last = null!;
+        for (int i = 0; i < eo.SourceSymbols + 3 && last?.Outcome != FrameOutcome.Withheld; i++)
+        {
+            last = store.Accept(eo.Frame((uint)(eo.SourceSymbols + 5 + i)).ToBytes());
+        }
+        Assert.True(last.Outcome == FrameOutcome.Withheld, last.Outcome.ToString());
+        Assert.DoesNotContain(store.HeldBulletins(), h => h.ObjectId == eo.ObjectId);
+    }
+
+    [Fact]
+    public void ReleasedReceiver_ReadsACanonicalBulletin_WithTheSameFields()
+    {
+        var (bulletin, _) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "13_TEST", "A title",
+            Bulletin.TextEncoding.GetBytes("R:261019/0850Z 13@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody.\r\n"));
+        byte[] bytes = bulletin.Serialize();
+        Assert.Contains("Canonical: 1\n", Bulletin.TextEncoding.GetString(bytes), StringComparison.Ordinal);
+
+        var (fields, text) = V0230BulletinParse(bytes);
+        Assert.Equal(("B", "G4ABC", "ALL", "WW", "13_TEST", "A title"), (fields["Type"], fields["From"], fields["To"], fields["At"], fields["Bid"], fields["Title"]));
+        Assert.Equal(bulletin.Date.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture), fields["Date"]);
+        Assert.Equal(bulletin.MessageText, text);
+    }
+
+    // The header reading of v0.23.0's Bulletin.Parse, copied: it keeps every key, knows nothing of Canonical, and takes the rest as the message text.
+    private static (Dictionary<string, string> Fields, string Text) V0230BulletinParse(ReadOnlySpan<byte> serialized)
+    {
+        string text = Bulletin.TextEncoding.GetString(serialized);
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        int position = 0;
+        while (true)
+        {
+            int end = text.IndexOf('\n', position);
+            Assert.True(end >= 0, "The bulletin header does not end with an empty line.");
+            string line = text[position..end];
+            position = end + 1;
+            if (line.Length == 0)
+            {
+                break;
+            }
+            int colon = line.IndexOf(':', StringComparison.Ordinal);
+            Assert.True(colon > 0, "Not a header line: " + line);
+            int valueStart = colon + 1 < line.Length && line[colon + 1] == ' ' ? colon + 2 : colon + 1;
+            Assert.True(fields.TryAdd(line[..colon], line[valueStart..]), "The header has a key twice.");
+        }
+        foreach (var key in new[] { "Type", "From", "To", "At", "Bid", "Date", "Title" })
+        {
+            Assert.True(fields.ContainsKey(key), "The header has no " + key);
+        }
+        return (fields, text[position..]);
     }
 }

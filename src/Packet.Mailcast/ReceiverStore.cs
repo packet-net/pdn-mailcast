@@ -77,7 +77,7 @@ public enum FrameOutcome
     /// <summary>
     /// The symbol completed a bulletin envelope (content type 5) that a trusted signed directory
     /// lists through an <c>env=</c> field and whose hash matches: it is kept (see
-    /// <see cref="ReceiverStore.EnvelopeFor"/>) and nothing goes to the BBS. Last, so the values
+    /// <see cref="ReceiverStore.EnvelopesFor"/>) and nothing goes to the BBS. Last, so the values
     /// before it are what they always were.
     /// </summary>
     CompletedEnvelope,
@@ -1038,7 +1038,8 @@ public sealed partial class ReceiverStore
 
         // Envelopes (issue #142) are not bulletins: they are linked from an entry's env= and never listed as rows.
         var envelopeIds = new HashSet<ulong>(UsableDirectories().SelectMany(d => d.Directory.Entries).Where(e => e.Envelope is not null).Select(e => e.Envelope!.ObjectId));
-        var ids = new HashSet<ulong>(fullest.Where(kv => !envelopeIds.Contains(kv.Key) && !(kv.Value.Symbols.TryGetValue(0, out var first) && first.Length > 0 && (first[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)).Select(kv => kv.Key));
+        var ids = new HashSet<ulong>(fullest.Where(kv => !envelopeIds.Contains(kv.Key) && !(kv.Value.Symbols.TryGetValue(0, out var first) && first.Length > 0 && (first[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)
+            && !(kv.Value.Withheld is { Length: > 0 } rebuilt && (rebuilt[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)).Select(kv => kv.Key));
         var withheld = new HashSet<ulong>(_instances.Values.Where(i => i.Withheld is not null).Select(i => i.ObjectId));
         foreach (var id in named.Keys)
         {
@@ -1646,20 +1647,30 @@ public sealed partial class ReceiverStore
     private string EnvelopePath(ulong objectId) => Path.Combine(_envelopeDir, ObjectId.Format(objectId));
 
     /// <summary>
-    /// The envelope kept for a bulletin, found through the <c>env=</c> field of its entry in a trusted
-    /// signed directory still remembered; null when no such directory links one, or it has not been
-    /// heard (or was pruned). Delivery does not use it yet (issue #142).
+    /// Every envelope kept for a bulletin, one per station whose trusted signed directory (still
+    /// remembered) links one that has been heard and not pruned, in a fixed order (station name,
+    /// then envelope object ID). Empty when there is none. Delivery does not use them yet (issue #142).
     /// </summary>
-    public BulletinEnvelope? EnvelopeFor(ulong bulletinObjectId)
+    public IReadOnlyList<(string Station, BulletinEnvelope Envelope)> EnvelopesFor(ulong bulletinObjectId)
     {
+        var found = new List<(string Station, ulong ObjectId, BulletinEnvelope Envelope)>();
         foreach (var (directory, check) in UsableDirectories())
         {
-            if (check.State == SignatureState.Trusted && directory.Find(bulletinObjectId)?.Envelope is { } link)
+            if (check.State != SignatureState.Trusted || directory.Find(bulletinObjectId)?.Envelope is not { } link)
             {
-                return ReadEnvelope(link.ObjectId);
+                continue;
+            }
+            string station = check.SignedBy ?? "";
+            if (found.Any(f => f.ObjectId == link.ObjectId && f.Station == station))
+            {
+                continue;
+            }
+            if (ReadEnvelope(link.ObjectId) is { } envelope)
+            {
+                found.Add((station, link.ObjectId, envelope));
             }
         }
-        return null;
+        return [.. found.OrderBy(f => f.Station, StringComparer.Ordinal).ThenBy(f => f.ObjectId).Select(f => (f.Station, f.Envelope))];
     }
 
     private BulletinEnvelope? ReadEnvelope(ulong envelopeObjectId)
@@ -1681,18 +1692,29 @@ public sealed partial class ReceiverStore
         }
     }
 
-    /// <summary>Deletes kept envelopes older than <see cref="ReceiverStoreOptions.ArchiveRetention"/>, as archived bulletins are.</summary>
+    /// <summary>
+    /// Deletes kept envelopes older than the longest of <see cref="ReceiverStoreOptions.ArchiveRetention"/>,
+    /// <see cref="ReceiverStoreOptions.DoneRetention"/> and <see cref="ReceiverStoreOptions.PartialRetention"/>
+    /// (so archive.days 0 does not drop them within the hour), and forgets the done marker of each, so
+    /// a resend can bring it back.
+    /// </summary>
     private void PruneEnvelopes(DateTimeOffset now)
     {
         if (!System.IO.Directory.Exists(_envelopeDir))
         {
             return;
         }
+        var keep = new[] { _options.ArchiveRetention, _options.DoneRetention, _options.PartialRetention }.Max();
         foreach (var file in System.IO.Directory.EnumerateFiles(_envelopeDir))
         {
-            if (now - File.GetLastWriteTimeUtc(file) > _options.ArchiveRetention)
+            if (now - File.GetLastWriteTimeUtc(file) > keep)
             {
                 TryDelete(file);
+                if (ObjectId.TryParse(Path.GetFileName(file), out ulong id) && _done.Remove(id))
+                {
+                    _doneHashes.Remove(id);
+                    TryDelete(DonePath(id));
+                }
             }
         }
     }
