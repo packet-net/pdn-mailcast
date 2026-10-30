@@ -306,13 +306,49 @@ fn check(path: &str) {
     println!("all cases match");
 }
 
+/// Checks the encoding symbols in a Model B vector file (tests/Packet.Mailcast.Tests/Vectors/model-b-v1.json)
+/// against the crate: each object's octets are encoded with the object's own OTI and every listed
+/// "esi:hex" symbol must be what the crate makes for that ESI.
+fn model_b(path: &str) {
+    let doc: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut compared = 0;
+    let mut differ = 0;
+    for case in doc["cases"].as_array().unwrap() {
+        for key in ["bulletinDictionary1", "envelopeObjectDictionary1"] {
+            let object = &case["expected"][key];
+            let data = unhex(object["objectHex"].as_str().unwrap());
+            let oti: [u8; 12] = unhex(object["otiHex"].as_str().unwrap()).try_into().unwrap();
+            let config = ObjectTransmissionInformation::deserialize(&oti);
+            assert_eq!(config.transfer_length(), data.len() as u64);
+            let encoder = Encoder::new(&data, config);
+            let blocks = encoder.get_block_encoders();
+            let k = block_sizes(&config)[0];
+            for v in object["symbols"].as_array().unwrap() {
+                let (esi, hexed) = v.as_str().unwrap().split_once(':').unwrap();
+                let esi: u32 = esi.parse().unwrap();
+                let theirs = symbol_for(&blocks[0], k, esi);
+                compared += 1;
+                if hex(theirs.data()) != hexed {
+                    differ += 1;
+                    println!("{} {} ESI {}: DIFFERS", case["name"], key, esi);
+                }
+            }
+        }
+    }
+    println!("model-b: {} symbols compared against the raptorq crate, {} differ", compared, differ);
+    if differ > 0 {
+        std::process::exit(1);
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     match (args.get(1).map(String::as_str), args.get(2)) {
         (Some("generate"), Some(path)) => generate(path),
         (Some("check"), Some(path)) => check(path),
+        (Some("model-b"), Some(path)) => model_b(path),
         _ => {
-            eprintln!("usage: raptorq-vectors generate <out.json> | check <ours.json>");
+            eprintln!("usage: raptorq-vectors generate <out.json> | check <ours.json> | model-b <model-b-v1.json>");
             std::process::exit(2);
         }
     }

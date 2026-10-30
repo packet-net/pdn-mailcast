@@ -239,13 +239,17 @@ The envelope is the station's own part: the routing lines and anything else take
 
 A receiver only keeps an envelope that a trusted signed directory lists, so a head end that sends envelopes without signing its directory gains nothing. The listing is one more field on the bulletin's own directory line, after `hash=`: `env=` then the envelope's 16 hex digit object ID, a semicolon and its 16 hex digit long hash (bytes 8 to 15 of the same SHA-256, as for `hash=`), lower case. It is inside the signature. Released readers ignore it like any field after the title, and a reader that finds it malformed ignores it too. An envelope heard before its directory is held until a directory lists it. A receiver that has the envelope can turn CR LF back into LF (unless Raw) and rebuild the station's copy exactly with `CanonicalForm.FromCanonicalBulletin`. This release only keeps envelopes; delivery does not use them yet, and a head end does not send them yet.
 
+### The test vectors define the format
+
+`tests/Packet.Mailcast.Tests/Vectors/model-b-v1.json` is the definition of the format, in bytes. For twelve inputs (an empty body, one line, a real multi-kilobyte bulletin, an FBB copy with origin block and Path, 8-bit and ANSI octets, a Raw body, a 60-character title, a title cut at trailing blanks, CR LF and lone CR bodies, a body over 128 KB, an envelope over 240 octets) it holds the canonical body and envelope, the type 1 object with dictionary 1 and 0, object IDs and long hashes, encoding symbols at chosen ESIs at 240-octet pieces (only a few for the large body), whole frames with CRC, the type 5 envelope object, and the directory line with `env=`. `ModelBVectorTests` rebuilds every byte from the inputs, so a dependency bump or code change that alters any of it fails the build; that is the check behind pinning zstd 1.5.7 output. Regenerate it only for a deliberate format change, with `dotnet run --project tools/Mailcast.ModelBVectors -- tests/Packet.Mailcast.Tests/Vectors/model-b-v1.json`. `tools/raptorq-vectors/reproduce_model_b.py` is a one-off independent reproduction from the inputs alone: its own short canonicaliser (written from docs/canonical-form.md and the #142 decisions, not from the C#) must give the canonical body, envelope and canonical bulletin; then libzstd 1.5.7 (python-zstandard, plain level 19 call) must give the compressed objects with dictionary 1 and 0, with the IDs, long hashes, OTI (RFC 6330 layout, piece size 240, one source block and sub-block, alignment 4, K = ceil(length / 240)), whole frames with CRC, the type 5 envelope object and the directory line with `env=`; and the Rust raptorq crate must give every listed symbol. It does not check anything outside the inputs in the file, and it is not run in CI.
+
 ### What counts as a format change
 
 Two sites combine their pieces only while all of these are the same. Any change to one is a format change:
 
 - the canonical rules (docs/canonical-form.md) and the canonical bulletin's fields above
 - the object serialisation (the bulletin header, the envelope serialisation, the content type octet)
-- the zstd version or settings (the output is pinned to zstd 1.5.7 as ZstdSharp 0.8.8 writes it; level 19, one thread, checksum, content size and dictionary ID on)
+- the zstd version or settings (the output is pinned to zstd 1.5.7 as ZstdSharp 0.8.8 writes it; level 19, one thread, checksum, content size and dictionary ID on; another implementation must use zstd's plain level 19 with these flags, not hand-built compression parameters, which differ for inputs over 128 KB)
 - the dictionary (numbered, never changed once numbered)
 - the piece size (240 bytes)
 - the RaptorQ parameters (RFC 6330, one source block, one sub-block, alignment 4)
