@@ -232,7 +232,7 @@ A bulletin is serialised as a header block of `Key: value` lines (`Type`, `From`
 Two head ends send interchangeable pieces only if they build byte-identical objects from one message (issue #142). A canonical bulletin is still content type 1, with one more header key after `Title`, `Canonical: 1`. Released receivers ignore the key and deliver it like any bulletin. It is made from a station's copy by `CanonicalForm.ToCanonicalBulletin` (rules in [canonical-form.md](canonical-form.md)):
 
 - `Title` is the first 59 bytes of the title, with trailing spaces and tabs removed. The full title is in the envelope.
-- `Date` is the time on the oldest routing line (the last `R:` line in the top of the copy), read as UTC, or `1970-01-01T00:00:00Z` if there is none.
+- `Date` is always `1970-01-01T00:00:00Z`, so every head end agrees whatever route the bulletin took. Receivers show the date only on their mail page.
 - The message text has no routing lines, and its body is the canonical body with each line feed written as CR LF, or the body as it is when the envelope says Raw.
 
 The envelope is the station's own part: the routing lines and anything else taken off the copy, the line-ending style and the full title, serialised as in canonical-form.md. It goes out as a content type 5 object (`TransferObject.ForEnvelope`): the serialised envelope, zstd compressed with the dictionary, cut into 240-byte pieces whatever the head end's piece size is. It is named like any object, by the hash of its dictionary ID and bytes, and is never combined with another station's, so its bytes need not match anyone else's.
