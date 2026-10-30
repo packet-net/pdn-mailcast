@@ -571,15 +571,28 @@ A transmitter can sign its directory, the list of what it is sending, so you can
 - **signed by GB7RDG**: this receiver checked the bulletin it rebuilt against the fingerprint a directory signed by a key you trust gives for it, and it matched. Only then.
 - **does not match GB7RDG's signed list**: it was delivered before any directory listed it (as always), and the signed directory heard since gives a different fingerprint. The log says so. One that a signed directory already lists, and that does not match, is not delivered at all.
 - **in GB7RDG's signed list**: a signed directory lists it, but it is not complete yet, or was rebuilt by an older receiver that kept no fingerprint, so nothing has been checked.
-- **not signed**: only directories with no signature list it, which is how every directory was before signing, and how a transmitter without a key still sends. It is delivered as usual.
+- **not signed**: only directories with no signature list it. This is the old wording from before unsigned directories were refused; a bulletin only an unsigned directory lists is now held (see below), so you see it only on a bulletin delivered before.
 
 Other stations sign their own directories too. The first time the receiver hears a station's signed directory it learns the station's key and keeps it, so that station's bulletins are delivered from then on, with no setting to change; the status page's Stations line lists every station with its key, and when it was learnt. If a directory later names that station but is signed by an unknown key, it is refused, its bulletins are held, and the page says so in bold. `trustedKeys` is still there to trust a key by hand before it is heard, or a second key for a station (when it changes keys, say). An entry whose label is the station's callsign is that station's; with any other label, the station is the one its first signed directory names, and the label is only what the page shows. If that callsign is pinned to another key already, the directory is refused as a key conflict. Take such a key out of `trustedKeys` and its pin goes with it at the next start, and the station is learnt again, like any other, if its signed directory is heard on air.
+
+A directory with no signature is not used either (issue #146): every head end now signs. The page says "unsigned, not used" for it, the log says so once per run rather than once a slot, and a bulletin only it lists is held like any other, until a signed directory lists it. If GB7RDG's slot times have not been heard from a signed directory, the receiver listens at the times in its config, as before.
 
 A directory whose signature does not check, or is signed by a key you have not added, is not used at all: not for names, not for the list, and not to decide what has stopped being sent. The log says why, once for each such directory, and the summary line says "The last list heard was not used" with the reason. A bulletin that only such a directory lists is held when it completes, not delivered; the row says so, and it goes to your BBS as soon as a good directory lists it too.
 
 A bulletin shows this while a directory naming it is remembered, which is 48 hours. A held bulletin stays held across a restart, until a good directory lists it or 14 days pass.
 
-What signing does not stop yet: a directory with its signature cut off is just an unsigned one, and is used as today; a bulletin no directory lists is still delivered, as today; and a signed directory can be sent again the same day, which is no worse than before. A later setting to accept signed directories only, not built yet, would close the first two.
+What signing does not stop: a bulletin no directory lists is still delivered, as before; and a signed directory can be sent again the same day, which is no worse than before.
+
+### Keys
+
+The page's **Keys** section lists every key the receiver trusts: the station, the key's ID (hover for the whole public key), where it came from, and when a directory it signed was last heard. The source is one of:
+
+- **built in**: GB7RDG's, part of the receiver.
+- **config file**: from `trustedKeys`; change it in the config file.
+- **learnt on first hearing**: the key a station's first signed directory gave. **Forget** removes it, and the directories it signed. It is learnt again the next time that station's directory is heard on air, so forgetting is for a key you no longer trust, and for tidying.
+- **added on this page**: type a callsign and a public key (base64, as a head end's journal prints it) and press **Add key**. The key is kept in `store/pins.txt`, and bulletins held back because of it are released. **Forget** removes it.
+
+Changing keys needs the same sign-in as the page's other buttons. Nothing about this changes what is sent on the air.
 
 The copies are a convenience: if one cannot be written (a full disk, say), that is logged, and a bulletin your BBS has taken leaves the outbox all the same. A refused one is moved to `store/quarantine/` instead, so it is kept without holding up newer mail.
 

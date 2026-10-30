@@ -19,6 +19,20 @@ case "$1" in
         echo "  put your callsign, locator, the station's API key and the BBS password in $CONFIG, then:"
         echo "  systemctl start pdn-mailcast-headend"
     fi
+    # Every head end signs its directories: make the key if there is none (never replacing a
+    # key that has content), and on every configure give it to the service user alone, which
+    # also covers a reinstall after a purge gave the user a new UID.
+    KEY=/etc/pdn-mailcast-headend/signing-key.pem
+    if [ -e "$KEY" ] && [ ! -s "$KEY" ]; then
+        rm -f "$KEY"
+    fi
+    if [ ! -e "$KEY" ]; then
+        /usr/bin/pdn-mailcast-headend --make-key || echo "pdn-mailcast-headend: could not make $KEY; run: sudo pdn-mailcast-headend --make-key" >&2
+    fi
+    if [ -e "$KEY" ]; then
+        chown pdn-mailcast-headend:pdn-mailcast-headend "$KEY"
+        chmod 0600 "$KEY"
+    fi
     ;;
 esac
 

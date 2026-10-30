@@ -24,7 +24,12 @@ public sealed class ReceiverHost : IAsyncDisposable
     private CancellationTokenSource? _audioRestart;
 
     /// <summary>Creates the receiver; nothing runs until <see cref="RunAsync"/> or <see cref="DecodeOnceAsync"/>.</summary>
-    public ReceiverHost(ReceiverConfig config, TimeProvider time, Action<string> log)
+    public ReceiverHost(ReceiverConfig config, TimeProvider time, Action<string> log) : this(config, time, log, false)
+    {
+    }
+
+    /// <param name="refuseUnsigned">Tests only: use the production rule (an unsigned directory is not used) whatever the test project's default.</param>
+    internal ReceiverHost(ReceiverConfig config, TimeProvider time, Action<string> log, bool refuseUnsigned)
     {
         _config = config;
         _time = time;
@@ -35,6 +40,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             ArchiveRetention = TimeSpan.FromDays(config.Archive.Days),
             ArchiveMaxBytes = config.Archive.MaxMegabytes * 1024L * 1024,
             TrustedKeys = config.AllTrustedKeys,
+            UnsignedDirectoriesAreUsed = !refuseUnsigned && ReceiverStoreOptions.DefaultUnsignedDirectoriesAreUsed,
             DeliveryCall = () => Ascii.Clean(Config.Bbs.Login).ToUpperInvariant(),
         });
         Intake.Sources = config.AcceptedSources;
@@ -57,6 +63,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted),
             report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.AlreadyHad));
         Intake.ScheduleHeard += OnScheduleHeard;
+        Intake.KeysChanged += RefreshFollowed;
         // Issue #48: after Slots.OnFrame above, so the slot this piece belongs to is already
         // the one Slots.Last knows about.
         Intake.Piece += OnPieceHandled;

@@ -20,10 +20,63 @@ public static partial class Program
     private const string DefaultConfig = "/etc/pdn-mailcast-headend/headend.json";
 
     /// <summary>
-    /// The directory signing key: when this file is there, every directory is signed with it. A
-    /// fixed place, not a setting. Made with <c>openssl genpkey -algorithm ed25519</c>; see docs/headend.md.
+    /// The directory signing key: every directory is signed with it, and the service does not start
+    /// without it. A fixed place, not a setting. The package makes it at install (<c>--make-key</c>);
+    /// one made with <c>openssl genpkey -algorithm ed25519</c> works too, see docs/headend.md.
     /// </summary>
     public const string SigningKeyPath = "/etc/pdn-mailcast-headend/signing-key.pem";
+
+    /// <summary>Where the key is read and made; <see cref="SigningKeyPath"/> except in tests.</summary>
+    internal static string KeyPath { get; set; } = SigningKeyPath;
+
+    /// <summary>--make-key: makes the key if there is none; says its ID and public key either way.</summary>
+    internal static int MakeKey()
+    {
+        try
+        {
+            bool made = DirectorySigner.CreateKeyFile(KeyPath);
+            if (made)
+            {
+                HandOverToServiceUser(KeyPath);
+            }
+            var signer = DirectorySigner.LoadIfPresent(KeyPath)!;
+            Console.WriteLine($"{(made ? "made the signing key" : "the signing key is already there")} at {KeyPath}");
+            Console.WriteLine(DescribeSigning(signer, KeyPath));
+            return 0;
+        }
+        catch (FormatException e)
+        {
+            Console.Error.WriteLine($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}");
+            return 1;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"pdn-mailcast-headend: the signing key at {KeyPath}: {Ascii.Plain(e.Message)}; run it with sudo");
+            return 1;
+        }
+    }
+
+    // Run as root, the new key is made the service user's, so the service can read it.
+    private static void HandOverToServiceUser(string path)
+    {
+        if (OperatingSystem.IsWindows() || Environment.UserName != "root")
+        {
+            return;
+        }
+        try
+        {
+            using var chown = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("chown", ["pdn-mailcast-headend:pdn-mailcast-headend", path]) { RedirectStandardError = true });
+            chown?.WaitForExit(5000);
+            if (chown is { ExitCode: not 0 })
+            {
+                Console.Error.WriteLine($"pdn-mailcast-headend: could not give {path} to the service user; run: chown pdn-mailcast-headend:pdn-mailcast-headend {path}");
+            }
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"pdn-mailcast-headend: could not give {path} to the service user: {Ascii.Plain(e.Message)}");
+        }
+    }
 
     private const string Usage = """
         pdn-mailcast-headend: a mailcast head end, which sends a BBS's bulletins on the air.
@@ -43,6 +96,9 @@ public static partial class Program
               the schedule carries on afterwards.
           pdn-mailcast-headend --check-config [--config FILE]
               Checks the configuration, and says whether directories will be signed.
+          pdn-mailcast-headend --make-key
+              Makes the directory signing key if there is none yet (the package does this when it
+              is installed), and says its ID and public key. Never replaces a key.
           pdn-mailcast-headend --version
 
         Exit codes: 0 fine, 1 failed, 2 the configuration or the command line is wrong.
@@ -71,6 +127,11 @@ public static partial class Program
             return 0;
         }
 
+        if (options.ContainsKey("--make-key"))
+        {
+            return MakeKey();
+        }
+
         string configPath = options.GetValueOrDefault("--config") ?? DefaultConfig;
         bool offline = options.ContainsKey("--wav") || options.ContainsKey("--plan");
         HeadEndConfig config;
@@ -94,17 +155,23 @@ public static partial class Program
         DirectorySigner? signer;
         try
         {
-            signer = DirectorySigner.LoadIfPresent(SigningKeyPath);
+            signer = DirectorySigner.LoadIfPresent(KeyPath);
         }
         catch (FormatException e)
         {
             if (!offline)
             {
-                await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; fix or remove it");
+                await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; fix it, or move it away and run: sudo pdn-mailcast-headend --make-key");
                 return 2;
             }
             await Console.Error.WriteLineAsync($"pdn-mailcast-headend: the signing key {Ascii.Plain(e.Message)}; this run's directories are unsigned");
             signer = null;
+        }
+        if (signer is null && !offline)
+        {
+            // Receivers do not use an unsigned directory, so a head end without a key would send nothing useful.
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: no signing key at {KeyPath}; make one with: sudo pdn-mailcast-headend --make-key");
+            return 2;
         }
 
         if (options.ContainsKey("--check-config"))
@@ -194,7 +261,7 @@ public static partial class Program
 
     /// <summary>One plain line on whether directories are signed, and with which key.</summary>
     internal static string DescribeSigning(DirectorySigner? signer, string path) => signer is null
-        ? $"signing: no key at {path}, so directories go out unsigned"
+        ? $"signing: no key at {path}, so offline runs go out unsigned"
         : $"signing: directories are signed with key {KeyId.Format(signer.KeyId)}, public key {signer.PublicKeyBase64}";
 
     internal static int Offline(HeadEndConfig config, Dictionary<string, string?> options, DateTimeOffset slot, ConsoleJournal journal, DirectorySigner? signer)
@@ -471,7 +538,7 @@ public static partial class Program
     internal static Dictionary<string, string?> ParseArguments(string[] args, out string? error)
     {
         string[] withValue = ["--config", "--wav", "--date", "--time", "--bulletins", "--rate"];
-        string[] flags = ["--plan", "--check-config", "--run-now", "--version", "--help"];
+        string[] flags = ["--plan", "--check-config", "--run-now", "--make-key", "--version", "--help"];
         var options = new Dictionary<string, string?>(StringComparer.Ordinal);
         error = null;
         for (int i = 0; i < args.Length; i++)

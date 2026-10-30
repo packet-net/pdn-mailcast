@@ -274,21 +274,44 @@ public class SignedDirectoryStoreTests
         Assert.False(row.Withheld);
     }
 
+    /// <summary>The real default: an unsigned directory is not used (issue #146).</summary>
+    private static ReceiverStore OpenStrict(string path, FakeTimeProvider time, List<string> log) =>
+        new(path, Compression.Default, new ReceiverStoreOptions { FlushToDisk = false, Time = time, Log = log.Add, TrustedKeys = Keys });
+
     [Fact]
-    public void Unsigned_WorksExactlyAsBefore()
+    public void Unsigned_IsUsedForNothing_SaidOnce_AndWhatOnlyItListsIsHeldUntilASignedOneListsIt()
     {
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 15, 9, 0, 0, TimeSpan.Zero));
-        var store = Open(dir.Path, time, []);
+        var log = new List<string>();
+        var store = OpenStrict(dir.Path, time, log);
         var a = Small(2);
-        var result = FeedAll(store, DirectoryFrames(null, a));
-        Assert.Equal(FrameOutcome.CompletedDirectory, result.Outcome);
-        Assert.Equal(DirectoryCheck.NotSigned, result.Check);
-        Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, a).Outcome);
-        Assert.Equal("not signed", Assert.Single(store.HeldBulletins()).Signature);
+        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var result = FeedAll(store, DirectoryFrames(new BroadcastDirectory(Day, [Entry(a, 0)], schedule: timetable)));
+        Assert.Equal(FrameOutcome.RejectedDirectory, result.Outcome);
+        Assert.Equal("unsigned, not used", result.Check!.Describe());
+        Assert.False(result.Check.Usable);
+        Assert.Null(store.Directory);
+        Assert.Null(store.HeardSchedule); // the config's slots stand, as with no directory heard
+        Assert.Empty(store.StationDirectories());
+        Assert.Equal("unsigned, not used", store.LastDirectoryHeard!.Check.Describe());
 
-        // A bulletin no directory lists is delivered as always.
-        Assert.Equal(FrameOutcome.CompletedBulletin, FeedObject(store, Small(3)).Outcome);
+        // Said once, however many unsigned directories follow.
+        FeedAll(store, DirectoryFrames(new BroadcastDirectory(Day.AddDays(1), [Entry(a, 0)], schedule: timetable)));
+        var said = log.Where(l => l.Contains("no signature", StringComparison.Ordinal)).ToList();
+        Assert.Single(said);
+        Assert.All(said, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
+
+        // The bulletin only it lists is held, as under a bad signature.
+        Assert.Equal(FrameOutcome.Withheld, FeedObject(store, a).Outcome);
+        Assert.Empty(store.Pending());
+
+        // A signed directory listing it lets it go.
+        time.Advance(TimeSpan.FromMinutes(5));
+        var good = FeedAll(store, DirectoryFrames(Signer, a));
+        Assert.Equal(FrameOutcome.CompletedDirectory, good.Outcome);
+        Assert.Single(good.Released!);
+        Assert.Single(store.Pending());
     }
 
     [Fact]

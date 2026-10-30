@@ -7,7 +7,8 @@ namespace Packet.Mailcast;
 /// <param name="Key">Its directory key.</param>
 /// <param name="PinnedAt">When it was learnt from the station's first signed directory; null for one built in or in <c>trustedKeys</c>.</param>
 /// <param name="FromTrustedKeys">Whether it was pinned because it is in <c>trustedKeys</c> (its label not a callsign): the pin goes when the key does.</param>
-public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false);
+/// <param name="Added">Whether it was added by hand on the status page (issue #146), not learnt on the air.</param>
+public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false, bool Added = false);
 
 /// <summary>
 /// A signed directory that named a station whose key is already pinned, under another key: it
@@ -59,6 +60,7 @@ public sealed partial class ReceiverStore
 
     // A station may hold several keys: GB7RDG's built-in one and a newer one in trustedKeys, say.
     private const string FromTrustedKeysMark = "trusted";
+    private const string AddedMark = "added";
 
     private readonly List<PinnedStation> _pins = [];
     private readonly Dictionary<string, KeyConflict> _conflicts = new(StringComparer.Ordinal);
@@ -117,7 +119,7 @@ public sealed partial class ReceiverStore
                 }
                 if (!_pins.Any(x => x.Key.KeyId == key.KeyId))
                 {
-                    _pins.Add(new PinnedStation(p[0], key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark));
+                    _pins.Add(new PinnedStation(p[0], key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark, p.Length >= 4 && p[3] == AddedMark));
                 }
             }
         }
@@ -143,7 +145,7 @@ public sealed partial class ReceiverStore
     private void WritePins(string what)
     {
         var lines = _pins.Where(x => x.PinnedAt is not null)
-            .Select(x => $"{x.Station}\t{Convert.ToBase64String(x.Key.PublicKey)}\t{x.PinnedAt!.Value.ToString("o", CultureInfo.InvariantCulture)}{(x.FromTrustedKeys ? "\t" + FromTrustedKeysMark : "")}\n");
+            .Select(x => $"{x.Station}\t{Convert.ToBase64String(x.Key.PublicKey)}\t{x.PinnedAt!.Value.ToString("o", CultureInfo.InvariantCulture)}{(x.FromTrustedKeys ? "\t" + FromTrustedKeysMark : x.Added ? "\t" + AddedMark : "")}\n");
         try
         {
             DurableFile.WriteAtomically(Path.Combine(_root, PinsFile), Bulletin.TextEncoding.GetBytes(string.Concat(lines)), flush: _options.FlushToDisk);
@@ -161,7 +163,7 @@ public sealed partial class ReceiverStore
     internal DirectoryCheck CheckDirectory(BroadcastDirectory directory)
     {
         ArgumentNullException.ThrowIfNull(directory);
-        var check = directory.Check(DirectoryKeys);
+        var check = CheckSignature(directory);
         if (check.State == SignatureState.Trusted && directory.SigningKeyId is { } trustedId && !_pins.Any(p => p.Key.KeyId == trustedId)
             && directory.Station is { } named && DirectoryKeys.FirstOrDefault(k => k.KeyId == trustedId) is { } configured)
         {
@@ -197,6 +199,23 @@ public sealed partial class ReceiverStore
     }
 
     /// <summary>
+    /// The directory's signature against <see cref="DirectoryKeys"/>; an unsigned directory is
+    /// refused, not used for anything (issue #146), unless a test says otherwise.
+    /// </summary>
+    /// <summary>What <see cref="CheckDirectory"/> finds, without pinning a key or noting a conflict.</summary>
+    public DirectoryCheck PeekCheck(BroadcastDirectory directory)
+    {
+        ArgumentNullException.ThrowIfNull(directory);
+        return CheckSignature(directory);
+    }
+
+    private DirectoryCheck CheckSignature(BroadcastDirectory directory)
+    {
+        var check = directory.Check(DirectoryKeys);
+        return check.State == SignatureState.None && !_options.UnsignedDirectoriesAreUsed ? DirectoryCheck.UnsignedNotUsed : check;
+    }
+
+    /// <summary>
     /// The refusal for a directory signed by a trustedKeys key not pinned yet that names a callsign
     /// pinned to another key (issue #187), recorded as a key conflict; null when it is not so.
     /// </summary>
@@ -225,7 +244,7 @@ public sealed partial class ReceiverStore
         var released = new List<Bulletin>();
         foreach (var (id, (directory, heardAt, _)) in _rejectedDirectories.ToList())
         {
-            var check = directory.Check(DirectoryKeys);
+            var check = CheckSignature(directory);
             if (check.Usable && KeyConflictOf(directory, check) is null)
             {
                 _rejectedDirectories.Remove(id);

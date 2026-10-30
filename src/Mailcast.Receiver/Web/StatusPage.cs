@@ -312,6 +312,12 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/filter/measure", "POST"):
                     await MeasureFilterAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/keys/add", "POST"):
+                    await AddKeyAsync(context).ConfigureAwait(false);
+                    break;
+                case ("/api/keys/forget", "POST"):
+                    await ForgetKeyAsync(context).ConfigureAwait(false);
+                    break;
                 case ("/api/stations/listen", "POST"):
                     await ListenToStationAsync(context).ConfigureAwait(false);
                     break;
@@ -844,7 +850,7 @@ public sealed class StatusPage : IAsyncDisposable
             schedule = Schedule(config, _host.Followed, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
             // Issues #178 and #144: each station's pinned key, when its newest directory was dated,
             // and any directory refused for naming a pinned station under another key.
-            stations = StationsView(_host.Intake.Pins(), _host.Intake.StationDirectories(), _host.Intake.KeyConflicts()),
+            stations = StationsView(_host.Intake.Pins(), _host.Intake.StationDirectories(), _host.Intake.KeyConflicts(), _host.Intake.KeyRows()),
             // Every station whose slots are known, whether this receiver listens at them, and if not why.
             listening = _host.Listening.Select(l => new
             {
@@ -1185,8 +1191,24 @@ public sealed class StatusPage : IAsyncDisposable
     };
 
     /// <summary>The stations this receiver knows, for the page.</summary>
-    internal static object StationsView(IReadOnlyList<Packet.Mailcast.PinnedStation> pins, IReadOnlyList<Packet.Mailcast.StationDirectory> heard, IReadOnlyList<Packet.Mailcast.KeyConflict> conflicts) => new
+    internal static object StationsView(IReadOnlyList<Packet.Mailcast.PinnedStation> pins, IReadOnlyList<Packet.Mailcast.StationDirectory> heard, IReadOnlyList<Packet.Mailcast.KeyConflict> conflicts, IReadOnlyList<Packet.Mailcast.KeyRow>? keys = null) => new
     {
+        // Issue #146: every trusted key, where it came from, and when its directory was last heard.
+        keys = (keys ?? []).Select(k => new
+        {
+            station = k.Station,
+            keyId = Packet.Mailcast.KeyId.Format(k.Key.KeyId),
+            publicKey = Convert.ToBase64String(k.Key.PublicKey),
+            source = k.Source switch
+            {
+                Packet.Mailcast.KeySource.BuiltIn => "built in",
+                Packet.Mailcast.KeySource.Config => "config file",
+                Packet.Mailcast.KeySource.Learnt => "learnt on first hearing",
+                _ => "added on this page",
+            },
+            lastHeard = k.LastHeard,
+            canForget = k.CanForget,
+        }),
         known = pins.Select(p => new
         {
             station = p.Station,
@@ -2044,6 +2066,52 @@ public sealed class StatusPage : IAsyncDisposable
 
     /// <summary>The typed-edges form: low and high, Hz.</summary>
     private sealed record FilterEdgesForm(double LowHz, double HighHz);
+
+    private sealed record AddKeyForm(string? Station, string? PublicKey);
+
+    private sealed record ForgetKeyForm(string? KeyId);
+
+    /// <summary>POST /api/keys/add: trusts a callsign's public key (issue #146).</summary>
+    private async Task AddKeyAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<AddKeyForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        var result = _host.Intake.AddKey(form?.Station, form?.PublicKey);
+        if (result.Error is { } why)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = why })).ConfigureAwait(false);
+            return;
+        }
+        _log($"keys: a key was added from the web page ({context.Request.RemoteEndPoint?.Address})");
+        _host.Delivery.Nudge();
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { added = true, note = result.Note })).ConfigureAwait(false);
+    }
+
+    /// <summary>POST /api/keys/forget: forgets a learnt or added key (issue #146).</summary>
+    private async Task ForgetKeyAsync(HttpListenerContext context)
+    {
+        var (answered, form) = await ReadJsonAsync<ForgetKeyForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        if (form?.KeyId is not { } text || !Packet.Mailcast.KeyId.TryParse(text, out ulong keyId))
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Say which key, by its id." })).ConfigureAwait(false);
+            return;
+        }
+        var result = _host.Intake.ForgetKey(keyId);
+        if (result.Error is { } why)
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = why })).ConfigureAwait(false);
+            return;
+        }
+        _log($"keys: key {Packet.Mailcast.KeyId.Format(keyId)} was forgotten from the web page ({context.Request.RemoteEndPoint?.Address})");
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { forgotten = true })).ConfigureAwait(false);
+    }
 
     private sealed record ListenForm(string? Station, bool Listen);
 
