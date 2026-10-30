@@ -135,6 +135,6 @@ internal sealed class ManualTime(DateTimeOffset start) : TimeProvider
 
 internal static class TestStores
 {
-    /// <summary>Store options without fsync, for tests that write thousands of symbols.</summary>
-    public static ReceiverStoreOptions Fast => new() { FlushToDisk = false };
+    /// <summary>Store options without fsync, for tests that write thousands of symbols; unsigned directories are used here (the refusal is tested with <c>new ReceiverStoreOptions()</c>).</summary>
+    public static ReceiverStoreOptions Fast => new() { FlushToDisk = false, UnsignedDirectoriesAreUsed = true };
 }

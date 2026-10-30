@@ -258,6 +258,12 @@ public sealed record ReceiverStoreOptions
     /// </summary>
     public IReadOnlyList<TrustedKey> TrustedKeys { get; init; } = TrustedKey.BuiltIn;
 
+    /// <summary>The default of <see cref="UnsignedDirectoriesAreUsed"/>; a test project turns it on for the many tests that are about something else. Never set in a program.</summary>
+    internal static bool DefaultUnsignedDirectoriesAreUsed { get; set; }
+
+    /// <summary>For tests of everything else: unsigned directories are used, as before issue #146. Never set in a program.</summary>
+    internal bool UnsignedDirectoriesAreUsed { get; init; } = DefaultUnsignedDirectoriesAreUsed;
+
     /// <summary>Where the store says what it threw away and why. Plain ASCII.</summary>
     public Action<string>? Log { get; init; }
 
@@ -1576,7 +1582,7 @@ public sealed partial class ReceiverStore
             {
                 // Once per directory: it is marked done, so its repeats are not rebuilt again.
                 string why = $"directory {ObjectId.Format(instance.ObjectId)} for {directory.Date:yyyy-MM-dd} not used: {check.Reason}";
-                if (check.State != SignatureState.None)
+                if (!check.Refused)
                 {
                     Log(why);
                 }

@@ -937,4 +937,60 @@ public class StatusPageTests
             }
         }
     }
+
+    [Fact]
+    public async Task Keys_ListedWithTheirSource_AddedAndForgottenFromThePage()
+    {
+        // Issue #146: one table of trusted keys; a page-added key can be forgotten, a built-in one cannot.
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path);
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        async Task<JsonElement[]> Keys() =>
+            [.. (await http.GetFromJsonAsync<JsonElement>("api/status")).GetProperty("stations").GetProperty("keys").EnumerateArray()];
+
+        var builtIn = Assert.Single(await Keys());
+        Assert.Equal("GB7RDG", builtIn.GetProperty("station").GetString());
+        Assert.Equal("built in", builtIn.GetProperty("source").GetString());
+        Assert.False(builtIn.GetProperty("canForget").GetBoolean());
+        var refused = await http.PostAsJsonAsync("api/keys/forget", new { keyId = builtIn.GetProperty("keyId").GetString() });
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+
+        var added = Packet.Mailcast.DirectorySigner.FromPem(Packet.Mailcast.DirectorySigner.NewKeyPem());
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "not a call", publicKey = added.PublicKeyBase64 })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "G4ABC", publicKey = "AAAA" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "G4ABC", publicKey = Convert.ToBase64String(Packet.Mailcast.TrustedKey.Gb7rdg.PublicKey) })).StatusCode); // already trusted
+        Assert.Single(await Keys());
+
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("api/keys/add", new { station = "g4abc", publicKey = added.PublicKeyBase64 })).StatusCode);
+        var keys = await Keys();
+        Assert.Equal(2, keys.Length);
+        var row = keys.Single(k => k.GetProperty("station").GetString() == "G4ABC");
+        Assert.Equal("added on this page", row.GetProperty("source").GetString());
+        Assert.Equal(Packet.Mailcast.KeyId.Format(added.KeyId), row.GetProperty("keyId").GetString());
+        Assert.True(row.GetProperty("canForget").GetBoolean());
+
+        // Kept across a restart, in the store.
+        Assert.Contains(host.Intake.Pins(), p => p.Station == "G4ABC" && p.Added);
+
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("api/keys/forget", new { keyId = Packet.Mailcast.KeyId.Format(added.KeyId) })).StatusCode);
+        Assert.Single(await Keys());
+    }
+
+    [Fact]
+    public async Task Keys_Changes_NeedTheSignInAndRefuseOtherSites()
+    {
+        using var dir = new TempDirectory();
+        var (host, page, http, _) = await StartAsync(dir.Path, password: "letmein");
+        await using var _h = host;
+        await using var _p = page;
+        using var _c = http;
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsJsonAsync("api/keys/add", new { station = "G4ABC", publicKey = "x" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsJsonAsync("api/keys/forget", new { keyId = "0000000000000000" })).StatusCode);
+
+        using var foreign = new HttpRequestMessage(HttpMethod.Post, "api/keys/forget") { Content = JsonContent.Create(new { keyId = "0000000000000000" }) };
+        foreign.Headers.Add("Origin", "http://evil.example");
+        Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(foreign)).StatusCode);
+    }
 }

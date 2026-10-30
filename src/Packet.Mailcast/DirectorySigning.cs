@@ -241,7 +241,7 @@ public sealed class TrustedKey
 /// <summary>Whether a directory was signed, and what that means for the receiver.</summary>
 public enum SignatureState
 {
-    /// <summary>No signature: the directory is not used for anything (issue #146).</summary>
+    /// <summary>No signature: a receiver does not use it (issue #146), though <see cref="BroadcastDirectory.Check"/> only reports the fact.</summary>
     None,
 
     /// <summary>A good signature by a trusted key.</summary>
@@ -254,20 +254,27 @@ public enum SignatureState
 /// <summary>What checking a directory's signature found.</summary>
 /// <param name="State">Signed, unsigned or rejected.</param>
 /// <param name="SignedBy">The trusted key's label, when signed.</param>
-/// <param name="Reason">Why it was rejected, in words, when rejected.</param>
-public sealed record DirectoryCheck(SignatureState State, string? SignedBy = null, string? Reason = null)
+/// <param name="Reason">Why it was rejected, in words, when rejected or refused.</param>
+/// <param name="Refused">An unsigned directory the receiver does not use (issue #146): see <see cref="Usable"/>.</param>
+public sealed record DirectoryCheck(SignatureState State, string? SignedBy = null, string? Reason = null, bool Refused = false)
 {
-    /// <summary>The check of a directory with no signature.</summary>
-    public static DirectoryCheck NotSigned { get; } = new(SignatureState.None, Reason: "it has no signature");
+    /// <summary>What a receiver makes of an unsigned directory: not used for anything.</summary>
+    public static DirectoryCheck UnsignedNotUsed { get; } = new(SignatureState.None, Reason: "it has no signature", Refused: true);
 
-    /// <summary>Whether the directory may be used: only when signed by a trusted key. An unsigned one is not used.</summary>
-    public bool Usable => State == SignatureState.Trusted;
+    /// <summary>The check of a directory with no signature.</summary>
+    public static DirectoryCheck NotSigned { get; } = new(SignatureState.None);
+
+    /// <summary>
+    /// Whether the directory may be used: signed by a trusted key. An unsigned one is not, once
+    /// the receiver has refused it (<see cref="Refused"/>; issue #146).
+    /// </summary>
+    public bool Usable => State == SignatureState.Trusted || (State == SignatureState.None && !Refused);
 
     /// <summary>A few plain words: "signed by GB7RDG", "not signed", or "rejected: ...".</summary>
     public string Describe() => State switch
     {
         SignatureState.Trusted => $"signed by {SignedBy}",
-        SignatureState.None => "unsigned, not used",
+        SignatureState.None => Refused ? "unsigned, not used" : "not signed",
         _ => $"rejected: {Reason}",
     };
 }

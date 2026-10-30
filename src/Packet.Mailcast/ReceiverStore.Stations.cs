@@ -163,7 +163,7 @@ public sealed partial class ReceiverStore
     internal DirectoryCheck CheckDirectory(BroadcastDirectory directory)
     {
         ArgumentNullException.ThrowIfNull(directory);
-        var check = directory.Check(DirectoryKeys);
+        var check = CheckSignature(directory);
         if (check.State == SignatureState.Trusted && directory.SigningKeyId is { } trustedId && !_pins.Any(p => p.Key.KeyId == trustedId)
             && directory.Station is { } named && DirectoryKeys.FirstOrDefault(k => k.KeyId == trustedId) is { } configured)
         {
@@ -199,6 +199,16 @@ public sealed partial class ReceiverStore
     }
 
     /// <summary>
+    /// The directory's signature against <see cref="DirectoryKeys"/>; an unsigned directory is
+    /// refused, not used for anything (issue #146), unless a test says otherwise.
+    /// </summary>
+    private DirectoryCheck CheckSignature(BroadcastDirectory directory)
+    {
+        var check = directory.Check(DirectoryKeys);
+        return check.State == SignatureState.None && !_options.UnsignedDirectoriesAreUsed ? DirectoryCheck.UnsignedNotUsed : check;
+    }
+
+    /// <summary>
     /// The refusal for a directory signed by a trustedKeys key not pinned yet that names a callsign
     /// pinned to another key (issue #187), recorded as a key conflict; null when it is not so.
     /// </summary>
@@ -227,7 +237,7 @@ public sealed partial class ReceiverStore
         var released = new List<Bulletin>();
         foreach (var (id, (directory, heardAt, _)) in _rejectedDirectories.ToList())
         {
-            var check = directory.Check(DirectoryKeys);
+            var check = CheckSignature(directory);
             if (check.Usable && KeyConflictOf(directory, check) is null)
             {
                 _rejectedDirectories.Remove(id);

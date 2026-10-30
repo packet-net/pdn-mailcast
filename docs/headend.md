@@ -315,25 +315,23 @@ When some bulletins are in the leftover tier, the slot lines and `--plan` say ho
 
 ## Signing the directory
 
-With a signing key, the head end signs every directory it sends. Receivers from 0.14.0 check the signature, so a listener can tell bulletins from this transmitter from a stray or forged source; older receivers ignore it and carry on as before. Without a key, directories go out unsigned, exactly as they always have.
+Every head end signs every directory it sends. Receivers refuse an unsigned directory: they use it for nothing, and hold the bulletins only it lists. Receivers from 0.14.0 check the signature; older ones ignore it and carry on as before.
 
-Make the key once, on the head end, and let the service read it:
+The package makes the key when it is installed (and on an upgrade, if there is none), in `/etc/pdn-mailcast-headend/signing-key.pem`, readable by the service only. It never replaces a key. To make one by hand, or to see the public key again:
 
 ```
-sudo sh -c 'umask 077; openssl genpkey -algorithm ed25519 -out /etc/pdn-mailcast-headend/signing-key.pem'
-sudo chown root:pdn-mailcast-headend /etc/pdn-mailcast-headend/signing-key.pem
-sudo chmod 0640 /etc/pdn-mailcast-headend/signing-key.pem
-sudo systemctl restart pdn-mailcast-headend
+sudo -u pdn-mailcast-headend pdn-mailcast-headend --make-key
 ```
 
-The place is fixed: there is no setting for it. At start-up the journal says which way it is, in one line:
+A key made with `openssl genpkey -algorithm ed25519` works the same: put it at that path, owned by `pdn-mailcast-headend`, mode 0600.
+
+The place is fixed: there is no setting for it. At start-up the journal says which key signs, in one line:
 
 ```
 signing: directories are signed with key 6f39d04c925c01cf, public key e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=
-signing: no key at /etc/pdn-mailcast-headend/signing-key.pem, so directories go out unsigned
 ```
 
-`pdn-mailcast-headend --check-config` prints the same line. A key file that is there but cannot be read, or is not an Ed25519 key, stops the service with the reason, rather than sending unsigned by surprise.
+`pdn-mailcast-headend --check-config` prints the same line. With no key, or a key file that cannot be read or is not an Ed25519 key, the service does not start: it says so in one line and exits with code 2. Only the offline modes (`--plan`, `--wav`) run without a key, and their directories are unsigned.
 
 The public key in that line is what listeners trust. GB7RDG's is built into the receiver. Another transmitter gives its line to listeners, who add the key to `trustedKeys` in their receiver.json (see the receiver's docs). Keep the private key private and backed up: a new key means every receiver has to be told the new public key.
 

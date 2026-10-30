@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Packet.Mailcast.Tests" />
+    <InternalsVisibleTo Include="Mailcast.Receiver.Tests" />
   </ItemGroup>
 
 </Project>
