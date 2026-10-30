@@ -1,0 +1,23 @@
+<<<ÿûÿûuser:>>>[[user]]<<<password:>>>[[user]]<<<
+Connected to GB7LAA's Telnet Server
+
+>>>[[C 2 GB7LAJ]]<<<LAA:GB7LAA} Connected to GB7LAJ
+>>><<<>>><<<[JNOS-2.0q.1-B1FHIM$]
+
+You have 0 messages.
+
+Please type 'REGISTER' at the > prompt.
+Area: g0lab Current msg# 0.
+?,A,B,C,CONV,D,E,F,H,I,IH,IP,J,K,L,M,N,NR,O,P,PI,R,S,T,U,V,W,X,Z >
+>>>[[SB LABTST @ WW]]<<<Subject:
+>>>[[lab t17_r_lines]]<<<Enter message.  End with /EX or ^Z in first column (^A aborts):
+>>>[[R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25]][[R:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F]][[]][[body after R lines.]][[R:261029/1000Z mid-body R line 9@X.#3.GBR.EURO]][[end.]]<<<>>>[[/EX]]<<<>>><<<Send(N=no)?>>>[[]]<<<Msg queued
+Area: g0lab Current msg# 0.
+?,A,B,C,CONV,D,E,F,H,I,IH,IP,J,K,L,M,N,NR,O,P,PI,R,S,T,U,V,W,X,Z >
+>>>[[B]]<<<
+Thank you g0lab, for calling laj.ampr.org JNOS.
+*** Disconnected from Stream 2
+Disconnected from Node - Telnet Session kept
+>>>[[B]]<<<*** Disconnected from Stream 2
+Disconnected from Node - Telnet Session kept
+>>>

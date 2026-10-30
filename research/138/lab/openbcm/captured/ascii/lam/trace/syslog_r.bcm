@@ -1,0 +1,5 @@
+30.10.26 02:26:43z SYSTEM: #L Start: V1.13-38-g65b7 Linux mem 1802144kB hd 13048MB
+30.10.26 02:26:43z SYSTEM: #R init_tnc: 200 ports
+30.10.26 02:26:43z SYSTEM: #S us_open: new users4.bcm created
+30.10.26 02:26:43z SYSTEM: #L msg: msg/messages.gb generated
+30.10.26 02:26:43z SYSTEM: #S msg_search: speech.bcm (ham) created

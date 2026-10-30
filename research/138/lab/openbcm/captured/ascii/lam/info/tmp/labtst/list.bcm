@@ -1,0 +1,18 @@
+0QU2DI0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM001#999%!$!!J|B!!!!!!!!!!!!!!!-lab t01_plain                                   
+0QU2DR0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM002#999%!&!!|B!!!!!!!!!!!!!!!-lab t02_from_line                               
+0QU2E50<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM003#999%!$!!l|B!!!!!!!!!!!!!!!-lab t03_from_to_top                             
+0QU2ED0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM004#999%!(!!x|B!!!!!!!!!!!!!!!-lab t04_trailing_ws                             
+0QU2EM0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM005#999%!&!!^|B!!!!!!!!!!!!!!!-lab t05_blank_first                             
+0QU2F10<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM006#999%!)!X*|B!!!!!!!!!!!!!!!-lab t06_long_lines                              
+0QU2FA0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM007#999%!"!!<|B!!!!!!!!!!!!!!!-T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa        
+0QU2FI0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM008#999%!"!!<|B!!!!!!!!!!!!!!!-T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+0QU2FR0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM009#999%!#!!J|B!!!!!!!!!!!!!!!-T100 ccccccccccccccccccccccccccccccccccccccccccc
+0QU2G50<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00A#999%!$!!m|B!!!!!!!!!!!!!!!-caf� title �                                    
+0QU2GD0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00B#999%!#!!V|B!!!!!!!!!!!!!!!-café £ ° — title                           
+0QU2GM0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00C#999%!$!!M|B!!!!!!!!!!!!!!!-lab t12_no_final_newline                        
+0QU2HM0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00D#999%!%!!)|B!!!!!!!!!!!!!!!-lab t13_ends_blank_lines                        
+0QU2I10<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00E#999%!$!!>|B!!!!!!!!!!!!!!!-lab t14_crlf_body                               
+0QU2J90<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00G#999%!&!!:|B!!!!!!!!!!!!!!!-lab t16_dot_line                                
+0QU2JI0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00H#999%!'!"K|B!!!!!!!!!!!!!!!-lab t17_r_lines                                 
+0QU2JQ0<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00I#999%!&!!d|B!!!!!!!!!!!!!!!-lab t19_gt_from_and_misc                        
+0QU2K50<G0LAB >LABTST  ~      @WW    $UQ0GB7LAM00J#999%!#!!D|B!!!!!!!!!!!!!!!-lab t20_ctrl_chars                              

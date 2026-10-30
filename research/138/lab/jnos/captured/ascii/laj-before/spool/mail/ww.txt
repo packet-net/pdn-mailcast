@@ -1,0 +1,724 @@
+From g0lab@laj.ampr.org Fri Oct 30 02:09:39 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA3 ; Fri, 30 Oct 2026 02:09:39 UTC
+Date: Fri, 30 Oct 2026 02:09:26 UTC
+Message-Id: <1@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t01_plain
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+Plain bulletin.
+Second line.
+Third line.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:10:41 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA6 ; Fri, 30 Oct 2026 02:10:41 UTC
+Date: Fri, 30 Oct 2026 02:10:28 UTC
+Message-Id: <4@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t02_from_line
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+>From the desk of the lab
+>From nobody Thu Oct 29 20:00:00 2026
+  From indented
+from lower
+End.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:11:42 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA9 ; Fri, 30 Oct 2026 02:11:42 UTC
+Date: Fri, 30 Oct 2026 02:11:29 UTC
+Message-Id: <7@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t03_from_to_top
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+From: G0FAKE@GB7XXX.#1.GBR.EURO
+To  : ALL@WW
+Body after fake header lines.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:12:45 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA12 ; Fri, 30 Oct 2026 02:12:45 UTC
+Date: Fri, 30 Oct 2026 02:12:32 UTC
+Message-Id: <10@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t04_trailing_ws
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:13:48 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA15 ; Fri, 30 Oct 2026 02:13:48 UTC
+Date: Fri, 30 Oct 2026 02:13:34 UTC
+Message-Id: <13@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t05_blank_first
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+
+first line above is blank
+
+
+two blank lines above this one.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:14:53 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA18 ; Fri, 30 Oct 2026 02:14:53 UTC
+Date: Fri, 30 Oct 2026 02:14:37 UTC
+Message-Id: <16@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t06_long_lines
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+L79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L255 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+x
+L256 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xx
+L300 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L600 abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+end.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:15:53 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA21 ; Fri, 30 Oct 2026 02:15:53 UTC
+Date: Fri, 30 Oct 2026 02:15:41 UTC
+Message-Id: <19@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+title is 40 chars exactly.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:16:53 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA24 ; Fri, 30 Oct 2026 02:16:53 UTC
+Date: Fri, 30 Oct 2026 02:16:41 UTC
+Message-Id: <22@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+title is 60 chars exactly.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:17:53 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA27 ; Fri, 30 Oct 2026 02:17:53 UTC
+Date: Fri, 30 Oct 2026 02:17:41 UTC
+Message-Id: <25@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: T100 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+title is 100 chars.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:18:54 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA30 ; Fri, 30 Oct 2026 02:18:54 UTC
+Date: Fri, 30 Oct 2026 02:18:41 UTC
+Message-Id: <28@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: cafÈ title £
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+latin1: cafÈ naÔve £ ∞ ˛ ¿ﬂ end
+high: ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü
+end.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:19:55 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA33 ; Fri, 30 Oct 2026 02:19:55 UTC
+Date: Fri, 30 Oct 2026 02:19:42 UTC
+Message-Id: <31@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: caf√© ¬£ ¬∞ ‚Äî title
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+utf8: caf√© na√Øve ¬£ ¬∞ ‚Ç¨ ‚Äî ‚Äì ‚Ä¶ Êó•Êú¨
+end.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:22:23 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA36 ; Fri, 30 Oct 2026 02:22:23 UTC
+Date: Fri, 30 Oct 2026 02:22:11 UTC
+Message-Id: <34@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t12_no_final_newline
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+line one
+line two
+last line without newline
+
+From g0lab@laj.ampr.org Fri Oct 30 02:23:25 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA39 ; Fri, 30 Oct 2026 02:23:25 UTC
+Date: Fri, 30 Oct 2026 02:23:12 UTC
+Message-Id: <37@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t13_ends_blank_lines
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+text
+
+
+
+
+From g0lab@laj.ampr.org Fri Oct 30 02:24:26 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA42 ; Fri, 30 Oct 2026 02:24:26 UTC
+Date: Fri, 30 Oct 2026 02:24:13 UTC
+Message-Id: <40@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t14_crlf_body
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+crlf one
+crlf two
+crlf three
+
+From g0lab@laj.ampr.org Fri Oct 30 02:29:17 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA46 ; Fri, 30 Oct 2026 02:29:17 UTC
+Date: Fri, 30 Oct 2026 02:29:04 UTC
+Message-Id: <44@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t16_dot_line
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+before
+.
+after
+..
+after2
+
+From g0lab@laj.ampr.org Fri Oct 30 02:30:20 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA49 ; Fri, 30 Oct 2026 02:30:20 UTC
+Date: Fri, 30 Oct 2026 02:30:06 UTC
+Message-Id: <47@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t17_r_lines
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25
+R:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F
+
+body after R lines.
+R:261029/1000Z mid-body R line 9@X.#3.GBR.EURO
+end.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:31:22 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA52 ; Fri, 30 Oct 2026 02:31:22 UTC
+Date: Fri, 30 Oct 2026 02:31:09 UTC
+Message-Id: <50@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t19_gt_from_and_misc
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+>From already escaped
+~ tilde line
+/EX-ish line: /EXIT
+# hash
+end.
+
+From g0lab@laj.ampr.org Fri Oct 30 02:32:22 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA55 ; Fri, 30 Oct 2026 02:32:22 UTC
+Date: Fri, 30 Oct 2026 02:32:10 UTC
+Message-Id: <53@laj.ampr.org>
+From: g0lab@laj.ampr.org
+To: labtst@ww
+Subject: lab t20_ctrl_chars
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (G0LAB on port axa)  ->    Sending message
+
+bell: esc:[0m ff: nul-free
+end.
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:32:50 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA62 ; Fri, 30 Oct 2026 02:32:50 UTC
+Date: Fri, 30 Oct 2026 02:32:33 UTC
+Message-Id: <2_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t01_plain
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 2@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+Plain bulletin.
+Second line.
+Third line.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:32:50 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA67 ; Fri, 30 Oct 2026 02:32:50 UTC
+Date: Fri, 30 Oct 2026 02:32:39 UTC
+Message-Id: <4_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t03_from_to_top
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 4@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+From: G0FAKE@GB7XXX.#1.GBR.EURO
+To  : ALL@WW
+Body after fake header lines.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:32:50 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA70 ; Fri, 30 Oct 2026 02:32:50 UTC
+Date: Fri, 30 Oct 2026 02:32:45 UTC
+Message-Id: <6_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t05_blank_first
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 6@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+
+first line above is blank
+
+
+two blank lines above this one.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:32:50 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA74 ; Fri, 30 Oct 2026 02:32:50 UTC
+Date: Fri, 30 Oct 2026 02:32:36 UTC
+Message-Id: <3_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t02_from_line
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 3@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+>From the desk of the lab
+>From nobody Thu Oct 29 20:00:00 2026
+  From indented
+from lower
+End.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:32:50 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA75 ; Fri, 30 Oct 2026 02:32:50 UTC
+Date: Fri, 30 Oct 2026 02:32:42 UTC
+Message-Id: <5_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t04_trailing_ws
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 5@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA90 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:26 UTC
+Message-Id: <19_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t20_ctrl_chars
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 19@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+bell: esc:[0m ff: nul-free
+end.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA101 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:32:56 UTC
+Message-Id: <9_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: T60 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 9@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+title is 60 chars exactly.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA107 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:17 UTC
+Message-Id: <16_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t16_dot_line
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 16@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+before
+.
+after
+..
+after2
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA110 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:05 UTC
+Message-Id: <12_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: caf√© ¬£ ¬∞ ‚Äî title
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 12@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+utf8: caf√© na√Øve ¬£ ¬∞ ‚Ç¨ ‚Äî ‚Äì ‚Ä¶ Êó•Êú¨
+end.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA118 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:11 UTC
+Message-Id: <14_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t13_ends_blank_lines
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 14@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+text
+
+
+
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA126 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:08 UTC
+Message-Id: <13_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t12_no_final_newline
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 13@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+line one
+line two
+last line without newline
+B
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA134 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:02 UTC
+Message-Id: <11_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: cafÈ title £
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 11@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+latin1: cafÈ naÔve £ ∞ ˛ ¿ﬂ end
+high: ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü
+end.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA140 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:14 UTC
+Message-Id: <15_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t14_crlf_body
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 15@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+crlf one
+crlf two
+crlf three
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA147 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:32:59 UTC
+Message-Id: <10_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: T100 cccccccccccccccccccccccccccccccccccccccccccccccccccccc
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 10@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+title is 100 chars.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA142 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:32:48 UTC
+Message-Id: <7_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t06_long_lines
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 7@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+L79 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L80 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L100 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L255 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+x
+L256 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xx
+L300 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+L600 abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcd
+efghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi a
+bcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefgh
+i abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcde
+fghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi ab
+cdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi
+ abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdef
+ghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abc
+defghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefg
+hi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi abcdefghi 
+end.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA155 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:32:53 UTC
+Message-Id: <8_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: T40 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0232Z 8@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+title is 40 chars exactly.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA156 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:23 UTC
+Message-Id: <18_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t19_gt_from_and_misc
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 18@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+
+>From already escaped
+~ tilde line
+/EX-ish line: /EXIT
+# hash
+end.
+
+
+From g0lab%gb7laa@laj.ampr.org Fri Oct 30 02:33:31 2026
+Received: from laj.ampr.org by laj.ampr.org (JNOS2.0q.1) with SMTP
+	id AA158 ; Fri, 30 Oct 2026 02:33:31 UTC
+Date: Fri, 30 Oct 2026 02:33:20 UTC
+Message-Id: <17_GB7LAA-1@gb7laa.bbs>
+From: g0lab%gb7laa.bbs@laj.ampr.org
+To: labtst@ww
+Subject: lab t17_r_lines
+X-BBS-Msg-Type: B
+X-JNOS-User-Port: Uplink   (GB7LAA-1 on port axa)  -> Sending message
+
+R:261030/0233Z 17@GB7LAA-1.#99.GBR.EURO LinBPQ6.0.25
+R:261029/1200Z 1@GB7FAKE.#1.GBR.EURO LinBPQ6.0.25
+R:261029/1100Z 7@GB7FAK2.#2.GBR.EURO [FBB] $:F
+
+body after R lines.
+R:261029/1000Z mid-body R line 9@X.#3.GBR.EURO
+end.
+
+

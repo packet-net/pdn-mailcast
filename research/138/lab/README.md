@@ -25,6 +25,10 @@ python3 -I scripts/analyse.py captured/b1f   # per-bulletin comparison tables
 
 `run_all.sh` rebuilds the lab from scratch (about 3 minutes, FBB creates its data files on first start), posts each bulletin in `bulletins/` once on GB7LAA and once on GB7LAF as G0LAB (an ordinary user, via the LAA node's telnet port; FBB is reached with `C 2 GB7LAF-1` from that session because its own telnet port refuses unregistered users), waits for forwarding to settle and copies the stores into `captured/<variant>/`.
 
+## More BBS software
+
+The XRouter, JNOS and openBCM labs live in `xrouter/`, `jnos/` and `openbcm/`, each with its own `up.sh`, `run_all.sh`, `post.py`, `capture.sh`, `analyse.py`, `compare_posted.py` and `captured/{b1f,ascii}`. Same shape as above: `./run_all.sh b1f` then `./run_all.sh ascii` on a Docker host (no kernel AX.25 needed for these three). XRouter and openBCM build or pull their own images (`ghcr.io/packethacking/xrouter:505p-amd64`; `openbcm/Dockerfile`), JNOS builds from the `Rhizomatica/jnos2` mirror (`jnos/Dockerfile`; it needs `/dev/net/tun` and NET_ADMIN, see `jnos/j/relay.py`). Results are in `FINDINGS.md`.
+
 ## Layout
 
 - `fbb/` Dockerfile (LinFBB + ve7fet AX.25 tools), entrypoint, and FBB config (`etc/`).

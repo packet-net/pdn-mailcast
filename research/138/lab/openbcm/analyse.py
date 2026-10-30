@@ -13,6 +13,7 @@ def keyof(t):
     for k, (title, _, _) in B.items():
         if t[:30] == title[:30]: return k
 def bpq(store):
+    if not os.path.exists(f"{D}/{store}/DIRMES.SYS"): return []   # nothing was posted on that BBS (ascii variant skips LAA)
     d = open(f"{D}/{store}/DIRMES.SYS", "rb").read(); out = []
     for s in range(0, len(d) - 307, 308):
         r = d[s:s+308]; n = struct.unpack_from("<i", r, 2)[0]; t = cs(r, 89, 61)
