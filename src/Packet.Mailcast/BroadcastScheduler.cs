@@ -847,6 +847,7 @@ public static class BroadcastScheduler
         int directoryLength = directory.Frame(0).ToBytes().Length;
         var bulletinLengths = new List<int>();
         var envelopeLengths = new List<int>(); // a carried bulletin's envelope goes in with its first piece
+        var envelopesCounted = new HashSet<ulong>(); // bulletins with the same envelope share its one object
         bool Fits()
         {
             int directoryFrames = DirectoryFrames(directory, bulletinLengths.Count, options);
@@ -880,9 +881,9 @@ public static class BroadcastScheduler
             while (queue.TryDequeue(out int i, out _))
             {
                 bulletinLengths.Add(lengths[i]);
-                if (counts[i] == 0 && bulletins[i].Envelope is { } envelope)
+                if (counts[i] == 0 && bulletins[i].Envelope is { } envelope && envelopesCounted.Add(envelope.ObjectId))
                 {
-                    envelopeLengths.AddRange(EnvelopeFrames(envelope, bulletins[i].EnvelopeNextEsi).Select(f => f.ToBytes().Length));
+                    envelopeLengths.AddRange(EnvelopeFrames(envelope, bulletins.Where(b => b.Envelope?.ObjectId == envelope.ObjectId).Max(b => b.EnvelopeNextEsi)).Select(f => f.ToBytes().Length));
                 }
                 if (!Fits())
                 {
@@ -920,12 +921,16 @@ public static class BroadcastScheduler
         // Each bulletin that sends pieces this slot repeats its envelope (issue #142), after the
         // bulletins so that their interleaving is the same with or without envelopes.
         int bulletinObjects = scheduled.Count - 1;
+        var envelopeSeen = new HashSet<ulong>();
         for (int i = 0; i < bulletins.Count; i++)
         {
             var (c, index) = bulletins[i];
-            if (counts[i] > 0 && c.Envelope is { } envelope)
+            // Two bulletins can have the same envelope, so the same object ID: it goes once per slot, and
+            // from the furthest ESI either has reached, so that no ESI of it is ever sent twice.
+            if (counts[i] > 0 && c.Envelope is { } envelope && envelopeSeen.Add(envelope.ObjectId))
             {
-                scheduled.Add(new ScheduledObject(envelope, index, c.EnvelopeNextEsi, envelope.SourceSymbols, EnvelopeFor: c.Bid));
+                uint first = bulletins.Where(b => b.Carried.Envelope?.ObjectId == envelope.ObjectId).Max(b => b.Carried.EnvelopeNextEsi);
+                scheduled.Add(new ScheduledObject(envelope, index, first, envelope.SourceSymbols, EnvelopeFor: c.Bid));
             }
         }
         int envelopeFrames = scheduled.Skip(1 + bulletinObjects).Sum(s => s.Count);

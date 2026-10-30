@@ -339,7 +339,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
                 throw new IOException("Broken pipe");
             }
             station.Frames.Add((station._time.GetUtcNow(), station.LeaseHeld, ax25.ToArray()));
-            _queued.Add((id, station._dropGeneration, Math.Max(0, ax25.Length - 16))); // the payload, as the head end counts it
+            _queued.Add((id, station._dropGeneration, ax25.Length)); // the whole AX.25 frame, as the planner charges it
             if (!_transmitting)
             {
                 _transmitting = true;

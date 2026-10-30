@@ -56,7 +56,15 @@ public class HeadEndCanonicalTests : IDisposable
 
         var plan = BroadcastScheduler.Plan(store.InRotation(Day), Day, 1, Compression.Default, options, store.DirectoryNextEsi);
         string line = Bulletin.TextEncoding.GetString(plan.Directory.Serialize()).Split('\n')[2];
-        Assert.StartsWith((string)expected["directoryEntryLine"]!, line, StringComparison.Ordinal); // then key= and the signature
+        // On air the first entry line also carries the station, slots and similar fields, so the literal vector line
+        // applies to later entries; here it is the only entry of a signed directory, with just key= and sig= after it.
+        int key = line.IndexOf("\tkey=", StringComparison.Ordinal);
+        Assert.True(key > 0, "the signed line has key=");
+        Assert.Equal((string)expected["directoryEntryLine"]!, line[..key]);
+        var after = line[(key + 1)..].Split('\t');
+        Assert.Equal(2, after.Length);
+        Assert.StartsWith("key=", after[0], StringComparison.Ordinal);
+        Assert.StartsWith("sig=", after[1], StringComparison.Ordinal);
 
         // The frames on air: the envelope's first frame is the file's, and so is the bulletin's if it is sent.
         var envelopeFrame = plan.Frames.Single(f => f.ObjectId == carried.Envelope.ObjectId && f.EncodingSymbolId == 0);
@@ -159,5 +167,76 @@ public class HeadEndCanonicalTests : IDisposable
         int envelopes = plan.Objects.Count(o => o.EnvelopeFor is not null);
         Assert.Equal(plan.Objects.Count(o => o.Bid is not null && o.Count > 0), envelopes);
         Assert.Equal(plan.Frames.Count, plan.Objects.Sum(o => o.Count));
+    }
+
+    [Fact]
+    public void TwoBulletinsWithTheSameEnvelope_ShareItsObject_SentOncePerSlot_AndNoEsiTwice()
+    {
+        var options = new ScheduleOptions();
+        var store = new HeadEndStore(_root, Compression.Default, options);
+        Bulletin Same(int n) => Bulletin.FromMessageText('B', "G4ABC", "ALL", "WW", $"{n}_TEST", "Same title", new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero),
+            $"R:261019/0850Z 1@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody number {n}.\r\n");
+        var a = store.Offer(Same(1), Day)!;
+        var b = store.Offer(Same(2), Day)!;
+        Assert.Equal(a.Envelope!.ObjectId, b.Envelope!.ObjectId);
+
+        var seen = new HashSet<uint>();
+        for (int day = 0; day < 3; day++)
+        {
+            var today = Day.AddDays(day);
+            var plan = BroadcastScheduler.Plan(store.InRotation(today), today, 5, Compression.Default, options, store.DirectoryNextEsi);
+            Assert.Single(plan.Objects, o => o.EnvelopeFor is not null);
+            foreach (var f in plan.Frames.Where(f => f.ObjectId == a.Envelope.ObjectId))
+            {
+                Assert.True(seen.Add(f.EncodingSymbolId), "an envelope ESI was sent twice");
+            }
+            store.Commit(plan);
+            var held = store.InRotation(today);
+            Assert.Equal(held[0].EnvelopeNextEsi, held[1].EnvelopeNextEsi);
+        }
+        Assert.Equal(3 * a.Envelope.SourceSymbols, seen.Count);
+        Assert.Equal((uint)seen.Count, new HeadEndStore(_root, Compression.Default, options).InRotation(Day.AddDays(2))[0].EnvelopeNextEsi);
+    }
+
+    [Fact]
+    public void AStateNamingAnEnvelopeWhoseFileIsMissing_IsSentWithoutIt_AndSaysSo()
+    {
+        var options = new ScheduleOptions();
+        var log = new List<string>();
+        var carried = new HeadEndStore(_root, Compression.Default, options).Offer(TestBulletins.Make(6, 1500), Day)!;
+        File.Delete(Directory.EnumerateFiles(_root, "envelope.bin", SearchOption.AllDirectories).Single());
+        var again = new HeadEndStore(_root, Compression.Default, options, log.Add).InRotation(Day).Single();
+        Assert.Null(again.Envelope);
+        Assert.Equal(carried.Transfer.ObjectId, again.Transfer.ObjectId);
+        Assert.Contains(log, l => l.Contains("envelope of", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ASignedHeadEnd_ToAReceiver_DeliversTheStationsCopyUnderTheReceiversOwnRoutingLine()
+    {
+        var signer = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var options = new ScheduleOptions { Signer = signer, Station = "ZZ1AAA" };
+        var store = new HeadEndStore(_root, Compression.Default, options);
+        var bulletins = new[] { TestBulletins.Make(31, 1200), TestBulletins.Make(32, 2500), TestBulletins.Make(33, 90) };
+        foreach (var b in bulletins)
+        {
+            store.Offer(b, Day);
+        }
+        var plan = BroadcastScheduler.Plan(store.InRotation(Day), Day, 1, Compression.Default, options, store.DirectoryNextEsi);
+        using var rx = new TempDirectory();
+        var receiver = new ReceiverStore(rx.Path, Compression.Default,
+            TestStores.Fast with { TrustedKeys = [TrustedKey.Parse("ZZ1AAA", signer.PublicKeyBase64)], DeliveryCall = () => "M0LTE-1" });
+        foreach (var frame in plan.Frames)
+        {
+            receiver.Accept(frame.ToBytes(), "ZZ1AAA");
+        }
+        var delivered = receiver.Pending().OrderBy(d => d.Bid).ToList();
+        Assert.Equal(bulletins.Length, delivered.Count);
+        foreach (var (got, original) in delivered.Zip(bulletins.OrderBy(b => b.Bid)))
+        {
+            Assert.Equal(original.Title, got.Title);
+            Assert.Matches(@"^R:\d{6}/\d{4}Z @:M0LTE-1 \[pdn-mailcast via ZZ1AAA\]\r\n", got.MessageText);
+            Assert.Equal(original.MessageText, got.MessageText[(got.MessageText.IndexOf("\r\n", StringComparison.Ordinal) + 2)..]);
+        }
     }
 }

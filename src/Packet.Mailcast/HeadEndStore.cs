@@ -202,14 +202,16 @@ public sealed class HeadEndStore
         }
         foreach (var o in broadcast.Objects)
         {
-            if (o.EnvelopeFor is { } envelopeBid)
+            if (o.EnvelopeFor is not null)
             {
-                if (next.TryGetValue(o.Transfer.ObjectId, out uint envelopeNext)
-                    && _entries.TryGetValue(KeyOf(envelopeBid), out var holder)
-                    && holder.Carried.Envelope?.ObjectId == o.Transfer.ObjectId && envelopeNext > holder.Carried.EnvelopeNextEsi)
+                // Every bulletin holding this envelope moves on, since they share its one object ID and its ESIs.
+                if (next.TryGetValue(o.Transfer.ObjectId, out uint envelopeNext))
                 {
-                    holder.Carried = holder.Carried with { EnvelopeNextEsi = envelopeNext };
-                    SaveState(holder);
+                    foreach (var holder in _entries.Values.Where(e => e.Carried.Envelope?.ObjectId == o.Transfer.ObjectId && envelopeNext > e.Carried.EnvelopeNextEsi).ToList())
+                    {
+                        holder.Carried = holder.Carried with { EnvelopeNextEsi = envelopeNext };
+                        SaveState(holder);
+                    }
                 }
                 continue;
             }
@@ -361,7 +363,11 @@ public sealed class HeadEndStore
             TransferObject? envelope = null;
             uint envelopeNextEsi = 0;
             var envelopePath = Path.Combine(dir, "envelope.bin");
-            if (File.Exists(envelopePath) && fields.TryGetValue("Envelope", out var envelopeId))
+            if (fields.ContainsKey("Envelope") && !File.Exists(envelopePath))
+            {
+                _log?.Invoke($"head end store: envelope of {fields["Bid"]} does not match; sent without it");
+            }
+            else if (fields.TryGetValue("Envelope", out var envelopeId))
             {
                 var envelopeOti = ObjectTransmissionInformation.Read(Convert.FromHexString(fields["EnvelopeOti"]));
                 var stored = TransferObject.FromStored(File.ReadAllBytes(envelopePath), ushort.Parse(fields["Dictionary"], CultureInfo.InvariantCulture), envelopeOti);

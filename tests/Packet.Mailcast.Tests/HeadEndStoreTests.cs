@@ -156,8 +156,10 @@ public class HeadEndStoreTests
             }
         }
         // Sent canonical (issue #142); without a signed directory no envelope is kept, so the receiver delivers the shared form.
-        static (string, string, string, string, string, string) Key(Bulletin b) => (b.Bid, b.From, b.To, b.At, b.Title, b.Body.Replace("\r\n", "\n").Trim('\n'));
-        Assert.Equal(bulletins.Select(TestBulletins.Canonical).Select(Key).Order(), delivered.Select(Key).Order());
+        // Exact, except the date (the receiver stamps its arrival time) and its one routing line of its own, which is checked on its own.
+        static (string, string, string, string, string, string) Exact(Bulletin b) => (b.Bid, b.From, b.To, b.At, b.Title, b.Body);
+        Assert.All(delivered, b => Assert.Matches(@"^R:\d{6}/\d{4}Z \[pdn-mailcast via \S+\]$", Assert.Single(b.RoutingLines)));
+        Assert.Equal(bulletins.Select(TestBulletins.Canonical).Select(Exact).Order(), delivered.Select(Exact).Order());
     }
 
     [Fact]

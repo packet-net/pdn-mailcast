@@ -425,7 +425,7 @@ public class BudgetSchedulerTests
         var bulletins = Enumerable.Range(0, 15).Select(i => RealisticHeld(200 + i, 1000 + (i * 300))).ToList();
         var plan = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, RealisticOptions, null, Frames(500), "ms110d-wn3");
         int k = plan.Objects[0].Transfer.SourceSymbols;
-        Assert.True(k >= 1);
+        Assert.Equal(3, k); // 15 entries at 240-octet pieces
         Assert.Equal(BroadcastScheduler.DirectoryFloor(k), plan.Objects[0].Count);
         Assert.True(plan.Objects[0].Count > k + RealisticOptions.DirectoryExtra);
     }
