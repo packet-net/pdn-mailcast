@@ -6,6 +6,8 @@ V=${1:-b1f}
 VARIANT=$V ./up.sh
 rm -rf captured/transcripts
 for k in $(ls ../bulletins/*.title | xargs -n1 basename | sed 's/\.title//'); do
+  # the 53 kB bulletin takes over an hour in plain ASCII forwarding at these link settings; skipped in the ascii variant
+  [ "$V" = ascii ] && [ $k = t18_very_long ] && continue
   python3 -I post.py laa $k; python3 -I post.py lam $k
 done
 prev=""; same=0

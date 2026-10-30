@@ -1,0 +1,8 @@
+# GB7LAJ forwards every bulletin area (ww) to GB7LAB over AX.25-over-UDP
+gb7lab
+ax25 axb gb7lab-1
+ww
+-------
+gb7laa
+ax25 axa gb7laa-1
+-------

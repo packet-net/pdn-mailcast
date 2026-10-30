@@ -26,9 +26,11 @@ def bcm():
         for f in sorted(files):
             if f == "list.bcm": continue
             d = open(os.path.join(root, f), "rb").read()
-            parts = d.split(b"\n", 3)
-            if len(parts) < 4: continue
-            h, flags, title, body = parts
+            parts = d.split(b"\n")
+            h = parts[0]; i = 1
+            while i < len(parts) and re.fullmatch(rb"[A-Z0-9]*\*?\.*", parts[i]): i += 1   # forward-status lines (GB7LAB*......)
+            if i >= len(parts): continue
+            title = parts[i]; body = b"\n".join(parts[i+1:])
             m = re.search(rb"\$(\S+)", h)
             out.append(dict(key=keyof(title), num=f, hdr=h, bid=m.group(1).decode("latin1") if m else "", title=title, body=body))
     return out

@@ -1,0 +1,14 @@
+R:261030/0115Z @:GB7LAX.#99.GBR.EURO [] #:7 XrLin505p
+Date: Fri, 30 Oct 2026 01:15:24 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t04_trailing_ws
+Message-ID: <AE3EFAC07LAX>
+
+trailing space   
+trailing tab	
+	tab at start
+mid	tab
+space-only line follows
+   
+end.

@@ -1,0 +1,23 @@
+<<<ÿûÿûuser:>>>[[user]]<<<password:>>>[[user]]<<<
+Connected to GB7LAA's Telnet Server
+
+>>>[[C 2 GB7LAM-8]]<<<LAA:GB7LAA} Connected to GB7LAM-8
+
+OpenBCM V1.13-38-g65b7 (Linux)
+Helplevel = 2, Lines = 0, last login 30.10.2026 01:14:01z
+Please enter your Home-BBS by typing "A F <boxcall>"
+
+No messages found for G0LAB @ ???.
+Help Dir Read Erase Check REPly Send Alter Quit
+(G0LAB)-->>>>[[SB LABTST @ WW]]<<<
+WW is known, forward to GB7LAB 
+Subject >>>>[[lab t05_blank_first]]<<<
+Enter text for LABTST @ WW 
+Ending with NNNN or /EX or CTRL-Z, abort with /AB or CTRL-X :
+>>>[[]][[first line above is blank]][[]][[]][[two blank lines above this one.]]<<<>>>[[/EX]]<<<5 lines stored for TMP/LABTST @ WW (10) 
+Help Dir Read Erase Check REPly Send Alter Quit
+(TMP/LABTST)-->>>>[[B]]<<<*** Disconnected from Stream 2
+Disconnected from Node - Telnet Session kept
+>>>[[B]]<<<*** Disconnected from Stream 2
+Disconnected from Node - Telnet Session kept
+>>>

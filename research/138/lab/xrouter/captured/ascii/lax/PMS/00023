@@ -1,0 +1,12 @@
+23 BF G0LAB 1793323277 LABTST@WW AE3F10D23LAX &:G0LAB
+lab t12_no_final_newline
+R:261030/0121Z @:GB7LAX.#99.GBR.EURO [] #:23 XrLin505p
+Date: Fri, 30 Oct 2026 01:21:18 +0000
+From: g0lab@gb7lax.#99.gbr.euro <g0lab@gb7lax-2.#99.gbr.euro>
+To: labtst@ww
+Subject: lab t12_no_final_newline
+Message-ID: <AE3F10D23LAX>
+
+line one
+line two
+last line without newline
