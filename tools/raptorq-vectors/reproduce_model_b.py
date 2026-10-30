@@ -187,27 +187,11 @@ def shared_title(title):
     return t.rstrip(BLANK)
 
 
-def oldest_route_date(top):
-    """Date of the bottom-most R: line in the top, else the epoch."""
-    found = None
-    for line in re.split(rb"[\r\n]", top):
-        m = re.match(rb"R:([0-9]{2})([0-9]{2})([0-9]{2})/([0-9]{2})([0-9]{2})[Zz]? ", line)
-        if m:
-            found = m
-    if found is None:
-        return "1970-01-01T00:00:00Z"
-    y, mo, d, h, mi = (int(g) for g in found.groups())
-    try:
-        return datetime.datetime(2000 + y, mo, d, h, mi).strftime("%Y-%m-%dT%H:%M:%SZ")
-    except ValueError:
-        return "1970-01-01T00:00:00Z"
-
-
 def canonical_bulletin(inp, body, style, top):
     title = shared_title(bytes.fromhex(inp["titleHex"]))
     text = body if style == 3 else body.replace(b"\n", b"\r\n")
     head = "Type: %s\nFrom: %s\nTo: %s\nAt: %s\nBid: %s\nDate: %s\nTitle: " % (
-        inp["type"], inp["from"], inp["to"], inp["at"], inp["bid"], oldest_route_date(top))
+        inp["type"], inp["from"], inp["to"], inp["at"], inp["bid"], "1970-01-01T00:00:00Z")
     return head.encode("latin-1") + title + b"\nCanonical: 1\n\n" + text
 
 

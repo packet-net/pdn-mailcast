@@ -599,7 +599,7 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
         Assert.True(bulletin.Canonical);
         Assert.Empty(bulletin.RoutingLines);
         Assert.Equal("Plain bulletin.\r\nSecond line.\r\n", bulletin.Body);
-        Assert.Equal(new DateTimeOffset(2026, 10, 18, 23, 15, 0, TimeSpan.Zero), bulletin.Date);
+        Assert.Equal(DateTimeOffset.UnixEpoch, bulletin.Date);
         Assert.Equal(LineEnding.CrLf, envelope.LineEnding);
         SharedRoundTrips(B(text), "t");
     }
@@ -635,7 +635,7 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
             SharedRoundTrips(B(text), "t");
         }
 
-        Assert.Equal(new DateTimeOffset(2026, 10, 19, 8, 50, 0, TimeSpan.Zero), Shared("R:261019/0850Z a\r\n").Bulletin.Date);
+        Assert.Equal(DateTimeOffset.UnixEpoch, Shared("R:261019/0850Z a\r\n").Bulletin.Date);
     }
 
     [Fact]
@@ -655,15 +655,13 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("R:261019/0850Z a\r\n\r\nbody\r\n", 2026, 10, 19, 8, 50)]
-    [InlineData("R:261019/0850 a\r\n\r\nbody\r\n", 2026, 10, 19, 8, 50)]
-    [InlineData("R:991231/2359z a\r\nR:261019/0850Z b\r\n\r\nbody\r\n", 2026, 10, 19, 8, 50)] // the last one is the oldest
-    [InlineData("R:261319/0850Z a\r\n\r\nbody\r\n", 1970, 1, 1, 0, 0)] // month 13
-    [InlineData("R:261019/2400Z a\r\n\r\nbody\r\n", 1970, 1, 1, 0, 0)] // 24:00
-    [InlineData("R:261019/0850Z a\n\nbody\n", 2026, 10, 19, 8, 50)] // LF copy
-    public void Shared_TheDate_IsTheOldestRoutingLine(string text, int y, int mo, int d, int h, int mi)
+    [InlineData("R:261019/0850Z a\r\n\r\nbody\r\n")]
+    [InlineData("R:991231/2359z a\r\nR:261019/0850Z b\r\n\r\nbody\r\n")]
+    [InlineData("R:261019/0850Z a\n\nbody\n")]
+    [InlineData("body\r\n")]
+    public void Shared_TheDate_IsAlways1970_WhateverTheRoutingLinesSay(string text)
     {
-        Assert.Equal(new DateTimeOffset(y, mo, d, h, mi, 0, TimeSpan.Zero), Shared(text).Bulletin.Date);
+        Assert.Equal(DateTimeOffset.UnixEpoch, Shared(text).Bulletin.Date);
         SharedRoundTrips(B(text), "t");
     }
 
