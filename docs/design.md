@@ -249,7 +249,7 @@ Two sites combine their pieces only while all of these are the same. Any change 
 
 - the canonical rules (docs/canonical-form.md) and the canonical bulletin's fields above
 - the object serialisation (the bulletin header, the envelope serialisation, the content type octet)
-- the zstd version or settings (the output is pinned to zstd 1.5.7 as ZstdSharp 0.8.8 writes it; level 19, one thread, checksum, content size and dictionary ID on)
+- the zstd version or settings (the output is pinned to zstd 1.5.7 as ZstdSharp 0.8.8 writes it; level 19, one thread, checksum, content size and dictionary ID on; another implementation must use zstd's plain level 19 with these flags, not hand-built compression parameters, which differ for inputs over 128 KB)
 - the dictionary (numbered, never changed once numbered)
 - the piece size (240 bytes)
 - the RaptorQ parameters (RFC 6330, one source block, one sub-block, alignment 4)
