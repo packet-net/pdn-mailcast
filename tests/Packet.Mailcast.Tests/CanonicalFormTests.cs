@@ -570,4 +570,165 @@ public sealed class CanonicalFormTests(ITestOutputHelper output)
         Assert.True(shared.Count >= 100);
         Assert.True(same >= shared.Count - 1, $"{same} of {shared.Count}; differing: {string.Join(", ", differing)}");
     }
+
+    // ---- The shared canonical bulletin (issue #142) ----
+
+    private static (Bulletin Bulletin, BulletinEnvelope Envelope) Shared(string text, string title = "t") =>
+        CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "12345_GB7RDG", title, B(text));
+
+    private static void SharedRoundTrips(byte[] original, string title)
+    {
+        var (bulletin, envelope) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "12345_GB7RDG", title, original);
+        Assert.True(bulletin.Canonical);
+        Assert.True(bulletin.Title.Length <= CanonicalForm.SharedTitleOctets);
+
+        // Through the wire form of both, as a receiver sees them.
+        var heard = Bulletin.Parse(bulletin.Serialize());
+        Assert.Equal(bulletin, heard);
+        var heardEnvelope = BulletinEnvelope.Parse(envelope.Serialise());
+        var (text, fullTitle) = CanonicalForm.FromCanonicalBulletin(heard, heardEnvelope);
+        Assert.Equal(original, text);
+        Assert.Equal(title, fullTitle);
+    }
+
+    [Fact]
+    public void Shared_LinBpq_TitleDateBodyAndNoRoutingLines()
+    {
+        const string text = "R:261019/0850Z 14961@GB7BEX.#38.GBR.EURO LinBPQ6.0.25\r\nR:261018/2315z 49399@GB7OSW.#16.GBR.EU LinBPQ6.0.25\r\n\r\nPlain bulletin.\r\nSecond line.\r\n";
+        var (bulletin, envelope) = Shared(text);
+        Assert.True(bulletin.Canonical);
+        Assert.Empty(bulletin.RoutingLines);
+        Assert.Equal("Plain bulletin.\r\nSecond line.\r\n", bulletin.Body);
+        Assert.Equal(new DateTimeOffset(2026, 10, 18, 23, 15, 0, TimeSpan.Zero), bulletin.Date);
+        Assert.Equal(LineEnding.CrLf, envelope.LineEnding);
+        SharedRoundTrips(B(text), "t");
+    }
+
+    [Fact]
+    public void Shared_ABodyEndedWithLf_BecomesCrLf_AndTheDateIsTheEpochWithoutRoutingLines()
+    {
+        var (bulletin, _) = Shared("one\ntwo\n");
+        Assert.Equal("one\r\ntwo\r\n", bulletin.Body);
+        Assert.Equal(DateTimeOffset.UnixEpoch, bulletin.Date);
+        SharedRoundTrips(B("one\ntwo\n"), "t");
+        SharedRoundTrips(B("one\rtwo\r"), "t");
+        SharedRoundTrips(B("no ending"), "t");
+    }
+
+    [Fact]
+    public void Shared_ARawBody_IsUsedAsItIs()
+    {
+        const string text = "mixed\r\nendings\nhere\r";
+        var (bulletin, envelope) = Shared(text);
+        Assert.Equal(LineEnding.Raw, envelope.LineEnding);
+        Assert.Equal("mixed\r\nendings\nhere\n", bulletin.Body);
+        SharedRoundTrips(B(text), "t");
+    }
+
+    [Fact]
+    public void Shared_Empty_AndBlankOnlyBodies()
+    {
+        foreach (var text in new[] { "", "\r\n", "  \r\n\r\n", "R:261019/0850Z a\r\n", "R:261019/0850Z a\r\n\r\n" })
+        {
+            var (bulletin, _) = Shared(text);
+            Assert.Equal("", bulletin.Body);
+            SharedRoundTrips(B(text), "t");
+        }
+
+        Assert.Equal(new DateTimeOffset(2026, 10, 19, 8, 50, 0, TimeSpan.Zero), Shared("R:261019/0850Z a\r\n").Bulletin.Date);
+    }
+
+    [Fact]
+    public void Shared_TheTitle_IsCutAt59Octets_WithTrailingBlanksRemoved_AndTheFullOneIsKept()
+    {
+        var sixty = new string('a', 58) + " b";
+        var (cut, envelope) = Shared("x\r\n", sixty);
+        Assert.Equal(new string('a', 58), cut.Title); // cut at 59 leaves a trailing space, which goes
+        Assert.Equal(sixty, envelope.Title);
+        Assert.Equal(new string('a', 59), Shared("x\r\n", new string('a', 59) + "b").Bulletin.Title);
+        Assert.Equal("short", Shared("x\r\n", "short \t ").Bulletin.Title);
+        Assert.Equal("", Shared("x\r\n", "  \t").Bulletin.Title);
+        Assert.Equal("a  b", Shared("x\r\n", "a\r\nb").Bulletin.Title);
+        SharedRoundTrips(B("x\r\n"), sixty);
+        SharedRoundTrips(B("x\r\n"), "\u00e9\u00ff" + new string('z', 80));
+        SharedRoundTrips(B("x\r\n"), "");
+    }
+
+    [Theory]
+    [InlineData("R:261019/0850Z a\r\n\r\nbody\r\n", 2026, 10, 19, 8, 50)]
+    [InlineData("R:261019/0850 a\r\n\r\nbody\r\n", 2026, 10, 19, 8, 50)]
+    [InlineData("R:991231/2359z a\r\nR:261019/0850Z b\r\n\r\nbody\r\n", 2026, 10, 19, 8, 50)] // the last one is the oldest
+    [InlineData("R:261319/0850Z a\r\n\r\nbody\r\n", 1970, 1, 1, 0, 0)] // month 13
+    [InlineData("R:261019/2400Z a\r\n\r\nbody\r\n", 1970, 1, 1, 0, 0)] // 24:00
+    [InlineData("R:261019/0850Z a\n\nbody\n", 2026, 10, 19, 8, 50)] // LF copy
+    public void Shared_TheDate_IsTheOldestRoutingLine(string text, int y, int mo, int d, int h, int mi)
+    {
+        Assert.Equal(new DateTimeOffset(y, mo, d, h, mi, 0, TimeSpan.Zero), Shared(text).Bulletin.Date);
+        SharedRoundTrips(B(text), "t");
+    }
+
+    [Theory]
+    [InlineData("R:looks like routing\r\nbody\r\n", 1)]
+    [InlineData("R:x\r\n", 1)]
+    [InlineData("R:\r\nR:\r\n", 2)]
+    [InlineData("R:one\nR:two\r\nR:x\r\n", 0)] // Raw: the body has bare LFs, so no line of it is a routing line to Bulletin
+    public void Shared_ABodyThatLooksLikeARoutingLine_StillRoundTrips(string text, int heldAsRouting)
+    {
+        var (bulletin, _) = Shared(text);
+        Assert.Equal(heldAsRouting, bulletin.RoutingLines.Count);
+        SharedRoundTrips(B(text), "t");
+    }
+
+    [Fact]
+    public void Shared_TwoStationsCopies_MakeOneCanonicalBulletin()
+    {
+        const string a = "R:261019/0850Z 1@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\nR:261018/2315Z 2@GB7BBB.#2.GBR.EU LinBPQ6.0.25\r\n\r\nSame words.\r\nTwo lines.\r\n";
+        const string b = "R:261019/1000Z 9@GB7CCC.#3.GBR.EURO LinBPQ6.0.25\r\nR:261019/0850Z 1@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\nR:261018/2315Z 2@GB7BBB.#2.GBR.EU LinBPQ6.0.25\r\n\r\nSame words.\r\nTwo lines.\r\n";
+        var one = Shared(a, "A fairly long title that one BBS cuts at fifty-nine octets and another at sixty").Bulletin;
+        var two = Shared(b, "A fairly long title that one BBS cuts at fifty-nine octets and another at sixty!").Bulletin;
+        Assert.Equal(one.Serialize(), two.Serialize());
+    }
+
+    [Fact]
+    public void Shared_FromCanonical_RefusesATextThatDoesNotRebuild()
+    {
+        var (bulletin, envelope) = Shared("a\r\nb\r\n");
+        var noEnd = new Bulletin('B', "G4ABC", "ALL", "WW", "1_X", "t", DateTimeOffset.UnixEpoch, [], "a\r\nb", canonical: true);
+        Assert.Throws<ArgumentException>(() => CanonicalForm.FromCanonicalBulletin(noEnd, envelope));
+        Assert.NotEmpty(CanonicalForm.FromCanonicalBulletin(bulletin, envelope).MessageText);
+    }
+
+    [Fact]
+    public void Corpus_EveryBulletin_RoundTripsThroughTheSharedBulletin()
+    {
+        var root = Path.Combine(RepoRoot(), "research", "138", "corpus");
+        var count = 0;
+        var byBid = new Dictionary<string, List<string>>();
+        foreach (var file in Directory.EnumerateFiles(root, "msg-*.txt", SearchOption.AllDirectories))
+        {
+            var (head, text) = ParseCorpus(file);
+            var title = head.GetValueOrDefault("Title", "");
+            SharedRoundTrips(text, title);
+            SharedRoundTrips(File.ReadAllBytes(file), "");
+            if (head.TryGetValue("Bid", out var bid) && !file.Contains("GB7CIP", StringComparison.Ordinal))
+            {
+                // Not GB7CIP's: its reader shows the routing as Path: headers, which a head end behind FBB
+                // does not see (FBB adds its own R: line when it forwards), so its copies have no date to take.
+                var (bulletin, _) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "1_X", title, text);
+                if (!byBid.TryGetValue(bid, out var list))
+                {
+                    byBid[bid] = list = [];
+                }
+
+                list.Add(L1.GetString(bulletin.Serialize()));
+            }
+
+            count++;
+        }
+
+        Assert.True(count > 900, $"only {count} corpus files");
+        var multi = byBid.Where(kv => kv.Value.Count > 1).ToList();
+        Assert.True(multi.Count(kv => kv.Value.Distinct().Count() == 1) >= 26, "the issue's lab figure was 26 of 37");
+        output.WriteLine($"{count} corpus bulletins round-trip through the shared bulletin; {multi.Count(kv => kv.Value.Distinct().Count() == 1)} of {multi.Count} BIDs held by several of GB7RDG, GB7NOT and GB7BPQ give one serialisation.");
+    }
 }
