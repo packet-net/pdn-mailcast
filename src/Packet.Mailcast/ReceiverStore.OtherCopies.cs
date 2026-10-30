@@ -25,15 +25,15 @@ public sealed partial class ReceiverStore
     /// <summary>The other copies on record, newest first. Safe to read from any thread: it is replaced, never changed.</summary>
     public IReadOnlyList<OtherCopy> OtherCopies => _otherCopiesView;
 
-    /// <summary>Whether an object is known to be another copy of a bulletin already delivered.</summary>
-    public bool IsOtherCopy(ulong objectId) => _otherCopies.ContainsKey(objectId);
+    /// <summary>Whether an object is known to be another copy of a bulletin already delivered. Used by tests; reads the published view, so safe from any thread.</summary>
+    public bool IsOtherCopy(ulong objectId) => _otherCopiesView.Any(c => c.ObjectId == objectId);
 
     /// <summary>How many other copies were recognised on a UTC day, per station (those with no known station are left out).</summary>
     public IReadOnlyDictionary<string, int> OtherCopyCounts(DateOnly day) =>
         _otherCopiesView
             .Where(c => c.Station is not null && DateOnly.FromDateTime(c.Time.UtcDateTime) == day)
-            .GroupBy(c => c.Station!, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+            .GroupBy(c => c.Station!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
     private string OtherCopyPath(ulong objectId) => Path.Combine(_root, OtherCopiesFolder, ObjectId.Format(objectId));
 
@@ -82,7 +82,6 @@ public sealed partial class ReceiverStore
             return;
         }
         var now = _options.Time.GetUtcNow();
-        WriteDone(objectId);
         foreach (var held in _instances.Values.Where(i => i.ObjectId == objectId).ToList())
         {
             Remove(held);
@@ -104,6 +103,7 @@ public sealed partial class ReceiverStore
             Log($"cannot remember that {ObjectId.Format(objectId)} is another copy of {bid}: {e.Message}");
         }
         _otherCopies[objectId] = copy;
+        WriteDone(objectId); // after the record: a restart restores a missing marker from it, never the other way round
         PublishOtherCopies();
         MailChanged();
         Log($"bulletin {bid}: other copy ({ObjectId.Format(objectId)}){(station is null ? "" : " from " + station)} not needed, already delivered");
@@ -169,7 +169,7 @@ public sealed partial class ReceiverStore
         {
             foreach (var entry in directory.Entries)
             {
-                if (_done.ContainsKey(entry.ObjectId) || _outboxItems.ContainsKey(OutboxName(entry.ObjectId)))
+                if ((_done.ContainsKey(entry.ObjectId) && !_awaiting.ContainsKey(entry.ObjectId)) || _outboxItems.ContainsKey(OutboxName(entry.ObjectId)))
                 {
                     continue;
                 }

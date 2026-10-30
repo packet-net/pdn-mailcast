@@ -859,7 +859,7 @@ public sealed partial class ReceiverStore
             ulong? kept = final ? DeliveredObject(bid) : null;
             foreach (var held in _outboxItems.Values.Where(o => string.Equals(o.Bulletin.Bid, bid, StringComparison.OrdinalIgnoreCase)).OrderBy(o => o.Written).ThenBy(o => o.Name, StringComparer.Ordinal).ToList())
             {
-                if (final && held.ObjectId is ulong copyId && kept is ulong keptId && keptId != copyId)
+                if (final && held.ObjectId is ulong copyId && kept is ulong keptId && keptId != copyId && !_archive.Contains(copyId)) // a re-send of an archived object is never an other copy
                 {
                     File.Delete(Path.Combine(_outbox, held.Name));
                     _outboxItems.Remove(held.Name);

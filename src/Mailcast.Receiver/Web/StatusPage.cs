@@ -1565,6 +1565,7 @@ public sealed class StatusPage : IAsyncDisposable
         var (newestCheck, lastHeard) = _host.Intake.DirectoryChecks();
         // Issue #147: other copies of a delivered bulletin, shown as one short line under it.
         var copies = _host.Intake.OtherCopies().ToLookup(c => c.Bid, StringComparer.OrdinalIgnoreCase);
+        var shownFor = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // once per BID, not under every row with it
         return new
         {
             total = mail.Count,
@@ -1587,7 +1588,7 @@ public sealed class StatusPage : IAsyncDisposable
             offset,
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
-            items = mail.Page(offset, limit).Select(m => MailView(m, signatures.GetValueOrDefault(m.ObjectId), copies[m.Bid])).ToList(),
+            items = mail.Page(offset, limit).Select(m => MailView(m, signatures.GetValueOrDefault(m.ObjectId), shownFor.Add(m.Bid) ? copies[m.Bid] : [])).ToList(),
             // The newest directory in use: "signed by GB7RDG" or "not signed"; and, when the
             // directory heard most recently was not used, why.
             signature = newestCheck?.Describe(),

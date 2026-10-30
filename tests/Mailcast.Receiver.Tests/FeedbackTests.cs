@@ -810,4 +810,17 @@ public class FeedbackTests
         await rig.AtAsync(service, ReportAt);
         Assert.Empty(rig.Bbs.Sent);
     }
+
+    [Fact]
+    public void OtherCopyCounts_GoToTheirStationsCaseInsensitively_IncludingOneWithNoSlotThatDay()
+    {
+        var slot = new FeedbackService.SlotRecord { Slot = new DateTimeOffset(2026, 10, 30, 9, 0, 0, TimeSpan.Zero), Station = "G8BPQ", Frames = 10 };
+        var copies = new Dictionary<string, int> { ["g8bpq"] = 2, ["M0XYZ"] = 1 };
+
+        var figures = FeedbackService.Figures([slot], "GB7RDG", copies);
+
+        Assert.Equal(2, figures.Single(f => f.Station == "G8BPQ").OtherCopies);
+        var extra = figures.Single(f => f.Station == "M0XYZ");
+        Assert.Equal(new ReportStation("M0XYZ", 0, 0, 0, 0, null, null, 1), extra);
+    }
 }

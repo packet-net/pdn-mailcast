@@ -107,7 +107,7 @@ public sealed record ReportStation(
 /// them; a reader ignores fields after the eighth on a station line, and lines it does not know
 /// after the station lines. The ninth field (issue #147) is how many objects heard from that
 /// station that day were another copy of a bulletin already delivered, <c>-</c> when not known;
-/// a station line with eight fields or fewer has none (this writes the field only when the count is known).</para>
+/// a station line with eight fields or fewer has none (the receiver's feedback service always writes it; <c>-</c>, or no field, reads as not known).</para>
 /// </remarks>
 public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHeader Header, IReadOnlyList<ReportSlot> Slots, IReadOnlyList<ReportStation>? Stations = null)
 {

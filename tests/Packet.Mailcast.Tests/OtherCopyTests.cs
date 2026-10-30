@@ -110,6 +110,7 @@ public class OtherCopyTests
 
         Assert.Empty(store.Pending());
         Assert.Equal(1, store.Mail.Archived);
+        Assert.Equal(a.ObjectId, Assert.Single(store.Mail.NewestFirst).ObjectId);
         Assert.True(store.IsOtherCopy(b.ObjectId));
         Assert.False(store.IsOtherCopy(a.ObjectId));
     }
@@ -155,5 +156,54 @@ public class OtherCopyTests
         reopened.Expire();
         Assert.False(reopened.IsOtherCopy(b.ObjectId));
         Assert.Empty(reopened.OtherCopies);
+    }
+
+    [Fact]
+    public void AResentArchivedObject_IsNeverAnOtherCopy()
+    {
+        using var dir = new TempDirectory();
+        var time = Clock();
+        var store = Open(dir.Path, time);
+        var (a, b, bid) = Pair(16);
+        Feed(store, a);
+        time.Advance(TimeSpan.FromMinutes(1));
+        Feed(store, b);
+        store.Acknowledge(bid, BbsVerdict.Refused);
+        Assert.Equal(2, store.Mail.Archived);
+
+        Assert.Equal(ResendOutcome.Resent, store.Resend(a.ObjectId).Outcome);
+        store.Acknowledge(bid, BbsVerdict.Accepted);
+        Assert.Equal(ResendOutcome.Resent, store.Resend(b.ObjectId).Outcome);
+        store.Acknowledge(bid, BbsVerdict.Accepted);
+
+        Assert.Empty(store.OtherCopies);
+        Assert.Equal(2, store.Mail.Archived);
+        Assert.All(store.Mail.NewestFirst, e => Assert.Equal(BbsVerdict.Accepted, e.Verdict));
+    }
+
+    [Fact]
+    public void ACanonicalBulletinWaitingForItsEnvelope_IsDroppedWhenItsBidIsDeliveredUnderAnotherObject()
+    {
+        using var dir = new TempDirectory();
+        var signer = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = Clock(), TrustedKeys = [TrustedKey.Parse("ZZ1AAA", signer.PublicKeyBase64)] });
+        var a = TestBulletins.Make(17, 3000);
+        var other = Bulletin.FromMessageText(a.Type, a.From, a.To, a.At, a.Bid, "a different full title", a.Date, "R:261030/0800Z 1@G8BPQ.#1.GBR.EURO\r\n" + a.MessageText);
+        var canonB = TestBulletins.Canonical(other);
+        var ta = TransferObject.ForBulletin(a, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var tb = TransferObject.ForBulletin(canonB, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        // Listed with an envelope link that never arrives, so the canonical object waits.
+        var entry = new DirectoryEntry(tb.ObjectId, tb.DictionaryId, 400, a.Bid, canonB.Title, Hash: ObjectId.LongHash(tb.DictionaryId, tb.Bytes), Envelope: new EnvelopeLink(0x1234UL, new string('a', ObjectId.ListedHashOctets * 2)));
+        var directory = TransferObject.ForDirectory(new BroadcastDirectory(Day, [entry], signer: signer), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        Feed(store, directory);
+        var waiting = Feed(store, tb, "G8BPQ");
+        Assert.Equal(FrameOutcome.AwaitingEnvelope, waiting.Outcome);
+        Assert.Single(store.Awaiting());
+
+        Feed(store, ta);
+        store.Acknowledge(a.Bid, BbsVerdict.Accepted);
+
+        Assert.Empty(store.Awaiting());
+        Assert.True(store.IsOtherCopy(tb.ObjectId));
     }
 }

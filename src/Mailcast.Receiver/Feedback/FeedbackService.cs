@@ -191,6 +191,7 @@ public sealed class FeedbackService
 
     internal static IReadOnlyList<ReportStation> Figures(IEnumerable<SlotRecord> slots, string own, IReadOnlyDictionary<string, int>? otherCopies = null)
     {
+        otherCopies = otherCopies is null ? null : new Dictionary<string, int>(otherCopies, StringComparer.OrdinalIgnoreCase);
         var figures = FiguresOf(slots, own, otherCopies).ToList();
         // A station that sent another copy but has no slot noted still gets its line.
         foreach (var (station, count) in (otherCopies ?? new Dictionary<string, int>()).OrderBy(p => p.Key, StringComparer.Ordinal))
