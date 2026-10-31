@@ -607,7 +607,7 @@ On disk they are in the state directory: waiting ones in `store/outbox/`, archiv
 
 ## The API for objects and pieces
 
-The receiver keeps every piece it hears, of every kind of object, and this API lets other programs read them and hand them in. It is meant for people writing their own tools: a second receiver that fills gaps from the first, a logger, a viewer for a content type of your own, a program that feeds in pieces from a recording. Everything is on the status page's address and port (`http://RECEIVER:8080/` below). An interactive reference, made from an OpenAPI 3.1 document, is at `/api/docs` on the receiver itself (it works with no internet), and the document is at `/api/openapi.json`. The JSON shapes here are a stable public interface: fields are only ever added, never renamed or removed, so ignore fields you do not know.
+The receiver keeps every piece it hears, of every kind of object, and this API lets other programs read them and hand them in. It is meant for people writing their own tools: a second receiver that fills gaps from the first, a logger, a viewer for a content type of your own, a program that feeds in pieces from a recording. Everything is on the status page's address and port (`http://RECEIVER:8080/` below). An interactive reference, made from an OpenAPI 3.1 document, is at `/api/docs` on the receiver itself (it works with no internet), and the document is at `/api/openapi.json`. The reads (`GET /api/objects`, `/api/objects/{id}/pieces`, `/api/objects/{id}/data`, `/api/openapi.json` and `/api/docs`) are always open to anyone who can reach the page, whatever the page's password: they show only pieces and objects heard on air or handed in, never your mail, settings or keys, and a head end on another computer reads them with no password. The page's password protects the mail, the settings and the keys. Handing pieces in needs the API key. The JSON shapes here are a stable public interface: fields are only ever added, never renamed or removed, so ignore fields you do not know.
 
 ### What a piece and an object are
 
@@ -643,6 +643,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
       "outside": 2,
       "complete": true,
       "listedBy": ["GB7RDG"],
+      "listings": [{ "station": "GB7RDG", "hash": "9c1e5a07d3b2f648" }],
       "updated": "2026-10-31T09:14:02+00:00",
       "cursor": 4812
     }
@@ -659,6 +660,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
 - `k`: pieces needed. `held`: pieces held. `outside`: of those, how many came from outside.
 - `complete`: the object has been rebuilt and matches its ID.
 - `listedBy`: the stations whose trusted signed directories, still remembered (about 48 hours), list the object. Empty if none does.
+- `listings`: the same stations, each with the long hash (16 hex digits) its directory lists the object with; `hash` is null for a listing that carries none. A program that passes the object on can then say what the original station vouched for.
 - `updated`, `cursor`: when and at what cursor value it last changed.
 - `next`: pass this as `since` to the next call. `more`: more rows wait; call again at once.
 
@@ -691,6 +693,8 @@ curl 'http://RECEIVER:8080/api/objects/3f9a0c5be1d27a44/pieces?limit=2'
 ```
 
 `frame` is the whole frame in hex, ready to post to another receiver or to parse. `from` is `air` or `outside`; `label` is the station (on air, null if not known) or the poster's label. A complete object keeps the pieces it was rebuilt from.
+
+If a rebuild does not match the object's ID, the receiver first tries again without the pieces handed in from outside, then without the pieces heard from each station in turn (by the station each was attributed to), before waiting for more pieces; when leaving one station out works it drops that station's pieces that do not fit and logs one line, such as `object 3f9a0c5be1d27a44: 1 piece(s) heard from G8BAD did not fit the object and were dropped; rebuilt without them`.
 
 Nothing is signalled when an object is dropped (expired, or pushed out by the size limit): it simply stops being listed, and there are no tombstones. A restart renumbers cursors: every kept object and piece gets a new, higher number, so a program following the receiver finds everything again once and should expect to fetch it again.
 
@@ -750,6 +754,17 @@ A program that gets a frame wrong is told so in `results`; the call itself still
 ### Following a receiver from another
 
 A small program can copy one receiver's pieces to another with these calls alone: read the index with the last `next` it saw, read each changed object's `pieces` since its own last cursor, and post the `frame` values to the other receiver. Because a receiver checks every object against its ID, the other receiver is safe from pieces that turn out wrong; use a different `source` label for each source you copy from, so that a bad one can be told from the good.
+
+## Finding it on the network
+
+A head end finds a receiver with no setting. Two things make that work:
+
+- A head end on the same machine looks at the receiver's usual port (8130, `web.port`) on 127.0.0.1.
+- The receiver announces itself on the local network by multicast DNS (also called mDNS or Bonjour), as the service `_pdn-mailcast._tcp`, named after your daily-report callsign and the computer, with four hex digits that tell computers of the same name apart and the port if it is not 8130 (for example `M0LTE on readingbox 3fa2`), on each network with only that network's address, and with the status page's port. The announcement carries `v` (this receiver's version), `api` (the version of the API above, 1) A head end on another computer on the same network browses for that service and reads the receiver's API (`GET` only: it changes nothing, and it cannot hand in pieces, which needs the API key).
+
+It is announced only when the page is reachable from the network (`web.lan`, on by default). With `"lan": false` nothing is announced, and the log says so in one line. The page's password does not matter here: the object and piece reads are open whatever it is.
+
+Multicast DNS does not cross routers or VLANs, and some Wi-Fi access points block it between devices. A head end behind one of those does not find the receiver. If multicast cannot be used at all (no network that supports it, a firewall), the receiver logs `discovery: cannot announce this receiver on the network (...)` once and carries on. To see what a head end found, look at the `receivers` list in its status (see [the head end's Status section](headend.md#receivers)); from a Linux machine on the same network, `avahi-browse -rt _pdn-mailcast._tcp` shows the announcement itself.
 
 ## What it logs
 

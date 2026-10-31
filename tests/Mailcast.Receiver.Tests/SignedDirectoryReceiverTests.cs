@@ -99,6 +99,35 @@ public class SignedDirectoryReceiverTests
         Assert.All(lines, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
     }
 
+    [Fact]
+    public async Task TheObjectApi_GivesTheHashEachTrustedDirectoryListsAnObjectWith()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 30, 0, TimeSpan.Zero));
+        var (host, page) = await StartAsync(dir.Path, time, []);
+        await using var _h = host;
+        await using var _p = page;
+        var slot = new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);
+        var mine = Samples.Bulletin(1);
+        foreach (var frame in Samples.Frames([mine], ScheduleOptions.Hourly with { Signer = Signer }, slot))
+        {
+            host.Intake.Offer(frame);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        using var http = new HttpClient { BaseAddress = new Uri(page.Url) };
+        var index = JsonSerializer.Deserialize<JsonElement>(await http.GetStringAsync("api/objects"));
+        var listed = index.GetProperty("objects").EnumerateArray().Where(o => o.GetProperty("listedBy").GetArrayLength() > 0).ToList();
+
+        Assert.NotEmpty(listed);
+        foreach (var row in listed)
+        {
+            var listing = Assert.Single(row.GetProperty("listings").EnumerateArray());
+            Assert.Equal("TEST", listing.GetProperty("station").GetString());
+            Assert.Matches("^[0-9a-f]{16}$", listing.GetProperty("hash").GetString());
+        }
+    }
+
     private static async Task<(ReceiverHost Host, StatusPage Page)> StartAsync(string dir, TimeProvider time, List<string> lines)
     {
         for (int attempt = 0; ; attempt++)

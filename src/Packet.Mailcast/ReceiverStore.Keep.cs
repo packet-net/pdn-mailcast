@@ -9,7 +9,13 @@ namespace Packet.Mailcast;
 /// <param name="Kept">What the keep holds of it.</param>
 /// <param name="ContentType">Its content type if known: from its rebuilt octets, from piece 0, or from a directory that lists it.</param>
 /// <param name="ListedBy">The stations whose trusted signed directories, still remembered, list it.</param>
-public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList<string> ListedBy);
+/// <param name="Listings">The same stations with the long hash (<see cref="DirectoryEntry.Hash"/>, 16 hex digits) each lists it with; null where a listing carries none.</param>
+public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList<string> ListedBy, IReadOnlyList<ObjectListing>? Listings = null);
+
+/// <summary>One trusted signed directory's listing of an object.</summary>
+/// <param name="Station">The station whose directory it is.</param>
+/// <param name="Hash">The long hash it lists, or null.</param>
+public sealed record ObjectListing(string Station, string? Hash);
 
 /// <summary>A page of <see cref="ObjectRow"/>s.</summary>
 /// <param name="Rows">The rows whose cursor is above the one asked for, in cursor order.</param>
@@ -89,11 +95,11 @@ public sealed partial class ReceiverStore
         return ObjectId.Of(held.DictionaryId, held.Data) == objectId ? held : null; // checked again: the file may have been damaged on disk
     }
 
-    private ObjectRow Row(KeptObject kept, Dictionary<ulong, SortedSet<string>> listed)
+    private ObjectRow Row(KeptObject kept, Dictionary<ulong, SortedDictionary<string, string?>> listed)
     {
         listed.TryGetValue(kept.ObjectId, out var by);
         byte? type = kept.ContentType ?? TypeFromDirectories(kept.ObjectId);
-        return new ObjectRow(kept, type, by is null ? [] : [.. by]);
+        return new ObjectRow(kept, type, by is null ? [] : [.. by.Keys], by is null ? [] : [.. by.Select(b => new ObjectListing(b.Key, b.Value))]);
     }
 
     private IEnumerable<(BroadcastDirectory Directory, string Station)> ListingDirectories()
@@ -107,25 +113,25 @@ public sealed partial class ReceiverStore
         }
     }
 
-    private Dictionary<ulong, SortedSet<string>> ListedByStation()
+    private Dictionary<ulong, SortedDictionary<string, string?>> ListedByStation()
     {
-        var listed = new Dictionary<ulong, SortedSet<string>>();
-        void Note(ulong id, string station)
+        var listed = new Dictionary<ulong, SortedDictionary<string, string?>>();
+        void Note(ulong id, string station, string? hash)
         {
             if (!listed.TryGetValue(id, out var set))
             {
-                listed[id] = set = new SortedSet<string>(StringComparer.Ordinal);
+                listed[id] = set = new SortedDictionary<string, string?>(StringComparer.Ordinal);
             }
-            set.Add(station);
+            set[station] = hash;
         }
         foreach (var (directory, station) in ListingDirectories())
         {
             foreach (var entry in directory.Entries)
             {
-                Note(entry.ObjectId, station);
+                Note(entry.ObjectId, station, entry.Hash);
                 if (entry.Envelope is { } link)
                 {
-                    Note(link.ObjectId, station);
+                    Note(link.ObjectId, station, link.Hash);
                 }
             }
         }
@@ -225,6 +231,56 @@ public sealed partial class ReceiverStore
             }
             instance.ResetDecoder();
             Log($"object {ObjectId.Format(instance.ObjectId)}: {bad.Count} bad piece(s) from outside ({string.Join(',', bad.Select(b => b.Label ?? "?").Distinct().Order(StringComparer.Ordinal))}) dropped; rebuilt without them");
+            return candidate;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A rebuild failed its ID check and the pieces from outside were not the cause (or there were none): try again leaving out
+    /// the pieces heard on air from each station in turn, by the station each was attributed to, before waiting for more. If one
+    /// set rebuilds to the ID, that station's pieces that do not agree with the true object are dropped, and one line names the
+    /// station. A station whose pieces are all of the object's pieces is not tried alone. Null when it does not help.
+    /// </summary>
+    private byte[]? RebuildWithoutStation(Instance instance)
+    {
+        var air = _keep.AirPieces(instance.Key).Where(p => p.Label is not null && instance.Symbols.ContainsKey(p.Esi)).ToList();
+        if (air.Count == 0 || instance.StationTried == instance.Symbols.Count)
+        {
+            return null;
+        }
+        instance.StationTried = instance.Symbols.Count;
+        int k = instance.Oti.SourceBlockSymbols(0);
+        foreach (string station in air.Select(p => p.Label!).Distinct().Order(StringComparer.Ordinal))
+        {
+            var left = air.Where(p => p.Label == station).Select(p => p.Esi).ToHashSet();
+            var use = instance.Arrival.Where(e => !left.Contains(e) && instance.Symbols.ContainsKey(e)).ToList();
+            if (use.Count < k)
+            {
+                continue;
+            }
+            var decoder = new ObjectDecoder(instance.Oti);
+            foreach (uint esi in use)
+            {
+                decoder.Add(new PayloadId(0, esi), instance.Symbols[esi]);
+            }
+            var candidate = decoder.TryDecode();
+            if (candidate is null || ObjectId.Of(instance.DictionaryId, candidate) != instance.ObjectId)
+            {
+                continue;
+            }
+            var encoder = new ObjectEncoder(candidate, instance.Oti);
+            var bad = left.Where(esi => !encoder.Encode(new PayloadId(0, esi)).AsSpan().SequenceEqual(instance.Symbols[esi])).ToList();
+            foreach (uint esi in bad)
+            {
+                instance.Symbols.Remove(esi);
+                instance.Arrival.Remove(esi);
+                TryDelete(SymbolPath(instance, esi));
+                _keep.RemovePiece(instance.Key, esi, _options.Time.GetUtcNow());
+            }
+            instance.ResetDecoder();
+            string plain = new([.. station.Select(c => c is >= ' ' and <= '~' ? c : '?')]);
+            Log($"object {ObjectId.Format(instance.ObjectId)}: {bad.Count} piece(s) heard from {plain} did not fit the object and were dropped; rebuilt without them");
             return candidate;
         }
         return null;

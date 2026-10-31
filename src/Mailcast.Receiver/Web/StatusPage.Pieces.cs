@@ -114,6 +114,7 @@ public sealed partial class StatusPage
         outside = row.Kept.PiecesOutside,
         complete = row.Kept.Complete,
         listedBy = row.ListedBy,
+        listings = (row.Listings ?? []).Select(l => new { station = l.Station, hash = l.Hash }),
         updated = row.Kept.Updated,
         cursor = row.Kept.Cursor,
     };
