@@ -361,9 +361,9 @@ jobs:
   release:
     needs: [version, deb, zip, nupkg]
     if: needs.version.outputs.publish == 'true'
-    # The repo's own branches and tags run on packet-net's self-hosted x64 runners; pull requests
-    # from forks stay on GitHub's machines, so outside code never runs on ours.
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
+    # Publishing runs on GitHub's machines, which come with gh; it only uploads what the jobs
+    # above built, so it takes a minute or two. Self-hosted runners are not all given gh.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
