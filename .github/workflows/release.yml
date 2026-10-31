@@ -377,6 +377,9 @@ jobs:
         with:
           fetch-depth: 0 # the release notes are written from first-parent history between tags
 
+      - name: Fetch gh if this runner has none
+        run: scripts/ci-ensure-gh.sh
+
       - name: Check the tools this job needs
         run: scripts/ci-require-tools.sh python3 gh sha256sum:coreutils
 
