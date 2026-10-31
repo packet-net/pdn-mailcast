@@ -377,3 +377,30 @@ public class DailyReportTests
         Assert.True(DailyReport.LooksLikeReport(withStations.Title, withStations.Body));
     }
 }
+
+public class DailyReportOutsidePiecesTests
+{
+    [Theory]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 17", 17)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4", null)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 -", null)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 later", null)]
+    public void NinthField_IsPiecesFromOutside_OrNotKnown(string line, int? expected)
+    {
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", line + "\n");
+        Assert.Equal(4, read.Header.GivenUp);
+        Assert.Equal(expected, read.Header.OutsidePieces);
+    }
+
+    [Fact]
+    public void Written_OnlyWhenThere_AfterAnEighthField()
+    {
+        var none = new ReportHeader("0.6.0", null, "sc", 3, 0, new Dictionary<string, int>(), 2, 4);
+        var some = none with { OutsidePieces = 9 };
+        var noEighth = new ReportHeader("0.6.0", null, "sc", 3, 0, new Dictionary<string, int>(), 2, null, 9);
+        string Header(ReportHeader h) => new DailyReport("G4ABC", new DateOnly(2026, 10, 6), h, []).Body.TrimEnd();
+        Assert.EndsWith(" 2 4", Header(none), StringComparison.Ordinal);
+        Assert.EndsWith(" 2 4 9", Header(some), StringComparison.Ordinal);
+        Assert.EndsWith(" 2 - 9", Header(noEighth), StringComparison.Ordinal);
+    }
+}

@@ -336,6 +336,7 @@ Fields are separated by one space, and `-` means not known. The first line is th
 6. Errors: `0`, or how many, a colon, and how many of each kind: `BBS` (a session with the BBS failed), `AUD` (the audio failed or was lost), `RIG` (a problem retuning the radio), `HOOK` (a hook command failed).
 7. How many of the day's bulletins the BBS already had (issue #86), such as `0` in the example above, or `3` for a day when the BBS answered FS `-` to three. A header with no seventh field at all, from a receiver before this was tracked, means not known, not zero: the old header folded this into field 5's delivered instead.
 8. How many part-received bulletins were given up that day: cleared because GB7RDG stopped sending them before this receiver had enough pieces (see [Bulletins](#bulletins)), such as `1` in the example above. Each counts once, on the day it was cleared; one GB7RDG starts sending again before then isn't counted. A header with no eighth field, from an older receiver, means not known. When the eighth field is there, so is the seventh, as `-` if that one isn't known.
+9. How many pieces were newly stored that day that were handed in from outside through the [API](#the-api-for-objects-and-pieces) rather than heard on air. Left out on a day with none, and by receivers before it existed; when it is there, so is the eighth, as `-` if that one isn't known. These pieces are in no slot's frames.
 
 Then one line for each slot listened to, in order:
 
@@ -355,7 +356,7 @@ When the slot's channel was measured, six more follow:
 11. The virtual height, km. Without the web SDR's position it is worked out for a 150 km path.
 12. What it was measured from: `b` the bursts, `p` the probe after the tone, whichever measured the slot better.
 
-A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the eighth field of the header (`-` or missing in the seventh or eighth means that count is not known) and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
+A real line, from a recording of the 16:00 slot on 5 October through the Wessex web SDR, reads `16 W4 41 - - - 2 1.9/-17 0.29 0.2 294 b`: 41 frames at 1200 bps, two paths with the second 1.9 ms later and 17 dB weaker, and a reflection about 290 km up. Its tone wasn't caught, so there is no SNR or offset. A slot listened to with nothing heard reads `11 - 0 - - -`. A reader should ignore anything after the ninth field of the header (`-` or missing in the seventh or eighth means that count is not known) and the twelfth of a slot line, and take `-` in a slot line's seventh field as no measurement, whatever follows. So the format can grow at the ends of its lines without a new number; a later field on a line with no measurement comes after six `-`. `Packet.Mailcast.Feedback.DailyReport.Parse(title, body)` reads one, R: lines and all, as a BBS shows it.
 
 The report goes once a day, 30 minutes after GB7RDG's last slot. Another station's slot that starts after that is on the status page but is not in any report, since the day's report has gone. A day goes only if it has a slot line or a station line: a day with only other stations' slots sends a report with station lines and no slot lines, and a day with nothing noted sends nothing.
 
@@ -603,6 +604,150 @@ The same is there for scripts, behind the page's password if it has one:
 - `POST /api/mail/resend` with `{"id": "<id>"}` as `application/json`: sends one again. Like saving the settings, it is refused from another site.
 
 On disk they are in the state directory: waiting ones in `store/outbox/`, archived ones in `store/archive/`, one file each. A file that cannot be read is moved to `store/quarantine/` and logged, and the receiver carries on.
+
+## The API for objects and pieces
+
+The receiver keeps every piece it hears, of every kind of object, and this API lets other programs read them and hand them in. It is meant for people writing their own tools: a second receiver that fills gaps from the first, a logger, a viewer for a content type of your own, a program that feeds in pieces from a recording. Everything is on the status page's address and port (`http://RECEIVER:8080/` below). The JSON shapes here are a stable public interface: fields are only ever added, never renamed or removed, so ignore fields you do not know.
+
+### What a piece and an object are
+
+An **object** is one thing the head end sends: a bulletin, a directory, an ionosonde reading, or anything of a content type that comes later. It is coded with RaptorQ into **pieces**. A **piece** is one frame, self-contained: it says which object it belongs to, how the object was coded, its own number (the ESI) and carries its own CRC, so a program can check it alone. Any K pieces (K is in the index) rebuild the object, usually exactly K and rarely one or two more. The frame layout is in [design.md](design.md#on-air-format); the API passes frames as the exact octets of an AX.25 UI frame's information field, in lower-case hex.
+
+An object is named by its **ID**: 16 hex digits, the first eight octets of the SHA-256 of the two-octet dictionary ID followed by the object's octets. So a rebuilt object checks itself against its ID, and the receiver does that check before it keeps or uses anything. The receiver takes a piece from any source, but a wrong piece that still passes its CRC cannot do lasting harm: if a rebuild fails the check, the receiver tries again without the pieces from outside, then without each source label's pieces, and drops the ones that turn out wrong.
+
+Pieces carry where they came from: `air` (heard in a slot, with the station whose slot it was if known) or `outside` (handed in through `POST /api/pieces`, with the label the poster gave). Pieces from outside never count towards the station heard most, a slot's frames or a slot's bulletins; the status page and the daily report count them apart.
+
+What reaches the BBS is unchanged: a bulletin is delivered the same way whether the last piece came on air or from outside. Objects of other content types are kept, within a size limit (64 MB by default, the oldest rebuilt objects dropped first, and nothing kept longer than 14 days), and shown nowhere as mail.
+
+### Reading
+
+Reads need nothing, like the status page itself. If the page has a password, send it with HTTP Basic (any user name), as for the rest of the page.
+
+**`GET /api/objects?since=N&limit=M`** is the index. `since` is a cursor (default 0, everything); `limit` is 1 to 1000 (default 200). Rows come in cursor order, and an object that changes (a new piece, completion, a new directory listing it) moves to the end with a new cursor.
+
+```
+curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
+```
+
+```json
+{
+  "objects": [
+    {
+      "id": "3f9a0c5be1d27a44",
+      "type": 1,
+      "typeName": "packet mail bulletin (FBB/BPQ message format)",
+      "dictionary": 1,
+      "oti": { "transferLength": 2891, "symbolSize": 240, "sourceBlocks": 1, "subBlocks": 1, "alignment": 4, "hex": "000000000b4b00f0010001..." },
+      "k": 13,
+      "held": 13,
+      "outside": 2,
+      "complete": true,
+      "listedBy": ["GB7RDG"],
+      "updated": "2026-10-31T09:14:02+00:00",
+      "cursor": 4812
+    }
+  ],
+  "next": 4812,
+  "more": false
+}
+```
+
+- `id`: the object ID.
+- `type`: the content type (the low 7 bits of the object's first octet; see [design.md](design.md#content-types)), or null if not yet known. It comes from piece 0, from the rebuilt object, or from a directory that lists the object; `typeName` says it in words.
+- `dictionary`: the zstd dictionary ID the object was compressed with, 0 for none.
+- `oti`: how the object is RaptorQ coded; `hex` is the 12 octets as they sit in a frame.
+- `k`: pieces needed. `held`: pieces held. `outside`: of those, how many came from outside.
+- `complete`: the object has been rebuilt and matches its ID.
+- `listedBy`: the stations whose trusted signed directories, still remembered (about 48 hours), list the object. Empty if none does.
+- `updated`, `cursor`: when and at what cursor value it last changed.
+- `next`: pass this as `since` to the next call. `more`: more rows wait; call again at once.
+
+To follow the receiver, call with `since=next` now and then. Cursors only go up, also across restarts. After a restart every kept object has a new cursor, so a program resuming from an old one sees all of them once more.
+
+**`GET /api/objects/{id}/pieces?since=N&limit=M`** gives one object's pieces. `limit` is 1 to 500 (default 100). 404 if the object is not held.
+
+```
+curl 'http://RECEIVER:8080/api/objects/3f9a0c5be1d27a44/pieces?limit=2'
+```
+
+```json
+{
+  "id": "3f9a0c5be1d27a44",
+  "complete": true,
+  "k": 13,
+  "pieces": [
+    {
+      "esi": 4,
+      "frame": "02003f9a0c5be1d27a440001...",
+      "heard": "2026-10-31T09:12:41+00:00",
+      "from": "air",
+      "label": "GB7RDG",
+      "cursor": 4790
+    }
+  ],
+  "next": 4790,
+  "more": true
+}
+```
+
+`frame` is the whole frame in hex, ready to post to another receiver or to parse. `from` is `air` or `outside`; `label` is the station (on air, null if not known) or the poster's label. A complete object keeps the pieces it was rebuilt from.
+
+**`GET /api/objects/{id}/data`** gives the rebuilt object's octets (the content type octet, any metadata, then the compressed content: exactly what the ID hashes), as `application/octet-stream`, with `X-Mailcast-Object-Id` and `X-Mailcast-Dictionary` headers. It is 404 unless the object is complete and still matches its ID.
+
+```
+curl -o object.bin 'http://RECEIVER:8080/api/objects/3f9a0c5be1d27a44/data'
+```
+
+Errors are JSON, `{"error": "..."}`, with the status code: 400 for a cursor that is not a number, 404 for an object that is not held or not complete.
+
+### Handing pieces in
+
+**`POST /api/pieces`** takes frames, checks each (format, CRC), and pools it with the pieces heard on air, marked as from outside. It needs the receiver's **API key**.
+
+The key is made on the status page: open "Sharing pieces", press "Make a new key", and copy it. The same section shows it again, makes a new one (the old stops working) or removes it. It is kept with the receiver's store, not in the config file. With no key set, posting is refused (403) with a message saying so. Give the key in either header:
+
+```
+Authorization: Bearer mcr_...
+X-Api-Key: mcr_...
+```
+
+Browsers cannot be used to post from another site: the page's usual Host and Origin checks apply, and a request whose `Origin` is another site is refused (403). A wrong key is 401, and too many wrong keys from one address are slowed and then refused (429), as for the page password. The page password is not needed to post; the key is enough.
+
+Send `application/json`: either `{"source": "my-tool", "frames": ["hex", ...]}` or just the list. `source` is an optional label for where the pieces came from (letters, digits and `. - _ : /`, at most 48 characters; anything else becomes `_`); without it, the sender's address is used. At most 500 frames, each at most 4096 octets, and a body of 4 MB.
+
+```
+curl -X POST 'http://RECEIVER:8080/api/pieces' \
+  -H 'Authorization: Bearer mcr_...' \
+  -H 'Content-Type: application/json' \
+  -d '{"source": "my-recorder", "frames": ["02003f9a0c5be1d27a440001...", "0200..."]}'
+```
+
+```json
+{
+  "source": "my-recorder",
+  "accepted": 1,
+  "results": [
+    { "outcome": "stored", "objectId": "3f9a0c5be1d27a44", "encodingSymbolId": 4, "detail": null },
+    { "outcome": "duplicate", "objectId": "3f9a0c5be1d27a44", "encodingSymbolId": 5, "detail": null }
+  ]
+}
+```
+
+`results` has one entry for each frame sent, in order. `accepted` counts the frames that added a piece. `outcome` is one of:
+
+- `stored`: kept, the object is not yet rebuilt.
+- `completedBulletin`, `completedDirectory`, `completedEnvelope`, `completedUnhandled`, `completedUnknown`, `completedIonosphere`, `completedPskReporter`, `awaitingEnvelope`, `withheld`, `completedOtherCopy`, `rejectedDirectory`: kept, and it finished the object. A bulletin goes to the BBS as usual.
+- `duplicate`: that piece was already held.
+- `alreadyComplete`: the object is already rebuilt; the frame was not needed.
+- `notAFrame`: not hex, or not a valid frame (version, length or CRC). `detail` says which when it is not hex.
+- `unknownDictionary`: the object uses a compression dictionary this receiver does not have.
+- `rejected`: refused; `detail` says why (the object is over the size limit for pieces from outside, or the receiver is already holding as many part-received objects as it allows and will not start another from outside).
+
+A program that gets a frame wrong is told so in `results`; the call itself still answers 200. Other errors: 400 for a body that is not what is described, 401, 403, 413 (too many frames or too large), 415 (not `application/json`), 429.
+
+### Following a receiver from another
+
+A small program can copy one receiver's pieces to another with these calls alone: read the index with the last `next` it saw, read each changed object's `pieces` since its own last cursor, and post the `frame` values to the other receiver. Because a receiver checks every object against its ID, the other receiver is safe from pieces that turn out wrong; use a different `source` label for each source you copy from, so that a bad one can be told from the good.
 
 ## What it logs
 

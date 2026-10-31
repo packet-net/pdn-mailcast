@@ -308,7 +308,7 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         // had stopped sending them) that day. Missing, or "-", means not known: an older sender's report.
         int? givenUp = f.Length > 7 ? ParseCount(f[7], "a given-up") : null;
         // Field 9 (issue #214): pieces handed in from outside that day. Missing, or "-", means not known.
-        int? outsidePieces = f.Length > 8 ? ParseCount(f[8], "an outside-pieces") : null;
+        int? outsidePieces = f.Length > 8 && TryInt(f[8], out int outsideCount) ? outsideCount : null; // lenient: older readers took anything after field 8 as a later field
         return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad, givenUp, outsidePieces);
     }
 
@@ -518,7 +518,7 @@ public static class ReportErrors
 /// eighth field, or <c>-</c> there; and, written, null leaves the field out.
 /// </param>
 /// <param name="OutsidePieces">
-/// Pieces of objects newly stored in the day that were handed in from outside, by a program or a peer
+/// Pieces of objects newly stored in the day that were handed in from outside by a program using the receiver's API
 /// (issue #214), not heard in any slot. Null when none or not known: read from a header with no ninth field, or
 /// <c>-</c> there; and, written, null leaves the field out. A ninth field is written after an eighth, as <c>-</c> if
 /// that one is null.

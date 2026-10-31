@@ -763,7 +763,7 @@ public sealed partial class ReceiverStore
     }
 
     /// <summary>
-    /// Offers a frame handed in from outside (issue #214): a poster of the receiver's API, or a peer. It is
+    /// Offers a frame handed in from outside (issue #214): a program posting to the receiver's API. It is
     /// checked and pooled with the pieces heard on air, but marked as from outside under
     /// <paramref name="label"/>: it never counts for the station heard most (issue #145), a repeat of a
     /// directory it carries does not count as hearing that directory, and, should a rebuild fail its ID check,

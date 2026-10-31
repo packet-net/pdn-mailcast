@@ -5,10 +5,10 @@ using Mailcast.RaptorQ;
 namespace Packet.Mailcast;
 
 /// <summary>Where a kept piece came from.</summary>
-/// <param name="Outside">False for a piece heard on air; true for one handed in from outside (a poster, or a peer).</param>
+/// <param name="Outside">False for a piece heard on air; true for one handed in from outside (a program posting to the API).</param>
 /// <param name="Label">
-/// On air, the station whose slot it was heard in, if known. From outside, the label of the poster or
-/// peer. Plain printable ASCII, at most <see cref="PieceKeep.MaxLabel"/> characters.
+/// On air, the station whose slot it was heard in, if known. From outside, the optional source label the
+/// poster gave. Plain printable ASCII, at most <see cref="PieceKeep.MaxLabel"/> characters.
 /// </param>
 public readonly record struct PieceSource(bool Outside, string? Label = null);
 
