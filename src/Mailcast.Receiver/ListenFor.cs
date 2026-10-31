@@ -34,9 +34,6 @@ public sealed record ListenForEntry
     /// <summary>Its daylight rule, or null when every slot runs.</summary>
     public DaylightSettings? Daylight { get; init; }
 
-    /// <summary>When the entry was added, UTC. Filled in by the receiver when missing; the 7 days count from it.</summary>
-    public DateTimeOffset? AddedUtc { get; init; }
-
     /// <summary>What is wrong with the entry, in a sentence, or null. The same checks as a head end's <c>advertise</c> entry.</summary>
     public string? Problem()
     {

@@ -13,8 +13,8 @@ public class ListenForTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 31, 10, 5, 0, TimeSpan.Zero);
 
-    private static ListenForEntry Entry(string call = "GM8BPQ", int minute = 30, int every = 60, long hz = 7_047_000, DateTimeOffset? added = null) =>
-        new() { Callsign = call, Minute = minute, EveryMinutes = every, FrequencyHz = hz, Sideband = "usb", AddedUtc = added ?? Now };
+    private static ListenForEntry Entry(string call = "GM8BPQ", int minute = 30, int every = 60, long hz = 7_047_000) =>
+        new() { Callsign = call, Minute = minute, EveryMinutes = every, FrequencyHz = hz, Sideband = "usb" };
 
     private static ReceiverConfig Config(string dir, params ListenForEntry[] entries) => new()
     {
@@ -66,7 +66,7 @@ public class ListenForTests
         var xyz = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
         using var dir = new TempDirectory();
         // Four by hand (added in order), and five adverts: six places in all, the adverts that lose are the last.
-        var hand = Enumerable.Range(1, 4).Select(i => Entry($"G0HA{i}", minute: 10 + i, added: Now.AddMinutes(i))).ToArray();
+        var hand = Enumerable.Range(1, 4).Select(i => Entry($"G0HA{i}", minute: 10 + i)).ToArray();
         var config = Config(dir.Path, hand) with { TrustedKeys = [new TrustedKeySettings { Label = "M0XYZ", PublicKey = xyz.PublicKeyBase64 }] };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(Now), _ => { });
         await HearAsync(host, ScheduleOptions.Hourly with
@@ -99,7 +99,10 @@ public class ListenForTests
 
         await HearAsync(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 40), 60), Signer = bpq, Station = "GM8BPQ" }, Now.AddMinutes(30), 1);
 
-        Assert.Equal(["M0OTH"], host.Config.ListenFor!.Select(e => e.Callsign));
+        // The config is left alone; the entry is retired in the state file and no longer used.
+        Assert.Equal(["GM8BPQ", "M0OTH"], host.Config.ListenFor!.Select(e => e.Callsign));
+        Assert.StartsWith("its own signed directory was heard", host.ListenForState.Get(host.Config.ListenFor![0])!.Retired, StringComparison.Ordinal);
+        Assert.Null(host.ListenForState.Get(host.Config.ListenFor![1])!.Retired);
         var own = host.Listening.Single(l => l.Station == "GM8BPQ");
         Assert.Equal("its own directory", own.Source);
         Assert.Equal(40, own.Timetable.Anchor.Minute);
@@ -116,32 +119,40 @@ public class ListenForTests
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(Now);
         var log = new List<string>();
-        await using var host = new ReceiverHost(Config(dir.Path, Entry(added: Now)), time, line => { lock (log) { log.Add(line); } });
+        await using var host = new ReceiverHost(Config(dir.Path, Entry()), time, line => { lock (log) { log.Add(line); } });
 
         time.Advance(TimeSpan.FromDays(7) - TimeSpan.FromMinutes(1));
         host.ExpireListenFor();
-        Assert.Single(host.Config.ListenFor!);
+        Assert.Null(host.ListenForState.Get(host.Config.ListenFor![0])!.Retired);
 
         time.Advance(TimeSpan.FromMinutes(1));
         host.ExpireListenFor();
         host.ExpireListenFor();
-        Assert.Null(host.Config.ListenFor);
+        Assert.Single(host.Config.ListenFor!);
+        Assert.Equal("not heard in 7 days", host.ListenForState.Get(host.Config.ListenFor![0])!.Retired);
         Assert.DoesNotContain(host.Listening, l => l.Station == "GM8BPQ");
         lock (log)
         {
             Assert.Single(log, l => l.StartsWith("listen-for: GM8BPQ was not heard in 7 days", StringComparison.Ordinal));
         }
-        Assert.Contains("GM8BPQ was not heard in 7 days", Assert.Single(host.ListenForNotes), StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task EntriesWithoutAnAddedTime_AreStampedAtStartUp()
+    public async Task TheAddedTime_SurvivesARestart_AndTheConfigFileIsNeverWritten()
     {
         using var dir = new TempDirectory();
-        var entry = Entry() with { AddedUtc = null };
-        await using var host = new ReceiverHost(Config(dir.Path, entry), new FakeTimeProvider(Now), _ => { });
-        host.StampListenFor();
-        Assert.Equal(Now, host.Config.ListenFor!.Single().AddedUtc);
+        string path = Path.Combine(dir.Path, "receiver.json");
+        File.WriteAllText(path, "{ \"audio\": \"ubersdr:wessex.zapto.org\" } // my notes\n");
+        var time = new FakeTimeProvider(Now);
+        var config = Config(dir.Path, Entry());
+        await using (var first = new ReceiverHost(config, time, _ => { }))
+        {
+            Assert.Equal(Now, first.ListenForState.Get(config.ListenFor![0])!.AddedUtc);
+        }
+        time.Advance(TimeSpan.FromDays(3));
+        await using var second = new ReceiverHost(config, time, _ => { });
+        Assert.Equal(Now, second.ListenForState.Get(config.ListenFor![0])!.AddedUtc);
+        Assert.EndsWith("// my notes\n", File.ReadAllText(path), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -154,7 +165,6 @@ public class ListenForTests
         Assert.Contains("\"listenFor\"", text, StringComparison.Ordinal);
         var back = ReceiverConfig.Load(path).ListenFor!.Single();
         Assert.Equal("GM8BPQ", back.Callsign);
-        Assert.Equal(Now, back.AddedUtc);
         Assert.Equal("IO87", back.Daylight!.Locator);
 
         var bad = Assert.Throws<ConfigException>(() => Config(dir.Path, Entry(hz: 0)).Validate());
@@ -171,13 +181,11 @@ public class ListenForTests
         await using var plain = new ReceiverHost(Config(dir.Path), new FakeTimeProvider(Now), _ => { });
         var lines = plain.SlotLines().ToList();
         Assert.Single(lines);
-        Assert.Contains("are GB7RDG's slots only", lines[0], StringComparison.Ordinal);
-        Assert.Contains("Listen for a station", lines[0], StringComparison.Ordinal);
 
         await using var shifted = new ReceiverHost(Config(dir.Path) with { Minute = 30 }, new FakeTimeProvider(Now), _ => { });
         lines = [.. shifted.SlotLines()];
         Assert.Equal(2, lines.Count);
-        Assert.Equal("config: minute 30 is GB7RDG's slot time; GB7RDG sends on the hour; for another station use Listen for a station on the status page", lines[1]);
+        Assert.Equal("config: minute 30 sets GB7RDG's slots only (now every hour at 30 minutes past); for another station use \"Listen for a station\" on the status page", lines[1]);
         Assert.All(lines, l => Assert.All(l, c => Assert.True(c < 128)));
     }
 
@@ -228,6 +236,14 @@ public class ListenForTests
 
         Assert.Equal(HttpStatusCode.BadRequest, (await http.SendAsync(Post("api/stations/listen-for", new { callsign = "GM8BPQ", minute = 30 }))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Post("api/stations/listen-for", Add))).StatusCode);
+        var bad = await http.SendAsync(new HttpRequestMessage(HttpMethod.Post, "api/stations/listen-for") { Content = new StringContent("{nope", System.Text.Encoding.UTF8, "application/json") });
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        Assert.Contains("Could not read the request", await bad.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        var noLocator = await http.SendAsync(Post("api/stations/listen-for", new { callsign = "M0NOL", minute = 5, frequencyHz = 7_040_000, sideband = "usb", daylightOnly = true }));
+        Assert.Equal(HttpStatusCode.BadRequest, noLocator.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Post("api/stations/listen-for", new { callsign = "M0EVR", minute = 5, frequencyHz = 7_040_000, sideband = "usb" }))).StatusCode);
+        Assert.Null(host.Config.ListenFor!.Single(e => e.Callsign == "M0EVR").Daylight);
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Post("api/stations/listen-for/remove", new { callsign = "M0EVR" }))).StatusCode);
 
         var status = await http.GetFromJsonAsync<JsonElement>("api/status");
         var row = status.GetProperty("listening").EnumerateArray().Single(l => l.GetProperty("station").GetString() == "GM8BPQ");
@@ -236,6 +252,7 @@ public class ListenForTests
         var entry = status.GetProperty("listenFor").EnumerateArray().Single();
         Assert.Equal("GM8BPQ", entry.GetProperty("callsign").GetString());
         Assert.Equal(Now, entry.GetProperty("addedUtc").GetDateTimeOffset());
+        Assert.Contains("daylight", entry.GetProperty("slots").GetString(), StringComparison.Ordinal); // a locator means daylight
 
         Assert.Equal(HttpStatusCode.NotFound, (await http.SendAsync(Post("api/stations/listen-for/remove", new { callsign = "G0NOP" }))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Post("api/stations/listen-for/remove", new { callsign = "GM8BPQ" }))).StatusCode);

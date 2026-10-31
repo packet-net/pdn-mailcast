@@ -278,15 +278,16 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
       <p class="muted">Give the slots and frequency of a station and this receiver listens at them like it does for an advert heard on air (the same limits apply, and only if it can tune there). Once the station's own signed directory is heard its own timetable is used and the entry goes; an entry never heard in 7 days goes too. <b>Minute</b> and <b>every</b> are that station's slots, not GB7RDG's.</p>
       <div id="listenForTable" class="muted">None added.</div>
       <form id="listenForAdd" class="row">
-        <input id="lfCall" placeholder="Callsign" size="10" autocomplete="off" spellcheck="false" aria-label="Callsign" required>
-        <input id="lfMinute" type="number" min="0" max="59" value="0" style="width:5em" aria-label="Minute past the hour">
-        <input id="lfEvery" type="number" min="1" max="1440" value="60" style="width:5em" aria-label="Every (minutes)">
-        <input id="lfFreq" type="number" min="1" step="1" placeholder="Frequency (Hz)" style="width:10em" aria-label="Frequency in Hz" required>
-        <select id="lfSide" aria-label="Sideband"><option value="usb">USB</option><option value="lsb">LSB</option></select>
-        <input id="lfLoc" placeholder="Locator (optional)" size="10" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Locator">
+        <label>Callsign <input id="lfCall" size="10" autocomplete="off" spellcheck="false" placeholder="GM8BPQ" required></label>
+        <label>Minute <input id="lfMinute" type="number" min="0" max="59" value="0" style="width:5em"></label>
+        <label>Every (min) <input id="lfEvery" type="number" min="1" max="1440" value="60" style="width:5em"></label>
+        <label>Frequency (MHz) <input id="lfFreq" type="number" min="0.001" step="0.001" placeholder="7.047" style="width:8em" required></label>
+        <label>Sideband <select id="lfSide"><option value="usb">USB</option><option value="lsb">LSB</option></select></label>
+        <label>Locator (optional) <input id="lfLoc" size="8" maxlength="6" autocomplete="off" spellcheck="false" placeholder="IO87"></label>
+        <label><input id="lfDay" type="checkbox" checked> Daylight only</label>
         <button type="submit">Listen for it</button>
       </form>
-      <div class="muted">Minute past the hour, every (minutes), then the signal's centre frequency in Hz.</div>
+      <div class="muted">Minute past the hour and every (minutes) are that station's slots. Daylight only needs a locator (from 120 minutes after sunrise to 30 before sunset there, as a head end would say); with no locator it listens at every slot.</div>
       <div id="listenForSaid" class="muted"></div>
     </details>
   </section>
@@ -1235,11 +1236,10 @@ function schedule(s) {
 
 /* issue #224: stations listened for by hand, with remove and add */
 function listenForView(s) {
-  const list = s.listenFor || [], notes = s.listenForNotes || [];
-  if (!list.length && !notes.length) { $("listenForTable").textContent = "None added."; return; }
-  $("listenForTable").innerHTML = (list.length ? `<table><thead><tr><th>Station</th><th>Slots</th><th>Frequency</th><th>Removed if not heard by</th><th></th></tr></thead><tbody>${list.map(e =>
-    `<tr><td>${esc(e.callsign)}</td><td>${esc(e.slots)}</td><td>${mhz(e.frequencyHz / 1000)} MHz ${e.sideband.toUpperCase()}</td><td>${e.removedAfter ? esc(new Date(e.removedAfter).toISOString().slice(0, 10)) : ""}</td><td><button type="button" class="listenForRemove" data-call="${esc(e.callsign)}" data-hz="${e.frequencyHz}">Remove</button></td></tr>`).join("")}</tbody></table>` : "")
-    + notes.map(n => `<div>${esc(n)}</div>`).join("");
+  const list = s.listenFor || [];
+  if (!list.length) { $("listenForTable").textContent = "None added."; return; }
+  $("listenForTable").innerHTML = `<table><thead><tr><th>Station</th><th>Slots</th><th>Frequency</th><th>Status</th><th></th></tr></thead><tbody>${list.map(e =>
+    `<tr><td>${esc(e.callsign)}</td><td>${esc(e.slots)}</td><td>${mhz(e.frequencyHz / 1000)} MHz ${e.sideband.toUpperCase()}</td><td>${e.retired ? `no longer needed: ${esc(e.retired)}` : `listened for until heard${e.removedAfter ? ", or " + esc(new Date(e.removedAfter).toISOString().slice(0, 10)) : ""}`}</td><td><button type="button" class="listenForRemove" data-call="${esc(e.callsign)}" data-hz="${e.frequencyHz}">Remove</button></td></tr>`).join("")}</tbody></table>`;
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest && e.target.closest(".listenForRemove");
@@ -1253,7 +1253,7 @@ $("listenForAdd").addEventListener("submit", async e => {
   e.preventDefault();
   const r = await api("api/stations/listen-for", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ callsign: $("lfCall").value, minute: Number($("lfMinute").value), everyMinutes: Number($("lfEvery").value),
-      frequencyHz: Number($("lfFreq").value), sideband: $("lfSide").value, locator: $("lfLoc").value }) });
+      frequencyHz: Math.round(Number($("lfFreq").value) * 1e6), sideband: $("lfSide").value, locator: $("lfLoc").value, daylightOnly: $("lfLoc").value.trim() ? $("lfDay").checked : false }) });
   $("listenForSaid").textContent = r.ok ? "Added. It is listened for if this receiver can tune to it; see Listening above." : r.error;
   if (r.ok) { $("lfCall").value = ""; $("lfLoc").value = ""; }
   refresh();

@@ -44,6 +44,8 @@ public sealed class ReceiverHost : IAsyncDisposable
             DeliveryCall = () => Ascii.Clean(Config.Bbs.Login).ToUpperInvariant(),
         });
         Intake.Sources = config.AcceptedSources;
+        ListenForState = new ListenForState(config.StateDirectory, log);
+        ListenForState.Sync(config.ListenFor, time.GetUtcNow());
         Ledger = new DeliveryLedger(config.StateDirectory);
         Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Followed);
         // Issue #145: the station whose slot the frame arrives in, from the schedule at the time (as the slot tracker places it).
@@ -529,7 +531,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             };
             var adverts = Intake.Adverts();
             // Issue #224: entries added by hand count as adverts, ahead of any heard on air for the same station.
-            var byHand = (Config.ListenFor ?? []).Where(e => e.Problem() is null).Select(e => (Entry: e, Advert: e.ToAdvert())).ToList();
+            var byHand = (Config.ListenFor ?? []).Where(e => e.Problem() is null && ListenForState.Get(e)?.Retired is null).Select(e => (Entry: e, Advert: e.ToAdvert())).ToList();
             var handAdverts = byHand.Select(h => h.Advert).ToList();
             var heard = Intake.StationDirectories().Select(d => d.Station);
             var pins = Intake.Pins();
@@ -574,7 +576,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 bool fromHand = own is null && advert is not null && handAdverts.Contains(advert);
                 DateTimeOffset seen = own is not null
                     ? pins.Where(p => p.Station == station).Select(p => p.PinnedAt ?? DateTimeOffset.MinValue).DefaultIfEmpty(DateTimeOffset.MaxValue).Min()
-                    : fromHand ? byHand.First(h => h.Advert == advert).Entry.AddedUtc ?? DateTimeOffset.MaxValue
+                    : fromHand ? ListenForState.Get(byHand.First(h => h.Advert == advert).Entry)?.AddedUtc ?? DateTimeOffset.MaxValue
                     : Intake.AdvertFirstSeen(station) is { } first ? new DateTimeOffset(first.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : DateTimeOffset.MaxValue;
                 candidates.Add((new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : fromHand ? "added by hand" : "an advert", why is null, why, locator, reach.Heard ? reach.DialHz : null, reach.Heard ? reach.How : null, reach.Heard ? reach.IfHz : null), own is not null ? 0 : fromHand ? 1 : 2, seen));
             }
@@ -713,7 +715,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Gives the slot tracker the stations followed now, and says so, if they changed.</summary>
     internal void RefreshFollowed()
     {
-        RemoveHeardListenFor();
+        RetireHeardListenFor();
+        ExpireListenFor();
         if (Slots.Schedule is not { } tracked)
         {
             return;
@@ -731,95 +734,41 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
     }
 
-    private readonly List<string> _listenForNotes = [];
+    /// <summary>What is kept about each "Listen for a station" entry: when it was added, and whether it is retired (issue #224).</summary>
+    public ListenForState ListenForState { get; private set; }
 
-    /// <summary>Notes for the status page about "Listen for a station" entries removed unheard after 7 days (this run only).</summary>
-    public IReadOnlyList<string> ListenForNotes
+    /// <summary>
+    /// Issue #224: an entry added by hand is retired once its station's own signed directory is
+    /// heard (its own timetable is used from then on), even if that directory gives no timetable.
+    /// One log line; the config file is not touched, the page shows it as no longer needed.
+    /// </summary>
+    internal void RetireHeardListenFor()
     {
-        get
+        var heard = Intake.StationDirectories().Select(d => d.Station).ToHashSet(StringComparer.Ordinal);
+        foreach (var e in Config.ListenFor ?? [])
         {
-            lock (_gate)
+            if ((heard.Contains(e.Callsign) || Intake.HeardTimetable(e.Callsign) is not null)
+                && ListenForState.Retire(e, "its own signed directory was heard, so its own timetable is used"))
             {
-                return [.. _listenForNotes];
+                _log($"listen-for: {e.Callsign} was heard (its own signed directory); no longer needed, its own slots are used from now on");
             }
         }
     }
 
     /// <summary>
-    /// Issue #224: an entry added by hand goes once its station's own signed directory is heard
-    /// (the station's own timetable is used from then on), with one log line.
-    /// </summary>
-    internal void RemoveHeardListenFor() =>
-        ChangeListenFor(e => Intake.HeardTimetable(e.Callsign) is not null,
-            e => $"listen-for: {e.Callsign} was heard (its own signed directory); removed from \"listenFor\", its own slots are used from now on");
-
-    /// <summary>
-    /// Issue #224: an entry never heard within 7 days of being added goes, with one log line and a
-    /// note on the status page, so a mistake cannot take a web SDR's allowance for ever.
+    /// Issue #224: an entry never heard within 7 days of being added is retired, with one log line,
+    /// so a mistake cannot take a web SDR's allowance for ever. The page shows it as no longer needed.
     /// </summary>
     internal void ExpireListenFor()
     {
         var now = _time.GetUtcNow();
-        ChangeListenFor(e => e.AddedUtc is { } added && now - added >= ListenForEntry.Lifetime,
-            e => $"listen-for: {e.Callsign} was not heard in {ListenForEntry.Lifetime.TotalDays:0} days; removed from \"listenFor\"");
-    }
-
-    /// <summary>Gives every entry without an added time one (now), saved, so the 7 days can be counted across restarts.</summary>
-    internal void StampListenFor()
-    {
-        var now = _time.GetUtcNow();
-        var config = Config;
-        if (config.ListenFor is not { } list || list.All(e => e.AddedUtc is not null))
+        foreach (var e in Config.ListenFor ?? [])
         {
-            return;
-        }
-        SaveQuietly(config with { ListenFor = [.. list.Select(e => e.AddedUtc is null ? e with { AddedUtc = now } : e)] });
-    }
-
-    private void ChangeListenFor(Func<ListenForEntry, bool> remove, Func<ListenForEntry, string> line)
-    {
-        var config = Config;
-        if (config.ListenFor is not { Count: > 0 } list || !list.Any(remove))
-        {
-            return;
-        }
-        var gone = list.Where(remove).ToList();
-        var rest = list.Where(e => !remove(e)).ToList();
-        SaveQuietly(config with { ListenFor = rest.Count == 0 ? null : rest });
-        foreach (var e in gone)
-        {
-            string said = line(e);
-            _log(said);
-            if (said.Contains("was not heard", StringComparison.Ordinal))
+            if (ListenForState.Get(e) is { Retired: null } r && now - r.AddedUtc >= ListenForEntry.Lifetime
+                && ListenForState.Retire(e, $"not heard in {ListenForEntry.Lifetime.TotalDays:0} days"))
             {
-                lock (_gate)
-                {
-                    _listenForNotes.Add($"{e.Callsign} was not heard in {ListenForEntry.Lifetime.TotalDays:0} days, so it is no longer listened for ({_time.GetUtcNow():yyyy-MM-dd})");
-                }
+                _log($"listen-for: {e.Callsign} was not heard in {ListenForEntry.Lifetime.TotalDays:0} days; no longer needed");
             }
-        }
-    }
-
-    /// <summary>Takes up a changed config the receiver made itself, and saves it where the page would; a file edited by hand since start-up is left alone.</summary>
-    private void SaveQuietly(ReceiverConfig next)
-    {
-        if (ConfigFile is { } file)
-        {
-            try
-            {
-                if (file.TrySave(next, _log) != ConfigFile.SaveOutcome.Saved)
-                {
-                    _log("listen-for: the config file was not updated; it will be tidied when it can be saved");
-                }
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                _log($"listen-for: cannot write {file.Path}: {Ascii.Clean(e.Message)}");
-            }
-        }
-        lock (_gate)
-        {
-            _config = next;
         }
     }
 
@@ -1080,8 +1029,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             _log(line);
         }
-        StampListenFor();
-        RemoveHeardListenFor();
+        RetireHeardListenFor();
         ExpireListenFor();
         if (Followed is { OneStation: false } followed)
         {
@@ -1275,6 +1223,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             bool audioChanged = AudioSettingsDiffer(_config, config);
             _config = config;
+            ListenForState.Sync(config.ListenFor, _time.GetUtcNow());
             Intake.Sources = config.AcceptedSources;
             // A running pipeline that carries on keeps its dial (pdn-soundmodem's, if it said one).
             ChannelWatch.AudioCentreHz = !audioChanged && _pipeline is { } running ? running.AudioCentreHz : config.AudioCentreHz;
@@ -1783,16 +1732,15 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
     }
 
-    /// <summary>The start-up lines about GB7RDG's slots: what they are, that <c>minute</c> is theirs alone, and a warning when it is not 0 (issue #224).</summary>
+    /// <summary>The start-up lines about GB7RDG's slots: what they are, and, when the config's <c>minute</c> is in use and is not 0, that it is GB7RDG's alone (issue #224).</summary>
     internal IEnumerable<string> SlotLines()
     {
-        const string OnlyGb7rdg = "the slot times in the config (\"minute\") are GB7RDG's slots only; other stations are learnt from their directories or adverts, or added with \"Listen for a station\" on the status page";
         yield return ScheduleFromDirectory
-            ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's); {OnlyGb7rdg}"
-            : $"slots: GB7RDG's slots are {Schedule.Describe()}; {OnlyGb7rdg}";
-        if (Config.SlotStart.Minute != 0)
+            ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's)"
+            : $"slots: GB7RDG's slots are {Schedule.Describe()}";
+        if (!ScheduleFromDirectory && Config.SlotStart.Minute != 0)
         {
-            yield return $"config: minute {Config.SlotStart.Minute} is GB7RDG's slot time; GB7RDG sends on the hour; for another station use Listen for a station on the status page";
+            yield return $"config: minute {Config.SlotStart.Minute} sets GB7RDG's slots only (now {Schedule.Describe()}); for another station use \"Listen for a station\" on the status page";
         }
     }
 

@@ -71,6 +71,9 @@ public sealed partial class StatusPage : IAsyncDisposable
 
     private readonly ReceiverHost _host;
     private readonly ConfigFile? _configFile;
+
+    /// <summary>Held across a read-modify-save of the config from the page, so two changes cannot lose one another.</summary>
+    private readonly SemaphoreSlim _configLock = new(1, 1);
     private readonly Action<string> _log;
     private HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
@@ -342,7 +345,15 @@ public sealed partial class StatusPage : IAsyncDisposable
                     await ForgetKeyAsync(context).ConfigureAwait(false);
                     break;
                 case ("/api/stations/listen", "POST"):
-                    await ListenToStationAsync(context).ConfigureAwait(false);
+                    await _configLock.WaitAsync().ConfigureAwait(false);
+                    try
+                    {
+                        await ListenToStationAsync(context).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        _configLock.Release();
+                    }
                     break;
                 case ("/api/stations/listen-for", "POST"):
                     await ListenForAsync(context, add: true).ConfigureAwait(false);
@@ -957,18 +968,22 @@ public sealed partial class StatusPage : IAsyncDisposable
                 skipped = (config.SkipStations ?? []).Contains(l.Station, StringComparer.OrdinalIgnoreCase),
                 byHand = l.Source == "added by hand",
             }),
-            // Issue #224: "Listen for a station" entries, and any removed unheard after 7 days.
-            listenFor = (config.ListenFor ?? []).Select(e => new
+            // Issue #224: "Listen for a station" entries, and which are no longer needed.
+            listenFor = (config.ListenFor ?? []).Select(e =>
             {
-                callsign = e.Callsign,
-                slots = SlotSchedule.From(e.ToAdvert().Timetable).Describe(),
-                frequencyHz = e.FrequencyHz,
-                sideband = e.Sideband.ToLowerInvariant(),
-                locator = e.Locator,
-                addedUtc = e.AddedUtc,
-                removedAfter = e.AddedUtc is { } added ? added + ListenForEntry.Lifetime : (DateTimeOffset?)null,
+                var kept = _host.ListenForState.Get(e);
+                return new
+                {
+                    callsign = e.Callsign,
+                    slots = SlotSchedule.From(e.ToAdvert().Timetable).Describe() + (e.Daylight is null ? " (every slot, no daylight rule)" : ""),
+                    frequencyHz = e.FrequencyHz,
+                    sideband = e.Sideband.ToLowerInvariant(),
+                    locator = e.Locator,
+                    addedUtc = kept?.AddedUtc,
+                    removedAfter = kept is null ? (DateTimeOffset?)null : kept.AddedUtc + ListenForEntry.Lifetime,
+                    retired = kept?.Retired,
+                };
             }),
-            listenForNotes = _host.ListenForNotes,
             // Issue #148: what each station's slots came to today (UTC), whether or not the daily report is on.
             heardToday = _host.Feedback.StationFigures(DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime)).Select(f => new
             {
@@ -2285,7 +2300,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         return true;
     }
 
-    private sealed record ListenForForm(string? Callsign, int? Minute, int? EveryMinutes, long? FrequencyHz, string? Sideband, string? Locator);
+    private sealed record ListenForForm(string? Callsign, int? Minute, int? EveryMinutes, long? FrequencyHz, string? Sideband, string? Locator, bool? DaylightOnly);
 
     /// <summary>
     /// Issue #224: adds, or removes, a "Listen for a station" entry, saved in the config file's
@@ -2301,9 +2316,23 @@ public sealed partial class StatusPage : IAsyncDisposable
         string? callsign = form?.Callsign?.Trim().ToUpperInvariant();
         if (form is null || !Packet.Mailcast.StationAdvert.IsCallsign(callsign))
         {
-            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Give the station's callsign." })).ConfigureAwait(false);
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = form is null ? "Could not read the request." : "Give the station's callsign." })).ConfigureAwait(false);
             return;
         }
+        await _configLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await ChangeListenForAsync(context, form, callsign!, add).ConfigureAwait(false);
+        }
+        finally
+        {
+            _configLock.Release();
+        }
+    }
+
+    /// <summary>One read-modify-save of <c>listenFor</c>, under <see cref="_configLock"/>.</summary>
+    private async Task ChangeListenForAsync(HttpListenerContext context, ListenForForm form, string callsign, bool add)
+    {
         var current = _host.Config;
         var list = (current.ListenFor ?? []).ToList();
         string said;
@@ -2317,9 +2346,15 @@ public sealed partial class StatusPage : IAsyncDisposable
                 FrequencyHz = form.FrequencyHz ?? 0,
                 Sideband = (form.Sideband ?? "usb").Trim().ToLowerInvariant(),
                 Locator = string.IsNullOrWhiteSpace(form.Locator) ? null : form.Locator.Trim(),
-                AddedUtc = _host.Time.GetUtcNow(),
             };
-            string? problem = entry.Problem();
+            // A locator means daylight at that place unless told otherwise, 120 minutes after sunrise to 30 before sunset, as head ends do.
+            bool daylight = form.DaylightOnly ?? entry.Locator is not null;
+            string? problem = daylight && entry.Locator is null ? "A daylight rule needs a locator: add one, or untick daylight only." : null;
+            if (daylight && entry.Locator is not null)
+            {
+                entry = entry with { Daylight = new Packet.Mailcast.DaylightSettings { Locator = entry.Locator } };
+            }
+            problem ??= entry.Problem();
             if (problem is null && _host.Intake.HeardTimetable(entry.Callsign) is not null)
             {
                 problem = $"{entry.Callsign}'s own signed directory has been heard here already, so its own timetable is used";
@@ -2331,6 +2366,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             }
             list.RemoveAll(entry.SamePlaceAs);
             list.Add(entry);
+            _host.ListenForState.Restart(entry, _host.Time.GetUtcNow());
             said = $"listening for {entry.Callsign} at {SlotSchedule.From(entry.ToAdvert().Timetable).Describe()} on {entry.FrequencyHz} Hz {entry.Sideband.ToUpperInvariant()}";
         }
         else
