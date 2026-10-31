@@ -25,7 +25,7 @@ namespace Mailcast.Receiver.Web;
 /// browser signs in on a page of its own and is given a session cookie (see
 /// <see cref="SessionStore"/>); a script can give the password with HTTP Basic instead.</para>
 /// </remarks>
-public sealed class StatusPage : IAsyncDisposable
+public sealed partial class StatusPage : IAsyncDisposable
 {
     private const string WaterfallBase = "/waterfall/";
 
@@ -238,6 +238,10 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/logout", "POST"):
                     await SignOutAsync(context).ConfigureAwait(false);
                     return;
+                case ("/api/pieces", "POST"):
+                    // The API key, not the page's password, lets a program in (issue #214).
+                    await PostPiecesAsync(context).ConfigureAwait(false);
+                    return;
             }
             string? session = null;
             if (!await AdmitAsync(context, path, id => session = id).ConfigureAwait(false))
@@ -311,6 +315,21 @@ public sealed class StatusPage : IAsyncDisposable
                     break;
                 case ("/api/filter/measure", "POST"):
                     await MeasureFilterAsync(context).ConfigureAwait(false);
+                    break;
+                case (ObjectsPath, "GET"):
+                    await ServeObjectsAsync(context).ConfigureAwait(false);
+                    break;
+                case (_, "GET") when path.StartsWith(ObjectsBase, StringComparison.Ordinal):
+                    await ServeObjectAsync(context, path[ObjectsBase.Length..]).ConfigureAwait(false);
+                    break;
+                case ("/api/key", "GET"):
+                    await ServeKeyAsync(context).ConfigureAwait(false);
+                    break;
+                case ("/api/key/new", "POST"):
+                    await ChangeKeyAsync(context, clear: false).ConfigureAwait(false);
+                    break;
+                case ("/api/key/clear", "POST"):
+                    await ChangeKeyAsync(context, clear: true).ConfigureAwait(false);
                     break;
                 case ("/api/keys/add", "POST"):
                     await AddKeyAsync(context).ConfigureAwait(false);
@@ -850,6 +869,7 @@ public sealed class StatusPage : IAsyncDisposable
             schedule = Schedule(config, _host.Followed, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
             // Issues #178 and #144: each station's pinned key, when its newest directory was dated,
             // and any directory refused for naming a pinned station under another key.
+            sharing = SharingView(),
             stations = StationsView(_host.Intake.Pins(), _host.Intake.StationDirectories(), _host.Intake.KeyConflicts(), _host.Intake.KeyRows()),
             // Every station whose slots are known, whether this receiver listens at them, and if not why.
             listening = _host.Listening.Select(l => new
@@ -1437,9 +1457,9 @@ public sealed class StatusPage : IAsyncDisposable
     }
 
     /// <summary>Reads a request's body, or answers 413 for one over <see cref="MaxFormBytes"/> and gives null.</summary>
-    private static async Task<(bool Answered, byte[]? Body)> ReadBodyAsync(HttpListenerContext context)
+    private static async Task<(bool Answered, byte[]? Body)> ReadBodyAsync(HttpListenerContext context, int maxBytes = MaxFormBytes)
     {
-        if (context.Request.ContentLength64 > MaxFormBytes)
+        if (context.Request.ContentLength64 > maxBytes)
         {
             await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
             return (true, null);
@@ -1450,7 +1470,7 @@ public sealed class StatusPage : IAsyncDisposable
         while ((read = await context.Request.InputStream.ReadAsync(buffer).ConfigureAwait(false)) > 0)
         {
             body.Write(buffer, 0, read);
-            if (body.Length > MaxFormBytes)
+            if (body.Length > maxBytes)
             {
                 await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
                 return (true, null);

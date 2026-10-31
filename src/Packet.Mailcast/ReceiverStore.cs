@@ -158,7 +158,8 @@ public sealed class MailParts
 /// Bulletins held back (<see cref="FrameOutcome.Withheld"/>) that this frame's directory
 /// (completed or repeated) lists, now delivered to the outbox; null if none.
 /// </param>
-public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null, IReadOnlyList<Bulletin>? Delivered = null);
+/// <param name="Kept">Whether this frame's piece was newly stored (it was not a duplicate and not refused).</param>
+public sealed record AcceptResult(FrameOutcome Outcome, ulong? ObjectId = null, Bulletin? Bulletin = null, BroadcastDirectory? Directory = null, string? Detail = null, byte? ContentType = null, IonoReading? Ionosphere = null, PskReading? PskReporter = null, IReadOnlyList<ulong>? NoLongerSent = null, DirectoryCheck? Check = null, IReadOnlyList<Bulletin>? Released = null, IReadOnlyList<Bulletin>? Delivered = null, bool Kept = false);
 
 /// <summary>The directory heard most recently, and what its signature check found.</summary>
 /// <param name="Date">The directory's date.</param>
@@ -263,6 +264,18 @@ public sealed record ReceiverStoreOptions
 
     /// <summary>For tests of everything else: unsigned directories are used, as before issue #146. Never set in a program.</summary>
     internal bool UnsignedDirectoriesAreUsed { get; init; } = DefaultUnsignedDirectoriesAreUsed;
+
+    /// <summary>
+    /// The most the keep of pieces and rebuilt objects (issue #214) may add up to, in bytes; past it the
+    /// oldest go first, rebuilt objects before part-received ones. Zero keeps nothing.
+    /// </summary>
+    public long KeepMaxBytes { get; init; } = 64L * 1024 * 1024;
+
+    /// <summary>The largest object, by the transfer length in its OTI, that pieces from outside are taken for.</summary>
+    public long KeepMaxObjectBytes { get; init; } = 4L * 1024 * 1024;
+
+    /// <summary>How long the keep holds an object after it last changed.</summary>
+    public TimeSpan KeepRetention { get; init; } = TimeSpan.FromDays(14);
 
     /// <summary>Where the store says what it threw away and why. Plain ASCII.</summary>
     public Action<string>? Log { get; init; }
@@ -408,6 +421,8 @@ public sealed partial class ReceiverStore
         {
             File.Delete(tmp);
         }
+        _keep = new PieceKeep(root, _options.FlushToDisk, Log);
+        LoadApiKey();
         foreach (var marker in System.IO.Directory.EnumerateFiles(_doneDir))
         {
             if (ObjectId.TryParse(Path.GetFileName(marker), out ulong id))
@@ -523,6 +538,10 @@ public sealed partial class ReceiverStore
             {
                 Log($"skipped unreadable partial object {Path.GetFileName(dir)}: {e.Message}");
             }
+        }
+        foreach (var instance in _instances.Values)
+        {
+            BackfillKeep(instance);
         }
         LoadStopped();
         if (System.IO.Directory.Exists(_heldDir))
@@ -687,6 +706,17 @@ public sealed partial class ReceiverStore
         (check.Usable ? _knownDirectories : _rejectedDirectories)[objectId] = (directory, now, check);
         NoteAdverts(directory, check);
         LastDirectoryHeard = new HeardDirectoryCheck(directory.Date, check);
+        if (check.Usable && StationOf(directory, check) is { } lister)
+        {
+            foreach (var entry in directory.Entries)
+            {
+                _keep.NoteListed(entry.ObjectId, lister);
+                if (entry.Envelope is { } link)
+                {
+                    _keep.NoteListed(link.ObjectId, lister);
+                }
+            }
+        }
         try
         {
             System.IO.Directory.CreateDirectory(Path.Combine(_root, KnownDirectoriesFolder));
@@ -727,12 +757,26 @@ public sealed partial class ReceiverStore
     /// <param name="heardFrom">The station this frame is taken to come from (the slot's station), or null if not known; counted per object to choose whose envelope to use (issue #145).</param>
     public AcceptResult Accept(ReadOnlySpan<byte> payload, string? heardFrom = null)
     {
-        var result = AcceptFrame(payload, heardFrom);
+        var result = AcceptFrame(payload, heardFrom, null);
         var delivered = TakeDelivered();
         return delivered.Count > 0 ? result with { Delivered = delivered } : result;
     }
 
-    private AcceptResult AcceptFrame(ReadOnlySpan<byte> payload, string? heardFrom)
+    /// <summary>
+    /// Offers a frame handed in from outside (issue #214): a poster of the receiver's API, or a peer. It is
+    /// checked and pooled with the pieces heard on air, but marked as from outside under
+    /// <paramref name="label"/>: it never counts for the station heard most (issue #145), a repeat of a
+    /// directory it carries does not count as hearing that directory, and, should a rebuild fail its ID check,
+    /// it is the first suspect (see <see cref="AcceptResult"/>'s <c>Kept</c> and the class remarks).
+    /// </summary>
+    public AcceptResult AcceptOutside(ReadOnlySpan<byte> payload, string label)
+    {
+        var result = AcceptFrame(payload, null, PieceKeep.CleanLabel(label) ?? "outside");
+        var delivered = TakeDelivered();
+        return delivered.Count > 0 ? result with { Delivered = delivered } : result;
+    }
+
+    private AcceptResult AcceptFrame(ReadOnlySpan<byte> payload, string? heardFrom, string? outside)
     {
         var now = _options.Time.GetUtcNow();
         if (now - _lastExpiry >= ExpiryInterval)
@@ -747,8 +791,16 @@ public sealed partial class ReceiverStore
         {
             return new AcceptResult(FrameOutcome.NotAFrame);
         }
+        if (outside is not null && !PieceKeep.Fits(frame.Oti, _options.KeepMaxObjectBytes))
+        {
+            return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "object too large to take from outside");
+        }
         if (_done.ContainsKey(frame.ObjectId))
         {
+            if (outside is not null)
+            {
+                return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId); // nothing heard on air: no state of ours changes
+            }
             // A repeat of a directory already held: still worth telling the caller which, so a
             // slot that only ever resends one already known (WN3/WN4 taking turns give the same
             // rotation a different ID each, or this is the first repeat since a restart) is not
@@ -791,15 +843,38 @@ public sealed partial class ReceiverStore
             return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "object already rebuilt and found unusable");
         }
         bool isNew = !_instances.TryGetValue(key, out var instance);
+        if (isNew && outside is not null && _instances.Count >= _options.MaxPartials)
+        {
+            // A poster must not push out what is being heard on air.
+            return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "too many partial objects held to start another from outside");
+        }
         instance ??= new Instance(key, frame.ObjectId, frame.DictionaryId, frame.Oti, Path.Combine(_objects, key));
         if (instance.Withheld is not null)
         {
             // Rebuilt already, and held back: more pieces would only rebuild it again.
             return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId);
         }
+        var source = outside is null ? new PieceSource(false, heardFrom) : new PieceSource(true, outside);
         if (instance.Symbols.ContainsKey(frame.EncodingSymbolId))
         {
             CountFrame(frame.ObjectId, heardFrom);
+            if (outside is null && _keep.SourceOf(key, frame.EncodingSymbolId) is { Outside: true })
+            {
+                // Heard on air what was handed in from outside: it is now an on-air piece, and if the two differ the one on air stands.
+                var heard = frame.Symbol.ToArray();
+                if (instance.Symbols[frame.EncodingSymbolId].AsSpan().SequenceEqual(heard))
+                {
+                    _keep.SetSource(key, frame.EncodingSymbolId, source, now);
+                    return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
+                }
+                Log($"object {ObjectId.Format(frame.ObjectId)}: piece {frame.EncodingSymbolId} heard on air differs from one from outside; the one on air stands");
+                instance.Replace(frame.EncodingSymbolId, heard);
+                DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), heard, now, _options.FlushToDisk);
+                _keep.Add(key, frame.ObjectId, frame.DictionaryId, frame.Oti, frame.EncodingSymbolId, payload.ToArray(), now, source, _options.KeepMaxBytes);
+                instance.LastPiece = now;
+                instance.OutsideTried = -1;
+                return (TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId)) with { Kept = true };
+            }
             return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
         }
         var symbol = frame.Symbol.ToArray();
@@ -816,8 +891,9 @@ public sealed partial class ReceiverStore
         }
         CountFrame(frame.ObjectId, heardFrom);
         DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), symbol, now, _options.FlushToDisk);
+        _keep.Add(key, frame.ObjectId, frame.DictionaryId, frame.Oti, frame.EncodingSymbolId, payload.ToArray(), now, source, _options.KeepMaxBytes);
         instance.LastPiece = now;
-        if (_stopped.ContainsKey(frame.ObjectId))
+        if (outside is null && _stopped.ContainsKey(frame.ObjectId))
         {
             Log($"partial object {Describe(frame.ObjectId)} has a new piece, so the head end is sending it again; kept");
             ForgetStopped(frame.ObjectId);
@@ -827,7 +903,7 @@ public sealed partial class ReceiverStore
             EnforcePartialLimit(instance);
         }
 
-        return TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId);
+        return (TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId)) with { Kept = true };
     }
 
     /// <summary>
@@ -1118,7 +1194,7 @@ public sealed partial class ReceiverStore
 
         // Envelopes (issue #142) are not bulletins: they are linked from an entry's env= and never listed as rows.
         var envelopeIds = new HashSet<ulong>(UsableDirectories().SelectMany(d => d.Directory.Entries).Where(e => e.Envelope is not null).Select(e => e.Envelope!.ObjectId));
-        var ids = new HashSet<ulong>(fullest.Where(kv => !envelopeIds.Contains(kv.Key) && !(kv.Value.Symbols.TryGetValue(0, out var first) && first.Length > 0 && (first[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)
+        var ids = new HashSet<ulong>(fullest.Where(kv => !envelopeIds.Contains(kv.Key) && !IsOtherTypeFromOutside(kv.Value) && !(kv.Value.Symbols.TryGetValue(0, out var first) && first.Length > 0 && (first[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)
             && !(kv.Value.Withheld is { Length: > 0 } rebuilt && (rebuilt[0] & ~ContentType.MetadataFollows) == (byte)ObjectKind.Envelope)).Select(kv => kv.Key));
         var withheld = new HashSet<ulong>(_instances.Values.Where(i => i.Withheld is not null).Select(i => i.ObjectId));
         foreach (var id in named.Keys)
@@ -1202,6 +1278,7 @@ public sealed partial class ReceiverStore
             }
         }
         PruneKnownDirectories(now);
+        _keep.Prune(now, _options.KeepRetention);
         PruneEnvelopes(now);
         ReleaseExpiredAwaiting();
         DropNoLongerSent(now);
@@ -1462,7 +1539,14 @@ public sealed partial class ReceiverStore
         }
         if (ObjectId.Of(instance.DictionaryId, data) == instance.ObjectId)
         {
+            KeepObject(instance, data);
             return Finish(instance, data);
+        }
+
+        if (RebuildWithoutOutside(instance) is { } clean)
+        {
+            KeepObject(instance, clean);
+            return Finish(instance, clean);
         }
 
         // Some piece is wrong. A wrong rebuild agrees with every piece it used, so the pieces
@@ -1505,11 +1589,13 @@ public sealed partial class ReceiverStore
                 instance.Symbols.Remove(bad);
                 instance.Arrival.Remove(bad);
                 File.Delete(SymbolPath(instance, bad));
+                _keep.RemovePiece(instance.Key, bad, _options.Time.GetUtcNow());
             }
             else
             {
                 Log($"object {ObjectId.Format(instance.ObjectId)}: rebuilt from {subset.Count} of its {instance.Symbols.Count} pieces");
             }
+            KeepObject(instance, candidate);
             return Finish(instance, candidate);
         }
 
@@ -2252,6 +2338,16 @@ public sealed partial class ReceiverStore
         public List<uint> Arrival { get; } = [];
 
         public DateTimeOffset LastPiece { get; set; }
+
+        /// <summary>How many pieces were held when the last attempt without the pieces from outside was made (-1: none yet).</summary>
+        public int OutsideTried { get; set; } = -1;
+
+        /// <summary>Puts another symbol in place of the one held for a piece number, and starts the decoder again.</summary>
+        public void Replace(uint esi, byte[] symbol)
+        {
+            Symbols[esi] = symbol;
+            ResetDecoder();
+        }
 
         /// <summary>Where the search for a good set of pieces has got to; see <see cref="RepairCandidate"/>.</summary>
         public int RepairCursor { get; set; } = int.MaxValue; // no search yet: the first mismatch starts one

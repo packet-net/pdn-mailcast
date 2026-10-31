@@ -285,6 +285,18 @@ public sealed class FeedbackService
         });
     }
 
+    /// <summary>
+    /// Pieces handed in from outside were newly stored (issue #214), counted on today's UTC date. They are
+    /// not slots' frames: this is the only place they are counted in the report.
+    /// </summary>
+    public void NoteOutsidePieces(int count)
+    {
+        if (count > 0)
+        {
+            Count(d => d.OutsidePieces += count);
+        }
+    }
+
     /// <summary>Something went wrong, of the kind <paramref name="code"/> (see <see cref="ReportErrors"/>).</summary>
     public void NoteError(string code) => Count(d => d.Errors[code] = d.Errors.GetValueOrDefault(code) + 1);
 
@@ -708,7 +720,7 @@ public sealed class FeedbackService
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
-            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count);
+            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count, record.OutsidePieces > 0 ? record.OutsidePieces : null);
         return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, own, _sources.OtherCopies(record.Day)));
     }
 
@@ -939,6 +951,9 @@ public sealed class FeedbackService
         /// counted once. Empty in a feedback.json from before this was kept, as for <see cref="AlreadyHad"/>.
         /// </summary>
         public List<string> GivenUp { get; set; } = [];
+
+        /// <summary>Pieces handed in from outside that day (issue #214); zero in a feedback.json from before.</summary>
+        public int OutsidePieces { get; set; }
 
         public SortedDictionary<string, int> Errors { get; set; } = new(StringComparer.Ordinal);
     }
