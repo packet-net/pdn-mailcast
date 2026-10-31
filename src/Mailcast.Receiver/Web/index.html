@@ -272,6 +272,25 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
     <div id="channelToday" class="muted">Nothing measured yet.</div>
   </section>
 
+  <section class="wide" id="listenForBox">
+    <details id="listenForDetails">
+      <summary><h2>Listen for a station</h2> <span class="muted">a station nobody advertises yet</span></summary>
+      <p class="muted">Give the slots and frequency of a station and this receiver listens at them like it does for an advert heard on air (the same limits apply, and only if it can tune there). Once the station's own signed directory is heard its own timetable is used and the entry goes; an entry never heard in 7 days goes too. <b>Minute</b> and <b>every</b> are that station's slots, not GB7RDG's.</p>
+      <div id="listenForTable" class="muted">None added.</div>
+      <form id="listenForAdd" class="row">
+        <input id="lfCall" placeholder="Callsign" size="10" autocomplete="off" spellcheck="false" aria-label="Callsign" required>
+        <input id="lfMinute" type="number" min="0" max="59" value="0" style="width:5em" aria-label="Minute past the hour">
+        <input id="lfEvery" type="number" min="1" max="1440" value="60" style="width:5em" aria-label="Every (minutes)">
+        <input id="lfFreq" type="number" min="1" step="1" placeholder="Frequency (Hz)" style="width:10em" aria-label="Frequency in Hz" required>
+        <select id="lfSide" aria-label="Sideband"><option value="usb">USB</option><option value="lsb">LSB</option></select>
+        <input id="lfLoc" placeholder="Locator (optional)" size="10" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Locator">
+        <button type="submit">Listen for it</button>
+      </form>
+      <div class="muted">Minute past the hour, every (minutes), then the signal's centre frequency in Hz.</div>
+      <div id="listenForSaid" class="muted"></div>
+    </details>
+  </section>
+
   <section class="wide" id="keysBox">
     <details id="keysDetails">
       <summary><h2>Keys</h2> <span class="muted">who may sign the directories this receiver uses</span></summary>
@@ -978,6 +997,7 @@ async function refresh() {
   $("summary").innerHTML = `Audio: ${esc(s.audio.state)}. ${s.framesHeard} frame${s.framesHeard === 1 ? "" : "s"} heard since it started. Version ${esc(s.version)}.`;
   schedule(s);
   keysView(s);
+  listenForView(s);
   sharingView(s);
   spectrogram(s);
   channel(s);
@@ -1182,7 +1202,7 @@ function schedule(s) {
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
     <dt>Slots</dt><dd>${esc(c.words)}${c.followed.length < 2 && c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
     <dt>Stations</dt><dd>${s.stations.known.map(k => `${esc(k.station)} (key ${esc(k.keyId)}${k.pinnedAt ? `, learnt ${esc(new Date(k.pinnedAt).toISOString().slice(0, 10))}` : ""}${k.heardDirectory ? `, directory heard for ${esc(k.heardDirectory)}` : ""})`).join("; ")}.${s.stations.conflicts.map(c => ` <strong>Refused</strong>: a directory naming ${esc(c.station)} signed by key ${esc(c.heardKeyId)}, not its pinned key ${esc(c.pinnedKeyId)}, last at ${utc(c.heardAt)}.`).join("")}</dd>
-    <dt>Listening</dt><dd>${s.listening.map(l => `${esc(l.station)}: ${l.frequencyHz ? `${esc(l.slots)}, ${mhz(l.frequencyHz / 1000)} MHz ${l.sideband.toUpperCase()}, from ${esc(l.from)}; ` : ""}${l.followed ? "listened at" : `not listened at: ${esc(l.why)}`}${l.station === "GB7RDG" ? "" : ` <button type="button" class="listenToggle" data-station="${esc(l.station)}" data-listen="${l.skipped ? "true" : "false"}">${l.skipped ? "Listen" : "Don't listen"}</button>`}`).join("<br>")}</dd>
+    <dt>Listening</dt><dd>${s.listening.map(l => `${esc(l.station)}: ${l.frequencyHz ? `${esc(l.slots)}, ${mhz(l.frequencyHz / 1000)} MHz ${l.sideband.toUpperCase()}, ${l.byHand ? "added by hand" : "from " + esc(l.from)}; ` : ""}${l.followed ? "listened at" : `not listened at: ${esc(l.why)}`}${l.station === "GB7RDG" ? "" : ` <button type="button" class="listenToggle" data-station="${esc(l.station)}" data-listen="${l.skipped ? "true" : "false"}">${l.skipped ? "Listen" : "Don't listen"}</button>`}`).join("<br>")}</dd>
     ${(s.heardToday || []).length ? `<dt>Heard today</dt><dd>${s.heardToday.map(h => `${esc(h.station)}: heard ${h.heard} of ${h.listened} slot${h.listened === 1 ? "" : "s"}, ${h.frames} frame${h.frames === 1 ? "" : "s"}, ${h.completed} bulletin${h.completed === 1 ? "" : "s"} completed${h.snrDb === null ? "" : `, tone SNR ${Math.round(h.snrDb)} dB (median)`}${h.virtualHeightKm === null ? "" : `, virtual height ${Math.round(h.virtualHeightKm)} km (median)`}`).join("<br>")}</dd>` : ""}
     <dt>Today</dt><dd>${c.today.length ? `${c.daylight ? "in daylight, " : ""}${c.today.join(", ")} UTC` : "no slots today"}</dd>
     <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
@@ -1212,6 +1232,32 @@ function schedule(s) {
   $("help").innerHTML = tips.map(t => `<li>${t}</li>`).join("");
 }
 
+
+/* issue #224: stations listened for by hand, with remove and add */
+function listenForView(s) {
+  const list = s.listenFor || [], notes = s.listenForNotes || [];
+  if (!list.length && !notes.length) { $("listenForTable").textContent = "None added."; return; }
+  $("listenForTable").innerHTML = (list.length ? `<table><thead><tr><th>Station</th><th>Slots</th><th>Frequency</th><th>Removed if not heard by</th><th></th></tr></thead><tbody>${list.map(e =>
+    `<tr><td>${esc(e.callsign)}</td><td>${esc(e.slots)}</td><td>${mhz(e.frequencyHz / 1000)} MHz ${e.sideband.toUpperCase()}</td><td>${e.removedAfter ? esc(new Date(e.removedAfter).toISOString().slice(0, 10)) : ""}</td><td><button type="button" class="listenForRemove" data-call="${esc(e.callsign)}" data-hz="${e.frequencyHz}">Remove</button></td></tr>`).join("")}</tbody></table>` : "")
+    + notes.map(n => `<div>${esc(n)}</div>`).join("");
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest && e.target.closest(".listenForRemove");
+  if (!b) return;
+  b.disabled = true;
+  const r = await api("api/stations/listen-for/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callsign: b.dataset.call, frequencyHz: Number(b.dataset.hz) }) });
+  $("listenForSaid").textContent = r.ok ? "Removed." : r.error;
+  refresh();
+});
+$("listenForAdd").addEventListener("submit", async e => {
+  e.preventDefault();
+  const r = await api("api/stations/listen-for", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ callsign: $("lfCall").value, minute: Number($("lfMinute").value), everyMinutes: Number($("lfEvery").value),
+      frequencyHz: Number($("lfFreq").value), sideband: $("lfSide").value, locator: $("lfLoc").value }) });
+  $("listenForSaid").textContent = r.ok ? "Added. It is listened for if this receiver can tune to it; see Listening above." : r.error;
+  if (r.ok) { $("lfCall").value = ""; $("lfLoc").value = ""; }
+  refresh();
+});
 
 /* issue #146: the keys table, with forget and add */
 function keysView(s) {

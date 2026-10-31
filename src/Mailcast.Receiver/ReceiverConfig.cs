@@ -356,6 +356,14 @@ public sealed record ReceiverConfig
     public IReadOnlyList<string>? SkipStations { get; init; }
 
     /// <summary>
+    /// Stations to listen for by hand (issue #224): each is treated like an advert heard on air
+    /// (same caps) until the station's own signed directory is heard, or 7 days pass without it.
+    /// Null (the default) has none; left out of a saved file while null. The status page sets it too.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ListenForEntry>? ListenFor { get; init; }
+
+    /// <summary>
     /// Every key this receiver trusts: the built-in ones, then <see cref="TrustedKeys"/>. Throws
     /// <see cref="ConfigException"/> if one of those cannot be read.
     /// </summary>
@@ -623,6 +631,10 @@ public sealed record ReceiverConfig
         if (string.IsNullOrWhiteSpace(StateDirectory))
         {
             throw new ConfigException("\"stateDirectory\" is empty");
+        }
+        if (ListenForEntry.FirstProblem(ListenFor) is { } listenForProblem)
+        {
+            throw new ConfigException(listenForProblem);
         }
         Rig?.Validate();
         Bpq?.Validate();
