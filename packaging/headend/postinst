@@ -4,6 +4,8 @@ set -e
 EXAMPLE=/usr/share/pdn-mailcast-headend/headend.example.json
 CONFIG=/etc/pdn-mailcast-headend/headend.json
 UNIT=pdn-mailcast-headend.service
+# Written by prerm on upgrade: the template instances it stopped, for postinst to start again.
+INSTANCES=/run/pdn-mailcast-headend.upgrade-instances
 
 case "$1" in
   configure)
@@ -18,6 +20,8 @@ case "$1" in
         echo "  Set up the station and the BBS (see /usr/share/doc/pdn-mailcast-headend/headend.md),"
         echo "  put your callsign, locator, the station's API key and the BBS password in $CONFIG, then:"
         echo "  systemctl start pdn-mailcast-headend"
+        echo "  A second head end is /etc/pdn-mailcast-headend/NAME.json and"
+        echo "  systemctl enable --now pdn-mailcast-headend@NAME (see headend.md)."
     fi
     # Every head end signs its directories: make the key if there is none (never replacing a
     # key that has content), and on every configure give it to the service user alone, which
@@ -35,6 +39,16 @@ case "$1" in
     fi
     ;;
 esac
+
+# Template instances (pdn-mailcast-headend@NAME) currently running, one unit name per line; empty
+# when systemd is not running. They are the operator's: never enabled or started by the package,
+# but restarted on upgrade like the plain unit.
+running_instances() {
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null; then
+        systemctl list-units --plain --no-legend --state=active,activating 'pdn-mailcast-headend@*.service' 2>/dev/null \
+            | awk '{print $1}'
+    fi
+}
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ]; then
     if command -v deb-systemd-helper >/dev/null; then
@@ -57,6 +71,17 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
             else
                 # From a version whose prerm left it running: restart it if it still is.
                 deb-systemd-invoke try-restart "$UNIT" >/dev/null || true
+            fi
+            # The instances the old prerm stopped, then any it left running on the old binary.
+            if [ -e "$INSTANCES" ]; then
+                for _unit in $(cat "$INSTANCES"); do
+                    deb-systemd-invoke start "$_unit" >/dev/null || true
+                done
+                rm -f "$INSTANCES"
+            else
+                for _unit in $(running_instances); do
+                    deb-systemd-invoke restart "$_unit" >/dev/null || true
+                done
             fi
         fi
     fi

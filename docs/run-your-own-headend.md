@@ -39,6 +39,10 @@ Pick a time no other mailcast station on your frequency uses. GB7RDG sends on th
 
 Every head end signs its directories, and receivers use none that are unsigned. The package makes your key when you install it, so there is nothing to do. The journal's `signing:` line gives your public key (or run `sudo pdn-mailcast-headend --make-key` to see it again). The service will not start without the key. Keep the private key safe and backed up: a new key means telling every listener again.
 
+## A second head end
+
+To run another on the same machine, say on QO-100 beside 40 m, see [Running a second head end](headend.md#running-a-second-head-end): a second pdn-soundmodem, a config of its own and `systemctl enable --now pdn-mailcast-headend@NAME`.
+
 ## Getting heard
 
 Receivers listen to GB7RDG out of the box. To be heard by them, ask an existing station such as GB7RDG to add you to its `advertise` list: its directories then tell every receiver when and where your slots are, and receivers listen there unless the listener switches you off. The first time a receiver hears your signed directory it learns your key and delivers your bulletins from then on; it refuses anyone else sending under your callsign with another key. Receivers hear a station on another HF frequency if they can retune for it, or if it falls in their passband; a QO-100 station is followed by receivers that have set `lnbHz` for a dish and LNB (see [receiver.md](receiver.md)), and shown as not followed by the rest. Say where you are on the air and where you are with `frequencyHz`, `sideband` and `locator` (see [headend.md](headend.md)), so receivers know without being told. `frequencyHz` is the frequency listeners receive on: for QO-100 the narrowband downlink, 10489.5 to 10490.0 MHz (such as `10489750000`), never the 2.4 GHz uplink or the IF of the radio driving a transverter. A listener can also add you by hand: your key in `trustedKeys` (and `daylight.locator` set to yours, since receivers work out daylight at IO91lk unless told otherwise); see [receiver.md](receiver.md).

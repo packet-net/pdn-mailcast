@@ -91,8 +91,55 @@ public sealed record HeadEndConfig
     /// <summary>The AX.25 destination of every frame.</summary>
     public string Destination { get; init; } = "MCAST";
 
+    /// <summary>The plain service's state directory, and the default for headend.json.</summary>
+    public const string PlainStateDirectory = "/var/lib/pdn-mailcast-headend";
+
+    /// <summary>
+    /// <c>stateDirectory</c> as the file gives it: where the bulletins, the ledger and the last
+    /// slot's report are kept. Usually left out, so that each head end on a machine has its own
+    /// (<see cref="DefaultStateDirectory"/>).
+    /// </summary>
+    [JsonPropertyName("stateDirectory")]
+    public string? StateDirectoryGiven { get; init; }
+
+    /// <summary>The state directory when the file leaves it out; see <see cref="StateDirectoryFor"/>.</summary>
+    [JsonIgnore]
+    public string DefaultStateDirectory { get; init; } = PlainStateDirectory;
+
     /// <summary>Where the bulletins, the ledger and the last slot's report are kept.</summary>
-    public string StateDirectory { get; init; } = "/var/lib/pdn-mailcast-headend";
+    [JsonIgnore]
+    public string StateDirectory => string.IsNullOrWhiteSpace(StateDirectoryGiven) ? DefaultStateDirectory : StateDirectoryGiven;
+
+    /// <summary>
+    /// The drop directory: <c>intake.dropDirectory</c>, <c>drop</c> in the state directory when
+    /// that is left out, or null when it is empty (no file drop).
+    /// </summary>
+    [JsonIgnore]
+    public string? DropDirectory => Intake.DropDirectory switch
+    {
+        null => Path.Combine(StateDirectory, "drop"),
+        var d when string.IsNullOrWhiteSpace(d) => null,
+        var d => d,
+    };
+
+    /// <summary>
+    /// The state directory for a file that leaves <c>stateDirectory</c> out: the one systemd made
+    /// for the service (<c>$STATE_DIRECTORY</c>) when there is one; otherwise named after the file,
+    /// as the units name theirs, so <c>headend.json</c> keeps /var/lib/pdn-mailcast-headend and
+    /// <c>NAME.json</c> (<c>pdn-mailcast-headend@NAME</c>) has /var/lib/pdn-mailcast-headend-NAME,
+    /// and commands run from a shell find the same one as the service.
+    /// </summary>
+    public static string StateDirectoryFor(string? configPath, string? systemdStateDirectory)
+    {
+        // systemd separates several with colons; the units give one.
+        string? given = systemdStateDirectory?.Split(':')[0];
+        if (!string.IsNullOrWhiteSpace(given))
+        {
+            return given;
+        }
+        string name = configPath is null ? "" : Path.GetFileNameWithoutExtension(configPath);
+        return name is "" or "headend" ? PlainStateDirectory : $"{PlainStateDirectory}-{name}";
+    }
 
     public SlotConfig Slot { get; init; } = new();
 
@@ -914,8 +961,11 @@ public sealed record ScheduleConfig
 
 public sealed record IntakeConfig
 {
-    /// <summary>A directory of bulletin files, checked every minute. Empty for none.</summary>
-    public string DropDirectory { get; init; } = "/var/lib/pdn-mailcast-headend/drop";
+    /// <summary>
+    /// A directory of bulletin files, checked every minute: <c>drop</c> in the state directory
+    /// when left out, none when empty. <see cref="HeadEndConfig.DropDirectory"/> is the one used.
+    /// </summary>
+    public string? DropDirectory { get; init; }
 
     public int MaxBulletinBytes { get; init; } = 32 * 1024;
 

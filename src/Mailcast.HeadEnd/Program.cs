@@ -93,7 +93,8 @@ public static partial class Program
               end's own store is used. Opens no connection to anything.
           pdn-mailcast-headend --run-now [--config FILE]
               Asks the running service for a one-off slot now, through its status listener
-              (POST /run). It is a whole slot with the usual checks, counted like any other, and
+              (POST /run): the one FILE configures, so a second head end is asked with its own
+              --config. It is a whole slot with the usual checks, counted like any other, and
               the schedule carries on afterwards.
           pdn-mailcast-headend --check-config [--config FILE]
               Checks the configuration, and says whether directories will be signed.
@@ -181,6 +182,7 @@ public static partial class Program
             Console.WriteLine(DescribeSigning(signer, SigningKeyPath));
             Console.WriteLine(DescribeSelf(config));
             Console.WriteLine(DescribeAdverts(config));
+            Console.WriteLine(DescribeDirectories(config));
             return 0;
         }
 
@@ -234,9 +236,10 @@ public static partial class Program
     internal static HeadEndConfig LoadConfig(string path, bool offline, bool pathGiven, out bool placeholder)
     {
         placeholder = offline && !pathGiven && !File.Exists(path);
-        return placeholder
+        HeadEndConfig config = placeholder
             ? HeadEndConfig.Parse($$$"""{"callsign": "{{{PlaceholderCallsign}}}", "station": {"apiKey": "offline"}}""")
             : HeadEndConfig.Load(path);
+        return config with { DefaultStateDirectory = HeadEndConfig.StateDirectoryFor(path, Environment.GetEnvironmentVariable("STATE_DIRECTORY")) };
     }
 
     /// <summary>One plain line on the other stations each directory tells listeners about (issue #178).</summary>
@@ -358,6 +361,16 @@ public static partial class Program
         journal.Write(DescribeSigning(signer, SigningKeyPath));
         journal.Write(DescribeSelf(config));
         journal.Write(DescribeAdverts(config));
+        journal.Write(DescribeDirectories(config));
+        // Two head ends on one machine (pdn-mailcast-headend@NAME) must never share these.
+        using DirectoryLock? stateLock = DirectoryLock.Take(config.StateDirectory, "\"stateDirectory\"", out string? problem);
+        using DirectoryLock? dropLock = problem is not null || config.DropDirectory is not { } drop || SameDirectory(drop, config.StateDirectory) ? null
+            : DirectoryLock.Take(drop, "\"intake\".\"dropDirectory\"", out problem);
+        if (problem is not null)
+        {
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: {problem}");
+            return 2;
+        }
         TimeProvider time = TimeProvider.System;
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) =>
@@ -393,11 +406,11 @@ public static partial class Program
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
         ReportReader? reportReader = null;
-        if (!string.IsNullOrWhiteSpace(config.Intake.DropDirectory))
+        if (config.DropDirectory is { } dropDirectory)
         {
-            Directory.CreateDirectory(config.Intake.DropDirectory);
-            intakes.Add(new ScheduledIntake(new FileDropIntake(config.Intake.DropDirectory, store, policy, journal), TimeSpan.FromMinutes(1)));
-            journal.Write($"intake: file drop {config.Intake.DropDirectory}, checked every minute");
+            Directory.CreateDirectory(dropDirectory);
+            intakes.Add(new ScheduledIntake(new FileDropIntake(dropDirectory, store, policy, journal), TimeSpan.FromMinutes(1)));
+            journal.Write($"intake: file drop {dropDirectory}, checked every minute");
         }
         if (config.Intake.Fbb is FbbIntakeConfig fbb)
         {
@@ -448,6 +461,12 @@ public static partial class Program
             }
             catch (System.Net.HttpListenerException e)
             {
+                if (StatusPortTaken(e))
+                {
+                    // Carrying on would leave --run-now asking whatever else holds the port.
+                    await Console.Error.WriteLineAsync(StatusPortTakenProblem(config));
+                    return 2;
+                }
                 journal.Write($"status: cannot listen on {server.Address}: {e.Message}; carrying on without it");
             }
         }
@@ -471,6 +490,22 @@ public static partial class Program
         journal.Write("pdn-mailcast-headend stopped");
         return 0;
     }
+
+    /// <summary>One line on where this head end keeps its state and takes dropped files from.</summary>
+    internal static string DescribeDirectories(HeadEndConfig config) =>
+        $"state: {config.StateDirectory}, file drop {config.DropDirectory ?? "off"}";
+
+    private static bool SameDirectory(string a, string b) =>
+        string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)), StringComparison.Ordinal);
+
+    /// <summary>Whether the status listener failed because something else has its port.</summary>
+    internal static bool StatusPortTaken(System.Net.HttpListenerException e) =>
+        // EADDRINUSE, as the listener gives it on Linux (98) and macOS (48), or Windows's code.
+        e.ErrorCode is 98 or 48 or (int)System.Net.Sockets.SocketError.AddressAlreadyInUse;
+
+    /// <summary>The one line a head end stops with when its status port is taken.</summary>
+    internal static string StatusPortTakenProblem(HeadEndConfig config) => string.Create(CultureInfo.InvariantCulture,
+        $"pdn-mailcast-headend: the status port {config.Status.Port} is taken, perhaps by another head end; give this one its own \"status\".\"port\"");
 
     /// <summary>Whether to keep the ionosonde reading fresh at <paramref name="t"/>: from an hour before a slot to a quarter of an hour after.</summary>
     internal static bool WantReading(SlotSchedule schedule, DateTimeOffset t) =>

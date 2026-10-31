@@ -6,7 +6,9 @@
   // a slot every hour on the hour in daylight; the rest are the defaults.
   "callsign": "",
   "destination": "MCAST",
-  "stateDirectory": "/var/lib/pdn-mailcast-headend",
+  // The bulletins in rotation and the slot reports are kept in /var/lib/pdn-mailcast-headend, or
+  // /var/lib/pdn-mailcast-headend-NAME for /etc/pdn-mailcast-headend/NAME.json, a second head end
+  // (pdn-mailcast-headend@NAME). Leave "stateDirectory" out so that each keeps its own.
 
   // How bulletins are carried: "budget" (the default for any slot interval but a day) fills each
   // slot to "budgetMinutes" on the air, tone and idents included, but always leaves the
@@ -75,8 +77,9 @@
     "whenUnreachable": "carryOn"
   },
 
+  // Bulletin files dropped in "drop" in the state directory are taken in too; "dropDirectory"
+  // names another, or "" for none.
   "intake": {
-    "dropDirectory": "/var/lib/pdn-mailcast-headend/drop",
     "maxBulletinBytes": 32768,
     "preSlotSeconds": 30,
     // The head end calls the BBS's forwarding port as a partner and takes the bulletins queued

@@ -4,11 +4,21 @@ set -e
 UNIT=pdn-mailcast-headend.service
 # Set while an upgrade has the service stopped, so postinst knows to start it again.
 MARK=/run/pdn-mailcast-headend.upgrade-was-running
+# The same for the template instances (pdn-mailcast-headend@NAME): the ones stopped, by name.
+INSTANCES=/run/pdn-mailcast-headend.upgrade-instances
+
+running_instances() {
+    systemctl list-units --plain --no-legend --state=active,activating 'pdn-mailcast-headend@*.service' 2>/dev/null \
+        | awk '{print $1}'
+}
 
 if [ -d /run/systemd/system ] && command -v deb-systemd-invoke >/dev/null; then
     case "$1" in
         remove)
             deb-systemd-invoke stop "$UNIT" >/dev/null || true
+            for _unit in $(running_instances); do
+                deb-systemd-invoke stop "$_unit" >/dev/null || true
+            done
             ;;
         upgrade)
             # Stop before dpkg replaces the files, not after: a .NET service still running
@@ -18,6 +28,13 @@ if [ -d /run/systemd/system ] && command -v deb-systemd-invoke >/dev/null; then
             if systemctl --quiet is-active "$UNIT" 2>/dev/null; then
                 : > "$MARK"
                 deb-systemd-invoke stop "$UNIT" >/dev/null || true
+            fi
+            _running="$(running_instances)"
+            if [ -n "$_running" ]; then
+                printf '%s\n' $_running > "$INSTANCES"
+                for _unit in $_running; do
+                    deb-systemd-invoke stop "$_unit" >/dev/null || true
+                done
             fi
             ;;
     esac

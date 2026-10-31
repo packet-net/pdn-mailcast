@@ -16,11 +16,16 @@ if [ "$1" = "purge" ]; then
         deb-systemd-helper purge "$UNIT" >/dev/null || true
         deb-systemd-helper unmask "$UNIT" >/dev/null || true
     fi
+    # Template instances are enabled by the operator, not the package, so deb-systemd-helper
+    # knows nothing of them: remove their enable links by hand. Their configs
+    # (/etc/pdn-mailcast-headend/NAME.json) are the operator's files and are kept.
+    rm -f /etc/systemd/system/*.wants/pdn-mailcast-headend@*.service
     # The config is made by postinst, not shipped, so dpkg does not remove it on purge. The
-    # bulletins and their ESIs in /var/lib/pdn-mailcast-headend go too: purge means start again.
+    # bulletins and their ESIs in /var/lib/pdn-mailcast-headend go too, and each instance's in
+    # /var/lib/pdn-mailcast-headend-NAME: purge means start again.
     rm -f /etc/pdn-mailcast-headend/headend.json
     rmdir --ignore-fail-on-non-empty /etc/pdn-mailcast-headend 2>/dev/null || true
-    rm -rf /var/lib/pdn-mailcast-headend
+    rm -rf /var/lib/pdn-mailcast-headend /var/lib/pdn-mailcast-headend-*
     if getent passwd pdn-mailcast-headend >/dev/null; then
         deluser --system --quiet pdn-mailcast-headend >/dev/null 2>&1 || true
     fi

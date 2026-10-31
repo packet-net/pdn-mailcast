@@ -1,0 +1,39 @@
+[Unit]
+Description=pdn-mailcast head end %i, through pdn-soundmodem
+Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/docs/headend.md
+# One instance per config file: pdn-mailcast-headend@NAME runs /etc/pdn-mailcast-headend/NAME.json
+# with its own state directory, /var/lib/pdn-mailcast-headend-NAME, for a second head end on the
+# same machine (another band, another modem). It is the plain unit with the paths parameterised
+# and nothing else changed. Each config must name its own modem (station.apiUrl, kissPort), its
+# own "status"."port" and its own BBS partner login; the head end stops at start-up and says so
+# if its status port or state directory is already another's. All instances, and the plain one,
+# share the one signing key, /etc/pdn-mailcast-headend/signing-key.pem.
+# Started after the pdn-soundmodem instance of the same name, when there is one.
+After=network-online.target time-sync.target pdn-soundmodem.service pdn-soundmodem@%i.service
+Wants=network-online.target time-sync.target
+ConditionPathExists=/etc/pdn-mailcast-headend/%i.json
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pdn-mailcast-headend --config /etc/pdn-mailcast-headend/%i.json
+Restart=on-failure
+RestartSec=10
+# Exit 2 means the configuration is wrong, and says how; retrying would only bury that.
+RestartPreventExitStatus=2
+# A stop mid-slot drops our queued frames and releases the lease, which then stays "closing" for up
+# to 60 s while the station sends the closing ident.
+TimeoutStopSec=150
+User=pdn-mailcast-headend
+Group=pdn-mailcast-headend
+# Beside the plain unit's, not inside it. With "stateDirectory" left out of the config, the head
+# end uses this one ($STATE_DIRECTORY), and its file drop is "drop" in it.
+StateDirectory=pdn-mailcast-headend-%i
+StateDirectoryMode=0750
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
