@@ -10,6 +10,7 @@
 #   usr/lib/pdn-mailcast-headend/pdn-mailcast-headend     the self-contained single-file binary
 #   usr/bin/pdn-mailcast-headend                          a link to it
 #   lib/systemd/system/pdn-mailcast-headend.service
+#   lib/systemd/system/pdn-mailcast-headend@.service      a second head end: NAME.json, pdn-mailcast-headend@NAME
 #   usr/share/pdn-mailcast-headend/headend.example.json   postinst copies it to /etc/pdn-mailcast-headend/headend.json
 #   usr/share/doc/pdn-mailcast-headend/                   headend.md and copyright
 # Its own directory under /usr/lib, not the receiver's, so the two packages never ship the same
@@ -61,6 +62,7 @@ install -m 0755 "$bin" "$stage/$lib/pdn-mailcast-headend"
 find "$pub" -maxdepth 1 -type f ! -name pdn-mailcast-headend ! -name '*.xml' ! -name '*.pdb' -exec install -m 0644 {} "$stage/$lib/" \;
 ln -s ../lib/pdn-mailcast-headend/pdn-mailcast-headend "$stage/usr/bin/pdn-mailcast-headend"
 install -m 0644 "$root/packaging/headend/pdn-mailcast-headend.service" "$stage/lib/systemd/system/"
+install -m 0644 "$root/packaging/headend/pdn-mailcast-headend@.service" "$stage/lib/systemd/system/"
 install -m 0644 "$root/packaging/headend/headend.example.json" "$stage/usr/share/pdn-mailcast-headend/"
 install -m 0644 "$root/docs/headend.md" "$stage/$doc/headend.md"
 cat > "$stage/$doc/copyright" <<COPYRIGHT

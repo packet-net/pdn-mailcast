@@ -168,7 +168,7 @@ Under the shares rule, a bulletin first carried before slots had times is counte
 
 ## A slot on demand
 
-`pdn-mailcast-headend --run-now` asks the running head end for a slot now, between the scheduled ones, for a test transmission say. It goes through the status listener: `POST /run` on `status.bind` and `status.port` (127.0.0.1:8216), and only from the same machine, so nothing on the LAN can key the transmitter. The head end answers 202 with the slot it started, named by the minute it starts in, or 409 if a slot is already running, a one-off is already starting, or the clock is behind the last slot run. The journal says who asked (the `X-Requested-By` header, which `--run-now` fills with the user, and the address).
+`pdn-mailcast-headend --run-now` asks the running head end for a slot now, between the scheduled ones, for a test transmission say. It goes through the status listener: `POST /run` on `status.bind` and `status.port` (127.0.0.1:8216) of the config it is given (`--config`, headend.json if left out), and only from the same machine, so nothing on the LAN can key the transmitter. The head end answers 202 with the slot it started, named by the minute it starts in, or 409 if a slot is already running, a one-off is already starting, or the clock is behind the last slot run. The journal says who asked (the `X-Requested-By` header, which `--run-now` fills with the user, and the address).
 
 It is a whole slot with the usual checks: the clock, the lease, the tone, the bursts and the idents. It runs whatever the time, daylight or not. It counts like any other slot, so no piece is ever sent twice: it sends what a scheduled slot would (a full slot under the budget rule; what is owed and the first share of anything new under the shares rule), and the directory even if nothing else is due. A bulletin first carried in a one-off slot at night has its repeat in daylight like any other. The schedule carries on as before; the next scheduled slot still runs, and sends nothing again that the one-off sent.
 
@@ -256,7 +256,7 @@ It costs little on the air. With 30 bulletins in rotation GB7RDG's directory is 
 
 ## Bulletins by file
 
-`intake.dropDirectory` takes bulletin files too, checked every minute: one bulletin per file in Packet.Mailcast's serialised form (a `Type:`, `From:`, `To:`, `At:`, `Bid:`, `Date:` and `Title:` header, a blank line, then the message text with its R: lines). A file taken in is deleted; one refused moves to `rejected/` with the reason in the journal. Name a file `.tmp` or start it with a dot while writing it, then rename it. Either way, only bulletins (type B) up to `intake.maxBulletinBytes` (32 KB) are taken, each BID once, and the next slot is the first it is carried in.
+`intake.dropDirectory` (`drop` in the state directory if left out, `""` for none) takes bulletin files too, checked every minute: one bulletin per file in Packet.Mailcast's serialised form (a `Type:`, `From:`, `To:`, `At:`, `Bid:`, `Date:` and `Title:` header, a blank line, then the message text with its R: lines). A file taken in is deleted; one refused moves to `rejected/` with the reason in the journal. Name a file `.tmp` or start it with a dot while writing it, then rename it. Either way, only bulletins (type B) up to `intake.maxBulletinBytes` (32 KB) are taken, each BID once, and the next slot is the first it is carried in.
 
 ## The Flex
 
@@ -390,6 +390,28 @@ The `locator` is optional: given, receivers draw the path from that station's pl
 
 A station on two frequencies, such as HF and QO-100, is listed once for each. For QO-100, give the downlink in `frequencyHz` (see [Saying where you are](#saying-where-you-are)). Every directory then carries them. It is only a hint about where to listen: receivers trust a station from its own signed directory, never from yours. The journal and `--check-config` say what is advertised. Each directory also names this head end (`callsign`) and, when signed, gives its public key, so receivers can learn it the first time they hear it.
 
+## Running a second head end
+
+One machine can run more than one head end, say one on 40 m and one on QO-100. Each has its own radio, so each needs its own pdn-soundmodem: a second one is `/etc/pdn-soundmodem/NAME.json` and `systemctl enable --now pdn-soundmodem@NAME` (see pdn-soundmodem's docs), with its own sound card, page port and KISS port.
+
+Then give the head end its own config, copied from the example, and start it as `pdn-mailcast-headend@NAME`:
+
+```sh
+sudo install -o root -g pdn-mailcast-headend -m 0640 /usr/share/pdn-mailcast-headend/headend.example.json /etc/pdn-mailcast-headend/qo100.json
+sudo nano /etc/pdn-mailcast-headend/qo100.json
+sudo pdn-mailcast-headend --check-config --config /etc/pdn-mailcast-headend/qo100.json
+sudo systemctl enable --now pdn-mailcast-headend@qo100
+```
+
+In the new file, set:
+
+- `callsign`, `frequencyHz` and the slot times for that station.
+- `station.apiUrl`, `station.apiKey` and `station.kissPort`: the second pdn-soundmodem's. A waveform that suits the path goes in `station.mode` or `schedule.modes`.
+- `status.port`: anything but the first head end's 8216, such as 8217.
+- `intake.fbb`: its own partner on the BBS, such as Q1HEAD, set up like the first. The BBS sends each bulletin once to each partner, so two head ends sharing a login would each get only some of them.
+
+Leave `stateDirectory` and `intake.dropDirectory` out: each head end then keeps its own, `/var/lib/pdn-mailcast-headend-NAME` (files to send go in its `drop`). A head end stops at start-up, saying what to change, if its state directory or its status port is already another's. Both sign with the same key, so receivers that know one know the other. Each can list the other in `advertise`, so their receivers hear about both. To ask for a slot now, name the config: `pdn-mailcast-headend --run-now --config /etc/pdn-mailcast-headend/qo100.json`; the journal is `journalctl -u pdn-mailcast-headend@qo100`. The first head end carries on as `pdn-mailcast-headend` with `headend.json`, unchanged.
+
 ## Offline
 
 `pdn-mailcast-headend --plan` prints what a slot would send, and about how long it would be on the air. `pdn-mailcast-headend --wav slot.wav` renders the whole slot to a WAV file with pdn-soundmodem's own MS110D modem: the tone and the channel probe, the CW ident where the station would send it, and the frames. `--bulletins DIR` takes a directory of bulletin files instead of the head end's store, all of them new in that slot. `--date` picks the day and `--time` the slot, the one running at that time (`slot.minute` if left out), daylight or not, and `--rate` the sample rate (48000 by default). Neither opens a connection to anything or changes the head end's state. Neither needs a config file: with none at the usual place and no `--config`, they run on the defaults with N0CALL, a placeholder callsign, and say so.
@@ -398,7 +420,7 @@ The published pdn-soundmodem package cannot pack frames yet, so offline every fr
 
 ## Configuration
 
-`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with hourly daylight slot settings and the defaults for the rest. What names the station has no default, and the service does not start without it: `callsign`, `station.apiKey` (the station's `api.key`), `slot.daylight.locator` when `slot.daylight` is given, `intake.fbb.user` and `intake.fbb.partnerCallsign` when `intake.fbb` is given, and `intake.reports.user` when `intake.reports` is given. A file that leaves one out is refused with each missing key named, for example `"callsign" is required: the station's callsign, which every frame is sent from`. The package does not start the service on a first install: set up the station and the BBS, fill in the callsign, the locator, the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file, and says whether directories will be signed.
+`/etc/pdn-mailcast-headend/headend.json`; the package seeds it from `headend.example.json`, which lists every key, with hourly daylight slot settings and the defaults for the rest. What names the station has no default, and the service does not start without it: `callsign`, `station.apiKey` (the station's `api.key`), `slot.daylight.locator` when `slot.daylight` is given, `intake.fbb.user` and `intake.fbb.partnerCallsign` when `intake.fbb` is given, and `intake.reports.user` when `intake.reports` is given. A file that leaves one out is refused with each missing key named, for example `"callsign" is required: the station's callsign, which every frame is sent from`. The package does not start the service on a first install: set up the station and the BBS, fill in the callsign, the locator, the API key and the BBS password, then `systemctl start pdn-mailcast-headend`. `pdn-mailcast-headend --check-config` checks a file, and says whether directories will be signed and where the state is kept. Leave `stateDirectory` out: the head end then uses `/var/lib/pdn-mailcast-headend` for `headend.json`, and `/var/lib/pdn-mailcast-headend-NAME` for a second head end's `NAME.json` (see [Running a second head end](#running-a-second-head-end)).
 
 Every object goes out in 240-octet pieces, whatever the file says: `schedule.symbolSize` is still read so an old file loads, but it is ignored and the head end says so once at start-up. A new bulletin is sent in the shared canonical form with its envelope (see docs/design.md), so two head ends can send interchangeable pieces; the envelope, normally one piece, is repeated in every slot that carries its bulletin. A bulletin already held when you upgrade keeps the way it was first encoded and has no envelope.
 

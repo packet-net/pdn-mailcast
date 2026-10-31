@@ -5,6 +5,7 @@ using Packet.Mailcast;
 namespace Mailcast.HeadEnd.Tests;
 
 /// <summary>The head end's directory signing key: the start-up line, and the status document.</summary>
+[Collection(KeyPathTests.Name)]
 public class SigningTests
 {
     [Fact]

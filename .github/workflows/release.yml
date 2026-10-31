@@ -203,6 +203,9 @@ jobs:
             grep -q "$lib/$pkg\$" <<<"$listing"
             grep -q "usr/bin/$pkg ->" <<<"$listing"
             grep -q "lib/systemd/system/$pkg\.service\$" <<<"$listing"
+            if [ "$pkg" = pdn-mailcast-headend ]; then
+              grep -q "lib/systemd/system/$pkg@\.service\$" <<<"$listing"
+            fi
             # postinst seeds the config from this path; if it moves, install breaks.
             grep -q "$share/$example\$" <<<"$listing"
             [ "$(dpkg-deb -f "$deb" Package)" = "$pkg" ]
@@ -219,25 +222,36 @@ jobs:
       - name: Check the bundled .NET runtime is the latest patch
         run: python3 scripts/check-bundled-runtime.py artifacts/pdn-mailcast-*_"${VERSION}"_"${ARCH}".deb
 
+      # Bookworm and Bullseye both: the packages say they install on either, so prove it.
       - name: Install both in a clean Debian and run them
         if: matrix.install_test
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
-          docker run --rm -e VERSION -v "$PWD/artifacts:/a:ro" debian:bookworm sh -ec '
-            apt-get update -qq
-            apt-get install -y -qq /a/pdn-mailcast-receiver_*.deb /a/pdn-mailcast-headend_*.deb
-            test -f /etc/pdn-mailcast/receiver.json
-            test -f /etc/pdn-mailcast-headend/headend.json
-            # The receiver reports Major.Minor.Patch alone (it is also the version in its FBB
-            # SID), so a prerelease 0.2.0-rc1 shows as 0.2.0; the head end reports it in full.
-            for p in pdn-mailcast-receiver pdn-mailcast-headend; do
-              out="$($p --version)"
-              echo "$out"
-              case "$out" in
-                "$p $VERSION"|"$p $VERSION+"*|"$p ${VERSION%%-*}") ;;
-                *) echo "$p reports \"$out\", expected version $VERSION" >&2; exit 1 ;;
-              esac
-            done'
+          for release in bookworm bullseye; do
+            echo "::group::debian:$release"
+            docker run --rm -e VERSION -v "$PWD/artifacts:/a:ro" "debian:$release" sh -ec '
+              # Bullseye security updates moved to archive.debian.org after its LTS ended in
+              # August 2026; the image still names deb.debian.org, whose pool no longer has them.
+              if [ "$(cat /etc/debian_version | cut -d. -f1)" = 11 ]; then
+                sed -i "s#deb.debian.org/debian-security#archive.debian.org/debian-security#" /etc/apt/sources.list
+              fi
+              apt-get update -qq
+              apt-get install -y -qq /a/pdn-mailcast-receiver_*.deb /a/pdn-mailcast-headend_*.deb
+              test -f /etc/pdn-mailcast/receiver.json
+              test -f /etc/pdn-mailcast-headend/headend.json
+              test -f /lib/systemd/system/pdn-mailcast-headend@.service
+              # The receiver reports Major.Minor.Patch alone (it is also the version in its FBB
+              # SID), so a prerelease 0.2.0-rc1 shows as 0.2.0; the head end reports it in full.
+              for p in pdn-mailcast-receiver pdn-mailcast-headend; do
+                out="$($p --version)"
+                echo "$out"
+                case "$out" in
+                  "$p $VERSION"|"$p $VERSION+"*|"$p ${VERSION%%-*}") ;;
+                  *) echo "$p reports \"$out\", expected version $VERSION" >&2; exit 1 ;;
+                esac
+              done'
+            echo "::endgroup::"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
