@@ -1,3 +1,4 @@
+using Mailcast.HeadEnd.Relay;
 using Packet.Mailcast;
 using Packet.Mailcast.Feedback;
 
@@ -70,11 +71,31 @@ public sealed class RotationStore
     /// the budget rule, with <paramref name="extras"/> (the ionosonde reading's frames) counted in,
     /// and the directory listing <paramref name="reports"/>, the listeners' recent daily reports.
     /// </summary>
-    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, SlotBudget? budget = null, string? mode = null, IReadOnlyList<MailcastFrame>? extras = null, ReportReceipts? reports = null)
+    public SlotBroadcast Plan(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, SlotBudget? budget = null, string? mode = null, IReadOnlyList<MailcastFrame>? extras = null, ReportReceipts? reports = null, RelaySelector? relay = null)
     {
         lock (_gate)
         {
-            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode, extras, reports);
+            // Other stations' objects heard by the receivers (issue #218) join the rotation, with what has been sent of each.
+            IReadOnlyList<RelayedObject>? relayed = relay?.Select(_store.GetRelayProgress, _store.CarriesObject);
+            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode, extras, reports, relayed);
+        }
+    }
+
+    /// <summary>What has been sent of an object relayed from another station.</summary>
+    public RelayProgress GetRelayProgress(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.GetRelayProgress(objectId);
+        }
+    }
+
+    /// <summary>Whether this head end carries the object itself.</summary>
+    public bool CarriesObject(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.CarriesObject(objectId);
         }
     }
 

@@ -45,6 +45,8 @@ public sealed class HeadEndStore
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private readonly string _directories;
     private readonly Dictionary<ulong, (DateOnly Day, uint NextEsi)> _directoryEsis = [];
+    private readonly string _relayed;
+    private readonly Dictionary<ulong, RelayEntry> _relay = [];
 
     /// <summary>Opens or creates a store.</summary>
     public HeadEndStore(string root, Compression compression, ScheduleOptions? options = null, Action<string>? log = null)
@@ -85,7 +87,32 @@ public sealed class HeadEndStore
                 _directoryEsis[d.ObjectId] = (d.Day, d.NextEsi);
             }
         }
+        _relayed = Path.Combine(root, "relayed");
+        Directory.CreateDirectory(_relayed);
+        foreach (var file in Directory.EnumerateFiles(_relayed))
+        {
+            if (file.EndsWith(".tmp", StringComparison.Ordinal))
+            {
+                File.Delete(file);
+                continue;
+            }
+            if (LoadRelay(file) is { } r)
+            {
+                _relay[r.ObjectId] = r;
+            }
+        }
     }
+
+    /// <summary>Whether this head end carries the object itself: a bulletin's object or envelope, whether in rotation or not.</summary>
+    public bool CarriesObject(ulong objectId) =>
+        _entries.Values.Any(e => e.Carried.Transfer.ObjectId == objectId || e.Carried.Envelope?.ObjectId == objectId);
+
+    /// <summary>What has been sent of an object relayed from another station (issue #218); <see cref="RelayProgress.None"/> for one never sent.</summary>
+    public RelayProgress GetRelayProgress(ulong objectId) =>
+        _relay.TryGetValue(objectId, out var r) ? new RelayProgress(new HashSet<uint>(r.Sent), r.FirstSlot, r.EnvelopeNextEsi) : RelayProgress.None;
+
+    /// <summary>How many relayed objects have something remembered.</summary>
+    public int RelayCount => _relay.Count;
 
     /// <summary>Whether a bulletin with this BID is remembered, regardless of case.</summary>
     public bool Holds(string bid)
@@ -204,6 +231,23 @@ public sealed class HeadEndStore
                 SaveDirectory(id, broadcast.Date, extraNext);
             }
         }
+        foreach (var r in broadcast.Relayed)
+        {
+            var sent = broadcast.Frames.Take(framesSent).Where(f => f.ObjectId == r.ObjectId).Select(f => f.EncodingSymbolId).ToList();
+            uint envelopeNext = r.Envelope is { } envelope && next.TryGetValue(envelope.ObjectId, out uint reached) ? reached : 0;
+            if (sent.Count == 0 && envelopeNext == 0)
+            {
+                continue;
+            }
+            if (!_relay.TryGetValue(r.ObjectId, out var entry))
+            {
+                _relay[r.ObjectId] = entry = new RelayEntry { ObjectId = r.ObjectId, Day = broadcast.Date };
+            }
+            entry.Sent.UnionWith(sent);
+            entry.FirstSlot ??= sent.Count > 0 ? broadcast.Slot : null;
+            entry.EnvelopeNextEsi = Math.Max(entry.EnvelopeNextEsi, envelopeNext);
+            SaveRelay(entry);
+        }
         foreach (var o in broadcast.Objects)
         {
             if (o.EnvelopeFor is not null)
@@ -271,7 +315,79 @@ public sealed class HeadEndStore
                 _directoryEsis.Remove(id);
             }
         }
+        foreach (var (id, r) in _relay.ToList())
+        {
+            if (today.DayNumber - r.Day.DayNumber >= _options.RememberDays)
+            {
+                File.Delete(RelayPath(id));
+                _relay.Remove(id);
+            }
+        }
         return removed;
+    }
+
+    private sealed class RelayEntry
+    {
+        public ulong ObjectId;
+        public DateOnly Day;
+        public DateTimeOffset? FirstSlot;
+        public uint EnvelopeNextEsi;
+        public readonly HashSet<uint> Sent = [];
+    }
+
+    private string RelayPath(ulong objectId) => Path.Combine(_relayed, ObjectId.Format(objectId) + ".txt");
+
+    // Day, first slot, the envelope's next ESI and every ESI sent (hex, sorted): so a restart never repeats one.
+    private void SaveRelay(RelayEntry r)
+    {
+        var text = new StringBuilder();
+        text.Append(CultureInfo.InvariantCulture, $"Day: {r.Day:yyyy-MM-dd}\n");
+        if (r.FirstSlot is DateTimeOffset first)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"FirstSlot: {first.UtcDateTime:yyyy-MM-ddTHH:mmZ}\n");
+        }
+        text.Append(CultureInfo.InvariantCulture, $"EnvelopeNextEsi: {r.EnvelopeNextEsi}\n");
+        text.Append("Sent: ").Append(string.Join(',', r.Sent.Order().Select(e => e.ToString("x", CultureInfo.InvariantCulture)))).Append('\n');
+        DurableFile.WriteAtomically(RelayPath(r.ObjectId), Bulletin.TextEncoding.GetBytes(text.ToString()));
+    }
+
+    private RelayEntry? LoadRelay(string path)
+    {
+        try
+        {
+            if (!ObjectId.TryParse(Path.GetFileNameWithoutExtension(path), out ulong id))
+            {
+                return null;
+            }
+            var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var line in Bulletin.TextEncoding.GetString(File.ReadAllBytes(path)).Split('\n'))
+            {
+                int colon = line.IndexOf(": ", StringComparison.Ordinal);
+                if (colon > 0)
+                {
+                    fields[line[..colon]] = line[(colon + 2)..];
+                }
+            }
+            var entry = new RelayEntry
+            {
+                ObjectId = id,
+                Day = DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                EnvelopeNextEsi = uint.Parse(fields["EnvelopeNextEsi"], CultureInfo.InvariantCulture),
+                FirstSlot = fields.TryGetValue("FirstSlot", out var slotText)
+                    ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
+                    : null,
+            };
+            foreach (string esi in fields["Sent"].Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                entry.Sent.Add(uint.Parse(esi, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture));
+            }
+            return entry;
+        }
+        catch (Exception e) when (e is FormatException or KeyNotFoundException or OverflowException or IOException)
+        {
+            _log?.Invoke($"head end store: unreadable relay state {Path.GetFileName(path)}: {e.Message}");
+            return null;
+        }
     }
 
     private string DirectoryPath(ulong objectId) => Path.Combine(_directories, ObjectId.Format(objectId) + ".txt");

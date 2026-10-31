@@ -1,4 +1,5 @@
 using Packet.Mailcast;
+using Mailcast.HeadEnd.Relay;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Planning;
 using Mailcast.HeadEnd.Slot;
@@ -337,6 +338,11 @@ public sealed class HeadEndService(
         }
 
         SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null);
+        if (plan.Relay is { } relay)
+        {
+            // One short line a slot on what is relayed from the other stations the receivers on the LAN hear (issue #218).
+            journal.Write(RelaySelector.Line(plan.RelayedObjects, plan.RelayedFrames, relay));
+        }
         if (IonosphereLine(plan, time.GetUtcNow()) is { } line)
         {
             // Observe only: the reading is in the plan already, and nothing here depends on it.
@@ -348,7 +354,7 @@ public sealed class HeadEndService(
             journal.Write(spots);
         }
         SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation);
-        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames };
+        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
         status.SetBulletinsHeld(store.Count);

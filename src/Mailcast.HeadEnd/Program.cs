@@ -388,7 +388,11 @@ public static partial class Program
         var pskReporter = config.PskReporter.Enabled ? new PskReporterMonitor(config.Callsign, time, journal.Write, host: config.PskReporter.Host, port: config.PskReporter.Port) : null;
         Func<PskReading>? spots = pskReporter is null ? null : () => pskReporter.Current;
         ReportLog? reports = config.Intake.Reports is null ? null : new ReportLog(config.StateDirectory, journal);
-        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports);
+        // Receivers on this machine and on the network, read-only (issue #218); no setting, and nothing waits for it. What they hear of
+        // the advertised stations joins the rotation, ranked least covered first.
+        var catalogue = new ObjectCatalogue(time);
+        var relay = new RelaySelector(catalogue, Compression.Default, config.Callsign, scheduleOptions.Adverts, time, journal);
+        var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports, relay);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
         FbbIntake? fbbIntake = null;
@@ -431,10 +435,9 @@ public static partial class Program
             : string.Create(CultureInfo.InvariantCulture, $"pskreporter: observe only, live spots from {config.PskReporter.Host}:{config.PskReporter.Port} near a slot, 40 and 80 m FT8/FT4/WSPR with both ends in the UK or Ireland, judged over the last {PskEvaluator.Window.TotalMinutes:0} min; 40 m sent"));
         journal.Write(DescribeSchedule(config));
         journal.Write(Describe(config, scheduleOptions, waveforms));
-        // Receivers on this machine and on the network, read-only (issue #218); no setting, and nothing waits for it.
-        var catalogue = new ObjectCatalogue(time);
         using var receivers = new ReceiverPool(catalogue, journal, time);
         status.Receivers = receivers.StatusView;
+        status.Relay = () => relay.StatusView(store.GetRelayProgress, store.CarriesObject);
         using var service = new HeadEndService(
             schedule, TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
             planner, store, intakes, runner, status, journal, time);

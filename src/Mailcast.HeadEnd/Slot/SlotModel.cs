@@ -162,6 +162,12 @@ public sealed record SlotReport
     /// <summary>How many of <see cref="BulletinsInRotation"/> were in the budget rule's leftover tier: listed, but sent only in airtime nothing else wanted.</summary>
     public int LeftoverInRotation { get; init; }
 
+    /// <summary>How many of another station's objects the slot sent pieces of (relayed from what the receivers on the LAN heard, issue #218).</summary>
+    public int RelayedObjects { get; init; }
+
+    /// <summary>How many of <see cref="FramesPlanned"/> were pieces of those.</summary>
+    public int RelayedFrames { get; init; }
+
     public bool ToneSent { get; init; }
 
     /// <summary>True when the channel probe followed the tone, all of it.</summary>

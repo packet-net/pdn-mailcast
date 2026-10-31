@@ -2,6 +2,7 @@ using Packet.Mailcast;
 using Packet.Mailcast.Feedback;
 using Packet.Mailcast.Propagation;
 using Mailcast.HeadEnd.Intake;
+using Mailcast.HeadEnd.Relay;
 using Mailcast.HeadEnd.Slot;
 
 namespace Mailcast.HeadEnd.Planning;
@@ -17,7 +18,10 @@ namespace Mailcast.HeadEnd.Planning;
 /// <param name="PskReporter">The PSK Reporter reading as the slot was planned; null when the head end takes none.</param>
 /// <param name="PskReporterFrames">How many of <paramref name="Frames"/> carry it (content type 4, source 3).</param>
 /// <param name="LeftoverInRotation">How many of <paramref name="BulletinsInRotation"/> are in the budget rule's leftover tier (<see cref="BroadcastScheduler.Leftover"/>).</param>
-public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0)
+/// <param name="Relay">What the relay found when the slot was planned (issue #218); null when this head end does not relay.</param>
+/// <param name="RelayedObjects">How many other stations' objects the slot sends pieces of.</param>
+/// <param name="RelayedFrames">How many of <paramref name="Frames"/> are pieces of those.</param>
+public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0, RelaySummary? Relay = null, int RelayedObjects = 0, int RelayedFrames = 0)
 {
     /// <summary>A plan with nothing in it.</summary>
     public static SlotPlan Empty(DateTimeOffset slot) => new(slot, [], 0, null);
@@ -78,7 +82,10 @@ public interface ISlotPlanner
 /// The listeners' daily reports that reached the head end (<see cref="ReportLog"/>); the
 /// directory lists the recent ones. Null lists none, and the directory says nothing about them.
 /// </param>
-public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null, ReportLog? reports = null) : ISlotPlanner
+/// <param name="relay">
+/// Picks the other stations' objects heard by the receivers on the LAN to relay in the rotation (issue #218); null relays none.
+/// </param>
+public sealed class StoreSlotPlanner(RotationStore store, Compression compression, ScheduleOptions options, Waveforms? waveforms = null, SlotSettings? settings = null, Func<TimeSpan, TimeSpan>? fillLimit = null, TimeProvider? time = null, Func<IonoReading>? ionosphere = null, Func<PskReading>? pskReporter = null, ReportLog? reports = null, RelaySelector? relay = null) : ISlotPlanner
 {
     /// <summary>Frames of the reading in each slot, either of which rebuilds it alone.</summary>
     public const int IonosphereFrames = 2;
@@ -101,20 +108,21 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
         ReportReceipts? listed = reports?.For(DateOnly.FromDateTime(slot.UtcDateTime));
-        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras, listed);
+        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras, listed, relay);
         if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
         {
             // Both readings would crowd out every bulletin frame: PSK Reporter's go first, and the
             // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
-            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames, listed);
+            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames, listed, relay);
         }
+        RelaySummary? summary = relay?.Summary;
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
-            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins);
+            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins, Relay: summary);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
         bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins);
+        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins, summary, broadcast.Relayed.Count, broadcast.RelayedFrames);
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>
