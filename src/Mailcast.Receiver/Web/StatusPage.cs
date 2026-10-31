@@ -71,6 +71,9 @@ public sealed partial class StatusPage : IAsyncDisposable
 
     private readonly ReceiverHost _host;
     private readonly ConfigFile? _configFile;
+
+    /// <summary>Held across a read-modify-save of the config from the page, so two changes cannot lose one another.</summary>
+    private readonly SemaphoreSlim _configLock = new(1, 1);
     private readonly Action<string> _log;
     private HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
@@ -342,7 +345,21 @@ public sealed partial class StatusPage : IAsyncDisposable
                     await ForgetKeyAsync(context).ConfigureAwait(false);
                     break;
                 case ("/api/stations/listen", "POST"):
-                    await ListenToStationAsync(context).ConfigureAwait(false);
+                    await _configLock.WaitAsync().ConfigureAwait(false);
+                    try
+                    {
+                        await ListenToStationAsync(context).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        _configLock.Release();
+                    }
+                    break;
+                case ("/api/stations/listen-for", "POST"):
+                    await ListenForAsync(context, add: true).ConfigureAwait(false);
+                    break;
+                case ("/api/stations/listen-for/remove", "POST"):
+                    await ListenForAsync(context, add: false).ConfigureAwait(false);
                     break;
                 case ("/api/filter/dial", "POST"):
                     await FilterDialAsync(context).ConfigureAwait(false);
@@ -949,6 +966,23 @@ public sealed partial class StatusPage : IAsyncDisposable
                 followed = l.Followed,
                 why = l.NotFollowedBecause,
                 skipped = (config.SkipStations ?? []).Contains(l.Station, StringComparer.OrdinalIgnoreCase),
+                byHand = l.Source == "added by hand",
+            }),
+            // Issue #224: "Listen for a station" entries, and which are no longer needed.
+            listenFor = (config.ListenFor ?? []).Select(e =>
+            {
+                var kept = _host.ListenForState.Get(e);
+                return new
+                {
+                    callsign = e.Callsign,
+                    slots = SlotSchedule.From(e.ToAdvert().Timetable).Describe() + (e.Daylight is null ? " (every slot, no daylight rule)" : ""),
+                    frequencyHz = e.FrequencyHz,
+                    sideband = e.Sideband.ToLowerInvariant(),
+                    locator = e.Locator,
+                    addedUtc = kept?.AddedUtc,
+                    removedAfter = kept is null ? (DateTimeOffset?)null : kept.AddedUtc + ListenForEntry.Lifetime,
+                    retired = kept?.Retired,
+                };
             }),
             // Issue #148: what each station's slots came to today (UTC), whether or not the daily report is on.
             heardToday = _host.Feedback.StationFigures(DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime)).Select(f => new
@@ -2226,30 +2260,133 @@ public sealed partial class StatusPage : IAsyncDisposable
             skip.Add(station!);
         }
         var next = current with { SkipStations = skip.Count == 0 ? null : skip };
-        if (_configFile is not null)
+        if (!await SaveFromPageAsync(context, next).ConfigureAwait(false))
         {
-            try
-            {
-                switch (_configFile.TrySave(next, _log))
-                {
-                    case ConfigFile.SaveOutcome.EditedByHand:
-                        await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.EditedByHand + "." })).ConfigureAwait(false);
-                        return;
-                    case ConfigFile.SaveOutcome.Unreadable:
-                        await RespondAsync(context, 503, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.Unreadable + "." })).ConfigureAwait(false);
-                        return;
-                }
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                await RespondAsync(context, 500, "application/json", JsonSerializer.Serialize(new { error = $"Cannot write {_configFile.Path}: {Ascii.Clean(e.Message)}" })).ConfigureAwait(false);
-                return;
-            }
+            return;
         }
         _log($"config: saved from the page: {(form.Listen ? "listening at" : "not listening at")} {station}'s slots");
         _host.Reconfigure(next);
         _host.RefreshFollowed();
         await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { station, listen = form.Listen })).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Saves <paramref name="next"/> to the config file, if there is one, as the page's other
+    /// settings are saved. Answers the request itself and returns false when it cannot.
+    /// </summary>
+    private async Task<bool> SaveFromPageAsync(HttpListenerContext context, ReceiverConfig next)
+    {
+        if (_configFile is null)
+        {
+            return true;
+        }
+        try
+        {
+            switch (_configFile.TrySave(next, _log))
+            {
+                case ConfigFile.SaveOutcome.EditedByHand:
+                    await RespondAsync(context, 409, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.EditedByHand + "." })).ConfigureAwait(false);
+                    return false;
+                case ConfigFile.SaveOutcome.Unreadable:
+                    await RespondAsync(context, 503, "application/json", JsonSerializer.Serialize(new { error = ConfigFile.Unreadable + "." })).ConfigureAwait(false);
+                    return false;
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            await RespondAsync(context, 500, "application/json", JsonSerializer.Serialize(new { error = $"Cannot write {_configFile.Path}: {Ascii.Clean(e.Message)}" })).ConfigureAwait(false);
+            return false;
+        }
+        return true;
+    }
+
+    private sealed record ListenForForm(string? Callsign, int? Minute, int? EveryMinutes, long? FrequencyHz, string? Sideband, string? Locator, bool? DaylightOnly);
+
+    /// <summary>
+    /// Issue #224: adds, or removes, a "Listen for a station" entry, saved in the config file's
+    /// <c>listenFor</c>. Same sign-in and Host rules as every other change (see <c>AdmitAsync</c>).
+    /// </summary>
+    private async Task ListenForAsync(HttpListenerContext context, bool add)
+    {
+        var (answered, form) = await ReadJsonAsync<ListenForForm>(context).ConfigureAwait(false);
+        if (answered)
+        {
+            return;
+        }
+        string? callsign = form?.Callsign?.Trim().ToUpperInvariant();
+        if (form is null || !Packet.Mailcast.StationAdvert.IsCallsign(callsign))
+        {
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = form is null ? "Could not read the request." : "Give the station's callsign." })).ConfigureAwait(false);
+            return;
+        }
+        await _configLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await ChangeListenForAsync(context, form, callsign!, add).ConfigureAwait(false);
+        }
+        finally
+        {
+            _configLock.Release();
+        }
+    }
+
+    /// <summary>One read-modify-save of <c>listenFor</c>, under <see cref="_configLock"/>.</summary>
+    private async Task ChangeListenForAsync(HttpListenerContext context, ListenForForm form, string callsign, bool add)
+    {
+        var current = _host.Config;
+        var list = (current.ListenFor ?? []).ToList();
+        string said;
+        if (add)
+        {
+            var entry = new ListenForEntry
+            {
+                Callsign = callsign!,
+                Minute = form.Minute ?? 0,
+                EveryMinutes = form.EveryMinutes ?? 60,
+                FrequencyHz = form.FrequencyHz ?? 0,
+                Sideband = (form.Sideband ?? "usb").Trim().ToLowerInvariant(),
+                Locator = string.IsNullOrWhiteSpace(form.Locator) ? null : form.Locator.Trim(),
+            };
+            // A locator means daylight at that place unless told otherwise, 120 minutes after sunrise to 30 before sunset, as head ends do.
+            bool daylight = form.DaylightOnly ?? entry.Locator is not null;
+            string? problem = daylight && entry.Locator is null ? "A daylight rule needs a locator: add one, or untick daylight only." : null;
+            if (daylight && entry.Locator is not null)
+            {
+                entry = entry with { Daylight = new Packet.Mailcast.DaylightSettings { Locator = entry.Locator } };
+            }
+            problem ??= entry.Problem();
+            if (problem is null && _host.Intake.HeardTimetable(entry.Callsign) is not null)
+            {
+                problem = $"{entry.Callsign}'s own signed directory has been heard here already, so its own timetable is used";
+            }
+            if (problem is not null)
+            {
+                await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = problem })).ConfigureAwait(false);
+                return;
+            }
+            list.RemoveAll(entry.SamePlaceAs);
+            list.Add(entry);
+            _host.ListenForState.Restart(entry, _host.Time.GetUtcNow());
+            said = $"listening for {entry.Callsign} at {SlotSchedule.From(entry.ToAdvert().Timetable).Describe()} on {entry.FrequencyHz} Hz {entry.Sideband.ToUpperInvariant()}";
+        }
+        else
+        {
+            if (list.RemoveAll(e => e.Callsign == callsign && (form.FrequencyHz is not { } hz || e.FrequencyHz == hz)) == 0)
+            {
+                await RespondAsync(context, 404, "application/json", JsonSerializer.Serialize(new { error = $"{callsign} is not in the list." })).ConfigureAwait(false);
+                return;
+            }
+            said = $"no longer listening for {callsign}";
+        }
+        var next = current with { ListenFor = list.Count == 0 ? null : list };
+        if (!await SaveFromPageAsync(context, next).ConfigureAwait(false))
+        {
+            return;
+        }
+        _log($"config: saved from the page: {said}");
+        _host.Reconfigure(next);
+        _host.RefreshFollowed();
+        await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(new { callsign, listenFor = add })).ConfigureAwait(false);
     }
 
     /// <summary>
