@@ -89,6 +89,9 @@ public sealed class StatusStore
     /// <summary>How the PSK Reporter feed is doing, for <c>pskReporterFeed</c>; null leaves it out.</summary>
     public Func<Packet.Mailcast.Propagation.PskFeedStatus>? PskReporterFeed { get; set; }
 
+    /// <summary>The receivers followed and what they have given, for <c>receivers</c> (issue #218); null leaves it out.</summary>
+    public Func<object>? Receivers { get; set; }
+
     /// <summary>The directory signing key's ID, for <c>signing</c>; null when directories go out unsigned.</summary>
     public ulong? SigningKeyId { get; set; }
 
@@ -253,6 +256,7 @@ public sealed class StatusStore
                 iono = Reading(),
                 pskReporter = Observed(PskReporter),
                 pskReporterFeed = Observed(PskReporterFeed),
+                receivers = Observed(Receivers),
                 // Whether directories are signed, and with which key (see docs/headend.md).
                 signing = new
                 {

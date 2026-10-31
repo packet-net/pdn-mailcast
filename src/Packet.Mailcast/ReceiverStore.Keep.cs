@@ -9,7 +9,13 @@ namespace Packet.Mailcast;
 /// <param name="Kept">What the keep holds of it.</param>
 /// <param name="ContentType">Its content type if known: from its rebuilt octets, from piece 0, or from a directory that lists it.</param>
 /// <param name="ListedBy">The stations whose trusted signed directories, still remembered, list it.</param>
-public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList<string> ListedBy);
+/// <param name="Listings">The same stations with the long hash (<see cref="DirectoryEntry.Hash"/>, 16 hex digits) each lists it with; null where a listing carries none.</param>
+public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList<string> ListedBy, IReadOnlyList<ObjectListing>? Listings = null);
+
+/// <summary>One trusted signed directory's listing of an object.</summary>
+/// <param name="Station">The station whose directory it is.</param>
+/// <param name="Hash">The long hash it lists, or null.</param>
+public sealed record ObjectListing(string Station, string? Hash);
 
 /// <summary>A page of <see cref="ObjectRow"/>s.</summary>
 /// <param name="Rows">The rows whose cursor is above the one asked for, in cursor order.</param>
@@ -89,11 +95,11 @@ public sealed partial class ReceiverStore
         return ObjectId.Of(held.DictionaryId, held.Data) == objectId ? held : null; // checked again: the file may have been damaged on disk
     }
 
-    private ObjectRow Row(KeptObject kept, Dictionary<ulong, SortedSet<string>> listed)
+    private ObjectRow Row(KeptObject kept, Dictionary<ulong, SortedDictionary<string, string?>> listed)
     {
         listed.TryGetValue(kept.ObjectId, out var by);
         byte? type = kept.ContentType ?? TypeFromDirectories(kept.ObjectId);
-        return new ObjectRow(kept, type, by is null ? [] : [.. by]);
+        return new ObjectRow(kept, type, by is null ? [] : [.. by.Keys], by is null ? [] : [.. by.Select(b => new ObjectListing(b.Key, b.Value))]);
     }
 
     private IEnumerable<(BroadcastDirectory Directory, string Station)> ListingDirectories()
@@ -107,25 +113,25 @@ public sealed partial class ReceiverStore
         }
     }
 
-    private Dictionary<ulong, SortedSet<string>> ListedByStation()
+    private Dictionary<ulong, SortedDictionary<string, string?>> ListedByStation()
     {
-        var listed = new Dictionary<ulong, SortedSet<string>>();
-        void Note(ulong id, string station)
+        var listed = new Dictionary<ulong, SortedDictionary<string, string?>>();
+        void Note(ulong id, string station, string? hash)
         {
             if (!listed.TryGetValue(id, out var set))
             {
-                listed[id] = set = new SortedSet<string>(StringComparer.Ordinal);
+                listed[id] = set = new SortedDictionary<string, string?>(StringComparer.Ordinal);
             }
-            set.Add(station);
+            set[station] = hash;
         }
         foreach (var (directory, station) in ListingDirectories())
         {
             foreach (var entry in directory.Entries)
             {
-                Note(entry.ObjectId, station);
+                Note(entry.ObjectId, station, entry.Hash);
                 if (entry.Envelope is { } link)
                 {
-                    Note(link.ObjectId, station);
+                    Note(link.ObjectId, station, link.Hash);
                 }
             }
         }

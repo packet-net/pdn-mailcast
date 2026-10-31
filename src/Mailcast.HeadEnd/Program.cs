@@ -7,6 +7,7 @@ using Mailcast.HeadEnd.Flex;
 using Mailcast.HeadEnd.Intake;
 using Mailcast.HeadEnd.Offline;
 using Mailcast.HeadEnd.Planning;
+using Mailcast.HeadEnd.Relay;
 using Mailcast.HeadEnd.Service;
 using Mailcast.HeadEnd.Slot;
 using Mailcast.HeadEnd.Station;
@@ -430,9 +431,14 @@ public static partial class Program
             : string.Create(CultureInfo.InvariantCulture, $"pskreporter: observe only, live spots from {config.PskReporter.Host}:{config.PskReporter.Port} near a slot, 40 and 80 m FT8/FT4/WSPR with both ends in the UK or Ireland, judged over the last {PskEvaluator.Window.TotalMinutes:0} min; 40 m sent"));
         journal.Write(DescribeSchedule(config));
         journal.Write(Describe(config, scheduleOptions, waveforms));
+        // Receivers on this machine and on the network, read-only (issue #218); no setting, and nothing waits for it.
+        var catalogue = new ObjectCatalogue(time);
+        using var receivers = new ReceiverPool(catalogue, journal, time);
+        status.Receivers = receivers.StatusView;
         using var service = new HeadEndService(
             schedule, TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
-            planner, store, intakes, runner, status, journal, time);
+            planner, store, intakes, runner, status, journal, time)
+        { BeforeSlot = receivers.ReadNowAsync };
         await using StatusServer? server = string.IsNullOrWhiteSpace(config.Status.Bind) ? null : new StatusServer(config.Status.Bind, config.Status.Port, status, service.RequestRunNow);
         if (server is not null)
         {
@@ -456,7 +462,9 @@ public static partial class Program
         // In the background and observe only: a slot never waits for it.
         Task ionosondeLoop = reading is null ? Task.CompletedTask : Task.Run(() => ionosonde.RunAsync(t => WantReading(schedule, t), stop.Token));
         Task pskReporterLoop = pskReporter is null ? Task.CompletedTask : Task.Run(() => pskReporter.RunAsync(t => WantReading(schedule, t), stop.Token));
+        Task receiversLoop = Task.Run(() => receivers.RunAsync(stop.Token));
         await service.RunAsync(stop.Token);
+        await receiversLoop;
         await ionosondeLoop;
         await pskReporterLoop;
         fbbIntake?.Dispose();

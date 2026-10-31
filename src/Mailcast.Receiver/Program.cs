@@ -112,6 +112,9 @@ static async Task<int> ReceiveAsync(string configPath, string? decode, Cancellat
                 + "set \"web\".\"port\" to another. Carrying on without the page.");
         }
 
+        // Tells head ends on the network where this receiver is (issue #218); only if the page can be reached from the network.
+        using var announcer = Announce(config, page.OnLan, Log);
+
         await host.RunAsync(stop);
         Log("stopped");
         return 0;
@@ -133,3 +136,7 @@ static async Task<int> ReceiveAsync(string configPath, string? decode, Cancellat
         return 0;
     }
 }
+
+// Multicast DNS: "_pdn-mailcast._tcp", named by the daily report's callsign if there is one, else by the computer's name.
+static Mailcast.Receiver.Discovery.ReceiverAnnouncement? Announce(ReceiverConfig config, bool serving, Action<string> log) =>
+    Mailcast.Receiver.Discovery.ReceiverAnnouncement.Start(config, serving, ReceiverHost.Version, new Packet.Mailcast.Discovery.UdpMdnsTransport(), log);

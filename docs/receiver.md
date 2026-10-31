@@ -643,6 +643,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
       "outside": 2,
       "complete": true,
       "listedBy": ["GB7RDG"],
+      "listings": [{ "station": "GB7RDG", "hash": "9c1e5a07d3b2f648" }],
       "updated": "2026-10-31T09:14:02+00:00",
       "cursor": 4812
     }
@@ -659,6 +660,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
 - `k`: pieces needed. `held`: pieces held. `outside`: of those, how many came from outside.
 - `complete`: the object has been rebuilt and matches its ID.
 - `listedBy`: the stations whose trusted signed directories, still remembered (about 48 hours), list the object. Empty if none does.
+- `listings`: the same stations, each with the long hash (16 hex digits) its directory lists the object with; `hash` is null for a listing that carries none. A program that passes the object on can then say what the original station vouched for.
 - `updated`, `cursor`: when and at what cursor value it last changed.
 - `next`: pass this as `since` to the next call. `more`: more rows wait; call again at once.
 
@@ -750,6 +752,17 @@ A program that gets a frame wrong is told so in `results`; the call itself still
 ### Following a receiver from another
 
 A small program can copy one receiver's pieces to another with these calls alone: read the index with the last `next` it saw, read each changed object's `pieces` since its own last cursor, and post the `frame` values to the other receiver. Because a receiver checks every object against its ID, the other receiver is safe from pieces that turn out wrong; use a different `source` label for each source you copy from, so that a bad one can be told from the good.
+
+## Finding it on the network
+
+A head end finds a receiver with no setting. Two things make that work:
+
+- A head end on the same machine looks at the receiver's usual port (8130, `web.port`) on 127.0.0.1.
+- The receiver announces itself on the local network by multicast DNS (also called mDNS or Bonjour), as the service `_pdn-mailcast._tcp`, named after your daily-report callsign and the computer (for example `M0LTE on readingbox`), with the status page's port. The announcement carries `v` (this receiver's version), `api` (the version of the API above, 1) and `pw=1` if the page has a password. A head end on another computer on the same network browses for that service and reads the receiver's API (`GET` only: it changes nothing, and it cannot hand in pieces, which needs the API key).
+
+It is announced only when the page is reachable from the network (`web.lan`, on by default). With `"lan": false` nothing is announced, and the log says so in one line. A receiver whose page has a password cannot be read by a head end, which has none; the head end says so in its journal.
+
+Multicast DNS does not cross routers or VLANs, and some Wi-Fi access points block it between devices. A head end behind one of those does not find the receiver. If multicast cannot be used at all (no network that supports it, a firewall), the receiver logs `discovery: cannot announce this receiver on the network (...)` once and carries on. To see what a head end found, look at the `receivers` list in its status (see [the head end's Status section](headend.md#receivers)); from a Linux machine on the same network, `avahi-browse -rt _pdn-mailcast._tcp` shows the announcement itself.
 
 ## What it logs
 

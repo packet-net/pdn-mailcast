@@ -128,6 +128,9 @@ public sealed partial class StatusPage : IAsyncDisposable
     /// <summary>Where the page is, for the log.</summary>
     public string Url { get; }
 
+    /// <summary>Whether the page is being served to the local network as well as to this machine; false until started.</summary>
+    public bool OnLan { get; private set; }
+
     /// <summary>Starts listening. Throws <see cref="HttpListenerException"/> if the port is taken.</summary>
     public void Start()
     {
@@ -149,6 +152,7 @@ public sealed partial class StatusPage : IAsyncDisposable
                 + "Run the receiver as the service (install-service.ps1), or once, from an administrator command prompt: "
                 + $"netsh http add urlacl url=http://+:{_host.Config.Web.Port}/ user=\"{Environment.UserDomainName}\\{Environment.UserName}\"");
         }
+        OnLan = lan;
         _accept = AcceptAsync();
         _log($"web: status page at {Url}{(lan ? " and on the local network" : "")}");
     }
