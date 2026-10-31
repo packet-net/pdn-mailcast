@@ -452,6 +452,15 @@ internal sealed class PieceKeep
         entry.Cursor = Next();
     }
 
+    /// <summary>Gives an object's row a new cursor value without changing it, so a reader that follows the cursor looks at it again (its count of frames heard on air moved).</summary>
+    public void Touch(ulong objectId)
+    {
+        if (Best(objectId) is { } entry)
+        {
+            entry.Cursor = Next();
+        }
+    }
+
     /// <summary>Keeps the rebuilt octets of an object that matched its ID.</summary>
     public void Complete(string key, ulong objectId, ushort dictionaryId, ObjectTransmissionInformation oti, byte[] data, DateTimeOffset now, long maxBytes)
     {

@@ -95,6 +95,45 @@ public class PieceKeepTests
     }
 
     [Fact]
+    public void FramesHeardOnAir_AreCountedPerObject_AndTheCountsSurviveARestart()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options());
+        var obj = Experiment(4);
+        for (uint esi = 0; esi < 5; esi++)
+        {
+            store.Accept(obj.Frame(esi).ToBytes(), esi < 3 ? "GB7RDG" : "G9XYZ");
+        }
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG"); // a repeat is another frame on the air
+        store.AcceptOutside(obj.Frame(9).ToBytes(), "tool"); // never counted
+        store.FlushAir();
+
+        var air = new ReceiverStore(dir.Path, Compression.Default, Options()).KeptObjects(0, 10).Rows.Single().Air!;
+
+        Assert.Equal(6, air.Frames);
+        Assert.Equal(4, air.ByStation["GB7RDG"]);
+        Assert.Equal(2, air.ByStation["G9XYZ"]);
+    }
+
+    [Fact]
+    public void TheObjectsCursor_MovesWhenItsAirCountDoes_AtMostOnceAMinute()
+    {
+        using var dir = new TempDirectory();
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options() with { Time = time });
+        var obj = Experiment(5);
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG");
+        long first = store.KeptObjects(0, 10).Rows.Single().Kept.Cursor;
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG"); // same minute: no new cursor
+        Assert.Equal(first, store.KeptObjects(0, 10).Rows.Single().Kept.Cursor);
+        time.Advance(TimeSpan.FromMinutes(2));
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG");
+        var row = store.KeptObjects(first, 10).Rows.Single();
+        Assert.True(row.Kept.Cursor > first);
+        Assert.Equal(3, row.Air!.Frames);
+    }
+
+    [Fact]
     public void AnOutsidePiece_HeardLaterOnAir_BecomesAnAirPiece()
     {
         using var dir = new TempDirectory();

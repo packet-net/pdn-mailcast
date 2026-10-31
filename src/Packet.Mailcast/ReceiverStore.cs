@@ -432,6 +432,7 @@ public sealed partial class ReceiverStore
         _keep.ExtraBytes = OutsideOnlyBytes;
         _keep.IsOutsideOnly = key => _instances.TryGetValue(key, out var i) && !i.HasAir;
         LoadApiKey();
+        LoadAir();
         foreach (var marker in System.IO.Directory.EnumerateFiles(_doneDir))
         {
             if (ObjectId.TryParse(Path.GetFileName(marker), out ulong id))
@@ -837,6 +838,10 @@ public sealed partial class ReceiverStore
         if (!MailcastFrame.TryParse(payload, out var frame) || frame is null)
         {
             return new AcceptResult(FrameOutcome.NotAFrame);
+        }
+        if (outside is null)
+        {
+            CountAir(frame.ObjectId, heardFrom, now);
         }
         if (outside is not null && OutsideOnlyTotal() > _options.KeepMaxBytes / 2)
         {

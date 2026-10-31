@@ -92,6 +92,9 @@ public sealed class StatusStore
     /// <summary>The receivers followed and what they have given, for <c>receivers</c> (issue #218); null leaves it out.</summary>
     public Func<object>? Receivers { get; set; }
 
+    /// <summary>What is relayed from the other stations the receivers hear, for <c>relay</c> (issue #218); null leaves it out.</summary>
+    public Func<object>? Relay { get; set; }
+
     /// <summary>The directory signing key's ID, for <c>signing</c>; null when directories go out unsigned.</summary>
     public ulong? SigningKeyId { get; set; }
 
@@ -257,6 +260,7 @@ public sealed class StatusStore
                 pskReporter = Observed(PskReporter),
                 pskReporterFeed = Observed(PskReporterFeed),
                 receivers = Observed(Receivers),
+                relay = Observed(Relay),
                 // Whether directories are signed, and with which key (see docs/headend.md).
                 signing = new
                 {

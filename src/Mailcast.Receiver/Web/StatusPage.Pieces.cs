@@ -114,7 +114,8 @@ public sealed partial class StatusPage
         outside = row.Kept.PiecesOutside,
         complete = row.Kept.Complete,
         listedBy = row.ListedBy,
-        listings = (row.Listings ?? []).Select(l => new { station = l.Station, hash = l.Hash }),
+        listings = (row.Listings ?? []).Select(l => new { station = l.Station, hash = l.Hash, envelope = l.Envelope is { } e ? new { id = ObjectId.Format(e.ObjectId), hash = e.Hash } : null }),
+        air = row.Air is { } a ? new { frames = a.Frames, stations = a.ByStation, first = a.First, last = a.Last } : null,
         updated = row.Kept.Updated,
         cursor = row.Kept.Cursor,
     };

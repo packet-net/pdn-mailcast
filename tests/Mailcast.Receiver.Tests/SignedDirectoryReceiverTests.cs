@@ -1,3 +1,4 @@
+using Packet.SoundModem.Waterfall;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -126,6 +127,41 @@ public class SignedDirectoryReceiverTests
             Assert.Equal("TEST", listing.GetProperty("station").GetString());
             Assert.Matches("^[0-9a-f]{16}$", listing.GetProperty("hash").GetString());
         }
+    }
+
+    [Fact]
+    public async Task TheObjectApi_LinksABulletinsEnvelopePerListingStation_AndListsTheEnvelopeAsAnObject()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 30, 0, TimeSpan.Zero));
+        var (host, page) = await StartAsync(dir.Path, time, []);
+        await using var _h = host;
+        await using var _p = page;
+        var slot = new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);
+        // A head end's store takes the bulletin in canonical form with an envelope, and its directory links it.
+        var options = ScheduleOptions.Hourly with { Signer = Signer };
+        using var store = new TempDirectory();
+        var head = new HeadEndStore(store.Path, Compression.Default, options);
+        head.Offer(Samples.Bulletin(1), DateOnly.FromDateTime(slot.UtcDateTime));
+        var plan = BroadcastScheduler.Plan(head.InRotation(slot), slot, 1, Compression.Default, options);
+        foreach (var frame in plan.Frames)
+        {
+            host.Intake.Offer(Ax25UiFrame.Build(Samples.Source, OnAir.Destination, frame.ToBytes()));
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        using var http = new HttpClient { BaseAddress = new Uri(page.Url) };
+        var index = JsonSerializer.Deserialize<JsonElement>(await http.GetStringAsync("api/objects"));
+        var rows = index.GetProperty("objects").EnumerateArray().ToList();
+        var linked = rows.SelectMany(o => o.GetProperty("listings").EnumerateArray())
+            .Where(l => l.TryGetProperty("envelope", out var e) && e.ValueKind == JsonValueKind.Object)
+            .ToList();
+        Assert.NotEmpty(linked);
+        var link = linked[0].GetProperty("envelope");
+        Assert.Matches("^[0-9a-f]{16}$", link.GetProperty("id").GetString());
+        Assert.Matches("^[0-9a-f]{16}$", link.GetProperty("hash").GetString());
+        var envelope = Assert.Single(rows, o => o.GetProperty("id").GetString() == link.GetProperty("id").GetString());
+        Assert.Equal(5, envelope.GetProperty("type").GetInt32());
     }
 
     private static async Task<(ReceiverHost Host, StatusPage Page)> StartAsync(string dir, TimeProvider time, List<string> lines)

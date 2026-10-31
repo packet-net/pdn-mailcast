@@ -798,6 +798,7 @@ public sealed class Intake : IAsyncDisposable
     {
         _queue.Writer.TryComplete();
         await _worker.ConfigureAwait(false);
+        _store.FlushAir(); // the counts of frames heard on air, so a restart does not start them again
     }
 
     private async Task RunAsync()
