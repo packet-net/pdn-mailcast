@@ -37,6 +37,51 @@ public sealed partial class StatusPage
     /// <summary>The largest body <c>POST /api/pieces</c> reads.</summary>
     public const int MaxPostBytes = 4 * 1024 * 1024;
 
+    /// <summary>
+    /// The public object and piece endpoints, as method and path template, exactly as the OpenAPI document
+    /// (<c>/api/openapi.json</c>) lists them. A test keeps the two together.
+    /// </summary>
+    internal static readonly (string Method, string Path)[] PublicApiRoutes =
+    [
+        ("GET", "/api/objects"),
+        ("GET", "/api/objects/{id}/pieces"),
+        ("GET", "/api/objects/{id}/data"),
+        ("POST", "/api/pieces"),
+    ];
+
+    private static readonly Lazy<string> OpenApi = new(() => Embedded("openapi.json"));
+
+    /// <summary>The API reference page: Scalar's standalone bundle (vendored, so no internet is needed), reading <c>openapi.json</c>.</summary>
+    private const string DocsPage = """
+        <!doctype html>
+        <html lang="en"><head><meta charset="utf-8"><title>pdn-mailcast receiver API</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1"></head>
+        <body>
+        <script id="api-reference" data-url="openapi.json" data-configuration='{"hideClientButton":true,"telemetry":false,"agent":{"disabled":true}}'></script>
+        <script src="docs/scalar.js"></script>
+        </body></html>
+        """;
+
+    /// <summary>The vendored Scalar bundle, sent still gzipped (every browser takes it).</summary>
+    private static async Task ServeScalarAsync(HttpListenerContext context)
+    {
+        using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Mailcast.Receiver.Web.scalar.js.gz")!;
+        var bytes = new MemoryStream();
+        await stream.CopyToAsync(bytes).ConfigureAwait(false);
+        if (!(context.Request.Headers["Accept-Encoding"] ?? "").Contains("gzip", StringComparison.OrdinalIgnoreCase))
+        {
+            using var plain = new MemoryStream();
+            using (var unzip = new System.IO.Compression.GZipStream(new MemoryStream(bytes.ToArray()), System.IO.Compression.CompressionMode.Decompress))
+            {
+                await unzip.CopyToAsync(plain).ConfigureAwait(false);
+            }
+            await RespondBytesAsync(context, 200, "text/javascript; charset=utf-8", plain.ToArray()).ConfigureAwait(false);
+            return;
+        }
+        context.Response.Headers["Content-Encoding"] = "gzip";
+        await RespondBytesAsync(context, 200, "text/javascript; charset=utf-8", bytes.ToArray()).ConfigureAwait(false);
+    }
+
     private static Task ErrorAsync(HttpListenerContext context, int status, string message) =>
         RespondAsync(context, status, "application/json", JsonSerializer.Serialize(new { error = message }));
 

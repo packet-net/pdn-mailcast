@@ -230,3 +230,47 @@ public class PieceApiTests
         Assert.Equal(1, sharing.GetProperty("objects").GetInt32());
     }
 }
+
+public class OpenApiTests
+{
+    [Fact]
+    public async Task TheDocument_IsOpenApi31_AndListsEveryPublicRoute_AndTheDocsPageWorksOffline()
+    {
+        using var dir = new TempDirectory();
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        int port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null, Web = new WebSettings { Port = port } };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero)), _ => { });
+        await using var page = new StatusPage(host, null, _ => { });
+        page.Start();
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/") };
+
+        var doc = await http.GetFromJsonAsync<JsonElement>("api/openapi.json");
+        Assert.StartsWith("3.1.", doc.GetProperty("openapi").GetString(), StringComparison.Ordinal);
+        var paths = doc.GetProperty("paths");
+        foreach (var (method, path) in StatusPage.PublicApiRoutes)
+        {
+            Assert.True(paths.TryGetProperty(path, out var item), path);
+            Assert.True(item.TryGetProperty(method.ToLowerInvariant(), out _), method + " " + path);
+        }
+        Assert.Equal(StatusPage.PublicApiRoutes.Length, paths.EnumerateObject().Sum(p => p.Value.EnumerateObject().Count()));
+        Assert.True(doc.GetProperty("components").GetProperty("securitySchemes").TryGetProperty("bearerKey", out _));
+
+        // Each listed route is really handled (anything but the generic 404 for a path nobody serves).
+        foreach (var (method, path) in StatusPage.PublicApiRoutes)
+        {
+            var request = new HttpRequestMessage(new HttpMethod(method), path.Replace("{id}", "0000000000000001"));
+            var answer = await http.SendAsync(request);
+            string body = await answer.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("Not found.", body, StringComparison.Ordinal);
+        }
+
+        var docs = await http.GetStringAsync("api/docs");
+        Assert.Contains("openapi.json", docs, StringComparison.Ordinal);
+        var script = await http.GetAsync("api/docs/scalar.js");
+        Assert.Equal(System.Net.HttpStatusCode.OK, script.StatusCode);
+        Assert.True((await script.Content.ReadAsByteArrayAsync()).Length > 1_000_000);
+    }
+}

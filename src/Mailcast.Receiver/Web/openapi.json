@@ -1,0 +1,204 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "pdn-mailcast receiver: objects and pieces",
+    "version": "1.0.0",
+    "description": "Read the objects and pieces a pdn-mailcast receiver has kept, and hand pieces in. An object is one thing the head end sends, coded with RaptorQ into pieces; a piece is one self-contained frame (layout: docs/design.md, section On-air format). An object is named by its ID, the first eight octets of the SHA-256 of the two-octet dictionary ID followed by the object's octets, and the receiver checks every rebuilt object against it. This interface is stable: fields are only added, never renamed or removed, so ignore fields you do not know.\n\nReads need nothing unless the status page has a password (then HTTP Basic, any user name). Posting needs the API key made on the status page, in the Sharing pieces section.",
+    "license": { "name": "AGPL-3.0", "identifier": "AGPL-3.0-only" }
+  },
+  "servers": [ { "url": "/" } ],
+  "tags": [
+    { "name": "Reading", "description": "Open like the status page." },
+    { "name": "Handing in", "description": "Needs the API key." }
+  ],
+  "paths": {
+    "/api/objects": {
+      "get": {
+        "tags": [ "Reading" ],
+        "operationId": "listObjects",
+        "summary": "The index of objects kept",
+        "description": "One row for each object, in cursor order. An object that changes (a new piece, completion, a new directory listing it) moves to the end with a new cursor. Cursors only go up, also across restarts; after a restart every object has a new cursor, so a program resuming from an old one sees them all once more.",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Only rows with a cursor above this. Pass the previous call's next.", "schema": { "type": "integer", "format": "int64", "minimum": 0, "default": 0 } },
+          { "name": "limit", "in": "query", "description": "Most rows to return.", "schema": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 200 } }
+        ],
+        "responses": {
+          "200": { "description": "A page of the index.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ObjectPage" }, "example": { "objects": [ { "id": "3f9a0c5be1d27a44", "type": 1, "typeName": "packet mail bulletin (FBB/BPQ message format)", "dictionary": 1, "oti": { "transferLength": 2891, "symbolSize": 240, "sourceBlocks": 1, "subBlocks": 1, "alignment": 4, "hex": "000000000b4b00f0010001" }, "k": 13, "held": 13, "outside": 2, "complete": true, "listedBy": [ "GB7RDG" ], "updated": "2026-10-31T09:14:02+00:00", "cursor": 4812 } ], "next": 4812, "more": false } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        },
+        "security": [ {}, { "pagePassword": [] } ]
+      }
+    },
+    "/api/objects/{id}/pieces": {
+      "get": {
+        "tags": [ "Reading" ],
+        "operationId": "listPieces",
+        "summary": "The pieces held for one object",
+        "description": "Each piece as the whole frame in hex, with when it was kept and where it came from. A complete object keeps the pieces it was rebuilt from.",
+        "parameters": [
+          { "$ref": "#/components/parameters/ObjectId" },
+          { "name": "since", "in": "query", "description": "Only pieces with a cursor above this.", "schema": { "type": "integer", "format": "int64", "minimum": 0, "default": 0 } },
+          { "name": "limit", "in": "query", "description": "Most pieces to return.", "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 } }
+        ],
+        "responses": {
+          "200": { "description": "A page of pieces.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PiecePage" }, "example": { "id": "3f9a0c5be1d27a44", "complete": true, "k": 13, "pieces": [ { "esi": 4, "frame": "02003f9a0c5be1d27a440001", "heard": "2026-10-31T09:12:41+00:00", "from": "air", "label": "GB7RDG", "cursor": 4790 } ], "next": 4790, "more": true } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        },
+        "security": [ {}, { "pagePassword": [] } ]
+      }
+    },
+    "/api/objects/{id}/data": {
+      "get": {
+        "tags": [ "Reading" ],
+        "operationId": "getObjectData",
+        "summary": "The rebuilt object's octets",
+        "description": "The content type octet, any metadata, then the compressed content: exactly what the ID hashes (after the dictionary ID). 404 unless the object is complete and still matches its ID.",
+        "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+        "responses": {
+          "200": {
+            "description": "The octets.",
+            "headers": {
+              "X-Mailcast-Object-Id": { "description": "The object ID.", "schema": { "type": "string" } },
+              "X-Mailcast-Dictionary": { "description": "The zstd dictionary ID the content was compressed with, 0 for none.", "schema": { "type": "integer" } }
+            },
+            "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        },
+        "security": [ {}, { "pagePassword": [] } ]
+      }
+    },
+    "/api/pieces": {
+      "post": {
+        "tags": [ "Handing in" ],
+        "operationId": "postPieces",
+        "summary": "Hand frames in",
+        "description": "Each frame is checked (format, CRC) and pooled with the pieces heard on air, marked as from outside under the source label. Pieces from outside never count towards the station heard most or any slot's figures. Requests whose Origin header names another site are refused. A frame that is wrong is reported in results; the call still answers 200.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "oneOf": [ { "$ref": "#/components/schemas/PostBody" }, { "type": "array", "maxItems": 500, "items": { "$ref": "#/components/schemas/HexFrame" }, "description": "Just the list of frames." } ] },
+              "example": { "source": "my-recorder", "frames": [ "02003f9a0c5be1d27a440001", "0200" ] }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "One result for each frame sent, in order.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostResult" }, "example": { "source": "my-recorder", "accepted": 1, "results": [ { "outcome": "stored", "objectId": "3f9a0c5be1d27a44", "encodingSymbolId": 4, "detail": null }, { "outcome": "notAFrame", "objectId": null, "encodingSymbolId": null, "detail": "not hex" } ] } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
+        },
+        "security": [ { "bearerKey": [] }, { "headerKey": [] } ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerKey": { "type": "http", "scheme": "bearer", "description": "The receiver's API key, made on its status page (Sharing pieces). With no key set, posting is refused with 403." },
+      "headerKey": { "type": "apiKey", "in": "header", "name": "X-Api-Key", "description": "The same key, as a header." },
+      "pagePassword": { "type": "http", "scheme": "basic", "description": "Only if the status page has a password: any user name, the page password." }
+    },
+    "parameters": {
+      "ObjectId": { "name": "id", "in": "path", "required": true, "description": "The object ID: 16 lower-case hex digits.", "schema": { "type": "string", "pattern": "^[0-9a-f]{16}$", "examples": [ "3f9a0c5be1d27a44" ] } }
+    },
+    "responses": {
+      "Error": { "description": "An error, with a sentence for the person.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": { "type": "object", "required": [ "error" ], "properties": { "error": { "type": "string" } } },
+      "HexFrame": { "type": "string", "description": "A frame payload exactly as sent (header, symbol, CRC) in hex, at most 4096 octets.", "pattern": "^([0-9a-fA-F]{2})*$" },
+      "Oti": {
+        "type": "object",
+        "description": "How the object is RaptorQ coded (RFC 6330 section 3.3).",
+        "properties": {
+          "transferLength": { "type": "integer", "format": "int64" },
+          "symbolSize": { "type": "integer" },
+          "sourceBlocks": { "type": "integer" },
+          "subBlocks": { "type": "integer" },
+          "alignment": { "type": "integer" },
+          "hex": { "type": "string", "description": "The 12 octets as they sit in a frame." }
+        }
+      },
+      "ObjectRow": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "The object ID." },
+          "type": { "type": [ "integer", "null" ], "description": "The content type (low 7 bits of the object's first octet), null if not yet known. Known from piece 0, the rebuilt object, or a directory that lists it." },
+          "typeName": { "type": [ "string", "null" ] },
+          "dictionary": { "type": "integer", "description": "The zstd dictionary ID, 0 for none." },
+          "oti": { "$ref": "#/components/schemas/Oti" },
+          "k": { "type": "integer", "description": "Pieces needed to rebuild it." },
+          "held": { "type": "integer", "description": "Pieces held." },
+          "outside": { "type": "integer", "description": "Of those, pieces that came from outside." },
+          "complete": { "type": "boolean", "description": "Rebuilt and matching its ID." },
+          "listedBy": { "type": "array", "items": { "type": "string" }, "description": "Stations whose trusted signed directories, still remembered, list it." },
+          "updated": { "type": "string", "format": "date-time" },
+          "cursor": { "type": "integer", "format": "int64" }
+        }
+      },
+      "ObjectPage": {
+        "type": "object",
+        "properties": {
+          "objects": { "type": "array", "items": { "$ref": "#/components/schemas/ObjectRow" } },
+          "next": { "type": "integer", "format": "int64", "description": "Pass as since next time." },
+          "more": { "type": "boolean", "description": "More rows wait; call again at once." }
+        }
+      },
+      "Piece": {
+        "type": "object",
+        "properties": {
+          "esi": { "type": "integer", "description": "The piece number (encoding symbol ID)." },
+          "frame": { "$ref": "#/components/schemas/HexFrame" },
+          "heard": { "type": "string", "format": "date-time" },
+          "from": { "type": "string", "enum": [ "air", "outside" ] },
+          "label": { "type": [ "string", "null" ], "description": "On air, the station whose slot it was heard in if known; from outside, the poster's source label." },
+          "cursor": { "type": "integer", "format": "int64" }
+        }
+      },
+      "PiecePage": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "complete": { "type": "boolean" },
+          "k": { "type": "integer" },
+          "pieces": { "type": "array", "items": { "$ref": "#/components/schemas/Piece" } },
+          "next": { "type": "integer", "format": "int64" },
+          "more": { "type": "boolean" }
+        }
+      },
+      "PostBody": {
+        "type": "object",
+        "required": [ "frames" ],
+        "properties": {
+          "source": { "type": "string", "maxLength": 48, "description": "Where the pieces came from. Letters, digits and . - _ : / ; anything else becomes _. Without it, the sender's address is used." },
+          "frames": { "type": "array", "maxItems": 500, "items": { "$ref": "#/components/schemas/HexFrame" } }
+        }
+      },
+      "FrameResult": {
+        "type": "object",
+        "properties": {
+          "outcome": { "type": "string", "description": "stored; duplicate; alreadyComplete; notAFrame; unknownDictionary; rejected; or, when the piece finished the object, completedBulletin, completedDirectory, completedEnvelope, completedUnhandled, completedUnknown, completedIonosphere, completedPskReporter, awaitingEnvelope, withheld, completedOtherCopy, rejectedDirectory." },
+          "objectId": { "type": [ "string", "null" ] },
+          "encodingSymbolId": { "type": [ "integer", "null" ] },
+          "detail": { "type": [ "string", "null" ] }
+        }
+      },
+      "PostResult": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string", "description": "The label used." },
+          "accepted": { "type": "integer", "description": "Frames that added a piece." },
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/FrameResult" } }
+        }
+      }
+    }
+  }
+}

@@ -316,6 +316,15 @@ public sealed partial class StatusPage : IAsyncDisposable
                 case ("/api/filter/measure", "POST"):
                     await MeasureFilterAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/openapi.json", "GET"):
+                    await RespondAsync(context, 200, "application/json", OpenApi.Value).ConfigureAwait(false);
+                    break;
+                case ("/api/docs", "GET"):
+                    await RespondAsync(context, 200, "text/html; charset=utf-8", DocsPage).ConfigureAwait(false);
+                    break;
+                case ("/api/docs/scalar.js", "GET"):
+                    await ServeScalarAsync(context).ConfigureAwait(false);
+                    break;
                 case (ObjectsPath, "GET"):
                     await ServeObjectsAsync(context).ConfigureAwait(false);
                     break;

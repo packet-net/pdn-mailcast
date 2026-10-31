@@ -607,7 +607,7 @@ On disk they are in the state directory: waiting ones in `store/outbox/`, archiv
 
 ## The API for objects and pieces
 
-The receiver keeps every piece it hears, of every kind of object, and this API lets other programs read them and hand them in. It is meant for people writing their own tools: a second receiver that fills gaps from the first, a logger, a viewer for a content type of your own, a program that feeds in pieces from a recording. Everything is on the status page's address and port (`http://RECEIVER:8080/` below). The JSON shapes here are a stable public interface: fields are only ever added, never renamed or removed, so ignore fields you do not know.
+The receiver keeps every piece it hears, of every kind of object, and this API lets other programs read them and hand them in. It is meant for people writing their own tools: a second receiver that fills gaps from the first, a logger, a viewer for a content type of your own, a program that feeds in pieces from a recording. Everything is on the status page's address and port (`http://RECEIVER:8080/` below). An interactive reference, made from an OpenAPI 3.1 document, is at `/api/docs` on the receiver itself (it works with no internet), and the document is at `/api/openapi.json`. The JSON shapes here are a stable public interface: fields are only ever added, never renamed or removed, so ignore fields you do not know.
 
 ### What a piece and an object are
 
