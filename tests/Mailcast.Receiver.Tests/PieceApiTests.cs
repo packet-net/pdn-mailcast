@@ -291,15 +291,52 @@ public class HostCheckTests
     [InlineData("[::1]:8080", true)]
     [InlineData("localhost", true)]
     [InlineData("evil.example", false)]
-    [InlineData("evil.example:8080", false)]
-    public void OnlyAnAddressLocalhostOrTheMachinesNameIsAnswered(string host, bool ok) => Assert.Equal(ok, StatusPage.IsOwnHost(host));
+    [InlineData("claude-code.evil.example", false)]
+    public void ForChangesOnlyAnAddressLocalhostOrTheMachinesNameIsAnswered(string host, bool ok) => Assert.Equal(ok, StatusPage.IsOwnHost(host));
 
     [Fact]
-    public void TheMachinesOwnName_WithAnyDomain_IsAnswered()
+    public void TheMachinesExactName_OrWithDotLocal_IsAnswered_NoOtherSuffix()
     {
-        string me = Environment.MachineName.Split('.')[0];
+        string me = Environment.MachineName;
         Assert.True(StatusPage.IsOwnHost(me.ToUpperInvariant() + ":8080"));
-        Assert.True(StatusPage.IsOwnHost(me + ".lan"));
-        Assert.False(StatusPage.IsOwnHost("x" + me + ".lan"));
+        Assert.True(StatusPage.IsOwnHost(me + ".local"));
+        Assert.False(StatusPage.IsOwnHost(me + ".evil.example"));
+        Assert.False(StatusPage.IsOwnHost(me + ".lan"));
+        Assert.False(StatusPage.IsOwnHost("x" + me));
+    }
+
+    [Fact]
+    public async Task AnOtherName_CanViewButNotChangeOrReadTheKey()
+    {
+        using var dir = new TempDirectory();
+        var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        int port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null, Web = new WebSettings { Port = port, Lan = true } };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero)), _ => { });
+        await using var page = new StatusPage(host, null, _ => { });
+        page.Start();
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}/") };
+        HttpRequestMessage As(HttpMethod method, string path)
+        {
+            var r = new HttpRequestMessage(method, path);
+            r.Headers.Host = "claude-code.evil.example:" + port;
+            return r;
+        }
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(As(HttpMethod.Get, "api/status"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(As(HttpMethod.Get, "api/objects"))).StatusCode);
+        var refused = await http.SendAsync(As(HttpMethod.Get, "api/key"));
+        Assert.Equal((HttpStatusCode)421, refused.StatusCode);
+        Assert.Contains("IP address", await refused.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        foreach (string path in new[] { "api/key/new", "api/key/clear", "api/mail/resend", "api/keys/add", "api/settings" })
+        {
+            Assert.Equal((HttpStatusCode)421, (await http.SendAsync(As(HttpMethod.Post, path))).StatusCode);
+        }
+        Assert.Null(host.Intake.ApiKey());
+        // Posting pieces is exempt: it needs the key, which says so.
+        Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(As(HttpMethod.Post, "api/pieces"))).StatusCode);
+        // By address, changing works.
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsync("api/key/new", null)).StatusCode);
     }
 }

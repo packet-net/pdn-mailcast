@@ -91,6 +91,12 @@ internal sealed class PieceKeep
     /// <summary>Octets held elsewhere on behalf of the keep (symbol files of objects with nothing heard on air), counted against the limit.</summary>
     public Func<long> ExtraBytes { get; set; } = () => 0;
 
+    /// <summary>Keys of part-received objects with nothing heard on air.</summary>
+    public Func<string, bool> IsOutsideOnly { get; set; } = _ => false;
+
+    /// <summary>Octets the keep holds for objects with nothing heard on air.</summary>
+    public long OutsideOnlyEntryBytes() => _entries.Values.Where(e => IsOutsideOnly(e.Key)).Sum(e => e.Bytes);
+
     /// <summary>How many octets the keep holds.</summary>
     public long Bytes => _bytes;
 
@@ -501,7 +507,8 @@ internal sealed class PieceKeep
 
     private void Enforce(long maxBytes, Entry added)
     {
-        while (_bytes + ExtraBytes() > maxBytes)
+        // Objects with nothing heard on air cannot push out the others below half the limit: they have their own cap.
+        while (_bytes + ExtraBytes() > maxBytes && _bytes - OutsideOnlyEntryBytes() > maxBytes / 2)
         {
             // Rebuilt objects go before part-received ones, the oldest first: a part-received object may still be finished.
             var victim = _entries.Values.Where(e => e != added && !IsProtected(e.Key)).OrderByDescending(e => e.Complete).ThenBy(e => e.Updated).FirstOrDefault();

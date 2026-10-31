@@ -35,6 +35,41 @@ public sealed partial class ReceiverStore
 {
     private readonly PieceKeep _keep;
 
+    /// <summary>
+    /// An object held back because pieces from outside went into it has, now, K or more pieces heard on air:
+    /// rebuilt from those alone, and if that matches its ID it is admitted as an on-air object. Null while it
+    /// cannot be.
+    /// </summary>
+    private AcceptResult? TryHeardOnAirAlone(Instance instance)
+    {
+        int k = instance.Oti.SourceBlockSymbols(0);
+        var air = instance.Arrival.Where(e => instance.Symbols.ContainsKey(e) && _keep.SourceOf(instance.Key, e) is not { Outside: true }).ToList();
+        if (air.Count < k)
+        {
+            return null;
+        }
+        var decoder = new ObjectDecoder(instance.Oti);
+        foreach (uint esi in air)
+        {
+            decoder.Add(new PayloadId(0, esi), instance.Symbols[esi]);
+        }
+        var data = decoder.TryDecode();
+        if (data is null || ObjectId.Of(instance.DictionaryId, data) != instance.ObjectId)
+        {
+            return null;
+        }
+        Log($"object {ObjectId.Format(instance.ObjectId)}: rebuilt from pieces heard on air alone, so it is not held for the pieces from outside");
+        instance.Withheld = null;
+        instance.WithheldForOutside = false;
+        return Finish(instance, data, heardOnAirAlone: true);
+    }
+
+    /// <summary>
+    /// What the objects with nothing heard on air hold, the keep's copy and the delivery path's: pieces from
+    /// outside may take up to half of <see cref="ReceiverStoreOptions.KeepMaxBytes"/>, no more.
+    /// </summary>
+    private long OutsideOnlyTotal() => OutsideOnlyBytes() + _keep.OutsideOnlyEntryBytes();
+
     /// <summary>The octets the delivery path holds for part-received objects with nothing heard on air; they count against the keep's limit.</summary>
     private long OutsideOnlyBytes() => _instances.Values.Where(i => !i.HasAir).Sum(i => i.Symbols.Values.Sum(v => (long)v.Length));
 

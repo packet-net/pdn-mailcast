@@ -132,4 +132,55 @@ public class PieceKeepReviewTests
         store.Expire();
         Assert.Equal(0, store.PartialObjects);
     }
+
+    [Fact]
+    public void AnObjectHeldBecauseOfOutsidePieces_IsAdmittedOnceKPiecesHeardOnAirRebuildIt()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options() with { Log = log.Add });
+        var b = Bulletin(11);
+        int k = b.SourceSymbols;
+        // One honest piece from outside, then enough on air to complete: held.
+        store.AcceptOutside(b.Frame(0).ToBytes(), "poster");
+        for (int i = 1; i <= k - 1; i++)
+        {
+            store.Accept(b.Frame((uint)i).ToBytes(), "TEST");
+        }
+        Assert.Empty(store.Pending());
+        Assert.Contains(log, l => l.Contains("pieces from outside went into it", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, l => l.Contains("failed its signature check", StringComparison.Ordinal));
+        // More on air: K heard on air alone now, so it is admitted as an on-air object.
+        var outcomes = new[] { store.Accept(b.Frame((uint)k).ToBytes(), "TEST").Outcome, store.Accept(b.Frame((uint)k + 1).ToBytes(), "TEST").Outcome }; // K pieces can fall just short of a rebuild
+        Assert.Contains(FrameOutcome.CompletedBulletin, outcomes);
+        Assert.Single(store.Pending());
+    }
+
+    [Fact]
+    public void OutsideOnlyObjects_CannotEvictOnAirOnes_AndAreStoppedAtHalfTheLimit()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(Now);
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options(time) with { KeepMaxBytes = 300_000, MaxPartials = 100 });
+        var onAir = new List<ulong>();
+        for (int i = 0; i < 20; i++)
+        {
+            var o = TransferObject.ForContent(0x71, RandomBytes(200 + i, 3000), default, false, Compression.NoDictionary, Compression.Default, symbolSize: 240);
+            onAir.Add(o.ObjectId);
+            store.Accept(o.Frame(0).ToBytes(), "TEST");
+            time.Advance(TimeSpan.FromSeconds(1));
+        }
+        for (int i = 0; i < 40; i++)
+        {
+            var o = TransferObject.ForContent(0x71, RandomBytes(300 + i, 60_000), default, false, Compression.NoDictionary, Compression.Default, symbolSize: 240);
+            for (int from = 0; from < 200; from += 100)
+            {
+                store.AcceptOutsideBatch([.. Enumerable.Range(from, 100).Select(n => o.Frame((uint)n).ToBytes())], "poster");
+            }
+        }
+        var held = store.KeptObjects(0, 1000).Rows.Select(r => r.Kept.ObjectId).ToHashSet();
+        Assert.All(onAir, id => Assert.Contains(id, held));
+        var stats = store.KeepStats();
+        Assert.True(stats.OutsidePieces * 270L < 300_000, $"{stats.OutsidePieces} outside pieces");
+    }
 }

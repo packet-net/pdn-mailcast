@@ -238,7 +238,7 @@ public sealed partial class StatusPage
         if (verdict != SignInThrottle.Verdict.Right)
         {
             context.Response.Headers["Retry-After"] = RetryAfter(wait);
-            await ErrorAsync(context, 429, TooMany(verdict, wait)).ConfigureAwait(false);
+            await ErrorAsync(context, 429, TooMany(verdict, wait, "API keys")).ConfigureAwait(false);
             return;
         }
         if (MediaType(request) != "application/json")

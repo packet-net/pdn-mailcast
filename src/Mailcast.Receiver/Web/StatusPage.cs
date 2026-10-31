@@ -389,10 +389,13 @@ public sealed partial class StatusPage : IAsyncDisposable
         {
             return (421, "This page only answers to localhost.");
         }
-        if (web.Lan && !IsOwnHost(host))
+        string path = request.Url?.AbsolutePath ?? "/";
+        bool sensitive = (request.HttpMethod != "GET" && path != "/api/pieces") || path == "/api/key";
+        if (web.Lan && sensitive && !IsOwnHost(host))
         {
-            // DNS rebinding: a page elsewhere must not reach this one by pointing a name of its own at it.
-            return (421, "This page answers only to an IP address, localhost or this machine's own name.");
+            // DNS rebinding: a page elsewhere must not change this one, or read its key, through a name of its own that it points here.
+            // Viewing needs nothing: any name, a DNS alias or a reverse proxy, may read the page. Posting pieces has its own key.
+            return (421, "Use this receiver's IP address in the URL to change settings or see the API key; other names are refused to stop other websites doing it.");
         }
         bool changes = request.HttpMethod != "GET" || request.IsWebSocketRequest;
         string? origin = request.Headers["Origin"];
@@ -404,9 +407,9 @@ public sealed partial class StatusPage : IAsyncDisposable
     }
 
     /// <summary>
-    /// Whether a Host header names this receiver without a name an outsider could point at it: an IP address,
-    /// localhost, or this machine's own name (its first label, any domain after it). No Host at all passes: a
-    /// browser always sends one.
+    /// Whether a Host header names this receiver by something an outsider cannot point at it: an IP
+    /// address, localhost, this machine's exact name, or that name with .local (any case, nothing else).
+    /// No Host at all passes: a browser always sends one.
     /// </summary>
     internal static bool IsOwnHost(string host)
     {
@@ -423,8 +426,8 @@ public sealed partial class StatusPage : IAsyncDisposable
         {
             return true;
         }
-        string first = name.Split('.')[0];
-        return first.Equals(Environment.MachineName.Split('.')[0], StringComparison.OrdinalIgnoreCase);
+        string me = Environment.MachineName;
+        return name.Equals(me, StringComparison.OrdinalIgnoreCase) || name.Equals(me + ".local", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsLoopbackHost(string host)
@@ -616,21 +619,21 @@ public sealed partial class StatusPage : IAsyncDisposable
         : Pause is { } pause ? pause(FailureDelay)
         : Task.Delay(FailureDelay, _host.Time);
 
-    private static string TooMany(SignInThrottle.Verdict verdict, TimeSpan wait) =>
-        verdict == SignInThrottle.Verdict.Busy ? Busy(wait) : LockedOut(wait);
+    private static string TooMany(SignInThrottle.Verdict verdict, TimeSpan wait, string what = "passwords") =>
+        verdict == SignInThrottle.Verdict.Busy ? Busy(wait, what) : LockedOut(wait, what);
 
-    private static string Busy(TimeSpan wait)
+    private static string Busy(TimeSpan wait, string what)
     {
         int seconds = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds));
-        return $"There have been too many wrong passwords lately, so sign-in is slowed down. Try again in {seconds} second{(seconds == 1 ? "" : "s")}.";
+        return $"There have been too many wrong {what} lately, so it is slowed down. Try again in {seconds} second{(seconds == 1 ? "" : "s")}.";
     }
 
     private const string WrongPassword = "That password is not right.";
 
-    private static string LockedOut(TimeSpan wait)
+    private static string LockedOut(TimeSpan wait, string what)
     {
         int minutes = Math.Max(1, (int)Math.Ceiling(wait.TotalMinutes));
-        return $"Too many wrong passwords from this address. Try again in {minutes} minute{(minutes == 1 ? "" : "s")}.";
+        return $"Too many wrong {what} from this address. Try again in {minutes} minute{(minutes == 1 ? "" : "s")}.";
     }
 
     private static string RetryAfter(TimeSpan wait) =>

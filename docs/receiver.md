@@ -621,7 +621,7 @@ What reaches the BBS is unchanged for pieces heard on air. If any piece behind a
 
 ### Reading
 
-Reads need nothing, like the status page itself. The page answers only to an IP address, `localhost` or the machine's own name as the address in the URL (anything else is refused with 421, which stops a web page elsewhere from reaching it through a name of its own). If the page has a password, send it with HTTP Basic (any user name), as for the rest of the page.
+Reads need nothing, like the status page itself. Any name may view the page and read the API, so a DNS alias or a reverse proxy works for that. But anything that changes something, and reading the API key, is refused (421) unless the address in the URL is an IP address, `localhost`, the machine's own name or that name with `.local`; this stops a web page elsewhere from changing the receiver through a name of its own that it points at it. Posting pieces is exempt, because it needs the API key. If the page has a password, send it with HTTP Basic (any user name), as for the rest of the page.
 
 **`GET /api/objects?since=N&limit=M`** is the index. `since` is a cursor (default 0, everything); `limit` is 1 to 1000 (default 200). Rows come in cursor order, and an object that changes (a new piece, completion, a new directory listing it) moves to the end with a new cursor.
 
