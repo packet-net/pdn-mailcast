@@ -390,7 +390,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             return (421, "This page only answers to localhost.");
         }
         string path = request.Url?.AbsolutePath ?? "/";
-        bool sensitive = (request.HttpMethod != "GET" && path != "/api/pieces") || path == "/api/key";
+        bool sensitive = (request.HttpMethod != "GET" && path is not ("/api/pieces" or "/login" or "/logout")) || path == "/api/key";
         if (web.Lan && sensitive && !IsOwnHost(host))
         {
             // DNS rebinding: a page elsewhere must not change this one, or read its key, through a name of its own that it points here.

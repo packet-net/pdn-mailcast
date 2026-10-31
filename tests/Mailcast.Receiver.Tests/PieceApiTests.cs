@@ -336,6 +336,9 @@ public class HostCheckTests
         Assert.Null(host.Intake.ApiKey());
         // Posting pieces is exempt: it needs the key, which says so.
         Assert.Equal(HttpStatusCode.Forbidden, (await http.SendAsync(As(HttpMethod.Post, "api/pieces"))).StatusCode);
+        // Signing in and out are exempt (no password is set here, so they just answer).
+        Assert.NotEqual((HttpStatusCode)421, (await http.SendAsync(As(HttpMethod.Post, "login"))).StatusCode);
+        Assert.NotEqual((HttpStatusCode)421, (await http.SendAsync(As(HttpMethod.Post, "logout"))).StatusCode);
         // By address, changing works.
         Assert.Equal(HttpStatusCode.OK, (await http.PostAsync("api/key/new", null)).StatusCode);
     }
