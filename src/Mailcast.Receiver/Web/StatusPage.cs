@@ -25,7 +25,7 @@ namespace Mailcast.Receiver.Web;
 /// browser signs in on a page of its own and is given a session cookie (see
 /// <see cref="SessionStore"/>); a script can give the password with HTTP Basic instead.</para>
 /// </remarks>
-public sealed class StatusPage : IAsyncDisposable
+public sealed partial class StatusPage : IAsyncDisposable
 {
     private const string WaterfallBase = "/waterfall/";
 
@@ -67,6 +67,7 @@ public sealed class StatusPage : IAsyncDisposable
     private readonly SessionStore _sessions;
     private readonly Dictionary<HttpListenerContext, string?> _sockets = [];
     private readonly SignInThrottle _throttle;
+    private readonly SignInThrottle _keyThrottle;
 
     private readonly ReceiverHost _host;
     private readonly ConfigFile? _configFile;
@@ -99,6 +100,7 @@ public sealed class StatusPage : IAsyncDisposable
         CookieName = $"pdn-mailcast-{web.Port}";
         _sessions = new SessionStore(Path.Combine(host.Config.StateDirectory, SessionStore.FileName), () => _host.Config.Web.Password, host.Time, log);
         _throttle = new SignInThrottle(host.Time, log);
+        _keyThrottle = new SignInThrottle(host.Time, log, "API keys");
         host.PipelineCreated += Attach;
     }
 
@@ -238,6 +240,10 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/logout", "POST"):
                     await SignOutAsync(context).ConfigureAwait(false);
                     return;
+                case ("/api/pieces", "POST"):
+                    // The API key, not the page's password, lets a program in (issue #214).
+                    await PostPiecesAsync(context).ConfigureAwait(false);
+                    return;
             }
             string? session = null;
             if (!await AdmitAsync(context, path, id => session = id).ConfigureAwait(false))
@@ -312,6 +318,30 @@ public sealed class StatusPage : IAsyncDisposable
                 case ("/api/filter/measure", "POST"):
                     await MeasureFilterAsync(context).ConfigureAwait(false);
                     break;
+                case ("/api/openapi.json", "GET"):
+                    await RespondAsync(context, 200, "application/json", OpenApi.Value).ConfigureAwait(false);
+                    break;
+                case ("/api/docs", "GET"):
+                    await RespondAsync(context, 200, "text/html; charset=utf-8", DocsPage).ConfigureAwait(false);
+                    break;
+                case ("/api/docs/scalar.js", "GET"):
+                    await ServeScalarAsync(context).ConfigureAwait(false);
+                    break;
+                case (ObjectsPath, "GET"):
+                    await ServeObjectsAsync(context).ConfigureAwait(false);
+                    break;
+                case (_, "GET") when path.StartsWith(ObjectsBase, StringComparison.Ordinal):
+                    await ServeObjectAsync(context, path[ObjectsBase.Length..]).ConfigureAwait(false);
+                    break;
+                case ("/api/key", "GET"):
+                    await ServeKeyAsync(context).ConfigureAwait(false);
+                    break;
+                case ("/api/key/new", "POST"):
+                    await ChangeKeyAsync(context, clear: false).ConfigureAwait(false);
+                    break;
+                case ("/api/key/clear", "POST"):
+                    await ChangeKeyAsync(context, clear: true).ConfigureAwait(false);
+                    break;
                 case ("/api/keys/add", "POST"):
                     await AddKeyAsync(context).ConfigureAwait(false);
                     break;
@@ -359,6 +389,14 @@ public sealed class StatusPage : IAsyncDisposable
         {
             return (421, "This page only answers to localhost.");
         }
+        string path = request.Url?.AbsolutePath ?? "/";
+        bool sensitive = (request.HttpMethod != "GET" && path is not ("/api/pieces" or "/login" or "/logout")) || path == "/api/key";
+        if (web.Lan && sensitive && !IsOwnHost(host))
+        {
+            // DNS rebinding: a page elsewhere must not change this one, or read its key, through a name of its own that it points here.
+            // Viewing needs nothing: any name, a DNS alias or a reverse proxy, may read the page. Posting pieces has its own key.
+            return (421, "Use this receiver's IP address in the URL to change settings or see the API key; other names are refused to stop other websites doing it.");
+        }
         bool changes = request.HttpMethod != "GET" || request.IsWebSocketRequest;
         string? origin = request.Headers["Origin"];
         if (changes && origin is not null && !SameOrigin(origin, host))
@@ -366,6 +404,30 @@ public sealed class StatusPage : IAsyncDisposable
             return (403, "Refused: this request came from another site.");
         }
         return null;
+    }
+
+    /// <summary>
+    /// Whether a Host header names this receiver by something an outsider cannot point at it: an IP
+    /// address, localhost, this machine's exact name, or that name with .local (any case, nothing else).
+    /// No Host at all passes: a browser always sends one.
+    /// </summary>
+    internal static bool IsOwnHost(string host)
+    {
+        if (host.Length == 0)
+        {
+            return true;
+        }
+        string name = host.StartsWith('[') ? host[..(host.IndexOf(']') + 1)] : host.Split(':')[0];
+        if (name.Length == 0)
+        {
+            return false;
+        }
+        if (IPAddress.TryParse(name.Trim('[', ']'), out _) || name.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        string me = Environment.MachineName;
+        return name.Equals(me, StringComparison.OrdinalIgnoreCase) || name.Equals(me + ".local", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsLoopbackHost(string host)
@@ -493,7 +555,7 @@ public sealed class StatusPage : IAsyncDisposable
         }
         if (IsBrowser(request))
         {
-            if (request.HttpMethod == "GET" && !request.IsWebSocketRequest && !path.StartsWith("/api/", StringComparison.Ordinal))
+            if (request.HttpMethod == "GET" && !request.IsWebSocketRequest && (!path.StartsWith("/api/", StringComparison.Ordinal) || path == "/api/docs"))
             {
                 await SignInPageAsync(context, 200, path, null).ConfigureAwait(false);
             }
@@ -557,21 +619,21 @@ public sealed class StatusPage : IAsyncDisposable
         : Pause is { } pause ? pause(FailureDelay)
         : Task.Delay(FailureDelay, _host.Time);
 
-    private static string TooMany(SignInThrottle.Verdict verdict, TimeSpan wait) =>
-        verdict == SignInThrottle.Verdict.Busy ? Busy(wait) : LockedOut(wait);
+    private static string TooMany(SignInThrottle.Verdict verdict, TimeSpan wait, string what = "passwords") =>
+        verdict == SignInThrottle.Verdict.Busy ? Busy(wait, what) : LockedOut(wait, what);
 
-    private static string Busy(TimeSpan wait)
+    private static string Busy(TimeSpan wait, string what)
     {
         int seconds = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds));
-        return $"There have been too many wrong passwords lately, so sign-in is slowed down. Try again in {seconds} second{(seconds == 1 ? "" : "s")}.";
+        return $"There have been too many wrong {what} lately, so it is slowed down. Try again in {seconds} second{(seconds == 1 ? "" : "s")}.";
     }
 
     private const string WrongPassword = "That password is not right.";
 
-    private static string LockedOut(TimeSpan wait)
+    private static string LockedOut(TimeSpan wait, string what)
     {
         int minutes = Math.Max(1, (int)Math.Ceiling(wait.TotalMinutes));
-        return $"Too many wrong passwords from this address. Try again in {minutes} minute{(minutes == 1 ? "" : "s")}.";
+        return $"Too many wrong {what} from this address. Try again in {minutes} minute{(minutes == 1 ? "" : "s")}.";
     }
 
     private static string RetryAfter(TimeSpan wait) =>
@@ -850,6 +912,7 @@ public sealed class StatusPage : IAsyncDisposable
             schedule = Schedule(config, _host.Followed, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
             // Issues #178 and #144: each station's pinned key, when its newest directory was dated,
             // and any directory refused for naming a pinned station under another key.
+            sharing = SharingView(),
             stations = StationsView(_host.Intake.Pins(), _host.Intake.StationDirectories(), _host.Intake.KeyConflicts(), _host.Intake.KeyRows()),
             // Every station whose slots are known, whether this receiver listens at them, and if not why.
             listening = _host.Listening.Select(l => new
@@ -1437,9 +1500,9 @@ public sealed class StatusPage : IAsyncDisposable
     }
 
     /// <summary>Reads a request's body, or answers 413 for one over <see cref="MaxFormBytes"/> and gives null.</summary>
-    private static async Task<(bool Answered, byte[]? Body)> ReadBodyAsync(HttpListenerContext context)
+    private static async Task<(bool Answered, byte[]? Body)> ReadBodyAsync(HttpListenerContext context, int maxBytes = MaxFormBytes)
     {
-        if (context.Request.ContentLength64 > MaxFormBytes)
+        if (context.Request.ContentLength64 > maxBytes)
         {
             await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
             return (true, null);
@@ -1450,7 +1513,7 @@ public sealed class StatusPage : IAsyncDisposable
         while ((read = await context.Request.InputStream.ReadAsync(buffer).ConfigureAwait(false)) > 0)
         {
             body.Write(buffer, 0, read);
-            if (body.Length > MaxFormBytes)
+            if (body.Length > maxBytes)
             {
                 await RespondAsync(context, 413, "application/json", JsonSerializer.Serialize(new { error = "That form is too large." })).ConfigureAwait(false);
                 return (true, null);

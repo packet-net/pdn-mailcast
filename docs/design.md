@@ -328,6 +328,10 @@ A small local web page for setup and status:
 
 pdn-soundmodem's station page already has the waterfall and level meter in its library, so the page reuses those and adds the mailcast panels. It listens on localhost and the LAN only.
 
+### Keeping every piece, and the API
+
+A receiver keeps the pieces of every object it hears, whatever the content type, and the rebuilt object once it matches its ID, within a storage limit, apart from what it delivers to the BBS. Each stored piece remembers whether it was heard on air (and in which station's slot) or handed in through the receiver's API with a source label. Because a piece is self-contained and an object is checked against its own ID, the source does not matter for correctness, only for counting (pieces from outside never count towards the station heard most or a slot's figures) and for finding mistakes: when a rebuild fails its ID check, the receiver retries without the pieces from outside, then without each label's, before waiting for more. The API itself is described in [receiver.md](receiver.md#the-api-for-objects-and-pieces).
+
 ## Where the code lives
 
 - **pdn-mailcast** (this repo) holds the head end, the receiver, and a core library with the on-air format, compression and directory, published on nuget.org as `Packet.Mailcast` (namespace `Packet.Mailcast`), after packet.net's `Packet.Core` and `Packet.Ax25`.

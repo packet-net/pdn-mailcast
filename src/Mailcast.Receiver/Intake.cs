@@ -265,6 +265,15 @@ public sealed class Intake : IAsyncDisposable
     public event Action<Bulletin>? BulletinCompleted;
 
     /// <summary>
+    /// A bulletin has been rebuilt with the help of pieces from outside (issue #214) and is waiting in the
+    /// outbox. Not a slot's: <see cref="BulletinCompleted"/> does not fire for it.
+    /// </summary>
+    public event Action<Bulletin>? BulletinCompletedOutside;
+
+    /// <summary>Pieces handed in from outside were newly stored (issue #214): how many, once per call to <see cref="AcceptOutside"/>.</summary>
+    public event Action<int>? OutsidePieces;
+
+    /// <summary>
     /// A canonical bulletin (issue #145) that completed earlier has left its wait for an envelope and is
     /// in the outbox. Not a new completion: <see cref="BulletinCompleted"/> fired when it completed.
     /// </summary>
@@ -643,6 +652,147 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
+    // ---- the API for objects and pieces (issue #214)
+
+    /// <summary>The index of objects kept (see <see cref="ReceiverStore.KeptObjects"/>).</summary>
+    public ObjectPage ObjectIndex(long since, int limit)
+    {
+        lock (_gate)
+        {
+            return _store.KeptObjects(since, limit);
+        }
+    }
+
+    /// <summary>One object's kept pieces, or null if it is not kept.</summary>
+    public PiecePage? ObjectPieces(ulong objectId, long since, int limit)
+    {
+        lock (_gate)
+        {
+            return _store.KeptPieces(objectId, since, limit);
+        }
+    }
+
+    /// <summary>An object's rebuilt octets, only once it matched its ID; else null.</summary>
+    public (byte[] Data, ushort DictionaryId)? ObjectData(ulong objectId)
+    {
+        lock (_gate)
+        {
+            return _store.KeptData(objectId);
+        }
+    }
+
+    /// <summary>What the keep holds.</summary>
+    public KeepStats KeepStats()
+    {
+        lock (_gate)
+        {
+            return _store.KeepStats();
+        }
+    }
+
+    /// <summary>The API key, or null if none is set.</summary>
+    public string? ApiKey()
+    {
+        lock (_gate)
+        {
+            return _store.ApiKey;
+        }
+    }
+
+    /// <summary>Makes a new API key, replacing any, and returns it.</summary>
+    public string NewApiKey()
+    {
+        lock (_gate)
+        {
+            return _store.NewApiKey();
+        }
+    }
+
+    /// <summary>Removes the API key.</summary>
+    public void ClearApiKey()
+    {
+        lock (_gate)
+        {
+            _store.ClearApiKey();
+        }
+    }
+
+    /// <summary>Whether <paramref name="given"/> is the API key.</summary>
+    public bool ApiKeyMatches(string? given)
+    {
+        lock (_gate)
+        {
+            return _store.ApiKeyMatches(given);
+        }
+    }
+
+    /// <summary>
+    /// Takes frames handed in from outside: each is checked and pooled with the pieces heard on air by the
+    /// same store, marked as from <paramref name="label"/>, in the order given. Done on the caller's thread
+    /// under the store's lock; none of it counts for a slot's figures.
+    /// </summary>
+    /// <returns>What became of each frame, in the same order.</returns>
+    public IReadOnlyList<OutsideOutcome> AcceptOutside(IReadOnlyList<byte[]> frames, string label)
+    {
+        ArgumentNullException.ThrowIfNull(frames);
+        var outcomes = new List<OutsideOutcome>(frames.Count);
+        var results = new List<AcceptResult>(frames.Count);
+        MailParts? parts = null;
+        IReadOnlyList<ulong> givenUp = [];
+        int kept = 0;
+        lock (_gate)
+        {
+            try
+            {
+                IReadOnlyList<AcceptResult> taken;
+                try
+                {
+                    taken = _store.AcceptOutsideBatch(frames, label);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    _log($"store: cannot keep a piece: {Ascii.Clean(e.Message)}");
+                    taken = [.. frames.Select(_ => new AcceptResult(FrameOutcome.Rejected, Detail: "the receiver could not keep it"))];
+                }
+                for (int i = 0; i < taken.Count; i++)
+                {
+                    results.Add(taken[i]);
+                    uint? esi = MailcastFrame.TryParse(frames[i], out var parsed) ? parsed!.EncodingSymbolId : null;
+                    outcomes.Add(OutsideOutcome.From(taken[i], esi));
+                    if (taken[i].Kept)
+                    {
+                        kept++;
+                    }
+                }
+                givenUp = _store.TakeGivenUp();
+                _progress = (_store.Directory, _store.Progress());
+                _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
+            }
+            finally
+            {
+                parts = _store.CaptureMail();
+            }
+        }
+        Publish(parts);
+        RaiseGivenUp(givenUp);
+        try
+        {
+            foreach (var result in results)
+            {
+                Report(result, outside: true);
+            }
+            if (kept > 0)
+            {
+                OutsidePieces?.Invoke(kept);
+            }
+        }
+        catch (Exception e)
+        {
+            _log($"store: a listener failed: {Ascii.Clean(e.Message)}");
+        }
+        return outcomes;
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -723,36 +873,39 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
-    private void Report(AcceptResult result)
+    private void Report(AcceptResult result, bool outside = false)
     {
         switch (result.Outcome)
         {
             case FrameOutcome.Stored:
-                Interlocked.Increment(ref _framesStored);
+                CountStored(outside);
                 break;
             case FrameOutcome.CompletedBulletin when result.Bulletin is { } bulletin:
-                Interlocked.Increment(ref _framesStored);
-                Completed(bulletin);
+                CountStored(outside);
+                Completed(bulletin, outside);
                 break;
             case FrameOutcome.AwaitingEnvelope when result.Bulletin is { } waiting:
                 // Complete now (counted in this slot), whenever it is released to the outbox.
-                Interlocked.Increment(ref _framesStored);
-                Completed(waiting);
+                CountStored(outside);
+                Completed(waiting, outside);
                 break;
             case FrameOutcome.CompletedOtherCopy:
                 // Issue #147: the store has logged the one line; not a bulletin to deliver, and not a failure.
-                Interlocked.Increment(ref _framesStored);
+                CountStored(outside);
                 break;
             case FrameOutcome.Withheld or FrameOutcome.RejectedDirectory:
                 // The store has said why, once.
-                Interlocked.Increment(ref _framesStored);
+                CountStored(outside);
                 break;
             case FrameOutcome.CompletedDirectory when result.Directory is { } directory:
-                Interlocked.Increment(ref _framesStored);
+                CountStored(outside);
                 _log($"directory for {directory.Date:yyyy-MM-dd}: {directory.Entries.Count} bulletins in rotation"
                     + (directory.Mode is { } mode ? $", sent on {Waveform.Words(mode)}" : "")
                     + (result.Check is { } check ? $", {Ascii.Clean(check.Describe())}" : ""));
-                DirectoryHeard?.Invoke(directory);
+                if (!outside)
+                {
+                    DirectoryHeard?.Invoke(directory);
+                }
                 SlotTimetable? changed = null;
                 lock (_gate)
                 {
@@ -775,25 +928,31 @@ public sealed class Intake : IAsyncDisposable
                 break;
             case FrameOutcome.CompletedIonosphere when result.Ionosphere is { } reading:
                 // Once per object, so once a slot at most. Never for the BBS.
-                Interlocked.Increment(ref _framesStored);
+                CountStored(outside);
                 lock (_gate)
                 {
                     _ionosphere = _store.Ionosphere;
                 }
                 DateTimeOffset now = _time.GetUtcNow();
                 _log(Ascii.Clean(reading.AsOf(now, IonoSettings.DefaultStaleAfter).Describe(now)));
-                IonosphereHeard?.Invoke(reading);
+                if (!outside)
+                {
+                    IonosphereHeard?.Invoke(reading);
+                }
                 break;
             case FrameOutcome.CompletedPskReporter when result.PskReporter is { } spots:
                 // Once per object, so once a slot at most. Never for the BBS.
-                Interlocked.Increment(ref _framesStored);
+                CountStored(outside);
                 lock (_gate)
                 {
                     _pskReporter = _store.PskReporter;
                 }
                 DateTimeOffset at = _time.GetUtcNow();
                 _log(Ascii.Clean(spots.AsOf(at, PskEvaluator.StaleAfter).Describe(at)));
-                PskReporterHeard?.Invoke(spots);
+                if (!outside)
+                {
+                    PskReporterHeard?.Invoke(spots);
+                }
                 break;
             case FrameOutcome.CompletedUnhandled when result.ContentType is { } type:
                 // Once per object: it is marked done, so its later frames are not rebuilt again.
@@ -810,7 +969,7 @@ public sealed class Intake : IAsyncDisposable
         }
         foreach (var released in result.Released ?? [])
         {
-            Completed(released);
+            Completed(released, outside);
         }
         foreach (var delivered in result.Delivered ?? [])
         {
@@ -819,10 +978,40 @@ public sealed class Intake : IAsyncDisposable
         }
     }
 
-    private void Completed(Bulletin bulletin)
+    private void CountStored(bool outside)
     {
-        _log($"bulletin complete: {Ascii.Clean(bulletin.Bid)} from {Ascii.Clean(bulletin.From)} to {Ascii.Clean(bulletin.To)}"
+        if (!outside)
+        {
+            Interlocked.Increment(ref _framesStored);
+        }
+    }
+
+    private void Completed(Bulletin bulletin, bool outside = false)
+    {
+        _log($"bulletin complete{(outside ? " (with pieces from outside)" : "")}: {Ascii.Clean(bulletin.Bid)} from {Ascii.Clean(bulletin.From)} to {Ascii.Clean(bulletin.To)}"
             + $"{(bulletin.At.Length > 0 ? "@" + Ascii.Clean(bulletin.At) : "")}, \"{Ascii.Clean(bulletin.Title)}\"");
+        if (outside)
+        {
+            // Not heard in any slot, so not in any slot's figures; the BBS delivery still wants to know.
+            BulletinCompletedOutside?.Invoke(bulletin);
+            BulletinReleased?.Invoke(bulletin);
+            return;
+        }
         BulletinCompleted?.Invoke(bulletin);
+    }
+}
+
+/// <summary>What became of one frame handed in from outside (issue #214).</summary>
+/// <param name="Outcome">The store's outcome in camel case: <c>stored</c>, <c>duplicate</c>, <c>notAFrame</c>, <c>alreadyComplete</c>, <c>unknownDictionary</c>, <c>rejected</c>, or <c>completedBulletin</c> and its like when the piece finished an object.</param>
+/// <param name="ObjectId">The frame's object, in 16 hex digits, if it was a frame.</param>
+/// <param name="EncodingSymbolId">The frame's piece number, if it was a frame.</param>
+/// <param name="Detail">Why not, for a refusal.</param>
+/// <param name="Kept">Whether the frame added a piece the receiver did not have.</param>
+public sealed record OutsideOutcome(string Outcome, string? ObjectId, uint? EncodingSymbolId, string? Detail, bool Kept = false)
+{
+    internal static OutsideOutcome From(AcceptResult result, uint? esi)
+    {
+        string name = result.Outcome.ToString();
+        return new OutsideOutcome(char.ToLowerInvariant(name[0]) + name[1..], result.ObjectId is { } id ? Packet.Mailcast.ObjectId.Format(id) : null, esi, result.Detail, result.Kept);
     }
 }

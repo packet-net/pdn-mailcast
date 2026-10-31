@@ -279,7 +279,7 @@ internal sealed class SessionStore
 /// with many addresses guessing without limit: the table of addresses is capped, so on its own it
 /// could be made to forget a lockout.
 /// </remarks>
-internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
+internal sealed class SignInThrottle(TimeProvider time, Action<string> log, string what = "passwords")
 {
     /// <summary>How long each wrong password waits before it is answered.</summary>
     public static readonly TimeSpan FailureDelay = TimeSpan.FromSeconds(1);
@@ -373,7 +373,7 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
                 if (!_slowed)
                 {
                     _slowed = true;
-                    log($"web: {GlobalBudget} wrong passwords within {FailureWindow.TotalMinutes:0} minutes from all addresses together; every sign-in is limited to one each {GlobalSpacing.TotalSeconds:0} seconds until that calms down");
+                    log($"web: {GlobalBudget} wrong {what} within {FailureWindow.TotalMinutes:0} minutes from all addresses together; every sign-in is limited to one each {GlobalSpacing.TotalSeconds:0} seconds until that calms down");
                 }
             }
             else
@@ -400,7 +400,7 @@ internal sealed class SignInThrottle(TimeProvider time, Action<string> log)
             {
                 tally.LockedUntil = now + LockoutTime;
                 tally.Failures.Clear();
-                log($"web: {MaxFailures} wrong passwords from {from} within {FailureWindow.TotalMinutes:0} minutes; sign-in from there is refused for {LockoutTime.TotalMinutes:0} minutes");
+                log($"web: {MaxFailures} wrong {what} from {from} within {FailureWindow.TotalMinutes:0} minutes; sign-in from there is refused for {LockoutTime.TotalMinutes:0} minutes");
             }
             return Verdict.Wrong;
         }

@@ -224,9 +224,11 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             ? "0"
             : string.Create(CultureInfo.InvariantCulture, $"{h.Errors.Values.Sum()}:{string.Join(',', h.Errors.Where(e => e.Value > 0).OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => string.Create(CultureInfo.InvariantCulture, $"{e.Key}{e.Value}")))}");
         string alreadyHad = h.AlreadyHad is { } a ? a.ToString(CultureInfo.InvariantCulture) : Missing;
-        string givenUp = h.GivenUp is { } g ? string.Create(CultureInfo.InvariantCulture, $" {g}") : "";
+        // Field 9 needs field 8 before it, as "-" if that one is not known.
+        string givenUp = h.GivenUp is { } g ? string.Create(CultureInfo.InvariantCulture, $" {g}") : h.OutsidePieces is not null ? " " + Missing : "";
+        string outside = h.OutsidePieces is { } o ? string.Create(CultureInfo.InvariantCulture, $" {o}") : "";
         return string.Create(CultureInfo.InvariantCulture,
-            $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors} {alreadyHad}{givenUp}");
+            $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors} {alreadyHad}{givenUp}{outside}");
     }
 
     private static string SlotLine(ReportSlot s)
@@ -305,7 +307,9 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         // Field 8: how many part-received bulletins were given up (dropped because the head end
         // had stopped sending them) that day. Missing, or "-", means not known: an older sender's report.
         int? givenUp = f.Length > 7 ? ParseCount(f[7], "a given-up") : null;
-        return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad, givenUp);
+        // Field 9 (issue #214): pieces handed in from outside that day. Missing, or "-", means not known.
+        int? outsidePieces = f.Length > 8 && TryInt(f[8], out int outsideCount) ? outsideCount : null; // lenient: older readers took anything after field 8 as a later field
+        return new ReportHeader(Value(f[1]) ?? "", Value(f[2]), Value(f[3]) ?? "", rebuilt, delivered, ParseErrors(f[5]), alreadyHad, givenUp, outsidePieces);
     }
 
     private static int? ParseCount(string field, string what) =>
@@ -513,4 +517,10 @@ public static class ReportErrors
 /// stopped sending them, each counted once. Null when not known: read from a header with no
 /// eighth field, or <c>-</c> there; and, written, null leaves the field out.
 /// </param>
-public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad, int? GivenUp = null);
+/// <param name="OutsidePieces">
+/// Pieces of objects newly stored in the day that were handed in from outside by a program using the receiver's API
+/// (issue #214), not heard in any slot. Null when none or not known: read from a header with no ninth field, or
+/// <c>-</c> there; and, written, null leaves the field out. A ninth field is written after an eighth, as <c>-</c> if
+/// that one is null.
+/// </param>
+public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad, int? GivenUp = null, int? OutsidePieces = null);
