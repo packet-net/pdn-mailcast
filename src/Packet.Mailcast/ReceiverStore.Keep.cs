@@ -77,6 +77,81 @@ public sealed partial class ReceiverStore
         public DateTimeOffset Last = first;
     }
 
+    /// <summary>How long a count of frames heard on air is kept after the last one: as long as a relay may still look at the object.</summary>
+    public static readonly TimeSpan AirRetention = TimeSpan.FromDays(7);
+
+    private const string AirFile = "air.txt";
+    private DateTimeOffset _airSaved;
+    private bool _airDirty;
+
+    /// <summary>Writes the counts of frames heard on air now (they are also written at most once a minute as frames arrive).</summary>
+    public void FlushAir()
+    {
+        if (!_airDirty)
+        {
+            return;
+        }
+        var now = _options.Time.GetUtcNow();
+        var text = new StringBuilder();
+        foreach (var (id, c) in _air.Where(kv => now - kv.Value.Last < AirRetention))
+        {
+            text.Append(ObjectId.Format(id)).Append('\t').Append(c.Frames.ToString(CultureInfo.InvariantCulture)).Append('\t')
+                .Append(c.First.UtcTicks.ToString(CultureInfo.InvariantCulture)).Append('\t').Append(c.Last.UtcTicks.ToString(CultureInfo.InvariantCulture)).Append('\t')
+                .Append(string.Join(';', c.ByStation.Select(s => Uri.EscapeDataString(s.Key) + "=" + s.Value.ToString(CultureInfo.InvariantCulture)))).Append('\n');
+        }
+        try
+        {
+            DurableFile.WriteAtomically(Path.Combine(_root, AirFile), Encoding.UTF8.GetBytes(text.ToString()), now, _options.FlushToDisk);
+            _airDirty = false;
+            _airSaved = now;
+        }
+        catch (IOException e)
+        {
+            Log($"could not save the counts of frames heard on air: {e.Message}");
+        }
+    }
+
+    private void LoadAir()
+    {
+        string path = Path.Combine(_root, AirFile);
+        if (!File.Exists(path))
+        {
+            return;
+        }
+        var now = _options.Time.GetUtcNow();
+        try
+        {
+            foreach (string line in File.ReadAllLines(path))
+            {
+                var f = line.Split('\t');
+                if (f.Length < 5 || !ObjectId.TryParse(f[0], out ulong id))
+                {
+                    continue;
+                }
+                var last = new DateTimeOffset(long.Parse(f[3], CultureInfo.InvariantCulture), TimeSpan.Zero);
+                if (now - last >= AirRetention)
+                {
+                    continue;
+                }
+                var c = new AirCount(new DateTimeOffset(long.Parse(f[2], CultureInfo.InvariantCulture), TimeSpan.Zero)) { Frames = int.Parse(f[1], CultureInfo.InvariantCulture), Last = last };
+                foreach (string part in f[4].Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int eq = part.IndexOf('=', StringComparison.Ordinal);
+                    if (eq > 0)
+                    {
+                        c.ByStation[Uri.UnescapeDataString(part[..eq])] = int.Parse(part[(eq + 1)..], CultureInfo.InvariantCulture);
+                    }
+                }
+                _air[id] = c;
+            }
+        }
+        catch (Exception e) when (e is FormatException or OverflowException or ArgumentException or IOException)
+        {
+            _air.Clear();
+            Log($"counts of frames heard on air unreadable, starting again: {e.Message}");
+        }
+    }
+
     private void CountAir(ulong objectId, string? station, DateTimeOffset now)
     {
         if (!_air.TryGetValue(objectId, out var c))
@@ -92,6 +167,11 @@ public sealed partial class ReceiverStore
         if (station is not null)
         {
             c.ByStation[station] = c.ByStation.GetValueOrDefault(station) + 1;
+        }
+        _airDirty = true;
+        if (now - _airSaved >= TimeSpan.FromMinutes(1))
+        {
+            FlushAir();
         }
     }
 

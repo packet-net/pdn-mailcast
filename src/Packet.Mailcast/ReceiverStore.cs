@@ -432,6 +432,7 @@ public sealed partial class ReceiverStore
         _keep.ExtraBytes = OutsideOnlyBytes;
         _keep.IsOutsideOnly = key => _instances.TryGetValue(key, out var i) && !i.HasAir;
         LoadApiKey();
+        LoadAir();
         foreach (var marker in System.IO.Directory.EnumerateFiles(_doneDir))
         {
             if (ObjectId.TryParse(Path.GetFileName(marker), out ulong id))

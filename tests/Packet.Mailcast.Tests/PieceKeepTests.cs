@@ -95,6 +95,27 @@ public class PieceKeepTests
     }
 
     [Fact]
+    public void FramesHeardOnAir_AreCountedPerObject_AndTheCountsSurviveARestart()
+    {
+        using var dir = new TempDirectory();
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options());
+        var obj = Experiment(4);
+        for (uint esi = 0; esi < 5; esi++)
+        {
+            store.Accept(obj.Frame(esi).ToBytes(), esi < 3 ? "GB7RDG" : "G9XYZ");
+        }
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG"); // a repeat is another frame on the air
+        store.AcceptOutside(obj.Frame(9).ToBytes(), "tool"); // never counted
+        store.FlushAir();
+
+        var air = new ReceiverStore(dir.Path, Compression.Default, Options()).KeptObjects(0, 10).Rows.Single().Air!;
+
+        Assert.Equal(6, air.Frames);
+        Assert.Equal(4, air.ByStation["GB7RDG"]);
+        Assert.Equal(2, air.ByStation["G9XYZ"]);
+    }
+
+    [Fact]
     public void AnOutsidePiece_HeardLaterOnAir_BecomesAnAirPiece()
     {
         using var dir = new TempDirectory();
