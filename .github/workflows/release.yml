@@ -230,6 +230,11 @@ jobs:
           for release in bookworm bullseye; do
             echo "::group::debian:$release"
             docker run --rm -e VERSION -v "$PWD/artifacts:/a:ro" "debian:$release" sh -ec '
+              # Bullseye security updates moved to archive.debian.org after its LTS ended in
+              # August 2026; the image still names deb.debian.org, whose pool no longer has them.
+              if [ "$(cat /etc/debian_version | cut -d. -f1)" = 11 ]; then
+                sed -i "s#deb.debian.org/debian-security#archive.debian.org/debian-security#" /etc/apt/sources.list
+              fi
               apt-get update -qq
               apt-get install -y -qq /a/pdn-mailcast-receiver_*.deb /a/pdn-mailcast-headend_*.deb
               test -f /etc/pdn-mailcast/receiver.json
