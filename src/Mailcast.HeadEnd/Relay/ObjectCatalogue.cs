@@ -23,8 +23,26 @@ public sealed class CatalogueObject
     /// <summary>The zstd dictionary ID.</summary>
     public ushort DictionaryId { get; init; }
 
-    /// <summary>The RaptorQ coding parameters.</summary>
+    /// <summary>The RaptorQ coding parameters: those of the frames heard on air when there are any, else the receiver's row.</summary>
     public ObjectTransmissionInformation Oti { get; init; }
+
+    /// <summary>Whether <see cref="Oti"/> comes from frames heard on air (never from one handed in).</summary>
+    public bool OtiFromAir { get; init; }
+
+    /// <summary>Whether the frames heard on air, or a receiver's row, disagree about the coding: the object is not safe to make pieces of.</summary>
+    public bool OtiConflict { get; init; }
+
+    /// <summary>Frames of the object heard on air, most reported by any receiver (they hear the same transmissions, so not summed), kept or not; null if no receiver says.</summary>
+    public int? AirFrames { get; init; }
+
+    /// <summary>Of <see cref="AirFrames"/>, by the station they were heard from.</summary>
+    public IReadOnlyDictionary<string, int> AirByStation { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>When the first on-air piece was heard (kept pieces and receivers' reports); null if none.</summary>
+    public DateTimeOffset? FirstHeard { get; init; }
+
+    /// <summary>When the latest on-air piece was heard; null if none.</summary>
+    public DateTimeOffset? LastHeard { get; init; }
 
     /// <summary>Pieces needed to rebuild it (source symbols in block 0).</summary>
     public int K { get; init; }
@@ -87,6 +105,12 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         public byte? Type;
         public ushort Dictionary;
         public ObjectTransmissionInformation Oti;
+        public bool OtiFromAir;
+        public bool OtiConflict;
+        public int? AirFrames;
+        public readonly Dictionary<string, int> AirByStation = new(StringComparer.Ordinal);
+        public DateTimeOffset? AirFirst;
+        public DateTimeOffset? AirLast;
         public int K;
         public readonly SortedDictionary<uint, CataloguePiece> Pieces = [];
         public readonly Dictionary<string, string?> Listings = new(StringComparer.Ordinal);
@@ -105,6 +129,9 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
 
     /// <summary>The most objects held.</summary>
     public int MaxObjects { get; } = maxObjects;
+
+    /// <summary>Whether the catalogue has ever held anything since start: until a receiver has been read, what it does not hold says nothing about what is on offer.</summary>
+    public bool EverHeld { get; private set; }
 
     /// <summary>Raised, outside the lock, with the ID of each object dropped to keep within the limits, so readers forget what they know of it.</summary>
     public event Action<ulong>? Evicted;
@@ -128,9 +155,34 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
                 return;
             }
             e.Type ??= row.Type;
-            e.Dictionary = row.Dictionary;
-            e.Oti = row.Oti;
-            e.K = row.K;
+            if (e.OtiFromAir)
+            {
+                // The coding the frames on air carry stands; a receiver's row that says otherwise makes the object unsafe to relay.
+                e.OtiConflict |= !SameOti(e.Oti, row.Oti) || e.Dictionary != row.Dictionary;
+            }
+            else
+            {
+                e.Dictionary = row.Dictionary;
+                e.Oti = row.Oti;
+                e.K = row.K;
+            }
+            if (row.Air is { } air)
+            {
+                e.AirFrames = Math.Max(e.AirFrames ?? 0, air.Frames);
+                foreach (var (station, n) in air.ByStation)
+                {
+                    e.AirByStation[station] = Math.Max(e.AirByStation.GetValueOrDefault(station), n);
+                }
+                if (air.First > DateTimeOffset.MinValue && (e.AirFirst is null || air.First < e.AirFirst))
+                {
+                    e.AirFirst = air.First;
+                }
+                if (air.Last > DateTimeOffset.MinValue && (e.AirLast is null || air.Last > e.AirLast))
+                {
+                    e.AirLast = air.Last;
+                }
+                e.Updated = time.GetUtcNow();
+            }
             foreach (var l in row.Listings)
             {
                 if (l.Station.Length > 0 && l.Envelope is { } link && (!e.EnvelopeLinks.TryGetValue(l.Station, out var known) || known != link))
@@ -163,6 +215,7 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         lock (_gate)
         {
             var e = Find(objectId, create: true)!;
+            EverHeld = true;
             if (e.Pieces.TryGetValue(piece.Esi, out var had))
             {
                 if (had.OnAir || !piece.OnAir)
@@ -172,6 +225,7 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
                 _bytes += piece.Frame.Length - had.Frame.Length;
                 e.Bytes += piece.Frame.Length - had.Frame.Length;
                 e.Pieces[piece.Esi] = new CataloguePiece(piece.Esi, piece.Frame, true, piece.Label, piece.Heard);
+                NoteAirCoding(e, frame);
                 added = false;
             }
             else
@@ -179,11 +233,10 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
                 e.Pieces[piece.Esi] = new CataloguePiece(piece.Esi, piece.Frame, piece.OnAir, piece.OnAir ? piece.Label : null, piece.Heard);
                 _bytes += piece.Frame.Length;
                 e.Bytes += piece.Frame.Length;
-                if (e.K == 0)
+                // The coding is taken from frames heard on air only, never from one handed in.
+                if (piece.OnAir)
                 {
-                    e.Oti = frame.Oti;
-                    e.Dictionary = frame.DictionaryId;
-                    e.K = frame.Oti.SourceBlockSymbols(0);
+                    NoteAirCoding(e, frame);
                 }
                 added = true;
             }
@@ -192,6 +245,25 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         }
         Raise(dropped);
         return added;
+    }
+
+    private static bool SameOti(ObjectTransmissionInformation a, ObjectTransmissionInformation b) => a.ToBytes().AsSpan().SequenceEqual(b.ToBytes());
+
+    // Under the lock.
+    private static void NoteAirCoding(Entry e, MailcastFrame frame)
+    {
+        if (!e.OtiFromAir)
+        {
+            e.OtiFromAir = true;
+            e.OtiConflict |= e.K > 0 && !SameOti(e.Oti, frame.Oti); // a row that came first said otherwise
+            e.Oti = frame.Oti;
+            e.Dictionary = frame.DictionaryId;
+            e.K = frame.Oti.SourceBlockSymbols(0);
+        }
+        else if (!SameOti(e.Oti, frame.Oti) || e.Dictionary != frame.DictionaryId)
+        {
+            e.OtiConflict = true;
+        }
     }
 
     /// <summary>Keeps the rebuilt octets of an object, if they match its ID with its dictionary. False (and nothing kept) if not.</summary>
@@ -260,12 +332,34 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         }
     }
 
-    private static CatalogueObject Snapshot(Entry e) => new()
+    private static CatalogueObject Snapshot(Entry e)
+    {
+        var onAir = e.Pieces.Values.Where(p => p.OnAir).Select(p => p.Heard).ToList();
+        DateTimeOffset? first = onAir.Count > 0 ? onAir.Min() : null;
+        DateTimeOffset? last = onAir.Count > 0 ? onAir.Max() : null;
+        if (e.AirFirst is { } af && (first is null || af < first))
+        {
+            first = af;
+        }
+        if (e.AirLast is { } al && (last is null || al > last))
+        {
+            last = al;
+        }
+        return Make(e, first, last);
+    }
+
+    private static CatalogueObject Make(Entry e, DateTimeOffset? first, DateTimeOffset? last) => new()
     {
         Id = e.Id,
         ContentType = e.Type,
         DictionaryId = e.Dictionary,
         Oti = e.Oti,
+        OtiFromAir = e.OtiFromAir,
+        OtiConflict = e.OtiConflict,
+        AirFrames = e.AirFrames,
+        AirByStation = new Dictionary<string, int>(e.AirByStation, StringComparer.Ordinal),
+        FirstHeard = first,
+        LastHeard = last,
         K = e.K,
         Pieces = [.. e.Pieces.Values],
         ListedBy = new Dictionary<string, string?>(e.Listings, StringComparer.Ordinal),

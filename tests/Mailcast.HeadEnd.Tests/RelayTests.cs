@@ -35,15 +35,21 @@ public class RelayTests
         public Fixture() => Catalogue = new ObjectCatalogue(Time);
 
         /// <summary>Puts pieces in the catalogue as a receiver would give them, with the listing a trusted directory would give.</summary>
-        public void Hear(TransferObject o, IEnumerable<uint> esis, bool onAir = true, string heardFrom = "GB7RDG", string? listedBy = "GB7RDG", string? hash = "same", bool complete = false, EnvelopeLink? envelope = null)
+        public void Hear(TransferObject o, IEnumerable<uint> esis, bool onAir = true, string heardFrom = "GB7RDG", string? listedBy = "GB7RDG", string? hash = "same", bool complete = false, EnvelopeLink? envelope = null, DateTimeOffset? heardAt = null, AirHeard? air = null, bool noAirCount = false)
         {
             long cursor = 1;
-            foreach (uint esi in esis)
+            var list = esis.ToList();
+            if (air is null && onAir && !noAirCount && list.Count > 0)
             {
-                Catalogue.AddPiece(o.ObjectId, new RemotePiece(esi, o.Frame(esi).ToBytes(), Now, onAir, onAir ? heardFrom : null, cursor++));
+                // A receiver that counts what it hears on air, as the current ones do.
+                air = new AirHeard(list.Count, new Dictionary<string, int> { [heardFrom] = list.Count }, heardAt ?? Now, heardAt ?? Now);
+            }
+            foreach (uint esi in list)
+            {
+                Catalogue.AddPiece(o.ObjectId, new RemotePiece(esi, o.Frame(esi).ToBytes(), heardAt ?? Now, onAir, onAir ? heardFrom : null, cursor++));
             }
             var listings = listedBy is null ? [] : new List<ObjectListing> { new(listedBy, hash == "same" ? ObjectId.LongHash(o.DictionaryId, o.Bytes) : hash, envelope) };
-            Catalogue.Note(new RemoteObject(o.ObjectId, (byte)o.Kind, o.DictionaryId, o.Oti, o.SourceSymbols, 0, complete, listings, cursor));
+            Catalogue.Note(new RemoteObject(o.ObjectId, (byte)o.Kind, o.DictionaryId, o.Oti, o.SourceSymbols, 0, complete, listings, cursor, air));
             if (complete)
             {
                 Catalogue.SetData(o.ObjectId, o.DictionaryId, o.Bytes.ToArray());
@@ -303,7 +309,7 @@ public class RelayTests
 
         Assert.True(plan.BulletinFrames > 0);
         string line = RelaySelector.Line(plan.Relayed.Count, plan.RelayedFrames, selector.Summary);
-        Assert.Equal("relay: 1 objects, 3 frames (1 heard on the LAN, 0 complete)", line);
+        Assert.Equal("relay: 1 objects, 3 frames (1 candidates, 0 complete, 0 listed)", line);
         Assert.All(line, c => Assert.InRange(c, ' ', '~'));
     }
 
@@ -335,7 +341,8 @@ public class RelayTests
         f.Hear(obj, [0u, 1u]);
         var store = new HeadEndStore(dir.Path, Compression.Default, options);
         var selector = f.Selector(options);
-        var status = new Mailcast.HeadEnd.Status.StatusStore(null, f.Time) { Relay = () => selector.StatusView(store.GetRelayProgress, store.CarriesObject) };
+        selector.Select(store.GetRelayProgress, store.CarriesObject);
+        var status = new Mailcast.HeadEnd.Status.StatusStore(null, f.Time) { Relay = selector.StatusView };
 
         using var doc = System.Text.Json.JsonDocument.Parse(status.Render());
 
@@ -373,7 +380,7 @@ public class RelayTests
         Assert.Equal(ObjectId.LongHash(envelope.DictionaryId, envelope.Bytes), entry.Envelope.Hash);
         Assert.Equal(envelope.SourceSymbols, plan.Frames.Count(x => x.ObjectId == envelope.ObjectId));
         store.Commit(plan);
-        Assert.Equal((uint)envelope.SourceSymbols, store.GetRelayProgress(obj.ObjectId).EnvelopeNextEsi);
+        Assert.Equal(envelope.SourceSymbols, store.GetRelayProgress(envelope.ObjectId).Sent.Count);
     }
 
     private static TransferObject EnvelopeObject(ScheduleOptions options) =>
@@ -399,7 +406,7 @@ public class RelayTests
         var entry = Assert.Single(plan.Directory.Entries);
         Assert.Equal(link, entry.Envelope);
         Assert.Equal(envelope.SourceSymbols, plan.Frames.Count(x => x.ObjectId == envelope.ObjectId));
-        Assert.Equal(envelope.SourceSymbols, relay.EnvelopeCount);
+        Assert.Equal(envelope.SourceSymbols, relay.EnvelopeFrames!.Count);
     }
 
     [Fact]
@@ -441,5 +448,241 @@ public class RelayTests
 
         store.Expire(later, _ => false);
         Assert.Empty(store.GetRelayProgress(obj.ObjectId).Sent);
+    }
+
+    [Fact]
+    public void ACompleteObjectHeardManyTimesOver_IsCoveredByTheReceiversFrameCount_NotByTheKPiecesKept()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var busy = Remote(110, 9000);
+        var quiet = Remote(111, 9000);
+        int k = busy.SourceSymbols;
+        f.Hear(busy, Enumerable.Range(0, k).Select(i => (uint)i), complete: true, air: new AirHeard(9 * k, new Dictionary<string, int> { ["GB7RDG"] = 9 * k }, Now, Now));
+        f.Hear(quiet, Enumerable.Range(0, k).Select(i => (uint)i), complete: true, air: new AirHeard(k, new Dictionary<string, int> { ["GB7RDG"] = k }, Now, Now));
+        var selector = f.Selector(options);
+
+        var plan = Plan(store, selector, options, frames: 18);
+
+        int Sent(ulong id) => plan.Frames.Count(x => x.ObjectId == id);
+        Assert.True(Sent(quiet.ObjectId) > Sent(busy.ObjectId), $"quiet {Sent(quiet.ObjectId)} busy {Sent(busy.ObjectId)}");
+        var chosen = selector.Select(store.GetRelayProgress, store.CarriesObject);
+        Assert.Equal(9 * k, chosen.Single(r => r.ObjectId == busy.ObjectId).HeardOnAir);
+        // Our own station's frames heard back are not counted again.
+        f.Hear(quiet, [], air: new AirHeard(k + 5, new Dictionary<string, int> { ["GB7RDG"] = k, ["M0LTE"] = 5 }, Now, Now));
+        Assert.Equal(k, selector.Select(store.GetRelayProgress, store.CarriesObject).Single(r => r.ObjectId == quiet.ObjectId).HeardOnAir);
+    }
+
+    [Fact]
+    public void ACompleteObjectFromAReceiverWithoutTheFrameCount_StillListed_CountsAsCoveredToTheLeftoverMark()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var obj = Remote(112, 9000);
+        f.Hear(obj, Enumerable.Range(0, obj.SourceSymbols).Select(i => (uint)i), complete: true, noAirCount: true);
+        var chosen = f.Selector(options).Select(new HeadEndStore(dir.Path, Compression.Default, options).GetRelayProgress, _ => false);
+        Assert.True(Assert.Single(chosen).HeardOnAir >= BroadcastScheduler.LeftoverSymbols(obj.SourceSymbols, options.Budget!));
+    }
+
+    [Fact]
+    public void AnOwnBulletinsCoverage_IncludesPiecesOfItHeardFromOtherStations()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var mine = store.Offer(Bulletins.Make(120, 9000), new DateOnly(2026, 10, 31))!;
+        var other = store.Offer(Bulletins.Make(121, 9000), new DateOnly(2026, 10, 31))!;
+        int k = mine.Transfer.SourceSymbols;
+        f.Hear(mine.Transfer, [3000u], listedBy: "M0LTE", air: new AirHeard(3 * k, new Dictionary<string, int> { ["GB7RDG"] = 3 * k }, Now, Now));
+        var selector = f.Selector(options);
+        var plan = BroadcastScheduler.Plan(store.InRotation(Slot), Slot, 1, Compression.Default, options, store.DirectoryNextEsi, Frames(26), "ms110d-wn4", null, null, [], selector.HeardFromOthers);
+
+        Assert.Equal(3 * k, selector.HeardFromOthers(mine.Transfer.ObjectId));
+        Assert.True(plan.Objects.Single(o => o.Bid == other.Bid).Count > plan.Objects.Single(o => o.Bid == mine.Bid).Count);
+    }
+
+    private static TransferObject OwnObject(ScheduleOptions options, Bulletin b)
+    {
+        using var scratch = new TempDirectory();
+        return new HeadEndStore(scratch.Path, Compression.Default, options).Offer(b, new DateOnly(2026, 10, 31))!.Transfer;
+    }
+
+    [Fact]
+    public void AnObjectThatBecomesOwnAfterRelaying_CarriesOnPastEveryRelayedEsi()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var bulletin = Bulletins.Make(130, 4000);
+        var obj = OwnObject(options, bulletin);
+        var f = new Fixture();
+        f.Hear(obj, [0u, 1u], complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var relayedPlan = Plan(store, f.Selector(options), options);
+        store.Commit(relayedPlan);
+        var relayedEsis = relayedPlan.Relayed.Single().Frames.Select(x => x.EncodingSymbolId).ToHashSet();
+        var slotOne = store.GetRelayProgress(obj.ObjectId).FirstSlot;
+
+        var carried = store.Offer(bulletin, new DateOnly(2026, 10, 31))!;
+
+        Assert.Equal(obj.ObjectId, carried.Transfer.ObjectId);
+        Assert.Equal(slotOne, carried.FirstSlot);
+        var own = Enumerable.Range(0, 200).Select(n => carried.EsiOf((uint)n)).Skip((int)carried.NextEsi);
+        Assert.Empty(own.Take(50).Intersect(relayedEsis));
+        Assert.All(relayedEsis, e => Assert.True(carried.Shuffle!.Unmap(e) < carried.NextEsi));
+        Assert.Empty(store.GetRelayProgress(obj.ObjectId).Sent); // now in the bulletin's own state
+        Assert.True(store.CarriesObject(obj.ObjectId));
+    }
+
+    [Fact]
+    public void AnOwnBulletinForgotten_LeavesItsSentEsisSoItNeverStartsFromZeroAgain()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var bulletin = Bulletins.Make(131, 4000);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var day = new DateOnly(2026, 10, 31);
+        store.Offer(bulletin, day);
+        var plan = BroadcastScheduler.Plan(store.InRotation(Slot), Slot, 1, Compression.Default, options, store.DirectoryNextEsi, Frames(30), "ms110d-wn4");
+        store.Commit(plan);
+        var sent = plan.Frames.Where(x => plan.Objects.Any(o => o.Bid == bulletin.Bid && o.Transfer.ObjectId == x.ObjectId)).Select(x => (x.ObjectId, x.EncodingSymbolId)).ToList();
+        Assert.NotEmpty(sent);
+
+        store.Expire(day.AddDays(options.RememberDays + 1));
+        Assert.Equal(0, store.Count);
+        var restarted = new HeadEndStore(dir.Path, Compression.Default, options);
+        Assert.Equal(sent.Count, restarted.GetRelayProgress(sent[0].ObjectId).Sent.Count);
+
+        var back = restarted.Offer(bulletin, day.AddDays(options.RememberDays + 1))!;
+        Assert.True(back.NextEsi >= (uint)sent.Count);
+        Assert.All(sent, x => Assert.True(back.Shuffle!.Unmap(x.EncodingSymbolId) < back.NextEsi));
+    }
+
+    [Fact]
+    public void AnObjectNotHeardOnAirForTwoDays_IsNotRelayed_WhateverWhenTheCatalogueGotIt()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var obj = Remote(140);
+        f.Hear(obj, [0u, 1u, 2u], heardAt: Now.AddHours(-49));
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+
+        Assert.Empty(Plan(store, f.Selector(options), options).Relayed);
+
+        // First heard 49 hours ago, it is past the retiring age however recently it was heard again.
+        f.Hear(obj, [5u], heardAt: Now.AddHours(-1));
+        Assert.Empty(Plan(store, f.Selector(options), options).Relayed);
+
+        var recent = Remote(141);
+        f.Hear(recent, [0u, 1u], heardAt: Now.AddHours(-10));
+        f.Hear(recent, [5u], heardAt: Now.AddHours(-1));
+        Assert.Equal(recent.ObjectId, Assert.Single(Plan(store, f.Selector(options), options).Relayed).ObjectId);
+    }
+
+    [Fact]
+    public void TheCodingIsOnlyEverTakenFromFramesOnAir_AndAnObjectWhoseFramesDisagreeIsLeftOut()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var obj = Remote(150);
+        var wrong = Remote(151, 6000);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        // A piece handed in with a different coding does not set the object's coding, and the on-air frames' stands.
+        f.Catalogue.AddPiece(obj.ObjectId, new RemotePiece(9, new MailcastFrame(obj.ObjectId, obj.DictionaryId, wrong.Oti, 9, obj.Frame(9).Symbol).ToBytes(), Now, false, null, 1));
+        f.Hear(obj, [0u, 1u]);
+        var selector = f.Selector(options);
+        Assert.Equal(obj.Oti, Assert.Single(selector.Select(store.GetRelayProgress, store.CarriesObject)).Oti);
+
+        // Two on-air frames that disagree: left out, said once.
+        var bad = Remote(152);
+        f.Hear(bad, [0u]);
+        f.Catalogue.AddPiece(bad.ObjectId, new RemotePiece(4, new MailcastFrame(bad.ObjectId, bad.DictionaryId, wrong.Oti, 4, bad.Frame(4).Symbol).ToBytes(), Now, true, "GB7RDG", 2));
+        Assert.DoesNotContain(selector.Select(store.GetRelayProgress, store.CarriesObject), r => r.ObjectId == bad.ObjectId);
+        selector.Select(store.GetRelayProgress, store.CarriesObject);
+        Assert.Single(f.Journal.Lines, l => l.Contains("coding is not certain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FreshPieces_AvoidWhatOthersAlreadySent()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var obj = Remote(160);
+        var shuffle = EsiShuffle.For("M0LTE", obj.ObjectId);
+        var firstThree = Enumerable.Range(0, 3).Select(n => shuffle.Map((uint)n)).ToList();
+        f.Hear(obj, firstThree, complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+
+        var relay = Assert.Single(Plan(store, f.Selector(options), options).Relayed);
+
+        Assert.Empty(relay.Frames.Select(x => x.EncodingSymbolId).Intersect(firstThree));
+    }
+
+    [Fact]
+    public void TwoBulletinsSharingAnEnvelope_SendItOnce_InThisStationsOrder_WithOneState()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var a = Remote(170);
+        var b = Remote(171);
+        var envelope = EnvelopeObject(options);
+        var link = new EnvelopeLink(envelope.ObjectId, ObjectId.LongHash(envelope.DictionaryId, envelope.Bytes));
+        f.Hear(a, [0u], complete: true, envelope: link);
+        f.Hear(b, [0u], complete: true, envelope: link);
+        f.Hear(envelope, [0u], complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+
+        var plan = Plan(store, f.Selector(options), options);
+        store.Commit(plan);
+
+        var sent = plan.Frames.Where(x => x.ObjectId == envelope.ObjectId).Select(x => x.EncodingSymbolId).ToList();
+        Assert.Equal(envelope.SourceSymbols, sent.Count);
+        Assert.Equal(EsiShuffle.For("M0LTE", envelope.ObjectId).Map(0), sent[0]);
+        Assert.Equal(sent.Order(), store.GetRelayProgress(envelope.ObjectId).Sent.Order());
+    }
+
+    [Fact]
+    public void AnEnvelopeObjectIsNeverACandidateOnItsOwn()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var envelope = EnvelopeObject(options);
+        f.Hear(envelope, [0u], complete: true); // listed by GB7RDG, but linked from no bulletin we know
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+
+        Assert.Empty(Plan(store, f.Selector(options), options).Relayed);
+    }
+
+    [Fact]
+    public void TheCatalogueSaysWhenItHasBeenReadAtAll()
+    {
+        var f = new Fixture();
+        Assert.False(f.Catalogue.EverHeld);
+        f.Hear(Remote(180), [0u]);
+        Assert.True(f.Catalogue.EverHeld);
+    }
+
+    [Fact]
+    public void TheDirectoryCountsListedRelayedObjectsApart()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        f.Hear(Remote(190), [0u, 1u], complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        store.Offer(Bulletins.Make(191, 2000), new DateOnly(2026, 10, 31));
+
+        var plan = Plan(store, f.Selector(options), options);
+
+        Assert.Equal(1, plan.RelayListed);
+        Assert.Equal(2, plan.Directory.Entries.Count);
     }
 }

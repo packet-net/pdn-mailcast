@@ -338,7 +338,7 @@ public sealed class HeadEndService(
         }
 
         SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null);
-        if (plan.Relay is { } relay)
+        if (plan.Relay is { Candidates: > 0 } relay)
         {
             // One short line a slot on what is relayed from the other stations the receivers on the LAN hear (issue #218).
             journal.Write(RelaySelector.Line(plan.RelayedObjects, plan.RelayedFrames, relay));

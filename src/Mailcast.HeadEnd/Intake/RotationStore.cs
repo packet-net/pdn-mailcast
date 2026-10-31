@@ -77,7 +77,7 @@ public sealed class RotationStore
         {
             // Other stations' objects heard by the receivers (issue #218) join the rotation, with what has been sent of each.
             IReadOnlyList<RelayedObject>? relayed = relay?.Select(_store.GetRelayProgress, _store.CarriesObject);
-            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode, extras, reports, relayed);
+            return BroadcastScheduler.Plan(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode, extras, reports, relayed, relay is null ? null : relay.HeardFromOthers);
         }
     }
 

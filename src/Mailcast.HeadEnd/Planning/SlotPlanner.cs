@@ -116,13 +116,15 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
             broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames, listed, relay);
         }
         RelaySummary? summary = relay?.Summary;
+        // Own bulletins only; what is relayed is counted apart.
+        int own(SlotBroadcast b) => b.Directory.Entries.Count - b.RelayListed;
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
-            return new SlotPlan(slot, [], broadcast.Directory.Entries.Count, null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins, Relay: summary);
+            return new SlotPlan(slot, [], own(broadcast), null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins, Relay: summary);
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
         bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
-        return new SlotPlan(slot, frames, broadcast.Directory.Entries.Count, broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins, summary, broadcast.Relayed.Count, broadcast.RelayedFrames);
+        return new SlotPlan(slot, frames, own(broadcast), broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins, summary, broadcast.Relayed.Count, broadcast.RelayedFrames);
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>

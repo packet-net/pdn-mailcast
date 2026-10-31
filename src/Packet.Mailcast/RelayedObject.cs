@@ -14,11 +14,10 @@ public sealed record RelayListing(string Bid, string Title, int Size);
 /// </summary>
 /// <param name="Sent">The ESIs this head end has sent of the object, unchanged and fresh alike.</param>
 /// <param name="FirstSlot">The slot it first sent a piece in; null until it has.</param>
-/// <param name="EnvelopeNextEsi">The first envelope ESI not yet sent.</param>
-public sealed record RelayProgress(IReadOnlySet<uint> Sent, DateTimeOffset? FirstSlot, uint EnvelopeNextEsi)
+public sealed record RelayProgress(IReadOnlySet<uint> Sent, DateTimeOffset? FirstSlot)
 {
     /// <summary>Nothing sent yet.</summary>
-    public static RelayProgress None { get; } = new(new HashSet<uint>(), null, 0);
+    public static RelayProgress None { get; } = new(new HashSet<uint>(), null);
 }
 
 /// <summary>
@@ -64,6 +63,21 @@ public sealed class RelayedObject
     /// <summary>What this head end has sent of it.</summary>
     public RelayProgress Progress { get; init; } = RelayProgress.None;
 
+    /// <summary>What has been sent of the envelope object: one state for the envelope, shared by every bulletin that links it.</summary>
+    public RelayProgress EnvelopeProgress { get; init; } = RelayProgress.None;
+
+    /// <summary>ESIs of the object heard on air (from anyone) that fresh pieces avoid, so a listener's pieces add up rather than repeat.</summary>
+    public IReadOnlySet<uint> Heard { get; init; } = new HashSet<uint>();
+
+    /// <summary>ESIs of the envelope object heard on air, avoided the same way.</summary>
+    public IReadOnlySet<uint> EnvelopeHeard { get; init; } = new HashSet<uint>();
+
+    /// <summary>When the first on-air piece of it was heard: its age when this head end has sent none yet; null if unknown.</summary>
+    public DateTimeOffset? FirstHeard { get; init; }
+
+    /// <summary>When it counts as first on the air for retiring by age: this head end's first slot of it, else when it was first heard.</summary>
+    public DateTimeOffset? FirstSlot => Progress.FirstSlot ?? FirstHeard;
+
     /// <summary>K: pieces needed to rebuild it.</summary>
     public int K => Oti.SourceBlockSymbols(0);
 
@@ -77,30 +91,37 @@ public sealed class RelayedObject
     public int Available => Complete ? int.MaxValue : HeardFrames.Count(f => !Progress.Sent.Contains(f.EncodingSymbolId));
 
     /// <summary>The next <paramref name="count"/> pieces to send: fresh ones in this station's own order if complete, else unchanged heard ones in ESI order.</summary>
-    internal List<MailcastFrame> NextPieces(int count, EsiShuffle? shuffle)
+    internal List<MailcastFrame> NextPieces(int count, EsiShuffle? shuffle) => Pieces(Transfer, HeardFrames, Progress, Heard, count, shuffle);
+
+    /// <summary>The envelope's pieces for a slot: its K fresh pieces in this station's own order for the envelope object.</summary>
+    internal List<MailcastFrame> EnvelopePieces(EsiShuffle? shuffle) =>
+        Envelope is { } e ? Pieces(e, [], EnvelopeProgress, EnvelopeHeard, e.SourceSymbols, shuffle) : [];
+
+    private static List<MailcastFrame> Pieces(TransferObject? transfer, IReadOnlyList<MailcastFrame> heard, RelayProgress progress, IReadOnlySet<uint> avoid, int count, EsiShuffle? shuffle)
     {
         var frames = new List<MailcastFrame>(count);
-        if (Transfer is null)
+        if (transfer is null)
         {
-            foreach (var f in HeardFrames.OrderBy(f => f.EncodingSymbolId))
+            foreach (var f in heard.OrderBy(f => f.EncodingSymbolId))
             {
                 if (frames.Count >= count)
                 {
                     break;
                 }
-                if (!Progress.Sent.Contains(f.EncodingSymbolId))
+                if (!progress.Sent.Contains(f.EncodingSymbolId))
                 {
                     frames.Add(f);
                 }
             }
             return frames;
         }
+        // Skipping what this station has sent and what others have already put on the air, so the pieces a listener hears add up.
         for (uint n = 0; frames.Count < count && n <= PayloadId.MaxEncodingSymbolId; n++)
         {
             uint esi = shuffle?.Map(n) ?? n;
-            if (!Progress.Sent.Contains(esi))
+            if (!progress.Sent.Contains(esi) && !avoid.Contains(esi))
             {
-                frames.Add(Transfer.Frame(esi));
+                frames.Add(transfer.Frame(esi));
             }
         }
         return frames;
@@ -114,6 +135,5 @@ public sealed class RelayedObject
 /// <param name="Fresh">Whether they are fresh pieces made from the checked object (else unchanged ones heard on air).</param>
 /// <param name="Listed">Whether the slot's directory lists it.</param>
 /// <param name="Envelope">The envelope object sent with it, or null.</param>
-/// <param name="EnvelopeFirstEsi">The first envelope ESI sent.</param>
-/// <param name="EnvelopeCount">How many envelope pieces are sent.</param>
-public sealed record ScheduledRelay(ulong ObjectId, byte Type, IReadOnlyList<MailcastFrame> Frames, bool Fresh, bool Listed, TransferObject? Envelope = null, uint EnvelopeFirstEsi = 0, int EnvelopeCount = 0);
+/// <param name="EnvelopeFrames">The envelope's pieces sent, in sending order.</param>
+public sealed record ScheduledRelay(ulong ObjectId, byte Type, IReadOnlyList<MailcastFrame> Frames, bool Fresh, bool Listed, TransferObject? Envelope = null, IReadOnlyList<MailcastFrame>? EnvelopeFrames = null);

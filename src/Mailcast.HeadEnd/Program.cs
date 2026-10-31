@@ -391,8 +391,8 @@ public static partial class Program
         // Receivers on this machine and on the network, read-only (issue #218); no setting, and nothing waits for it. What they hear of
         // the advertised stations joins the rotation, ranked least covered first.
         var catalogue = new ObjectCatalogue(time);
-        store.StillOffered = id => catalogue.Get(id) is not null;
-        var relay = new RelaySelector(catalogue, Compression.Default, config.Callsign, scheduleOptions.Adverts, time, journal);
+        store.StillOffered = id => catalogue.Get(id) is not null || !catalogue.EverHeld;
+        var relay = new RelaySelector(catalogue, Compression.Default, config.Callsign, scheduleOptions.Adverts, time, journal, scheduleOptions.Budget);
         var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, time, reading, spots, reports, relay);
         var policy = new IntakePolicy(config.Intake.MaxBulletinBytes);
         var intakes = new List<ScheduledIntake>();
@@ -438,7 +438,7 @@ public static partial class Program
         journal.Write(Describe(config, scheduleOptions, waveforms));
         using var receivers = new ReceiverPool(catalogue, journal, time);
         status.Receivers = receivers.StatusView;
-        status.Relay = () => relay.StatusView(store.GetRelayProgress, store.CarriesObject);
+        status.Relay = relay.StatusView;
         using var service = new HeadEndService(
             schedule, TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
             planner, store, intakes, runner, status, journal, time);

@@ -10,7 +10,15 @@ namespace Packet.Mailcast;
 /// <param name="ContentType">Its content type if known: from its rebuilt octets, from piece 0, or from a directory that lists it.</param>
 /// <param name="ListedBy">The stations whose trusted signed directories, still remembered, list it.</param>
 /// <param name="Listings">The same stations with the long hash (<see cref="DirectoryEntry.Hash"/>, 16 hex digits) each lists it with; null where a listing carries none.</param>
-public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList<string> ListedBy, IReadOnlyList<ObjectListing>? Listings = null);
+/// <param name="Air">Every frame of the object heard on air since this receiver started, kept or not, so after the object is complete too (issue #218); null if none.</param>
+public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList<string> ListedBy, IReadOnlyList<ObjectListing>? Listings = null, AirHeard? Air = null);
+
+/// <summary>How much of an object was heard on air: frames, by station, and when.</summary>
+/// <param name="Frames">All frames of the object heard on air.</param>
+/// <param name="ByStation">Of those, by the station they were heard from (the label of the slot); frames with no station are not listed here.</param>
+/// <param name="First">When the first was heard.</param>
+/// <param name="Last">When the latest was heard.</param>
+public sealed record AirHeard(int Frames, IReadOnlyDictionary<string, int> ByStation, DateTimeOffset First, DateTimeOffset Last);
 
 /// <summary>One trusted signed directory's listing of an object.</summary>
 /// <param name="Station">The station whose directory it is.</param>
@@ -56,6 +64,37 @@ public sealed partial class ReceiverStore
 
     private string? _apiKey;
 
+    /// <summary>Frames heard on air per object since start, kept or not (issue #218): what a relay counts as already sent. Bounded.</summary>
+    private readonly Dictionary<ulong, AirCount> _air = [];
+
+    private const int MostAirObjects = 20_000;
+
+    private sealed class AirCount(DateTimeOffset first)
+    {
+        public int Frames;
+        public readonly Dictionary<string, int> ByStation = new(StringComparer.Ordinal);
+        public readonly DateTimeOffset First = first;
+        public DateTimeOffset Last = first;
+    }
+
+    private void CountAir(ulong objectId, string? station, DateTimeOffset now)
+    {
+        if (!_air.TryGetValue(objectId, out var c))
+        {
+            if (_air.Count >= MostAirObjects)
+            {
+                _air.Remove(_air.MinBy(kv => kv.Value.Last).Key);
+            }
+            _air[objectId] = c = new AirCount(now);
+        }
+        c.Frames++;
+        c.Last = now;
+        if (station is not null)
+        {
+            c.ByStation[station] = c.ByStation.GetValueOrDefault(station) + 1;
+        }
+    }
+
     /// <summary>What the keep holds.</summary>
     public KeepStats KeepStats()
     {
@@ -100,7 +139,8 @@ public sealed partial class ReceiverStore
     {
         listed.TryGetValue(kept.ObjectId, out var by);
         byte? type = kept.ContentType ?? TypeFromDirectories(kept.ObjectId);
-        return new ObjectRow(kept, type, by is null ? [] : [.. by.Keys], by is null ? [] : [.. by.Select(b => new ObjectListing(b.Key, b.Value.Hash, b.Value.Env))]);
+        return new ObjectRow(kept, type, by is null ? [] : [.. by.Keys], by is null ? [] : [.. by.Select(b => new ObjectListing(b.Key, b.Value.Hash, b.Value.Env))],
+            _air.TryGetValue(kept.ObjectId, out var air) ? new AirHeard(air.Frames, new Dictionary<string, int>(air.ByStation, StringComparer.Ordinal), air.First, air.Last) : null);
     }
 
     private IEnumerable<(BroadcastDirectory Directory, string Station)> ListingDirectories()

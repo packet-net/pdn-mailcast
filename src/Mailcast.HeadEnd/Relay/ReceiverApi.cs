@@ -16,7 +16,8 @@ public sealed record RemoteObject(
     int Held,
     bool Complete,
     IReadOnlyList<ObjectListing> Listings,
-    long Cursor);
+    long Cursor,
+    AirHeard? Air = null);
 
 /// <summary>A page of <see cref="RemoteObject"/>.</summary>
 public sealed record RemoteObjectPage(IReadOnlyList<RemoteObject> Objects, long Next, bool More);
@@ -75,6 +76,23 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
                     // A receiver from before the listings: the stations, without the hashes.
                     listings.AddRange(by.EnumerateArray().Select(s => new ObjectListing(s.GetString() ?? "", null)));
                 }
+                AirHeard? air = null;
+                if (o.TryGetProperty("air", out var a) && a.ValueKind == JsonValueKind.Object && a.TryGetProperty("frames", out var af) && af.ValueKind == JsonValueKind.Number)
+                {
+                    var by = new Dictionary<string, int>(StringComparer.Ordinal);
+                    if (a.TryGetProperty("stations", out var st) && st.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var kv in st.EnumerateObject().Where(kv => kv.Value.ValueKind == JsonValueKind.Number))
+                        {
+                            by[kv.Name] = kv.Value.GetInt32();
+                        }
+                    }
+                    air = new AirHeard(
+                        af.GetInt32(),
+                        by,
+                        a.TryGetProperty("first", out var f) && f.ValueKind == JsonValueKind.String ? f.GetDateTimeOffset() : DateTimeOffset.MinValue,
+                        a.TryGetProperty("last", out var l2) && l2.ValueKind == JsonValueKind.String ? l2.GetDateTimeOffset() : DateTimeOffset.MinValue);
+                }
                 rows.Add(new RemoteObject(
                     id,
                     o.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.Number ? (byte)t.GetInt32() : null,
@@ -84,7 +102,8 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
                     o.GetProperty("held").GetInt32(),
                     o.GetProperty("complete").GetBoolean(),
                     listings,
-                    o.GetProperty("cursor").GetInt64()));
+                    o.GetProperty("cursor").GetInt64(),
+                    air));
             }
             return new RemoteObjectPage(rows, root.GetProperty("next").GetInt64(), root.GetProperty("more").GetBoolean());
         }

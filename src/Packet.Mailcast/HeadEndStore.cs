@@ -31,7 +31,7 @@ namespace Packet.Mailcast;
 /// <para>And one file per directory object sent, <c>directories/OBJECTID.txt</c>, with its Day and
 /// NextEsi, so a later plan with the same directory object does not repeat its pieces.</para>
 /// <para>And one file per object relayed from another station (issue #218), <c>relayed/OBJECTID.txt</c>, with its Day, FirstSlot,
-/// EnvelopeNextEsi and every ESI sent (Sent, hex), so that a restart never repeats one.</para>
+/// and every ESI sent (Sent, hex), so that a restart never repeats one. An envelope object relayed with a bulletin has a file of its own, shared by every bulletin that links it. A bulletin this head end takes later that was relayed first carries on past every ESI relayed, and one it forgets leaves such a file behind, so neither ever starts again from 0.</para>
 /// <para>
 /// Both are written to a temporary name and renamed, object first, so a folder whose state is
 /// missing or does not match its object is an interrupted first offer and is discarded.
@@ -111,7 +111,7 @@ public sealed class HeadEndStore
 
     /// <summary>What has been sent of an object relayed from another station (issue #218); <see cref="RelayProgress.None"/> for one never sent.</summary>
     public RelayProgress GetRelayProgress(ulong objectId) =>
-        _relay.TryGetValue(objectId, out var r) ? new RelayProgress(new HashSet<uint>(r.Sent), r.FirstSlot, r.EnvelopeNextEsi) : RelayProgress.None;
+        _relay.TryGetValue(objectId, out var r) ? new RelayProgress(new HashSet<uint>(r.Sent), r.FirstSlot) : RelayProgress.None;
 
     /// <summary>How many relayed objects have something remembered.</summary>
     public int RelayCount => _relay.Count;
@@ -165,7 +165,17 @@ public sealed class HeadEndStore
         var envelopeObject = envelope is null ? null : TransferObject.ForEnvelope(envelope, _options.DictionaryId, _compression);
         // A bulletin taken now is sent in this station's own piece order (issue #143); with no station named, in sequence.
         var shuffle = _options.Station is { } station ? EsiShuffle.For(station, transfer.ObjectId) : null;
-        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, 0, Envelope: envelopeObject, Shuffle: shuffle);
+        // Relayed before it was taken (it came from the receivers first, or was forgotten and is back): carry on past every ESI sent,
+        // with its first slot, so none is repeated and its age is not lost.
+        uint nextEsi = 0;
+        DateTimeOffset? firstSlot = null;
+        if (_relay.TryGetValue(transfer.ObjectId, out var relayed))
+        {
+            nextEsi = relayed.Sent.Count == 0 ? 0 : relayed.Sent.Max(esi => shuffle?.Unmap(esi) ?? esi) + 1;
+            firstSlot = relayed.FirstSlot;
+        }
+        uint envelopeNext = envelopeObject is not null && _relay.TryGetValue(envelopeObject.ObjectId, out var relayedEnvelope) && relayedEnvelope.Sent.Count > 0 ? relayedEnvelope.Sent.Max() + 1 : 0;
+        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, nextEsi, firstSlot, envelopeObject, envelopeNext, shuffle);
         var dir = Path.Combine(_bulletins, key);
         Directory.CreateDirectory(dir);
         DurableFile.WriteAtomically(Path.Combine(dir, "object.bin"), transfer.Bytes);
@@ -176,6 +186,12 @@ public sealed class HeadEndStore
         var entry = new Entry(dir, carried);
         SaveState(entry);
         _entries[key] = entry;
+        if (relayed is not null)
+        {
+            // Its ESIs are in the bulletin's state now.
+            File.Delete(RelayPath(transfer.ObjectId));
+            _relay.Remove(transfer.ObjectId);
+        }
         return carried;
     }
 
@@ -233,22 +249,14 @@ public sealed class HeadEndStore
                 SaveDirectory(id, broadcast.Date, extraNext);
             }
         }
+        var sentFrames = broadcast.Frames.Take(framesSent).ToList();
         foreach (var r in broadcast.Relayed)
         {
-            var sent = broadcast.Frames.Take(framesSent).Where(f => f.ObjectId == r.ObjectId).Select(f => f.EncodingSymbolId).ToList();
-            uint envelopeNext = r.Envelope is { } envelope && next.TryGetValue(envelope.ObjectId, out uint reached) ? reached : 0;
-            if (sent.Count == 0 && envelopeNext == 0)
+            RecordRelayed(r.ObjectId, sentFrames, broadcast);
+            if (r.Envelope is { } relayEnvelope)
             {
-                continue;
+                RecordRelayed(relayEnvelope.ObjectId, sentFrames, broadcast);
             }
-            if (!_relay.TryGetValue(r.ObjectId, out var entry))
-            {
-                _relay[r.ObjectId] = entry = new RelayEntry { ObjectId = r.ObjectId, Day = broadcast.Date };
-            }
-            entry.Sent.UnionWith(sent);
-            entry.FirstSlot ??= sent.Count > 0 ? broadcast.Slot : null;
-            entry.EnvelopeNextEsi = Math.Max(entry.EnvelopeNextEsi, envelopeNext);
-            SaveRelay(entry);
         }
         foreach (var o in broadcast.Objects)
         {
@@ -304,6 +312,18 @@ public sealed class HeadEndStore
         {
             if (today.DayNumber - entry.Carried.FirstSeen.DayNumber >= _options.RememberDays)
             {
+                // Leave its sent ESIs behind, so that if it comes back (offered again, or relayed from a receiver) it never starts from 0.
+                if (entry.Carried.NextEsi > 0)
+                {
+                    var kept = _relay.TryGetValue(entry.Carried.Transfer.ObjectId, out var had) ? had : new RelayEntry { ObjectId = entry.Carried.Transfer.ObjectId, Day = today };
+                    for (uint n = 0; n < entry.Carried.NextEsi; n++)
+                    {
+                        kept.Sent.Add(entry.Carried.EsiOf(n));
+                    }
+                    kept.FirstSlot ??= entry.Carried.FirstSlot;
+                    _relay[kept.ObjectId] = kept;
+                    SaveRelay(kept);
+                }
                 Directory.Delete(entry.Dir, recursive: true);
                 _entries.Remove(key);
                 removed++;
@@ -330,12 +350,28 @@ public sealed class HeadEndStore
         return removed;
     }
 
+    // The ESIs of an object (a relayed one or a relayed envelope) among the frames sent, added to what is remembered of it.
+    private void RecordRelayed(ulong objectId, List<MailcastFrame> sentFrames, SlotBroadcast broadcast)
+    {
+        var sent = sentFrames.Where(f => f.ObjectId == objectId).Select(f => f.EncodingSymbolId).ToList();
+        if (sent.Count == 0)
+        {
+            return;
+        }
+        if (!_relay.TryGetValue(objectId, out var entry))
+        {
+            _relay[objectId] = entry = new RelayEntry { ObjectId = objectId, Day = broadcast.Date };
+        }
+        entry.Sent.UnionWith(sent);
+        entry.FirstSlot ??= broadcast.Slot;
+        SaveRelay(entry);
+    }
+
     private sealed class RelayEntry
     {
         public ulong ObjectId;
         public DateOnly Day;
         public DateTimeOffset? FirstSlot;
-        public uint EnvelopeNextEsi;
         public readonly HashSet<uint> Sent = [];
     }
 
@@ -350,7 +386,6 @@ public sealed class HeadEndStore
         {
             text.Append(CultureInfo.InvariantCulture, $"FirstSlot: {first.UtcDateTime:yyyy-MM-ddTHH:mmZ}\n");
         }
-        text.Append(CultureInfo.InvariantCulture, $"EnvelopeNextEsi: {r.EnvelopeNextEsi}\n");
         text.Append("Sent: ").Append(string.Join(',', r.Sent.Order().Select(e => e.ToString("x", CultureInfo.InvariantCulture)))).Append('\n');
         DurableFile.WriteAtomically(RelayPath(r.ObjectId), Bulletin.TextEncoding.GetBytes(text.ToString()));
     }
@@ -376,7 +411,6 @@ public sealed class HeadEndStore
             {
                 ObjectId = id,
                 Day = DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
-                EnvelopeNextEsi = uint.Parse(fields["EnvelopeNextEsi"], CultureInfo.InvariantCulture),
                 FirstSlot = fields.TryGetValue("FirstSlot", out var slotText)
                     ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
                     : null,

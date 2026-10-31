@@ -838,6 +838,10 @@ public sealed partial class ReceiverStore
         {
             return new AcceptResult(FrameOutcome.NotAFrame);
         }
+        if (outside is null)
+        {
+            CountAir(frame.ObjectId, heardFrom, now);
+        }
         if (outside is not null && OutsideOnlyTotal() > _options.KeepMaxBytes / 2)
         {
             return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "pieces from outside already take their share of the room");
