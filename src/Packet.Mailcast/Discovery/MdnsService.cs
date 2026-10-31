@@ -65,10 +65,7 @@ public static class ReceiverService
     }
 
     /// <summary>The TXT strings a receiver announces.</summary>
-    public static IReadOnlyList<string> Text(string version, bool needsPassword) =>
-        needsPassword
-            ? ["txtvers=1", "v=" + version, "api=" + ApiVersion, "pw=1"]
-            : ["txtvers=1", "v=" + version, "api=" + ApiVersion];
+    public static IReadOnlyList<string> Text(string version) => ["txtvers=1", "v=" + version, "api=" + ApiVersion];
 }
 
 /// <summary>

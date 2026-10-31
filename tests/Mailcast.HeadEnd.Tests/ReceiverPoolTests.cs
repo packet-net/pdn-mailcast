@@ -103,8 +103,8 @@ public class ReceiverPoolTests
         var journal = new MemoryJournal();
         var net = new FakeMdnsNetwork();
         using var pool = Pool(catalogue, journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
-        using var announceA = new MdnsAnnouncer(net.Join(), "rx a", a.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
-        using var announceB = new MdnsAnnouncer(net.Join(), "rx b", b.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
+        using var announceA = new MdnsAnnouncer(net.Join(), "rx a", a.Port, ReceiverService.Text("0.1.0"), _ => { }, networks: Lan);
+        using var announceB = new MdnsAnnouncer(net.Join(), "rx b", b.Port, ReceiverService.Text("0.1.0"), _ => { }, networks: Lan);
         announceA.Start();
         announceB.Start();
         using var stop = new CancellationTokenSource();
@@ -133,7 +133,7 @@ public class ReceiverPoolTests
         var catalogue = new ObjectCatalogue(TimeProvider.System);
         var net = new FakeMdnsNetwork();
         using var pool = Pool(catalogue, journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
-        var announce = new MdnsAnnouncer(net.Join(), "rx a", receiver.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
+        var announce = new MdnsAnnouncer(net.Join(), "rx a", receiver.Port, ReceiverService.Text("0.1.0"), _ => { }, networks: Lan);
         announce.Start();
         using var stop = new CancellationTokenSource();
         var run = Task.Run(() => pool.RunAsync(stop.Token));
@@ -155,7 +155,7 @@ public class ReceiverPoolTests
         var net = new FakeMdnsNetwork();
         var journal = new MemoryJournal();
         using var pool = Pool(new ObjectCatalogue(TimeProvider.System), journal, new FakeTimeProvider(Start), receiver.Port, net);
-        using var announce = new MdnsAnnouncer(net.Join(), "same one", receiver.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
+        using var announce = new MdnsAnnouncer(net.Join(), "same one", receiver.Port, ReceiverService.Text("0.1.0"), _ => { }, networks: Lan);
         announce.Start();
         using var stop = new CancellationTokenSource();
         var run = Task.Run(() => pool.RunAsync(stop.Token));
@@ -212,25 +212,36 @@ public class ReceiverPoolTests
     }
 
     [Fact]
-    public async Task AReceiverWithAPassword_IsFollowedAndSaidOnce_NotReadFromAndNotLost()
+    public async Task ANetworkReceiverThatKeepsFailing_IsAskedLessOften_AndSaidOnce()
     {
-        using var receiver = new FakeReceiver { Password = true };
+        using var receiver = new FakeReceiver();
+        var net = new FakeMdnsNetwork();
         var journal = new MemoryJournal();
-        using var pool = Pool(new ObjectCatalogue(TimeProvider.System), journal, new FakeTimeProvider(Start), receiver.Port);
+        using var pool = Pool(new ObjectCatalogue(TimeProvider.System), journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
+        using var stop = new CancellationTokenSource();
+        var run = Task.Run(() => pool.RunAsync(stop.Token));
+        var injector = net.Join();
+        await Eventually(() => { injector.Send(Announce("rx x", receiver.Port, 120)); return pool.Receivers.Count == 1 && pool.Receivers[0].State == "ok"; }, "found and read");
+
+        receiver.Broken = true;
+        lock (receiver.Requests)
+        {
+            receiver.Requests.Clear();
+        }
         for (int i = 0; i < 5; i++)
         {
             await pool.ReadNowAsync(CancellationToken.None);
         }
 
-        var seen = Assert.Single(pool.Receivers);
-        Assert.Equal("not readable", seen.State);
-        Assert.Contains("password", seen.Problem, StringComparison.Ordinal);
-        Assert.Single(journal.Lines, l => l.Contains("cannot read", StringComparison.Ordinal));
-        // The probe, then three reads; after three failures in a row it is asked less often, so the last two reads asked nothing.
+        // Three failed reads, then it is left alone until its back-off ends.
         lock (receiver.Requests)
         {
-            Assert.Equal(4, receiver.Requests.Count);
+            Assert.Equal(3, receiver.Requests.Count);
         }
+        Assert.Equal("not readable", pool.Receivers[0].State);
+        Assert.Single(journal.Lines, l => l.Contains("cannot read", StringComparison.Ordinal));
+        stop.Cancel();
+        await run;
     }
 
     [Fact]
@@ -419,7 +430,7 @@ public class ReceiverPoolTests
         var m = new DnsMessage { IsResponse = true };
         m.Records.Add(new DnsRecord { Name = ReceiverService.TypeName, Type = DnsRecord.TypePtr, Ttl = ttl, Target = full });
         m.Records.Add(new DnsRecord { Name = full, Type = DnsRecord.TypeSrv, Ttl = ttl, Port = (ushort)port, Target = "h-mailcast.local" });
-        m.Records.Add(new DnsRecord { Name = full, Type = DnsRecord.TypeTxt, Ttl = ttl, Text = ReceiverService.Text("0.1.0", false) });
+        m.Records.Add(new DnsRecord { Name = full, Type = DnsRecord.TypeTxt, Ttl = ttl, Text = ReceiverService.Text("0.1.0") });
         m.Records.Add(new DnsRecord { Name = "h-mailcast.local", Type = DnsRecord.TypeA, Ttl = ttl, Address = IPAddress.Loopback });
         return m.ToBytes();
     }
@@ -462,7 +473,7 @@ public class ReceiverPoolTests
         var run = Task.Run(() => pool.RunAsync(stop.Token));
         var announcers = new[] { a, b, c }.Select((r, i) =>
         {
-            var m = new MdnsAnnouncer(net.Join(), $"rx {i}", r.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
+            var m = new MdnsAnnouncer(net.Join(), $"rx {i}", r.Port, ReceiverService.Text("0.1.0"), _ => { }, networks: Lan);
             m.Start();
             return m;
         }).ToList();

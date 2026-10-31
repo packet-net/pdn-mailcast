@@ -156,6 +156,33 @@ public class PieceKeepTests
     }
 
     [Fact]
+    public void ABadPieceHeardOnAir_IsFoundByItsStation_BeforeWaitingForMore()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options(log));
+        var obj = Bulletin(8);
+        int k = obj.SourceSymbols;
+        for (int i = 0; i < k - 1; i++)
+        {
+            store.Accept(obj.Frame((uint)i).ToBytes(), "GB7RDG");
+        }
+        var good = obj.Frame((uint)(k - 1));
+        var wrong = good.Symbol.ToArray();
+        wrong[5] ^= 0x33;
+        var poisoned = new MailcastFrame(good.ObjectId, good.DictionaryId, good.Oti, good.EncodingSymbolId, wrong).ToBytes();
+        Assert.Equal(FrameOutcome.Rejected, store.Accept(poisoned, "G8BAD").Outcome); // k pieces, one wrong: no match, waits
+
+        var last = store.Accept(obj.Frame((uint)k).ToBytes(), "GB7RDG");
+
+        Assert.Equal(FrameOutcome.CompletedBulletin, last.Outcome);
+        var line = Assert.Single(log, l => l.Contains("heard from G8BAD", StringComparison.Ordinal));
+        Assert.Contains("1 piece(s)", line, StringComparison.Ordinal);
+        Assert.All(log, l => Assert.True(l.All(c => c < 128)));
+        Assert.DoesNotContain(store.KeptPieces(obj.ObjectId, 0, 500)!.Pieces, p => p.Source.Label == "G8BAD");
+    }
+
+    [Fact]
     public void ABadPiece_IsFoundByLabel_WhenThereAreGoodOnesFromAnotherLabel()
     {
         using var dir = new TempDirectory();

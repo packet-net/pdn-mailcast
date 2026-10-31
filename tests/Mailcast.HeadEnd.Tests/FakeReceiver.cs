@@ -55,7 +55,7 @@ internal sealed class FakeReceiver : IDisposable
 
     public List<string> Requests { get; } = [];
 
-    public bool Password { get; set; }
+    public bool Broken { get; set; }
 
     public static int FreePort()
     {
@@ -126,9 +126,9 @@ internal sealed class FakeReceiver : IDisposable
         }
         try
         {
-            if (Password)
+            if (Broken)
             {
-                Reply(context, 401, "application/json", """{"error":"Sign in first: this page needs its password."}""");
+                Reply(context, 500, "application/json", """{"error":"broken"}""");
                 return;
             }
             var query = context.Request.QueryString;

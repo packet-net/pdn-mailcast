@@ -269,10 +269,6 @@ public sealed class ReceiverPool : IDisposable
             // The index of one object: the shape of the answer says it is a receiver and not some other web page.
             await new ReceiverApiClient(_http, url).GetObjectsAsync(0, 1, probe.Token).ConfigureAwait(false);
         }
-        catch (ReceiverReadException e) when (e.NeedsPassword)
-        {
-            // It is one, but not one we can read; follow it so the status says why.
-        }
         catch (Exception e) when (e is ReceiverReadException or OperationCanceledException && !cancellation.IsCancellationRequested)
         {
             return; // nothing there, or not a receiver
@@ -437,7 +433,7 @@ public sealed class ReceiverPool : IDisposable
                     double factor = Math.Pow(2, Math.Min(link.Failures - 3, 10));
                     link.NextTry = _time.GetUtcNow() + TimeSpan.FromTicks((long)Math.Min(_options.ReadEvery.Ticks * factor, LongestBackoff.Ticks));
                 }
-                if (link.Source == ReceiverSource.ThisMachine && !e.NeedsPassword && link.Failures >= _options.LocalFailuresToLose)
+                if (link.Source == ReceiverSource.ThisMachine && link.Failures >= _options.LocalFailuresToLose)
                 {
                     _links.Remove(link.Key);
                     lost = true;
@@ -447,7 +443,7 @@ public sealed class ReceiverPool : IDisposable
             {
                 _journal.Write($"receiver: lost {link.Name} at {link.Url} ({problem})");
             }
-            else if (link.ReportedProblem != problem && (e.NeedsPassword || link.Failures >= 3))
+            else if (link.ReportedProblem != problem && link.Failures >= 3)
             {
                 link.ReportedProblem = problem;
                 _journal.Write($"receiver: cannot read {link.Name} at {link.Url}: {problem}");

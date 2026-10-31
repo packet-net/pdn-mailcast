@@ -249,6 +249,10 @@ public sealed partial class StatusPage : IAsyncDisposable
                     await PostPiecesAsync(context).ConfigureAwait(false);
                     return;
             }
+            if (context.Request.HttpMethod == "GET" && await ServePublicAsync(context, path).ConfigureAwait(false))
+            {
+                return; // the object and piece reads and the API reference: open on the network whatever the page password
+            }
             string? session = null;
             if (!await AdmitAsync(context, path, id => session = id).ConfigureAwait(false))
             {
@@ -322,21 +326,6 @@ public sealed partial class StatusPage : IAsyncDisposable
                 case ("/api/filter/measure", "POST"):
                     await MeasureFilterAsync(context).ConfigureAwait(false);
                     break;
-                case ("/api/openapi.json", "GET"):
-                    await RespondAsync(context, 200, "application/json", OpenApi.Value).ConfigureAwait(false);
-                    break;
-                case ("/api/docs", "GET"):
-                    await RespondAsync(context, 200, "text/html; charset=utf-8", DocsPage).ConfigureAwait(false);
-                    break;
-                case ("/api/docs/scalar.js", "GET"):
-                    await ServeScalarAsync(context).ConfigureAwait(false);
-                    break;
-                case (ObjectsPath, "GET"):
-                    await ServeObjectsAsync(context).ConfigureAwait(false);
-                    break;
-                case (_, "GET") when path.StartsWith(ObjectsBase, StringComparison.Ordinal):
-                    await ServeObjectAsync(context, path[ObjectsBase.Length..]).ConfigureAwait(false);
-                    break;
                 case ("/api/key", "GET"):
                     await ServeKeyAsync(context).ConfigureAwait(false);
                     break;
@@ -372,6 +361,37 @@ public sealed partial class StatusPage : IAsyncDisposable
         catch (Exception e) when (e is HttpListenerException or IOException or ObjectDisposedException)
         {
             // The browser went away.
+        }
+    }
+
+    /// <summary>
+    /// The public reads: the objects and pieces, the OpenAPI document and the reference page. They are open to anyone who can
+    /// reach the page, with or without a password (head ends and other programs read them with none); the password protects
+    /// the mail, the settings and the keys. They show only what was heard on air or handed in, never the mail or the settings.
+    /// </summary>
+    private async Task<bool> ServePublicAsync(HttpListenerContext context, string path)
+    {
+        switch (path)
+        {
+            case ObjectsPath:
+                await ServeObjectsAsync(context).ConfigureAwait(false);
+                return true;
+            case "/api/openapi.json":
+                await RespondAsync(context, 200, "application/json", OpenApi.Value).ConfigureAwait(false);
+                return true;
+            case "/api/docs":
+                await RespondAsync(context, 200, "text/html; charset=utf-8", DocsPage).ConfigureAwait(false);
+                return true;
+            case "/api/docs/scalar.js":
+                await ServeScalarAsync(context).ConfigureAwait(false);
+                return true;
+            default:
+                if (path.StartsWith(ObjectsBase, StringComparison.Ordinal))
+                {
+                    await ServeObjectAsync(context, path[ObjectsBase.Length..]).ConfigureAwait(false);
+                    return true;
+                }
+                return false;
         }
     }
 

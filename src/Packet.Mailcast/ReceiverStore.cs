@@ -926,6 +926,7 @@ public sealed partial class ReceiverStore
                 _keep.Add(key, frame.ObjectId, frame.DictionaryId, frame.Oti, frame.EncodingSymbolId, payload.ToArray(), now, source, _options.KeepMaxBytes);
                 instance.TouchAir(now);
                 instance.OutsideTried = -1;
+                instance.StationTried = -1;
                 return (TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId)) with { Kept = true };
             }
             return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
@@ -1622,6 +1623,13 @@ public sealed partial class ReceiverStore
         {
             KeepObject(instance, clean);
             return Finish(instance, clean);
+        }
+
+        // Then each station's on-air pieces in turn (a station whose receiver heard garbled frames, or a mix-up of objects).
+        if (RebuildWithoutStation(instance) is { } cleaned)
+        {
+            KeepObject(instance, cleaned);
+            return Finish(instance, cleaned);
         }
 
         // Some piece is wrong. A wrong rebuild agrees with every piece it used, so the pieces
@@ -2452,6 +2460,9 @@ public sealed partial class ReceiverStore
 
         /// <summary>How many pieces were held when the last attempt without the pieces from outside was made (-1: none yet).</summary>
         public int OutsideTried { get; set; } = -1;
+
+        /// <summary>The same for the attempt without each station's on-air pieces in turn (-1: none yet).</summary>
+        public int StationTried { get; set; } = -1;
 
         /// <summary>Puts another symbol in place of the one held for a piece number, and starts the decoder again.</summary>
         public void Replace(uint esi, byte[] symbol)

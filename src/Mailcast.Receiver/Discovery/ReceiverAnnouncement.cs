@@ -31,8 +31,7 @@ public sealed class ReceiverAnnouncement : IDisposable
     }
 
     /// <summary>The TXT strings for this configuration.</summary>
-    public static IReadOnlyList<string> Text(ReceiverConfig config, string version) =>
-        ReceiverService.Text(version, config.Web.Password.Length > 0);
+    public static IReadOnlyList<string> Text(string version) => ReceiverService.Text(version);
 
     /// <summary>
     /// Starts announcing, or returns null having said why in one line (the page is not on the network, or multicast does
@@ -51,7 +50,7 @@ public sealed class ReceiverAnnouncement : IDisposable
             log("discovery: not announcing this receiver on the network, because its page is only on this machine; a head end here finds it by itself");
             return null;
         }
-        var announcer = new MdnsAnnouncer(transport, InstanceName(config), config.Web.Port, Text(config, version), log);
+        var announcer = new MdnsAnnouncer(transport, InstanceName(config), config.Web.Port, Text(version), log);
         if (!announcer.Start())
         {
             announcer.Dispose();

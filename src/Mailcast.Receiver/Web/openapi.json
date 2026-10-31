@@ -28,7 +28,7 @@
           "401": { "$ref": "#/components/responses/Error" },
           "429": { "$ref": "#/components/responses/Error" }
         },
-        "security": [ {}, { "pagePassword": [] } ]
+        "security": [ {} ]
       }
     },
     "/api/objects/{id}/pieces": {
@@ -49,7 +49,7 @@
           "404": { "$ref": "#/components/responses/Error" },
           "429": { "$ref": "#/components/responses/Error" }
         },
-        "security": [ {}, { "pagePassword": [] } ]
+        "security": [ {} ]
       }
     },
     "/api/objects/{id}/data": {
@@ -72,7 +72,7 @@
           "404": { "$ref": "#/components/responses/Error" },
           "429": { "$ref": "#/components/responses/Error" }
         },
-        "security": [ {}, { "pagePassword": [] } ]
+        "security": [ {} ]
       }
     },
     "/api/pieces": {

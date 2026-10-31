@@ -106,13 +106,11 @@ public class AnnouncementTests
     }
 
     [Fact]
-    public void WithoutACallsign_TheInstanceIsNamedByTheComputer_AndAPasswordIsSaid()
+    public void WithoutACallsign_TheInstanceIsNamedByTheComputer()
     {
         var plain = new ReceiverConfig();
         Assert.Equal(ReceiverService.Label(Environment.MachineName) + " " + ReceiverService.MachineSuffix(), ReceiverAnnouncement.InstanceName(plain));
-        Assert.DoesNotContain("pw=1", ReceiverAnnouncement.Text(plain, "1.0.0"));
-        var locked = new ReceiverConfig { Web = new WebSettings { Password = "x" } };
-        Assert.Contains("pw=1", ReceiverAnnouncement.Text(locked, "1.0.0"));
+        Assert.DoesNotContain("pw=1", ReceiverAnnouncement.Text("1.0.0")); // the object reads are open whatever the page password
     }
 
     [Fact]

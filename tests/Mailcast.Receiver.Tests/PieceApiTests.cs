@@ -198,17 +198,24 @@ public class PieceApiTests
     }
 
     [Fact]
-    public async Task WithAPagePassword_ReadsNeedItButPostsNeedOnlyTheKey()
+    public async Task WithAPagePassword_TheObjectReadsAndTheReferenceStayOpen_ButTheRestNeedsIt()
     {
         using var dir = new TempDirectory();
         var (host, page, http) = await StartAsync(dir.Path, password: "secret");
         await using var _h = host; await using var _p = page; using var _c = http;
         string key = host.Intake.NewApiKey();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync("api/objects")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Post(new { frames = Frames(Obj(), 0, 1) }, key))).StatusCode);
-        var read = new HttpRequestMessage(HttpMethod.Get, "api/objects");
-        read.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("x:secret")));
-        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(read)).StatusCode);
+        var obj = Obj();
+        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Post(new { frames = Frames(obj, 0, obj.SourceSymbols) }, key))).StatusCode);
+        string id = ObjectId.Format(obj.ObjectId);
+        foreach (string open in new[] { "api/objects", $"api/objects/{id}/pieces", $"api/objects/{id}/data", "api/openapi.json", "api/docs" })
+        {
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync(open)).StatusCode);
+        }
+        // The password still guards the mail, the settings, the status and the key.
+        foreach (string closed in new[] { "api/mail", "api/settings", "api/status", "api/key" })
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(closed)).StatusCode);
+        }
     }
 
     [Fact]

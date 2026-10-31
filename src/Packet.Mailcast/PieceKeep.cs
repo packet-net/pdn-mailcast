@@ -356,6 +356,10 @@ internal sealed class PieceKeep
     public List<(uint Esi, string? Label)> OutsidePieces(string key) =>
         _entries.TryGetValue(key, out var e) ? [.. e.Pieces.Where(p => p.Value.Source.Outside).Select(p => (p.Key, p.Value.Source.Label))] : [];
 
+    /// <summary>The pieces of this variant that were heard on air, with the station each was attributed to (null if none was).</summary>
+    public List<(uint Esi, string? Label)> AirPieces(string key) =>
+        _entries.TryGetValue(key, out var e) ? [.. e.Pieces.Where(p => !p.Value.Source.Outside).Select(p => (p.Key, p.Value.Source.Label))] : [];
+
     /// <summary>Whether this variant has its rebuilt octets.</summary>
     public bool IsComplete(string key) => _entries.TryGetValue(key, out var e) && e.Complete;
 

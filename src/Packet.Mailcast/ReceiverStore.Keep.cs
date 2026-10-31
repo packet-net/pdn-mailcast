@@ -236,6 +236,56 @@ public sealed partial class ReceiverStore
         return null;
     }
 
+    /// <summary>
+    /// A rebuild failed its ID check and the pieces from outside were not the cause (or there were none): try again leaving out
+    /// the pieces heard on air from each station in turn, by the station each was attributed to, before waiting for more. If one
+    /// set rebuilds to the ID, that station's pieces that do not agree with the true object are dropped, and one line names the
+    /// station. A station whose pieces are all of the object's pieces is not tried alone. Null when it does not help.
+    /// </summary>
+    private byte[]? RebuildWithoutStation(Instance instance)
+    {
+        var air = _keep.AirPieces(instance.Key).Where(p => p.Label is not null && instance.Symbols.ContainsKey(p.Esi)).ToList();
+        if (air.Count == 0 || instance.StationTried == instance.Symbols.Count)
+        {
+            return null;
+        }
+        instance.StationTried = instance.Symbols.Count;
+        int k = instance.Oti.SourceBlockSymbols(0);
+        foreach (string station in air.Select(p => p.Label!).Distinct().Order(StringComparer.Ordinal))
+        {
+            var left = air.Where(p => p.Label == station).Select(p => p.Esi).ToHashSet();
+            var use = instance.Arrival.Where(e => !left.Contains(e) && instance.Symbols.ContainsKey(e)).ToList();
+            if (use.Count < k)
+            {
+                continue;
+            }
+            var decoder = new ObjectDecoder(instance.Oti);
+            foreach (uint esi in use)
+            {
+                decoder.Add(new PayloadId(0, esi), instance.Symbols[esi]);
+            }
+            var candidate = decoder.TryDecode();
+            if (candidate is null || ObjectId.Of(instance.DictionaryId, candidate) != instance.ObjectId)
+            {
+                continue;
+            }
+            var encoder = new ObjectEncoder(candidate, instance.Oti);
+            var bad = left.Where(esi => !encoder.Encode(new PayloadId(0, esi)).AsSpan().SequenceEqual(instance.Symbols[esi])).ToList();
+            foreach (uint esi in bad)
+            {
+                instance.Symbols.Remove(esi);
+                instance.Arrival.Remove(esi);
+                TryDelete(SymbolPath(instance, esi));
+                _keep.RemovePiece(instance.Key, esi, _options.Time.GetUtcNow());
+            }
+            instance.ResetDecoder();
+            string plain = new([.. station.Select(c => c is >= ' ' and <= '~' ? c : '?')]);
+            Log($"object {ObjectId.Format(instance.ObjectId)}: {bad.Count} piece(s) heard from {plain} did not fit the object and were dropped; rebuilt without them");
+            return candidate;
+        }
+        return null;
+    }
+
     // ---- the API key
 
     /// <summary>

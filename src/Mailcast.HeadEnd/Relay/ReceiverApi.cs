@@ -27,12 +27,8 @@ public sealed record RemotePiece(uint Esi, byte[] Frame, DateTimeOffset Heard, b
 /// <summary>A page of <see cref="RemotePiece"/>.</summary>
 public sealed record RemotePiecePage(IReadOnlyList<RemotePiece> Pieces, long Next, bool More);
 
-/// <summary>A receiver could not be read; <see cref="NeedsPassword"/> says it wants the page's password.</summary>
-public sealed class ReceiverReadException(string message, bool needsPassword = false, Exception? inner = null) : Exception(message, inner)
-{
-    /// <summary>The receiver answered 401: its page has a password, which the head end does not have.</summary>
-    public bool NeedsPassword { get; } = needsPassword;
-}
+/// <summary>A receiver could not be read.</summary>
+public sealed class ReceiverReadException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
 /// Reads a receiver's API for objects and pieces (docs/receiver.md): open GETs only, so nothing here can change a
@@ -87,7 +83,7 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
         }
         catch (Exception e) when (e is KeyNotFoundException or InvalidOperationException or FormatException or ArgumentException or OverflowException)
         {
-            throw new ReceiverReadException("its list of objects is not in the expected form", inner: e);
+            throw new ReceiverReadException("its list of objects is not in the expected form", e);
         }
     }
 
@@ -123,7 +119,7 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
             }
             catch (Exception e) when (e is KeyNotFoundException or InvalidOperationException or FormatException or ArgumentException or OverflowException)
             {
-                throw new ReceiverReadException("its list of pieces is not in the expected form", inner: e);
+                throw new ReceiverReadException("its list of pieces is not in the expected form", e);
             }
         }
     }
@@ -149,16 +145,12 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancellation.IsCancellationRequested)
         {
-            throw new ReceiverReadException(e is HttpRequestException { InnerException: System.Net.Sockets.SocketException s } ? s.Message : e.Message, inner: e);
+            throw new ReceiverReadException(e is HttpRequestException { InnerException: System.Net.Sockets.SocketException s } ? s.Message : e.Message, e);
         }
     }
 
     private static void Check(HttpResponseMessage response)
     {
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            throw new ReceiverReadException("it has a password on its page", needsPassword: true);
-        }
         if (!response.IsSuccessStatusCode)
         {
             var e = new ReceiverReadException($"it answered {(int)response.StatusCode}");
@@ -177,7 +169,7 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
         }
         catch (JsonException e)
         {
-            throw new ReceiverReadException("it did not answer with JSON", inner: e);
+            throw new ReceiverReadException("it did not answer with JSON", e);
         }
     }
 }
