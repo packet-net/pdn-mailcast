@@ -122,12 +122,6 @@ public sealed class HeadEndService(
 
     private readonly Lock _gate = new();
     private bool _inSlot;
-
-    /// <summary>
-    /// Run in the bounded time before each slot, after the intakes: reads the receivers again (issue #218), so a slot is
-    /// planned with what they have heard up to now. A failure or a late finish only means the slot goes ahead without it.
-    /// </summary>
-    public Func<CancellationToken, Task>? BeforeSlot { get; init; }
     private (DateTimeOffset Slot, string By)? _runNow;
     // Cancelled to wake the wait for a slot when a one-off slot is asked for; replaced after it.
     private CancellationTokenSource _wakeup = new();
@@ -334,23 +328,6 @@ public sealed class HeadEndService(
                     journal.Write($"intake ({scheduled.Intake.Name}): not finished within {preSlotIntakeLimit.TotalSeconds:0} s before the slot; going ahead with what is held");
                     break;
                 }
-            }
-        }
-        if (BeforeSlot is { } before)
-        {
-            using var readLimit = new CancellationTokenSource(TimeSpan.FromSeconds(10), time);
-            using var readBounded = CancellationTokenSource.CreateLinkedTokenSource(cancellation, readLimit.Token);
-            try
-            {
-                await before(readBounded.Token);
-            }
-            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
-            {
-                journal.Write("receivers: not finished reading within 10 s before the slot; going ahead with what is held");
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                journal.Write($"receivers: could not be read before the slot ({e.Message}); going ahead with what is held");
             }
         }
         int forgotten = store.Expire(day);

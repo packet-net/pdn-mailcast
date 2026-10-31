@@ -212,6 +212,7 @@ public sealed class DnsMessage
     private static string ReadName(ReadOnlySpan<byte> p, ref int at)
     {
         var labels = new List<string>();
+        int total = 0;
         int cursor = at;
         int resumeAt = -1;
         for (int hops = 0; hops < 64; hops++)
@@ -239,6 +240,11 @@ public sealed class DnsMessage
             if ((length & 0xC0) != 0 || cursor + 1 + length > p.Length)
             {
                 throw new FormatException("bad label");
+            }
+            total += 1 + length;
+            if (total > 255)
+            {
+                throw new FormatException("name too long"); // a name is at most 255 octets (RFC 1035)
             }
             labels.Add(Encoding.UTF8.GetString(p.Slice(cursor + 1, length)));
             cursor += 1 + length;

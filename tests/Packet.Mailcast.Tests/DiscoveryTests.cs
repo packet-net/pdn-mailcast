@@ -23,8 +23,26 @@ public class DiscoveryTests
             return m;
         }
 
-        public sealed class Member(Network net, IPAddress address) : IMdnsTransport
+        public sealed class Member : IMdnsTransport
         {
+            private readonly Network net;
+            private readonly IPAddress address;
+            private readonly System.Threading.Channels.Channel<(byte[] Packet, IPAddress From)> _in = System.Threading.Channels.Channel.CreateUnbounded<(byte[], IPAddress)>();
+
+            public Member(Network net, IPAddress address)
+            {
+                this.net = net;
+                this.address = address;
+                // In order, as a real network keeps a sender's packets.
+                _ = Task.Run(async () =>
+                {
+                    await foreach (var (packet, from) in _in.Reader.ReadAllAsync())
+                    {
+                        Received?.Invoke(packet, from);
+                    }
+                });
+            }
+
             public event Action<byte[], IPAddress>? Received;
 
             public void Start()
@@ -44,15 +62,15 @@ public class DiscoveryTests
                 }
                 foreach (var m in all)
                 {
-                    _ = Task.Run(() => m.Received?.Invoke(packet, address));
+                    m._in.Writer.TryWrite((packet, address));
                 }
             }
 
+            public void Send(Func<IPAddress, byte[]> packetForNetwork) => Send(packetForNetwork(address));
+
             public void Inject(byte[] packet, IPAddress from) => Received?.Invoke(packet, from);
 
-            public void Dispose()
-            {
-            }
+            public void Dispose() => _in.Writer.TryComplete();
         }
     }
 
@@ -64,6 +82,8 @@ public class DiscoveryTests
         }
         Assert.True(condition(), what);
     }
+
+    private static readonly LocalNetworks Lan = new(() => [(IPAddress.Loopback, 8), (IPAddress.Parse("10.0.0.0"), 8), (IPAddress.Parse("192.168.1.0"), 24)]);
 
     private static readonly string[] Text = ["txtvers=1", "v=0.1.0", "api=1"];
 
@@ -129,8 +149,8 @@ public class DiscoveryTests
     {
         var net = new Network();
         var lines = new List<string>();
-        using var announcer = new MdnsAnnouncer(net.Join(IPAddress.Parse("10.45.0.77")), "M0LTE on box", 8130, Text, lines.Add, addresses: () => [IPAddress.Parse("10.45.0.77")]);
-        using var browser = new MdnsBrowser(net.Join(), ReceiverService.TypeName, lines.Add);
+        using var announcer = new MdnsAnnouncer(net.Join(IPAddress.Parse("10.45.0.77")), "M0LTE on box", 8130, Text, lines.Add, networks: Lan);
+        using var browser = new MdnsBrowser(net.Join(), ReceiverService.TypeName, lines.Add, networks: Lan);
         var found = new List<FoundService>();
         var lost = new List<string>();
         browser.Found += f => { lock (found) { found.Add(f); } };
@@ -168,7 +188,7 @@ public class DiscoveryTests
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero));
         var net = new Network();
         var member = net.Join();
-        using var browser = new MdnsBrowser(member, ReceiverService.TypeName, _ => { }, time);
+        using var browser = new MdnsBrowser(member, ReceiverService.TypeName, _ => { }, time, Lan);
         browser.Start();
         var message = new DnsMessage { IsResponse = true };
         string instance = "rx._pdn-mailcast._tcp.local";
@@ -191,8 +211,8 @@ public class DiscoveryTests
     {
         var net = new Network { Broken = true };
         var lines = new List<string>();
-        using var announcer = new MdnsAnnouncer(net.Join(), "x", 8130, Text, lines.Add);
-        using var browser = new MdnsBrowser(net.Join(), ReceiverService.TypeName, lines.Add);
+        using var announcer = new MdnsAnnouncer(net.Join(), "x", 8130, Text, lines.Add, networks: Lan);
+        using var browser = new MdnsBrowser(net.Join(), ReceiverService.TypeName, lines.Add, networks: Lan);
 
         Assert.False(announcer.Start());
         Assert.False(browser.Start());
@@ -213,32 +233,89 @@ public class DiscoveryTests
     }
 
     [Fact]
-    public async Task OnRealSockets_AnAnnouncementIsFound_WhereMulticastWorks()
+    public async Task OnRealSockets_AnAnnouncementIsFound()
     {
-        // Another port than 5353 keeps this clear of Avahi and of other test runs. A machine whose networks cannot multicast
-        // (a container, a CI runner) cannot run this; the transport says so and the test ends there.
+        // Needs a machine whose networks multicast (a container or CI runner often cannot), so it runs only where asked:
+        // PDN_MAILCAST_REAL_MDNS=1 dotnet test ... --filter OnRealSockets. Another port than 5353 keeps it clear of Avahi.
+        if (Environment.GetEnvironmentVariable("PDN_MAILCAST_REAL_MDNS") != "1")
+        {
+            return;
+        }
         int port = 20000 + Random.Shared.Next(20000);
         using var browserSide = new UdpMdnsTransport(port);
         using var announcerSide = new UdpMdnsTransport(port);
         var lines = new List<string>();
         using var browser = new MdnsBrowser(browserSide, ReceiverService.TypeName, lines.Add);
         using var announcer = new MdnsAnnouncer(announcerSide, "socket test", 8130, Text, lines.Add);
-        if (!browser.Start() || !announcer.Start())
-        {
-            Assert.All(lines, l => Assert.StartsWith("discovery: cannot ", l, StringComparison.Ordinal));
-            return;
-        }
+        Assert.True(browser.Start());
+        Assert.True(announcer.Start());
 
-        for (int i = 0; i < 150 && browser.Current.Count == 0; i++)
+        for (int i = 0; i < 250 && browser.Current.Count == 0; i++)
         {
             await Task.Delay(20);
         }
 
-        // Multicast can be offered by the system and filtered in between; only a find is checked, not its absence.
-        if (browser.Current.Count == 1)
+        var found = Assert.Single(browser.Current);
+        Assert.Equal("socket test", found.Name);
+        Assert.Equal(8130, found.Port);
+    }
+
+    [Fact]
+    public void AName_OverTheLimitOf255Octets_IsRefused()
+    {
+        var message = new DnsMessage();
+        message.Questions.Add(new DnsQuestion(string.Join('.', Enumerable.Repeat(new string('a', 60), 5)), DnsRecord.TypePtr));
+        Assert.Null(DnsMessage.Parse(message.ToBytes()));
+    }
+
+    private static byte[] Announcement(string instance, string host, ushort port, string address, string? srvName = null, string typeName = ReceiverService.TypeName)
+    {
+        var m = new DnsMessage { IsResponse = true };
+        m.Records.Add(new DnsRecord { Name = typeName, Type = DnsRecord.TypePtr, Ttl = 120, Target = instance });
+        m.Records.Add(new DnsRecord { Name = srvName ?? instance, Type = DnsRecord.TypeSrv, Ttl = 120, Port = port, Target = host });
+        m.Records.Add(new DnsRecord { Name = host, Type = DnsRecord.TypeA, Ttl = 120, Address = IPAddress.Parse(address) });
+        return m.ToBytes();
+    }
+
+    [Fact]
+    public void TheBrowser_BelievesOnlyLocalSources_LocalAddresses_AndNamesUnderItsType()
+    {
+        var net = new Network();
+        var member = net.Join();
+        using var browser = new MdnsBrowser(member, ReceiverService.TypeName, _ => { }, networks: Lan);
+        browser.Start();
+
+        member.Inject(Announcement("a._pdn-mailcast._tcp.local", "h.local", 8130, "10.1.1.1"), IPAddress.Parse("8.8.8.8")); // from far away
+        Assert.Empty(browser.Current);
+        member.Inject(Announcement("b._pdn-mailcast._tcp.local", "h.local", 8130, "8.8.4.4"), IPAddress.Parse("10.2.2.2")); // points far away
+        Assert.Equal(IPAddress.Parse("10.2.2.2"), Assert.Single(browser.Current).Address); // the A record was not believed; the sender is
+        member.Inject(Announcement("c.other._tcp.local", "h.local", 8130, "10.1.1.1", typeName: "_other._tcp.local"), IPAddress.Parse("10.2.2.3"));
+        member.Inject(Announcement("d._pdn-mailcast._tcp.local", "h.local", 8130, "10.1.1.1", srvName: "e.other._tcp.local"), IPAddress.Parse("10.2.2.3"));
+        Assert.Single(browser.Current);
+
+        // At most MdnsBrowser.MaxInstances.
+        for (int i = 0; i < 100; i++)
         {
-            Assert.Equal("socket test", browser.Current[0].Name);
-            Assert.Equal(8130, browser.Current[0].Port);
+            member.Inject(Announcement($"n{i}._pdn-mailcast._tcp.local", $"h{i}.local", 8130, "10.1.1.1"), IPAddress.Parse("10.2.2.9"));
+        }
+        Assert.True(browser.Current.Count <= MdnsBrowser.MaxInstances);
+    }
+
+    [Fact]
+    public async Task TheAnnouncer_SaysOnEachNetworkOnlyTheAddressItHasThere()
+    {
+        var net = new Network();
+        var listener = net.Join();
+        var heard = new List<DnsMessage>();
+        listener.Received += (p, _) => { if (DnsMessage.Parse(p) is { } m) { lock (heard) { heard.Add(m); } } };
+        using var announcer = new MdnsAnnouncer(net.Join(IPAddress.Parse("192.168.1.20")), "x", 8130, Text, _ => { }, networks: Lan);
+        announcer.Start();
+        await Eventually(() => { lock (heard) { return heard.Count > 0; } }, "an announcement");
+
+        lock (heard)
+        {
+            var a = heard[0].Records.Where(r => r.Type == DnsRecord.TypeA).ToList();
+            Assert.Equal(IPAddress.Parse("192.168.1.20"), Assert.Single(a).Address);
         }
     }
 }

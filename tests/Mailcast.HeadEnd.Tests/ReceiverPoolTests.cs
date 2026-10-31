@@ -20,12 +20,15 @@ public class ReceiverPoolTests
         Assert.True(condition(), what);
     }
 
+    private static readonly LocalNetworks Lan = new(() => [(IPAddress.Loopback, 8)]);
+
     private static ReceiverPool Pool(ObjectCatalogue catalogue, MemoryJournal journal, FakeTimeProvider time, int localPort, FakeMdnsNetwork? net = null) =>
         new(catalogue, journal, time, new ReceiverPoolOptions
         {
             LocalPort = localPort,
             Transport = net is null ? null : () => net.Join(),
             IsOwnAddress = a => IPAddress.IsLoopback(a),
+            Networks = Lan,
         });
 
     [Fact]
@@ -100,8 +103,8 @@ public class ReceiverPoolTests
         var journal = new MemoryJournal();
         var net = new FakeMdnsNetwork();
         using var pool = Pool(catalogue, journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
-        using var announceA = new MdnsAnnouncer(net.Join(), "rx a", a.Port, ReceiverService.Text("0.1.0", false), _ => { }, addresses: () => [IPAddress.Loopback]);
-        using var announceB = new MdnsAnnouncer(net.Join(), "rx b", b.Port, ReceiverService.Text("0.1.0", false), _ => { }, addresses: () => [IPAddress.Loopback]);
+        using var announceA = new MdnsAnnouncer(net.Join(), "rx a", a.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
+        using var announceB = new MdnsAnnouncer(net.Join(), "rx b", b.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
         announceA.Start();
         announceB.Start();
         using var stop = new CancellationTokenSource();
@@ -130,11 +133,11 @@ public class ReceiverPoolTests
         var catalogue = new ObjectCatalogue(TimeProvider.System);
         var net = new FakeMdnsNetwork();
         using var pool = Pool(catalogue, journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
-        var announce = new MdnsAnnouncer(net.Join(), "rx a", receiver.Port, ReceiverService.Text("0.1.0", false), _ => { }, addresses: () => [IPAddress.Loopback]);
+        var announce = new MdnsAnnouncer(net.Join(), "rx a", receiver.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
         announce.Start();
         using var stop = new CancellationTokenSource();
         var run = Task.Run(() => pool.RunAsync(stop.Token));
-        await Eventually(() => pool.Receivers.Count == 1, "found");
+        await Eventually(() => pool.Receivers.Count == 1 && pool.Receivers[0].State == "ok", "found and read");
 
         announce.Dispose(); // says goodbye
         await Eventually(() => pool.Receivers.Count == 0, "lost");
@@ -152,7 +155,7 @@ public class ReceiverPoolTests
         var net = new FakeMdnsNetwork();
         var journal = new MemoryJournal();
         using var pool = Pool(new ObjectCatalogue(TimeProvider.System), journal, new FakeTimeProvider(Start), receiver.Port, net);
-        using var announce = new MdnsAnnouncer(net.Join(), "same one", receiver.Port, ReceiverService.Text("0.1.0", false), _ => { }, addresses: () => [IPAddress.Loopback]);
+        using var announce = new MdnsAnnouncer(net.Join(), "same one", receiver.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
         announce.Start();
         using var stop = new CancellationTokenSource();
         var run = Task.Run(() => pool.RunAsync(stop.Token));
@@ -223,6 +226,11 @@ public class ReceiverPoolTests
         Assert.Equal("not readable", seen.State);
         Assert.Contains("password", seen.Problem, StringComparison.Ordinal);
         Assert.Single(journal.Lines, l => l.Contains("cannot read", StringComparison.Ordinal));
+        // The probe, then three reads; after three failures in a row it is asked less often, so the last two reads asked nothing.
+        lock (receiver.Requests)
+        {
+            Assert.Equal(4, receiver.Requests.Count);
+        }
     }
 
     [Fact]
@@ -342,5 +350,137 @@ public class ReceiverPoolTests
         var first = section.GetProperty("receivers")[0];
         Assert.Equal("this machine", first.GetProperty("found").GetString());
         Assert.Equal("ok", first.GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task ACatalogueAtItsCap_StaysFull_AcrossResyncs()
+    {
+        using var receiver = new FakeReceiver();
+        var objects = Enumerable.Range(50, 3).Select(s => FakeReceiver.Make(s)).ToList();
+        foreach (var o in objects)
+        {
+            receiver.Add(o, [(0u, true, "GB7RDG"), (1u, true, "GB7RDG")]);
+        }
+        var time = new FakeTimeProvider(Start);
+        var catalogue = new ObjectCatalogue(time, maxObjects: 2);
+        using var pool = Pool(catalogue, new MemoryJournal(), time, receiver.Port);
+
+        for (int round = 0; round < 6; round++)
+        {
+            await pool.ReadNowAsync(CancellationToken.None);
+            var totals = catalogue.Totals();
+            Assert.Equal(2, totals.Objects);
+            Assert.Equal(4, totals.Pieces);
+            time.Advance(ReceiverReader.ResyncEvery + TimeSpan.FromMinutes(1));
+        }
+    }
+
+    [Fact]
+    public void AnIndexRowAlone_MakesNoEntry()
+    {
+        var catalogue = new ObjectCatalogue(TimeProvider.System);
+        var o = FakeReceiver.Make(60);
+        catalogue.Note(new RemoteObject(o.ObjectId, 0x71, 0, o.Oti, o.SourceSymbols, 0, false, [], 1));
+        Assert.Null(catalogue.Get(o.ObjectId));
+        Assert.Equal(0, catalogue.Totals().Objects);
+    }
+
+    [Fact]
+    public async Task OneReadMakesAtMostTheBudgetOfRequests_AndCatchesUpOverSeveralReads()
+    {
+        using var receiver = new FakeReceiver();
+        var objects = Enumerable.Range(0, 250).Select(s => FakeReceiver.Make(100 + s, size: 300)).ToList();
+        foreach (var o in objects)
+        {
+            receiver.Add(o, [(0u, true, "GB7RDG")]);
+        }
+        var catalogue = new ObjectCatalogue(TimeProvider.System);
+        using var pool = Pool(catalogue, new MemoryJournal(), new FakeTimeProvider(Start), receiver.Port);
+
+        await pool.ReadNowAsync(CancellationToken.None);
+        int first;
+        lock (receiver.Requests)
+        {
+            first = receiver.Requests.Count;
+        }
+        Assert.InRange(first, 1, ReceiverReader.MaxRequestsPerRead + 2); // the budget, and the probe
+        Assert.True(catalogue.Totals().Objects < 250);
+
+        for (int i = 0; i < 5 && catalogue.Totals().Objects < 250; i++)
+        {
+            await pool.ReadNowAsync(CancellationToken.None);
+        }
+        Assert.Equal(250, catalogue.Totals().Objects);
+    }
+
+    private static byte[] Announce(string instance, int port, uint ttl)
+    {
+        string full = instance + "." + ReceiverService.TypeName;
+        var m = new DnsMessage { IsResponse = true };
+        m.Records.Add(new DnsRecord { Name = ReceiverService.TypeName, Type = DnsRecord.TypePtr, Ttl = ttl, Target = full });
+        m.Records.Add(new DnsRecord { Name = full, Type = DnsRecord.TypeSrv, Ttl = ttl, Port = (ushort)port, Target = "h-mailcast.local" });
+        m.Records.Add(new DnsRecord { Name = full, Type = DnsRecord.TypeTxt, Ttl = ttl, Text = ReceiverService.Text("0.1.0", false) });
+        m.Records.Add(new DnsRecord { Name = "h-mailcast.local", Type = DnsRecord.TypeA, Ttl = ttl, Address = IPAddress.Loopback });
+        return m.ToBytes();
+    }
+
+    [Fact]
+    public async Task ANetworkReceiverThatMoves_ReplacesItsStaleLink_AndGoodbyeRemovesIt()
+    {
+        using var first = new FakeReceiver();
+        using var second = new FakeReceiver();
+        var net = new FakeMdnsNetwork();
+        var journal = new MemoryJournal();
+        using var pool = Pool(new ObjectCatalogue(TimeProvider.System), journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
+        using var stop = new CancellationTokenSource();
+        var run = Task.Run(() => pool.RunAsync(stop.Token));
+        var injector = net.Join();
+        // Said again until heard: the pool's browser starts in the background.
+        await Eventually(() => { injector.Send(Announce("rx same", first.Port, 120)); return pool.Receivers.Count == 1 && pool.Receivers[0].Url.Contains($":{first.Port}/", StringComparison.Ordinal); }, "first address");
+
+        // The same instance name announced at another port, the old one never saying goodbye: the old link is stale and goes.
+        injector.Send(Announce("rx same", second.Port, 120));
+        await Eventually(() => pool.Receivers.Count == 1 && pool.Receivers[0].Url.Contains($":{second.Port}/", StringComparison.Ordinal), "moved");
+        Assert.Contains(journal.Lines, l => l.StartsWith("receiver: rx same moved from ", StringComparison.Ordinal));
+
+        injector.Send(Announce("rx same", second.Port, 0)); // goodbye
+        await Eventually(() => pool.Receivers.Count == 0, "removed by name");
+        stop.Cancel();
+        await run;
+    }
+
+    [Fact]
+    public async Task NoMoreThanTwoReceiversAtOneAddress_AreFollowed()
+    {
+        using var a = new FakeReceiver();
+        using var b = new FakeReceiver();
+        using var c = new FakeReceiver();
+        var net = new FakeMdnsNetwork();
+        var journal = new MemoryJournal();
+        using var pool = Pool(new ObjectCatalogue(TimeProvider.System), journal, new FakeTimeProvider(Start), FakeReceiver.FreePort(), net);
+        using var stop = new CancellationTokenSource();
+        var run = Task.Run(() => pool.RunAsync(stop.Token));
+        var announcers = new[] { a, b, c }.Select((r, i) =>
+        {
+            var m = new MdnsAnnouncer(net.Join(), $"rx {i}", r.Port, ReceiverService.Text("0.1.0", false), _ => { }, networks: Lan);
+            m.Start();
+            return m;
+        }).ToList();
+        await Eventually(() => journal.Lines.Any(l => l.Contains("already following 2 at that address", StringComparison.Ordinal)), "the third refused");
+
+        Assert.Equal(2, pool.Receivers.Count);
+        announcers.ForEach(x => x.Dispose());
+        stop.Cancel();
+        await run;
+    }
+
+    [Fact]
+    public async Task AResponseOverTheLimit_IsAReadError_NotAnOutOfMemory()
+    {
+        using var receiver = new FakeReceiver();
+        receiver.Add(FakeReceiver.Make(70), [(0u, true, "GB7RDG")]);
+        using var small = new HttpClient { MaxResponseContentBufferSize = 100 };
+        var client = new ReceiverApiClient(small, receiver.Url);
+        await Assert.ThrowsAsync<ReceiverReadException>(() => client.GetObjectsAsync(0, 10, CancellationToken.None));
     }
 }

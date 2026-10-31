@@ -102,12 +102,27 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
     /// <summary>The most objects held.</summary>
     public int MaxObjects { get; } = maxObjects;
 
-    /// <summary>Notes what a receiver says about an object: its type, coding and the listings of it. Creates it if new.</summary>
+    /// <summary>Raised, outside the lock, with the ID of each object dropped to keep within the limits, so readers forget what they know of it.</summary>
+    public event Action<ulong>? Evicted;
+
+    /// <summary>
+    /// Notes what a receiver says about an object: its type, coding and the listings of it. Only for an object already held (by
+    /// a piece or its rebuilt octets): a row alone makes no entry, so an object with nothing in it can never push out one that has.
+    /// </summary>
+    /// <remarks>
+    /// The listings here are what a receiver claims; the catalogue does not check them. Part 2 of issue 218 must relay only from
+    /// checked data: take the object from rebuilt octets that match the ID, and compute the long hash from those octets itself
+    /// (<see cref="ObjectId.LongHash"/>), never copying a receiver's hash into a directory it signs.
+    /// </remarks>
     public void Note(RemoteObject row)
     {
         lock (_gate)
         {
-            var e = Find(row.Id, create: true)!;
+            var e = Find(row.Id, create: false);
+            if (e is null)
+            {
+                return;
+            }
             e.Type ??= row.Type;
             e.Dictionary = row.Dictionary;
             e.Oti = row.Oti;
@@ -120,7 +135,6 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
                     e.Updated = time.GetUtcNow();
                 }
             }
-            Trim(row.Id);
         }
     }
 
@@ -136,6 +150,7 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
             return false;
         }
         bool added;
+        List<ulong> dropped;
         lock (_gate)
         {
             var e = Find(objectId, create: true)!;
@@ -164,8 +179,9 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
                 added = true;
             }
             e.Updated = time.GetUtcNow();
-            Trim(objectId);
+            dropped = Trim(objectId);
         }
+        Raise(dropped);
         return added;
     }
 
@@ -176,6 +192,7 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         {
             return false;
         }
+        List<ulong> dropped = [];
         lock (_gate)
         {
             var e = Find(objectId, create: true)!;
@@ -186,9 +203,10 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
                 e.Bytes += data.Length;
                 _bytes += data.Length;
                 e.Updated = time.GetUtcNow();
-                Trim(objectId);
+                dropped = Trim(objectId);
             }
         }
+        Raise(dropped);
         return true;
     }
 
@@ -256,8 +274,9 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
     }
 
     // Drops the object changed longest ago, again and again, while over a limit; never the one just changed. Under the lock.
-    private void Trim(ulong keep)
+    private List<ulong> Trim(ulong keep)
     {
+        var dropped = new List<ulong>();
         while (_objects.Count > 1 && (_bytes > MaxBytes || _objects.Count > MaxObjects))
         {
             var oldest = _objects.Values.Where(e => e.Id != keep).MinBy(e => e.Updated);
@@ -267,7 +286,16 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
             }
             _objects.Remove(oldest.Id);
             _bytes -= oldest.Bytes;
+            dropped.Add(oldest.Id);
         }
+        return dropped;
     }
 
+    private void Raise(List<ulong> dropped)
+    {
+        foreach (ulong id in dropped)
+        {
+            Evicted?.Invoke(id);
+        }
+    }
 }

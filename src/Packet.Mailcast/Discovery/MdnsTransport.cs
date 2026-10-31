@@ -15,6 +15,12 @@ public interface IMdnsTransport : IDisposable
 
     /// <summary>Sends a packet to the mDNS group on every network that can carry it. Never throws for a network that fails.</summary>
     void Send(byte[] packet);
+
+    /// <summary>
+    /// Sends to the group on each network that can carry it, a packet made for that network: the function is given the
+    /// address this machine has on it (RFC 6762, section 6.2: a host announces on a network only the addresses it has there).
+    /// </summary>
+    void Send(Func<IPAddress, byte[]> packetForNetwork);
 }
 
 /// <summary>Multicast cannot be used on this machine (no capable network, a firewall, a refused socket).</summary>
@@ -23,7 +29,8 @@ public sealed class MdnsUnavailableException(string message, Exception? inner = 
 /// <summary>
 /// Multicast DNS over UDP, IPv4 (224.0.0.251, port 5353): one socket sharing the port with whatever else
 /// listens on it (Avahi, Windows' own DNS client), joined to the group on each network that is up and
-/// can multicast. Networks that appear later are joined when next sent on.
+/// can multicast. A network that is not up yet, or appears later, is joined when next sent on (a browser asks every 30 s and
+/// an announcer announces every minute), so a machine whose network comes up after the program does is not given up on.
 /// </summary>
 public sealed class UdpMdnsTransport(int port = UdpMdnsTransport.StandardPort) : IMdnsTransport
 {
@@ -50,7 +57,7 @@ public sealed class UdpMdnsTransport(int port = UdpMdnsTransport.StandardPort) :
             try
             {
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+                if (OperatingSystem.IsLinux())
                 {
                     TryReusePort(socket);
                 }
@@ -66,15 +73,9 @@ public sealed class UdpMdnsTransport(int port = UdpMdnsTransport.StandardPort) :
             lock (_gate)
             {
                 _socket = socket;
-                JoinNewInterfaces();
-                if (_joined.Count == 0)
-                {
-                    _socket = null;
-                    socket.Dispose();
-                    throw new MdnsUnavailableException("no network here can multicast");
-                }
+                JoinNewInterfaces(); // none yet is not a failure: Send tries again
             }
-            _ = Task.Run(() => ReceiveLoop(socket));
+            new Thread(() => ReceiveLoop(socket)) { IsBackground = true, Name = "mdns-receive" }.Start();
         }
         catch (SocketException e)
         {
@@ -82,7 +83,7 @@ public sealed class UdpMdnsTransport(int port = UdpMdnsTransport.StandardPort) :
         }
     }
 
-    // Linux wants SO_REUSEPORT as well when another program (Avahi) holds the port; ignore if the platform lacks it.
+    // Linux wants SO_REUSEPORT as well when another program (Avahi) holds the port (level SOL_SOCKET 1, option 15, Linux only).
     private static void TryReusePort(Socket socket)
     {
         try
@@ -134,7 +135,10 @@ public sealed class UdpMdnsTransport(int port = UdpMdnsTransport.StandardPort) :
     }
 
     /// <inheritdoc />
-    public void Send(byte[] packet)
+    public void Send(byte[] packet) => Send(_ => packet);
+
+    /// <inheritdoc />
+    public void Send(Func<IPAddress, byte[]> packetForNetwork)
     {
         lock (_gate)
         {
@@ -148,7 +152,7 @@ public sealed class UdpMdnsTransport(int port = UdpMdnsTransport.StandardPort) :
                 try
                 {
                     _socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface, address.GetAddressBytes());
-                    _socket.SendTo(packet, new IPEndPoint(Group, port));
+                    _socket.SendTo(packetForNetwork(address), new IPEndPoint(Group, port));
                 }
                 catch (SocketException)
                 {

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Packet.Mailcast;
 
 namespace Mailcast.HeadEnd.Relay;
@@ -16,7 +17,7 @@ public readonly record struct ReadResult(int Objects, int NewPieces, int NewObje
 /// <see cref="ResyncEvery"/>, and after any failure, the whole index is read again from the start, which
 /// costs one request per 500 objects when nothing changed.
 /// </summary>
-public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue catalogue, TimeProvider time)
+public sealed class ReceiverReader
 {
     /// <summary>How often the whole index is read again from the start.</summary>
     public static readonly TimeSpan ResyncEvery = TimeSpan.FromMinutes(30);
@@ -27,8 +28,8 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
     /// <summary>Pieces asked for at a time (the receiver's most).</summary>
     public const int PiecesPerRequest = 500;
 
-    // A read stops after this many requests: a receiver with more is caught up over several reads.
-    private const int MaxRequestsPerRead = 200;
+    /// <summary>The most requests one read makes in all, of every kind: a receiver with more is caught up over several reads.</summary>
+    public const int MaxRequestsPerRead = 200;
 
     private sealed class ObjectState
     {
@@ -37,13 +38,25 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
         public readonly HashSet<uint> Seen = [];
     }
 
-    private readonly Dictionary<ulong, ObjectState> _objects = [];
+    private readonly ReceiverApiClient _client;
+    private readonly ObjectCatalogue _catalogue;
+    private readonly TimeProvider _time;
+    private readonly ConcurrentDictionary<ulong, ObjectState> _objects = [];
     private long _cursor;
     private bool _resync = true;
     private DateTimeOffset _lastFull = DateTimeOffset.MinValue;
+    private int _requests;
+
+    /// <summary>Makes a reader for one receiver, giving what it reads to <paramref name="catalogue"/>.</summary>
+    public ReceiverReader(ReceiverApiClient client, ObjectCatalogue catalogue, TimeProvider time)
+    {
+        _client = client;
+        _catalogue = catalogue;
+        _time = time;
+    }
 
     /// <summary>The receiver's address.</summary>
-    public Uri Url => client.BaseUrl;
+    public Uri Url => _client.BaseUrl;
 
     /// <summary>Objects this receiver has listed.</summary>
     public int ObjectsKnown => _objects.Count;
@@ -51,26 +64,44 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
     /// <summary>The next read starts from the start of the index (after a failure or a long while).</summary>
     public void ReadAgainFromStart() => _resync = true;
 
+    /// <summary>
+    /// Forgets what it knows of one object, because the catalogue dropped it: when the receiver next lists it as changed, or the
+    /// index is read again from the start, the object is read afresh rather than taken as already given.
+    /// </summary>
+    public void Forget(ulong objectId) => _objects.TryRemove(objectId, out _);
+
+    // True while the read still has requests to spend; every request of a read, index, pieces or octets, draws on the one budget.
+    private bool Spend() => _requests++ < MaxRequestsPerRead;
+
     /// <summary>Reads what changed. Throws <see cref="ReceiverReadException"/> if the receiver cannot be read (and the next read starts from the start).</summary>
     public async Task<ReadResult> ReadAsync(CancellationToken cancellation)
     {
-        var now = time.GetUtcNow();
+        var now = _time.GetUtcNow();
         if (_resync || now - _lastFull >= ResyncEvery)
         {
             _cursor = 0;
         }
         bool full = _cursor == 0;
-        int rows = 0, pieces = 0, rebuilt = 0, requests = 0;
+        int rows = 0, pieces = 0, rebuilt = 0;
+        _requests = 0;
         try
         {
-            while (requests++ < MaxRequestsPerRead)
+            while (Spend())
             {
-                var page = await client.GetObjectsAsync(_cursor, ObjectsPerRequest, cancellation).ConfigureAwait(false);
+                var page = await _client.GetObjectsAsync(_cursor, ObjectsPerRequest, cancellation).ConfigureAwait(false);
+                bool finished = true;
                 foreach (var row in page.Objects)
                 {
                     rows++;
-                    catalogue.Note(row);
-                    var state = _objects.TryGetValue(row.Id, out var s) ? s : _objects[row.Id] = new ObjectState();
+                    var state = _objects.GetOrAdd(row.Id, _ => new ObjectState());
+                    if (_objects.Count > _catalogue.MaxObjects)
+                    {
+                        // Never more state than the catalogue could hold objects: an object it would not keep is not remembered as read.
+                        foreach (ulong stale in _objects.Keys.Where(k => k != row.Id).Take(_objects.Count - _catalogue.MaxObjects))
+                        {
+                            _objects.TryRemove(stale, out _);
+                        }
+                    }
                     if (row.Cursor < state.RowCursor || row.Held < state.Seen.Count)
                     {
                         state.PieceCursor = 0; // numbered again from the start
@@ -78,23 +109,35 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
                     }
                     if (row.Cursor != state.RowCursor || row.Held != state.Seen.Count)
                     {
-                        (int added, int used) = await ReadPiecesAsync(row, state, cancellation).ConfigureAwait(false);
-                        pieces += added;
-                        requests += used;
+                        pieces += await ReadPiecesAsync(row, state, cancellation).ConfigureAwait(false);
                     }
-                    state.RowCursor = row.Cursor;
-                    if (row.Complete && !catalogue.HasData(row.Id) && await client.GetDataAsync(row.Id, cancellation).ConfigureAwait(false) is { } data)
+                    if (row.Complete && !_catalogue.HasData(row.Id))
                     {
-                        requests++;
-                        if (catalogue.SetData(row.Id, data.Dictionary, data.Data))
+                        if (!Spend())
+                        {
+                            finished = false;
+                            break;
+                        }
+                        if (await _client.GetDataAsync(row.Id, cancellation).ConfigureAwait(false) is { } data && _catalogue.SetData(row.Id, data.Dictionary, data.Data))
                         {
                             rebuilt++;
                         }
                     }
+                    if (_requests > MaxRequestsPerRead)
+                    {
+                        finished = false; // pieces not all read: this row is looked at again
+                        break;
+                    }
+                    _catalogue.Note(row);
+                    state.RowCursor = row.Cursor;
                 }
-                if (page.Objects.Count > 0 && page.Next < _cursor)
+                if (!finished)
                 {
-                    _cursor = 0; // its numbering went back: start again next time
+                    break; // the budget is spent; the cursor stays, and the rows done are cheap to pass over next time
+                }
+                if (page.Next < _cursor)
+                {
+                    _cursor = 0; // its numbering went back (even an empty page says so): start again next time
                     break;
                 }
                 _cursor = page.Next;
@@ -117,12 +160,12 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
         return new ReadResult(rows, pieces, rebuilt);
     }
 
-    private async Task<(int Added, int Requests)> ReadPiecesAsync(RemoteObject row, ObjectState state, CancellationToken cancellation)
+    private async Task<int> ReadPiecesAsync(RemoteObject row, ObjectState state, CancellationToken cancellation)
     {
-        int added = 0, requests = 0;
-        while (requests++ < MaxRequestsPerRead)
+        int added = 0;
+        while (Spend())
         {
-            var page = await client.GetPiecesAsync(row.Id, state.PieceCursor, PiecesPerRequest, cancellation).ConfigureAwait(false);
+            var page = await _client.GetPiecesAsync(row.Id, state.PieceCursor, PiecesPerRequest, cancellation).ConfigureAwait(false);
             if (page is null)
             {
                 break; // dropped by the receiver meanwhile
@@ -130,7 +173,7 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
             foreach (var piece in page.Pieces)
             {
                 state.Seen.Add(piece.Esi);
-                if (catalogue.AddPiece(row.Id, piece))
+                if (_catalogue.AddPiece(row.Id, piece))
                 {
                     added++;
                 }
@@ -141,6 +184,6 @@ public sealed class ReceiverReader(ReceiverApiClient client, ObjectCatalogue cat
                 break;
             }
         }
-        return (added, requests);
+        return added;
     }
 }

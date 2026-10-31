@@ -40,7 +40,29 @@ public static class ReceiverService
     }
 
     /// <summary>Text with anything outside printable ASCII made a question mark, for a log line.</summary>
-    internal static string Plain(string text) => new([.. text.Select(c => c is >= ' ' and <= '~' ? c : '?')]);
+    public static string Plain(string text) => new([.. text.Select(c => c is >= ' ' and <= '~' ? c : '?')]);
+
+    /// <summary>What came from the network, made safe to print: plain ASCII and at most 60 characters.</summary>
+    public static string Safe(string? text)
+    {
+        string plain = Plain(text ?? "");
+        return plain.Length <= 60 ? plain : plain[..60];
+    }
+
+    /// <summary>
+    /// Four hex digits that tell this machine from another with the same name (a Raspberry Pi called "raspberrypi", say): from its
+    /// name and its network cards' hardware addresses. Used in the instance name and the host name, which must be unique on the network.
+    /// </summary>
+    public static string MachineSuffix()
+    {
+        var macs = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n => n.NetworkInterfaceType is not (System.Net.NetworkInformation.NetworkInterfaceType.Loopback or System.Net.NetworkInformation.NetworkInterfaceType.Tunnel))
+            .Select(n => n.GetPhysicalAddress().ToString())
+            .Where(m => m.Length > 0)
+            .Order(StringComparer.Ordinal);
+        byte[] hash = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(Environment.MachineName + "|" + string.Join(',', macs)));
+        return Convert.ToHexStringLower(hash.AsSpan(0, 2));
+    }
 
     /// <summary>The TXT strings a receiver announces.</summary>
     public static IReadOnlyList<string> Text(string version, bool needsPassword) =>
@@ -52,9 +74,15 @@ public static class ReceiverService
 /// <summary>
 /// Announces one service on the local network by multicast DNS (RFC 6762, 6763): answers questions about
 /// it, says so unprompted at start and every minute (a record's life is two), and says goodbye when
-/// disposed. A failure to use multicast is reported once through the log and
-/// the announcer then does nothing; it never throws.
+/// disposed. On each network it says only the address it has there. A failure to use multicast is reported
+/// once through the log and the announcer then does nothing; it never throws.
 /// </summary>
+/// <remarks>
+/// Deviation from RFC 6762, on purpose: the RFC has a host announce twice at start and then only answer queries, with a
+/// querier asking again at growing intervals. Here the announcement is repeated every minute and a browser asks every 30
+/// seconds, whatever it has heard. That costs a few small packets a minute and helps where a firewall drops the query or the
+/// response in one direction, or the network was not up when the other side started.
+/// </remarks>
 public sealed class MdnsAnnouncer : IDisposable
 {
     /// <summary>How often the service is announced again.</summary>
@@ -68,20 +96,20 @@ public sealed class MdnsAnnouncer : IDisposable
     private readonly IReadOnlyList<string> _text;
     private readonly Action<string> _log;
     private readonly TimeProvider _time;
-    private readonly Func<IReadOnlyList<IPAddress>> _addresses;
+    private readonly LocalNetworks _networks;
     private readonly CancellationTokenSource _stop = new();
     private DateTimeOffset _lastAnswer = DateTimeOffset.MinValue;
     private bool _running;
 
     /// <summary>Makes an announcer; <see cref="Start"/> begins.</summary>
     /// <param name="transport">The network.</param>
-    /// <param name="instance">The instance name, one DNS label (see <see cref="ReceiverService.Label"/>).</param>
+    /// <param name="instance">The instance name, one DNS label (see <see cref="ReceiverService.Label"/>), unique on the network.</param>
     /// <param name="port">The TCP port of the service.</param>
     /// <param name="text">TXT strings.</param>
     /// <param name="log">One plain line at a time.</param>
     /// <param name="time">The clock.</param>
-    /// <param name="addresses">This machine's addresses to announce; the network's by default.</param>
-    public MdnsAnnouncer(IMdnsTransport transport, string instance, int port, IReadOnlyList<string> text, Action<string> log, TimeProvider? time = null, Func<IReadOnlyList<IPAddress>>? addresses = null)
+    /// <param name="networks">The networks this machine is on, to ignore queries from elsewhere; the cards' by default.</param>
+    public MdnsAnnouncer(IMdnsTransport transport, string instance, int port, IReadOnlyList<string> text, Action<string> log, TimeProvider? time = null, LocalNetworks? networks = null)
     {
         _transport = transport;
         _instance = instance;
@@ -89,8 +117,8 @@ public sealed class MdnsAnnouncer : IDisposable
         _text = text;
         _log = log;
         _time = time ?? TimeProvider.System;
-        _addresses = addresses ?? OwnAddresses;
-        _host = ReceiverService.Label(Environment.MachineName).Replace(' ', '-').ToLowerInvariant() + "-mailcast.local";
+        _networks = networks ?? new LocalNetworks();
+        _host = ReceiverService.Label(Environment.MachineName).Replace(' ', '-').ToLowerInvariant() + "-" + ReceiverService.MachineSuffix() + "-mailcast.local";
     }
 
     /// <summary>The full name of the instance: <c>NAME._pdn-mailcast._tcp.local</c>.</summary>
@@ -107,7 +135,7 @@ public sealed class MdnsAnnouncer : IDisposable
         catch (MdnsUnavailableException e)
         {
             _transport.Received -= OnReceived;
-            _log($"discovery: cannot announce this receiver on the network ({ReceiverService.Plain(e.Message)}); head ends on other machines need its address typed in");
+            _log($"discovery: cannot announce this receiver on the network ({ReceiverService.Plain(e.Message)}); head ends on other machines will not find it");
             return false;
         }
         _running = true;
@@ -138,7 +166,7 @@ public sealed class MdnsAnnouncer : IDisposable
 
     private void OnReceived(byte[] packet, IPAddress from)
     {
-        if (!_running || DnsMessage.Parse(packet) is not { IsResponse: false } query)
+        if (!_running || !_networks.IsLocal(from) || DnsMessage.Parse(packet) is not { IsResponse: false } query)
         {
             return;
         }
@@ -163,28 +191,15 @@ public sealed class MdnsAnnouncer : IDisposable
         Send(Ttl);
     }
 
-    private void Send(uint ttl)
+    private void Send(uint ttl) => _transport.Send(address =>
     {
         var message = new DnsMessage { IsResponse = true };
         message.Records.Add(new DnsRecord { Name = ReceiverService.TypeName, Type = DnsRecord.TypePtr, Ttl = ttl, Target = InstanceName });
         message.Records.Add(new DnsRecord { Name = InstanceName, Type = DnsRecord.TypeSrv, Ttl = ttl, Port = (ushort)_port, Target = _host });
         message.Records.Add(new DnsRecord { Name = InstanceName, Type = DnsRecord.TypeTxt, Ttl = ttl, Text = _text });
-        foreach (var address in _addresses())
-        {
-            message.Records.Add(new DnsRecord { Name = _host, Type = DnsRecord.TypeA, Ttl = ttl, Address = address });
-        }
-        _transport.Send(message.ToBytes());
-    }
-
-    /// <summary>This machine's usable IPv4 addresses.</summary>
-    public static IReadOnlyList<IPAddress> OwnAddresses() =>
-    [
-        .. NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-            .SelectMany(n => n.GetIPProperties().UnicastAddresses)
-            .Select(u => u.Address)
-            .Where(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a)),
-    ];
+        message.Records.Add(new DnsRecord { Name = _host, Type = DnsRecord.TypeA, Ttl = ttl, Address = address });
+        return message.ToBytes();
+    });
 
     /// <inheritdoc />
     public void Dispose()
@@ -220,33 +235,41 @@ public sealed record FoundService(string Name, IPAddress Address, int Port, IRea
 /// Looks for a service by multicast DNS and keeps the set that is there: asks at start and every
 /// <see cref="Every"/>, listens always, and raises <see cref="Found"/> when an instance appears (or its address or
 /// port changes) and <see cref="Lost"/> when it says goodbye or stops being announced for its record's life.
+/// Only packets from, and addresses on, the networks this machine is on are believed, only records under the service
+/// type are kept, and at most <see cref="MaxInstances"/> instances.
 /// </summary>
+/// <remarks>The fixed re-query every 30 s deviates from RFC 6762 on purpose; see <see cref="MdnsAnnouncer"/>.</remarks>
 public sealed class MdnsBrowser : IDisposable
 {
     /// <summary>How often it asks.</summary>
     public static readonly TimeSpan Every = TimeSpan.FromSeconds(30);
 
+    /// <summary>The most instances kept.</summary>
+    public const int MaxInstances = 64;
+
     private readonly IMdnsTransport _transport;
     private readonly string _typeName;
     private readonly Action<string> _log;
     private readonly TimeProvider _time;
+    private readonly LocalNetworks _networks;
     private readonly Lock _gate = new();
     private readonly Dictionary<string, DateTimeOffset> _instances = new(StringComparer.OrdinalIgnoreCase); // instance full name -> expiry
     private readonly Dictionary<string, (string Host, ushort Port)> _srv = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyList<string>> _txt = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, IPAddress> _hosts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, HashSet<IPAddress>> _hosts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IPAddress> _from = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, FoundService> _known = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _stop = new();
     private bool _running;
 
     /// <summary>Makes a browser for a service type such as <see cref="ReceiverService.TypeName"/>.</summary>
-    public MdnsBrowser(IMdnsTransport transport, string typeName, Action<string> log, TimeProvider? time = null)
+    public MdnsBrowser(IMdnsTransport transport, string typeName, Action<string> log, TimeProvider? time = null, LocalNetworks? networks = null)
     {
         _transport = transport;
         _typeName = typeName;
         _log = log;
         _time = time ?? TimeProvider.System;
+        _networks = networks ?? new LocalNetworks();
     }
 
     /// <summary>An instance appeared, or its address or port changed. May be raised on any thread.</summary>
@@ -309,11 +332,12 @@ public sealed class MdnsBrowser : IDisposable
 
     private void OnReceived(byte[] packet, IPAddress from)
     {
-        if (!_running || DnsMessage.Parse(packet) is not { IsResponse: true } message)
+        if (!_running || !_networks.IsLocal(from) || DnsMessage.Parse(packet) is not { IsResponse: true } message)
         {
             return;
         }
         var now = _time.GetUtcNow();
+        string underType = "." + _typeName;
         var changed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var gone = new List<string>();
         lock (_gate)
@@ -322,31 +346,55 @@ public sealed class MdnsBrowser : IDisposable
             {
                 switch (r.Type)
                 {
-                    case DnsRecord.TypePtr when string.Equals(r.Name, _typeName, StringComparison.OrdinalIgnoreCase) && r.Target is { } instance:
+                    case DnsRecord.TypePtr when string.Equals(r.Name, _typeName, StringComparison.OrdinalIgnoreCase) && r.Target is { } instance
+                        && instance.EndsWith(underType, StringComparison.OrdinalIgnoreCase):
                         if (r.Ttl == 0)
                         {
                             _instances.Remove(instance);
                             gone.Add(instance);
                         }
-                        else
+                        else if (_instances.ContainsKey(instance) || _instances.Count < MaxInstances)
                         {
                             _instances[instance] = now + TimeSpan.FromSeconds(r.Ttl);
                             _from[instance] = from;
                             changed.Add(instance);
                         }
                         break;
-                    case DnsRecord.TypeSrv when r.Ttl > 0 && r.Target is { } host:
+                    case DnsRecord.TypeSrv when r.Ttl > 0 && r.Target is { } host && r.Name.EndsWith(underType, StringComparison.OrdinalIgnoreCase) && (_srv.ContainsKey(r.Name) || _srv.Count < MaxInstances):
                         _srv[r.Name] = (host, r.Port);
                         _from[r.Name] = from;
                         changed.Add(r.Name);
                         break;
-                    case DnsRecord.TypeTxt when r.Ttl > 0:
-                        _txt[r.Name] = r.Text;
+                    case DnsRecord.TypeTxt when r.Ttl > 0 && r.Name.EndsWith(underType, StringComparison.OrdinalIgnoreCase) && (_txt.ContainsKey(r.Name) || _txt.Count < MaxInstances):
+                        _txt[r.Name] = [.. r.Text.Take(16)];
                         changed.Add(r.Name);
                         break;
-                    case DnsRecord.TypeA when r.Ttl > 0 && r.Address is { } address:
-                        _hosts[r.Name] = address;
-                        break;
+                }
+            }
+            // Addresses only for hosts a kept SRV names, and only if on one of our networks (a packet cannot point us elsewhere).
+            foreach (var r in message.Records)
+            {
+                if (r.Type == DnsRecord.TypeA && r.Address is { } address && _networks.IsLocal(address) && _srv.Values.Any(v => string.Equals(v.Host, r.Name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (r.Ttl == 0)
+                    {
+                        _hosts.GetValueOrDefault(r.Name)?.Remove(address);
+                    }
+                    else
+                    {
+                        if (!_hosts.TryGetValue(r.Name, out var set))
+                        {
+                            _hosts[r.Name] = set = [];
+                        }
+                        if (set.Count < 8)
+                        {
+                            set.Add(address);
+                        }
+                        foreach (var i in _srv.Where(v => string.Equals(v.Value.Host, r.Name, StringComparison.OrdinalIgnoreCase)).Select(v => v.Key))
+                        {
+                            changed.Add(i);
+                        }
+                    }
                 }
             }
         }
@@ -365,15 +413,13 @@ public sealed class MdnsBrowser : IDisposable
         FoundService? found;
         lock (_gate)
         {
-            if (!_instances.ContainsKey(instance) || !_srv.TryGetValue(instance, out var srv) || !instance.EndsWith("." + _typeName, StringComparison.OrdinalIgnoreCase))
+            if (!_instances.ContainsKey(instance) || !_srv.TryGetValue(instance, out var srv))
             {
                 return;
             }
-            // The address the announcement came from is known to be reachable from here; the A record may be one of
-            // several, on networks this machine is not on.
-            var address = _from.TryGetValue(instance, out var from) && !IPAddress.IsLoopback(from) ? from
-                : _hosts.TryGetValue(srv.Host, out var a) ? a
-                : from;
+            // An address of the host on a network this machine is on; failing that, the one the announcement came from.
+            IPAddress? address = _hosts.TryGetValue(srv.Host, out var set) ? set.FirstOrDefault(_networks.IsLocal) : null;
+            address ??= _from.GetValueOrDefault(instance);
             if (address is null)
             {
                 return;
@@ -398,7 +444,10 @@ public sealed class MdnsBrowser : IDisposable
             {
                 name = instance[..^(_typeName.Length + 1)];
             }
-            _srv.Remove(instance);
+            if (_srv.Remove(instance, out var srv) && !_srv.Values.Any(v => string.Equals(v.Host, srv.Host, StringComparison.OrdinalIgnoreCase)))
+            {
+                _hosts.Remove(srv.Host);
+            }
             _txt.Remove(instance);
             _from.Remove(instance);
         }
@@ -418,6 +467,13 @@ public sealed class MdnsBrowser : IDisposable
             foreach (string e in expired)
             {
                 _instances.Remove(e);
+            }
+            // Records of instances that were never announced by PTR, or are long gone, do not stay.
+            foreach (string stray in _srv.Keys.Concat(_txt.Keys).Where(k => !_instances.ContainsKey(k) && !expired.Contains(k, StringComparer.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+            {
+                _srv.Remove(stray);
+                _txt.Remove(stray);
+                _from.Remove(stray);
             }
         }
         foreach (string e in expired)

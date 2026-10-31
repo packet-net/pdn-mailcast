@@ -437,8 +437,7 @@ public static partial class Program
         status.Receivers = receivers.StatusView;
         using var service = new HeadEndService(
             schedule, TimeSpan.FromMinutes(config.Slot.CatchUp), TimeSpan.FromMinutes(config.Slot.RetryMinutes), TimeSpan.FromSeconds(config.Intake.PreSlotSeconds),
-            planner, store, intakes, runner, status, journal, time)
-        { BeforeSlot = receivers.ReadNowAsync };
+            planner, store, intakes, runner, status, journal, time);
         await using StatusServer? server = string.IsNullOrWhiteSpace(config.Status.Bind) ? null : new StatusServer(config.Status.Bind, config.Status.Port, status, service.RequestRunNow);
         if (server is not null)
         {

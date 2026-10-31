@@ -33,7 +33,10 @@ public sealed class ReceiverPoolOptions
     /// <summary>Makes the network side of multicast DNS; null leaves the network alone (only this machine is looked at).</summary>
     public Func<IMdnsTransport>? Transport { get; init; } = static () => new UdpMdnsTransport();
 
-    /// <summary>Whether an address belongs to this machine; the network's own addresses by default.</summary>
+    /// <summary>The networks this machine is on, to believe only announcements from them; the network cards' by default.</summary>
+    public LocalNetworks? Networks { get; init; }
+
+    /// <summary>Whether an address belongs to this machine; the network cards' own addresses by default.</summary>
     public Func<IPAddress, bool>? IsOwnAddress { get; init; }
 }
 
@@ -41,23 +44,45 @@ public sealed class ReceiverPoolOptions
 /// The receivers the head end reads (issue #218), with no setting: first one on this machine on the receiver's usual
 /// port, then any that announce themselves on the local network (<c>_pdn-mailcast._tcp</c>, multicast DNS). They come
 /// and go as they start and stop, and everything read goes into one <see cref="ObjectCatalogue"/>. A line in the
-/// journal for each receiver found or lost. Multicast not working here is said once, and a receiver on this machine
-/// is still found. Multicast does not cross routers or VLANs; a receiver beyond one is not found.
+/// journal for each receiver found or lost. Multicast not working here is said once, and a receiver on this machine is
+/// still found. Multicast does not cross routers or VLANs; a receiver beyond one is not found.
 /// </summary>
+/// <remarks>
+/// Reading is in the background only and nothing waits for it: receivers are read in parallel, each request with its own short
+/// timeout, and a receiver that keeps failing is asked less often. At most <see cref="MaxReceivers"/> are followed, and
+/// <see cref="MaxPerAddress"/> at one address, because anything on the network can announce itself.
+/// </remarks>
 public sealed class ReceiverPool : IDisposable
 {
-    private sealed class Link(string key, string name, ReceiverSource source, Uri url, ReceiverReader reader)
+    /// <summary>The most receivers followed.</summary>
+    public const int MaxReceivers = 16;
+
+    /// <summary>The most receivers followed at one address.</summary>
+    public const int MaxPerAddress = 2;
+
+    /// <summary>The most a response may be: bigger is refused.</summary>
+    public const long MaxResponseBytes = 16L * 1024 * 1024;
+
+    /// <summary>The longest wait before a receiver that keeps failing is asked again.</summary>
+    public static readonly TimeSpan LongestBackoff = TimeSpan.FromMinutes(10);
+
+    private const string LocalKey = "local";
+
+    private sealed class Link(string key, string instance, string name, ReceiverSource source, Uri url, string endpoint, ReceiverReader reader)
     {
         public readonly string Key = key;
+        public readonly string Instance = instance;
         public string Name = name;
         public readonly ReceiverSource Source = source;
         public readonly Uri Url = url;
+        public readonly string Endpoint = endpoint;
         public readonly ReceiverReader Reader = reader;
         public string? Version;
         public int Failures;
         public string? Problem;
         public string? ReportedProblem;
         public DateTimeOffset? LastRead;
+        public DateTimeOffset NextTry;
     }
 
     private readonly HttpClient _http;
@@ -65,26 +90,30 @@ public sealed class ReceiverPool : IDisposable
     private readonly IJournal _journal;
     private readonly TimeProvider _time;
     private readonly ReceiverPoolOptions _options;
+    private readonly LocalNetworks _networks;
     private readonly Lock _gate = new();
     private readonly Dictionary<string, Link> _links = [];
     private readonly SemaphoreSlim _reading = new(1, 1);
     private readonly SemaphoreSlim _kick = new(0, 1);
     private MdnsBrowser? _browser;
+    private string? _refusedLine;
 
     /// <summary>Makes a pool; <see cref="RunAsync"/> runs it.</summary>
     /// <param name="catalogue">Where what is read goes.</param>
     /// <param name="journal">Where found and lost go.</param>
     /// <param name="time">The clock.</param>
     /// <param name="options">Settings; the defaults run.</param>
-    /// <param name="http">The client to read with; one with a 15 s timeout by default.</param>
+    /// <param name="http">The client to read with; one with a 5 s timeout for each request and a 16 MiB limit on a response by default.</param>
     public ReceiverPool(ObjectCatalogue catalogue, IJournal journal, TimeProvider time, ReceiverPoolOptions? options = null, HttpClient? http = null)
     {
         Catalogue = catalogue;
         _journal = journal;
         _time = time;
         _options = options ?? new ReceiverPoolOptions();
-        _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        _networks = _options.Networks ?? new LocalNetworks();
+        _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(5), MaxResponseContentBufferSize = MaxResponseBytes };
         _ownsHttp = http is null;
+        catalogue.Evicted += OnEvicted;
     }
 
     /// <summary>What the receivers have given.</summary>
@@ -119,28 +148,61 @@ public sealed class ReceiverPool : IDisposable
         };
     }
 
+    private void OnEvicted(ulong id)
+    {
+        Link[] links;
+        lock (_gate)
+        {
+            links = [.. _links.Values];
+        }
+        foreach (var l in links)
+        {
+            l.Reader.Forget(id);
+        }
+    }
+
     /// <summary>Looks for receivers and reads them until cancelled.</summary>
     public async Task RunAsync(CancellationToken cancellation)
     {
         if (_options.Transport is { } make)
         {
-            var browser = new MdnsBrowser(make(), ReceiverService.TypeName, _journal.Write, _time);
-            browser.Found += OnFound;
-            browser.Lost += OnLost;
-            _browser = browser;
-            browser.Start();
+            try
+            {
+                var browser = new MdnsBrowser(make(), ReceiverService.TypeName, _journal.Write, _time, _networks);
+                browser.Found += OnFound;
+                browser.Lost += OnLost;
+                _browser = browser;
+                browser.Start();
+            }
+            catch (Exception e) when (e is System.Net.Sockets.SocketException or InvalidOperationException or ObjectDisposedException)
+            {
+                _journal.Write($"discovery: cannot look for receivers on the network ({ReceiverService.Safe(e.Message)}); only one on this machine is found");
+            }
         }
-        try
+        string? said = null;
+        while (!cancellation.IsCancellationRequested)
         {
-            while (!cancellation.IsCancellationRequested)
+            try
             {
                 await ReadNowAsync(cancellation).ConfigureAwait(false);
                 await WaitForNextReadAsync(cancellation).ConfigureAwait(false);
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // Stopping.
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+#pragma warning disable CA1031 // nothing here may stop the head end: say it once and go on
+            catch (Exception e)
+#pragma warning restore CA1031
+            {
+                string line = $"receivers: reading failed ({ReceiverService.Safe(e.Message)}); carrying on";
+                if (line != said)
+                {
+                    said = line;
+                    _journal.Write(line);
+                }
+                await Task.Delay(_options.ReadEvery, _time, cancellation).ConfigureAwait(false);
+            }
         }
     }
 
@@ -167,8 +229,8 @@ public sealed class ReceiverPool : IDisposable
     }
 
     /// <summary>
-    /// Looks on this machine for a receiver if none is followed there, then reads every receiver followed. Never throws for a
-    /// receiver that cannot be read; the problem is on the receiver's status. A read already going is waited for.
+    /// Looks on this machine for a receiver if none is followed there, then reads every receiver followed, all at once. Never
+    /// throws for a receiver that cannot be read; the problem is on the receiver's status. A read already going is waited for.
     /// </summary>
     public async Task ReadNowAsync(CancellationToken cancellation)
     {
@@ -181,10 +243,7 @@ public sealed class ReceiverPool : IDisposable
             {
                 links = [.. _links.Values];
             }
-            foreach (var link in links)
-            {
-                await ReadAsync(link, cancellation).ConfigureAwait(false);
-            }
+            await Task.WhenAll(links.Select(l => ReadAsync(l, cancellation))).ConfigureAwait(false);
         }
         finally
         {
@@ -194,10 +253,10 @@ public sealed class ReceiverPool : IDisposable
 
     private async Task ProbeThisMachineAsync(CancellationToken cancellation)
     {
-        string key = KeyOf(IPAddress.Loopback, _options.LocalPort);
+        string endpoint = EndpointOf(IPAddress.Loopback, _options.LocalPort);
         lock (_gate)
         {
-            if (_links.ContainsKey(key))
+            if (_links.Values.Any(l => l.Endpoint == endpoint))
             {
                 return;
             }
@@ -218,59 +277,98 @@ public sealed class ReceiverPool : IDisposable
         {
             return; // nothing there, or not a receiver
         }
-        Add(key, "this machine", ReceiverSource.ThisMachine, url, null);
+        Add(new Link(LocalKey, "", "this machine", ReceiverSource.ThisMachine, url, endpoint, NewReader(url)), null);
     }
+
+    private ReceiverReader NewReader(Uri url) => new(new ReceiverApiClient(_http, url), Catalogue, _time);
 
     private void OnFound(FoundService found)
     {
         if (found.Get("api") is { } api && api != ReceiverService.ApiVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
         {
-            _journal.Write($"receiver: {found.Name} at {found.Address}:{found.Port} speaks API version {api}, which this head end does not; not read");
+            _journal.Write($"receiver: {ReceiverService.Safe(found.Name)} at {found.Address}:{found.Port} speaks API version {ReceiverService.Safe(api)}, which this head end does not; not read");
             return;
         }
-        string key = KeyOf(found.Address, found.Port);
+        string name = ReceiverService.Safe(found.Name);
+        string key = "net:" + found.Name;
+        string endpoint = EndpointOf(found.Address, found.Port);
+        string? version = found.Get("v") is { } v ? ReceiverService.Safe(v) : null;
+        var url = new Uri($"http://{found.Address}:{found.Port}/");
+        Link? old;
         lock (_gate)
         {
-            // The same receiver the local probe already follows, heard again over the network.
-            if (_links.TryGetValue(key, out var existing))
+            _links.TryGetValue(key, out old);
+            if (old is not null && old.Endpoint == endpoint)
             {
-                existing.Version = found.Get("v") ?? existing.Version;
-                if (existing.Source == ReceiverSource.ThisMachine)
+                old.Version = version ?? old.Version;
+                return;
+            }
+            if (old is null && _links.Values.FirstOrDefault(l => l.Endpoint == endpoint) is { } same)
+            {
+                // The receiver the local probe already follows (or another name for one followed), heard again over the network.
+                same.Version = version ?? same.Version;
+                if (same.Source == ReceiverSource.ThisMachine)
                 {
-                    existing.Name = found.Name;
+                    same.Name = name;
                 }
                 return;
             }
+            if (old is not null)
+            {
+                _links.Remove(key); // announced again somewhere else: the old link is stale
+            }
         }
-        Add(key, found.Name, ReceiverSource.Network, new Uri($"http://{(found.Address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{found.Address}]" : found.Address.ToString())}:{found.Port}/"), found.Get("v"));
+        if (old is not null)
+        {
+            _journal.Write($"receiver: {name} moved from {old.Url} to {url}");
+        }
+        Add(new Link(key, found.Name, name, ReceiverSource.Network, url, endpoint, NewReader(url)) { Version = version }, old is null ? version : null, quiet: old is not null);
     }
 
     private void OnLost(string name)
     {
-        Link? gone = null;
+        Link? gone;
         lock (_gate)
         {
-            gone = _links.Values.FirstOrDefault(l => l.Source == ReceiverSource.Network && l.Name == name);
-            if (gone is not null)
-            {
-                _links.Remove(gone.Key);
-            }
-        }
-        if (gone is not null)
-        {
-            _journal.Write($"receiver: lost {gone.Name} at {gone.Url} (it stopped announcing itself)");
-        }
-    }
-
-    private void Add(string key, string name, ReceiverSource source, Uri url, string? version)
-    {
-        var link = new Link(key, name, source, url, new ReceiverReader(new ReceiverApiClient(_http, url), Catalogue, _time)) { Version = version };
-        lock (_gate)
-        {
-            if (!_links.TryAdd(key, link))
+            if (!_links.Remove("net:" + name, out gone))
             {
                 return;
             }
+        }
+        _journal.Write($"receiver: lost {gone.Name} at {gone.Url} (it stopped announcing itself)");
+    }
+
+    private void Add(Link link, string? version, bool quiet = false)
+    {
+        string? refused = null;
+        lock (_gate)
+        {
+            string host = link.Endpoint[..link.Endpoint.LastIndexOf(':')];
+            if (_links.ContainsKey(link.Key) || _links.Values.Any(l => l.Endpoint == link.Endpoint))
+            {
+                return; // already followed, perhaps found another way while this was being looked at
+            }
+            if (_links.Count >= MaxReceivers)
+            {
+                refused = $"receiver: not following {link.Name} at {link.Url}: already following {MaxReceivers}";
+            }
+            else if (_links.Values.Count(l => l.Endpoint[..l.Endpoint.LastIndexOf(':')] == host) >= MaxPerAddress)
+            {
+                refused = $"receiver: not following {link.Name} at {link.Url}: already following {MaxPerAddress} at that address";
+            }
+            else
+            {
+                _links[link.Key] = link;
+            }
+        }
+        if (refused is not null)
+        {
+            if (refused != _refusedLine)
+            {
+                _refusedLine = refused;
+                _journal.Write(refused);
+            }
+            return;
         }
         try
         {
@@ -280,19 +378,40 @@ public sealed class ReceiverPool : IDisposable
         {
             // A read is already asked for.
         }
-        _journal.Write($"receiver: found {name} at {url} ({(source == ReceiverSource.ThisMachine ? "on this machine" : "on the network")}{(version is null ? "" : ", version " + version)})");
+        if (!quiet)
+        {
+            _journal.Write($"receiver: found {link.Name} at {link.Url} ({(link.Source == ReceiverSource.ThisMachine ? "on this machine" : "on the network")}{(version is null ? "" : ", version " + version)})");
+        }
     }
 
     private async Task ReadAsync(Link link, CancellationToken cancellation)
     {
+        var now = _time.GetUtcNow();
+        if (link.NextTry > now)
+        {
+            return; // failing: asked less often
+        }
         try
         {
-            var result = await link.Reader.ReadAsync(cancellation).ConfigureAwait(false);
+            ReadResult result;
+            using (var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
+            {
+                limit.CancelAfter(TimeSpan.FromSeconds(90)); // a whole read, many requests, still ends
+                try
+                {
+                    result = await link.Reader.ReadAsync(limit.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+                {
+                    throw new ReceiverReadException("it did not finish in time");
+                }
+            }
             lock (_gate)
             {
                 link.LastRead = _time.GetUtcNow();
                 link.Failures = 0;
                 link.Problem = null;
+                link.NextTry = default;
             }
             if (link.ReportedProblem is not null)
             {
@@ -307,10 +426,17 @@ public sealed class ReceiverPool : IDisposable
         catch (ReceiverReadException e)
         {
             bool lost = false;
+            string problem = ReceiverService.Safe(e.Message);
             lock (_gate)
             {
                 link.Failures++;
-                link.Problem = e.Message;
+                link.Problem = problem;
+                if (link.Failures >= 3)
+                {
+                    // Failing for good: ask less and less often, up to every 10 minutes.
+                    double factor = Math.Pow(2, Math.Min(link.Failures - 3, 10));
+                    link.NextTry = _time.GetUtcNow() + TimeSpan.FromTicks((long)Math.Min(_options.ReadEvery.Ticks * factor, LongestBackoff.Ticks));
+                }
                 if (link.Source == ReceiverSource.ThisMachine && !e.NeedsPassword && link.Failures >= _options.LocalFailuresToLose)
                 {
                     _links.Remove(link.Key);
@@ -319,30 +445,27 @@ public sealed class ReceiverPool : IDisposable
             }
             if (lost)
             {
-                _journal.Write($"receiver: lost {link.Name} at {link.Url} ({e.Message})");
+                _journal.Write($"receiver: lost {link.Name} at {link.Url} ({problem})");
             }
-            else if (link.ReportedProblem != e.Message && (e.NeedsPassword || link.Failures >= 3))
+            else if (link.ReportedProblem != problem && (e.NeedsPassword || link.Failures >= 3))
             {
-                link.ReportedProblem = e.Message;
-                _journal.Write($"receiver: cannot read {link.Name} at {link.Url}: {e.Message}");
+                link.ReportedProblem = problem;
+                _journal.Write($"receiver: cannot read {link.Name} at {link.Url}: {problem}");
             }
-        }
-        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
-        {
-            // Not expected from the client (it turns timeouts into read errors); treated as nothing happening.
         }
     }
 
     // This machine's own address and a port are one receiver however it was reached.
-    private string KeyOf(IPAddress address, int port) =>
+    private string EndpointOf(IPAddress address, int port) =>
         (IPAddress.IsLoopback(address) || IsOwn(address) ? "127.0.0.1" : address.ToString()) + ":" + port.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private bool IsOwn(IPAddress address) =>
-        _options.IsOwnAddress is { } own ? own(address) : MdnsAnnouncer.OwnAddresses().Contains(address);
+        _options.IsOwnAddress is { } own ? own(address) : LocalNetworks.FromInterfaces().Any(n => n.Address.Equals(address));
 
     /// <inheritdoc />
     public void Dispose()
     {
+        Catalogue.Evicted -= OnEvicted;
         if (_browser is { } browser)
         {
             browser.Found -= OnFound;

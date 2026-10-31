@@ -20,8 +20,26 @@ internal sealed class FakeMdnsNetwork
         return m;
     }
 
-    private sealed class Member(FakeMdnsNetwork net, IPAddress address) : IMdnsTransport
+    private sealed class Member : IMdnsTransport
     {
+        private readonly FakeMdnsNetwork net;
+        private readonly IPAddress address;
+        private readonly System.Threading.Channels.Channel<(byte[] Packet, IPAddress From)> _in = System.Threading.Channels.Channel.CreateUnbounded<(byte[], IPAddress)>();
+
+        public Member(FakeMdnsNetwork net, IPAddress address)
+        {
+            this.net = net;
+            this.address = address;
+            // In order, as a real network keeps a sender's packets.
+            _ = Task.Run(async () =>
+            {
+                await foreach (var (packet, from) in _in.Reader.ReadAllAsync())
+                {
+                    Received?.Invoke(packet, from);
+                }
+            });
+        }
+
         public event Action<byte[], IPAddress>? Received;
 
         public void Start()
@@ -41,9 +59,11 @@ internal sealed class FakeMdnsNetwork
             }
             foreach (var m in all)
             {
-                _ = Task.Run(() => m.Received?.Invoke(packet, address));
+                m._in.Writer.TryWrite((packet, address));
             }
         }
+
+        public void Send(Func<IPAddress, byte[]> packetForNetwork) => Send(packetForNetwork(address));
 
         public void Dispose()
         {
@@ -51,6 +71,7 @@ internal sealed class FakeMdnsNetwork
             {
                 net._members.Remove(this);
             }
+            _in.Writer.TryComplete();
         }
     }
 }

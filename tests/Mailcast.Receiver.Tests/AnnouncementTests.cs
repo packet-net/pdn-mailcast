@@ -23,8 +23,23 @@ public class AnnouncementTests
             return s;
         }
 
-        public sealed class Side(Bus bus) : IMdnsTransport
+        public sealed class Side : IMdnsTransport
         {
+            private readonly Bus bus;
+            private readonly System.Threading.Channels.Channel<byte[]> _in = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+
+            public Side(Bus bus)
+            {
+                this.bus = bus;
+                _ = Task.Run(async () =>
+                {
+                    await foreach (var packet in _in.Reader.ReadAllAsync())
+                    {
+                        Received?.Invoke(packet, IPAddress.Loopback);
+                    }
+                });
+            }
+
             public bool Disposed { get; private set; }
 
             public event Action<byte[], IPAddress>? Received;
@@ -46,11 +61,17 @@ public class AnnouncementTests
                 }
                 foreach (var s in all)
                 {
-                    _ = Task.Run(() => s.Received?.Invoke(packet, IPAddress.Loopback));
+                    s._in.Writer.TryWrite(packet);
                 }
             }
 
-            public void Dispose() => Disposed = true;
+            public void Send(Func<IPAddress, byte[]> packetForNetwork) => Send(packetForNetwork(IPAddress.Loopback));
+
+            public void Dispose()
+            {
+                Disposed = true;
+                _in.Writer.TryComplete();
+            }
         }
     }
 
@@ -88,7 +109,7 @@ public class AnnouncementTests
     public void WithoutACallsign_TheInstanceIsNamedByTheComputer_AndAPasswordIsSaid()
     {
         var plain = new ReceiverConfig();
-        Assert.Equal(ReceiverService.Label(Environment.MachineName), ReceiverAnnouncement.InstanceName(plain));
+        Assert.Equal(ReceiverService.Label(Environment.MachineName) + " " + ReceiverService.MachineSuffix(), ReceiverAnnouncement.InstanceName(plain));
         Assert.DoesNotContain("pw=1", ReceiverAnnouncement.Text(plain, "1.0.0"));
         var locked = new ReceiverConfig { Web = new WebSettings { Password = "x" } };
         Assert.Contains("pw=1", ReceiverAnnouncement.Text(locked, "1.0.0"));
