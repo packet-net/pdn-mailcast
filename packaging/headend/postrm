@@ -25,7 +25,16 @@ if [ "$1" = "purge" ]; then
     # /var/lib/pdn-mailcast-headend-NAME: purge means start again.
     rm -f /etc/pdn-mailcast-headend/headend.json
     rmdir --ignore-fail-on-non-empty /etc/pdn-mailcast-headend 2>/dev/null || true
-    rm -rf /var/lib/pdn-mailcast-headend /var/lib/pdn-mailcast-headend-*
+    rm -rf /var/lib/pdn-mailcast-headend
+    # Only an instance's: one a head end has run in (its lock file), or one with a NAME.json,
+    # never a directory of the operator's own such as a backup.
+    for _dir in /var/lib/pdn-mailcast-headend-*; do
+        [ -d "$_dir" ] || continue
+        _name="${_dir#/var/lib/pdn-mailcast-headend-}"
+        if [ -e "$_dir/.headend.lock" ] || [ -e "/etc/pdn-mailcast-headend/$_name.json" ]; then
+            rm -rf "$_dir"
+        fi
+    done
     if getent passwd pdn-mailcast-headend >/dev/null; then
         deluser --system --quiet pdn-mailcast-headend >/dev/null 2>&1 || true
     fi

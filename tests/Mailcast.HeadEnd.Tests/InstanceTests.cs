@@ -18,6 +18,8 @@ public class InstanceTests
     [InlineData("/etc/pdn-mailcast-headend/qo100.json", "/var/lib/pdn-mailcast-headend-qo100", "/var/lib/pdn-mailcast-headend-qo100")]
     [InlineData("/home/tf/other.json", "/var/lib/somewhere", "/var/lib/somewhere")]
     [InlineData("/etc/pdn-mailcast-headend/headend.json", "", "/var/lib/pdn-mailcast-headend")]
+    // pdn-mailcast-headend@headend: still the plain directory, so the lock or the read-only check refuses it.
+    [InlineData("/etc/pdn-mailcast-headend/headend.json", "/var/lib/pdn-mailcast-headend-headend", "/var/lib/pdn-mailcast-headend")]
     public void StateDirectoryFor_IsSystemdsOrNamedAfterTheFile(string? configPath, string? systemd, string expected) =>
         Assert.Equal(expected, HeadEndConfig.StateDirectoryFor(configPath, systemd));
 
@@ -54,11 +56,30 @@ public class InstanceTests
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "qo100.json");
         File.WriteAllText(path, ExampleConfig.Filled(Example));
-        var config = Program.LoadConfig(path, offline: false, pathGiven: true, out _);
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("STATE_DIRECTORY")))
+        string? old = Environment.GetEnvironmentVariable("STATE_DIRECTORY");
+        try
         {
-            Assert.Equal("/var/lib/pdn-mailcast-headend-qo100", config.StateDirectory);
+            Environment.SetEnvironmentVariable("STATE_DIRECTORY", null);
+            Assert.Equal("/var/lib/pdn-mailcast-headend-qo100", Program.LoadConfig(path, offline: false, pathGiven: true, out _).StateDirectory);
+            Environment.SetEnvironmentVariable("STATE_DIRECTORY", "/var/lib/pdn-mailcast-headend-other");
+            Assert.Equal("/var/lib/pdn-mailcast-headend-other", Program.LoadConfig(path, offline: false, pathGiven: true, out _).StateDirectory);
         }
+        finally
+        {
+            Environment.SetEnvironmentVariable("STATE_DIRECTORY", old);
+        }
+    }
+
+    [Fact]
+    public void ThePlainConfig_IsRefusedUnderTheTemplate_InOneLine()
+    {
+        const string Plain = "/etc/pdn-mailcast-headend/headend.json";
+        Assert.Null(Program.PlainConfigUnderTemplate(Plain, null));
+        Assert.Null(Program.PlainConfigUnderTemplate(Plain, "/var/lib/pdn-mailcast-headend"));
+        Assert.Null(Program.PlainConfigUnderTemplate("/etc/pdn-mailcast-headend/qo100.json", "/var/lib/pdn-mailcast-headend-qo100"));
+        Assert.Equal(
+            "/etc/pdn-mailcast-headend/headend.json is the plain service's config; run it as pdn-mailcast-headend, and give a second head end a NAME.json of its own",
+            Program.PlainConfigUnderTemplate(Plain, "/var/lib/pdn-mailcast-headend-headend"));
     }
 
     [Fact]

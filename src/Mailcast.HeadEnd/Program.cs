@@ -219,6 +219,11 @@ public static partial class Program
             }
             return Offline(config, options, slot, journal, signer);
         }
+        if (PlainConfigUnderTemplate(configPath, Environment.GetEnvironmentVariable("STATE_DIRECTORY")) is { } wrongUnit)
+        {
+            await Console.Error.WriteLineAsync($"pdn-mailcast-headend: {wrongUnit}");
+            return 2;
+        }
         return await ServiceAsync(config, journal, signer);
     }
 
@@ -463,9 +468,10 @@ public static partial class Program
             {
                 if (StatusPortTaken(e))
                 {
-                    // Carrying on would leave --run-now asking whatever else holds the port.
+                    // Carrying on would leave --run-now asking whatever else holds the port. Exit 1,
+                    // not 2, so systemd tries again: the port may be taken only for a moment.
                     await Console.Error.WriteLineAsync(StatusPortTakenProblem(config));
-                    return 2;
+                    return 1;
                 }
                 journal.Write($"status: cannot listen on {server.Address}: {e.Message}; carrying on without it");
             }
@@ -489,6 +495,20 @@ public static partial class Program
         reportReader?.Dispose();
         journal.Write("pdn-mailcast-headend stopped");
         return 0;
+    }
+
+    /// <summary>
+    /// Why not, in one line, when <c>headend.json</c> is run by a unit other than the plain one,
+    /// such as <c>pdn-mailcast-headend@headend</c>: that would be a second head end on the first
+    /// one's config, its modem and its BBS login. Null when fine.
+    /// </summary>
+    internal static string? PlainConfigUnderTemplate(string configPath, string? systemdStateDirectory)
+    {
+        string? given = systemdStateDirectory?.Split(':')[0];
+        return Path.GetFileNameWithoutExtension(configPath) == "headend" && !string.IsNullOrWhiteSpace(given)
+            && !SameDirectory(given, HeadEndConfig.PlainStateDirectory)
+            ? $"{configPath} is the plain service's config; run it as pdn-mailcast-headend, and give a second head end a NAME.json of its own"
+            : null;
     }
 
     /// <summary>One line on where this head end keeps its state and takes dropped files from.</summary>

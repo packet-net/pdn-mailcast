@@ -21,6 +21,7 @@ if [ -d /run/systemd/system ] && command -v deb-systemd-invoke >/dev/null; then
             done
             ;;
         upgrade)
+            rm -f "$INSTANCES"
             # Stop before dpkg replaces the files, not after: a .NET service still running
             # loads some assemblies lazily, and one shutting down after the swap can find a
             # different version of a library it needs (0.9.1 to 0.12.0 crashed in

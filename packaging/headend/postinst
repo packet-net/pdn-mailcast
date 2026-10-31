@@ -74,8 +74,10 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
             fi
             # The instances the old prerm stopped, then any it left running on the old binary.
             if [ -e "$INSTANCES" ]; then
+                # systemctl, not deb-systemd-invoke, which skips a unit that is not enabled: an
+                # instance started by hand is started again too.
                 for _unit in $(cat "$INSTANCES"); do
-                    deb-systemd-invoke start "$_unit" >/dev/null || true
+                    systemctl start "$_unit" >/dev/null || true
                 done
                 rm -f "$INSTANCES"
             else

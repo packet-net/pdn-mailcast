@@ -123,22 +123,25 @@ public sealed record HeadEndConfig
     };
 
     /// <summary>
-    /// The state directory for a file that leaves <c>stateDirectory</c> out: the one systemd made
-    /// for the service (<c>$STATE_DIRECTORY</c>) when there is one; otherwise named after the file,
+    /// The state directory for a file that leaves <c>stateDirectory</c> out: /var/lib/pdn-mailcast-headend
+    /// for <c>headend.json</c> always; for another file the one systemd made for the service
+    /// (<c>$STATE_DIRECTORY</c>) when there is one, otherwise named after the file,
     /// as the units name theirs, so <c>headend.json</c> keeps /var/lib/pdn-mailcast-headend and
     /// <c>NAME.json</c> (<c>pdn-mailcast-headend@NAME</c>) has /var/lib/pdn-mailcast-headend-NAME,
     /// and commands run from a shell find the same one as the service.
     /// </summary>
     public static string StateDirectoryFor(string? configPath, string? systemdStateDirectory)
     {
+        // headend.json is the plain service's, whichever unit runs it, so that
+        // pdn-mailcast-headend@headend cannot run a second head end on the first one's config.
+        string name = configPath is null ? "" : Path.GetFileNameWithoutExtension(configPath);
+        if (name is "" or "headend")
+        {
+            return PlainStateDirectory;
+        }
         // systemd separates several with colons; the units give one.
         string? given = systemdStateDirectory?.Split(':')[0];
-        if (!string.IsNullOrWhiteSpace(given))
-        {
-            return given;
-        }
-        string name = configPath is null ? "" : Path.GetFileNameWithoutExtension(configPath);
-        return name is "" or "headend" ? PlainStateDirectory : $"{PlainStateDirectory}-{name}";
+        return string.IsNullOrWhiteSpace(given) ? $"{PlainStateDirectory}-{name}" : given;
     }
 
     public SlotConfig Slot { get; init; } = new();
