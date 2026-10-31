@@ -30,6 +30,8 @@ namespace Packet.Mailcast;
 /// </para>
 /// <para>And one file per directory object sent, <c>directories/OBJECTID.txt</c>, with its Day and
 /// NextEsi, so a later plan with the same directory object does not repeat its pieces.</para>
+/// <para>And one file per object relayed from another station (issue #218), <c>relayed/OBJECTID.txt</c>, with its Day, FirstSlot,
+/// EnvelopeNextEsi and every ESI sent (Sent, hex), so that a restart never repeats one.</para>
 /// <para>
 /// Both are written to a temporary name and renamed, object first, so a folder whose state is
 /// missing or does not match its object is an interrupted first offer and is discarded.
