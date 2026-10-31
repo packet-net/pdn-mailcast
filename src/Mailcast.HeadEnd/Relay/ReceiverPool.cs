@@ -405,6 +405,7 @@ public sealed class ReceiverPool : IDisposable
             lock (_gate)
             {
                 link.LastRead = _time.GetUtcNow();
+                Catalogue.MarkRead();
                 link.Failures = 0;
                 link.Problem = null;
                 link.NextTry = default;

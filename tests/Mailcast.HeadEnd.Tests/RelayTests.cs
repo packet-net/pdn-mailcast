@@ -440,7 +440,7 @@ public class RelayTests
         store.Commit(Plan(store, f.Selector(options), options));
         int sent = store.GetRelayProgress(obj.ObjectId).Sent.Count;
         Assert.True(sent > 0);
-        var later = DateOnly.FromDateTime(Slot.UtcDateTime).AddDays(options.RememberDays + 30);
+        var later = DateOnly.FromDateTime(Slot.UtcDateTime).AddDays(options.RememberDays + 5);
 
         store.Expire(later, id => f.Catalogue.Get(id) is not null);
         Assert.Equal(sent, store.GetRelayProgress(obj.ObjectId).Sent.Count);
@@ -684,5 +684,91 @@ public class RelayTests
 
         Assert.Equal(1, plan.RelayListed);
         Assert.Equal(2, plan.Directory.Entries.Count);
+    }
+
+    [Fact]
+    public void UnchangedPiecesRelayedBeforeTheObjectBecomesOwn_DoNotRetireTheBulletin()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var bulletin = Bulletins.Make(200, 4000);
+        var obj = OwnObject(options, bulletin);
+        var f = new Fixture();
+        f.Hear(obj, [(uint)obj.SourceSymbols + 100u, 16_000_000u, 9_000_000u]); // another station's ESIs, anywhere in the 24-bit space
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var relayedPlan = Plan(store, f.Selector(options), options);
+        Assert.Equal(3, relayedPlan.RelayedFrames);
+        store.Commit(relayedPlan);
+
+        var carried = store.Offer(bulletin, new DateOnly(2026, 10, 31))!;
+
+        Assert.Equal(0u, carried.NextEsi);
+        var plan = BroadcastScheduler.Plan(store.InRotation(Slot), Slot, 1, Compression.Default, options, store.DirectoryNextEsi, Frames(40), "ms110d-wn4");
+        Assert.Contains(plan.Directory.Entries, e => e.ObjectId == obj.ObjectId);
+        Assert.True(plan.Objects.Single(o => o.Bid == bulletin.Bid).Count > 0);
+
+        // Expiry afterwards does not build a huge set either.
+        store.Expire(new DateOnly(2026, 10, 31).AddDays(options.RememberDays + 1));
+        Assert.True(store.GetRelayProgress(obj.ObjectId).Sent.Count < 100);
+    }
+
+    [Fact]
+    public void ARelayedEnvelope_ThenOwn_StartsPastNoneOfItsEsisAndStaysInRange()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var bulletin = Bulletins.Make(201, 4000);
+        using var scratch = new TempDirectory();
+        var own = new HeadEndStore(scratch.Path, Compression.Default, options).Offer(bulletin, new DateOnly(2026, 10, 31))!;
+        var envelope = own.Envelope!;
+        var f = new Fixture();
+        var link = new EnvelopeLink(envelope.ObjectId, ObjectId.LongHash(envelope.DictionaryId, envelope.Bytes));
+        f.Hear(own.Transfer, [0u], complete: true, envelope: link);
+        f.Hear(envelope, [0u], complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var relayedPlan = Plan(store, f.Selector(options), options);
+        store.Commit(relayedPlan);
+        var sent = store.GetRelayProgress(envelope.ObjectId).Sent;
+        Assert.NotEmpty(sent);
+
+        var carried = store.Offer(bulletin, new DateOnly(2026, 10, 31))!;
+
+        Assert.True(carried.EnvelopeNextEsi + (uint)envelope.SourceSymbols <= 0xFFFFFF);
+        Assert.Empty(Enumerable.Range(0, envelope.SourceSymbols).Select(i => carried.EnvelopeNextEsi + (uint)i).Intersect(sent));
+    }
+
+    [Fact]
+    public void RelayState_GoesThirtyDaysAfterTheLastPieceSent_WhateverIsOffered()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var obj = Remote(202);
+        f.Hear(obj, [0u, 1u, 2u], complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        store.Commit(Plan(store, f.Selector(options), options));
+        var today = DateOnly.FromDateTime(Slot.UtcDateTime);
+
+        store.Expire(today.AddDays(HeadEndStore.RelayStateMaxDays - 1), _ => true);
+        Assert.NotEmpty(store.GetRelayProgress(obj.ObjectId).Sent);
+        store.Expire(today.AddDays(HeadEndStore.RelayStateMaxDays), _ => true);
+        Assert.Empty(store.GetRelayProgress(obj.ObjectId).Sent);
+    }
+
+    [Fact]
+    public void FramesWithNoStationLabel_DoNotCountForAnOwnBulletin_ButDoForARelayedObject()
+    {
+        using var dir = new TempDirectory();
+        var options = Options();
+        var f = new Fixture();
+        var mine = Remote(203);
+        f.Hear(mine, [3000u], listedBy: "M0LTE", air: new AirHeard(50, new Dictionary<string, int> { ["gb7rdg"] = 10 }, Now, Now));
+        var theirs = Remote(204);
+        f.Hear(theirs, [3000u], air: new AirHeard(50, new Dictionary<string, int> { ["m0lte"] = 10 }, Now, Now));
+        var selector = f.Selector(options);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+
+        Assert.Equal(10, selector.HeardFromOthers(mine.ObjectId)); // the 40 with no label are not counted
+        Assert.Equal(40, selector.Select(store.GetRelayProgress, store.CarriesObject).Single(r => r.ObjectId == theirs.ObjectId).HeardOnAir); // ours, any case, taken off
     }
 }

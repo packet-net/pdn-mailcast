@@ -133,6 +133,12 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
     /// <summary>Whether the catalogue has ever held anything since start: until a receiver has been read, what it does not hold says nothing about what is on offer.</summary>
     public bool EverHeld { get; private set; }
 
+    /// <summary>Whether a receiver has been read successfully since start.</summary>
+    public bool ReadOnce { get; private set; }
+
+    /// <summary>Notes a successful read of a receiver.</summary>
+    public void MarkRead() => ReadOnce = true;
+
     /// <summary>Raised, outside the lock, with the ID of each object dropped to keep within the limits, so readers forget what they know of it.</summary>
     public event Action<ulong>? Evicted;
 

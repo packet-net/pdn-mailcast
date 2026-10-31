@@ -113,6 +113,9 @@ public sealed class HeadEndStore
     public RelayProgress GetRelayProgress(ulong objectId) =>
         _relay.TryGetValue(objectId, out var r) ? new RelayProgress(new HashSet<uint>(r.Sent), r.FirstSlot) : RelayProgress.None;
 
+    /// <summary>A relayed object's sent-state goes this many days after the last piece sent, whether or not anything still offers the object.</summary>
+    public const int RelayStateMaxDays = 30;
+
     /// <summary>How many relayed objects have something remembered.</summary>
     public int RelayCount => _relay.Count;
 
@@ -171,10 +174,24 @@ public sealed class HeadEndStore
         DateTimeOffset? firstSlot = null;
         if (_relay.TryGetValue(transfer.ObjectId, out var relayed))
         {
-            nextEsi = relayed.Sent.Count == 0 ? 0 : relayed.Sent.Max(esi => shuffle?.Unmap(esi) ?? esi) + 1;
+            // Only this station's own fresh pieces move the count; another station's ESIs sent unchanged would unmap to anywhere.
+            nextEsi = relayed.NextFresh;
             firstSlot = relayed.FirstSlot;
         }
-        uint envelopeNext = envelopeObject is not null && _relay.TryGetValue(envelopeObject.ObjectId, out var relayedEnvelope) && relayedEnvelope.Sent.Count > 0 ? relayedEnvelope.Sent.Max() + 1 : 0;
+        // An own envelope counts up from a first ESI; start at the lowest one whose run of K pieces holds none already sent.
+        uint envelopeNext = 0;
+        if (envelopeObject is not null && _relay.TryGetValue(envelopeObject.ObjectId, out var relayedEnvelope))
+        {
+            for (bool moved = true; moved;)
+            {
+                moved = false;
+                foreach (uint esi in relayedEnvelope.Sent.Where(e => e >= envelopeNext && e < envelopeNext + (uint)envelopeObject.SourceSymbols))
+                {
+                    envelopeNext = esi + 1;
+                    moved = true;
+                }
+            }
+        }
         var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, nextEsi, firstSlot, envelopeObject, envelopeNext, shuffle);
         var dir = Path.Combine(_bulletins, key);
         Directory.CreateDirectory(dir);
@@ -252,10 +269,10 @@ public sealed class HeadEndStore
         var sentFrames = broadcast.Frames.Take(framesSent).ToList();
         foreach (var r in broadcast.Relayed)
         {
-            RecordRelayed(r.ObjectId, sentFrames, broadcast);
+            RecordRelayed(r.ObjectId, sentFrames, broadcast, r.Fresh);
             if (r.Envelope is { } relayEnvelope)
             {
-                RecordRelayed(relayEnvelope.ObjectId, sentFrames, broadcast);
+                RecordRelayed(relayEnvelope.ObjectId, sentFrames, broadcast, fresh: true);
             }
         }
         foreach (var o in broadcast.Objects)
@@ -316,6 +333,8 @@ public sealed class HeadEndStore
                 if (entry.Carried.NextEsi > 0)
                 {
                     var kept = _relay.TryGetValue(entry.Carried.Transfer.ObjectId, out var had) ? had : new RelayEntry { ObjectId = entry.Carried.Transfer.ObjectId, Day = today };
+                    kept.Last = today;
+                    kept.NextFresh = Math.Max(kept.NextFresh, entry.Carried.NextEsi);
                     for (uint n = 0; n < entry.Carried.NextEsi; n++)
                     {
                         kept.Sent.Add(entry.Carried.EsiOf(n));
@@ -341,7 +360,9 @@ public sealed class HeadEndStore
         {
             // A relayed object's sent-state stays as long as anything still offers the object (the catalogue, so a receiver), so it
             // can never be relayed again from scratch; past the remembering days it goes only once nobody offers it.
-            if (today.DayNumber - r.Day.DayNumber >= _options.RememberDays && stillOffered?.Invoke(id) != true)
+            // Or, whatever is offered, once nothing has been sent of it for RelayStateMaxDays.
+            if (today.DayNumber - r.Last.DayNumber >= RelayStateMaxDays
+                || (today.DayNumber - r.Day.DayNumber >= _options.RememberDays && stillOffered?.Invoke(id) != true))
             {
                 File.Delete(RelayPath(id));
                 _relay.Remove(id);
@@ -351,7 +372,7 @@ public sealed class HeadEndStore
     }
 
     // The ESIs of an object (a relayed one or a relayed envelope) among the frames sent, added to what is remembered of it.
-    private void RecordRelayed(ulong objectId, List<MailcastFrame> sentFrames, SlotBroadcast broadcast)
+    private void RecordRelayed(ulong objectId, List<MailcastFrame> sentFrames, SlotBroadcast broadcast, bool fresh)
     {
         var sent = sentFrames.Where(f => f.ObjectId == objectId).Select(f => f.EncodingSymbolId).ToList();
         if (sent.Count == 0)
@@ -364,6 +385,12 @@ public sealed class HeadEndStore
         }
         entry.Sent.UnionWith(sent);
         entry.FirstSlot ??= broadcast.Slot;
+        entry.Last = broadcast.Date;
+        if (fresh)
+        {
+            var shuffle = _options.Station is { } station ? EsiShuffle.For(station, objectId) : null;
+            entry.NextFresh = Math.Max(entry.NextFresh, sent.Max(esi => shuffle?.Unmap(esi) ?? esi) + 1);
+        }
         SaveRelay(entry);
     }
 
@@ -372,6 +399,10 @@ public sealed class HeadEndStore
         public ulong ObjectId;
         public DateOnly Day;
         public DateTimeOffset? FirstSlot;
+        public DateOnly Last;
+
+        /// <summary>The count after the highest of this station's own fresh pieces (in its scrambled order) sent; unchanged ESIs of another station do not move it.</summary>
+        public uint NextFresh;
         public readonly HashSet<uint> Sent = [];
     }
 
@@ -386,6 +417,8 @@ public sealed class HeadEndStore
         {
             text.Append(CultureInfo.InvariantCulture, $"FirstSlot: {first.UtcDateTime:yyyy-MM-ddTHH:mmZ}\n");
         }
+        text.Append(CultureInfo.InvariantCulture, $"Last: {r.Last:yyyy-MM-dd}\n");
+        text.Append(CultureInfo.InvariantCulture, $"NextFresh: {r.NextFresh}\n");
         text.Append("Sent: ").Append(string.Join(',', r.Sent.Order().Select(e => e.ToString("x", CultureInfo.InvariantCulture)))).Append('\n');
         DurableFile.WriteAtomically(RelayPath(r.ObjectId), Bulletin.TextEncoding.GetBytes(text.ToString()));
     }
@@ -411,6 +444,8 @@ public sealed class HeadEndStore
             {
                 ObjectId = id,
                 Day = DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Last = fields.TryGetValue("Last", out var lastText) ? DateOnly.ParseExact(lastText, "yyyy-MM-dd", CultureInfo.InvariantCulture) : DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                NextFresh = fields.TryGetValue("NextFresh", out var freshText) ? uint.Parse(freshText, CultureInfo.InvariantCulture) : 0,
                 FirstSlot = fields.TryGetValue("FirstSlot", out var slotText)
                     ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
                     : null,

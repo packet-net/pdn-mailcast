@@ -61,7 +61,7 @@ public sealed class RelaySelector
         ArgumentNullException.ThrowIfNull(adverts);
         _catalogue = catalogue;
         _compression = compression;
-        _station = station;
+        _station = station?.ToUpperInvariant();
         _stations = new HashSet<string>(adverts.Select(a => a.Callsign), StringComparer.OrdinalIgnoreCase);
         if (station is not null)
         {
@@ -88,16 +88,21 @@ public sealed class RelaySelector
     /// How many on-air pieces of an object were heard from stations other than this one: what counts towards the coverage of this head end's
     /// own bulletin of the same object. Zero if the catalogue knows nothing of it.
     /// </summary>
-    public int HeardFromOthers(ulong objectId) => _catalogue.Get(objectId) is { } o ? Heard(o) : 0;
+    public int HeardFromOthers(ulong objectId) => _catalogue.Get(objectId) is { } o ? Heard(o, labelledOnly: true) : 0;
 
-    private int Heard(CatalogueObject o)
+    // Pieces heard on air from stations other than this one. For this head end's own bulletin only frames the receiver put a station to
+    // count (the safer way: a frame of unknown origin might be our own); for a relayed object every frame but our own does.
+    private int Heard(CatalogueObject o, bool labelledOnly = false)
     {
-        int kept = o.Pieces.Count(p => p.OnAir && !IsOwn(p.HeardFrom));
-        int air = o.AirFrames is { } frames ? Math.Max(0, frames - (_station is not null ? o.AirByStation.GetValueOrDefault(_station, 0) : 0)) : 0;
+        int kept = o.Pieces.Count(p => p.OnAir && !IsOwn(p.HeardFrom) && (!labelledOnly || p.HeardFrom is not null));
+        int own = o.AirByStation.Where(kv => IsOwn(kv.Key)).Sum(kv => kv.Value);
+        int air = o.AirFrames is { } frames
+            ? Math.Max(0, (labelledOnly ? o.AirByStation.Where(kv => !IsOwn(kv.Key)).Sum(kv => kv.Value) : frames - own))
+            : 0;
         return Math.Max(kept, air);
     }
 
-    private bool IsOwn(string? label) => _station is not null && string.Equals(label, _station, StringComparison.OrdinalIgnoreCase);
+    private bool IsOwn(string? label) => _station is not null && label is not null && string.Equals(label, _station, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The objects to put in the rotation, each with what the receivers heard and what this head end has sent. Also remembered for <see cref="StatusView"/>.</summary>
     /// <param name="progress">What has been sent of an object, by ID.</param>

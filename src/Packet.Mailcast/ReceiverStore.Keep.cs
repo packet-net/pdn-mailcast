@@ -75,6 +75,7 @@ public sealed partial class ReceiverStore
         public readonly Dictionary<string, int> ByStation = new(StringComparer.Ordinal);
         public readonly DateTimeOffset First = first;
         public DateTimeOffset Last = first;
+        public DateTimeOffset Bumped;
     }
 
     /// <summary>How long a count of frames heard on air is kept after the last one: as long as a relay may still look at the object.</summary>
@@ -169,6 +170,12 @@ public sealed partial class ReceiverStore
             c.ByStation[station] = c.ByStation.GetValueOrDefault(station) + 1;
         }
         _airDirty = true;
+        if (now - c.Bumped >= TimeSpan.FromMinutes(1))
+        {
+            // So that a reader following the cursor sees the new count (at most once a minute for an object).
+            c.Bumped = now;
+            _keep.Touch(objectId);
+        }
         if (now - _airSaved >= TimeSpan.FromMinutes(1))
         {
             FlushAir();

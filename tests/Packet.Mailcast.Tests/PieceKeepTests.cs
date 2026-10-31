@@ -116,6 +116,24 @@ public class PieceKeepTests
     }
 
     [Fact]
+    public void TheObjectsCursor_MovesWhenItsAirCountDoes_AtMostOnceAMinute()
+    {
+        using var dir = new TempDirectory();
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero));
+        var store = new ReceiverStore(dir.Path, Compression.Default, Options() with { Time = time });
+        var obj = Experiment(5);
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG");
+        long first = store.KeptObjects(0, 10).Rows.Single().Kept.Cursor;
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG"); // same minute: no new cursor
+        Assert.Equal(first, store.KeptObjects(0, 10).Rows.Single().Kept.Cursor);
+        time.Advance(TimeSpan.FromMinutes(2));
+        store.Accept(obj.Frame(0).ToBytes(), "GB7RDG");
+        var row = store.KeptObjects(first, 10).Rows.Single();
+        Assert.True(row.Kept.Cursor > first);
+        Assert.Equal(3, row.Air!.Frames);
+    }
+
+    [Fact]
     public void AnOutsidePiece_HeardLaterOnAir_BecomesAnAirPiece()
     {
         using var dir = new TempDirectory();
