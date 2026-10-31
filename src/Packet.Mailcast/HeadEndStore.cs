@@ -297,7 +297,7 @@ public sealed class HeadEndStore
     /// Forgets bulletins first seen <see cref="ScheduleOptions.RememberDays"/> or more days
     /// before <paramref name="today"/>. Returns how many.
     /// </summary>
-    public int Expire(DateOnly today)
+    public int Expire(DateOnly today, Func<ulong, bool>? stillOffered = null)
     {
         int removed = 0;
         foreach (var (key, entry) in _entries.ToList())
@@ -319,7 +319,9 @@ public sealed class HeadEndStore
         }
         foreach (var (id, r) in _relay.ToList())
         {
-            if (today.DayNumber - r.Day.DayNumber >= _options.RememberDays)
+            // A relayed object's sent-state stays as long as anything still offers the object (the catalogue, so a receiver), so it
+            // can never be relayed again from scratch; past the remembering days it goes only once nobody offers it.
+            if (today.DayNumber - r.Day.DayNumber >= _options.RememberDays && stillOffered?.Invoke(id) != true)
             {
                 File.Delete(RelayPath(id));
                 _relay.Remove(id);

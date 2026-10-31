@@ -15,7 +15,8 @@ public sealed record ObjectRow(KeptObject Kept, byte? ContentType, IReadOnlyList
 /// <summary>One trusted signed directory's listing of an object.</summary>
 /// <param name="Station">The station whose directory it is.</param>
 /// <param name="Hash">The long hash it lists, or null.</param>
-public sealed record ObjectListing(string Station, string? Hash);
+/// <param name="Envelope">For a bulletin: the envelope object that directory links (<c>env=</c>), with its long hash; null if it links none (issue #218).</param>
+public sealed record ObjectListing(string Station, string? Hash, EnvelopeLink? Envelope = null);
 
 /// <summary>A page of <see cref="ObjectRow"/>s.</summary>
 /// <param name="Rows">The rows whose cursor is above the one asked for, in cursor order.</param>
@@ -95,11 +96,11 @@ public sealed partial class ReceiverStore
         return ObjectId.Of(held.DictionaryId, held.Data) == objectId ? held : null; // checked again: the file may have been damaged on disk
     }
 
-    private ObjectRow Row(KeptObject kept, Dictionary<ulong, SortedDictionary<string, string?>> listed)
+    private ObjectRow Row(KeptObject kept, Dictionary<ulong, SortedDictionary<string, (string? Hash, EnvelopeLink? Env)>> listed)
     {
         listed.TryGetValue(kept.ObjectId, out var by);
         byte? type = kept.ContentType ?? TypeFromDirectories(kept.ObjectId);
-        return new ObjectRow(kept, type, by is null ? [] : [.. by.Keys], by is null ? [] : [.. by.Select(b => new ObjectListing(b.Key, b.Value))]);
+        return new ObjectRow(kept, type, by is null ? [] : [.. by.Keys], by is null ? [] : [.. by.Select(b => new ObjectListing(b.Key, b.Value.Hash, b.Value.Env))]);
     }
 
     private IEnumerable<(BroadcastDirectory Directory, string Station)> ListingDirectories()
@@ -113,22 +114,22 @@ public sealed partial class ReceiverStore
         }
     }
 
-    private Dictionary<ulong, SortedDictionary<string, string?>> ListedByStation()
+    private Dictionary<ulong, SortedDictionary<string, (string? Hash, EnvelopeLink? Env)>> ListedByStation()
     {
-        var listed = new Dictionary<ulong, SortedDictionary<string, string?>>();
-        void Note(ulong id, string station, string? hash)
+        var listed = new Dictionary<ulong, SortedDictionary<string, (string? Hash, EnvelopeLink? Env)>>();
+        void Note(ulong id, string station, string? hash, EnvelopeLink? env = null)
         {
             if (!listed.TryGetValue(id, out var set))
             {
-                listed[id] = set = new SortedDictionary<string, string?>(StringComparer.Ordinal);
+                listed[id] = set = new SortedDictionary<string, (string? Hash, EnvelopeLink? Env)>(StringComparer.Ordinal);
             }
-            set[station] = hash;
+            set[station] = (hash, env);
         }
         foreach (var (directory, station) in ListingDirectories())
         {
             foreach (var entry in directory.Entries)
             {
-                Note(entry.ObjectId, station, entry.Hash);
+                Note(entry.ObjectId, station, entry.Hash, entry.Envelope);
                 if (entry.Envelope is { } link)
                 {
                     Note(link.ObjectId, station, link.Hash);

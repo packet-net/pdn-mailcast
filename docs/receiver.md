@@ -643,7 +643,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
       "outside": 2,
       "complete": true,
       "listedBy": ["GB7RDG"],
-      "listings": [{ "station": "GB7RDG", "hash": "9c1e5a07d3b2f648" }],
+      "listings": [{ "station": "GB7RDG", "hash": "9c1e5a07d3b2f648", "envelope": { "id": "5b0c2d9e44a1f377", "hash": "0a1b2c3d4e5f6071" } }],
       "updated": "2026-10-31T09:14:02+00:00",
       "cursor": 4812
     }
@@ -660,7 +660,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
 - `k`: pieces needed. `held`: pieces held. `outside`: of those, how many came from outside.
 - `complete`: the object has been rebuilt and matches its ID.
 - `listedBy`: the stations whose trusted signed directories, still remembered (about 48 hours), list the object. Empty if none does.
-- `listings`: the same stations, each with the long hash (16 hex digits) its directory lists the object with; `hash` is null for a listing that carries none. A program that passes the object on can then say what the original station vouched for.
+- `listings`: the same stations, each with the long hash (16 hex digits) its directory lists the object with; `hash` is null for a listing that carries none. A program that passes the object on can then say what the original station vouched for. `envelope` (additive; older receivers leave it out) is, for a bulletin, the envelope object that station's directory links with `env=`: its `id` and long `hash`. The envelope is itself an object in this index (`type` 5, listed by the same station), so a program that relays the bulletin can fetch the envelope's pieces and data the same way and check them against that ID and hash. It is null when the directory links none.
 - `updated`, `cursor`: when and at what cursor value it last changed.
 - `next`: pass this as `since` to the next call. `more`: more rows wait; call again at once.
 

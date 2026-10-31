@@ -60,7 +60,14 @@ public sealed class ReceiverApiClient(HttpClient http, Uri baseUrl)
                 {
                     foreach (var item in l.EnumerateArray())
                     {
-                        listings.Add(new ObjectListing(item.GetProperty("station").GetString() ?? "", item.TryGetProperty("hash", out var h) && h.ValueKind == JsonValueKind.String ? h.GetString() : null));
+                        EnvelopeLink? link = null;
+                        if (item.TryGetProperty("envelope", out var env) && env.ValueKind == JsonValueKind.Object
+                            && ObjectId.TryParse(env.TryGetProperty("id", out var eid) && eid.ValueKind == JsonValueKind.String ? eid.GetString() ?? "" : "", out ulong envelopeId)
+                            && env.TryGetProperty("hash", out var eh) && eh.ValueKind == JsonValueKind.String && eh.GetString() is { } envelopeHash && envelopeHash.Length == 16 && envelopeHash.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f')))
+                        {
+                            link = new EnvelopeLink(envelopeId, envelopeHash);
+                        }
+                        listings.Add(new ObjectListing(item.GetProperty("station").GetString() ?? "", item.TryGetProperty("hash", out var h) && h.ValueKind == JsonValueKind.String ? h.GetString() : null, link));
                     }
                 }
                 else if (o.TryGetProperty("listedBy", out var by) && by.ValueKind == JsonValueKind.Array)

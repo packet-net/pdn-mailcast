@@ -21,8 +21,8 @@ public readonly record struct RelaySummary(int Candidates, int Complete, int Dro
 /// go out, unchanged. Once it is complete and its octets match its object ID (and the long hash a trusted directory lists for it, if
 /// any), fresh pieces are made from those octets, and the object is listed with a hash computed from them, never one copied from a
 /// receiver.</para>
-/// <para>An envelope is not relayed yet: the receivers' API does not say which envelope object belongs to a bulletin, so none is ever
-/// held and checked here.</para>
+/// <para>A bulletin's envelope is the one a listing station links (<c>env=</c>, as the receivers report it), taken only if held complete
+/// and matching both its object ID and the long hash listed; it goes with the bulletin and is linked from its listing.</para>
 /// </remarks>
 public sealed class RelaySelector
 {
@@ -86,13 +86,21 @@ public sealed class RelaySelector
         var found = new List<RelayedObject>();
         int complete = 0;
         int dropped = 0;
-        foreach (var o in _catalogue.All())
+        var all = _catalogue.All();
+        var byId = all.ToDictionary(o => o.Id);
+        // Envelopes are relayed with their bulletin, never on their own.
+        var envelopeIds = new HashSet<ulong>(all.SelectMany(o => o.EnvelopeLinks.Values.Select(l => l.ObjectId)));
+        foreach (var o in all)
         {
+            if (envelopeIds.Contains(o.Id) || o.ContentType == (byte)ObjectKind.Envelope)
+            {
+                continue;
+            }
             if (o.K < 1 || now - o.Updated > StaleAfter || carries(o.Id) || !o.ListedBy.Keys.Any(_stations.Contains))
             {
                 continue;
             }
-            var made = Make(o, progress(o.Id), out bool refused);
+            var made = Make(o, progress(o.Id), byId, out bool refused);
             if (refused)
             {
                 dropped++;
@@ -114,7 +122,7 @@ public sealed class RelaySelector
         return found;
     }
 
-    private RelayedObject? Make(CatalogueObject o, RelayProgress progress, out bool refused)
+    private RelayedObject? Make(CatalogueObject o, RelayProgress progress, Dictionary<ulong, CatalogueObject> byId, out bool refused)
     {
         refused = false;
         TransferObject? transfer = null;
@@ -166,8 +174,34 @@ public sealed class RelaySelector
             HeardFrames = heard,
             Transfer = transfer,
             Listing = transfer is null ? null : ListingOf(transfer),
+            Envelope = transfer is null ? null : EnvelopeOf(o, byId),
             Progress = progress,
         };
+    }
+
+    // The envelope a listing station links, if it is held complete, matches its ID and the listed hash, and is an envelope object.
+    private static TransferObject? EnvelopeOf(CatalogueObject o, Dictionary<ulong, CatalogueObject> byId)
+    {
+        foreach (var link in o.EnvelopeLinks.Values.OrderBy(l => l.ObjectId))
+        {
+            if (byId.TryGetValue(link.ObjectId, out var e) && e.Data is { } data
+                && ObjectId.LongHash(e.DictionaryId, data) == link.Hash)
+            {
+                try
+                {
+                    var envelope = TransferObject.FromStored(data, e.DictionaryId, e.Oti);
+                    if (envelope.ObjectId == link.ObjectId && envelope.Kind == ObjectKind.Envelope)
+                    {
+                        return envelope;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    // the OTI does not describe the octets: not usable
+                }
+            }
+        }
+        return null;
     }
 
     // The fields a directory entry needs, from the checked object. A bulletin gives its own BID, title and length; any other type gets

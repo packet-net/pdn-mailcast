@@ -126,12 +126,15 @@ public sealed class RotationStore
         }
     }
 
+    /// <summary>Whether anything still offers an object (the receivers' catalogue): its relay state is kept while so. Null offers none.</summary>
+    public Func<ulong, bool>? StillOffered { get; set; }
+
     /// <summary>Forgets bulletins past the store's remembering days.</summary>
     public int Expire(DateOnly today)
     {
         lock (_gate)
         {
-            return _store.Expire(today);
+            return _store.Expire(today, StillOffered);
         }
     }
 }

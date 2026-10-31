@@ -48,6 +48,9 @@ public sealed class CatalogueObject
     /// </summary>
     public required IReadOnlyDictionary<string, string?> ListedBy { get; init; }
 
+    /// <summary>The envelope each listing station links for the object (<c>env=</c>), by station; empty if none does.</summary>
+    public IReadOnlyDictionary<string, EnvelopeLink> EnvelopeLinks { get; init; } = new Dictionary<string, EnvelopeLink>();
+
     /// <summary>The rebuilt object (kind octet and zstd frame), checked against the object ID; null until a receiver has it complete.</summary>
     public byte[]? Data { get; init; }
 
@@ -87,6 +90,7 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         public int K;
         public readonly SortedDictionary<uint, CataloguePiece> Pieces = [];
         public readonly Dictionary<string, string?> Listings = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, EnvelopeLink> EnvelopeLinks = new(StringComparer.Ordinal);
         public byte[]? Data;
         public DateTimeOffset Updated;
         public long Bytes;
@@ -129,6 +133,11 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
             e.K = row.K;
             foreach (var l in row.Listings)
             {
+                if (l.Station.Length > 0 && l.Envelope is { } link && (!e.EnvelopeLinks.TryGetValue(l.Station, out var known) || known != link))
+                {
+                    e.EnvelopeLinks[l.Station] = link;
+                    e.Updated = time.GetUtcNow();
+                }
                 if (l.Station.Length > 0 && (!e.Listings.TryGetValue(l.Station, out var had) || (had is null && l.Hash is not null)))
                 {
                     e.Listings[l.Station] = l.Hash;
@@ -260,6 +269,7 @@ public sealed class ObjectCatalogue(TimeProvider time, long maxBytes = ObjectCat
         K = e.K,
         Pieces = [.. e.Pieces.Values],
         ListedBy = new Dictionary<string, string?>(e.Listings, StringComparer.Ordinal),
+        EnvelopeLinks = new Dictionary<string, EnvelopeLink>(e.EnvelopeLinks, StringComparer.Ordinal),
         Data = e.Data,
         Updated = e.Updated,
     };
