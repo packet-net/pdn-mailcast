@@ -23,9 +23,10 @@
           { "name": "limit", "in": "query", "description": "Most rows to return.", "schema": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 200 } }
         ],
         "responses": {
-          "200": { "description": "A page of the index.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ObjectPage" }, "example": { "objects": [ { "id": "3f9a0c5be1d27a44", "type": 1, "typeName": "packet mail bulletin (FBB/BPQ message format)", "dictionary": 1, "oti": { "transferLength": 2891, "symbolSize": 240, "sourceBlocks": 1, "subBlocks": 1, "alignment": 4, "hex": "000000000b4b00f0010001" }, "k": 13, "held": 13, "outside": 2, "complete": true, "listedBy": [ "GB7RDG" ], "updated": "2026-10-31T09:14:02+00:00", "cursor": 4812 } ], "next": 4812, "more": false } } } },
+          "200": { "description": "A page of the index.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ObjectPage" }, "example": { "objects": [ { "id": "3f9a0c5be1d27a44", "type": 1, "typeName": "packet mail bulletin (FBB/BPQ message format)", "dictionary": 1, "oti": { "transferLength": 2891, "symbolSize": 240, "sourceBlocks": 1, "subBlocks": 1, "alignment": 4, "hex": "0000000b4b0000f001000104" }, "k": 13, "held": 13, "outside": 2, "complete": true, "listedBy": [ "GB7RDG" ], "updated": "2026-10-31T09:14:02+00:00", "cursor": 4812 } ], "next": 4812, "more": false } } } },
           "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" }
+          "401": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
         },
         "security": [ {}, { "pagePassword": [] } ]
       }
@@ -45,7 +46,8 @@
           "200": { "description": "A page of pieces.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PiecePage" }, "example": { "id": "3f9a0c5be1d27a44", "complete": true, "k": 13, "pieces": [ { "esi": 4, "frame": "02003f9a0c5be1d27a440001", "heard": "2026-10-31T09:12:41+00:00", "from": "air", "label": "GB7RDG", "cursor": 4790 } ], "next": 4790, "more": true } } } },
           "400": { "$ref": "#/components/responses/Error" },
           "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "404": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
         },
         "security": [ {}, { "pagePassword": [] } ]
       }
@@ -67,7 +69,8 @@
             "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
           },
           "401": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
+          "404": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
         },
         "security": [ {}, { "pagePassword": [] } ]
       }
@@ -77,7 +80,7 @@
         "tags": [ "Handing in" ],
         "operationId": "postPieces",
         "summary": "Hand frames in",
-        "description": "Each frame is checked (format, CRC) and pooled with the pieces heard on air, marked as from outside under the source label. Pieces from outside never count towards the station heard most or any slot's figures. Requests whose Origin header names another site are refused. A frame that is wrong is reported in results; the call still answers 200.",
+        "description": "Each frame is checked (format, CRC) and pooled with the pieces heard on air, marked as from outside under the source label. Pieces from outside never count towards the station heard most or any slot's figures. Requests whose Origin header names another site are refused. A frame that is wrong is reported in results; the call still answers 200. Per object, at most K+16 pieces are taken from outside, and a rebuild is tried once per object after the whole post.",
         "requestBody": {
           "required": true,
           "content": {
@@ -88,7 +91,7 @@
           }
         },
         "responses": {
-          "200": { "description": "One result for each frame sent, in order.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostResult" }, "example": { "source": "my-recorder", "accepted": 1, "results": [ { "outcome": "stored", "objectId": "3f9a0c5be1d27a44", "encodingSymbolId": 4, "detail": null }, { "outcome": "notAFrame", "objectId": null, "encodingSymbolId": null, "detail": "not hex" } ] } } } },
+          "200": { "description": "One result for each frame sent, in order.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostResult" }, "example": { "source": "my-recorder", "accepted": 1, "results": [ { "outcome": "stored", "objectId": "3f9a0c5be1d27a44", "encodingSymbolId": 4, "detail": null, "kept": true }, { "outcome": "notAFrame", "objectId": null, "encodingSymbolId": null, "detail": "not hex", "kept": false } ] } } } },
           "400": { "$ref": "#/components/responses/Error" },
           "401": { "$ref": "#/components/responses/Error" },
           "403": { "$ref": "#/components/responses/Error" },
@@ -114,7 +117,7 @@
     },
     "schemas": {
       "Error": { "type": "object", "required": [ "error" ], "properties": { "error": { "type": "string" } } },
-      "HexFrame": { "type": "string", "description": "A frame payload exactly as sent (header, symbol, CRC) in hex, at most 4096 octets.", "pattern": "^([0-9a-fA-F]{2})*$" },
+      "HexFrame": { "type": "string", "description": "A frame payload exactly as sent (header, symbol, CRC) in hex, at most 1007 octets.", "pattern": "^([0-9a-fA-F]{2})*$" },
       "Oti": {
         "type": "object",
         "description": "How the object is RaptorQ coded (RFC 6330 section 3.3).",
@@ -188,14 +191,15 @@
           "outcome": { "type": "string", "description": "stored; duplicate; alreadyComplete; notAFrame; unknownDictionary; rejected; or, when the piece finished the object, completedBulletin, completedDirectory, completedEnvelope, completedUnhandled, completedUnknown, completedIonosphere, completedPskReporter, awaitingEnvelope, withheld, completedOtherCopy, rejectedDirectory." },
           "objectId": { "type": [ "string", "null" ] },
           "encodingSymbolId": { "type": [ "integer", "null" ] },
-          "detail": { "type": [ "string", "null" ] }
+          "detail": { "type": [ "string", "null" ] },
+          "kept": { "type": "boolean", "description": "Whether the frame added a piece the receiver did not have." }
         }
       },
       "PostResult": {
         "type": "object",
         "properties": {
           "source": { "type": "string", "description": "The label used." },
-          "accepted": { "type": "integer", "description": "Frames that added a piece." },
+          "accepted": { "type": "integer", "description": "Frames that added a piece (the results with kept true)." },
           "results": { "type": "array", "items": { "$ref": "#/components/schemas/FrameResult" } }
         }
       }

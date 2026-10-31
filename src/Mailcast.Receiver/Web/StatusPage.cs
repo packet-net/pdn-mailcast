@@ -67,6 +67,7 @@ public sealed partial class StatusPage : IAsyncDisposable
     private readonly SessionStore _sessions;
     private readonly Dictionary<HttpListenerContext, string?> _sockets = [];
     private readonly SignInThrottle _throttle;
+    private readonly SignInThrottle _keyThrottle;
 
     private readonly ReceiverHost _host;
     private readonly ConfigFile? _configFile;
@@ -99,6 +100,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         CookieName = $"pdn-mailcast-{web.Port}";
         _sessions = new SessionStore(Path.Combine(host.Config.StateDirectory, SessionStore.FileName), () => _host.Config.Web.Password, host.Time, log);
         _throttle = new SignInThrottle(host.Time, log);
+        _keyThrottle = new SignInThrottle(host.Time, log, "API keys");
         host.PipelineCreated += Attach;
     }
 
@@ -387,6 +389,11 @@ public sealed partial class StatusPage : IAsyncDisposable
         {
             return (421, "This page only answers to localhost.");
         }
+        if (web.Lan && !IsOwnHost(host))
+        {
+            // DNS rebinding: a page elsewhere must not reach this one by pointing a name of its own at it.
+            return (421, "This page answers only to an IP address, localhost or this machine's own name.");
+        }
         bool changes = request.HttpMethod != "GET" || request.IsWebSocketRequest;
         string? origin = request.Headers["Origin"];
         if (changes && origin is not null && !SameOrigin(origin, host))
@@ -394,6 +401,30 @@ public sealed partial class StatusPage : IAsyncDisposable
             return (403, "Refused: this request came from another site.");
         }
         return null;
+    }
+
+    /// <summary>
+    /// Whether a Host header names this receiver without a name an outsider could point at it: an IP address,
+    /// localhost, or this machine's own name (its first label, any domain after it). No Host at all passes: a
+    /// browser always sends one.
+    /// </summary>
+    internal static bool IsOwnHost(string host)
+    {
+        if (host.Length == 0)
+        {
+            return true;
+        }
+        string name = host.StartsWith('[') ? host[..(host.IndexOf(']') + 1)] : host.Split(':')[0];
+        if (name.Length == 0)
+        {
+            return false;
+        }
+        if (IPAddress.TryParse(name.Trim('[', ']'), out _) || name.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        string first = name.Split('.')[0];
+        return first.Equals(Environment.MachineName.Split('.')[0], StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsLoopbackHost(string host)
@@ -521,7 +552,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         }
         if (IsBrowser(request))
         {
-            if (request.HttpMethod == "GET" && !request.IsWebSocketRequest && !path.StartsWith("/api/", StringComparison.Ordinal))
+            if (request.HttpMethod == "GET" && !request.IsWebSocketRequest && (!path.StartsWith("/api/", StringComparison.Ordinal) || path == "/api/docs"))
             {
                 await SignInPageAsync(context, 200, path, null).ConfigureAwait(false);
             }

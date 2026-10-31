@@ -85,6 +85,12 @@ internal sealed class PieceKeep
         Load();
     }
 
+    /// <summary>Keys of part-received objects the delivery path still holds with pieces from outside; the keep never drops these (their provenance decides what may be delivered).</summary>
+    public Func<string, bool> IsProtected { get; set; } = _ => false;
+
+    /// <summary>Octets held elsewhere on behalf of the keep (symbol files of objects with nothing heard on air), counted against the limit.</summary>
+    public Func<long> ExtraBytes { get; set; } = () => 0;
+
     /// <summary>How many octets the keep holds.</summary>
     public long Bytes => _bytes;
 
@@ -493,14 +499,19 @@ internal sealed class PieceKeep
         }
     }
 
-    private void Enforce(long maxBytes, Entry keep)
+    private void Enforce(long maxBytes, Entry added)
     {
-        while (_bytes > maxBytes)
+        while (_bytes + ExtraBytes() > maxBytes)
         {
             // Rebuilt objects go before part-received ones, the oldest first: a part-received object may still be finished.
-            var victim = _entries.Values.Where(e => e != keep).OrderByDescending(e => e.Complete).ThenBy(e => e.Updated).FirstOrDefault();
+            var victim = _entries.Values.Where(e => e != added && !IsProtected(e.Key)).OrderByDescending(e => e.Complete).ThenBy(e => e.Updated).FirstOrDefault();
             if (victim is null)
             {
+                if (!IsProtected(added.Key))
+                {
+                    _log?.Invoke($"keep: over its size limit; dropped {ObjectId.Format(added.ObjectId)} itself");
+                    Drop(added);
+                }
                 return;
             }
             _log?.Invoke($"keep: over its size limit; dropped {ObjectId.Format(victim.ObjectId)}, last changed {victim.Updated:u}");

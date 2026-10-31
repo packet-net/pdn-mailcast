@@ -35,6 +35,9 @@ public sealed partial class ReceiverStore
 {
     private readonly PieceKeep _keep;
 
+    /// <summary>The octets the delivery path holds for part-received objects with nothing heard on air; they count against the keep's limit.</summary>
+    private long OutsideOnlyBytes() => _instances.Values.Where(i => !i.HasAir).Sum(i => i.Symbols.Values.Sum(v => (long)v.Length));
+
     /// <summary>Where the API key is kept, under the store's folder.</summary>
     public const string ApiKeyFile = "api-key.txt";
 

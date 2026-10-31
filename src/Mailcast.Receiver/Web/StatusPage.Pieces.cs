@@ -31,8 +31,8 @@ public sealed partial class StatusPage
     /// <summary>The most frames one <c>POST /api/pieces</c> takes.</summary>
     public const int MaxPostedFrames = 500;
 
-    /// <summary>The largest frame, in octets, a post may hold; a frame is under 1 KB on air.</summary>
-    public const int MaxPostedFrameLength = 4096;
+    /// <summary>The largest frame, in octets, a post may hold: IL2P's 1023 less the 16 of an AX.25 UI frame's addresses, control and PID.</summary>
+    public const int MaxPostedFrameLength = 1007;
 
     /// <summary>The largest body <c>POST /api/pieces</c> reads.</summary>
     public const int MaxPostBytes = 4 * 1024 * 1024;
@@ -57,7 +57,7 @@ public sealed partial class StatusPage
         <html lang="en"><head><meta charset="utf-8"><title>pdn-mailcast receiver API</title>
         <meta name="viewport" content="width=device-width, initial-scale=1"></head>
         <body>
-        <script id="api-reference" data-url="openapi.json" data-configuration='{"hideClientButton":true,"telemetry":false,"agent":{"disabled":true}}'></script>
+        <script id="api-reference" data-url="openapi.json" data-configuration='{"hideClientButton":true,"telemetry":false,"agent":{"disabled":true},"withDefaultFonts":false,"showDeveloperTools":"never"}'></script>
         <script src="docs/scalar.js"></script>
         </body></html>
         """;
@@ -228,7 +228,7 @@ public sealed partial class StatusPage
         }
         var from = RemoteAddress(request);
         // The same wrong-guess limits as the page's password, so a key cannot be guessed at.
-        var verdict = _throttle.Check(from, given, key, out var wait);
+        var verdict = _keyThrottle.Check(from, given, key, out var wait);
         if (verdict == SignInThrottle.Verdict.Wrong)
         {
             await PauseAsync().ConfigureAwait(false);
@@ -334,7 +334,7 @@ public sealed partial class StatusPage
         {
             outcomes[i] ??= taken[slot[i]];
         }
-        int stored = taken.Count(o => o.Outcome is not ("duplicate" or "notAFrame" or "alreadyComplete" or "unknownDictionary" or "rejected"));
+        int stored = taken.Count(o => o.Kept);
         if (hex.Count > 0)
         {
             _log($"web: {hex.Count} piece(s) handed in as \"{label}\" from {from}: {stored} new");

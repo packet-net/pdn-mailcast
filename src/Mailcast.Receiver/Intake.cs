@@ -744,22 +744,22 @@ public sealed class Intake : IAsyncDisposable
         {
             try
             {
-                foreach (var frame in frames)
+                IReadOnlyList<AcceptResult> taken;
+                try
                 {
-                    AcceptResult result;
-                    try
-                    {
-                        result = _store.AcceptOutside(frame, label);
-                    }
-                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                    {
-                        _log($"store: cannot keep a piece: {Ascii.Clean(e.Message)}");
-                        result = new AcceptResult(FrameOutcome.Rejected, Detail: "the receiver could not keep it");
-                    }
-                    results.Add(result);
-                    uint? esi = MailcastFrame.TryParse(frame, out var parsed) ? parsed!.EncodingSymbolId : null;
-                    outcomes.Add(OutsideOutcome.From(result, esi));
-                    if (result.Kept)
+                    taken = _store.AcceptOutsideBatch(frames, label);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    _log($"store: cannot keep a piece: {Ascii.Clean(e.Message)}");
+                    taken = [.. frames.Select(_ => new AcceptResult(FrameOutcome.Rejected, Detail: "the receiver could not keep it"))];
+                }
+                for (int i = 0; i < taken.Count; i++)
+                {
+                    results.Add(taken[i]);
+                    uint? esi = MailcastFrame.TryParse(frames[i], out var parsed) ? parsed!.EncodingSymbolId : null;
+                    outcomes.Add(OutsideOutcome.From(taken[i], esi));
+                    if (taken[i].Kept)
                     {
                         kept++;
                     }
@@ -1006,11 +1006,12 @@ public sealed class Intake : IAsyncDisposable
 /// <param name="ObjectId">The frame's object, in 16 hex digits, if it was a frame.</param>
 /// <param name="EncodingSymbolId">The frame's piece number, if it was a frame.</param>
 /// <param name="Detail">Why not, for a refusal.</param>
-public sealed record OutsideOutcome(string Outcome, string? ObjectId, uint? EncodingSymbolId, string? Detail)
+/// <param name="Kept">Whether the frame added a piece the receiver did not have.</param>
+public sealed record OutsideOutcome(string Outcome, string? ObjectId, uint? EncodingSymbolId, string? Detail, bool Kept = false)
 {
     internal static OutsideOutcome From(AcceptResult result, uint? esi)
     {
         string name = result.Outcome.ToString();
-        return new OutsideOutcome(char.ToLowerInvariant(name[0]) + name[1..], result.ObjectId is { } id ? Packet.Mailcast.ObjectId.Format(id) : null, esi, result.Detail);
+        return new OutsideOutcome(char.ToLowerInvariant(name[0]) + name[1..], result.ObjectId is { } id ? Packet.Mailcast.ObjectId.Format(id) : null, esi, result.Detail, result.Kept);
     }
 }

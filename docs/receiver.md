@@ -582,7 +582,7 @@ A directory whose signature does not check, or is signed by a key you have not a
 
 A bulletin shows this while a directory naming it is remembered, which is 48 hours. A held bulletin stays held across a restart, until a good directory lists it or 14 days pass.
 
-What signing does not stop: a bulletin no directory lists is still delivered, as before; and a signed directory can be sent again the same day, which is no worse than before.
+What signing does not stop: a bulletin no directory lists is still delivered when it was heard on air, as before (one with any piece handed in through the [API](#the-api-for-objects-and-pieces) is held instead); and a signed directory can be sent again the same day, which is no worse than before.
 
 ### Keys
 
@@ -617,11 +617,11 @@ An object is named by its **ID**: 16 hex digits, the first eight octets of the S
 
 Pieces carry where they came from: `air` (heard in a slot, with the station whose slot it was if known) or `outside` (handed in through `POST /api/pieces`, with the label the poster gave). Pieces from outside never count towards the station heard most, a slot's frames or a slot's bulletins; the status page and the daily report count them apart.
 
-What reaches the BBS is unchanged: a bulletin is delivered the same way whether the last piece came on air or from outside. Objects of other content types are kept, within a size limit (64 MB by default, the oldest rebuilt objects dropped first, and nothing kept longer than 14 days), and shown nowhere as mail.
+What reaches the BBS is unchanged for pieces heard on air. If any piece behind a rebuilt bulletin or envelope came from outside, it is delivered or kept only when a trusted signed directory lists it with a matching long hash; otherwise it is held (not delivered) until one does, so posting a bulletin of your own to a receiver gets it nowhere. Ionosonde and PSK Reporter readings completed with pieces from outside are never used, and a reading dated more than 5 minutes ahead of the receiver's clock is not used from any source. Objects of other content types are kept, within a size limit (64 MB by default, the oldest rebuilt objects dropped first, and nothing kept longer than 14 days), and shown nowhere as mail.
 
 ### Reading
 
-Reads need nothing, like the status page itself. If the page has a password, send it with HTTP Basic (any user name), as for the rest of the page.
+Reads need nothing, like the status page itself. The page answers only to an IP address, `localhost` or the machine's own name as the address in the URL (anything else is refused with 421, which stops a web page elsewhere from reaching it through a name of its own). If the page has a password, send it with HTTP Basic (any user name), as for the rest of the page.
 
 **`GET /api/objects?since=N&limit=M`** is the index. `since` is a cursor (default 0, everything); `limit` is 1 to 1000 (default 200). Rows come in cursor order, and an object that changes (a new piece, completion, a new directory listing it) moves to the end with a new cursor.
 
@@ -637,7 +637,7 @@ curl 'http://RECEIVER:8080/api/objects?since=0&limit=2'
       "type": 1,
       "typeName": "packet mail bulletin (FBB/BPQ message format)",
       "dictionary": 1,
-      "oti": { "transferLength": 2891, "symbolSize": 240, "sourceBlocks": 1, "subBlocks": 1, "alignment": 4, "hex": "000000000b4b00f0010001..." },
+      "oti": { "transferLength": 2891, "symbolSize": 240, "sourceBlocks": 1, "subBlocks": 1, "alignment": 4, "hex": "0000000b4b0000f001000104" },
       "k": 13,
       "held": 13,
       "outside": 2,
@@ -692,6 +692,8 @@ curl 'http://RECEIVER:8080/api/objects/3f9a0c5be1d27a44/pieces?limit=2'
 
 `frame` is the whole frame in hex, ready to post to another receiver or to parse. `from` is `air` or `outside`; `label` is the station (on air, null if not known) or the poster's label. A complete object keeps the pieces it was rebuilt from.
 
+Nothing is signalled when an object is dropped (expired, or pushed out by the size limit): it simply stops being listed, and there are no tombstones. A restart renumbers cursors: every kept object and piece gets a new, higher number, so a program following the receiver finds everything again once and should expect to fetch it again.
+
 **`GET /api/objects/{id}/data`** gives the rebuilt object's octets (the content type octet, any metadata, then the compressed content: exactly what the ID hashes), as `application/octet-stream`, with `X-Mailcast-Object-Id` and `X-Mailcast-Dictionary` headers. It is 404 unless the object is complete and still matches its ID.
 
 ```
@@ -704,7 +706,7 @@ Errors are JSON, `{"error": "..."}`, with the status code: 400 for a cursor that
 
 **`POST /api/pieces`** takes frames, checks each (format, CRC), and pools it with the pieces heard on air, marked as from outside. It needs the receiver's **API key**.
 
-The key is made on the status page: open "Sharing pieces", press "Make a new key", and copy it. The same section shows it again, makes a new one (the old stops working) or removes it. It is kept with the receiver's store, not in the config file. With no key set, posting is refused (403) with a message saying so. Give the key in either header:
+The status page is open to anyone on the network unless it has a password (`web.password`), and so is this section: without a page password, anyone on your LAN can read the key and change it. Set a password if that matters. The key is made on the status page: open "Sharing pieces", press "Make a new key", and copy it. The same section shows it again, makes a new one (the old stops working) or removes it. It is kept with the receiver's store, not in the config file. With no key set, posting is refused (403) with a message saying so. Give the key in either header:
 
 ```
 Authorization: Bearer mcr_...
@@ -713,7 +715,7 @@ X-Api-Key: mcr_...
 
 Browsers cannot be used to post from another site: the page's usual Host and Origin checks apply, and a request whose `Origin` is another site is refused (403). A wrong key is 401, and too many wrong keys from one address are slowed and then refused (429), as for the page password. The page password is not needed to post; the key is enough.
 
-Send `application/json`: either `{"source": "my-tool", "frames": ["hex", ...]}` or just the list. `source` is an optional label for where the pieces came from (letters, digits and `. - _ : /`, at most 48 characters; anything else becomes `_`); without it, the sender's address is used. At most 500 frames, each at most 4096 octets, and a body of 4 MB.
+Send `application/json`: either `{"source": "my-tool", "frames": ["hex", ...]}` or just the list. `source` is an optional label for where the pieces came from (letters, digits and `. - _ : /`, at most 48 characters; anything else becomes `_`); without it, the sender's address is used. At most 500 frames, each at most 1007 octets (the longest frame on air), and a body of 4 MB. A receiver takes at most 16 pieces more than an object needs (K) from outside, and at most 32 part-received objects that have nothing heard on air; more are `rejected`. It tries to rebuild an object once for each post, not for each frame.
 
 ```
 curl -X POST 'http://RECEIVER:8080/api/pieces' \
@@ -733,10 +735,10 @@ curl -X POST 'http://RECEIVER:8080/api/pieces' \
 }
 ```
 
-`results` has one entry for each frame sent, in order. `accepted` counts the frames that added a piece. `outcome` is one of:
+`results` has one entry for each frame sent, in order. `accepted` counts the frames that added a piece (`kept` is true in their results). `outcome` is one of:
 
 - `stored`: kept, the object is not yet rebuilt.
-- `completedBulletin`, `completedDirectory`, `completedEnvelope`, `completedUnhandled`, `completedUnknown`, `completedIonosphere`, `completedPskReporter`, `awaitingEnvelope`, `withheld`, `completedOtherCopy`, `rejectedDirectory`: kept, and it finished the object. A bulletin goes to the BBS as usual.
+- `completedBulletin`, `completedDirectory`, `completedEnvelope`, `completedUnhandled`, `completedUnknown`, `completedIonosphere`, `completedPskReporter`, `awaitingEnvelope`, `withheld`, `completedOtherCopy`, `rejectedDirectory`: kept, and it finished the object. A bulletin goes to the BBS only under the rule above (otherwise the outcome is `withheld`).
 - `duplicate`: that piece was already held.
 - `alreadyComplete`: the object is already rebuilt; the frame was not needed.
 - `notAFrame`: not hex, or not a valid frame (version, length or CRC). `detail` says which when it is not hex.

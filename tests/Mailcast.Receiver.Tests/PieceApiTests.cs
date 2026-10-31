@@ -138,7 +138,7 @@ public class PieceApiTests
         Assert.Equal(ObjectId.Format(obj.ObjectId), results[0].GetProperty("objectId").GetString());
         Assert.Equal("notAFrame", results[^3].GetProperty("outcome").GetString()); // not hex
         Assert.Equal("notAFrame", results[^2].GetProperty("outcome").GetString()); // not a frame
-        Assert.Equal("alreadyComplete", results[^1].GetProperty("outcome").GetString());
+        Assert.Equal("duplicate", results[^1].GetProperty("outcome").GetString()); // the rebuild comes once, after the whole post
 
         string id = ObjectId.Format(obj.ObjectId);
         var index = await http.GetFromJsonAsync<JsonElement>("api/objects");
@@ -269,8 +269,37 @@ public class OpenApiTests
 
         var docs = await http.GetStringAsync("api/docs");
         Assert.Contains("openapi.json", docs, StringComparison.Ordinal);
+        Assert.Contains("\"withDefaultFonts\":false", docs, StringComparison.Ordinal);
+        Assert.Contains("\"showDeveloperTools\":\"never\"", docs, StringComparison.Ordinal);
+        foreach (var example in doc.GetProperty("paths").GetProperty("/api/objects").GetProperty("get").GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json").GetProperty("example").GetProperty("objects").EnumerateArray())
+        {
+            var oti = ObjectTransmissionInformation.Read(Convert.FromHexString(example.GetProperty("oti").GetProperty("hex").GetString()!));
+            Assert.Equal(example.GetProperty("oti").GetProperty("transferLength").GetInt64(), oti.TransferLength);
+            Assert.Equal(example.GetProperty("oti").GetProperty("symbolSize").GetInt32(), oti.SymbolSize);
+        }
         var script = await http.GetAsync("api/docs/scalar.js");
         Assert.Equal(System.Net.HttpStatusCode.OK, script.StatusCode);
         Assert.True((await script.Content.ReadAsByteArrayAsync()).Length > 1_000_000);
+    }
+}
+
+
+public class HostCheckTests
+{
+    [Theory]
+    [InlineData("192.168.1.5:8080", true)]
+    [InlineData("[::1]:8080", true)]
+    [InlineData("localhost", true)]
+    [InlineData("evil.example", false)]
+    [InlineData("evil.example:8080", false)]
+    public void OnlyAnAddressLocalhostOrTheMachinesNameIsAnswered(string host, bool ok) => Assert.Equal(ok, StatusPage.IsOwnHost(host));
+
+    [Fact]
+    public void TheMachinesOwnName_WithAnyDomain_IsAnswered()
+    {
+        string me = Environment.MachineName.Split('.')[0];
+        Assert.True(StatusPage.IsOwnHost(me.ToUpperInvariant() + ":8080"));
+        Assert.True(StatusPage.IsOwnHost(me + ".lan"));
+        Assert.False(StatusPage.IsOwnHost("x" + me + ".lan"));
     }
 }

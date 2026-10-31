@@ -274,6 +274,12 @@ public sealed record ReceiverStoreOptions
     /// <summary>The largest object, by the transfer length in its OTI, that pieces from outside are taken for.</summary>
     public long KeepMaxObjectBytes { get; init; } = 4L * 1024 * 1024;
 
+    /// <summary>The most part-received objects held that have no piece heard on air, only pieces from outside; past this, pieces from outside cannot start another.</summary>
+    public int MaxOutsidePartials { get; init; } = 32;
+
+    /// <summary>How many pieces beyond K (the number needed) one object may hold from outside before more are refused.</summary>
+    public int OutsideSparePieces { get; init; } = 16;
+
     /// <summary>How long the keep holds an object after it last changed.</summary>
     public TimeSpan KeepRetention { get; init; } = TimeSpan.FromDays(14);
 
@@ -422,6 +428,8 @@ public sealed partial class ReceiverStore
             File.Delete(tmp);
         }
         _keep = new PieceKeep(root, _options.FlushToDisk, Log);
+        _keep.IsProtected = key => _instances.ContainsKey(key) && _keep.HasOutside(key);
+        _keep.ExtraBytes = OutsideOnlyBytes;
         LoadApiKey();
         foreach (var marker in System.IO.Directory.EnumerateFiles(_doneDir))
         {
@@ -769,11 +777,49 @@ public sealed partial class ReceiverStore
     /// directory it carries does not count as hearing that directory, and, should a rebuild fail its ID check,
     /// it is the first suspect (see <see cref="AcceptResult"/>'s <c>Kept</c> and the class remarks).
     /// </summary>
-    public AcceptResult AcceptOutside(ReadOnlySpan<byte> payload, string label)
+    public AcceptResult AcceptOutside(ReadOnlySpan<byte> payload, string label) =>
+        AcceptOutsideBatch([payload.ToArray()], label)[0];
+
+    private Dictionary<string, int>? _batch;
+    private int _batchIndex;
+
+    /// <summary>
+    /// Offers several frames handed in from outside, as <see cref="AcceptOutside"/> for each. A rebuild is
+    /// tried at most once for each object, after all the frames, and only when it holds K pieces, so a post
+    /// of many frames does not decode again and again; the frame that brought an object to a rebuild
+    /// carries its result.
+    /// </summary>
+    public IReadOnlyList<AcceptResult> AcceptOutsideBatch(IReadOnlyList<byte[]> frames, string label)
     {
-        var result = AcceptFrame(payload, null, PieceKeep.CleanLabel(label) ?? "outside");
+        ArgumentNullException.ThrowIfNull(frames);
+        string cleaned = PieceKeep.CleanLabel(label) ?? "outside";
+        var results = new List<AcceptResult>(frames.Count);
+        _batch = [];
+        try
+        {
+            for (int i = 0; i < frames.Count; i++)
+            {
+                _batchIndex = i;
+                results.Add(AcceptFrame(frames[i], null, cleaned));
+            }
+            foreach (var (key, index) in _batch)
+            {
+                if (_instances.TryGetValue(key, out var instance) && instance.Symbols.Count >= instance.Oti.SourceBlockSymbols(0) && TryComplete(instance) is { } done)
+                {
+                    results[index] = done with { Kept = true };
+                }
+            }
+        }
+        finally
+        {
+            _batch = null;
+        }
         var delivered = TakeDelivered();
-        return delivered.Count > 0 ? result with { Delivered = delivered } : result;
+        if (delivered.Count > 0 && results.Count > 0)
+        {
+            results[^1] = results[^1] with { Delivered = delivered };
+        }
+        return results;
     }
 
     private AcceptResult AcceptFrame(ReadOnlySpan<byte> payload, string? heardFrom, string? outside)
@@ -843,7 +889,8 @@ public sealed partial class ReceiverStore
             return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "object already rebuilt and found unusable");
         }
         bool isNew = !_instances.TryGetValue(key, out var instance);
-        if (isNew && outside is not null && _instances.Count >= _options.MaxPartials)
+        if (isNew && outside is not null
+            && (_instances.Count >= _options.MaxPartials || _instances.Values.Count(i => !i.HasAir) >= _options.MaxOutsidePartials))
         {
             // A poster must not push out what is being heard on air.
             return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "too many partial objects held to start another from outside");
@@ -865,17 +912,22 @@ public sealed partial class ReceiverStore
                 if (instance.Symbols[frame.EncodingSymbolId].AsSpan().SequenceEqual(heard))
                 {
                     _keep.SetSource(key, frame.EncodingSymbolId, source, now);
+                    instance.TouchAir(now);
                     return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
                 }
                 Log($"object {ObjectId.Format(frame.ObjectId)}: piece {frame.EncodingSymbolId} heard on air differs from one from outside; the one on air stands");
                 instance.Replace(frame.EncodingSymbolId, heard);
                 DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), heard, now, _options.FlushToDisk);
                 _keep.Add(key, frame.ObjectId, frame.DictionaryId, frame.Oti, frame.EncodingSymbolId, payload.ToArray(), now, source, _options.KeepMaxBytes);
-                instance.LastPiece = now;
+                instance.TouchAir(now);
                 instance.OutsideTried = -1;
                 return (TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId)) with { Kept = true };
             }
             return new AcceptResult(FrameOutcome.Duplicate, frame.ObjectId);
+        }
+        if (outside is not null && instance.Symbols.Count >= frame.Oti.SourceBlockSymbols(0) + _options.OutsideSparePieces)
+        {
+            return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "this object has enough pieces already");
         }
         var symbol = frame.Symbol.ToArray();
         if (!instance.TryAdd(frame.EncodingSymbolId, symbol, out string? problem))
@@ -892,7 +944,14 @@ public sealed partial class ReceiverStore
         CountFrame(frame.ObjectId, heardFrom);
         DurableFile.WriteAtomically(SymbolPath(instance, frame.EncodingSymbolId), symbol, now, _options.FlushToDisk);
         _keep.Add(key, frame.ObjectId, frame.DictionaryId, frame.Oti, frame.EncodingSymbolId, payload.ToArray(), now, source, _options.KeepMaxBytes);
-        instance.LastPiece = now;
+        if (outside is null)
+        {
+            instance.TouchAir(now);
+        }
+        else
+        {
+            instance.LastOutside = now;
+        }
         if (outside is null && _stopped.ContainsKey(frame.ObjectId))
         {
             Log($"partial object {Describe(frame.ObjectId)} has a new piece, so the head end is sending it again; kept");
@@ -903,6 +962,11 @@ public sealed partial class ReceiverStore
             EnforcePartialLimit(instance);
         }
 
+        if (outside is not null && _batch is not null)
+        {
+            _batch[key] = _batchIndex; // one rebuild for the object, after the whole post
+            return new AcceptResult(FrameOutcome.Stored, frame.ObjectId, Kept: true);
+        }
         return (TryComplete(instance) ?? new AcceptResult(FrameOutcome.Stored, frame.ObjectId)) with { Kept = true };
     }
 
@@ -1284,7 +1348,7 @@ public sealed partial class ReceiverStore
         DropNoLongerSent(now);
         foreach (var instance in _instances.Values.ToList())
         {
-            if (now - instance.LastPiece > _options.PartialRetention)
+            if (now - instance.ExpiryTime > _options.PartialRetention)
             {
                 Log($"partial object {ObjectId.Format(instance.ObjectId)} expired with {instance.Symbols.Count} of {instance.Oti.SourceBlockSymbols(0)} pieces");
                 Remove(instance);
@@ -1330,7 +1394,7 @@ public sealed partial class ReceiverStore
                 }
                 continue;
             }
-            if (!canMark || _stopped.ContainsKey(id) || held.Max(i => i.LastPiece) >= heardAt || !IsKnownBulletin(id, held)
+            if (!canMark || _stopped.ContainsKey(id) || held.All(i => !i.HasAir) || held.Max(i => i.LastPiece) >= heardAt || !IsKnownBulletin(id, held)
                 || others.Any(o => o.Directory.Find(id) is not null))
             {
                 continue;
@@ -1520,15 +1584,21 @@ public sealed partial class ReceiverStore
     {
         while (_instances.Count > _options.MaxPartials)
         {
-            var oldest = _instances.Values.Where(i => i != keep).MinBy(i => i.LastPiece);
+            var oldest = _instances.Values.Where(i => i != keep).OrderBy(i => i.HasAir).ThenBy(i => i.ExpiryTime).FirstOrDefault(); // outside-only objects go first
             if (oldest is null)
             {
                 return;
             }
-            Log($"too many partial objects; dropped {ObjectId.Format(oldest.ObjectId)}, last piece {oldest.LastPiece:u}");
+            Log($"too many partial objects; dropped {ObjectId.Format(oldest.ObjectId)}, last piece {oldest.ExpiryTime:u}");
             Remove(oldest);
         }
     }
+
+    /// <summary>
+    /// How far ahead of this receiver's clock a propagation reading may be dated and still be used. A reading
+    /// dated later than this, from any source, is kept as an object but never shown or relied on.
+    /// </summary>
+    public static readonly TimeSpan MostFutureReading = TimeSpan.FromMinutes(5);
 
     private AcceptResult? TryComplete(Instance instance)
     {
@@ -1614,8 +1684,14 @@ public sealed partial class ReceiverStore
         {
             // Observe only, never for the BBS. Marked done either way, so its later frames are ignored.
             MarkDone(instance);
+            bool fromOutside = _keep.HasOutside(instance.Key);
+            var limit = _options.Time.GetUtcNow() + MostFutureReading;
             if (PskRecord.TryDecode(data, out var spots))
             {
+                if (fromOutside || spots.ObservedUtc > limit)
+                {
+                    return new AcceptResult(FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type); // not used: see MostFutureReading
+                }
                 if (PskReporter?.ObservedUtc is not { } heard || spots.ObservedUtc >= heard)
                 {
                     DurableFile.WriteAtomically(Path.Combine(_root, PskReporterFile), data, flush: _options.FlushToDisk);
@@ -1623,7 +1699,7 @@ public sealed partial class ReceiverStore
                 }
                 return new AcceptResult(FrameOutcome.CompletedPskReporter, instance.ObjectId, ContentType: type, PskReporter: spots);
             }
-            if (!IonoRecord.TryDecode(data, out var reading))
+            if (!IonoRecord.TryDecode(data, out var reading) || fromOutside || reading.SoundingTimeUtc > limit)
             {
                 return new AcceptResult(FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type);
             }
@@ -1730,7 +1806,7 @@ public sealed partial class ReceiverStore
         }
 
         string longHash = ObjectId.LongHash(instance.DictionaryId, data);
-        switch (Admit(instance.ObjectId, longHash))
+        switch (Admit(instance.ObjectId, longHash, _keep.HasOutside(instance.Key)))
         {
             case Admission.WrongHash:
                 return Unusable(instance, $"({bulletin.Bid}) does not match the hash its signed directory lists for it, so it is not delivered");
@@ -1922,7 +1998,7 @@ public sealed partial class ReceiverStore
     /// be used and lists it decides: a trusted signed one only if the long hash matches. Failing
     /// that, it is held if a rejected directory lists it, and delivered, as always, if nothing does.
     /// </summary>
-    private Admission Admit(ulong objectId, string hash)
+    private Admission Admit(ulong objectId, string hash, bool fromOutside = false)
     {
         bool listed = false;
         bool signedListing = false;
@@ -1945,6 +2021,11 @@ public sealed partial class ReceiverStore
         if (signedListing)
         {
             return Admission.WrongHash;
+        }
+        if (fromOutside)
+        {
+            // Pieces from outside went into this rebuild: only a trusted signed directory's matching hash vouches for it.
+            return Admission.Hold;
         }
         if (listed)
         {
@@ -2184,7 +2265,21 @@ public sealed partial class ReceiverStore
             System.IO.Directory.Delete(dir, recursive: true);
             return;
         }
-        instance.LastPiece = last;
+        foreach (var esi in instance.Symbols.Keys)
+        {
+            if (_keep.SourceOf(name, esi) is not { Outside: true })
+            {
+                instance.HasAir = true;
+            }
+        }
+        if (instance.HasAir)
+        {
+            instance.LastPiece = last;
+        }
+        else
+        {
+            instance.LastOutside = last;
+        }
         _instances[name] = instance;
     }
 
@@ -2337,7 +2432,24 @@ public sealed partial class ReceiverStore
         /// <summary>ESIs held, in the order they arrived.</summary>
         public List<uint> Arrival { get; } = [];
 
+        /// <summary>When a piece was last heard on air (never set by a piece from outside).</summary>
         public DateTimeOffset LastPiece { get; set; }
+
+        /// <summary>Whether any piece of this object was heard on air.</summary>
+        public bool HasAir { get; set; }
+
+        /// <summary>When a piece from outside last arrived.</summary>
+        public DateTimeOffset LastOutside { get; set; }
+
+        /// <summary>What expiry and eviction go by: the last piece on air, or for an object with none, the last from outside.</summary>
+        public DateTimeOffset ExpiryTime => HasAir ? LastPiece : LastOutside;
+
+        /// <summary>A piece was heard on air.</summary>
+        public void TouchAir(DateTimeOffset now)
+        {
+            HasAir = true;
+            LastPiece = now;
+        }
 
         /// <summary>How many pieces were held when the last attempt without the pieces from outside was made (-1: none yet).</summary>
         public int OutsideTried { get; set; } = -1;
