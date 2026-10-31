@@ -901,10 +901,9 @@ public sealed partial class ReceiverStore
             return new AcceptResult(FrameOutcome.Rejected, frame.ObjectId, Detail: "too many partial objects held to start another from outside");
         }
         instance ??= new Instance(key, frame.ObjectId, frame.DictionaryId, frame.Oti, Path.Combine(_objects, key));
-        if (instance.Withheld is not null && !(outside is null && instance.WithheldForOutside))
+        if (instance.Withheld is not null)
         {
             // Rebuilt already, and held back: more pieces would only rebuild it again.
-            // (Not so when it is held for pieces from outside and this one was heard on air: enough of those rebuild it alone.)
             return new AcceptResult(FrameOutcome.AlreadyComplete, frame.ObjectId);
         }
         var source = outside is null ? new PieceSource(false, heardFrom) : new PieceSource(true, outside);
@@ -1608,10 +1607,6 @@ public sealed partial class ReceiverStore
 
     private AcceptResult? TryComplete(Instance instance)
     {
-        if (instance.WithheldForOutside && instance.Withheld is not null)
-        {
-            return TryHeardOnAirAlone(instance);
-        }
         var data = instance.TryDecode();
         if (data is null)
         {
@@ -1684,7 +1679,7 @@ public sealed partial class ReceiverStore
     }
 
     /// <summary>Unpacks an object that matches its ID, by its content type.</summary>
-    private AcceptResult? Finish(Instance instance, byte[] data, bool heardOnAirAlone = false)
+    private AcceptResult? Finish(Instance instance, byte[] data)
     {
         if (!ContentType.TryRead(data, out byte type, out _, out _))
         {
@@ -1694,11 +1689,10 @@ public sealed partial class ReceiverStore
         {
             // Observe only, never for the BBS. Marked done either way, so its later frames are ignored.
             MarkDone(instance);
-            bool fromOutside = !heardOnAirAlone && _keep.HasOutside(instance.Key);
             var limit = _options.Time.GetUtcNow() + MostFutureReading;
             if (PskRecord.TryDecode(data, out var spots))
             {
-                if (fromOutside || spots.ObservedUtc > limit)
+                if (spots.ObservedUtc > limit)
                 {
                     return new AcceptResult(FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type); // not used: see MostFutureReading
                 }
@@ -1709,7 +1703,7 @@ public sealed partial class ReceiverStore
                 }
                 return new AcceptResult(FrameOutcome.CompletedPskReporter, instance.ObjectId, ContentType: type, PskReporter: spots);
             }
-            if (!IonoRecord.TryDecode(data, out var reading) || fromOutside || reading.SoundingTimeUtc > limit)
+            if (!IonoRecord.TryDecode(data, out var reading) || reading.SoundingTimeUtc > limit)
             {
                 return new AcceptResult(FrameOutcome.CompletedUnknown, instance.ObjectId, ContentType: type);
             }
@@ -1816,31 +1810,23 @@ public sealed partial class ReceiverStore
         }
 
         string longHash = ObjectId.LongHash(instance.DictionaryId, data);
-        var admission = Admit(instance.ObjectId, longHash, !heardOnAirAlone && _keep.HasOutside(instance.Key));
-        switch (admission)
+        switch (Admit(instance.ObjectId, longHash))
         {
             case Admission.WrongHash:
                 return Unusable(instance, $"({bulletin.Bid}) does not match the hash its signed directory lists for it, so it is not delivered");
             case Admission.Hold:
-            case Admission.HoldOutside:
                 if (_held.Add(instance.ObjectId))
                 {
                     System.IO.Directory.CreateDirectory(_heldDir);
                     DurableFile.WriteAtomically(Path.Combine(_heldDir, ObjectId.Format(instance.ObjectId)),
                         Bulletin.TextEncoding.GetBytes(_options.Time.GetUtcNow().ToString("o", CultureInfo.InvariantCulture)), flush: _options.FlushToDisk);
                 }
-                bool forOutside = admission == Admission.HoldOutside;
                 if (instance.Withheld is null)
                 {
                     instance.Withheld = data;
-                    instance.WithheldForOutside = forOutside;
-                    Log(forOutside
-                        ? $"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}) is complete, but pieces from outside went into it and no trusted signed directory lists it: held, not delivered, until one does or K pieces heard on air rebuild it"
-                        : $"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}) is complete, but only a directory that failed its signature check lists it: held, not delivered, until a good directory lists it");
+                    Log($"bulletin {bulletin.Bid} ({ObjectId.Format(instance.ObjectId)}) is complete, but only a directory that failed its signature check lists it: held, not delivered, until a good directory lists it");
                 }
-                return new AcceptResult(FrameOutcome.Withheld, instance.ObjectId, Detail: forOutside
-                    ? "held: pieces from outside went into it and no trusted signed directory lists it"
-                    : "held: only a directory that failed its signature check lists it");
+                return new AcceptResult(FrameOutcome.Withheld, instance.ObjectId, Detail: "held: only a directory that failed its signature check lists it");
             default:
                 break;
         }
@@ -2009,7 +1995,6 @@ public sealed partial class ReceiverStore
         Deliver,
         WrongHash,
         Hold,
-        HoldOutside,
     }
 
     /// <summary>
@@ -2017,7 +2002,7 @@ public sealed partial class ReceiverStore
     /// be used and lists it decides: a trusted signed one only if the long hash matches. Failing
     /// that, it is held if a rejected directory lists it, and delivered, as always, if nothing does.
     /// </summary>
-    private Admission Admit(ulong objectId, string hash, bool fromOutside = false)
+    private Admission Admit(ulong objectId, string hash)
     {
         bool listed = false;
         bool signedListing = false;
@@ -2040,11 +2025,6 @@ public sealed partial class ReceiverStore
         if (signedListing)
         {
             return Admission.WrongHash;
-        }
-        if (fromOutside)
-        {
-            // Pieces from outside went into this rebuild: only a trusted signed directory's matching hash vouches for it.
-            return Admission.HoldOutside;
         }
         if (listed)
         {
@@ -2543,9 +2523,6 @@ public sealed partial class ReceiverStore
 
         /// <summary>The rebuilt object, when it is held back (<see cref="FrameOutcome.Withheld"/>); null otherwise.</summary>
         public byte[]? Withheld { get; set; }
-
-        /// <summary>Whether it is held because pieces from outside went into it (not because a directory failed its check).</summary>
-        public bool WithheldForOutside { get; set; }
 
         /// <summary>Starts the decoder again from the pieces held, after a rebuild that was no use.</summary>
         public void ResetDecoder()

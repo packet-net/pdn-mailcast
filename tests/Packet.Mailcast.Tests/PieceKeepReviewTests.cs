@@ -39,26 +39,27 @@ public class PieceKeepReviewTests
     }
 
     [Fact]
-    public void ABulletinBuiltFromOutsidePieces_IsHeldUnlessASignedDirectoryListsItWithItsHash()
+    public void ABulletinBuiltFromOutsidePieces_FollowsTheSameRulesAsOneHeardOnAir()
     {
         using var dir = new TempDirectory();
         var store = new ReceiverStore(dir.Path, Compression.Default, Options());
         var listed = Bulletin(1);
         var unlisted = Bulletin(2);
-        FeedAir(store, SignedDirectory(listed));
+        var wrongHash = Bulletin(4);
+        // A signed directory lists the first with its hash, and the third with another object's hash.
+        var entries = new[]
+        {
+            new DirectoryEntry(listed.ObjectId, listed.DictionaryId, 3000, "B1", "t1", Hash: ObjectId.LongHash(listed.DictionaryId, listed.Bytes)),
+            new DirectoryEntry(wrongHash.ObjectId, wrongHash.DictionaryId, 3000, "B4", "t4", Hash: ObjectId.LongHash(listed.DictionaryId, listed.Bytes)),
+        };
+        var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), "ms110d-wn3", Signer);
+        FeedAir(store, TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240));
 
-        var frames = Enumerable.Range(0, unlisted.SourceSymbols + 1).Select(i => unlisted.Frame((uint)i).ToBytes()).ToList();
-        var results = store.AcceptOutsideBatch(frames, "poster");
-        Assert.Contains(results, r => r.Outcome == FrameOutcome.Withheld);
-        Assert.Empty(store.Pending());
-
-        // Listed with the right hash: delivered, though it came from outside.
-        var ok = store.AcceptOutsideBatch(Enumerable.Range(0, listed.SourceSymbols + 1).Select(i => listed.Frame((uint)i).ToBytes()).ToList(), "poster");
-        Assert.Contains(ok, r => r.Outcome == FrameOutcome.CompletedBulletin);
-        Assert.Single(store.Pending());
-
-        // A later signed directory that lists the held one releases it.
-        FeedAir(store, SignedDirectory(listed, unlisted));
+        List<byte[]> All(TransferObject o) => [.. Enumerable.Range(0, o.SourceSymbols + 1).Select(i => o.Frame((uint)i).ToBytes())];
+        Assert.Contains(store.AcceptOutsideBatch(All(unlisted), "poster"), r => r.Outcome == FrameOutcome.CompletedBulletin); // nothing lists it: delivered, as on air
+        Assert.Contains(store.AcceptOutsideBatch(All(listed), "poster"), r => r.Outcome == FrameOutcome.CompletedBulletin);
+        Assert.Equal(2, store.Pending().Count);
+        Assert.DoesNotContain(store.AcceptOutsideBatch(All(wrongHash), "poster"), r => r.Outcome == FrameOutcome.CompletedBulletin); // a signed hash that does not match refuses it
         Assert.Equal(2, store.Pending().Count);
     }
 
@@ -72,19 +73,18 @@ public class PieceKeepReviewTests
     }
 
     [Fact]
-    public void ReadingsFromOutside_OrDatedInTheFuture_AreNeverUsed()
+    public void ReadingsFromOutsideCount_ButNoneDatedInTheFuture_FromAnySource()
     {
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(Now);
         var store = new ReceiverStore(dir.Path, Compression.Default, Options(time));
         TransferObject Reading(DateTimeOffset at) => TransferObject.ForRecord((byte)ObjectKind.Propagation, IonoRecord.Encode(new IonoReading { Station = "DB049", SoundingTimeUtc = at, Source = IonoSource.Giro }).AsSpan(1));
 
-        store.AcceptOutside(Reading(Now.AddMinutes(-10)).Frame(0).ToBytes(), "poster");
+        store.AcceptOutside(Reading(Now.AddHours(3)).Frame(0).ToBytes(), "poster");
         Assert.Null(store.Ionosphere);
-        store.Accept(Reading(Now.AddHours(3)).Frame(0).ToBytes(), "TEST");
+        store.Accept(Reading(Now.AddHours(4)).Frame(0).ToBytes(), "TEST");
         Assert.Null(store.Ionosphere);
-        var fine = Reading(Now.AddMinutes(-20));
-        Assert.Equal(FrameOutcome.CompletedIonosphere, store.Accept(fine.Frame(0).ToBytes(), "TEST").Outcome);
+        Assert.Equal(FrameOutcome.CompletedIonosphere, store.AcceptOutside(Reading(Now.AddMinutes(-10)).Frame(0).ToBytes(), "poster").Outcome);
         Assert.NotNull(store.Ionosphere);
     }
 
@@ -131,29 +131,6 @@ public class PieceKeepReviewTests
         time.Advance(TimeSpan.FromDays(5));
         store.Expire();
         Assert.Equal(0, store.PartialObjects);
-    }
-
-    [Fact]
-    public void AnObjectHeldBecauseOfOutsidePieces_IsAdmittedOnceKPiecesHeardOnAirRebuildIt()
-    {
-        using var dir = new TempDirectory();
-        var log = new List<string>();
-        var store = new ReceiverStore(dir.Path, Compression.Default, Options() with { Log = log.Add });
-        var b = Bulletin(11);
-        int k = b.SourceSymbols;
-        // One honest piece from outside, then enough on air to complete: held.
-        store.AcceptOutside(b.Frame(0).ToBytes(), "poster");
-        for (int i = 1; i <= k - 1; i++)
-        {
-            store.Accept(b.Frame((uint)i).ToBytes(), "TEST");
-        }
-        Assert.Empty(store.Pending());
-        Assert.Contains(log, l => l.Contains("pieces from outside went into it", StringComparison.Ordinal));
-        Assert.DoesNotContain(log, l => l.Contains("failed its signature check", StringComparison.Ordinal));
-        // More on air: K heard on air alone now, so it is admitted as an on-air object.
-        var outcomes = new[] { store.Accept(b.Frame((uint)k).ToBytes(), "TEST").Outcome, store.Accept(b.Frame((uint)k + 1).ToBytes(), "TEST").Outcome }; // K pieces can fall just short of a rebuild
-        Assert.Contains(FrameOutcome.CompletedBulletin, outcomes);
-        Assert.Single(store.Pending());
     }
 
     [Fact]

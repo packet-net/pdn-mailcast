@@ -582,7 +582,7 @@ A directory whose signature does not check, or is signed by a key you have not a
 
 A bulletin shows this while a directory naming it is remembered, which is 48 hours. A held bulletin stays held across a restart, until a good directory lists it or 14 days pass.
 
-What signing does not stop: a bulletin no directory lists is still delivered when it was heard on air, as before (one with any piece handed in through the [API](#the-api-for-objects-and-pieces) is held instead); and a signed directory can be sent again the same day, which is no worse than before.
+What signing does not stop: a bulletin no directory lists is still delivered when it was heard on air, as before (the same goes for one built with pieces handed in through the [API](#the-api-for-objects-and-pieces)); and a signed directory can be sent again the same day, which is no worse than before.
 
 ### Keys
 
@@ -613,11 +613,11 @@ The receiver keeps every piece it hears, of every kind of object, and this API l
 
 An **object** is one thing the head end sends: a bulletin, a directory, an ionosonde reading, or anything of a content type that comes later. It is coded with RaptorQ into **pieces**. A **piece** is one frame, self-contained: it says which object it belongs to, how the object was coded, its own number (the ESI) and carries its own CRC, so a program can check it alone. Any K pieces (K is in the index) rebuild the object, usually exactly K and rarely one or two more. The frame layout is in [design.md](design.md#on-air-format); the API passes frames as the exact octets of an AX.25 UI frame's information field, in lower-case hex.
 
-An object is named by its **ID**: 16 hex digits, the first eight octets of the SHA-256 of the two-octet dictionary ID followed by the object's octets. So a rebuilt object checks itself against its ID, and the receiver does that check before it keeps or uses anything. The receiver takes a piece from any source, but a wrong piece that still passes its CRC cannot do lasting harm: if a rebuild fails the check, the receiver tries again without the pieces from outside, then without each source label's pieces, and drops the ones that turn out wrong.
+An object is named by its **ID**: 16 hex digits, the first eight octets of the SHA-256 of the two-octet dictionary ID followed by the object's octets. So a rebuilt object checks itself against its ID, and the receiver does that check before it keeps or uses anything. The receiver takes a piece from any source, and a wrong piece that still passes its CRC, from a mistake or otherwise, spoils a rebuild until it is found: if a rebuild fails the check, the receiver tries again without the pieces from outside, then without each source label's pieces, and drops the ones that turn out wrong.
 
 Pieces carry where they came from: `air` (heard in a slot, with the station whose slot it was if known) or `outside` (handed in through `POST /api/pieces`, with the label the poster gave). Pieces from outside never count towards the station heard most, a slot's frames or a slot's bulletins; the status page and the daily report count them apart.
 
-What reaches the BBS is unchanged for pieces heard on air. If any piece behind a rebuilt bulletin or envelope came from outside, it is delivered or kept only when a trusted signed directory lists it with a matching long hash; otherwise it is held (not delivered) until one does, so posting a bulletin of your own to a receiver gets it nowhere. Ionosonde and PSK Reporter readings completed with pieces from outside are never used, and a reading dated more than 5 minutes ahead of the receiver's clock is not used from any source. Objects of other content types are kept, within a size limit (64 MB by default, the oldest rebuilt objects dropped first, and nothing kept longer than 14 days), and shown nowhere as mail.
+Pieces from outside are treated like pieces heard on air. Anyone with the API key can hand in pieces of any object, and an object rebuilt with them goes through exactly the same checks and rules as one heard on air: it must match its ID; a signed directory's hash that does not match refuses it; a bulletin is delivered to the BBS (and an ionosonde or PSK Reporter reading is used) as if it had been heard. The receiver trusts what the key lets in; the key is how you decide who that is. The one exception is a reading dated more than 5 minutes ahead of the receiver's clock, which is not used from any source. Objects of other content types are kept, within a size limit (64 MB by default, the oldest rebuilt objects dropped first, and nothing kept longer than 14 days), and shown nowhere as mail.
 
 ### Reading
 
@@ -738,7 +738,7 @@ curl -X POST 'http://RECEIVER:8080/api/pieces' \
 `results` has one entry for each frame sent, in order. `accepted` counts the frames that added a piece (`kept` is true in their results). `outcome` is one of:
 
 - `stored`: kept, the object is not yet rebuilt.
-- `completedBulletin`, `completedDirectory`, `completedEnvelope`, `completedUnhandled`, `completedUnknown`, `completedIonosphere`, `completedPskReporter`, `awaitingEnvelope`, `withheld`, `completedOtherCopy`, `rejectedDirectory`: kept, and it finished the object. A bulletin goes to the BBS only under the rule above (otherwise the outcome is `withheld`).
+- `completedBulletin`, `completedDirectory`, `completedEnvelope`, `completedUnhandled`, `completedUnknown`, `completedIonosphere`, `completedPskReporter`, `awaitingEnvelope`, `withheld`, `completedOtherCopy`, `rejectedDirectory`: kept, and it finished the object. A bulletin goes to the BBS as if it had been heard on air.
 - `duplicate`: that piece was already held.
 - `alreadyComplete`: the object is already rebuilt; the frame was not needed.
 - `notAFrame`: not hex, or not a valid frame (version, length or CRC). `detail` says which when it is not hex.

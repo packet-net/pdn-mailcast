@@ -173,7 +173,7 @@ public class PieceKeepTests
         store.AcceptOutside(new MailcastFrame(bad.ObjectId, bad.DictionaryId, bad.Oti, bad.EncodingSymbolId, wrong).ToBytes(), "liar");
         store.AcceptOutside(obj.Frame((uint)(k - 1)).ToBytes(), "honest");
         var result = store.AcceptOutside(obj.Frame((uint)k).ToBytes(), "honest");
-        Assert.Equal(FrameOutcome.Withheld, result.Outcome);
+        Assert.Equal(FrameOutcome.CompletedBulletin, result.Outcome);
         Assert.Contains(log, l => l.Contains("(liar)", StringComparison.Ordinal));
         var held = store.KeptPieces(obj.ObjectId, 0, 500)!.Pieces;
         Assert.DoesNotContain(held, p => p.Source.Label == "liar");
@@ -181,7 +181,7 @@ public class PieceKeepTests
     }
 
     [Fact]
-    public void OnAirOnly_IsUnchanged_AndAnOutsideBulletinNoDirectoryListsIsHeld()
+    public void ABulletinFinishedWithOutsidePieces_IsDeliveredLikeOneHeardOnAir()
     {
         using var dir = new TempDirectory();
         var store = new ReceiverStore(dir.Path, Compression.Default, Options());
@@ -192,7 +192,7 @@ public class PieceKeepTests
             var r = i % 2 == 0 ? store.Accept(obj.Frame((uint)i).ToBytes(), "GB7RDG") : store.AcceptOutside(obj.Frame((uint)i).ToBytes(), "tool");
             Assert.NotEqual(FrameOutcome.Rejected, r.Outcome);
         }
-        Assert.Empty(store.Pending()); // held: see PieceKeepReviewTests for the release
+        Assert.Single(store.Pending());
         using var dir2 = new TempDirectory();
         var onAir = new ReceiverStore(dir2.Path, Compression.Default, Options());
         var outcomes = Enumerable.Range(0, n).Select(i => onAir.Accept(obj.Frame((uint)i).ToBytes(), "GB7RDG").Outcome).ToList();

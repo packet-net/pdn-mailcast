@@ -80,7 +80,7 @@
         "tags": [ "Handing in" ],
         "operationId": "postPieces",
         "summary": "Hand frames in",
-        "description": "Each frame is checked (format, CRC) and pooled with the pieces heard on air, marked as from outside under the source label. Pieces from outside never count towards the station heard most or any slot's figures. Requests whose Origin header names another site are refused. A frame that is wrong is reported in results; the call still answers 200. Per object, at most K+16 pieces are taken from outside, and a rebuild is tried once per object after the whole post.",
+        "description": "Each frame is checked (format, CRC) and pooled with the pieces heard on air, marked as from outside under the source label. Pieces from outside are treated like pieces heard on air (anyone with the key can hand in pieces of any object), but never count towards the station heard most or any slot's figures. Requests whose Origin header names another site are refused. A frame that is wrong is reported in results; the call still answers 200. Per object, at most K+16 pieces are taken from outside, and a rebuild is tried once per object after the whole post.",
         "requestBody": {
           "required": true,
           "content": {
