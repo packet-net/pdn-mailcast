@@ -176,7 +176,8 @@ public class SourcesTests
         var config = new ReceiverConfig { StateDirectory = dir.Path, Audio = "wav:/nonexistent.wav", Sources = CallsignList.Parse(["G4ABC"]) };
         await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
 
-        Assert.Equal(["G4ABC"], host.Intake.Sources);
+        // GB7RDG is always followed (its key is built in), so it is accepted whatever "sources" says (issue #228).
+        Assert.Equal(["G4ABC", "GB7RDG"], host.Intake.Sources);
         host.Reconfigure(config with { Sources = null });
         Assert.Equal(ReceiverConfig.DefaultSources, host.Intake.Sources);
     }

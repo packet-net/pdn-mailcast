@@ -88,6 +88,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
+        RefreshSources();
     }
 
     /// <summary>
@@ -717,6 +718,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         RetireHeardListenFor();
         ExpireListenFor();
+        RefreshSources();
         if (Slots.Schedule is not { } tracked)
         {
             return;
@@ -732,6 +734,57 @@ public sealed class ReceiverHost : IAsyncDisposable
             Slots.Schedule = followed;
             WakeListenNow();
         }
+    }
+
+    /// <summary>
+    /// Issue #228: the stations frames are accepted from besides the configured ones: every station
+    /// this receiver follows, has a pinned key for, or was asked to listen for (not one it was told to
+    /// skip), sorted, without those already in the configured list. Updated by <see cref="RefreshSources"/>.
+    /// </summary>
+    public IReadOnlyList<string> SourcesFromFollowed => _sourcesFromFollowed;
+
+    private volatile IReadOnlyList<string> _sourcesFromFollowed = [];
+
+    /// <summary>Recomputes what <see cref="Intake"/> accepts frames from; call when followed stations, pins, adverts, listenFor or skips change.</summary>
+    internal void RefreshSources()
+    {
+        var config = Config;
+        var skip = new HashSet<string>((config.SkipStations ?? []).Select(BaseOf), StringComparer.Ordinal);
+        var stations = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pin in Intake.Pins())
+        {
+            stations.Add(BaseOf(pin.Station));
+        }
+        foreach (var e in config.ListenFor ?? [])
+        {
+            if (e.Problem() is null && ListenForState.Get(e)?.Retired is null)
+            {
+                stations.Add(BaseOf(e.Callsign));
+            }
+        }
+        foreach (var l in Listening.Where(l => l.Followed))
+        {
+            stations.Add(BaseOf(l.Station));
+        }
+        var configured = config.AcceptedSources;
+        var extra = stations.Where(c => c.Length > 0 && !skip.Contains(c) && !configured.Contains(c)).Order(StringComparer.Ordinal).ToList();
+        var accepted = configured.Plus(extra);
+        if (!extra.SequenceEqual(_sourcesFromFollowed))
+        {
+            _sourcesFromFollowed = extra;
+            if (extra.Count > 0)
+            {
+                _log($"config: frames are also accepted from the stations followed: {string.Join(", ", extra)}");
+            }
+        }
+        Intake.Sources = accepted;
+    }
+
+    private static string BaseOf(string call)
+    {
+        string upper = (call ?? "").Trim().ToUpperInvariant();
+        int dash = upper.IndexOf('-', StringComparison.Ordinal);
+        return dash < 0 ? upper : upper[..dash];
     }
 
     /// <summary>What is kept about each "Listen for a station" entry: when it was added, and whether it is retired (issue #224).</summary>
@@ -1161,8 +1214,8 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The start-up line saying which callsigns frames are accepted from, and whether that is the default for a file without "sources".</summary>
     internal static string SourcesLine(ReceiverConfig config) => config.Sources is null
-        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default; add \"sources\" to choose"
-        : $"config: frames are accepted from {config.Sources}, as \"sources\" says";
+        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default, and from the stations followed; add \"sources\" to choose"
+        : $"config: frames are accepted from {config.Sources}, as \"sources\" says, and from the stations followed";
 
     /// <summary>
     /// Issue #133: every <see cref="EarlyEndPoll"/>, writes the summary line of the slot tracked
@@ -1224,7 +1277,6 @@ public sealed class ReceiverHost : IAsyncDisposable
             bool audioChanged = AudioSettingsDiffer(_config, config);
             _config = config;
             ListenForState.Sync(config.ListenFor, _time.GetUtcNow());
-            Intake.Sources = config.AcceptedSources;
             // A running pipeline that carries on keeps its dial (pdn-soundmodem's, if it said one).
             ChannelWatch.AudioCentreHz = !audioChanged && _pipeline is { } running ? running.AudioCentreHz : config.AudioCentreHz;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
@@ -1233,7 +1285,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 restart = _audioRestart;
             }
         }
-        _log($"config: now listening on {config.Audio}, delivering to {DescribeBbs(config.Bbs)}, accepting frames from {config.AcceptedSources}");
+        RefreshSources();
+        _log($"config: now listening on {config.Audio}, delivering to {DescribeBbs(config.Bbs)}, accepting frames from {Intake.Sources}");
         restart?.Cancel();
         Delivery.Nudge();
     }

@@ -1762,7 +1762,8 @@ async function loadSettings() {
   $("cards").innerHTML = settings.soundCards.map(c => `<option value="${esc(c)}">`).join("");
   $("sources").value = settings.sources.join(", ");
   $("sourcesNote").innerHTML = 'The callsigns the mailcast is sent from, separated by commas: <code>"sources"</code> in receiver.json. Any SSID is accepted.'
-    + (settings.sourcesSet ? "" : " Your config file leaves it out, so these are the default.");
+    + (settings.sourcesSet ? "" : " Your config file leaves it out, so these are the default.")
+    + ((settings.sourcesFollowed || []).length ? " Also accepted, because this receiver follows them: " + esc(settings.sourcesFollowed.join(", ")) + "." : "");
   $("type").value = settings.bbs.type;
   $("host").value = settings.bbs.host;
   $("port").value = settings.bbs.port;

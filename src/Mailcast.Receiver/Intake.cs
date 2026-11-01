@@ -393,7 +393,7 @@ public sealed class Intake : IAsyncDisposable
                 return;
             }
         }
-        _log($"intake: a frame to {OnAir.Destination} from {call} was ignored: not from an accepted source ({sources}); \"sources\" in the config file sets them");
+        _log($"intake: a frame to {OnAir.Destination} from {call} was ignored: not from an accepted source ({sources}); follow the station or add it to \"sources\" in the config file");
     }
 
     private void Dropped()

@@ -52,6 +52,31 @@ public sealed class CallsignList : IReadOnlyList<string>, IEquatable<CallsignLis
         return call;
     }
 
+    /// <summary>
+    /// These callsigns followed by <paramref name="more"/> (SSIDs dropped, repeats and anything that is
+    /// not a callsign skipped); this list itself when nothing is added.
+    /// </summary>
+    public CallsignList Plus(IEnumerable<string> more)
+    {
+        var calls = new List<string>(_calls);
+        foreach (string entry in more)
+        {
+            try
+            {
+                string call = BaseCall(entry);
+                if (!calls.Contains(call, StringComparer.Ordinal))
+                {
+                    calls.Add(call);
+                }
+            }
+            catch (ConfigException)
+            {
+                // Not a callsign: nothing to accept.
+            }
+        }
+        return calls.Count == _calls.Length ? this : new CallsignList([.. calls]);
+    }
+
     /// <summary>Whether <paramref name="baseCall"/> (upper case, no SSID) is one of these.</summary>
     public bool Contains(string baseCall) => Array.IndexOf(_calls, baseCall) >= 0;
 
