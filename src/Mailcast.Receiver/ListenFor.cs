@@ -35,11 +35,15 @@ public sealed record ListenForEntry
     public DaylightSettings? Daylight { get; init; }
 
     /// <summary>What is wrong with the entry, in a sentence, or null. The same checks as a head end's <c>advertise</c> entry.</summary>
-    public string? Problem()
+    public string? Problem(StationsFile? stations = null)
     {
         if (!StationAdvert.IsCallsign(Callsign))
         {
             return $"\"callsign\" '{Ascii.Clean(Callsign)}' is not a callsign (upper case, A to Z and 0 to 9, an optional -SSID)";
+        }
+        if (stations is not null && stations.Current(Callsign) is var now && now != Callsign)
+        {
+            return $"\"callsign\" {Callsign} is now {now}, already known";
         }
         if (FrequencyHz < 1)
         {
@@ -73,7 +77,7 @@ public sealed record ListenForEntry
         Callsign == other.Callsign && FrequencyHz == other.FrequencyHz && Sideband.Equals(other.Sideband, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The first problem among <paramref name="entries"/>, worded for the config file, or null.</summary>
-    public static string? FirstProblem(IReadOnlyList<ListenForEntry>? entries)
+    public static string? FirstProblem(IReadOnlyList<ListenForEntry>? entries, StationsFile? stations = null)
     {
         for (int i = 0; i < (entries?.Count ?? 0); i++)
         {
@@ -81,7 +85,7 @@ public sealed record ListenForEntry
             {
                 return $"\"listenFor\" entry {i + 1} is null";
             }
-            if (entries[i].Problem() is { } problem)
+            if (entries[i].Problem(stations) is { } problem)
             {
                 return $"\"listenFor\" entry {i + 1}: {problem}";
             }

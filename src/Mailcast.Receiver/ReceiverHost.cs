@@ -81,7 +81,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             // transmitting, so neither rigctld nor LinBPQ is touched.
             Retuner = new Retuner(config, () => Followed, () => AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.SoundModem, time, log,
                 new ReceiveWindow(() => AudioSource.Parse(Config.Audio) is { Kind: AudioSourceKind.SoundModem } s ? s.SoundModemPort : AudioSource.DefaultSoundModemPort),
-                () => Config.DialHz, FollowDial, Hooks, EarlyEndReason, slot => PointAtSlot(slot));
+                () => Config.DialHz, FollowDial, Hooks, EarlyEndReason, slot => PointAtSlot(slot)) { SignalAt = slot => StationAtSlot(slot)?.HeardAtHz };
         }
         else if (config.Rig is not null)
         {
@@ -1072,7 +1072,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         if (Followed is { OneStation: false } followed)
         {
             _log(followed.Stations.Count == 0
-                ? "slots: no station is followed yet; they come from the stations file, adverts heard on air and \"Listen for a station\""
+                ? $"slots: no station is listened at: {NoStationWhy()}"
                 : $"slots: following {followed.Describe()}");
         }
         _log(SourcesLine(Config));
@@ -1096,6 +1096,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         if (Config.WebSdrSlotsPerDayIgnored)
         {
             _log("config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every daylight slot that fits in its allowance");
+        }
+        foreach (var (name, now) in Config.IgnoredSkips)
+        {
+            _log($"config: skipStations \"{Ascii.Clean(name)}\" is an old name of {now} and is ignored; to skip {now} give \"{now}\"");
         }
         _log(ConfigFile.PartsLine(Config));
         int pending = Intake.Pending().Count;
@@ -1338,7 +1342,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 if (schedule.Stations.Count == 0)
                 {
                     // No station is known to listen for: nothing opens the web SDR until one is.
-                    Audio = new($"the web SDR {WebSdrHost(source)} is closed: no station is known to listen for yet", AudioPhase.Closed);
+                    Audio = new($"the web SDR {WebSdrHost(source)} is closed: no station is listened at ({NoStationWhy()})", AudioPhase.Closed);
                     if (AudioState != closedSaid)
                     {
                         closedSaid = AudioState;
@@ -1792,11 +1796,23 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             yield return $"stations: {path} lists {(Config.Stations.Stations.Count == 0 ? "no stations" : string.Join(", ", Config.Stations.Stations.Select(s => s.Callsign)))}";
         }
+        else if (Config.Stations.Searched.Count > 0)
+        {
+            yield return $"stations: no stations file found (looked in {string.Join(", ", Config.Stations.Searched)}); nothing is trusted or followed until a key, an advert or a listenFor entry is added";
+        }
         foreach (var station in Listening)
         {
-            yield return $"slots: {station.Station}'s slots are {SlotSchedule.From(station.Timetable).Describe()} (from {station.Source})";
+            string source = station.Source == "added by hand" ? "added by hand" : "from " + station.Source;
+            yield return station.Followed
+                ? $"slots: {station.Station}'s slots are {SlotSchedule.From(station.Timetable).Describe()} ({source})"
+                : $"slots: {station.Station} is not listened at: {station.NotFollowedBecause} (its slots are {SlotSchedule.From(station.Timetable).Describe()}, {source})";
         }
     }
+
+    /// <summary>Why no station is listened at, in a few words: none known yet, or each one's reason.</summary>
+    private string NoStationWhy() => Listening.Count == 0
+        ? "none is known yet; they come from the stations file, adverts heard on air and \"Listen for a station\""
+        : string.Join("; ", Listening.Select(l => $"{l.Station}: {l.NotFollowedBecause}"));
 
     private async Task ExpireListenForAsync(CancellationToken cancellation)
     {

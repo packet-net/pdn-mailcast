@@ -711,6 +711,7 @@ public sealed class FeedbackService
     private DailyReport Build(DayRecord record, FeedbackSettings settings)
     {
         // The slot lines are every slot listened to, whichever station's; the station lines say whose.
+        bool several = record.Slots.Where(s => s.Station is not null).Select(s => s.Station).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
         var slots = record.Slots.Select(s => new ReportSlot(
             TimeOnly.FromDateTime(s.Slot.UtcDateTime),
             s.Waveform,
@@ -719,7 +720,8 @@ public sealed class FeedbackService
             s.OffsetHz,
             s.Verdict is null ? [] : s.Verdict.Split('+'),
             // The measurement may have finished after the slot's window closed.
-            _sources.Channel(s.Slot) ?? s.Channel)).ToList();
+            _sources.Channel(s.Slot) ?? s.Channel,
+            several ? s.Station : null)).ToList();
         string? locator = _sources.Locator() is { } l && Maidenhead.TryParse(l, out _, out _)
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;

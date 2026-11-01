@@ -143,7 +143,7 @@ public class UpgradeTests
     }
 
     [Fact]
-    public async Task ASkipKeptUnderTheOldName_IsTheStationsSkip()
+    public async Task ASkipKeptUnderTheOldName_StaysTheNoOpItWas_AndIsSaidToBeIgnored()
     {
         var key = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
         using var dir = new TempDirectory();
@@ -152,9 +152,30 @@ public class UpgradeTests
             new FakeTimeProvider(Now), _ => { });
 
         var m0lte = Assert.Single(host.Listening);
-        Assert.False(m0lte.Followed);
-        Assert.Equal("you chose not to listen at its slots", m0lte.NotFollowedBecause);
-        Assert.Empty(host.Followed.Stations);
+        Assert.True(m0lte.Followed);
+        Assert.Equal([("GB7RDG", "M0LTE")], host.Config.IgnoredSkips);
+
+        // Skipping M0LTE by its name works, as for any station.
+        await using var skipped = new ReceiverHost(host.Config with { SkipStations = ["M0LTE"] }, new FakeTimeProvider(Now), _ => { });
+        Assert.Empty(skipped.Followed.Stations);
+        Assert.Contains(skipped.SlotLines(), l => l.StartsWith("slots: M0LTE is not listened at: you chose not to listen at its slots (its slots are every hour on the hour", StringComparison.Ordinal) && l.EndsWith(", from the stations file)", StringComparison.Ordinal));
+
+        // And a listenFor of the old name is refused, naming the new.
+        var entry = new ListenForEntry { Callsign = "GB7RDG", FrequencyHz = 7_047_000 };
+        Assert.Equal("\"callsign\" GB7RDG is now M0LTE, already known", entry.Problem(host.Config.Stations));
+        var refused = Assert.Throws<ConfigException>(() => (host.Config with { ListenFor = [entry] }).Validate());
+        Assert.Contains("GB7RDG is now M0LTE, already known", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WithNoStationsFileAnywhere_TheStartUpSaysWhereItLookedAndWhatThatMeans()
+    {
+        using var dir = new TempDirectory();
+        var none = StationsFile.Locate(Path.Combine(dir.Path, "receiver.json"), Path.Combine(dir.Path, "missing.json"));
+        await using var host = new ReceiverHost(new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = none }, new FakeTimeProvider(Now), _ => { });
+
+        string line = Assert.Single(host.SlotLines());
+        Assert.Equal($"stations: no stations file found (looked in {Path.Combine(dir.Path, "stations.json")}, {Path.Combine(dir.Path, "missing.json")}); nothing is trusted or followed until a key, an advert or a listenFor entry is added", line);
     }
 
     [Fact]

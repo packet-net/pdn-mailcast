@@ -22,6 +22,12 @@ public sealed class SoundModemRetuneTests
     private static readonly DateTimeOffset Noon = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
 
     /// <summary>A retuner on the receive window of a fake pdn-soundmodem, on a fake clock.</summary>
+    [Theory]
+    [InlineData(7_052_000, 3250)]
+    [InlineData(7_052_300, 2950)]
+    public void TheWindowWidth_IsTheSignalsTopEdgeAtTheDialInForce(double dialHz, int expected) =>
+        Assert.Equal(expected, Retuner.WindowWidthHz(dialHz, StationFixture.SignalHz));
+
     private sealed class Station : IAsyncDisposable
     {
         private readonly CancellationTokenSource _stop = new();

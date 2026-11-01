@@ -58,8 +58,11 @@ public sealed class StationsFile
     /// <summary>The daily report's address as <c>BULLETIN@ADDRESS</c>, or null when the file gives none.</summary>
     public string? Report { get; }
 
-    /// <summary>Where it was read from, or null for one made in code.</summary>
+    /// <summary>Where it was read from, or null for one made in code or found nowhere.</summary>
     public string? Path { get; }
+
+    /// <summary>The places looked for a file when none was found; empty otherwise.</summary>
+    public IReadOnlyList<string> Searched { get; init; } = [];
 
     /// <summary>The first station in the file, or null when there are none.</summary>
     public KnownStation? First => _stations.Count > 0 ? _stations[0] : null;
@@ -118,14 +121,16 @@ public sealed class StationsFile
         {
             return Load(overridden);
         }
+        var looked = new List<string> { overridden };
         foreach (string shipped in shippedPath is null ? ShippedPaths : [shippedPath])
         {
             if (File.Exists(shipped))
             {
                 return Load(shipped);
             }
+            looked.Add(shipped);
         }
-        return Empty;
+        return new StationsFile([], null) { Searched = looked };
     }
 
     /// <summary>Where the package puts the file: on Linux /usr/share/pdn-mailcast-receiver, else beside the program.</summary>

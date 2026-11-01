@@ -314,9 +314,14 @@ public sealed record ReceiverConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? SkipStations { get; init; }
 
-    /// <summary>Whether the listener chose not to listen at <paramref name="station"/>'s slots; a name from before the stations file (a station's <c>formerly</c>) is that station's.</summary>
+    /// <summary>Whether the listener chose not to listen at <paramref name="station"/>'s slots. A name from before the stations file (a station's <c>formerly</c>) is not that station: it skipped nothing then and skips nothing now.</summary>
     public bool IsSkipped(string station) =>
-        (SkipStations ?? []).Any(s => string.Equals(Stations.Current(s), station, StringComparison.OrdinalIgnoreCase));
+        (SkipStations ?? []).Any(s => string.Equals(s, station, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The <see cref="SkipStations"/> that are a station's former name, which are ignored.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<(string Name, string Now)> IgnoredSkips =>
+        [.. (SkipStations ?? []).Select(s => (Name: s, Now: Stations.Current(s.ToUpperInvariant()))).Where(p => !string.Equals(p.Name, p.Now, StringComparison.OrdinalIgnoreCase))];
 
     /// <summary>
     /// Stations to listen for by hand (issue #224): each is treated like an advert heard on air
@@ -581,7 +586,7 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException("\"stateDirectory\" is empty");
         }
-        if (ListenForEntry.FirstProblem(ListenFor) is { } listenForProblem)
+        if (ListenForEntry.FirstProblem(ListenFor, Stations) is { } listenForProblem)
         {
             throw new ConfigException(listenForProblem);
         }

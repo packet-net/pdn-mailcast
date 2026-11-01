@@ -302,7 +302,7 @@ jobs:
           test -f "$zip" || { echo "::error::$zip was not built"; exit 1; }
           listing="$(python3 -m zipfile -l "$zip")"
           echo "$listing"
-          for f in pdn-mailcast-receiver.exe receiver.example.json install-service.ps1 README.txt README.md LICENSE; do
+          for f in pdn-mailcast-receiver.exe receiver.example.json stations.json install-service.ps1 README.txt README.md LICENSE; do
             grep -q "pdn-mailcast-receiver/$f " <<<"$listing" || { echo "::error::$f is not in the zip"; exit 1; }
           done
           # A Windows PE executable, not a Linux one published by mistake.

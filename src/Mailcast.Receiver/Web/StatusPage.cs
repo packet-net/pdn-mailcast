@@ -2263,7 +2263,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             return;
         }
         var current = _host.Config;
-        var skip = (current.SkipStations ?? []).Where(c => !string.Equals(current.Stations.Current(c), station, StringComparison.OrdinalIgnoreCase)).ToList();
+        var skip = (current.SkipStations ?? []).Where(c => !string.Equals(c, station, StringComparison.OrdinalIgnoreCase)).ToList();
         if (!form.Listen)
         {
             skip.Add(station!);
@@ -2363,7 +2363,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             {
                 entry = entry with { Daylight = new Packet.Mailcast.DaylightSettings { Locator = entry.Locator } };
             }
-            problem ??= entry.Problem();
+            problem ??= entry.Problem(_host.Config.Stations);
             if (problem is null && _host.Intake.HeardTimetable(entry.Callsign) is not null)
             {
                 problem = $"{entry.Callsign}'s own signed directory has been heard here already, so its own timetable is used";

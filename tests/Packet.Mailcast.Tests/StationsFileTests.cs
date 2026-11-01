@@ -172,5 +172,6 @@ public class StationsFileTests
 
         Assert.Empty(file.Stations);
         Assert.Null(file.Report);
+        Assert.Equal([Path.Combine(dir.Path, "stations.json"), Path.Combine(dir.Path, "missing.json")], file.Searched);
     }
 }
