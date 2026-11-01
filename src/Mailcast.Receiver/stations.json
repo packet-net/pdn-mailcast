@@ -1,0 +1,26 @@
+{
+  // The stations this receiver trusts and follows before it has heard anything, and the address
+  // the daily report goes to. A package update may change this file. To use your own list, put a
+  // stations.json beside receiver.json (an empty "stations" list is fine): it is used instead of this one.
+  //
+  // Each station: its callsign and the public key its directories are signed with; its slots
+  // (the minute past the hour, minutes between slots, and optionally a daylight rule), used until
+  // its own directory gives them; where its signal is centred (Hz), its sideband and locator;
+  // and "formerly", the names an older version of the receiver kept its notes under.
+  "report": "MCAST@GB7RDG.#42.GBR.EURO",
+  "stations": [
+    {
+      "callsign": "M0LTE",
+      "publicKey": "MCowBQYDK2VwAyEAe1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=",
+      "slots": {
+        "minute": 0,
+        "everyMinutes": 60,
+        "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 }
+      },
+      "frequencyHz": 7053800,
+      "sideband": "usb",
+      "locator": "IO91lk",
+      "formerly": ["GB7RDG"]
+    }
+  ]
+}

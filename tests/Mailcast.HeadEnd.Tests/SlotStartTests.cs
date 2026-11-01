@@ -23,7 +23,7 @@ public class SlotStartTests
     public void HalfPast_ReachesTheScheduleTheSchedulerAndTheDirectory()
     {
         var config = Parse(HalfPastInDaylight);
-        var expected = new SlotTimetable(new TimeOnly(0, 30), 60, DaylightRule.Gb7rdg);
+        var expected = new SlotTimetable(new TimeOnly(0, 30), 60, StationFixture.Daylight);
         Assert.Equal(expected, config.ToSlotTimetable());
         Assert.Equal(expected, config.ToSlotSchedule().Timetable);
         Assert.Equal(expected, config.ToScheduleOptions().Timetable);

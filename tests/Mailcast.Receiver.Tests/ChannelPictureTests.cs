@@ -24,6 +24,9 @@ public class ChannelPictureTests
         VirtualHeightKm = virtualHeightKm,
         Locator = locator,
         Modes = modes,
+        Station = StationFixture.Callsign,
+        StationLocator = StationFixture.Locator,
+        StationPlace = GroundPlace.FromLocator(StationFixture.Locator),
     };
 
     [Fact]
@@ -294,7 +297,7 @@ public class ChannelPictureTests
         var place = GroundPlace.FromLocator("IO80qr");
         var time = new FakeTimeProvider(Noon.AddMinutes(5));
         var log = new List<string>();
-        await using var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, null, () => place) { Rest = false };
+        await using var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, null, () => place) { Rest = false, Transmitter = _ => Fixture.OnAir };
         watch.Offer(ChannelTests.Captured(11, time.GetUtcNow()), Noon);
         watch.SlotOver();
         await watch.IdleAsync().WaitAsync(TimeSpan.FromSeconds(60));

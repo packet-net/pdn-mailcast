@@ -155,6 +155,7 @@ public sealed class Retuner : IAsyncDisposable
         _bpq = config.Bpq;
         _dedicated = rig.DedicatedRadio;
         _owedPort = _bpq?.HfPort ?? 0;
+        _configAudioCentreHz = config.AudioCentreHz;
         _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "PKTUSB", 3000);
         _dialAt = dialAt;
         _file = InterlockFile.PathIn(config.StateDirectory);
@@ -213,6 +214,7 @@ public sealed class Retuner : IAsyncDisposable
         _earlyEnd = earlyEnd;
         // pdn-soundmodem holds its own transmitting; LinBPQ is not this retuner's to hold off.
         _bpq = null;
+        _configAudioCentreHz = config.AudioCentreHz;
         _tuning = _configTuning = new RigTuning((long)Math.Round(config.DialHz), "USB", 0);
         _dialAt = dialAt;
         _windowDialHz = dialHz;
@@ -240,7 +242,7 @@ public sealed class Retuner : IAsyncDisposable
     /// <summary>
     /// The dial for the slot starting at <paramref name="slot"/>: the station whose slot it is may be
     /// on another frequency (issue #179), in which case the dial that keeps its signal where the
-    /// config's dial keeps GB7RDG's; otherwise the config's.
+    /// config's dial keeps the stations file's first; otherwise the config's.
     /// </summary>
     private long? DialFor(DateTimeOffset slot) => _dialAt?.Invoke(slot) is { } dial ? (long)Math.Round(dial) : null;
 
@@ -253,9 +255,14 @@ public sealed class Retuner : IAsyncDisposable
 
     /// <summary>
     /// The band a receive window asks pdn-soundmodem's rig to pass, in Hz of audio: up to the
-    /// signal's top edge at <paramref name="dialHz"/>, 3250 Hz at the usual dial.
+    /// signal's top edge: its audio centre plus half its width, 3250 Hz at the usual 1800.
     /// </summary>
-    internal static int WindowWidthHz(double dialHz) => (int)Math.Ceiling(OnAir.AudioCentreHz(dialHz) + OnAir.HalfWidthHz);
+    internal static int WindowWidthHz(double audioCentreHz) => (int)Math.Ceiling(audioCentreHz + OnAir.HalfWidthHz);
+
+    /// <summary>Where the signal is in the audio at the dial in force: the config's own centre, or, with the dial moved for a station, the usual one.</summary>
+    private double WindowAudioCentreHz => _slotDialHz is null ? _configAudioCentreHz : OnAir.CentreAudioHz;
+
+    private readonly double _configAudioCentreHz;
 
     /// <summary>LinBPQ's node, or null for a radio nothing else transmits on.</summary>
     public BpqNode? Node { get; }
@@ -845,7 +852,7 @@ public sealed class Retuner : IAsyncDisposable
         {
             _windowMaybe = true;
         }
-        var answer = await Window!.TakeAsync(dial, WindowWidthHz(dial), Length(closes), cancellation).ConfigureAwait(false);
+        var answer = await Window!.TakeAsync(dial, WindowWidthHz(WindowAudioCentreHz), Length(closes), cancellation).ConfigureAwait(false);
         if (answer.Outcome == WindowOutcome.Granted)
         {
             lock (_gate)
@@ -904,7 +911,7 @@ public sealed class Retuner : IAsyncDisposable
             if (now - _windowRenewed >= Check)
             {
                 _windowRenewed = now;
-                var renewal = await Window!.TakeAsync(dial, WindowWidthHz(dial), Length(closes), cancellation).ConfigureAwait(false);
+                var renewal = await Window!.TakeAsync(dial, WindowWidthHz(WindowAudioCentreHz), Length(closes), cancellation).ConfigureAwait(false);
                 if (renewal.Outcome != WindowOutcome.Granted)
                 {
                     Warn($"retune: WARNING - could not renew pdn-soundmodem's receive window ({renewal.Why})");

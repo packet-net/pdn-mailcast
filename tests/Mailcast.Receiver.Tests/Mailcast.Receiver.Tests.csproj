@@ -14,6 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\StationFixture.cs" Link="StationFixture.cs" />
+    <Using Include="PdnMailcast.TestSupport" />
     <Using Include="Xunit" />
   </ItemGroup>
 
@@ -27,6 +29,7 @@
     <None Include="Updates\Packages-*" CopyToOutputDirectory="PreserveNewest" LinkBase="Updates" />
     <None Include="Channel\*.wav" CopyToOutputDirectory="PreserveNewest" LinkBase="Channel" />
     <None Include="..\..\src\Mailcast.Receiver\receiver.example.json" CopyToOutputDirectory="PreserveNewest" Link="receiver.example.json" />
+    <None Include="..\..\src\Mailcast.Receiver\stations.json" CopyToOutputDirectory="PreserveNewest" Link="stations.json" />
   </ItemGroup>
 
 </Project>

@@ -20,7 +20,7 @@ public class ListenForTests
     {
         Audio = "ubersdr:wessex.zapto.org",
         StateDirectory = dir,
-        Daylight = null,
+        Stations = StationFixture.EverySlot,
         ListenFor = entries.Length == 0 ? null : entries,
     };
 
@@ -61,11 +61,11 @@ public class ListenForTests
     }
 
     [Fact]
-    public async Task Caps_AtMostSixStations_AndHandEntriesComeBeforeAdverts()
+    public async Task Caps_AtMostSevenStations_AndHandEntriesComeBeforeAdverts()
     {
         var xyz = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
         using var dir = new TempDirectory();
-        // Four by hand (added in order), and five adverts: six places in all, the adverts that lose are the last.
+        // Four by hand (added in order), five adverts, the fixture station and M0XYZ: seven places in all, the adverts that lose are the last.
         var hand = Enumerable.Range(1, 4).Select(i => Entry($"G0HA{i}", minute: 10 + i)).ToArray();
         var config = Config(dir.Path, hand) with { TrustedKeys = [new TrustedKeySettings { Label = "M0XYZ", PublicKey = xyz.PublicKeyBase64 }] };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(Now), _ => { });
@@ -78,8 +78,8 @@ public class ListenForTests
         }, Now, 1);
 
         var listening = host.Listening.ToDictionary(l => l.Station);
-        Assert.Equal(["GB7RDG", "M0XYZ", "G0HA1", "G0HA2", "G0HA3", "G0HA4", "G0AA1"], host.Followed.Stations.Select(s => s.Station));
-        Assert.Contains("at most 6 stations besides GB7RDG", listening["G0AA2"].NotFollowedBecause, StringComparison.Ordinal);
+        Assert.Equal(["M0XYZ", "GB7RDG", "G0HA1", "G0HA2", "G0HA3", "G0HA4", "G0AA1"], host.Followed.Stations.Select(s => s.Station));
+        Assert.Contains("at most 7 stations, and others were heard of first", listening["G0AA2"].NotFollowedBecause, StringComparison.Ordinal);
         Assert.Equal("added by hand", listening["G0HA4"].Source);
         Assert.Equal("an advert", listening["G0AA1"].Source);
     }
@@ -169,23 +169,24 @@ public class ListenForTests
 
         var bad = Assert.Throws<ConfigException>(() => Config(dir.Path, Entry(hz: 0)).Validate());
         Assert.Contains("\"listenFor\" entry 1", bad.Message, StringComparison.Ordinal);
-        Assert.Throws<ConfigException>(() => Config(dir.Path, Entry("GB7RDG")).Validate());
-        Assert.Throws<ConfigException>(() => Config(dir.Path, Entry(), Entry()).Validate());
+                Assert.Throws<ConfigException>(() => Config(dir.Path, Entry(), Entry()).Validate());
         Assert.Throws<ConfigException>(() => Config(dir.Path, Entry(every: 7)).Validate());
     }
 
     [Fact]
-    public async Task TheStartUpLines_SayMinuteIsGb7rdgsOnly_AndWarnWhenItIsNotZero()
+    public async Task TheStartUpLines_SayEachStationsSlotsAndWhereTheyCameFrom()
     {
         using var dir = new TempDirectory();
         await using var plain = new ReceiverHost(Config(dir.Path), new FakeTimeProvider(Now), _ => { });
         var lines = plain.SlotLines().ToList();
+        Assert.Equal("stations: fixture lists GB7RDG", lines[0]);
+        lines = [.. lines.Where(l => l.StartsWith("slots:", StringComparison.Ordinal))];
         Assert.Single(lines);
+        Assert.Equal("slots: GB7RDG's slots are every hour on the hour (from the stations file)", lines[0]);
 
-        await using var shifted = new ReceiverHost(Config(dir.Path) with { Minute = 30 }, new FakeTimeProvider(Now), _ => { });
-        lines = [.. shifted.SlotLines()];
-        Assert.Equal(2, lines.Count);
-        Assert.Equal("config: minute 30 sets GB7RDG's slots only (now every hour at 30 minutes past); for another station use \"Listen for a station\" on the status page", lines[1]);
+        await using var shifted = new ReceiverHost(Config(dir.Path) with { Stations = StationFixture.Custom(minute: 30) }, new FakeTimeProvider(Now), _ => { });
+        lines = [.. shifted.SlotLines().Where(l => l.StartsWith("slots:", StringComparison.Ordinal))];
+        Assert.Equal("slots: GB7RDG's slots are every hour at 30 minutes past (from the stations file)", lines[0]);
         Assert.All(lines, l => Assert.All(l, c => Assert.True(c < 128)));
     }
 

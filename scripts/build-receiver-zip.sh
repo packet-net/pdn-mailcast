@@ -47,6 +47,8 @@ mkdir -p "$stage"
 find "$pub" -maxdepth 1 -type f ! -name '*.xml' ! -name '*.pdb' -exec cp {} "$stage/" \;
 cp "$root/packaging/windows/README.txt" "$root/packaging/windows/install-service.ps1" "$stage/"
 cp "$root/src/Mailcast.Receiver/README.md" "$stage/README.md"
+# The stations file, beside the program (stations.json beside receiver.json is used instead of it).
+cp "$root/src/Mailcast.Receiver/stations.json" "$stage/stations.json"
 cp "$root/LICENSE" "$stage/LICENSE"
 
 # The example as Windows reads it: a Windows sound card and path, and the state directory

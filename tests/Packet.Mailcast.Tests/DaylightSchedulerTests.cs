@@ -5,7 +5,7 @@ namespace Packet.Mailcast.Tests;
 /// <summary>Carrying bulletins when only the daylight slots run.</summary>
 public class DaylightSchedulerTests
 {
-    private static readonly SlotTimetable Gb7rdg = new(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+    private static readonly SlotTimetable Gb7rdg = new(TimeOnly.MinValue, 60, StationFixture.Daylight);
 
     private static readonly ScheduleOptions FiveCarryings = ScheduleOptions.Hourly with { Timetable = Gb7rdg };
 

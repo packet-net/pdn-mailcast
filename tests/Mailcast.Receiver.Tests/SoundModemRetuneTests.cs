@@ -34,9 +34,9 @@ public sealed class SoundModemRetuneTests
             Fake = fake;
             Port = fake.Port;
             Clock = new FakeTimeProvider(start);
-            Config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = _dir.Path, Daylight = null, Retune = true };
+            Config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = _dir.Path, Stations = StationFixture.EverySlot, Retune = true };
             Config.Validate();
-            Retuner = new Retuner(Config, () => Config.Schedule, () => true, Clock, Log.Enqueue,
+            Retuner = new Retuner(Config, () => Fixture.Followed(Config), () => true, Clock, Log.Enqueue,
                 new ReceiveWindow(() => Port, requestTimeout ?? ReceiveWindow.RequestTimeout), () => Config.DialHz, dial => Dials.Enqueue(dial), null, earlyEnd);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
         }
@@ -520,7 +520,7 @@ public sealed class SoundModemRetuneTests
     {
         await using var fake = new FakeSoundModem(rateHz: 12_000, dialHz: BulletinDialHz);
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            BulletinDialHz, _ => { }, TimeProvider.System, retunedByWindow: true);
+            BulletinDialHz, StationFixture.SignalHz, _ => { }, TimeProvider.System, retunedByWindow: true);
         await using var _ = pipeline;
         int heard = 0;
         pipeline.SourceBlock += _ => Interlocked.Increment(ref heard);
@@ -551,7 +551,7 @@ public sealed class SoundModemRetuneTests
     {
         await using var fake = new FakeSoundModem(dialHz: 7_052_300);
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            BulletinDialHz, _ => { }, TimeProvider.System, retunedByWindow: true);
+            BulletinDialHz, StationFixture.SignalHz, _ => { }, TimeProvider.System, retunedByWindow: true);
         await using var _ = pipeline;
 
         Assert.False(pipeline.FollowDial(7_051_800));
@@ -653,7 +653,7 @@ public sealed class SoundModemRetuneTests
         await using var fake = new FakeSoundModem(dialHz: 7_060_000);
         var log = new ConcurrentQueue<string>();
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            BulletinDialHz, log.Enqueue, TimeProvider.System, retunedByWindow: true);
+            BulletinDialHz, StationFixture.SignalHz, log.Enqueue, TimeProvider.System, retunedByWindow: true);
         await using var _ = pipeline;
 
         await pipeline.OpenAsync(CancellationToken.None);
@@ -674,7 +674,7 @@ public sealed class SoundModemRetuneTests
     {
         await using var fake = new FakeSoundModem(dialHz: 7_052_300);
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            BulletinDialHz, _ => { }, TimeProvider.System, retunedByWindow: true);
+            BulletinDialHz, StationFixture.SignalHz, _ => { }, TimeProvider.System, retunedByWindow: true);
         await using var _ = pipeline;
         await pipeline.OpenAsync(CancellationToken.None);
         Assert.Equal(7_052_300, pipeline.DialHz);
@@ -692,7 +692,7 @@ public sealed class SoundModemRetuneTests
         // to 1800 Hz once the audio thread has the next block.
         Assert.True(pipeline.FollowDial(7_040_000));
         Assert.Equal(7_040_000, pipeline.DialHz);
-        Assert.Equal(1800, AudioPipeline.AudioCentreFor(pipeline.DialHz), 3);
+        Assert.Equal(1800, AudioPipeline.AudioCentreFor(pipeline.DialHz, StationFixture.SignalHz), 3);
         var block = new float[OnAir.SampleRate / 10];
         // A block the input made before it was asked to move (no tag) is dropped, not fed under
         // the new placement.
@@ -715,7 +715,7 @@ public sealed class SoundModemRetuneTests
     {
         await using var fake = new FakeSoundModem(dialHz: 7_052_300);
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            BulletinDialHz, _ => { }, TimeProvider.System);
+            BulletinDialHz, StationFixture.SignalHz, _ => { }, TimeProvider.System);
         await using var _ = pipeline;
         await pipeline.OpenAsync(CancellationToken.None);
 
@@ -724,7 +724,7 @@ public sealed class SoundModemRetuneTests
 
         await using var away = new FakeSoundModem(dialHz: 7_060_000);
         var refused = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, away.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            BulletinDialHz, _ => { }, TimeProvider.System);
+            BulletinDialHz, StationFixture.SignalHz, _ => { }, TimeProvider.System);
         await using var __ = refused;
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => refused.OpenAsync(CancellationToken.None));
         Assert.Contains("set \"retune\": true here for its receive window to tune the radio for each slot", e.Message, StringComparison.Ordinal);
@@ -764,7 +764,7 @@ public sealed class SoundModemRetuneTests
         const double IfDial = 739_735_855;
         await using var fake = new FakeSoundModem(dialHz: IfDial);
         var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
+        var pipeline = AudioPipeline.Create(source, 7_052_000, StationFixture.SignalHz, _ => { }, TimeProvider.System);
         await using var _ = pipeline;
         pipeline.AlternateSignals = [(739_737_655, 9_750_012_345)];
         await pipeline.OpenAsync(CancellationToken.None);
@@ -782,7 +782,7 @@ public sealed class SoundModemRetuneTests
     {
         await using var fake = new FakeSoundModem(dialHz: 739_735_855);
         var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        var pipeline = AudioPipeline.Create(source, 7_052_000, _ => { }, TimeProvider.System);
+        var pipeline = AudioPipeline.Create(source, 7_052_000, StationFixture.SignalHz, _ => { }, TimeProvider.System);
         await using var _ = pipeline;
         await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.OpenAsync(CancellationToken.None));
     }
@@ -795,7 +795,7 @@ public sealed class SoundModemRetuneTests
         await using var fake = new FakeSoundModem(dialHz: IfDial);
         var source = new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
         using var dir = new TempDirectory();
-        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Daylight = null, LnbHz = 9_750_012_345 };
+        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Stations = StationFixture.EverySlot, LnbHz = 9_750_012_345 };
         var log = new List<string>();
         var noon = new DateTimeOffset(2026, 10, 26, 12, 0, 0, TimeSpan.Zero);
         // 12:47 UTC: not in any slot window of GB7RDG's.
@@ -830,7 +830,7 @@ public sealed class SoundModemRetuneTests
         await using var fake = new FakeSoundModem(dialHz: 739_735_855);
         using var dir = new TempDirectory();
         var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 12, 20, 0, TimeSpan.Zero));
-        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Daylight = null, LnbHz = 9_750_012_345 };
+        var config = new ReceiverConfig { Audio = $"soundmodem:{fake.Port}", StateDirectory = dir.Path, Stations = StationFixture.EverySlot, LnbHz = 9_750_012_345 };
         await using var host = new ReceiverHost(config, time, _ => { });
         var pipeline = host.CreatePipeline(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)), config);
         await using var _ = pipeline;
@@ -849,7 +849,7 @@ public sealed class SoundModemRetuneTests
 
         // The control: a sound card at the same time pauses between slots.
         using var dir2 = new TempDirectory();
-        var card = new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir2.Path, Daylight = null };
+        var card = new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir2.Path, Stations = StationFixture.EverySlot };
         await using var cardHost = new ReceiverHost(card, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 12, 47, 0, TimeSpan.Zero)), _ => { });
         cardHost.CheckSlotWindow();
         Assert.NotNull(cardHost.BetweenSlots);

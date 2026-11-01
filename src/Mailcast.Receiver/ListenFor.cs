@@ -41,10 +41,6 @@ public sealed record ListenForEntry
         {
             return $"\"callsign\" '{Ascii.Clean(Callsign)}' is not a callsign (upper case, A to Z and 0 to 9, an optional -SSID)";
         }
-        if (Callsign == ReceiverStore.BuiltInStation)
-        {
-            return "\"callsign\" GB7RDG is listened at already, by \"minute\" and \"everyMinutes\"";
-        }
         if (FrequencyHz < 1)
         {
             return "\"frequencyHz\" is required: where the station's signal is centred, in Hz";

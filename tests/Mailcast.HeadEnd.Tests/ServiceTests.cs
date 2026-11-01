@@ -481,7 +481,7 @@ public class ServiceTests
     }
 
     // Hourly in daylight at GB7RDG: on 5 October 09:00 to 17:00 UTC, on the 6th likewise.
-    private static readonly SlotSchedule Daylight = new(new TimeOnly(0, 0), TimeSpan.FromHours(1), DaylightRule.Gb7rdg);
+    private static readonly SlotSchedule Daylight = new(new TimeOnly(0, 0), TimeSpan.FromHours(1), StationFixture.Daylight);
 
     private static Head DaylightHead(TempDirectory dir, DateTimeOffset start) =>
         new(dir, start, Daylight, ScheduleOptions.HourlyDaylight with { Timetable = Daylight.Timetable },
@@ -556,7 +556,7 @@ public class ServiceTests
         Assert.Equal(Daylight.Timetable, BroadcastDirectory.Parse(plan.Broadcast.Directory.Serialize()).Schedule);
     }
     // Hourly in daylight at half past (issue #176): on 5 October 08:30 to 16:30 UTC.
-    private static readonly SlotSchedule HalfPast = new(new TimeOnly(0, 30), TimeSpan.FromHours(1), DaylightRule.Gb7rdg);
+    private static readonly SlotSchedule HalfPast = new(new TimeOnly(0, 30), TimeSpan.FromHours(1), StationFixture.Daylight);
 
     private static Head HalfPastHead(TempDirectory dir, DateTimeOffset start) =>
         new(dir, start, HalfPast, ScheduleOptions.HourlyDaylight with { Timetable = HalfPast.Timetable },

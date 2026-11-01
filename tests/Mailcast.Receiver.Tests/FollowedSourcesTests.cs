@@ -22,7 +22,7 @@ public class FollowedSourcesTests
     {
         Audio = "ubersdr:wessex.zapto.org",
         StateDirectory = dir,
-        Daylight = null,
+        Stations = StationFixture.EverySlot,
         ListenFor = entries.Length == 0 ? null : entries,
     };
 
@@ -40,8 +40,8 @@ public class FollowedSourcesTests
         Assert.True(Hears(host, "GM8BPQ-3")); // any SSID: the bootstrap case, before its own directory is heard
         Assert.False(Hears(host, "G4ABC"));
         Assert.False(Hears(host, "G4ABC"));
-        Assert.Equal(["GM8BPQ"], host.SourcesFromFollowed);
-        Assert.Equal(["GB7RDG", "M0LTE", "GM8BPQ"], host.Intake.Sources);
+        Assert.Equal(["GB7RDG", "GM8BPQ"], host.SourcesFromFollowed);
+        Assert.Equal(["GB7RDG", "GM8BPQ"], host.Intake.Sources);
         lock (log)
         {
             Assert.Single(log, l => l.StartsWith("intake: a frame", StringComparison.Ordinal) && l.Contains("G4ABC", StringComparison.Ordinal));
@@ -88,7 +88,7 @@ public class FollowedSourcesTests
         Assert.True(Hears(host, "GM8BPQ"));
 
         host.Reconfigure(Config(dir.Path));
-        Assert.Empty(host.SourcesFromFollowed);
+        Assert.Equal(["GB7RDG"], host.SourcesFromFollowed);
         Assert.False(Hears(host, "GM8BPQ"));
     }
 
@@ -141,6 +141,6 @@ public class FollowedSourcesTests
     [Fact]
     public void SourcesLine_SaysFollowedStationsAreAlsoAccepted()
     {
-        Assert.Contains("and from the stations it knows of", ReceiverHost.SourcesLine(new ReceiverConfig()), StringComparison.Ordinal);
+        Assert.Contains("the stations it knows of", ReceiverHost.SourcesLine(new ReceiverConfig()), StringComparison.Ordinal);
     }
 }

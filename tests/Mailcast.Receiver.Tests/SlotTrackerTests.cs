@@ -22,7 +22,7 @@ public class SlotTrackerTests
     public void HourlySlots_WithNoToneHeard_AreStillTwoSlots()
     {
         var time = new FakeTimeProvider(At(12, 0, 30));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         for (int i = 0; i < 10; i++)
         {
@@ -43,7 +43,7 @@ public class SlotTrackerTests
     public void LongSlot_WithAQuietSpell_IsNotSplit()
     {
         var time = new FakeTimeProvider(At(12, 0, 30));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         slots.OnFrame();
         time.SetUtcNow(At(12, 25));
@@ -59,7 +59,7 @@ public class SlotTrackerTests
     public void LateSlot_IsNotMergedWithTheOneBefore()
     {
         var time = new FakeTimeProvider(At(12, 50));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
 
         // The 13:00 slot started late; its frames are only minutes after the 12:00 slot's last.
@@ -74,7 +74,7 @@ public class SlotTrackerTests
     public void FrameJustBeforeTheSlotByThisClock_CountsForIt()
     {
         var time = new FakeTimeProvider(At(12, 59, 30));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         slots.OnFrame();
 
@@ -92,7 +92,7 @@ public class SlotTrackerTests
     {
         // The tone is reported when it ends, 10 s after it began.
         var time = new FakeTimeProvider(At(hour, minute, second));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         slots.OnTone(Tone());
 
@@ -110,7 +110,7 @@ public class SlotTrackerTests
     {
         var time = new FakeTimeProvider(At(hour, minute, second));
         var log = new List<string>();
-        var slots = new SlotTracker(time, log.Add, Hourly);
+        var slots = new SlotTracker(time, log.Add, Fixture.Of(Hourly));
 
         slots.OnTone(Tone());
 
@@ -122,7 +122,7 @@ public class SlotTrackerTests
     public void ToneFarFromAnySlot_DoesNotDisturbTheSlotInProgress()
     {
         var time = new FakeTimeProvider(At(13, 1));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnTone(Tone());
         slots.OnFrame();
 
@@ -138,7 +138,7 @@ public class SlotTrackerTests
     public void FramesThenTheTone_AreOneSlot()
     {
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
 
         time.SetUtcNow(At(13, 0, 12));
@@ -169,7 +169,7 @@ public class SlotTrackerTests
     public void OnDirectory_SetsHeardDirectory_EvenWithoutAWaveform()
     {
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         var directory = Directory();
 
@@ -183,7 +183,7 @@ public class SlotTrackerTests
     public void OnDirectory_WithAWaveform_SetsBothAndKeepsTheWaveformOnANextCallWithout()
     {
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         var second = Directory();
 
@@ -198,7 +198,7 @@ public class SlotTrackerTests
     public void OnDirectory_WithNoSlotTrackedYet_DoesNothing()
     {
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         slots.OnDirectory(Directory("ms110d-wn4"));
 
@@ -212,7 +212,7 @@ public class SlotTrackerTests
         // frame, say) arriving mid-slot must not take the place of the one already tracked for
         // this slot, or the early-end check would judge completeness against the wrong rotation.
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         var todayDate = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
         var today = DirectoryWithEntry(todayDate);
@@ -230,7 +230,7 @@ public class SlotTrackerTests
         // Issue #72: same day, but a different rotation (a second head end, or a test head end
         // on the air at the same time): still not this slot's.
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         var today = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
         var tracked = DirectoryWithEntry(today, objectId: 1);
@@ -248,7 +248,7 @@ public class SlotTrackerTests
         // The two waveforms taking turns resend the same rotation as a different object (the
         // mode is part of what is hashed): still this slot's, so it may replace what is tracked.
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         var today = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
         slots.OnDirectory(DirectoryWithEntry(today, objectId: 1));
@@ -265,7 +265,7 @@ public class SlotTrackerTests
         // Issue #72: the day rolling over mid-slot is this slot's too, even with an entirely
         // different rotation.
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         var today = DateOnly.FromDateTime(At(13, 0).UtcDateTime);
         slots.OnDirectory(DirectoryWithEntry(today, objectId: 1));
@@ -280,7 +280,7 @@ public class SlotTrackerTests
     public void OnProbeCaptured_SetsTheFlagOnTheSlotInProgress()
     {
         var time = new FakeTimeProvider(At(13, 0, 5));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
         slots.OnFrame();
         Assert.False(slots.Last!.ProbeCaptured);
 
@@ -308,7 +308,7 @@ public class SlotTrackerTests
     {
         var lines = new List<string>();
         var time = new FakeTimeProvider(At(11, 0, 12));
-        var slots = new SlotTracker(time, lines.Add, Hourly);
+        var slots = new SlotTracker(time, lines.Add, Fixture.Of(Hourly));
         slots.OnTone(new ToneReport(1801.2, 1.2, 14.2, TimeSpan.FromSeconds(10)));
         for (int i = 0; i < 120; i++)
         {
@@ -348,7 +348,7 @@ public class SlotTrackerTests
     {
         var lines = new List<string>();
         var time = new FakeTimeProvider(At(11, 3));
-        var slots = new SlotTracker(time, lines.Add, Hourly);
+        var slots = new SlotTracker(time, lines.Add, Fixture.Of(Hourly));
         slots.OnFrame(Wn4, 200);
 
         slots.EndIfOver(At(10, 0));
@@ -366,7 +366,7 @@ public class SlotTrackerTests
     {
         var lines = new List<string>();
         var time = new FakeTimeProvider(At(11, 3));
-        var slots = new SlotTracker(time, lines.Add, Hourly);
+        var slots = new SlotTracker(time, lines.Add, Fixture.Of(Hourly));
         slots.OnListening(At(11, 0));
         slots.OnFrame(null, 50);
 
@@ -414,7 +414,7 @@ public class SlotTrackerTests
     {
         var lines = new List<string>();
         var time = new FakeTimeProvider(At(11, 0, 15));
-        var slots = new SlotTracker(time, lines.Add, Hourly);
+        var slots = new SlotTracker(time, lines.Add, Fixture.Of(Hourly));
         slots.OnListening(At(11, 0));
         slots.EndIfOver(null);
         Assert.Empty(lines);
@@ -438,7 +438,7 @@ public class SlotTrackerTests
     {
         var lines = new List<string>();
         var time = new FakeTimeProvider(At(11, 1));
-        var slots = new SlotTracker(time, lines.Add, Hourly);
+        var slots = new SlotTracker(time, lines.Add, Fixture.Of(Hourly));
         slots.OnListening(At(11, 0));
         slots.OnFrame(Wn4, 100);
 

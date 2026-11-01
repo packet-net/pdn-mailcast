@@ -43,9 +43,6 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
         Longitude = lon;
     }
 
-    /// <summary>GB7RDG's: from 2 hours after sunrise to 30 minutes before sunset, near Reading.</summary>
-    public static DaylightRule Gb7rdg { get; } = new("IO91lk", 120, 30);
-
     /// <summary>Where the sun is reckoned, as a Maidenhead locator: IO91lk.</summary>
     public string Locator { get; }
 
@@ -130,11 +127,11 @@ public sealed record DaylightWindow(DateOnly Day, SunTimes Sun, DateTimeOffset? 
         : Opens is { } opens && Closes is { } closes && slot >= opens && slot <= closes;
 }
 
-/// <summary>Daylight settings as a configuration file gives them; GB7RDG's by default.</summary>
+/// <summary>Daylight settings as a configuration file gives them: the offsets default to the usual 120 and 30 minutes, and the locator has no default, since it is the station's own.</summary>
 public sealed record DaylightSettings
 {
     /// <summary>Where the sun is reckoned, a 4 or 6 character Maidenhead locator.</summary>
-    public string Locator { get; init; } = "IO91lk";
+    public string Locator { get; init; } = "";
 
     /// <summary>The first slot may start this long after sunrise.</summary>
     public int AfterSunriseMinutes { get; init; } = 120;

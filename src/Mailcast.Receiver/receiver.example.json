@@ -13,14 +13,16 @@
   // "locator": "IO91lk",
 
   // The USB dial in kHz. The web SDR is tuned here, and your radio should be too if you use
-  // a sound card. The signal itself always stays on 7.0538 MHz: the best dial for a sound card
-  // is 7.0538 MHz minus the middle of its own receive filter, which the status page's "Measure
-  // my filter" works out for you. See docs/receiver.md.
-  "dialKHz": 7052.0,
+  // a sound card. Left out, it is the first station in the stations file's frequency less 1.8 kHz,
+  // which puts that signal at 1800 Hz in your audio. The best dial for a sound card is the
+  // signal's frequency minus the middle of its own receive filter, which the status page's
+  // "Measure my filter" works out for you. See docs/receiver.md.
+  // "dialKHz": 7052.0,
 
-  // The callsigns the broadcast is accepted from, any SSID. GB7RDG sends it today, and it may
-  // move to M0LTE. Frames from anyone else are ignored. Left out, it is these two.
-  "sources": ["GB7RDG", "M0LTE"],
+  // Callsigns the broadcast is accepted from besides every station the receiver knows of (the
+  // stations file, and those it hears of on the air or by "Listen for a station"), any SSID.
+  // Left out, there are none besides those.
+  // "sources": ["G4ABC"],
 
   // Your BBS. "type" is "linBpq" or "fbb". For LinBPQ the port is the FBBPORT in its
   // Telnet port, and the login is the USER= name you made for the receiver.
@@ -42,16 +44,12 @@
     "password": ""
   },
 
-  // GB7RDG's slots: at "minute" past the hour (UTC), then one every "everyMinutes", so every hour
-  // on the hour, but only in daylight: from 2 hours after sunrise to 30 minutes before sunset
-  // near Reading (IO91lk). Once the receiver has heard GB7RDG's directory, which gives its
-  // slots, it uses that instead. A sound card decodes from 2 minutes before each slot until
-  // it is over, and rests between slots unless a status page shows the spectrogram. A web SDR listens from 2
-  // minutes before each daylight slot to 12 after, which is every slot for most of the year;
-  // near midsummer it skips the earliest morning ones to stay inside its 3 hours a day.
-  "minute": 0,
-  "everyMinutes": 60,
-  "daylight": { "locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
+  // The stations, their keys and their slots are in the stations file (stations.json), not here:
+  // the package ships one, and a stations.json beside this file is used instead of it. Once the
+  // receiver has heard a station's own directory, which gives its slots, it uses those. A sound card decodes
+  // from 2 minutes before each slot until it is over, and rests between slots unless a status page shows the
+  // spectrogram. A web SDR listens from 2 minutes before each daylight slot to 12 after, which is every slot
+  // for most of the year; near midsummer it skips the earliest morning ones to stay inside its 3 hours a day.
 
   // The receiver keeps its own copy of each bulletin once your BBS has answered for it, to
   // read on the status page or send to the BBS again: for "days", and "maxMegabytes" in all,
@@ -69,12 +67,13 @@
   // shares your radio, and start it again), add "hooks" as docs/receiver.md says under
   // "Running your own commands around each slot".
 
-  // To send M0LTE a short report each day of what your receiver heard, add
+  // To send a short report each day of what your receiver heard, add
   // "feedback": { "enabled": true, "callsign": "your callsign" }, as docs/receiver.md says
-  // under "Sending a daily report".
+  // under "Sending a daily report". It goes to the stations file's report address, or to
+  // "to": "BULLETIN@ADDRESS" if you give one.
 
-  // GB7RDG's directory signing key is built in, so the status page shows its signed bulletins
-  // as "signed by GB7RDG". To trust another transmitter as well, add its label and the public
+  // The stations file's keys are trusted, so the status page shows those stations' signed bulletins
+  // as "signed by" them. To trust another transmitter as well, add its label and the public
   // key from its head end's start-up line, as docs/receiver.md says under "Signed directories":
   // "trustedKeys": [ { "label": "GB7XYZ", "publicKey": "..." } ],
 

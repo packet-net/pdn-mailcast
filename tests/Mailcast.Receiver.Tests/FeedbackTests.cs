@@ -14,7 +14,7 @@ namespace Mailcast.Receiver.Tests;
 public class FeedbackTests
 {
     private static readonly DateOnly Day = new(2026, 10, 6);
-    private static readonly SlotSchedule Schedule = new ReceiverConfig().Schedule;
+    private static readonly SlotSchedule Schedule = Fixture.Slots(new ReceiverConfig());
     private static readonly IReadOnlyList<DateTimeOffset> Slots = Schedule.ActiveOn(Day);
     private static readonly DateTimeOffset ReportAt = Slots[^1] + FeedbackService.AfterLastSlot;
 
@@ -61,7 +61,8 @@ public class FeedbackTests
         public FeedbackService Start() => new(new FeedbackSources
         {
             Settings = () => Settings,
-            Schedule = () => Schedule,
+            Followed = () => Fixture.Of(Schedule),
+            Stations = () => StationFixture.Stations,
             Listened = day => [.. Schedule.ActiveOn(day).Concat(Others.Where(o => DateOnly.FromDateTime(o.UtcDateTime) == day)).Order()],
             Station = slot => Others.Contains(slot) ? "G8BPQ" : "GB7RDG",
             LastSlot = () => Last,
@@ -108,6 +109,44 @@ public class FeedbackTests
     }
 
     [Fact]
+    public async Task TheReportGoesToFeedbackTo_ElseToTheStationsFilesAddress()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path, new FeedbackSettings { Enabled = true, Callsign = "g4abc", To = "BULL@HOST.#9.GBR.EURO" });
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day);
+        await rig.AtAsync(service, ReportAt);
+
+        var mail = Assert.Single(rig.Bbs.Sent);
+        Assert.Equal(("BULL", "HOST.#9.GBR.EURO"), (mail.To, mail.At));
+        Assert.Equal("BULL@HOST.#9.GBR.EURO", JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("to").GetString());
+        Assert.Contains(rig.Log, l => l.StartsWith("feedback: on. A daily report from G4ABC goes through the BBS as a public bulletin to BULL@HOST.#9.GBR.EURO,", StringComparison.Ordinal));
+
+        // Left out, the stations file's.
+        using var dir2 = new TempDirectory();
+        var plain = new Rig(dir2.Path);
+        var other = plain.Start();
+        await plain.ListenAsync(other, Day);
+        await plain.AtAsync(other, ReportAt);
+        var sent = Assert.Single(plain.Bbs.Sent);
+        Assert.Equal((StationFixture.ReportTo, StationFixture.ReportAt), (sent.To, sent.At));
+    }
+
+    [Fact]
+    public void AReportThatHasNowhereToGo_IsRefusedAtStartUp_InOneLine()
+    {
+        var on = new FeedbackSettings { Enabled = true, Callsign = "G4ABC" };
+
+        var e = Assert.Throws<ConfigException>(() => new ReceiverConfig { Feedback = on, Stations = StationsFile.Empty }.Validate());
+        Assert.Equal("\"feedback\" is enabled but there is no address to send the report to: set \"feedback\".\"to\" to a bulletin and BBS address such as \"MCAST@HOST.#42.GBR.EURO\"", e.Message);
+
+        // Given, or in the stations file, it is fine; and off, it is not looked at.
+        new ReceiverConfig { Feedback = on with { To = "MCAST@HOST.#42.GBR.EURO" }, Stations = StationsFile.Empty }.Validate();
+        new ReceiverConfig { Feedback = on }.Validate();
+        new ReceiverConfig { Feedback = on with { Enabled = false }, Stations = StationsFile.Empty }.Validate();
+    }
+
+    [Fact]
     public async Task Report_GoesHalfAnHourAfterTheLastSlot_OnceOnly()
     {
         using var dir = new TempDirectory();
@@ -141,7 +180,7 @@ public class FeedbackTests
         await rig.AtAsync(restarted, ReportAt.AddMinutes(20));
         await rig.AtAsync(restarted, ReportAt.AddHours(5));
         Assert.Single(rig.Bbs.Sent);
-        Assert.Equal(FeedbackService.ReportTime(Schedule, Day.AddDays(1)), restarted.Next(rig.Time.GetUtcNow()));
+        Assert.Equal(FeedbackService.ReportTime(Fixture.Of(Schedule), Day.AddDays(1)), restarted.Next(rig.Time.GetUtcNow()));
     }
 
     [Fact]
@@ -166,7 +205,7 @@ public class FeedbackTests
         Assert.Equal(next[0].AddHours(-2), restarted.Last!.SentAt);
 
         // And that day's own report goes as usual.
-        await rig.AtAsync(restarted, FeedbackService.ReportTime(Schedule, Day.AddDays(1))!.Value);
+        await rig.AtAsync(restarted, FeedbackService.ReportTime(Fixture.Of(Schedule), Day.AddDays(1))!.Value);
         Assert.Equal(2, rig.Bbs.Sent.Count);
         Assert.Equal(2, DailyReport.Parse(rig.Bbs.Sent[1].Title, rig.Bbs.Sent[1].Body).Slots.Count);
     }
@@ -307,14 +346,14 @@ public class FeedbackTests
         using var dir = new TempDirectory();
         var rig = new Rig(dir.Path);
         var service = rig.Start();
-        JsonElement Receipt() => JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("receipt");
+        JsonElement Receipt() => JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("receipts") is { } list && list.GetArrayLength() > 0 ? list[0] : JsonDocument.Parse("null").RootElement;
 
         // A head end that does not list reports says nothing either way.
-        service.NoteDirectory(Directory(Day, null));
+        service.NoteDirectory(Directory(Day, null), StationFixture.Callsign);
         Assert.Equal(JsonValueKind.Null, Receipt().ValueKind);
 
         // The day before's report reached it.
-        service.NoteDirectory(Directory(Day, Listing(("G8BPQ", Day.AddDays(-1)), ("G4ABC", Day.AddDays(-1)))));
+        service.NoteDirectory(Directory(Day, Listing(("G8BPQ", Day.AddDays(-1)), ("G4ABC", Day.AddDays(-1)))), StationFixture.Callsign);
         Assert.Equal("GB7RDG got your report for 2026-10-05", Receipt().GetProperty("text").GetString());
         Assert.True(Receipt().GetProperty("gotLatest").GetBoolean());
         Assert.Single(rig.Log, l => l == "feedback: GB7RDG got the daily report from G4ABC for 2026-10-05, as its directory for 2026-10-06 says");
@@ -323,13 +362,13 @@ public class FeedbackTests
         await rig.ListenAsync(service, Day, only: 1);
         await rig.AtAsync(service, ReportAt);
         Assert.Equal(Day, service.Last!.Day);
-        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day.AddDays(-1)))));
+        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day.AddDays(-1)))), StationFixture.Callsign);
         Assert.Equal("GB7RDG has not had your report for 2026-10-06 yet. It has not had a report from you since the one for 2026-10-05", Receipt().GetProperty("text").GetString());
         Assert.False(Receipt().GetProperty("gotLatest").GetBoolean());
 
         // Then one does: said once, however often it is heard, and kept across a restart.
-        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day))));
-        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day))));
+        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day))), StationFixture.Callsign);
+        service.NoteDirectory(Directory(Day.AddDays(1), Listing(("G4ABC", Day))), StationFixture.Callsign);
         service = rig.Start();
         Assert.Equal("GB7RDG got your report for 2026-10-06", Receipt().GetProperty("text").GetString());
         Assert.Equal(Day.AddDays(1), DateOnly.Parse(Receipt().GetProperty("listedOn").GetString()!, System.Globalization.CultureInfo.InvariantCulture));
@@ -344,12 +383,12 @@ public class FeedbackTests
     [Fact]
     public void Receipt_InWords_WhenGb7rdgHasHadNoneLately()
     {
-        var never = new FeedbackService.ReceiptRecord { Callsign = "G4ABC", ListedOn = Day.AddDays(1) };
+        var never = new FeedbackService.ReceiptRecord { Callsign = "G4ABC", Station = "GB7RDG", ListedOn = Day.AddDays(1) };
         var sent = new SentReport { Day = Day, Answer = FeedbackAnswer.Accepted };
         Assert.Equal("GB7RDG has not had your report for 2026-10-06 yet, nor any other from you lately", FeedbackService.DescribeReceipt(never, sent));
         // Before a directory later than the report's day, nothing is said about it.
-        Assert.Null(FeedbackService.DescribeReceipt(new FeedbackService.ReceiptRecord { Callsign = "G4ABC", ListedOn = Day }, sent));
-        Assert.Null(FeedbackService.DescribeReceipt(new FeedbackService.ReceiptRecord { Callsign = "G4ABC" }, sent));
+        Assert.Null(FeedbackService.DescribeReceipt(new FeedbackService.ReceiptRecord { Callsign = "G4ABC", Station = "GB7RDG", ListedOn = Day }, sent));
+        Assert.Null(FeedbackService.DescribeReceipt(new FeedbackService.ReceiptRecord { Callsign = "G4ABC", Station = "GB7RDG" }, sent));
     }
 
     [Fact]
@@ -373,7 +412,7 @@ public class FeedbackTests
         Assert.Equal("refused by the BBS: the BBS answered Reject; it is not sent again", view.GetProperty("lastAnswer").GetString());
         Assert.Equal(ReportAt, view.GetProperty("lastSent").GetDateTimeOffset());
         Assert.StartsWith("MCR G4ABC 2026-10-06\nMCR1 0.6.0 IO91lk sc 0/0 0 0 0\n", view.GetProperty("text").GetString(), StringComparison.Ordinal);
-        Assert.Equal(FeedbackService.ReportTime(Schedule, Day.AddDays(1)), view.GetProperty("next").GetDateTimeOffset());
+        Assert.Equal(FeedbackService.ReportTime(Fixture.Of(Schedule), Day.AddDays(1)), view.GetProperty("next").GetDateTimeOffset());
         Assert.Contains(rig.Log, l => l.Contains("was refused by the BBS", StringComparison.Ordinal));
     }
 
@@ -500,7 +539,7 @@ public class FeedbackTests
         var right = new Rig(dir.Path);
         var restarted = right.Start();
         await right.ListenAsync(restarted, Day.AddDays(-1), only: 2);
-        await right.AtAsync(restarted, FeedbackService.ReportTime(Schedule, Day.AddDays(-1))!.Value);
+        await right.AtAsync(restarted, FeedbackService.ReportTime(Fixture.Of(Schedule), Day.AddDays(-1))!.Value);
 
         var mail = Assert.Single(right.Bbs.Sent);
         Assert.Equal(Day.AddDays(-1), DailyReport.Parse(mail.Title, mail.Body).Day);
@@ -591,14 +630,14 @@ public class FeedbackTests
         var tomorrow = Day.AddDays(1);
         rig.Settings = new FeedbackSettings { Enabled = true, Callsign = "G4ABC" };
         await rig.AtAsync(service, Slots[^1].AddMinutes(20));
-        Assert.Equal(FeedbackService.ReportTime(Schedule, tomorrow), service.Next(rig.Time.GetUtcNow()));
+        Assert.Equal(FeedbackService.ReportTime(Fixture.Of(Schedule), tomorrow), service.Next(rig.Time.GetUtcNow()));
         Assert.Contains(rig.Log, l => l.StartsWith("feedback: on.", StringComparison.Ordinal));
         Assert.True(JsonSerializer.SerializeToElement(service.View(), ReceiverConfig.JsonLine).GetProperty("enabled").GetBoolean());
         await rig.AtAsync(service, ReportAt);
         Assert.Empty(rig.Bbs.Sent);
 
         await rig.ListenAsync(service, tomorrow);
-        await rig.AtAsync(service, FeedbackService.ReportTime(Schedule, tomorrow)!.Value);
+        await rig.AtAsync(service, FeedbackService.ReportTime(Fixture.Of(Schedule), tomorrow)!.Value);
         var mail = Assert.Single(rig.Bbs.Sent);
         Assert.Equal(tomorrow, DailyReport.Parse(mail.Title, mail.Body).Day);
 
@@ -606,7 +645,7 @@ public class FeedbackTests
         var after = tomorrow.AddDays(1);
         rig.Settings = new FeedbackSettings { Enabled = false, Callsign = "G4ABC" };
         await rig.ListenAsync(service, after);
-        await rig.AtAsync(service, FeedbackService.ReportTime(Schedule, after)!.Value.AddMinutes(5));
+        await rig.AtAsync(service, FeedbackService.ReportTime(Fixture.Of(Schedule), after)!.Value.AddMinutes(5));
         Assert.Single(rig.Bbs.Sent);
         Assert.Single(rig.Log, l => l.StartsWith("feedback: off", StringComparison.Ordinal));
         Assert.Null(service.Next(rig.Time.GetUtcNow()));
@@ -652,7 +691,8 @@ public class FeedbackTests
     }
 
     [Theory]
-    [InlineData("""{ "feedback": { "enabled": true, "callsign": "G4ABC", "to": "G0XYZ" } }""", "\"to\" is not a setting of \"feedback\"")]
+    [InlineData("""{ "feedback": { "enabled": true, "callsign": "G4ABC", "wibble": "G0XYZ" } }""", "\"wibble\" is not a setting of \"feedback\"")]
+    [InlineData("""{ "feedback": { "enabled": true, "callsign": "G4ABC", "to": "G0XYZ" } }""", "\"feedback\".\"to\" \"G0XYZ\" is not an address")]
     [InlineData("""{ "feedback": { "enabled": true } }""", "has no \"callsign\"")]
     [InlineData("""{ "feedback": { "enabled": "yes", "callsign": "G4ABC" } }""", "\"feedback\" setting that cannot be read")]
     public void Config_FeedbackThatCannotWork_IsRefusedWithAReason(string json, string expected)
@@ -696,7 +736,7 @@ public class FeedbackTests
         await rig.AtAsync(service, ReportAt);
         var restarted = rig.Start();
         await rig.ListenAsync(restarted, Day.AddDays(1), only: 1);
-        await rig.AtAsync(restarted, FeedbackService.ReportTime(Schedule, Day.AddDays(1))!.Value);
+        await rig.AtAsync(restarted, FeedbackService.ReportTime(Fixture.Of(Schedule), Day.AddDays(1))!.Value);
 
         Assert.Equal(2, rig.Bbs.Sent.Count);
         Assert.Equal(rig.Bbs.Sent[0].Bid[4..6], rig.Bbs.Sent[1].Bid[4..6]);
@@ -706,7 +746,7 @@ public class FeedbackTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task OtherStationsSlots_AreCountedPerStation_AndStayOutOfTheSlotLines(bool reportOn)
+    public async Task EveryStationsSlots_AreCountedPerStation_AndAreInTheSlotLines(bool reportOn)
     {
         using var dir = new TempDirectory();
         var rig = new Rig(dir.Path);
@@ -723,10 +763,10 @@ public class FeedbackTests
         await rig.ListenAsync(service, Day);
 
         var figures = service.StationFigures(Day);
-        Assert.Equal(["GB7RDG", "G8BPQ"], figures.Select(f => f.Station));
-        Assert.Equal(new ReportStation("G8BPQ", 2, 1, 40, 2, 9, null, 0), figures[1]);
-        Assert.Equal(Slots.Count, figures[0].Listened);
-        Assert.Equal(Slots.Count, figures[0].Heard);
+        Assert.Equal(["G8BPQ", "GB7RDG"], figures.Select(f => f.Station)); // by callsign: no station comes first
+        Assert.Equal(new ReportStation("G8BPQ", 2, 1, 40, 2, 9, null, 0), figures[0]);
+        Assert.Equal(Slots.Count, figures[1].Listened);
+        Assert.Equal(Slots.Count, figures[1].Heard);
 
         if (!reportOn)
         {
@@ -735,7 +775,7 @@ public class FeedbackTests
         await rig.AtAsync(service, ReportAt);
         var mail = Assert.Single(rig.Bbs.Sent);
         var report = DailyReport.Parse(mail.Title, mail.Body);
-        Assert.Equal(Slots.Count, report.Slots.Count);
+        Assert.Equal(Slots.Count + 2, report.Slots.Count);
         Assert.Equal(figures, report.Stations);
         Assert.Contains("S G8BPQ 2 1 40 2 9 -", mail.Body);
     }
@@ -760,9 +800,10 @@ public class FeedbackTests
         await rig.AtAsync(service, second.AddMinutes(1));
 
         var figures = service.StationFigures(Day);
-        Assert.Equal(150, figures[0].Frames);
-        Assert.Equal(16, figures[0].SnrDb);
-        Assert.Equal(40, figures[1].Frames);
+        var gb7rdg = figures.Single(f => f.Station == "GB7RDG");
+        Assert.Equal(150, gb7rdg.Frames);
+        Assert.Equal(16, gb7rdg.SnrDb);
+        Assert.Equal(40, figures.Single(f => f.Station == "G8BPQ").Frames);
     }
 
     [Fact]
@@ -781,7 +822,7 @@ public class FeedbackTests
     }
 
     [Fact]
-    public async Task ADayOfOnlyOtherStationsSlots_SendsAReportWithStationLinesAndNoSlotLines()
+    public async Task ADayOfOnlyOtherStationsSlots_SendsAReportWithStationLinesAndTheirSlotLines()
     {
         using var dir = new TempDirectory();
         var rig = new Rig(dir.Path);
@@ -797,7 +838,7 @@ public class FeedbackTests
 
         var mail = Assert.Single(rig.Bbs.Sent);
         var report = DailyReport.Parse(mail.Title, mail.Body);
-        Assert.Empty(report.Slots);
+        Assert.Equal(TimeOnly.FromDateTime(heard.UtcDateTime), Assert.Single(report.Slots).Start);
         Assert.Equal("G8BPQ", Assert.Single(report.Stations!, s => s.Station == "G8BPQ").Station);
     }
 
@@ -817,7 +858,7 @@ public class FeedbackTests
         var slot = new FeedbackService.SlotRecord { Slot = new DateTimeOffset(2026, 10, 30, 9, 0, 0, TimeSpan.Zero), Station = "G8BPQ", Frames = 10 };
         var copies = new Dictionary<string, int> { ["g8bpq"] = 2, ["M0XYZ"] = 1 };
 
-        var figures = FeedbackService.Figures([slot], "GB7RDG", copies);
+        var figures = FeedbackService.Figures([slot], copies);
 
         Assert.Equal(2, figures.Single(f => f.Station == "G8BPQ").OtherCopies);
         var extra = figures.Single(f => f.Station == "M0XYZ");

@@ -180,15 +180,6 @@ public sealed class TrustedKey
     public ulong KeyId { get; }
 
     /// <summary>
-    /// GB7RDG's own key, the first of <see cref="BuiltIn"/>: SubjectPublicKeyInfo
-    /// <c>MCowBQYDK2VwAyEAe1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=</c>.
-    /// </summary>
-    public static TrustedKey Gb7rdg { get; } = Parse("GB7RDG", "MCowBQYDK2VwAyEAe1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=");
-
-    /// <summary>The keys every receiver trusts, before any of its own.</summary>
-    public static IReadOnlyList<TrustedKey> BuiltIn { get; } = [Gb7rdg];
-
-    /// <summary>
     /// A key from its label and its base64: the 32 raw octets (as the head end logs it), or a
     /// whole SubjectPublicKeyInfo (the body of <c>openssl pkey -pubout</c>'s PEM). Throws
     /// <see cref="FormatException"/>, saying what is wrong, if it is neither.

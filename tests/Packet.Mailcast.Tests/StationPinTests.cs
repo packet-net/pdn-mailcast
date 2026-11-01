@@ -63,7 +63,7 @@ public class StationPinTests
     [Fact]
     public void NewFields_RoundTrip_AndReleasedReceiversReadTheSameDirectory()
     {
-        var directory = Directory(HalfPast, Bpq, "G8BPQ", [BpqAdvert with { Callsign = "GB7RDG", Timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg) }, new("QO100X", OnTheHour, 10_489_750_000, Sideband.Usb)], Big(1), Big(2));
+        var directory = Directory(HalfPast, Bpq, "G8BPQ", [BpqAdvert with { Callsign = "GB7RDG", Timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight) }, new("QO100X", OnTheHour, 10_489_750_000, Sideband.Usb)], Big(1), Big(2));
         byte[] bytes = directory.Serialize();
         string first = Bulletin.TextEncoding.GetString(bytes).Split('\n')[2];
         Assert.Contains("\tstation=G8BPQ\tpubkey=" + Bpq.PublicKeyBase64, first, StringComparison.Ordinal);
@@ -96,7 +96,7 @@ public class StationPinTests
         Assert.Contains(store.Pins, p => p.Station == "G8BPQ" && p.Key.KeyId == Bpq.KeyId && p.PinnedAt is not null);
         Assert.Equal(FrameOutcome.CompletedBulletin, Feed(store, obj).Outcome);
         Assert.Equal(HalfPast, store.HeardTimetable("G8BPQ"));
-        Assert.Null(store.HeardSchedule); // not GB7RDG's
+        Assert.Empty(store.HeardSchedules); // not a station of the stations file
 
         // Kept across a restart.
         var (reopened, _, _) = Open(dir);
@@ -111,12 +111,13 @@ public class StationPinTests
         using var dir = new TempDirectory();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with
         {
+            Stations = StationsFile.Empty,
             TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("GB7RDG", newer.PublicKeyBase64)],
         });
         var result = Feed(store, Directory(OnTheHour, newer, "M0LTE", null, Big(90)));
         Assert.Equal(FrameOutcome.CompletedDirectory, result.Outcome);
-        Assert.Equal(ReceiverStore.BuiltInStation, store.StationOf(result.Directory!, result.Check!));
-        Assert.Equal(2, store.Pins.Count(p => p.Station == ReceiverStore.BuiltInStation));
+        Assert.Equal(StationFixture.Callsign, store.StationOf(result.Directory!, result.Check!));
+        Assert.Equal(2, store.Pins.Count(p => p.Station == StationFixture.Callsign));
     }
 
     [Fact]
@@ -133,7 +134,7 @@ public class StationPinTests
         Assert.Equal(2, log.Count(l => l.Contains("skipped an unreadable line", StringComparison.Ordinal)));
         var result = Feed(store, Directory(HalfPast, Bpq, "G8BPQ", null, Big(91)));
         Assert.Equal("G8BPQ", store.StationOf(result.Directory!, result.Check!));
-        Assert.Equal(["GB7RDG", "G8BPQ"], store.StationDirectories().Select(d => d.Station).Where(s => s != ReceiverStore.BuiltInStation).Prepend("GB7RDG"));
+        Assert.Equal(["GB7RDG", "G8BPQ"], store.StationDirectories().Select(d => d.Station).Where(s => s != StationFixture.Callsign).Prepend("GB7RDG"));
         Assert.DoesNotContain(store.Pins, p => p.Station.Contains("BOB", StringComparison.Ordinal));
     }
 
@@ -162,9 +163,9 @@ public class StationPinTests
         using var _d = dir;
         // GB7RDG's head end sends from M0LTE, signed with GB7RDG's key.
         var result = Feed(store, Directory(OnTheHour, Rdg, "M0LTE", null, Big(30)));
-        Assert.Equal(ReceiverStore.BuiltInStation, store.StationOf(result.Directory!, result.Check!));
+        Assert.Equal(StationFixture.Callsign, store.StationOf(result.Directory!, result.Check!));
         Assert.DoesNotContain(store.Pins, p => p.Station == "M0LTE");
-        Assert.Equal(OnTheHour, store.HeardSchedule);
+        Assert.Equal(OnTheHour, store.HeardTimetable(StationFixture.Callsign));
     }
 
     [Fact]
@@ -173,12 +174,12 @@ public class StationPinTests
         var (store, _, dir) = Open();
         using var _d = dir;
         var plain = Feed(store, Directory(HalfPast, null, null, null, Big(40)));
-        Assert.Equal(ReceiverStore.BuiltInStation, store.StationOf(plain.Directory!, plain.Check!));
-        Assert.Equal(HalfPast, store.HeardSchedule);
+        Assert.Equal(StationFixture.Callsign, store.StationOf(plain.Directory!, plain.Check!));
+        Assert.Equal(HalfPast, store.HeardTimetable(StationFixture.Callsign));
         var claims = Feed(store, Directory(OnTheHour, null, "G8BPQ", [BpqAdvert], Big(41)));
         Assert.Equal(FrameOutcome.CompletedDirectory, claims.Outcome);
         Assert.Null(store.StationOf(claims.Directory!, claims.Check!));
-        Assert.Equal(HalfPast, store.HeardSchedule);
+        Assert.Equal(HalfPast, store.HeardTimetable(StationFixture.Callsign));
         Assert.Empty(store.Adverts()); // adverts only from trusted signed directories
     }
 
@@ -227,6 +228,7 @@ public class StationPinTests
         using var dir = new TempDirectory();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with
         {
+            Stations = StationsFile.Empty,
             TrustedKeys = [TrustedKey.Parse("GB7RDG", Rdg.PublicKeyBase64), TrustedKey.Parse("Bob's station", Impostor.PublicKeyBase64)],
         });
         var result = Feed(store, Directory(OnTheHour, Impostor, "GB7RDG", null, Big(92)));
@@ -304,7 +306,7 @@ public class StationPinTests
         Assert.Equal([other.ObjectId], Feed(store, Directory(OnTheHour, Rdg, "M0LTE", null, Big(72))).NoLongerSent);
         time.Advance(TimeSpan.FromMinutes(30));
         Assert.Equal([shared.ObjectId], Feed(store, Directory(HalfPast, Bpq, "G8BPQ", null, Big(73))).NoLongerSent);
-        Assert.Equal([ReceiverStore.BuiltInStation, "G8BPQ"], store.StationDirectories().Select(d => d.Station));
+        Assert.Equal(["G8BPQ", StationFixture.Callsign], store.StationDirectories().Select(d => d.Station)); // by callsign
     }
 
     [Fact]

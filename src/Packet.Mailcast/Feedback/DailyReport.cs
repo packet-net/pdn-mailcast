@@ -119,15 +119,9 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
 
     /// <summary>
     /// Who the report is addressed to: it goes as a public bulletin, type B, to MCAST, so anyone
-    /// on GB7RDG can list it. Nothing addressed to MCAST is ever taken in for the broadcast.
+    /// on the BBS it is sent to can list it. Nothing addressed to MCAST is ever taken in for the broadcast.
     /// </summary>
     public const string BulletinTo = "MCAST";
-
-    /// <summary>
-    /// The report's @ field: GB7RDG's full hierarchical address, so mail routing carries it to
-    /// GB7RDG and it stays there, rather than a flood area such as WW or GBR.
-    /// </summary>
-    public const string BulletinAt = "GB7RDG.#42.GBR.EURO";
 
     private const string Missing = "-";
 

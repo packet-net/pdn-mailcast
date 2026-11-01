@@ -194,7 +194,7 @@
 </div>
 <div id="optIn" hidden>
   <div id="optInAsk">
-    <p><strong>Help the experiment:</strong> post a short daily report of what this receiver heard as a public bulletin on GB7RDG (MCAST). It goes as one small message through your own BBS, about 500 bytes a day. Nothing else is sent.</p>
+    <p><strong>Help the experiment:</strong> post a short daily report of what this receiver heard as a public bulletin to <span id="optInAddress">the report address</span>. It goes as one small message through your own BBS, about 500 bytes a day. Nothing else is sent.</p>
     <form id="optInForm">
       <label><input type="checkbox" id="optInBox"> Send a daily report</label>
       <label>Your callsign <input id="optInCall" maxlength="6" autocomplete="off" spellcheck="false" placeholder="G4ABC"></label>
@@ -224,7 +224,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
   </section>
 
   <section>
-    <h2 id="hearingTitle">Hearing GB7RDG</h2>
+    <h2 id="hearingTitle">Hearing</h2>
     <dl id="when"></dl>
     <p class="muted" id="slotShape">Each slot starts with a 10 second tone, then a few minutes of short data bursts.</p>
     <p id="listenNow" hidden>
@@ -1091,7 +1091,7 @@ function feedback(s) {
   $("feedback").innerHTML = `<dt>Goes to</dt><dd>${esc(f.to)}, a public bulletin, through your BBS, every day half an hour after the last slot</dd>
     ${f.lastSent ? `<dt>Last sent</dt><dd>${when(f.lastSent)}</dd>` : ""}
     ${f.lastAnswer ? `<dt>The BBS said</dt><dd class="${tone}">${esc(f.lastAnswer)}</dd>` : ""}
-    ${f.receipt && f.receipt.text ? `<dt>GB7RDG</dt><dd class="${f.receipt.gotLatest ? "good" : "warn"}">${esc(f.receipt.text)}</dd>` : ""}
+    ${(f.receipts || []).filter(r => r.text).map(r => `<dt>${esc(r.station)}</dt><dd class="${r.gotLatest ? "good" : "warn"}">${esc(r.text)}</dd>`).join("")}
     ${f.next ? `<dt>Next</dt><dd>${when(f.next)}</dd>` : ""}`;
   $("feedbackText").hidden = !f.text;
   if (f.text && $("feedbackText").textContent !== f.text) $("feedbackText").textContent = f.text;
@@ -1104,9 +1104,10 @@ function optIn(s) {
   $("optIn").hidden = !on && !s.bbs.reachable;
   $("optIn").classList.toggle("on", on);
   $("optInAsk").hidden = on;
+  if (f && f.to) $("optInAddress").textContent = f.to;
   $("optInOn").hidden = !on;
   $("optInNoLocator").hidden = !on || !settings || settings.audio.startsWith("ubersdr:") || !!settings.locator;
-  if (on) $("optInLine").textContent = `Daily report, a public bulletin on GB7RDG (MCAST): on${f.next ? `, next at ${day(f.next)}${utc(f.next)}` : ""}.`;
+  if (on) $("optInLine").textContent = `Daily report, a public bulletin to ${f.to}: on${f.next ? `, next at ${day(f.next)}${utc(f.next)}` : ""}.`;
   const call = $("optInCall");
   if (settings && !call.value && document.activeElement !== call && settings.feedback.callsign) call.value = settings.feedback.callsign;
   $("optInSave").disabled = !$("optInBox").checked;
@@ -1194,19 +1195,19 @@ const day = t => new Date(t).toISOString().slice(0, 10) !== new Date().toISOStri
 const at = t => `${day(t)}${utc(t)} (${local(t)} your time)`;
 function schedule(s) {
   const c = s.schedule, a = s.audio, web = c.webSdr;
-  $("hearingTitle").textContent = "Hearing " + (c.followed.map(f => f.station).join(", ") || "GB7RDG");
+  $("hearingTitle").textContent = "Hearing " + (c.followed.map(f => f.station).join(", ") || "no station yet");
   const kind = a.source.startsWith("ubersdr:") ? "web" : a.source.startsWith("wav:") ? "wav" : /^sdrconnect:/i.test(a.source) ? "sdrconnect" : "radio";
   const tuning = kind === "web" ? `The web SDR ${esc(sdr(s))} is tuned for it (USB, dial ${mhz(a.dialKHz)} MHz).`
     : kind === "sdrconnect" ? `The receiver tunes SDRconnect (${esc(a.source.slice(11))}) for it (USB, dial ${mhz(a.dialKHz)} MHz); leave its tuning alone while the receiver runs.`
     : kind === "radio" && a.dialFromSoundModem ? `pdn-soundmodem says its radio is on USB with the dial on ${mhz(a.dialKHz)} MHz.`
     : kind === "radio" ? `Set your radio to USB with the dial on ${mhz(a.dialKHz)} MHz.` : `USB dial ${mhz(a.dialKHz)} MHz.`;
   let rows = `<dt>Frequency</dt><dd>${mhz(a.centreKHz)} MHz. ${tuning}</dd>
-    <dt>Slots</dt><dd>${esc(c.words)}${c.followed.length < 2 && c.from === "directory" ? " (as GB7RDG's own directory gives them)" : ""}</dd>
+    <dt>Slots</dt><dd>${esc(c.words)}</dd>
     <dt>Stations</dt><dd>${s.stations.known.map(k => `${esc(k.station)} (key ${esc(k.keyId)}${k.pinnedAt ? `, learnt ${esc(new Date(k.pinnedAt).toISOString().slice(0, 10))}` : ""}${k.heardDirectory ? `, directory heard for ${esc(k.heardDirectory)}` : ""})`).join("; ")}.${s.stations.conflicts.map(c => ` <strong>Refused</strong>: a directory naming ${esc(c.station)} signed by key ${esc(c.heardKeyId)}, not its pinned key ${esc(c.pinnedKeyId)}, last at ${utc(c.heardAt)}.`).join("")}</dd>
-    <dt>Listening</dt><dd>${s.listening.map(l => `${esc(l.station)}: ${l.frequencyHz ? `${esc(l.slots)}, ${mhz(l.frequencyHz / 1000)} MHz ${l.sideband.toUpperCase()}, ${l.byHand ? "added by hand" : "from " + esc(l.from)}; ` : ""}${l.followed ? "listened at" : `not listened at: ${esc(l.why)}`}${l.station === "GB7RDG" ? "" : ` <button type="button" class="listenToggle" data-station="${esc(l.station)}" data-listen="${l.skipped ? "true" : "false"}">${l.skipped ? "Listen" : "Don't listen"}</button>`}`).join("<br>")}</dd>
+    <dt>Listening</dt><dd>${s.listening.map(l => `${esc(l.station)}: ${l.frequencyHz ? `${esc(l.slots)}, ${mhz(l.frequencyHz / 1000)} MHz ${l.sideband.toUpperCase()}, ${l.byHand ? "added by hand" : "from " + esc(l.from)}; ` : ""}${l.followed ? "listened at" : `not listened at: ${esc(l.why)}`}<button type="button" class="listenToggle" data-station="${esc(l.station)}" data-listen="${l.skipped ? "true" : "false"}">${l.skipped ? "Listen" : "Don't listen"}</button>`).join("<br>")}</dd>
     ${(s.heardToday || []).length ? `<dt>Heard today</dt><dd>${s.heardToday.map(h => `${esc(h.station)}: heard ${h.heard} of ${h.listened} slot${h.listened === 1 ? "" : "s"}, ${h.frames} frame${h.frames === 1 ? "" : "s"}, ${h.completed} bulletin${h.completed === 1 ? "" : "s"} completed${h.snrDb === null ? "" : `, tone SNR ${Math.round(h.snrDb)} dB (median)`}${h.virtualHeightKm === null ? "" : `, virtual height ${Math.round(h.virtualHeightKm)} km (median)`}`).join("<br>")}</dd>` : ""}
     <dt>Today</dt><dd>${c.today.length ? `${c.daylight ? "in daylight, " : ""}${c.today.join(", ")} UTC` : "no slots today"}</dd>
-    <dt>Next slot</dt><dd>${at(c.next)}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
+    <dt>Next slot</dt><dd>${c.next ? at(c.next) : "none"}${c.recent ? `; the ${utc(c.recent)} one began ${Math.max(0, Math.round((Date.now() - new Date(c.recent)) / 60000))} min ago` : ""}</dd>`;
   if (web) {
     const all = web.slotsPerDay === c.slotsPerDay, w = a.webSdr || {};
     rows += `<dt>Web SDR</dt><dd>${w.url ? `<a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.host)}</a>` : esc(w.host)}${w.about ? ` (${esc(w.about)})` : ""}:
@@ -1217,15 +1218,15 @@ function schedule(s) {
   $("when").innerHTML = rows;
   $("slotShape").textContent = `Each slot starts with a ${c.toneSeconds} second tone, ${s.markers.centreHz} Hz in your audio, then a few minutes of short data bursts.`;
   listenNow(s);
-  if (!s.slot) $("slot").textContent = `Nothing heard yet. ${web && !web.openNow ? `The web SDR ${sdr(s)} listens next at ${utc(web.slot)}.` : `The next slot is at ${utc(c.next)}.`}`;
+  if (!s.slot) $("slot").textContent = `Nothing heard yet. ${web && !web.openNow ? `The web SDR ${sdr(s)} listens next at ${utc(web.slot)}.` : c.next ? `The next slot is at ${utc(c.next)}.` : "No station is followed yet."}`;
 
   const tips = [
     web ? `Wait for the next slot the web SDR listens to, at ${utc(web.slot)}, and watch the spectrogram.`
-      : `Wait for the next slot, at ${utc(c.next)}, and watch the spectrogram.`,
+      : c.next ? `Wait for the next slot, at ${utc(c.next)}, and watch the spectrogram.` : "Wait for a station to be heard of or added, and watch the spectrogram.",
     "The tone shows as a bright line on the dashed centre line, then the data fills the space between the blue edges.",
     "40 m changes through the day, so some slots may not reach you. Give it a few slots before changing anything.",
   ];
-  if (c.daylight) tips.splice(1, 0, `GB7RDG sends only in daylight, ${esc(c.daylight.words)}, because 40 m does not reach UK stations at night. Today that is ${c.today.length ? c.today.join(", ") + " UTC" : "no slots at all"}.`);
+  if (c.daylight) tips.splice(1, 0, `${esc(c.followed[0].station)} sends only in daylight, ${esc(c.daylight.words)}, because 40 m does not reach UK stations at night. Today that is ${c.today.length ? c.today.join(", ") + " UTC" : "no slots at all"}.`);
   if (kind === "sdrconnect") tips.push("Check SDRconnect is running with its WebSocket Server on, and that the level meter moves.");
   if (kind === "radio") tips.push(`Check the radio is on USB at ${mhz(a.dialKHz)} MHz with a receive filter at least 3 kHz wide, and that the level meter moves.`);
   if (web) tips.push(`If ${esc(sdr(s))} never hears it, try another UberSDR receiver in the settings below.`);

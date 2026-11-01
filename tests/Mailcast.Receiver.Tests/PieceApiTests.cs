@@ -23,7 +23,7 @@ public class PieceApiTests
             probe.Start();
             int port = ((IPEndPoint)probe.LocalEndpoint).Port;
             probe.Stop();
-            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir, Daylight = null, Web = new WebSettings { Port = port, Password = password } };
+            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir, Stations = StationFixture.EverySlot, Web = new WebSettings { Port = port, Password = password } };
             var host = new ReceiverHost(config, new FakeTimeProvider(Start), _ => { });
             var page = new StatusPage(host, null, _ => { }) { FailureDelay = TimeSpan.Zero };
             try
@@ -248,7 +248,7 @@ public class OpenApiTests
         probe.Start();
         int port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port;
         probe.Stop();
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null, Web = new WebSettings { Port = port } };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot, Web = new WebSettings { Port = port } };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero)), _ => { });
         await using var page = new StatusPage(host, null, _ => { });
         page.Start();
@@ -320,7 +320,7 @@ public class HostCheckTests
         probe.Start();
         int port = ((IPEndPoint)probe.LocalEndpoint).Port;
         probe.Stop();
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null, Web = new WebSettings { Port = port, Lan = true } };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot, Web = new WebSettings { Port = port, Lan = true } };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero)), _ => { });
         await using var page = new StatusPage(host, null, _ => { });
         page.Start();

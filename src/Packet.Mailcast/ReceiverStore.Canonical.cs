@@ -130,7 +130,7 @@ public sealed partial class ReceiverStore
                 var loaded = new AwaitingItem(id, bulletin, parts[1], since);
                 foreach (var station in parts[3].Split(';', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    loaded.Listed.Add(station);
+                    loaded.Listed.Add(_options.Stations.Current(station));
                 }
                 _awaiting[id] = loaded;
                 var counts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -139,7 +139,8 @@ public sealed partial class ReceiverStore
                     int eq = pair.LastIndexOf('=');
                     if (eq > 0 && int.TryParse(pair[(eq + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out int n))
                     {
-                        counts[pair[..eq]] = n;
+                        string named = _options.Stations.Current(pair[..eq]);
+                        counts[named] = counts.GetValueOrDefault(named) + n;
                     }
                 }
                 if (counts.Count > 0)

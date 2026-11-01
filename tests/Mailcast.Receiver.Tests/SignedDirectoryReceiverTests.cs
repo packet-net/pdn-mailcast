@@ -30,7 +30,7 @@ public class SignedDirectoryReceiverTests
         // Left out, only the built-in key, and nothing is written for it.
         File.WriteAllText(path, "{}");
         var plain = ReceiverConfig.Load(path);
-        Assert.Equal([TrustedKey.Gb7rdg], plain.AllTrustedKeys);
+        Assert.Equal([StationFixture.Key.KeyId], plain.AllTrustedKeys.Select(k => k.KeyId));
         plain.Save(path);
         Assert.DoesNotContain("trustedKeys", File.ReadAllText(path), StringComparison.Ordinal);
     }

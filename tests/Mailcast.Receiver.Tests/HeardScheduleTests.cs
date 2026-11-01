@@ -3,13 +3,16 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace Mailcast.Receiver.Tests;
 
-/// <summary>The head end's timetable, heard in its directory, in place of the config file's.</summary>
+/// <summary>A station's timetable, heard in its directory, in place of the stations file's.</summary>
 public class HeardScheduleTests
 {
     private static readonly DateTimeOffset Slot = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
 
+    /// <summary>The slots the receiver counts for its one station now.</summary>
+    private static SlotSchedule Used(ReceiverHost host) => host.Followed.Stations.Single().Schedule;
+
     [Fact]
-    public async Task ADirectoryWithATimetable_IsUsedInsteadOfTheConfig_SaysSo_AndOutlivesARestart()
+    public async Task ADirectoryWithATimetable_IsUsedInsteadOfTheStationsFile_SaysSo_AndOutlivesARestart()
     {
         using var dir = new TempDirectory();
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path };
@@ -19,18 +22,18 @@ public class HeardScheduleTests
 
         await using (var host = new ReceiverHost(config, new FakeTimeProvider(Slot), line => { lock (log) { log.Add(line); } }))
         {
-            Assert.False(host.ScheduleFromDirectory);
-            Assert.Equal(config.Schedule, host.Schedule);
+            Assert.Empty(host.Intake.HeardSchedules);
+            Assert.Equal(Fixture.Slots(config), Used(host));
             foreach (var frame in Samples.Frames([Samples.Bulletin(1)], options, Slot))
             {
                 host.Intake.Offer(frame);
             }
             await host.Intake.DrainAsync(CancellationToken.None);
 
-            Assert.True(host.ScheduleFromDirectory);
-            Assert.Equal(SlotSchedule.From(heard), host.Schedule);
+            Assert.Single(host.Intake.HeardSchedules);
+            Assert.Equal(SlotSchedule.From(heard), Used(host));
             Assert.Equal(heard.Daylight, host.Slots.Schedule!.First.Daylight);
-            Assert.Single(log, l => l == "slots: GB7RDG's directory gives its slots as every hour at 30 minutes past, in daylight: from 60 minutes after sunrise to 60 minutes before sunset at IO91lk; using that instead of the config file's");
+            Assert.Single(log, l => l == "slots: GB7RDG's directory gives its slots as every hour at 30 minutes past, in daylight: from 60 minutes after sunrise to 60 minutes before sunset at IO91lk; using that instead of the stations file's");
 
             // Hearing the same again says nothing more.
             foreach (var frame in Samples.Frames([Samples.Bulletin(2)], options, Slot.AddHours(1)))
@@ -43,13 +46,13 @@ public class HeardScheduleTests
 
         await using (var again = new ReceiverHost(config, new FakeTimeProvider(Slot), _ => { }))
         {
-            Assert.True(again.ScheduleFromDirectory);
-            Assert.Equal(SlotSchedule.From(heard), again.Schedule);
+            Assert.Single(again.Intake.HeardSchedules);
+            Assert.Equal(SlotSchedule.From(heard), Used(again));
         }
     }
 
     [Fact]
-    public async Task ADirectoryWithoutOne_AsFromAV020HeadEnd_LeavesTheConfigInForce()
+    public async Task ADirectoryWithoutOne_AsFromAV020HeadEnd_LeavesTheStationsFileInForce()
     {
         using var dir = new TempDirectory();
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path };
@@ -60,8 +63,8 @@ public class HeardScheduleTests
         }
         await host.Intake.DrainAsync(CancellationToken.None);
         Assert.NotNull(host.Intake.Progress().Directory);
-        Assert.False(host.ScheduleFromDirectory);
-        Assert.Equal(config.Schedule, host.Schedule);
+        Assert.Empty(host.Intake.HeardSchedules);
+        Assert.Equal(Fixture.Slots(config), Used(host));
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public class ListenNowApiTests
     {
         Audio = "ubersdr:wessex.zapto.org",
         StateDirectory = dir,
-        Daylight = null,
+        Stations = StationFixture.EverySlot,
         Web = new WebSettings { Port = webPort, Password = password },
     };
 

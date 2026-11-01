@@ -40,6 +40,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             ArchiveRetention = TimeSpan.FromDays(config.Archive.Days),
             ArchiveMaxBytes = config.Archive.MaxMegabytes * 1024L * 1024,
             TrustedKeys = config.AllTrustedKeys,
+            Stations = config.Stations,
             UnsignedDirectoriesAreUsed = !refuseUnsigned && ReceiverStoreOptions.DefaultUnsignedDirectoriesAreUsed,
             DeliveryCall = () => Ascii.Clean(Config.Bbs.Login).ToUpperInvariant(),
         });
@@ -49,7 +50,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Ledger = new DeliveryLedger(config.StateDirectory);
         Slots = new SlotTracker(time, log, AudioSource.Parse(config.Audio).Kind == AudioSourceKind.Wav ? null : Followed);
         // Issue #145: the station whose slot the frame arrives in, from the schedule at the time (as the slot tracker places it).
-        Intake.HeardFrom = () => Followed is not { } followed ? null
+        Intake.HeardFrom = () => Followed is not { Stations.Count: > 0 } followed ? null
             : followed.OneStation ? followed.Stations[0].Station
             : followed.StationAt(followed.LatestStart(time.GetUtcNow() + SlotTracker.ClockAllowance));
         Bbs = new BbsClient(config.Bbs, time, log) { Version = Version };
@@ -71,7 +72,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.Piece += OnPieceHandled;
         // The dial the audio is really heard on: pdn-soundmodem's own, when it says one.
         Hooks = new SlotHooks(() => Config, time, log) { DialKHz = () => DialHz / 1000, SignalKHz = slot => StationAtSlot(slot)?.FrequencyHz / 1000.0 };
-        ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place) { AudioCentreHz = config.AudioCentreHz };
+        ChannelWatch = new ChannelWatch(time, log, Path.Combine(config.StateDirectory, ChannelWatch.FileName), () => Place, config.Stations) { AudioCentreHz = config.AudioCentreHz };
         ChannelWatch.Transmitter = slot => StationAtSlot(slot)?.OnTheAir;
         ChannelWatch.Measured += FrameHistory.OnChannelMeasured;
         if (config.Retune && AudioSource.Parse(config.Audio).Kind == AudioSourceKind.SoundModem)
@@ -163,7 +164,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             captured = samples.ToArray();
         }
-        return FilterScan.Analyse(captured);
+        return FilterScan.Analyse(captured, Config.CentreHz);
     }
 
     private readonly object _listenNowGate = new();
@@ -200,10 +201,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         var feedback = new FeedbackService(new FeedbackSources
         {
             Settings = () => Config.Feedback,
-            Schedule = () => Kind() == AudioSourceKind.Wav ? null : Schedule,
+            Followed = () => Kind() == AudioSourceKind.Wav ? null : Followed,
             Listened = ListenedOn,
-            Station = slot => Followed.OneStation ? Followed.Stations[0].Station : Followed.StationAt(slot) ?? ReceiverStore.BuiltInStation,
-            OwnStation = () => Followed.OneStation ? Followed.Stations[0].Station : ReceiverStore.BuiltInStation,
+            Station = slot => Followed.OneStation ? Followed.Stations[0].Station : Followed.StationAt(slot),
+            Stations = () => Config.Stations,
             LastSlot = () => Slots.Last,
             Ionosphere = () => Intake.Ionosphere,
             PskReporter = () => Intake.PskReporter,
@@ -215,13 +216,12 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
         Intake.GivenUp += feedback.NoteGivenUp;
         Intake.OutsidePieces += feedback.NoteOutsidePieces;
-        // The report goes to GB7RDG, and only its directories say whether it got there, whatever
-        // the report says about other stations (issue #148).
+        // Each station's directories say whether the report reached it (issue #136).
         Intake.DirectoryHeard += directory =>
         {
-            if (Intake.StationOf(directory) == ReceiverStore.BuiltInStation)
+            if (Intake.StationOf(directory) is { } station)
             {
-                feedback.NoteDirectory(directory);
+                feedback.NoteDirectory(directory, station);
             }
         };
         Delivery.SessionFinished += report =>
@@ -251,7 +251,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The config's <c>hooks</c>, run around each slot listened to.</summary>
     public SlotHooks Hooks { get; }
 
-    /// <summary>The radio path from GB7RDG, measured after each slot from the bursts decoded.</summary>
+    /// <summary>The radio path from each station, measured after each slot from the bursts decoded.</summary>
     public ChannelWatch ChannelWatch { get; }
 
     /// <summary>
@@ -303,7 +303,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// The slot a burst heard at <paramref name="heard"/> belongs to, for the channel
-    /// measurement: with GB7RDG's slots known, the slot that began within <see cref="SlotLasts"/>
+    /// measurement: with the stations' slots known, the slot that began within <see cref="SlotLasts"/>
     /// before it, or null if none did (a sound card hearing another MS110D station between
     /// slots). Without them (a recording), one slot for each run of bursts with no gap of
     /// <see cref="SlotTracker.Gap"/>, named by its first burst.
@@ -331,7 +331,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         if (Pipeline is { } pipeline && pipeline.FollowDial(dialHz))
         {
-            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz);
+            ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz, Config.CentreHz);
         }
     }
 
@@ -474,14 +474,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public Retuner? Retuner { get; }
 
-    /// <summary>
-    /// GB7RDG's slots: as its newest directory gives them once one has been heard, and until then
-    /// as the config file does.
-    /// </summary>
-    public SlotSchedule Schedule => Intake.HeardSchedule is { } heard ? SlotSchedule.From(heard) : Config.Schedule;
-
-    /// <summary>The most stations, besides GB7RDG, whose slots this receiver listens at.</summary>
-    public const int MostFollowedStations = 6;
+    /// <summary>The most stations whose slots this receiver listens at.</summary>
+    public const int MostFollowedStations = 7;
 
     /// <summary>The fewest minutes between a followed station's slots: at most one slot an hour.</summary>
     public const int MinutesBetweenFollowedSlots = 60;
@@ -507,45 +501,37 @@ public sealed class ReceiverHost : IAsyncDisposable
             AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr);
 
     /// <summary>
-    /// Every station this receiver knows the slots of (issues #178 and #144), GB7RDG first:
-    /// GB7RDG by its directory or the config; any other by the timetable its own signed directory
-    /// gives, or else the newest advert for it. Each station's frequency, sideband and place come
-    /// from its own directory, else an advert (issue #179); GB7RDG alone falls back to 7.0538 MHz
-    /// USB at IO91lk, and any other to the frequency the dial setting is written for. Each says
-    /// whether it is followed, and if not, why.
+    /// Every station this receiver knows the slots of (issues #178 and #144), all equal: a station of the
+    /// stations file by its own directory or else the file's timetable; any other by the timetable its own
+    /// signed directory gives, or else the newest advert for it. Each station's frequency, sideband and place come
+    /// from its own directory, else its advert or the stations file (issue #179), else the frequency it was heard on.
+    /// Each says whether it is followed, and if not, why. At most <see cref="MostFollowedStations"/> are followed.
     /// </summary>
     public IReadOnlyList<ListenedStation> Listening
     {
         get
         {
-            var skip = new HashSet<string>(Config.SkipStations ?? [], StringComparer.OrdinalIgnoreCase);
-            var rdg = Intake.HeardDetails(ReceiverStore.BuiltInStation);
-            var rdgBuiltIn = ReceiverStore.BuiltInDetails;
-            var rdgOnAir = new StationOnAir(ReceiverStore.BuiltInStation, rdg?.FrequencyHz ?? rdgBuiltIn.FrequencyHz!.Value, rdg?.Sideband ?? rdgBuiltIn.Sideband!.Value,
-                rdg?.Locator ?? rdgBuiltIn.Locator, rdg?.FrequencyHz is null ? "assumed" : "its own directory");
-            // GB7RDG is always listened at, as before; if this receiver cannot hear where it says it is, the log says so (see RefreshFollowed).
-            var rdgReach = Reach(rdgOnAir);
-            var list = new List<ListenedStation>
-            {
-                new(ReceiverStore.BuiltInStation, Schedule.Timetable, rdgOnAir.FrequencyHz, rdgOnAir.Sideband,
-                    ScheduleFromDirectory ? "its own directory" : "the config file", true, null, rdgOnAir.Locator, rdgReach.Heard ? rdgReach.DialHz : Config.DialHz, rdgReach.How, rdgReach.IfHz),
-            };
+            var config = Config;
+            var file = config.Stations;
+            var fileAdverts = file.Stations.Select(k => k.ToAdvert()).ToList();
             var adverts = Intake.Adverts();
             // Issue #224: entries added by hand count as adverts, ahead of any heard on air for the same station.
-            var byHand = (Config.ListenFor ?? []).Where(e => e.Problem() is null && ListenForState.Get(e)?.Retired is null).Select(e => (Entry: e, Advert: e.ToAdvert())).ToList();
+            var byHand = (config.ListenFor ?? []).Where(e => e.Problem() is null && ListenForState.Get(e)?.Retired is null).Select(e => (Entry: e, Advert: e.ToAdvert())).ToList();
             var handAdverts = byHand.Select(h => h.Advert).ToList();
-            var heard = Intake.StationDirectories().Select(d => d.Station);
+            var heard = Intake.StationDirectories().Select(d => d.Station).ToList();
             var pins = Intake.Pins();
-            var candidates = new List<(ListenedStation Station, int Tier, DateTimeOffset Seen)>();
-            foreach (string station in adverts.Select(a => a.Callsign).Concat(handAdverts.Select(a => a.Callsign)).Concat(heard).Distinct(StringComparer.Ordinal).Where(c => c != ReceiverStore.BuiltInStation).Order(StringComparer.Ordinal))
+            var candidates = new List<(ListenedStation Station, int Tier, DateTimeOffset Seen, int Order)>();
+            foreach (string station in file.Stations.Select(k => k.Callsign).Concat(adverts.Select(a => a.Callsign)).Concat(handAdverts.Select(a => a.Callsign)).Concat(heard).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
             {
                 var own = Intake.HeardTimetable(station);
                 var details = Intake.HeardDetails(station);
-                var advertised = handAdverts.Where(a => a.Callsign == station).Concat(adverts.Where(a => a.Callsign == station)).ToList();
+                var known = file.Find(station);
+                var fileAdvert = known?.ToAdvert();
+                var advertised = handAdverts.Where(a => a.Callsign == station).Concat(fileAdvert is null ? [] : [fileAdvert]).Concat(adverts.Where(a => a.Callsign == station)).ToList();
                 // What its own directory says about where it is on the air comes first. Otherwise
                 // the advert this receiver can hear, if one is, else the first, to show why not.
                 // A directory that says nothing of it (a head end from before v0.20.0) and no advert:
-                // the frequency the dial setting is written for, as before.
+                // the stations file's details, else the frequency the dial setting is written for.
                 StationAdvert? advert = null;
                 bool heardHere = heard.Contains(station);
                 // A station whose own signed directory is heard here is where it was heard (the
@@ -553,40 +539,46 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // an advert says; adverts only place stations known from adverts alone.
                 if (details?.FrequencyHz is null && !heardHere)
                 {
-                    // Its own directory heard here, saying nothing of where it is, and adverts that put it
-                    // out of reach: it is plainly within reach (an advert is only a hint), so it is
-                    // taken to be where the dial setting is written for, as before issue #179.
                     advert = advertised.FirstOrDefault(a => Reach(new StationOnAir(station, a.FrequencyHz, a.Sideband, a.Locator, "an advert")).Heard) ?? advertised.FirstOrDefault();
                 }
-                if ((own ?? advert?.Timetable ?? advertised.FirstOrDefault()?.Timetable) is not { } timetable)
+                var timetableAdvert = advert ?? advertised.FirstOrDefault();
+                if ((own ?? timetableAdvert?.Timetable) is not { } timetable)
                 {
                     continue;
                 }
-                long hz = details?.FrequencyHz ?? advert?.FrequencyHz ?? WhereHeard(station);
-                var sideband = details?.Sideband ?? (details?.FrequencyHz is not null ? Sideband.Usb : advert?.Sideband ?? Sideband.Usb);
-                string? locator = details?.Locator ?? (heardHere ? null : advert?.Locator ?? advertised.Select(a => a.Locator).FirstOrDefault(l => l is not null));
-                string frequencyFrom = details?.FrequencyHz is not null ? "its own directory" : advert is not null ? "an advert" : heardHere ? "where its directory was heard" : "assumed";
+                long hz = details?.FrequencyHz ?? advert?.FrequencyHz ?? known?.FrequencyHz ?? WhereHeard(station);
+                var sideband = details?.Sideband ?? (details?.FrequencyHz is not null ? Sideband.Usb : advert?.Sideband ?? known?.Sideband ?? Sideband.Usb);
+                string? locator = details?.Locator ?? (heardHere ? known?.Locator : advert?.Locator ?? known?.Locator ?? advertised.Select(a => a.Locator).FirstOrDefault(l => l is not null));
+                bool fromFile = fileAdvert is not null && advert == fileAdvert;
+                string frequencyFrom = details?.FrequencyHz is not null ? "its own directory" : fromFile ? "the stations file" : advert is not null ? "an advert" : known is not null ? "the stations file" : heardHere ? "where its directory was heard" : "assumed";
                 var reach = Reach(new StationOnAir(station, hz, sideband, locator, frequencyFrom));
-                string? why = skip.Contains(station) ? "you chose not to listen at its slots"
+                string? why = config.IsSkipped(station) ? "you chose not to listen at its slots"
                     : !reach.Heard ? reach.Why
                     : timetable.EveryMinutes < MinutesBetweenFollowedSlots ? $"its slots are every {timetable.EveryMinutes} minutes, and a station is only listened at for at most one slot an hour"
                     : null;
                 // Heard directly first, by when its key was pinned (keys given by hand first);
-                // then advertised only, by the date it was first advertised; then by callsign.
-                // Then entries added by hand (an explicit wish outranks a hint heard on air), by when they were added.
-                bool fromHand = own is null && advert is not null && handAdverts.Contains(advert);
+                // then the stations file's, in the file's order; then entries added by hand (an explicit
+                // wish outranks a hint heard on air), by when they were added; then advertised only,
+                // by the date it was first advertised; then by callsign.
+                bool fromHand = own is null && timetableAdvert is not null && handAdverts.Contains(timetableAdvert);
+                bool fromKnown = own is null && !fromHand && timetableAdvert is not null && timetableAdvert == fileAdvert;
                 DateTimeOffset seen = own is not null
                     ? pins.Where(p => p.Station == station).Select(p => p.PinnedAt ?? DateTimeOffset.MinValue).DefaultIfEmpty(DateTimeOffset.MaxValue).Min()
-                    : fromHand ? ListenForState.Get(byHand.First(h => h.Advert == advert).Entry)?.AddedUtc ?? DateTimeOffset.MaxValue
+                    : fromHand ? ListenForState.Get(byHand.First(h => h.Advert == timetableAdvert).Entry)?.AddedUtc ?? DateTimeOffset.MaxValue
+                    : fromKnown ? DateTimeOffset.MinValue
                     : Intake.AdvertFirstSeen(station) is { } first ? new DateTimeOffset(first.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : DateTimeOffset.MaxValue;
-                candidates.Add((new ListenedStation(station, timetable, hz, sideband, own is not null ? "its own directory" : fromHand ? "added by hand" : "an advert", why is null, why, locator, reach.Heard ? reach.DialHz : null, reach.Heard ? reach.How : null, reach.Heard ? reach.IfHz : null), own is not null ? 0 : fromHand ? 1 : 2, seen));
+                int order = known is null ? int.MaxValue : file.Stations.ToList().IndexOf(known);
+                string source = own is not null ? "its own directory" : fromHand ? "added by hand" : fromKnown ? "the stations file" : "an advert";
+                candidates.Add((new ListenedStation(station, timetable, hz, sideband, source, why is null, why, locator, reach.Heard ? reach.DialHz : null, reach.Heard ? reach.How : null, reach.Heard ? reach.IfHz : null),
+                    own is not null ? 0 : fromKnown ? 1 : fromHand ? 2 : 3, seen, order));
             }
+            var list = new List<ListenedStation>();
             int taken = 0;
-            foreach (var (station, _, _) in candidates.OrderBy(c => c.Tier).ThenBy(c => c.Seen).ThenBy(c => c.Station.Station, StringComparer.Ordinal))
+            foreach (var (station, _, _, _) in candidates.OrderBy(c => c.Tier).ThenBy(c => c.Seen).ThenBy(c => c.Order).ThenBy(c => c.Station.Station, StringComparer.Ordinal))
             {
                 if (station.Followed && ++taken > MostFollowedStations)
                 {
-                    list.Add(station with { Followed = false, NotFollowedBecause = $"this receiver listens at the slots of at most {MostFollowedStations} stations besides GB7RDG, and others were heard of first" });
+                    list.Add(station with { Followed = false, NotFollowedBecause = $"this receiver listens at the slots of at most {MostFollowedStations} stations, and others were heard of first" });
                 }
                 else
                 {
@@ -600,12 +592,6 @@ public sealed class ReceiverHost : IAsyncDisposable
                     list.Add(new ListenedStation(callsign, new SlotTimetable(TimeOnly.MinValue, 60), 0, Sideband.Usb, "an advert", false,
                         $"it was advertised{(by is null ? "" : $" by {by}")} past the first {BroadcastDirectory.MostAdverts} adverts, the most a directory is read for"));
                 }
-            }
-            // A dial that cannot hear GB7RDG (pdn-soundmodem's radio on the LNB's IF) while it does
-            // hear another station: GB7RDG is not followed, rather than followed at a nonsense audio position.
-            if (!rdgReach.Heard && (Pipeline?.HomeLnb is not null || list.Any(l => l.Station != ReceiverStore.BuiltInStation && l.Followed)))
-            {
-                list[0] = list[0] with { Followed = false, NotFollowedBecause = rdgReach.Why };
             }
             return list;
         }
@@ -663,33 +649,24 @@ public sealed class ReceiverHost : IAsyncDisposable
             ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz, home.IfHz);
             return;
         }
-        pipeline.SetSignal(OnAir.DefaultSignalHz);
+        pipeline.SetSignal(Config.CentreHz);
         if (Retuner is { Window: null } && pipeline.Source.Kind != AudioSourceKind.SoundModem)
         {
             pipeline.SetDial(Config.DialHz);
         }
-        ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz);
+        ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz, Config.CentreHz);
     }
 
     /// <summary>
-    /// The slots of every station this receiver follows (issue #144): GB7RDG's
-    /// (<see cref="Schedule"/>), then every other station in <see cref="Listening"/> that is
-    /// followed. With none, GB7RDG's alone, exactly as before.
+    /// The slots of every station this receiver follows (issue #144), each its own timetable; none
+    /// when no station is known or none can be heard.
     /// </summary>
     public FollowedSlots Followed
     {
         get
         {
             var followed = Listening.Where(l => l.Followed).ToList();
-            if (followed.Count == 0)
-            {
-                // Only the LNB's downlink is heard and no station on it is known yet: GB7RDG's
-                // slots stand in as the placeholder timetable, and nothing is pointed at them.
-                return FollowedSlots.One(Schedule);
-            }
-            return followed.Count == 1 && followed[0].Station == ReceiverStore.BuiltInStation
-                ? FollowedSlots.One(Schedule)
-                : new FollowedSlots([.. followed.Select(l => (l.Station, l.Station == ReceiverStore.BuiltInStation ? Schedule : SlotSchedule.From(l.Timetable)))]);
+            return followed.Count == 0 ? FollowedSlots.None : new FollowedSlots([.. followed.Select(l => (l.Station, SlotSchedule.From(l.Timetable)))]);
         }
     }
 
@@ -836,13 +813,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
     }
 
-    /// <summary>Whether <see cref="Schedule"/> comes from GB7RDG's directory rather than the config file.</summary>
-    public bool ScheduleFromDirectory => Intake.HeardSchedule is not null;
-
-    private void OnScheduleHeard(Packet.Mailcast.SlotTimetable heard)
+    private void OnScheduleHeard(string station, Packet.Mailcast.SlotTimetable heard)
     {
         var schedule = SlotSchedule.From(heard);
-        _log($"slots: GB7RDG's directory gives its slots as {schedule.Describe()}; using that instead of the config file's");
+        _log($"slots: {station}'s directory gives its slots as {schedule.Describe()}; using that instead of the stations file's");
         if (Slots.Schedule is not null)
         {
             Slots.Schedule = Followed;
@@ -912,7 +886,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     public bool DialFromSoundModem => Pipeline is { DialSettled: true } pipeline ? pipeline.DialFromSoundModem : SoundModemDialSaid is not null;
 
     /// <summary>Where the signal's centre is in the audio the page's spectrogram shows, Hz; see <see cref="AudioPipeline.AudioCentreHz"/>.</summary>
-    public double AudioCentreHz => Pipeline is { DialSettled: true } pipeline ? pipeline.AudioCentreHz : AudioPipeline.AudioCentreFor(DialHz);
+    public double AudioCentreHz => Pipeline is { DialSettled: true } pipeline ? pipeline.AudioCentreHz : AudioPipeline.AudioCentreFor(DialHz, Config.CentreHz);
 
     private (string Audio, double DialHz)? _soundModemDial;
 
@@ -1088,7 +1062,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public async Task RunAsync(CancellationToken cancellation)
     {
-        _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} (USB dial {OnAir.Mhz(Config.DialHz)} MHz), delivering to {DescribeBbs(Config.Bbs)}");
+        _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} ({(Config.ResolvedDialKHz is null ? "no USB dial set" : $"USB dial {OnAir.Mhz(Config.DialHz)} MHz")}), delivering to {DescribeBbs(Config.Bbs)}");
         foreach (string line in SlotLines())
         {
             _log(line);
@@ -1097,7 +1071,9 @@ public sealed class ReceiverHost : IAsyncDisposable
         ExpireListenFor();
         if (Followed is { OneStation: false } followed)
         {
-            _log($"slots: following {followed.Describe()}");
+            _log(followed.Stations.Count == 0
+                ? "slots: no station is followed yet; they come from the stations file, adverts heard on air and \"Listen for a station\""
+                : $"slots: following {followed.Describe()}");
         }
         _log(SourcesLine(Config));
         if (SourcesFromFollowed.Count > 0)
@@ -1113,9 +1089,9 @@ public sealed class ReceiverHost : IAsyncDisposable
                 _log($"config: \"{key}\" is not a setting and is ignored");
             }
         }
-        if (Config.SlotUtcWithoutEveryMinutes)
+        if (Config.SlotSettingsIgnored.Count > 0)
         {
-            _log($"config: no \"everyMinutes\" (an older file); read as every 60 minutes, at :{Config.SlotStart.Minute:00} past each hour, the same hourly slots, so nothing needs changing");
+            _log($"config: {string.Join(", ", Config.SlotSettingsIgnored.Select(k => $"\"{k}\""))} no longer used and ignored; each station's slots are in the stations file or its own directory");
         }
         if (Config.WebSdrSlotsPerDayIgnored)
         {
@@ -1229,7 +1205,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The start-up line saying which callsigns frames are accepted from, and whether that is the default for a file without "sources".</summary>
     internal static string SourcesLine(ReceiverConfig config) => config.Sources is null
-        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default, and from the stations it knows of; add \"sources\" to choose"
+        ? "config: there is no \"sources\" in the config file, so frames are accepted from the stations it knows of; add \"sources\" to accept others"
         : $"config: frames are accepted from {config.Sources}, as \"sources\" says, and from the stations it knows of";
 
     /// <summary>
@@ -1275,10 +1251,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>Whether going from <paramref name="a"/> to <paramref name="b"/> restarts the audio: its source, or when it listens.</summary>
     private static bool AudioSettingsDiffer(ReceiverConfig a, ReceiverConfig b) =>
         !string.Equals(a.Audio, b.Audio, StringComparison.Ordinal)
-        || !string.Equals(a.SlotAnchor, b.SlotAnchor, StringComparison.Ordinal)
-        || a.EveryMinutes != b.EveryMinutes
-        || a.Daylight != b.Daylight
-        || a.DialKHz != b.DialKHz;
+        || a.ResolvedDialKHz != b.ResolvedDialKHz;
 
     /// <summary>
     /// Puts a new configuration in force: the BBS settings at once, and the audio pipeline is
@@ -1362,6 +1335,18 @@ public sealed class ReceiverHost : IAsyncDisposable
                 // Said again whenever it changes: once a day with a daylight rule, as the days
                 // lengthen and shorten.
                 var schedule = Followed;
+                if (schedule.Stations.Count == 0)
+                {
+                    // No station is known to listen for: nothing opens the web SDR until one is.
+                    Audio = new($"the web SDR {WebSdrHost(source)} is closed: no station is known to listen for yet", AudioPhase.Closed);
+                    if (AudioState != closedSaid)
+                    {
+                        closedSaid = AudioState;
+                        _log($"audio: {AudioState}");
+                    }
+                    await ClockDelayAsync(ClockCheck, restart.Token).ConfigureAwait(false);
+                    continue;
+                }
                 var (opens, closes, slot) = ListeningWindow.Next(_time.GetUtcNow(), schedule);
                 if (slot == EarlyEndFinished?.Slot)
                 {
@@ -1737,8 +1722,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         // A web SDR is opened for one slot's window: tuned to that slot's station (issue #179).
         var station = slot is { } s ? StationAtSlot(s) : null;
-        var pipeline = AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, _log, _time, config.Web.Port,
-            retunedByWindow: Retuner?.Window is not null, signalHz: station?.HeardAtHz ?? OnAir.DefaultSignalHz);
+        var pipeline = AudioPipeline.Create(source, station?.How == HowHeard.Retune ? station.DialHz!.Value : config.DialHz, station?.HeardAtHz ?? config.CentreHz, _log, _time, config.Web.Port,
+            retunedByWindow: Retuner?.Window is not null);
         pipeline.AlternateSignals = LnbSignals(source, config);
         pipeline.LnbHz = source.Kind == AudioSourceKind.UberSdr ? null : config.LnbHz;
         return pipeline;
@@ -1800,15 +1785,16 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
     }
 
-    /// <summary>The start-up lines about GB7RDG's slots: what they are, and, when the config's <c>minute</c> is in use and is not 0, that it is GB7RDG's alone (issue #224).</summary>
+    /// <summary>The start-up lines about the stations' slots: what they are, one line each (the stations file's, until a directory says otherwise).</summary>
     internal IEnumerable<string> SlotLines()
     {
-        yield return ScheduleFromDirectory
-            ? $"slots: GB7RDG's slots are {Schedule.Describe()}, as its directory gives them (used instead of the config file's)"
-            : $"slots: GB7RDG's slots are {Schedule.Describe()}";
-        if (!ScheduleFromDirectory && Config.SlotStart.Minute != 0)
+        if (Config.Stations.Path is { } path)
         {
-            yield return $"config: minute {Config.SlotStart.Minute} sets GB7RDG's slots only (now {Schedule.Describe()}); for another station use \"Listen for a station\" on the status page";
+            yield return $"stations: {path} lists {(Config.Stations.Stations.Count == 0 ? "no stations" : string.Join(", ", Config.Stations.Stations.Select(s => s.Callsign)))}";
+        }
+        foreach (var station in Listening)
+        {
+            yield return $"slots: {station.Station}'s slots are {SlotSchedule.From(station.Timetable).Describe()} (from {station.Source})";
         }
     }
 

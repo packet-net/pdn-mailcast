@@ -5,10 +5,11 @@ namespace Packet.Mailcast;
 /// <summary>A station's key as this receiver holds it (issue #178).</summary>
 /// <param name="Station">The station's callsign.</param>
 /// <param name="Key">Its directory key.</param>
-/// <param name="PinnedAt">When it was learnt from the station's first signed directory; null for one built in or in <c>trustedKeys</c>.</param>
+/// <param name="PinnedAt">When it was learnt from the station's first signed directory; null for one from the stations file or in <c>trustedKeys</c>.</param>
 /// <param name="FromTrustedKeys">Whether it was pinned because it is in <c>trustedKeys</c> (its label not a callsign): the pin goes when the key does.</param>
 /// <param name="Added">Whether it was added by hand on the status page (issue #146), not learnt on the air.</param>
-public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false, bool Added = false);
+/// <param name="FromStationsFile">Whether it is the key of a station in the stations file (<see cref="StationsFile"/>); never written to <see cref="ReceiverStore.PinsFile"/>.</param>
+public sealed record PinnedStation(string Station, TrustedKey Key, DateTimeOffset? PinnedAt, bool FromTrustedKeys = false, bool Added = false, bool FromStationsFile = false);
 
 /// <summary>
 /// A signed directory that named a station whose key is already pinned, under another key: it
@@ -30,8 +31,8 @@ public sealed record StationDirectory(string Station, BroadcastDirectory Directo
 /// <summary>Stations, their pinned keys, and their directories (issues #178 and #144).</summary>
 /// <remarks>
 /// <para>
-/// Each station signs its own directories, and may have more than one key. GB7RDG's key is
-/// built in. Every key in the receiver's <c>trustedKeys</c> is trusted, and pinned to its label
+/// Each station signs its own directories, and may have more than one key. The key of every
+/// station in the stations file is trusted and pinned to that station's callsign. Every key in the receiver's <c>trustedKeys</c> is trusted, and pinned to its label
 /// when that is a callsign, or else to the callsign its first signed directory names; the label
 /// is only what the page shows. Any other station's key is pinned the first
 /// time its signed directory is heard: the directory names the station (<c>station=</c>) and
@@ -44,21 +45,18 @@ public sealed record StationDirectory(string Station, BroadcastDirectory Directo
 /// </para>
 /// <para>
 /// A trusted signed directory belongs to the station its key is pinned to. An unsigned one
-/// belongs to GB7RDG when it names no station or names GB7RDG, exactly as before stations were
-/// named; one naming another station belongs to none, since anyone can send an unsigned
-/// directory. A directory of no station still names and delivers bulletins as any usable
-/// directory does, but gives no station's bulletins up and sets no station's timetable.
+/// (used only by tests: a program refuses them) belongs to the stations-file station it names,
+/// or, naming none, to the first station of the file; one naming another station belongs to none,
+/// since anyone can send an unsigned directory. A directory of no station still names and delivers
+/// bulletins as any usable directory does, but gives no station's bulletins up and sets no station's timetable.
 /// </para>
 /// </remarks>
 public sealed partial class ReceiverStore
 {
-    /// <summary>The station whose key is built in, and that unsigned directories belong to: GB7RDG.</summary>
-    public const string BuiltInStation = "GB7RDG";
-
     /// <summary>Where keys learnt on the air are kept, under the store's folder: one <c>CALL TAB base64 TAB pinned-at</c> line each.</summary>
     public const string PinsFile = "pins.txt";
 
-    // A station may hold several keys: GB7RDG's built-in one and a newer one in trustedKeys, say.
+    // A station may hold several keys: the stations file's and a newer one in trustedKeys, say.
     private const string FromTrustedKeysMark = "trusted";
     private const string AddedMark = "added";
 
@@ -67,20 +65,27 @@ public sealed partial class ReceiverStore
     private bool _newPin;
 
     /// <summary>
-    /// Every station's pinned keys: built in, from <c>trustedKeys</c> (pinned to its label when
+    /// Every station's pinned keys: from the stations file, from <c>trustedKeys</c> (pinned to its label when
     /// that is a callsign, otherwise to the callsign its first signed directory names), and
-    /// learnt on the air. GB7RDG first, then by callsign.
+    /// learnt on the air. By callsign.
     /// </summary>
-    public IReadOnlyList<PinnedStation> Pins => [.. _pins.OrderBy(p => p.Station != BuiltInStation).ThenBy(p => p.Station, StringComparer.Ordinal)];
+    public IReadOnlyList<PinnedStation> Pins => [.. _pins.OrderBy(p => p.Station, StringComparer.Ordinal)];
 
     /// <summary>Signed directories refused because they named a station pinned to another key, newest per station.</summary>
     public IReadOnlyList<KeyConflict> KeyConflicts => [.. _conflicts.Values.OrderBy(c => c.Station, StringComparer.Ordinal)];
 
-    /// <summary>The keys directories are checked against: every key in <c>trustedKeys</c> and the built-in one, and every pinned key.</summary>
+    /// <summary>The keys directories are checked against: every key in <c>trustedKeys</c>, and every pinned key (the stations file's among them).</summary>
     public IReadOnlyList<TrustedKey> DirectoryKeys { get; private set; } = [];
 
     private void LoadPins()
     {
+        foreach (var station in _options.Stations.Stations)
+        {
+            if (!_pins.Any(p => p.Key.KeyId == station.Key.KeyId))
+            {
+                _pins.Add(new PinnedStation(station.Callsign, station.Key, null, FromStationsFile: true));
+            }
+        }
         foreach (var key in _options.TrustedKeys)
         {
             string label = key.Label.ToUpperInvariant();
@@ -119,7 +124,14 @@ public sealed partial class ReceiverStore
                 }
                 if (!_pins.Any(x => x.Key.KeyId == key.KeyId))
                 {
-                    _pins.Add(new PinnedStation(p[0], key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark, p.Length >= 4 && p[3] == AddedMark));
+                    // A name an older version kept this key under is read as the station that lists it under "formerly".
+                    string station = _options.Stations.Current(p[0]);
+                    if (station != p[0])
+                    {
+                        Log($"{PinsFile}: {p[0]}'s key is read as {station}'s");
+                        dropped = true;
+                    }
+                    _pins.Add(new PinnedStation(station, key, at, p.Length >= 4 && p[3] == FromTrustedKeysMark, p.Length >= 4 && p[3] == AddedMark));
                 }
             }
         }
@@ -268,14 +280,15 @@ public sealed partial class ReceiverStore
             SignatureState.Trusted => directory.SigningKeyId is not { } id ? null
                 : _pins.FirstOrDefault(p => p.Key.KeyId == id)?.Station
                 ?? (directory.Station is null ? DirectoryKeys.FirstOrDefault(k => k.KeyId == id)?.Label : null),
-            SignatureState.None => directory.Station is null or BuiltInStation ? BuiltInStation : null,
+            SignatureState.None => directory.Station is null ? _options.Stations.First?.Callsign
+                : _options.Stations.Find(directory.Station)?.Callsign,
             _ => null,
         };
     }
 
     /// <summary>
     /// The newest directory remembered from each station (issue #144): the latest date, and of
-    /// those the one heard last. GB7RDG first, then by callsign.
+    /// those the one heard last. By callsign.
     /// </summary>
     public IReadOnlyList<StationDirectory> StationDirectories()
     {
@@ -296,21 +309,21 @@ public sealed partial class ReceiverStore
                 newest[station] = new StationDirectory(station, directory, check, heardAt);
             }
         }
-        return [.. newest.Values.OrderBy(d => d.Station != BuiltInStation).ThenBy(d => d.Station, StringComparer.Ordinal)];
+        return [.. newest.Values.OrderBy(d => d.Station, StringComparer.Ordinal)];
     }
 
     /// <summary>
-    /// The timetable <paramref name="station"/>'s own directories give: for GB7RDG,
-    /// <see cref="HeardSchedule"/>, kept across restarts; for another, that of its newest
-    /// remembered directory that gives one, always one signed by its own pinned key. Null when
-    /// none does.
+    /// The timetable <paramref name="station"/>'s own directories give: for a station of the
+    /// stations file, the one in <see cref="HeardSchedules"/>, kept across restarts; for another,
+    /// that of its newest remembered directory that gives one, always one signed by its own
+    /// pinned key. Null when none does.
     /// </summary>
     public SlotTimetable? HeardTimetable(string station)
     {
         ArgumentNullException.ThrowIfNull(station);
-        if (station == BuiltInStation)
+        if (_heardSchedules.TryGetValue(station, out var kept))
         {
-            return HeardSchedule;
+            return kept.Timetable;
         }
         return _knownDirectories.Values
             .Where(k => k.Directory.Schedule is not null && k.Check.State == SignatureState.Trusted && StationOf(k.Directory, k.Check) == station)
@@ -322,7 +335,7 @@ public sealed partial class ReceiverStore
     /// What <paramref name="station"/> says about its own transmitter (issue #179): the
     /// frequency, sideband and locator of its newest remembered trusted directory that gives
     /// any, each part from the newest that gives that part. Null when no directory of its does
-    /// (GB7RDG then has the built-in details, see <see cref="BuiltInDetails"/>; any other is
+    /// (a station of the stations file then has that file's details; any other is
     /// known from its adverts).
     /// </summary>
     public StationDetails? HeardDetails(string station)
@@ -350,12 +363,6 @@ public sealed partial class ReceiverStore
             withHz is not null ? withHz.Sideband ?? Sideband.Usb : newestFirst.Select(d => d.Sideband).FirstOrDefault(v => v is not null),
             newestFirst.Select(d => d.Locator).FirstOrDefault(v => v is not null));
     }
-
-    /// <summary>
-    /// What a receiver has always assumed of GB7RDG, used until a directory of its says otherwise:
-    /// 7.0538 MHz upper sideband, from IO91lk.
-    /// </summary>
-    public static StationDetails BuiltInDetails { get; } = new(7_053_800, Sideband.Usb, "IO91lk");
 
     // The advert taken for each station and place (callsign, frequency, sideband), and the date
     // of the directory it came from.

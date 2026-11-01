@@ -432,9 +432,9 @@ public sealed class SlotHooks : IDisposable
     }
 
     private IReadOnlyDictionary<string, string> Environment(string hook, DateTimeOffset slot, ReceiverConfig config, bool? beforeOk) =>
-        SlotHookEnvironment.For(hook, slot, DialKHz?.Invoke() ?? config.DialKHz, SignalKHz?.Invoke(slot) ?? config.CentreHz / 1000, beforeOk);
+        SlotHookEnvironment.For(hook, slot, DialKHz?.Invoke() ?? config.DialHz / 1000, SignalKHz?.Invoke(slot) ?? config.CentreHz / 1000, beforeOk);
 
-    /// <summary>The centre of the signal of the station whose slot it is, in kHz (issue #179); null (or unset) is the config's, GB7RDG's.</summary>
+    /// <summary>The centre of the signal of the station whose slot it is, in kHz (issue #179); null (or unset) is the config's.</summary>
     public Func<DateTimeOffset, double?>? SignalKHz { get; init; }
 
     private void WriteNote(Note note)

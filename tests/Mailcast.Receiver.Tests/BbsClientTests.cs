@@ -168,7 +168,7 @@ public class BbsClientTests
     public async Task Deliver_DailyReport_IsProposedAsABulletinToMcastAtGb7rdg()
     {
         await using var bbs = new FakeBbs();
-        var report = new Packet.Mailcast.Bulletin(Feedback.FeedbackSettings.Type, "G4ABC", Feedback.FeedbackSettings.To, Feedback.FeedbackSettings.At, "G4ABC_61006",
+        var report = new Packet.Mailcast.Bulletin(Feedback.FeedbackSettings.Type, "G4ABC", StationFixture.ReportTo, StationFixture.ReportAt, "G4ABC_61006",
             "MCR G4ABC 2026-10-06", new DateTimeOffset(2026, 10, 6, 18, 30, 0, TimeSpan.Zero), [], "MCR1 0.6.0 - sc 0/0 0\r\n10 W4 150 16 +1.2 IG\r\n");
 
         var session = await Client(bbs.Port).DeliverAsync([report], CancellationToken.None);

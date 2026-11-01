@@ -118,3 +118,19 @@ internal sealed class TempDirectory : IDisposable
         }
     }
 }
+
+/// <summary>A schedule as the slots of the fixture station, for the tests of what listens to slots.</summary>
+internal static class Fixture
+{
+    /// <summary>The fixture station on the air, for a channel measurement made of its slots.</summary>
+    public static StationOnAir OnAir { get; } = new(StationFixture.Callsign, StationFixture.SignalHz, Sideband.Usb, StationFixture.Locator, "assumed");
+
+    /// <summary>The slots of the fixture station alone.</summary>
+    public static FollowedSlots Of(SlotSchedule schedule) => FollowedSlots.One(schedule, StationFixture.Callsign);
+
+    /// <summary>The slots a config's stations file gives its first station, as the receiver counts them.</summary>
+    public static SlotSchedule Slots(ReceiverConfig config) => SlotSchedule.From(config.Stations.First!.Slots);
+
+    /// <summary>The same as followed slots.</summary>
+    public static FollowedSlots Followed(ReceiverConfig config) => Of(Slots(config));
+}

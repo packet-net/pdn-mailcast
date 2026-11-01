@@ -413,8 +413,8 @@ public class StatusPageTests
 
         foreach (string part in new[]
         {
-            "id=\"optIn\"", "Help the experiment:", "as a public bulletin on GB7RDG (MCAST)", "about 500 bytes a day. Nothing else is sent.", "Send a daily report", "Your callsign",
-            "Daily report, a public bulletin on GB7RDG (MCAST): on", "Turn off", "docs/receiver.md#sending-a-daily-report",
+            "id=\"optIn\"", "Help the experiment:", "as a public bulletin to <span id=\"optInAddress\">", "about 500 bytes a day. Nothing else is sent.", "Send a daily report", "Your callsign",
+            "Daily report, a public bulletin to ${f.to}: on", "Turn off", "docs/receiver.md#sending-a-daily-report",
         })
         {
             Assert.Contains(part, html, StringComparison.Ordinal);
@@ -477,9 +477,9 @@ public class StatusPageTests
     [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
     public void Schedule_GivesTheNextSlot_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
     {
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Daylight = null };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", Stations = StationFixture.EverySlot };
 
-        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, Fixture.Followed(config), T(now)), ReceiverConfig.JsonLine);
 
         Assert.Equal(T(next), schedule.GetProperty("next").GetDateTimeOffset());
         if (recent is null)
@@ -501,9 +501,9 @@ public class StatusPageTests
     [Fact]
     public void Schedule_SoundCard_HasNoWebSdrPart()
     {
-        var config = new ReceiverConfig { Audio = Samples.SoundCard, Daylight = null };
+        var config = new ReceiverConfig { Audio = Samples.SoundCard, Stations = StationFixture.EverySlot };
 
-        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T("2026-10-05T13:20:00Z")), ReceiverConfig.JsonLine);
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, Fixture.Followed(config), T("2026-10-05T13:20:00Z")), ReceiverConfig.JsonLine);
 
         Assert.Equal(JsonValueKind.Null, schedule.GetProperty("webSdr").ValueKind);
         Assert.Equal(24, schedule.GetProperty("slotsPerDay").GetInt32());
@@ -518,11 +518,10 @@ public class StatusPageTests
     {
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
 
-        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, T(now)), ReceiverConfig.JsonLine);
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, Fixture.Followed(config), T(now)), ReceiverConfig.JsonLine);
 
         Assert.Equal(T(next), schedule.GetProperty("next").GetDateTimeOffset());
         Assert.Equal(recent is null ? JsonValueKind.Null : JsonValueKind.String, schedule.GetProperty("recent").ValueKind);
-        Assert.Equal("config", schedule.GetProperty("from").GetString());
         Assert.Equal(9, schedule.GetProperty("slotsPerDay").GetInt32());
         Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"], schedule.GetProperty("today").EnumerateArray().Select(e => e.GetString()));
         Assert.Equal("IO91lk", schedule.GetProperty("daylight").GetProperty("locator").GetString());
@@ -536,14 +535,13 @@ public class StatusPageTests
     }
 
     [Fact]
-    public void Schedule_FromTheDirectory_IsUsedAndSaidSo()
+    public void Schedule_OfSeveralStations_UsesTheTimetableGiven()
     {
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
         var heard = SlotSchedule.From(new Packet.Mailcast.SlotTimetable(new TimeOnly(0, 30), 60, new Packet.Mailcast.DaylightRule("IO91lk", 60, 60)));
 
-        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, heard, true, T("2026-10-05T12:05:00Z")), ReceiverConfig.JsonLine);
+        var schedule = JsonSerializer.SerializeToElement(StatusPage.Schedule(config, Fixture.Of(heard), T("2026-10-05T12:05:00Z")), ReceiverConfig.JsonLine);
 
-        Assert.Equal("directory", schedule.GetProperty("from").GetString());
         Assert.Equal(T("2026-10-05T12:30:00Z"), schedule.GetProperty("next").GetDateTimeOffset());
         Assert.Equal("07:30", schedule.GetProperty("today")[0].GetString());
         Assert.Equal("16:30", schedule.GetProperty("today").EnumerateArray().Last().GetString());
@@ -952,7 +950,7 @@ public class StatusPageTests
 
         var builtIn = Assert.Single(await Keys());
         Assert.Equal("GB7RDG", builtIn.GetProperty("station").GetString());
-        Assert.Equal("built in", builtIn.GetProperty("source").GetString());
+        Assert.Equal("stations file", builtIn.GetProperty("source").GetString());
         Assert.False(builtIn.GetProperty("canForget").GetBoolean());
         var refused = await http.PostAsJsonAsync("api/keys/forget", new { keyId = builtIn.GetProperty("keyId").GetString() });
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
@@ -960,7 +958,7 @@ public class StatusPageTests
         var added = Packet.Mailcast.DirectorySigner.FromPem(Packet.Mailcast.DirectorySigner.NewKeyPem());
         Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "not a call", publicKey = added.PublicKeyBase64 })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "G4ABC", publicKey = "AAAA" })).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "G4ABC", publicKey = Convert.ToBase64String(Packet.Mailcast.TrustedKey.Gb7rdg.PublicKey) })).StatusCode); // already trusted
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("api/keys/add", new { station = "G4ABC", publicKey = Convert.ToBase64String(StationFixture.Key.PublicKey) })).StatusCode); // already trusted
         Assert.Single(await Keys());
 
         Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("api/keys/add", new { station = "g4abc", publicKey = added.PublicKeyBase64 })).StatusCode);

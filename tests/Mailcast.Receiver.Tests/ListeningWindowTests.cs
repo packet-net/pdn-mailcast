@@ -90,7 +90,7 @@ public class ListeningWindowTests
         Assert.True((ReceiverConfig.MostWebSdrSlotsPerDay + 1) * (ReceiverConfig.WebSdrBefore + ReceiverConfig.WebSdrAfter) > TimeSpan.FromHours(3));
     }
 
-    private static readonly SlotSchedule Daylight = new(new TimeOnly(0, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg);
+    private static readonly SlotSchedule Daylight = new(new TimeOnly(0, 0), 60, StationFixture.Daylight);
 
     private static string[] Hhmm(IEnumerable<DateTimeOffset> times) => [.. times.Select(t => t.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture))];
 

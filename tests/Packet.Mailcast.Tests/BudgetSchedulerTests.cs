@@ -344,7 +344,7 @@ public class BudgetSchedulerTests
     [Fact]
     public void Fill_AlwaysSendsTheDirectory_WithTheModeAndTheTimetable()
     {
-        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var options = Options with { Timetable = timetable };
         var held = Enumerable.Range(0, 40).Select(i => AtCoverage(20 + i, 5000, i % 4)).ToList();
         var plan = BroadcastScheduler.Plan(held, Slot, 1, Compression.Default, options, null, Frames(120), "ms110d-wn3");
@@ -484,7 +484,7 @@ public class Gb7rdgStoreTests
         string root = Copy(Directory.CreateTempSubdirectory("mailcast-gb7rdg-").FullName);
         try
         {
-            var options = ScheduleOptions.HourlyBudget with { Timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg) };
+            var options = ScheduleOptions.HourlyBudget with { Timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight) };
             var log = new List<string>();
 
             // The shares rule, as 0.3.0 runs it, has only the bulletin it first carried at 09:00.

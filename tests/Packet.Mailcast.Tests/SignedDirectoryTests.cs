@@ -13,7 +13,7 @@ public class SignedDirectoryTests(ITestOutputHelper output)
     private static (BroadcastDirectory Unsigned, BroadcastDirectory Signed) Pair(int count, int seed = 1)
     {
         var objects = TestBulletins.Day(seed, count).Select(b => (Bulletin: b, Object: TransferObject.ForBulletin(b, ZstdDictionary.Gb7rdg1Id, Compression.Default))).ToList();
-        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var plain = objects.Select(o => new DirectoryEntry(o.Object.ObjectId, o.Object.DictionaryId, o.Bulletin.Serialize().Length, o.Bulletin.Bid, o.Bulletin.Title)).ToList();
         var hashed = objects.Select((o, i) => plain[i] with { Hash = ObjectId.LongHash(o.Object.DictionaryId, o.Object.Bytes) }).ToList();
         return (new BroadcastDirectory(Day, plain, timetable, "ms110d-wn3"), new BroadcastDirectory(Day, hashed, timetable, "ms110d-wn3", Signer));
@@ -35,7 +35,7 @@ public class SignedDirectoryTests(ITestOutputHelper output)
         Assert.Equal(signed.Schedule, parsed.Schedule);
         Assert.Equal(signed.Mode, parsed.Mode);
         Assert.True(parsed.IsSigned);
-        Assert.Equal(new DirectoryCheck(SignatureState.Trusted, SignedBy: "TEST"), parsed.Check([TrustedKey.Gb7rdg, Trusted]));
+        Assert.Equal(new DirectoryCheck(SignatureState.Trusted, SignedBy: "TEST"), parsed.Check([StationFixture.Key, Trusted]));
         Assert.Equal("signed by TEST", parsed.Check([Trusted]).Describe());
         Assert.Equal(signed.Check([Trusted]), parsed.Check([Trusted]));
     }
@@ -115,7 +115,7 @@ public class SignedDirectoryTests(ITestOutputHelper output)
     public void AnotherKey_OrAnUnreadableSignature_IsRejected_WithWhy()
     {
         var (_, signed) = Pair(2);
-        var unknown = signed.Check([TrustedKey.Gb7rdg]);
+        var unknown = signed.Check([StationFixture.Key]);
         Assert.Equal(SignatureState.Rejected, unknown.State);
         Assert.Equal($"it is signed by key {KeyId.Format(Signer.KeyId)}, which is not a trusted key", unknown.Reason);
 
@@ -130,12 +130,12 @@ public class SignedDirectoryTests(ITestOutputHelper output)
     [Fact]
     public void Gb7rdgsKey_IsBuiltIn_FromItsSubjectPublicKeyInfo()
     {
-        Assert.Equal("GB7RDG", TrustedKey.BuiltIn[0].Label);
-        Assert.Same(TrustedKey.Gb7rdg, TrustedKey.BuiltIn[0]);
-        Assert.Equal("6f39d04c925c01cf", KeyId.Format(TrustedKey.Gb7rdg.KeyId));
-        Assert.Equal("e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=", Convert.ToBase64String(TrustedKey.Gb7rdg.PublicKey));
+        Assert.Equal("GB7RDG", new[] { StationFixture.Key }[0].Label);
+        Assert.Same(StationFixture.Key, new[] { StationFixture.Key }[0]);
+        Assert.Equal("6f39d04c925c01cf", KeyId.Format(StationFixture.Key.KeyId));
+        Assert.Equal("e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=", Convert.ToBase64String(StationFixture.Key.PublicKey));
         // The raw 32 octets, as the head end logs them, are the same key.
-        Assert.Equal(TrustedKey.Gb7rdg.KeyId, TrustedKey.Parse("again", "e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=").KeyId);
+        Assert.Equal(StationFixture.Key.KeyId, TrustedKey.Parse("again", "e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=").KeyId);
     }
 
     [Theory]
@@ -214,7 +214,7 @@ public class SignedDirectoryStoreTests
     private static readonly DateOnly Day = new(2026, 10, 15);
     private static readonly DirectorySigner Signer = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
     private static readonly DirectorySigner Stranger = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
-    private static readonly IReadOnlyList<TrustedKey> Keys = [TrustedKey.Gb7rdg, TrustedKey.Parse("TEST", Signer.PublicKeyBase64)];
+    private static readonly IReadOnlyList<TrustedKey> Keys = [StationFixture.Key, TrustedKey.Parse("TEST", Signer.PublicKeyBase64)];
 
     private static ReceiverStore Open(string path, FakeTimeProvider time, List<string> log) =>
         new(path, Compression.Default, TestStores.Fast with { Time = time, Log = log.Add, TrustedKeys = Keys });
@@ -286,13 +286,13 @@ public class SignedDirectoryStoreTests
         var log = new List<string>();
         var store = OpenStrict(dir.Path, time, log);
         var a = Small(2);
-        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var result = FeedAll(store, DirectoryFrames(new BroadcastDirectory(Day, [Entry(a, 0)], schedule: timetable)));
         Assert.Equal(FrameOutcome.RejectedDirectory, result.Outcome);
         Assert.Equal("unsigned, not used", result.Check!.Describe());
         Assert.False(result.Check.Usable);
         Assert.Null(store.Directory);
-        Assert.Null(store.HeardSchedule); // the config's slots stand, as with no directory heard
+        Assert.Empty(store.HeardSchedules); // the config's slots stand, as with no directory heard
         Assert.Empty(store.StationDirectories());
         Assert.Equal("unsigned, not used", store.LastDirectoryHeard!.Check.Describe());
 

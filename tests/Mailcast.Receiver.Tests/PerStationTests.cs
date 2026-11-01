@@ -87,7 +87,7 @@ public class PerStationTests
         {
             Audio = Samples.SoundCard,
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
             LnbHz = 9_750_000_000,
         };
@@ -98,7 +98,7 @@ public class PerStationTests
         Assert.True(listened.Followed);
         Assert.Equal(10_489_750_000, listened.FrequencyHz);
         Assert.Equal(739_750_000, listened.IfHz);
-        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, _ => { }, new FakeTimeProvider(slot));
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, StationFixture.SignalHz, _ => { }, new FakeTimeProvider(slot));
         Assert.Equal(739_748_200, host.PointAtSlot(slot, pipeline)!.Value, 0.5);
         Assert.Equal(739_750_000, pipeline.SignalHz);
         Assert.Equal(9_750_000_000, pipeline.LnbOffsetHz);
@@ -156,9 +156,9 @@ public class PerStationTests
         var log = new List<string>();
         var time = new FakeTimeProvider(Noon);
         // Dial 7.052 MHz; GB7RDG's signal is at 1800 Hz in the audio.
-        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), 7_052_000, log.Add, time);
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), 7_052_000, StationFixture.SignalHz, log.Add, time);
         Assert.Equal(1800, pipeline.AudioCentreHz, 0.5);
-        Assert.Equal(OnAir.DefaultSignalHz, pipeline.SignalHz);
+        Assert.Equal(StationFixture.SignalHz, pipeline.SignalHz);
 
         // A station 700 Hz lower: 1100 Hz in the audio, still inside 1000 to 2000 Hz.
         Assert.True(pipeline.SetSignal(7_053_100));
@@ -188,7 +188,7 @@ public class PerStationTests
 
         // A web SDR is tuned for each slot: the dial for 7.047 MHz, the place from the directory.
         {
-            await using var host = await Open(new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null });
+            await using var host = await Open(new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot });
             var bpqListening = host.Listening.Single(l => l.Station == "G8BPQ");
             Assert.True(bpqListening.Followed);
             Assert.Equal(7_047_000, bpqListening.FrequencyHz);
@@ -197,8 +197,9 @@ public class PerStationTests
             Assert.Equal(HowHeard.Retune, bpqListening.How);
             Assert.Equal(7_045_200, bpqListening.DialHz!.Value, 0.5);
             // GB7RDG is where it always was.
-            Assert.Equal(7_052_000, host.Listening[0].DialHz!.Value, 0.5);
-            Assert.Equal("IO91lk", host.Listening[0].Locator);
+            var rdgListening = host.Listening.Single(l => l.Station == StationFixture.Callsign);
+            Assert.Equal(7_052_000, rdgListening.DialHz!.Value, 0.5);
+            Assert.Equal("IO91lk", rdgListening.Locator);
 
             // Opened for G8BPQ's slot, the pipeline is tuned and listening for that station.
             var pipeline = host.CreatePipeline(AudioSource.Parse("ubersdr:wessex.zapto.org"), host.Config, slot);
@@ -208,18 +209,18 @@ public class PerStationTests
             // And for GB7RDG's, as before.
             var rdg = host.CreatePipeline(AudioSource.Parse("ubersdr:wessex.zapto.org"), host.Config, new DateTimeOffset(2026, 10, 26, 10, 0, 0, TimeSpan.Zero));
             Assert.Equal(7_052_000, rdg.DialHz, 0.5);
-            Assert.Equal(OnAir.DefaultSignalHz, rdg.SignalHz);
+            Assert.Equal(StationFixture.SignalHz, rdg.SignalHz);
         }
 
         // A sound card with its dial left at 7.052 MHz cannot hear 7.047 MHz, and says so; set
         // to 7.0452 MHz it hears it from the passband alone, with nothing to retune.
         {
-            await using var fixedDial = await Open(new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir.Path, Daylight = null });
+            await using var fixedDial = await Open(new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir.Path, Stations = StationFixture.EverySlot });
             var no = fixedDial.Listening.Single(l => l.Station == "G8BPQ");
             Assert.False(no.Followed);
             Assert.Contains("7.047 MHz USB, not where this receiver listens", no.NotFollowedBecause, StringComparison.Ordinal);
 
-            await using var moved = await Open(new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir.Path, Daylight = null, DialKHz = 7045.2 });
+            await using var moved = await Open(new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = dir.Path, Stations = StationFixture.EverySlot, DialKHz = 7045.2 });
             var yes = moved.Listening.Single(l => l.Station == "G8BPQ");
             Assert.True(yes.Followed);
             Assert.Equal(HowHeard.Passband, yes.How);
@@ -272,9 +273,21 @@ public class PerStationTests
     }
 
     [Fact]
-    public void AReportWithNoStationNamed_IsGb7rdgs_AsEveryOneWasBefore()
+    public void AReportWithNoStationNamed_IsOfNoParticularStation_AndHasNoPlaceForIt()
     {
         var report = ChannelReport.Summarise(Noon, Noon, [Picture(), Picture()], 2, Wessex);
+        Assert.Null(report.DistanceKm);
+        Assert.Null(report.Station);
+        Assert.Equal("the station", report.StationName);
+        Assert.Equal("station", report.StationLabel);
+        Assert.Null(report.StationPlaceOrDefault);
+        Assert.True(report.Skywave);
+    }
+
+    [Fact]
+    public void AReportWithTheFixtureStation_HasItsDistanceNameAndLabel()
+    {
+        var report = ChannelReport.Summarise(Noon, Noon, [Picture(), Picture()], 2, Wessex, transmitter: Fixture.OnAir);
         Assert.Equal(PathGeometry.DistanceKm(Wessex, GroundPlace.FromLocator("IO91lk")!), report.DistanceKm!.Value, 1.0);
         Assert.Equal("GB7RDG", report.StationName);
         Assert.Equal("GB7RDG IO91lk", report.StationLabel);
@@ -332,14 +345,14 @@ public class PerStationTests
         {
             Audio = Samples.SoundCard,
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
         };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
         await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ", Details = new StationDetails(7_047_000, Sideband.Usb, "IO83") }, slot, 1);
 
         // Config dial 7.052 MHz, station on 7.047 MHz, the rig retuned for its slot.
-        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, _ => { }, new FakeTimeProvider(slot));
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, StationFixture.SignalHz, _ => { }, new FakeTimeProvider(slot));
         Assert.Equal(7_052_000, pipeline.DialHz);
         Assert.Equal(7_045_200, host.PointAtSlot(slot, pipeline)!.Value, 0.5);
         Assert.Equal(7_045_200, pipeline.DialHz, 0.5);
@@ -357,18 +370,18 @@ public class PerStationTests
         {
             Audio = Samples.SoundCard,
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Rig = new RigSettings { Rigctld = "127.0.0.1:4532", DedicatedRadio = true },
         };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
         await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ", Details = new StationDetails(7_047_000, Sideband.Usb, "IO83") }, slot, 1);
-        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, _ => { }, new FakeTimeProvider(slot));
+        var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.Alsa, "test"), config.DialHz, StationFixture.SignalHz, _ => { }, new FakeTimeProvider(slot));
         host.PointAtSlot(slot, pipeline);
         Assert.Equal(7_047_000, pipeline.SignalHz);
         Assert.Equal(7_045_200, pipeline.DialHz, 0.5);
 
         host.ReturnToConfig(pipeline);
-        Assert.Equal(OnAir.DefaultSignalHz, pipeline.SignalHz);
+        Assert.Equal(StationFixture.SignalHz, pipeline.SignalHz);
         Assert.Equal(7_052_000, pipeline.DialHz, 0.5);
     }
 
@@ -379,7 +392,7 @@ public class PerStationTests
         var other = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
         using var dir = new TempDirectory();
         var slot = new DateTimeOffset(2026, 10, 26, 10, 30, 0, TimeSpan.Zero);
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot };
         await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
         // G8BPQ's own directory, saying nothing of its frequency, is heard here.
         await Hear(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ" }, slot, 1);

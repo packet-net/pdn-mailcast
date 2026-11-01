@@ -21,7 +21,7 @@ public class ContentTypeTests
         Assert.Equal(1, kind);
         Assert.Equal(Sample, Bulletin.Parse(content));
 
-        var directory = new BroadcastDirectory(new DateOnly(2026, 10, 5), [new DirectoryEntry(obj.ObjectId, obj.DictionaryId, 100, Sample.Bid, Sample.Title)], new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg));
+        var directory = new BroadcastDirectory(new DateOnly(2026, 10, 5), [new DirectoryEntry(obj.ObjectId, obj.DictionaryId, 100, Sample.Bid, Sample.Title)], new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight));
         var dirObj = TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
         Assert.Equal(2, dirObj.Bytes[0]);
         var (dirKind, dirContent) = V020Reader.Unpack(dirObj.Bytes, ZstdDictionary.Gb7rdg1Id, Compression.Default);
@@ -47,7 +47,7 @@ public class ContentTypeTests
     [Fact]
     public void Directory_CarriesEachEntrysType_AndTheTimetableOnTheFirstLine()
     {
-        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var d = new BroadcastDirectory(new DateOnly(2026, 10, 5),
         [
             new DirectoryEntry(1, 1, 10, "1_A", "First"),

@@ -29,7 +29,7 @@ public class FeedbackLinBpqTests(ITestOutputHelper output)
             new ReportSlot(new TimeOnly(11, 0), null, 0, null, null, []),
         ]);
         string bid = FeedbackService.Bid("G4ABC", "T1", day);
-        var mail = new Bulletin(FeedbackSettings.Type, "G4ABC", FeedbackSettings.To, FeedbackSettings.At, bid, report.Title,
+        var mail = new Bulletin(FeedbackSettings.Type, "G4ABC", StationFixture.ReportTo, StationFixture.ReportAt, bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()), [], report.Body);
 
         var first = await client.DeliverAsync([mail], cancellation);

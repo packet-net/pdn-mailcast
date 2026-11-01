@@ -36,7 +36,7 @@ public class ConfigFileTests
     }
 
     [Fact]
-    public void TrySave_FromAnOldSlotUtcFile_WritesMinuteAndDropsTheOldKey()
+    public void TrySave_FromAnOldSlotUtcFile_DropsTheOldSlotKeys()
     {
         using var dir = new TempDirectory();
         string path = Write(dir, """{ "audio": "ubersdr:wessex.zapto.org", "bbs": { "password": "secret-pw" }, "slotUtc": "00:30" }""");
@@ -45,10 +45,10 @@ public class ConfigFileTests
         Assert.Equal(ConfigFile.SaveOutcome.Saved, file.TrySave(file.Config with { DialKHz = 7052.3 }, _ => { }));
 
         string saved = File.ReadAllText(path);
-        Assert.Contains("\"minute\": 30", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("minute", saved, StringComparison.Ordinal);
         Assert.DoesNotContain("slotUtc", saved, StringComparison.Ordinal);
         Assert.Contains("secret-pw", saved, StringComparison.Ordinal);
-        Assert.Equal(new TimeOnly(0, 30), ReceiverConfig.Load(path).SlotStart);
+        Assert.Empty(ReceiverConfig.Load(path).SlotSettingsIgnored);
     }
 
     [Fact]

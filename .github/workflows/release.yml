@@ -208,6 +208,10 @@ jobs:
             fi
             # postinst seeds the config from this path; if it moves, install breaks.
             grep -q "$share/$example\$" <<<"$listing"
+            # the receiver reads its stations from here; without it nothing is trusted or followed
+            if [ "$pkg" = pdn-mailcast-receiver ]; then
+              grep -q "usr/share/pdn-mailcast-receiver/stations.json\$" <<<"$listing"
+            fi
             [ "$(dpkg-deb -f "$deb" Package)" = "$pkg" ]
             [ "$(dpkg-deb -f "$deb" Version)" = "$VERSION" ]
             [ "$(dpkg-deb -f "$deb" Architecture)" = "$ARCH" ]
