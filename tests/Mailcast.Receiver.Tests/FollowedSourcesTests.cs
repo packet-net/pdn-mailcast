@@ -113,8 +113,34 @@ public class FollowedSourcesTests
     }
 
     [Fact]
+    public async Task Bootstrap_ListenFor_ThenItsDirectoryIsHeard_ThenPinned_ThenRetired_AcceptedThroughout()
+    {
+        var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        using var dir = new TempDirectory();
+        var config = Config(dir.Path, Entry()) with { TrustedKeys = [new TrustedKeySettings { Label = "GM8BPQ", PublicKey = bpq.PublicKeyBase64 }] };
+        await using var host = new ReceiverHost(config, new FakeTimeProvider(Now), _ => { });
+        Assert.True(Hears(host, "GM8BPQ")); // asked for by hand, before anything is heard
+
+        var frames = Samples.Frames([Samples.Bulletin(1)], ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 40), 60), Signer = bpq, Station = "GM8BPQ" }, Now.AddMinutes(30));
+        foreach (var frame in frames)
+        {
+            // Sent as GM8BPQ itself, which only a receiver that knows of it accepts.
+            long before = host.Intake.FramesHeard;
+            host.Intake.Offer(Ax25UiFrame.Build("GM8BPQ", OnAir.Destination, frame.AsSpan(16).ToArray()));
+            Assert.Equal(before + 1, host.Intake.FramesHeard);
+        }
+        await host.Intake.DrainAsync(CancellationToken.None);
+
+        // Pinned now, and the entry retired: still accepted.
+        Assert.Contains(host.Intake.Pins(), p => p.Station == "GM8BPQ");
+        Assert.NotNull(host.ListenForState.Get(host.Config.ListenFor![0])!.Retired);
+        Assert.Contains("GM8BPQ", host.SourcesFromFollowed);
+        Assert.True(Hears(host, "GM8BPQ"));
+    }
+
+    [Fact]
     public void SourcesLine_SaysFollowedStationsAreAlsoAccepted()
     {
-        Assert.Contains("and from the stations followed", ReceiverHost.SourcesLine(new ReceiverConfig()), StringComparison.Ordinal);
+        Assert.Contains("and from the stations it knows of", ReceiverHost.SourcesLine(new ReceiverConfig()), StringComparison.Ordinal);
     }
 }

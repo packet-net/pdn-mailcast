@@ -785,6 +785,11 @@ public sealed class Intake : IAsyncDisposable
             {
                 OutsidePieces?.Invoke(kept);
             }
+            // Issue #228: a directory completed from outside may add stations, so the followed list and accepted sources are refreshed.
+            if (results.Any(r => r.Outcome == FrameOutcome.CompletedDirectory))
+            {
+                KeysChanged?.Invoke();
+            }
         }
         catch (Exception e)
         {
