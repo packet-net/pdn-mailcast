@@ -272,6 +272,11 @@ public class ConfigFileTests
 
         var window = none with { Audio = "soundmodem", Retune = true };
         Assert.StartsWith("config: retuning through pdn-soundmodem's receive window on (\"retune\"), ", ConfigFile.PartsLine(window), StringComparison.Ordinal);
+
+        // A rig with pdn-soundmodem's audio is not used: say so rather than "rig retuning on".
+        var rigIgnored = none with { Audio = "soundmodem", Rig = new RigSettings() };
+        Assert.StartsWith("config: retuning off: \"rig\" is not used with \"audio\": \"soundmodem\"; set \"retune\": true and give pdn-soundmodem a \"rig\" section, ", ConfigFile.PartsLine(rigIgnored), StringComparison.Ordinal);
+        Assert.StartsWith("config: retuning through pdn-soundmodem's receive window on (\"retune\"); \"rig\" is not used with this audio, ", ConfigFile.PartsLine(rigIgnored with { Retune = true }), StringComparison.Ordinal);
     }
 
     [Fact]
