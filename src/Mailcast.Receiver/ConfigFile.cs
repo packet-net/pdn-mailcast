@@ -205,8 +205,11 @@ public sealed class ConfigFile
     /// </summary>
     public static string PartsLine(ReceiverConfig config)
     {
-        string retuning = config.Retune && AudioSource.Parse(config.Audio).Kind == AudioSourceKind.SoundModem
-            ? "retuning through pdn-soundmodem's receive window on (\"retune\")"
+        bool soundModem = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.SoundModem;
+        string retuning = soundModem && config.Retune
+            ? "retuning through pdn-soundmodem's receive window on (\"retune\")" + (config.Rig is null ? "" : "; \"rig\" is not used with this audio")
+            : soundModem && config.Rig is not null
+                ? "retuning off: \"rig\" is not used with \"audio\": \"soundmodem\"; set \"retune\": true and give pdn-soundmodem a \"rig\" section"
             : config.Rig is { } rig
                 ? config.Bpq is not null ? "rig retuning on, with LinBPQ held off the air through \"bpq\""
                     : rig.DedicatedRadio ? "rig retuning on (a dedicated radio)"
