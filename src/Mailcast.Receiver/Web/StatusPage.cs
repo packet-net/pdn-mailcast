@@ -999,7 +999,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             listenNow = ListenNowView(_host, config, _host.Time.GetUtcNow()),
             level = new { lowDbFs = InputLevelMeter.TargetPeakLowDbFs, highDbFs = InputLevelMeter.TargetPeakHighDbFs, advice = LevelAdvice(config.Audio) },
             burst = BurstView(_host.Pipeline?.Burst.Shown),
-            // The radio path from GB7RDG, measured after each slot from the bursts decoded.
+            // The radio path from M0LTE, measured after each slot from the bursts decoded.
             channel = ChannelTile.View(_host.ChannelWatch, slot, _host.Time.GetUtcNow()),
             slot = slot is null ? null : new
             {
@@ -1056,7 +1056,7 @@ public sealed partial class StatusPage : IAsyncDisposable
                 date = directory.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                 entries = directory.Entries.Count,
                 stale = directory.Date != DateOnly.FromDateTime(_host.Time.GetUtcNow().UtcDateTime),
-                // "signed by GB7RDG" or "not signed".
+                // "signed by M0LTE" or "not signed".
                 signature = newestCheck?.Describe(),
             },
             // The directory heard most recently, used or not: "signed" (by a trusted key, named
@@ -1225,7 +1225,7 @@ public sealed partial class StatusPage : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// Issue #135: the waveform, rate and words stay null until a frame has decoded on the burst.
-    /// The autobaud can lock briefly on the tone or the channel probe, to a waveform GB7RDG never
+    /// The autobaud can lock briefly on the tone or the channel probe, to a waveform M0LTE never
     /// sends (75 bps, WN0), before a later layer throws it away as noise; a lock alone is not a speed.
     /// </remarks>
     internal static object? BurstView(HeardBurst? burst) => burst is null ? null : new
@@ -1698,7 +1698,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         int limit = int.TryParse(query["limit"], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int l) ? Math.Clamp(l, 1, MaxMailPage) : 50;
         var mail = _host.Intake.Mail(); // in memory, newest first, already counted: no files, no lock, no sorting
         var held = _host.Intake.HeldBulletins();
-        // What the directories still remembered say of each: "signed by GB7RDG" only once its own hash matched (see HeldBulletin.Signature).
+        // What the directories still remembered say of each: "signed by M0LTE" only once its own hash matched (see HeldBulletin.Signature).
         var signatures = held.Where(h => h.Signature is not null).ToDictionary(h => h.ObjectId, h => h.Signature!);
         var partial = held.Where(h => !h.Complete).Select(h => new
         {
@@ -1741,7 +1741,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             limit,
             archive = new { days = _host.Config.Archive.Days, maxMegabytes = _host.Config.Archive.MaxMegabytes },
             items = mail.Page(offset, limit).Select(m => MailView(m, signatures.GetValueOrDefault(m.ObjectId), shownFor.Add(m.Bid) ? copies[m.Bid] : [])).ToList(),
-            // The newest directory in use: "signed by GB7RDG" or "not signed"; and, when the
+            // The newest directory in use: "signed by M0LTE" or "not signed"; and, when the
             // directory heard most recently was not used, why.
             signature = newestCheck?.Describe(),
             rejected = lastHeard is { Check.Usable: false } ? lastHeard.Check.Reason : null,
@@ -1823,7 +1823,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             // Issue #47: when it was rebuilt, and (once archived) when the BBS answered, shown together.
             completed = m.Completed,
             delivered = m.Waiting ? (DateTimeOffset?)null : m.Time,
-            // As HeldBulletin.Signature: "signed by GB7RDG" only once its own hash matched; null once no directory remembered names it.
+            // As HeldBulletin.Signature: "signed by M0LTE" only once its own hash matched; null once no directory remembered names it.
             signature,
             // Issue #147: "other copy from G8BPQ, not needed", one short line each, under the bulletin.
             otherCopies = otherCopies.Select(c => new { from = c.Station, time = c.Time, text = c.Station is null ? "other copy, not needed" : "other copy from " + c.Station + ", not needed" }).ToList(),

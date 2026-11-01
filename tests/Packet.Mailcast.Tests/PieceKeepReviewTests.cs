@@ -14,13 +14,13 @@ public class PieceKeepReviewTests
     private static ReceiverStoreOptions Options(FakeTimeProvider? time = null) =>
         new() { FlushToDisk = false, TrustedKeys = [Trusted], Time = time ?? new FakeTimeProvider(Now) };
 
-    private static TransferObject Bulletin(int seed) => TransferObject.ForBulletin(TestBulletins.Make(seed, 3000), ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
+    private static TransferObject Bulletin(int seed) => TransferObject.ForBulletin(TestBulletins.Make(seed, 3000), ZstdDictionary.Dictionary1Id, Compression.Default, 240);
 
     private static TransferObject SignedDirectory(params TransferObject[] listed)
     {
         var entries = listed.Select((o, i) => new DirectoryEntry(o.ObjectId, o.DictionaryId, 3000, "B" + i, "t" + i, Hash: ObjectId.LongHash(o.DictionaryId, o.Bytes))).ToList();
         var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), "ms110d-wn3", Signer);
-        return TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
+        return TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default, 240);
     }
 
     private static byte[] RandomBytes(int seed, int size)
@@ -53,7 +53,7 @@ public class PieceKeepReviewTests
             new DirectoryEntry(wrongHash.ObjectId, wrongHash.DictionaryId, 3000, "B4", "t4", Hash: ObjectId.LongHash(listed.DictionaryId, listed.Bytes)),
         };
         var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), "ms110d-wn3", Signer);
-        FeedAir(store, TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240));
+        FeedAir(store, TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default, 240));
 
         List<byte[]> All(TransferObject o) => [.. Enumerable.Range(0, o.SourceSymbols + 1).Select(i => o.Frame((uint)i).ToBytes())];
         Assert.Contains(store.AcceptOutsideBatch(All(unlisted), "poster"), r => r.Outcome == FrameOutcome.CompletedBulletin); // nothing lists it: delivered, as on air

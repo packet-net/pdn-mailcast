@@ -1,6 +1,6 @@
 # pdn-mailcast technical fact sheet
 
-A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from GB7RDG's station, received by a standalone program or a web SDR and forwarded into the listener's own BBS. Figures are as configured and measured on 2026-10-05. The design and its reasoning are in [design.md](design.md).
+A one-way HF transmission of packet BBS bulletins from M0LTE, received by a standalone program or a web SDR and forwarded into the listener's own BBS. Figures are as configured and measured on 2026-10-05. The design and its reasoning are in [design.md](design.md).
 
 ## Signal
 
@@ -17,7 +17,7 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from G
 | Power | 50 W setting on a Flex 6500; measured forward power about 41 W median during data, 44 W during the tone; SWR 1.02 to 1.09 |
 | Transmit level | pdn-soundmodem `txAmplitude` 1.0 (data peaks at about 0.75 of full scale; the tone at 0.8) |
 | Identification | AX.25 source callsign M0LTE on every frame, plus CW ident M0LTE at 20 wpm on the signal centre at the start of each slot and when the transmitter is released |
-| Accepted sources | Frames may come from GB7RDG or M0LTE; receivers accept both (the receiver's `sources` setting), so the broadcast can move to M0LTE without a receiver update |
+| Accepted sources | Frames from every station the receiver knows of: the shipped stations file (M0LTE), adverts, directories and "Listen for a station" |
 
 ## Timetable
 
@@ -29,7 +29,7 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from G
 | Slot sequence | Listen for a clear channel (up to 2 min), take the transmit lease, 10 s tone at 7.0538 MHz, 8 s pause, bursts with 1 s gaps, release the lease, closing CW ident |
 | Slot limit | 10 minutes from the slot's time, closing ident included; nothing keys past it. The budget rule fills a slot to about 7.8 minutes, keeping back the 2 minute clear-channel wait and a carrier wait, and fills a late slot less |
 | Typical airtime | Head end 0.3.0: about 2.5 minutes per slot in October, about 4 in December. Budget rule: up to about 7.8 minutes in every slot while bulletins are in rotation, about 70 minutes a day in October at WN4 |
-| Timetable announcement | Sent in every slot inside the directory, so receivers follow GB7RDG without configuration |
+| Timetable announcement | Sent in every slot inside the directory, so receivers follow M0LTE without configuration |
 
 ## Framing and coding
 
@@ -40,14 +40,14 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from G
 | Object ID | First 8 bytes of SHA-256 over the dictionary ID and the object, so every object checks itself |
 | Forward error correction | RaptorQ (RFC 6330), one source block per object, 240-byte symbols; any K plus a couple of symbols rebuilds an object, and pieces from different slots add up |
 | Repeats | Budget rule: every slot sends fresh symbols of every bulletin in rotation, least covered first, at least enough that any 3 slots rebuild it and at most 0.6 x K a slot, until 6 x K in all or 36 hours; after that, only in airtime nothing else wants (the leftover tier: only in a slot that sends other bulletins too, after them, still in the directory) until 10 x K or 48 hours. Head end 0.3.0: 1.2 x K + 2 in the first slot, 0.4 x K five slots later. A symbol number is never reused |
-| Compression | zstd with a trained 64 KB dictionary (`gb7rdg-1`, ID 1), checksum required; bulletins come down to about 30% of their size |
+| Compression | zstd with a trained 64 KB dictionary (dictionary 1), checksum required; bulletins come down to about 30% of their size |
 | Content types | First byte of each object: 1 packet mail bulletin (FBB/BPQ message format), 2 directory, 3 reserved for DAPPS, 4 propagation reading, 112 to 127 experimental; top bit set means a length-prefixed metadata block follows |
 | Ionosonde reading | From 0.6.0, in each slot that keys: is 40 m open from Reading at 100, 500 and 1000 km, by Fairford's (else Chilton's, else Dourbes') latest sounding from GIRO or PROPquest, with the skip zone. Content type 4, one object per source: 24 bytes for the ionosonde, not compressed, in 2 frames of 55 bytes, inside the airtime budget and not in the directory. Observe only: it never changes what or when the head end sends. D-layer absorption is not modelled |
 | PSK Reporter reading | In each slot that keys, beside the ionosonde's: is 40 m open at 100, 500 and 1000 km by the last 30 minutes of FT8, FT4 and WSPR spots between UK and Irish stations on PSK Reporter's public MQTT feed, with the spots, stations and median SNR behind each verdict, and a skip zone. Open means open for FT8, which decodes far below what MS110D needs, so it is no promise M0LTE will be heard; the medians are the better guide. Never calls a quiet distance closed without evidence; UNKNOWN when the feed was down. Content type 4, source 3: 27 bytes, in 2 frames of 59 bytes. 80 m is judged too, at the head end only. Observe only |
 | Directory | Sent in every slot that keys: the bulletins in rotation (BID, title, size, content type), the timetable, the daylight rule and the slot's waveform; text, versioned, unknown fields ignored. From 0.14.0, signed with Ed25519 when the head end has a key, and with 8 more bytes of each object's hash, so each is checked against 16; older receivers ignore both. About 370 bytes more for 25 bulletins, about 10 more directory frames a slot at 240-byte pieces. A slot with nothing to send keys nothing, directory included; 0.3.0 skipped slots that way when no share was due, the budget rule only when nothing is in rotation but the leftover tier |
 | Bulletin format | Key: value header (type, from, to, at, BID, date, title), blank line, then the message with its R: lines, as a BBS partner would forward it |
 
-## Station (GB7RDG)
+## Station (M0LTE)
 
 | | |
 |---|---|
@@ -64,9 +64,9 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, transmitted from G
 | Audio | A radio on 7.052 MHz USB into a sound card (decodes around every daylight slot), or a public UberSDR web receiver (listens to every daylight slot, 14 minutes each, up to 12 a day to stay inside the 3 hours a day such receivers allow) |
 | Delivery | Logs in to the listener's LinBPQ or Linux FBB as forwarding partner Q0CAST and offers each rebuilt bulletin by FBB B1F; the BBS keeps or refuses it by BID like any partner |
 | Durability | Rebuilt bulletins stay in an on-disk outbox until the BBS has answered; completed markers expire after 14 days, and partial objects 14 days after their last piece, or 24 hours after a directory shows the head end has stopped sending them |
-| Signatures | From 0.14.0: GB7RDG's key built in, others added in `trustedKeys`; the page shows "signed by" only for a bulletin whose own hash matched a trusted signed list, else "not signed" or what is wrong. A directory that fails its check is not used, and what only it lists is held, not delivered. Since issue #146 an unsigned directory is not used and every head end signs |
+| Signatures | From 0.14.0: M0LTE's key in the shipped stations file, others added in `trustedKeys`; the page shows "signed by" only for a bulletin whose own hash matched a trusted signed list, else "not signed" or what is wrong. A directory that fails its check is not used, and what only it lists is held, not delivered. Since issue #146 an unsigned directory is not used and every head end signs |
 | Mail | The receiver keeps its own copy of every bulletin (30 days or 50 MB unless set), readable on the status page, and any of them can be sent to the BBS again |
-| Daily report | Off unless the listener turns it on: once a day, a public bulletin of about 500 bytes on what the receiver heard, from the listener's callsign to `MCAST@GB7RDG.#42.GBR.EURO` through their own BBS, where anyone on GB7RDG can read it (`L> MCAST`). From 0.16.0 GB7RDG's directory lists whose reports arrived, each listener's newest if it is for that day or one of the two before (up to 100 listeners), and the status page says whether GB7RDG got the listener's latest |
+| Daily report | Off unless the listener turns it on: once a day, a public bulletin of about 500 bytes on what the receiver heard, from the listener's callsign to `MCAST@GB7RDG.#42.GBR.EURO` through their own BBS, where anyone on GB7RDG can read it (`L> MCAST`). From 0.16.0 M0LTE's directory lists whose reports arrived, each listener's newest if it is for that day or one of the two before (up to 100 listeners), and the status page says whether M0LTE got the listener's latest |
 | Sharing a radio | If the radio is also a LinBPQ packet radio, the receiver turns LinBPQ's transmitter off on that port (`XMITOFF`), tunes the rig to 7.052 MHz by Hamlib rigctld (flrig works through `rigctld -m 4`) from a minute before each slot to 12 minutes after, then puts the rig back and turns the port on again; it gives the rig back at once if it ever sees PTT on |
 | Status | Local web page with level meter, spectrogram, the tone's frequency offset and signal-to-noise, today's slot times and bulletin progress; open on the local network only with a password, behind a sign-in page |
 

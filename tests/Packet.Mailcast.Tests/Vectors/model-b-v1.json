@@ -1,7 +1,7 @@
 {
   "format": "Model B v1, issue #142 of packet-net/pdn-mailcast. This file is the definition of the format: see docs/design.md.",
   "generator": "tools/Mailcast.ModelBVectors (the library under test); reproduced independently by tools/raptorq-vectors/reproduce_model_b.py",
-  "zstd": "1.5.7 (ZstdSharp.Port 0.8.8), level 19, one thread, checksum, content size and dictionary ID on; dictionary 1 is src/Packet.Mailcast/Dictionaries/gb7rdg-1.zdict",
+  "zstd": "1.5.7 (ZstdSharp.Port 0.8.8), level 19, one thread, checksum, content size and dictionary ID on; dictionary 1 is src/Packet.Mailcast/Dictionaries/dictionary-1.zdict",
   "pieceSize": 240,
   "notes": "All octets are lower-case hex. Symbols are \u0027esi:hex\u0027 of the encoding symbol; frames are \u0027esi:hex\u0027 of the whole payload including its CRC. The directory line is the bulletin\u0027s entry in an unsigned directory, with env= for the envelope object. Objects are type octet then the zstd frame.",
   "cases": [

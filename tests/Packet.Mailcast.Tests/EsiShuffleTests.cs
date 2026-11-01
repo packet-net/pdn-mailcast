@@ -169,7 +169,7 @@ public class EsiShuffleTests
     public void Receiver_RebuildsFromTwoStationsShuffledPieces_AndFromRepairOnlyPieces()
     {
         var bulletin = TestBulletins.Make(11, 6000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         var a = EsiShuffle.For("GB7RDG", obj.ObjectId);
         var b = EsiShuffle.For("M0LTE", obj.ObjectId);
         using var dir = new TempDirectory();

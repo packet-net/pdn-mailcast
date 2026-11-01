@@ -15,7 +15,7 @@ comments, as each licence requires):
 
 - Towns: GeoNames (https://www.geonames.org/), CC BY 4.0
   (https://creativecommons.org/licenses/by/4.0/). cities15000.zip (population over 15000, or a
-  capital) across the whole region a bounce can fall in (GB7RDG out to 2000 km, below), plus
+  capital) across the whole region a bounce can fall in (M0LTE out to 2000 km, below), plus
   cities5000.zip (over 5000) within the core of Britain and Ireland, to keep the embedded file a
   sensible size while still naming the smaller towns where most receivers in practice are.
 
@@ -55,9 +55,9 @@ from shapely import simplify
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "src" / "Mailcast.Receiver" / "Data"
 
-# Wide enough to hold a ground bounce for any path from GB7RDG to a European receiver this
+# Wide enough to hold a ground bounce for any path from M0LTE to a European receiver this
 # feature is meant for: a bounce point lies on the great circle to the receiver, so it is no
-# further from GB7RDG than the receiver itself, and this is every bearing out to 2000 km (found
+# further from M0LTE than the receiver itself, and this is every bearing out to 2000 km (found
 # by issue #89's own review: the first, narrower box cut off the southern Bay of Biscay, so a
 # receiver down there got no sea label at all, and a real offshore point nearby fell back to a
 # coastal town's name instead).

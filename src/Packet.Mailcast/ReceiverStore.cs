@@ -196,8 +196,8 @@ public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Rec
 /// <param name="ClearedAt">When such an object is to be dropped (<see cref="ReceiverStore.NoLongerSentRetention"/> after <paramref name="NoLongerSentSince"/>); null otherwise.</param>
 /// <param name="Signature">
 /// What the directories still remembered that name it say about it, in a few words: "signed by
-/// GB7RDG" only for a complete bulletin whose own hash matches the one a trusted signed directory
-/// lists; "does not match GB7RDG's signed list" when it does not; "in GB7RDG's signed list" for
+/// M0LTE" only for a complete bulletin whose own hash matches the one a trusted signed directory
+/// lists; "does not match M0LTE's signed list" when it does not; "in M0LTE's signed list" for
 /// one not yet complete, or rebuilt before its hash was kept; "not signed" when only unsigned
 /// directories name it; null when none does.
 /// </param>

@@ -8,7 +8,7 @@ public class KeysTableTests
     private static readonly DateOnly Day = new(2026, 10, 30);
     private static readonly DirectorySigner Bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
 
-    private static TransferObject Small(int n) => TransferObject.ForBulletin(TestBulletins.Make(n, 400), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+    private static TransferObject Small(int n) => TransferObject.ForBulletin(TestBulletins.Make(n, 400), ZstdDictionary.Dictionary1Id, Compression.Default);
 
     private static BroadcastDirectory Directory(DirectorySigner signer, string? station, params TransferObject[] listed) =>
         new(Day, listed.Select(o => new DirectoryEntry(o.ObjectId, o.DictionaryId, 400, $"{o.ObjectId % 100000}_TEST", "Bulletin", Hash: ObjectId.LongHash(o.DictionaryId, o.Bytes))),
@@ -29,7 +29,7 @@ public class KeysTableTests
     }
 
     private static AcceptResult Feed(ReceiverStore store, BroadcastDirectory d) =>
-        Feed(store, TransferObject.ForDirectory(d, ZstdDictionary.Gb7rdg1Id, Compression.Default));
+        Feed(store, TransferObject.ForDirectory(d, ZstdDictionary.Dictionary1Id, Compression.Default));
 
     private static ReceiverStore Open(TempDirectory dir, FakeTimeProvider time, params TrustedKey[] configured) => new(dir.Path, Compression.Default,
         new ReceiverStoreOptions { FlushToDisk = false, Time = time, TrustedKeys = [.. new[] { StationFixture.Key }, .. configured] });

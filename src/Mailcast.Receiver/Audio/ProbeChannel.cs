@@ -17,7 +17,7 @@ namespace Mailcast.Receiver;
 internal sealed record ProbeMeasurement(ChannelSnapshots Snapshots, double PeakDb, double Share, double StartSeconds, double LagZeroSeconds);
 
 /// <summary>
-/// The radio path measured from the channel-sounding probe GB7RDG sends after each slot's tone:
+/// The radio path measured from the channel-sounding probe M0LTE sends after each slot's tone:
 /// pdn-soundmodem's <c>zc255</c>, a Zadoff-Chu sequence of 255 chips at 2400 chips/s repeated 61
 /// times, 1.5 s after the tone, on the tone's frequency.
 /// </summary>
@@ -79,7 +79,7 @@ internal static class ProbeChannel
 
     /// <summary>
     /// The averaged profile's peak (each window against its own floor) must stand this far over
-    /// its floor. Noise alone reaches under 3 dB in GB7RDG's recordings, and the probe at -15 dB
+    /// its floor. Noise alone reaches under 3 dB in M0LTE's recordings, and the probe at -15 dB
     /// in 3 kHz about 12 dB. The CW ident's keying with no noise at all can reach 10 dB, but in
     /// only a few windows, which <see cref="FoundShare"/> catches.
     /// </summary>

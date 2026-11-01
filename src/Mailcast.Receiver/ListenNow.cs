@@ -15,7 +15,7 @@ namespace Mailcast.Receiver;
 /// <para>It never overlaps a slot window: a request is refused if one starts within
 /// <see cref="MinBeforeWindow"/>, and the session it opens is cut short at once if a window
 /// would otherwise start before it is due to close (which, given the refusal, only happens if
-/// the schedule itself changes mid-session, such as a new directory from GB7RDG). It is a web
+/// the schedule itself changes mid-session, such as a new directory from M0LTE). It is a web
 /// SDR peek only: no hook is run, no rig is retuned and LinBPQ is not held off.</para>
 /// </remarks>
 public sealed class ListenNowService
@@ -69,7 +69,7 @@ public sealed class ListenNowService
     /// The session open now, if any: null once <see cref="Duration"/> has passed, or (issue #57)
     /// at once if <paramref name="nextWindowOpens"/> has moved to now or the past, or is now
     /// sooner than the session's own end, since a slot's window must never be overlapped however
-    /// it came to be sooner than it looked when the session was granted (GB7RDG's directory,
+    /// it came to be sooner than it looked when the session was granted (M0LTE's directory,
     /// heard mid-session, can move it).
     /// </summary>
     public DateTimeOffset? ActiveUntil(DateTimeOffset now, DateTimeOffset nextWindowOpens)

@@ -17,7 +17,7 @@ public class PieceKeepTests
     }
 
     private static TransferObject Bulletin(int seed) =>
-        TransferObject.ForBulletin(TestBulletins.Make(seed, 4000), ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
+        TransferObject.ForBulletin(TestBulletins.Make(seed, 4000), ZstdDictionary.Dictionary1Id, Compression.Default, 240);
 
     [Fact]
     public void AnObjectOfAnyType_IsKept_WithItsPiecesAndRebuiltOctets()

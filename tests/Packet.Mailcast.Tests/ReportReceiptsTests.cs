@@ -23,7 +23,7 @@ public class ReportReceiptsTests(ITestOutputHelper output)
 
     private static BroadcastDirectory Directory(int count, ReportReceipts? reports, bool signed = true)
     {
-        var objects = TestBulletins.Day(3, count).Select(b => (Bulletin: b, Object: TransferObject.ForBulletin(b, ZstdDictionary.Gb7rdg1Id, Compression.Default))).ToList();
+        var objects = TestBulletins.Day(3, count).Select(b => (Bulletin: b, Object: TransferObject.ForBulletin(b, ZstdDictionary.Dictionary1Id, Compression.Default))).ToList();
         var entries = objects.Select(o => new DirectoryEntry(o.Object.ObjectId, o.Object.DictionaryId, o.Bulletin.Serialize().Length, o.Bulletin.Bid, o.Bulletin.Title,
             Hash: signed ? ObjectId.LongHash(o.Object.DictionaryId, o.Object.Bytes) : null)).ToList();
         return new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), "ms110d-wn4", signed ? Signer : null, reports);
@@ -116,7 +116,7 @@ public class ReportReceiptsTests(ITestOutputHelper output)
         Assert.Equal(with.Entries, old.Entries);
         Assert.Equal(withSignature ? SignatureState.Trusted : SignatureState.None, old.Check([Trusted]).State);
 
-        var withObject = TransferObject.ForDirectory(with, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var withObject = TransferObject.ForDirectory(with, ZstdDictionary.Dictionary1Id, Compression.Default);
         var older = V0130Reader.ReadDirectoryObject(withObject.Bytes, withObject.DictionaryId, Compression.Default);
         Assert.Equal(oldWithout.Entries.Select(e => e with { Hash = null }), older.Entries);
         Assert.Equal(oldWithout.Schedule, older.Schedule);
@@ -132,7 +132,7 @@ public class ReportReceiptsTests(ITestOutputHelper output)
     public void Airtime_TheListAddsLittleToTheDirectory()
     {
         TransferObject Object(ReportReceipts? reports) =>
-            TransferObject.ForDirectory(Directory(30, reports), ZstdDictionary.Gb7rdg1Id, Compression.Default, 240, MailcastFrame.StandardAlignment);
+            TransferObject.ForDirectory(Directory(30, reports), ZstdDictionary.Dictionary1Id, Compression.Default, 240, MailcastFrame.StandardAlignment);
         string[] calls = ["G8BPQ", "GM8BPQ", "G7TAJ", "M9TWM", "GM4CXF", "G4ABC", "M0XYZ", "2E0ABC", "G0DEF", "MW1GHI",
             "GI4JKL", "M7MNO", "G3PQR", "EI2STU", "G6VWX", "M1YZA", "GW0BCD", "G4EFG", "M5HIJ", "2M0KLM"];
         ReportReceipts Listeners(int n) => new(calls.Concat(Enumerable.Range(0, 100).Select(i => $"{(i % 3 == 0 ? "M" : "G")}{i % 8}{(char)('A' + (i * 7 % 26))}{(char)('A' + (i * 11 % 26))}{(char)('A' + (i * 5 % 26))}")).Distinct().Take(n)

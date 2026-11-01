@@ -7,7 +7,7 @@ public class MailArchiveTests
     /// <summary>Feeds the store pieces of <paramref name="bulletin"/> until it is rebuilt; returns its object ID.</summary>
     private static ulong Rebuild(ReceiverStore store, Bulletin bulletin)
     {
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         for (uint esi = 0; !store.IsComplete(obj.ObjectId); esi++)
         {
             Assert.True(esi < 100);

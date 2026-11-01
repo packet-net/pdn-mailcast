@@ -19,7 +19,7 @@ public sealed record HeadEndConfig
     public string Callsign { get; init; } = "";
 
     /// <summary>
-    /// Where this station's signal is centred, in Hz (GB7RDG's is 7053800). Optional; given, it is
+    /// Where this station's signal is centred, in Hz (M0LTE's is 7053800). Optional; given, it is
     /// carried in every directory (issue #179) so that receivers know where to listen for this
     /// station without being told by another. A head end that transmits through another program,
     /// such as pdn-soundmodem, knows this only from here.
@@ -1183,7 +1183,7 @@ public sealed record AdvertisedStation
     /// <summary>Its slots, the same shape as this head end's own <c>slot</c>.</summary>
     public AdvertisedSlot Slot { get; init; } = new();
 
-    /// <summary>Where its signal is centred, in Hz (GB7RDG's is 7053800). Required.</summary>
+    /// <summary>Where its signal is centred, in Hz (M0LTE's is 7053800). Required.</summary>
     public long FrequencyHz { get; init; }
 
     /// <summary><c>usb</c> or <c>lsb</c>.</summary>

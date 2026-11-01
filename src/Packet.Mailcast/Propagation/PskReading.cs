@@ -116,7 +116,7 @@ public sealed record PskReading
     /// A few words for the top of the tile, saying whose verdict it is: "FT8 spots: open from
     /// about 260 km", "FT8 spots: open near and far", "FT8 spots: closed", "FT8 spots: too few to
     /// say". FT8 decodes far weaker signals than the mailcast needs, so these never promise that
-    /// GB7RDG will be heard.
+    /// M0LTE will be heard.
     /// </summary>
     public string Headline()
     {

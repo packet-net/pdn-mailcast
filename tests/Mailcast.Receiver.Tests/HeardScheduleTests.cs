@@ -73,7 +73,7 @@ public class HeardScheduleTests
         using var dir = new TempDirectory();
         var log = new List<string>();
         await using var intake = new Intake(dir.Path, line => { lock (log) { log.Add(line); } });
-        var dapps = TransferObject.ForContent((byte)ObjectKind.DappsMessage, "a DAPPS message"u8.ToArray(), [], false, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var dapps = TransferObject.ForContent((byte)ObjectKind.DappsMessage, "a DAPPS message"u8.ToArray(), [], false, ZstdDictionary.Dictionary1Id, Compression.Default);
         for (uint esi = 0; esi < 10; esi++)
         {
             intake.Offer(Packet.SoundModem.Waterfall.Ax25UiFrame.Build(Samples.Source, OnAir.Destination, dapps.Frame(esi).ToBytes()));

@@ -644,7 +644,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         if (pipeline.HomeLnb is { } home)
         {
-            // Opened on an LNB's IF: between slots it stays on the downlink, not on GB7RDG's HF signal.
+            // Opened on an LNB's IF: between slots it stays on the downlink, not on M0LTE's HF signal.
             pipeline.SetSignal(home.IfHz, home.LnbHz);
             ChannelWatch.AudioCentreHz = AudioPipeline.AudioCentreFor(pipeline.DialHz, home.IfHz);
             return;
@@ -1400,7 +1400,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 closeAt = new CancellationTokenSource();
                 closingSlot = slot;
                 // Issue #57: a "Listen now" session's close is re-checked against the schedule
-                // every time, not just at grant, so a window GB7RDG's directory moves earlier
+                // every time, not just at grant, so a window M0LTE's directory moves earlier
                 // mid-session is still never overlapped. Issue #80: NextWebSdrWindowOpens, not
                 // the raw schedule, so a session granted during what would have been the rest of
                 // a window that ended early is not mistaken for overlapping that same window

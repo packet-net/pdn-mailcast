@@ -27,7 +27,7 @@ import zstandard
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 VECTORS = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "tests", "Packet.Mailcast.Tests", "Vectors", "model-b-v1.json")
-DICTIONARY = os.path.join(ROOT, "src", "Packet.Mailcast", "Dictionaries", "gb7rdg-1.zdict")
+DICTIONARY = os.path.join(ROOT, "src", "Packet.Mailcast", "Dictionaries", "dictionary-1.zdict")
 
 failures = 0
 checked = 0

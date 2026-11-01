@@ -12,7 +12,7 @@ public class SignedDirectoryTests(ITestOutputHelper output)
 
     private static (BroadcastDirectory Unsigned, BroadcastDirectory Signed) Pair(int count, int seed = 1)
     {
-        var objects = TestBulletins.Day(seed, count).Select(b => (Bulletin: b, Object: TransferObject.ForBulletin(b, ZstdDictionary.Gb7rdg1Id, Compression.Default))).ToList();
+        var objects = TestBulletins.Day(seed, count).Select(b => (Bulletin: b, Object: TransferObject.ForBulletin(b, ZstdDictionary.Dictionary1Id, Compression.Default))).ToList();
         var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var plain = objects.Select(o => new DirectoryEntry(o.Object.ObjectId, o.Object.DictionaryId, o.Bulletin.Serialize().Length, o.Bulletin.Bid, o.Bulletin.Title)).ToList();
         var hashed = objects.Select((o, i) => plain[i] with { Hash = ObjectId.LongHash(o.Object.DictionaryId, o.Object.Bytes) }).ToList();
@@ -46,8 +46,8 @@ public class SignedDirectoryTests(ITestOutputHelper output)
         var (_, a) = Pair(4);
         var (_, b) = Pair(4);
         Assert.Equal(a.Serialize(), b.Serialize());
-        Assert.Equal(TransferObject.ForDirectory(a, ZstdDictionary.Gb7rdg1Id, Compression.Default).ObjectId,
-            TransferObject.ForDirectory(b, ZstdDictionary.Gb7rdg1Id, Compression.Default).ObjectId);
+        Assert.Equal(TransferObject.ForDirectory(a, ZstdDictionary.Dictionary1Id, Compression.Default).ObjectId,
+            TransferObject.ForDirectory(b, ZstdDictionary.Dictionary1Id, Compression.Default).ObjectId);
     }
 
     [Fact]
@@ -80,8 +80,8 @@ public class SignedDirectoryTests(ITestOutputHelper output)
     public void OldReceivers_ReadASignedDirectory_ExactlyAsTheUnsignedOne(int count)
     {
         var (plain, signed) = Pair(count, seed: 40 + count);
-        var plainObject = TransferObject.ForDirectory(plain, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
-        var signedObject = TransferObject.ForDirectory(signed, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
+        var plainObject = TransferObject.ForDirectory(plain, ZstdDictionary.Dictionary1Id, Compression.Default, 240);
+        var signedObject = TransferObject.ForDirectory(signed, ZstdDictionary.Dictionary1Id, Compression.Default, 240);
         Assert.Equal((byte)ObjectKind.Directory, signedObject.Bytes[0]); // no metadata bit: the type octet old receivers want
 
         var old = V0130Reader.ReadDirectoryObject(signedObject.Bytes, signedObject.DictionaryId, Compression.Default);
@@ -198,8 +198,8 @@ public class SignedDirectoryTests(ITestOutputHelper output)
     public void Airtime_SigningAddsLittleToTheDirectory(int count, int mostExtraSymbols)
     {
         var (plain, signed) = Pair(count, seed: 77);
-        var a = TransferObject.ForDirectory(plain, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
-        var b = TransferObject.ForDirectory(signed, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
+        var a = TransferObject.ForDirectory(plain, ZstdDictionary.Dictionary1Id, Compression.Default, 240);
+        var b = TransferObject.ForDirectory(signed, ZstdDictionary.Dictionary1Id, Compression.Default, 240);
         int floorBefore = Math.Max(a.SourceSymbols + 2, BroadcastScheduler.DirectoryFloor(a.SourceSymbols));
         int floorAfter = Math.Max(b.SourceSymbols + 2, BroadcastScheduler.DirectoryFloor(b.SourceSymbols));
         output.WriteLine($"{count} bulletins: {a.Length} -> {b.Length} octets on the air (+{b.Length - a.Length}), K {a.SourceSymbols} -> {b.SourceSymbols}, directory frames a slot at least {floorBefore} -> {floorAfter}");
@@ -219,11 +219,11 @@ public class SignedDirectoryStoreTests
     private static ReceiverStore Open(string path, FakeTimeProvider time, List<string> log) =>
         new(path, Compression.Default, TestStores.Fast with { Time = time, Log = log.Add, TrustedKeys = Keys });
 
-    private static TransferObject Small(int seed) => TransferObject.ForBulletin(TestBulletins.Make(seed, 400), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+    private static TransferObject Small(int seed) => TransferObject.ForBulletin(TestBulletins.Make(seed, 400), ZstdDictionary.Dictionary1Id, Compression.Default);
 
     private static TransferObject Big(int seed)
     {
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(seed, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(seed, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.True(obj.SourceSymbols > 1);
         return obj;
     }
@@ -236,7 +236,7 @@ public class SignedDirectoryStoreTests
 
     private static List<MailcastFrame> DirectoryFrames(BroadcastDirectory directory)
     {
-        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default);
         return [.. Enumerable.Range(0, obj.SourceSymbols).Select(i => obj.Frame((uint)i))];
     }
 

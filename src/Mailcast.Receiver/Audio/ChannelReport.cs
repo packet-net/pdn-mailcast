@@ -139,7 +139,7 @@ public sealed record ChannelReport
 
     /// <summary>
     /// The ground distance assumed for the height when the receiver's place is not known: a
-    /// typical UK path. Within about 300 km of GB7RDG the height barely depends on it: 1.93 ms
+    /// typical UK path. Within about 300 km of M0LTE the height barely depends on it: 1.93 ms
     /// between 1F and 2F is 289 km straight overhead and 307 km at 300 km. Further out it does: on
     /// the 851 km path to Lewis, 1.5 ms is 231 km here but 312 km at the true distance, so a
     /// distant receiver needs its place ("locator") for a height worth having.

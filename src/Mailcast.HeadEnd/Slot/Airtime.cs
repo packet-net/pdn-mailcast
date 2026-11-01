@@ -59,7 +59,7 @@ public sealed class LinearAirtime(TimeSpan perBurst, TimeSpan perFrame, double s
 /// them, each with the station's own delay, the gaps between them, and the closing ident.
 /// </summary>
 /// <remarks>
-/// The fixed parts were measured on GB7RDG. The slot of 2026-10-06 09:00 UTC (33 frames of 271
+/// The fixed parts were measured on M0LTE. The slot of 2026-10-06 09:00 UTC (33 frames of 271
 /// octets on WN4, 6 bursts, a 10 s tone) took 119.7 s from its start to the release, and the one
 /// of 2026-10-05 16:00 (41 frames, 7 bursts, a 30 s tone) 161.5 s. Of that, about 3 s went
 /// before the tone, the tone took about 1 s more than its length, and each burst about 2.5 s

@@ -30,7 +30,7 @@ public class MailTests
     /// </summary>
     private static byte[] FirstPieceOf(Bulletin bulletin)
     {
-        var transfer = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var transfer = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.True(transfer.SourceSymbols > 1);
         return Ax25UiFrame.Build(Samples.Source, OnAir.Destination, transfer.Frame(0).ToBytes());
     }
@@ -455,7 +455,7 @@ public class MailTests
         using var _c = http;
         var (canonical, _) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "77_TEST", "A title",
             System.Text.Encoding.Latin1.GetBytes("R:261019/0850Z 77@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody.\r\n"));
-        var transfer = TransferObject.ForBulletin(canonical, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var transfer = TransferObject.ForBulletin(canonical, ZstdDictionary.Dictionary1Id, Compression.Default);
         for (uint i = 0; i < transfer.SourceSymbols; i++)
         {
             host.Intake.Offer(Ax25UiFrame.Build(Samples.Source, OnAir.Destination, transfer.Frame(i).ToBytes()));

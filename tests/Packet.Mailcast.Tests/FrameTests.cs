@@ -105,10 +105,10 @@ public class FrameTests
     public void ObjectId_IsTheFirstEightOctetsOfSha256OfDictionaryAndObject()
     {
         var bulletin = TestBulletins.Make(1, 2000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         var sha = System.Security.Cryptography.SHA256.HashData([0x00, 0x01, .. obj.Bytes]); // dictionary ID 1, then the object
         Assert.Equal(BinaryPrimitives.ReadUInt64BigEndian(sha), obj.ObjectId);
-        Assert.Equal(obj.ObjectId, ObjectId.Of(ZstdDictionary.Gb7rdg1Id, obj.Bytes));
+        Assert.Equal(obj.ObjectId, ObjectId.Of(ZstdDictionary.Dictionary1Id, obj.Bytes));
         Assert.NotEqual(obj.ObjectId, ObjectId.Of(2, obj.Bytes));
         Assert.Equal((byte)ObjectKind.Bulletin, obj.Bytes[0]);
 
@@ -121,7 +121,7 @@ public class FrameTests
     [Fact]
     public void FromStored_GivesTheSameObject()
     {
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(3, 5000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(3, 5000), ZstdDictionary.Dictionary1Id, Compression.Default);
         var again = TransferObject.FromStored(obj.Bytes, obj.DictionaryId, obj.Oti);
         Assert.Equal(obj.ObjectId, again.ObjectId);
         Assert.Equal(obj.Frame(17).ToBytes(), again.Frame(17).ToBytes());

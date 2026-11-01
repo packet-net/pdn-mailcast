@@ -10,7 +10,7 @@
   // Where your radio is, as a 4 or 6 character Maidenhead locator, for a sound card,
   // soundmodem, sdrconnect or a recording. It names the radio path's hops and goes in the daily report.
   // A web SDR says where it is itself, so with one this is not used.
-  // "locator": "IO91lk",
+  // "locator": "JO01ab",
 
   // The USB dial in kHz. The web SDR is tuned here, and your radio should be too if you use
   // a sound card. Left out, it is the first station in the stations file's frequency less 1.8 kHz,
@@ -18,11 +18,6 @@
   // signal's frequency minus the middle of its own receive filter, which the status page's
   // "Measure my filter" works out for you. See docs/receiver.md.
   // "dialKHz": 7052.0,
-
-  // Callsigns the broadcast is accepted from besides every station the receiver knows of (the
-  // stations file, and those it hears of on the air or by "Listen for a station"), any SSID.
-  // Left out, there are none besides those.
-  // "sources": ["G4ABC"],
 
   // Your BBS. "type" is "linBpq" or "fbb". For LinBPQ the port is the FBBPORT in its
   // Telnet port, and the login is the USER= name you made for the receiver.

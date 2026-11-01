@@ -35,7 +35,7 @@ if (Get-Service $name -ErrorAction SilentlyContinue) {
     sc.exe create $name binPath= $binPath start= delayed-auto DisplayName= 'pdn-mailcast receiver' | Out-Null
 }
 if ($LASTEXITCODE -ne 0) { throw "sc.exe could not set up the service ($LASTEXITCODE)" }
-sc.exe description $name 'Hears GB7RDG''s bulletins on 40 m and hands each one to your BBS.' | Out-Null
+sc.exe description $name 'Hears mailcast bulletins on 40 m and hands each one to your BBS.' | Out-Null
 # Start it again a minute after any failure, and count a stop with an error as a failure too
 # (that is how the receiver says it needs restarting); the count resets after a day.
 sc.exe failure $name reset= 86400 actions= restart/60000/restart/60000/restart/60000 | Out-Null

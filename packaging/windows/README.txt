@@ -1,7 +1,8 @@
 pdn-mailcast-receiver for Windows
 =================================
 
-This hears GB7RDG's bulletins on 40 m and hands each one to your BBS. Everything it needs is
+This hears mailcast bulletins on 40 m (M0LTE's, to start with) and hands each one to your BBS.
+Everything it needs is
 in this folder: there is no .NET to install. Windows 10 or 11, 64-bit (x64).
 
 Trying it

@@ -591,10 +591,10 @@ public sealed class BroadcastDirectory
 /// <summary>
 /// What a station says about its own transmitter in its directory (issue #179): where its signal
 /// is centred, on which sideband, and where it is. Each part is optional: a head end that is not
-/// told leaves it out, and a receiver then falls back to an advert for the station, and for GB7RDG
+/// told leaves it out, and a receiver then falls back to an advert for the station, and for M0LTE
 /// to what it has always assumed.
 /// </summary>
-/// <param name="FrequencyHz">The signal's centre in Hz (GB7RDG's is 7053800); null for not given.</param>
+/// <param name="FrequencyHz">The signal's centre in Hz (M0LTE's is 7053800); null for not given.</param>
 /// <param name="Sideband">The sideband; null for not given (usb is then assumed).</param>
 /// <param name="Locator">A 4 or 6 character Maidenhead locator; null for not given.</param>
 public sealed record StationDetails(long? FrequencyHz = null, Sideband? Sideband = null, string? Locator = null)

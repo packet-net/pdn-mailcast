@@ -18,7 +18,7 @@ public class OtherCopyTests
     {
         var a = TestBulletins.Make(seed, 8000);
         var b = Bulletin.FromMessageText(a.Type, a.From, a.To, a.At, a.Bid, "another title for the same bulletin", a.Date, "R:261030/0800Z 1@G8BPQ.#1.GBR.EURO\r\n" + a.MessageText);
-        return (TransferObject.ForBulletin(a, ZstdDictionary.Gb7rdg1Id, Compression.Default), TransferObject.ForBulletin(b, ZstdDictionary.Gb7rdg1Id, Compression.Default), a.Bid);
+        return (TransferObject.ForBulletin(a, ZstdDictionary.Dictionary1Id, Compression.Default), TransferObject.ForBulletin(b, ZstdDictionary.Dictionary1Id, Compression.Default), a.Bid);
     }
 
     private static List<MailcastFrame> Frames(TransferObject o, int count) => [.. Enumerable.Range(0, Math.Min(count, o.SourceSymbols)).Select(i => o.Frame((uint)i))];
@@ -38,7 +38,7 @@ public class OtherCopyTests
     private static void ListBulletins(ReceiverStore store, string? station, params (TransferObject Object, string Bid)[] listed)
     {
         var entries = listed.Select(l => new DirectoryEntry(l.Object.ObjectId, l.Object.DictionaryId, 400, l.Bid, "title")).ToArray();
-        var dir = TransferObject.ForDirectory(new BroadcastDirectory(Day, entries, station: station), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var dir = TransferObject.ForDirectory(new BroadcastDirectory(Day, entries, station: station), ZstdDictionary.Dictionary1Id, Compression.Default);
         Feed(store, dir);
     }
 
@@ -190,11 +190,11 @@ public class OtherCopyTests
         var a = TestBulletins.Make(17, 3000);
         var other = Bulletin.FromMessageText(a.Type, a.From, a.To, a.At, a.Bid, "a different full title", a.Date, "R:261030/0800Z 1@G8BPQ.#1.GBR.EURO\r\n" + a.MessageText);
         var canonB = TestBulletins.Canonical(other);
-        var ta = TransferObject.ForBulletin(a, ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var tb = TransferObject.ForBulletin(canonB, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var ta = TransferObject.ForBulletin(a, ZstdDictionary.Dictionary1Id, Compression.Default);
+        var tb = TransferObject.ForBulletin(canonB, ZstdDictionary.Dictionary1Id, Compression.Default);
         // Listed with an envelope link that never arrives, so the canonical object waits.
         var entry = new DirectoryEntry(tb.ObjectId, tb.DictionaryId, 400, a.Bid, canonB.Title, Hash: ObjectId.LongHash(tb.DictionaryId, tb.Bytes), Envelope: new EnvelopeLink(0x1234UL, new string('a', ObjectId.ListedHashOctets * 2)));
-        var directory = TransferObject.ForDirectory(new BroadcastDirectory(Day, [entry], signer: signer), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var directory = TransferObject.ForDirectory(new BroadcastDirectory(Day, [entry], signer: signer), ZstdDictionary.Dictionary1Id, Compression.Default);
         Feed(store, directory);
         var waiting = Feed(store, tb, "G8BPQ");
         Assert.Equal(FrameOutcome.AwaitingEnvelope, waiting.Outcome);

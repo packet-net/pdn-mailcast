@@ -65,9 +65,9 @@ public static class ModelBVectors
         var bulletinOctets = bulletin.Serialize();
         var envelopeOctets = envelope.Serialise();
 
-        var withDictionary = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, compression, PieceSize);
+        var withDictionary = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, compression, PieceSize);
         var withoutDictionary = TransferObject.ForBulletin(bulletin, Compression.NoDictionary, compression, PieceSize);
-        var envelopeObject = TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, compression);
+        var envelopeObject = TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, compression);
 
         var link = new EnvelopeLink(envelopeObject.ObjectId, ObjectId.LongHash(envelopeObject.DictionaryId, envelopeObject.Bytes.ToArray()));
         var entry = new DirectoryEntry(withDictionary.ObjectId, withDictionary.DictionaryId, bulletinOctets.Length, bulletin.Bid, bulletin.Title,
@@ -149,7 +149,7 @@ public static class ModelBVectors
         {
             ["format"] = "Model B v1, issue #142 of packet-net/pdn-mailcast. This file is the definition of the format: see docs/design.md.",
             ["generator"] = "tools/Mailcast.ModelBVectors (the library under test); reproduced independently by tools/raptorq-vectors/reproduce_model_b.py",
-            ["zstd"] = "1.5.7 (ZstdSharp.Port 0.8.8), level 19, one thread, checksum, content size and dictionary ID on; dictionary 1 is src/Packet.Mailcast/Dictionaries/gb7rdg-1.zdict",
+            ["zstd"] = "1.5.7 (ZstdSharp.Port 0.8.8), level 19, one thread, checksum, content size and dictionary ID on; dictionary 1 is src/Packet.Mailcast/Dictionaries/dictionary-1.zdict",
             ["pieceSize"] = PieceSize,
             ["notes"] = "All octets are lower-case hex. Symbols are 'esi:hex' of the encoding symbol; frames are 'esi:hex' of the whole payload including its CRC. The directory line is the bulletin's entry in an unsigned directory, with env= for the envelope object. Objects are type octet then the zstd frame.",
             ["cases"] = cases,
