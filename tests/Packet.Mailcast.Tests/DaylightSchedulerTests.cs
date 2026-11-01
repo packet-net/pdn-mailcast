@@ -35,7 +35,7 @@ public class DaylightSchedulerTests
         var first = T("2026-10-05T15:00:00Z");
         Assert.Equal([0, 5, 10, 17, 25], BroadcastScheduler.CarryingSlots(first, plain).Select(s => (int)(s - first).TotalHours));
         Assert.Equal(first.AddHours(29), BroadcastScheduler.RotationEnd(first, plain));
-        var carried = new CarriedBulletin("1_X", "t", 10, new DateOnly(2026, 10, 5), TransferObject.ForBulletin(TestBulletins.Day(1, 1)[0], ZstdDictionary.Gb7rdg1Id, Compression.Default), 0, first);
+        var carried = new CarriedBulletin("1_X", "t", 10, new DateOnly(2026, 10, 5), TransferObject.ForBulletin(TestBulletins.Day(1, 1)[0], ZstdDictionary.Dictionary1Id, Compression.Default), 0, first);
         for (int h = -2; h < 32; h++)
         {
             var slot = first.AddHours(h);

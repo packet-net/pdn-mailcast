@@ -172,7 +172,7 @@ public sealed class FollowedSlots
 
     /// <summary>
     /// The slots in words, for the page and the log: one station's as <see cref="SlotSchedule.Describe"/>,
-    /// several as "GB7RDG every hour on the hour; G8BPQ every hour at 30 minutes past".
+    /// several as "M0LTE every hour on the hour; G8BPQ every hour at 30 minutes past".
     /// </summary>
     public string Describe() => Stations.Count == 0 ? "no station" : OneStation ? First.Describe() : string.Join("; ", Stations.Select(s => $"{s.Station} {s.Schedule.Describe()}"));
 
@@ -270,7 +270,7 @@ public static class ListeningWindow
         var active = schedule.ActiveOn(day);
         // When there are more daylight slots than fit in the allowance (near midsummer), the
         // earliest morning ones are left out, not the late afternoon ones: late afternoon is often
-        // the best time for 40 m to reach stations near GB7RDG, and an early morning slot hears little.
+        // the best time for 40 m to reach stations near M0LTE, and an early morning slot hears little.
         int n = Math.Min(ReceiverConfig.MostWebSdrSlotsPerDay, active.Count);
         return [.. active.Skip(active.Count - n)];
     }

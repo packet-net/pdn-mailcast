@@ -8,7 +8,7 @@ namespace Mailcast.HeadEnd.Intake;
 /// The listeners' daily reports that have reached the BBS (issue #136), as <see cref="ReportReader"/>
 /// learns them from its list: for each callsign, the day of its newest report and when the head
 /// end first saw it, kept in <see cref="FileName"/> in the state directory. The directory lists
-/// the recent ones (<see cref="ReportReceipts"/>), so a listener's receiver can say whether GB7RDG
+/// the recent ones (<see cref="ReportReceipts"/>), so a listener's receiver can say whether the station
 /// got its report. The reports themselves are never read, kept or broadcast.
 /// </summary>
 public sealed class ReportLog
@@ -126,7 +126,7 @@ public sealed class ReportLog
     /// <summary>
     /// What a directory dated <paramref name="today"/> lists (<see cref="ReportReceipts.ForDay"/>):
     /// null, so the directory says nothing, until the BBS's list has been read once. A head end
-    /// that cannot read it would otherwise tell every listener that GB7RDG has had none.
+    /// that cannot read it would otherwise tell every listener that the station has had none.
     /// </summary>
     public ReportReceipts? For(DateOnly today)
     {

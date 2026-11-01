@@ -22,7 +22,7 @@ public class CanonicalDeliveryTests
         string title = "A fairly long title for canonical bulletin number " + seed + " that goes past the shared fifty nine octets";
         byte[] original = Bulletin.TextEncoding.GetBytes($"R:261019/0850Z {seed}@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody {seed}.\r\nSecond line.\r\n" + (bigBody ? BigText() : ""));
         var (canonical, _) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", $"{seed}_TEST", title, original);
-        return new Made(TransferObject.ForBulletin(canonical, ZstdDictionary.Gb7rdg1Id, Compression.Default), canonical, original, title);
+        return new Made(TransferObject.ForBulletin(canonical, ZstdDictionary.Dictionary1Id, Compression.Default), canonical, original, title);
     }
 
     private static string BigText()
@@ -36,7 +36,7 @@ public class CanonicalDeliveryTests
     {
         byte[] copy = Bulletin.TextEncoding.GetBytes($"R:261019/0900Z {route} LinBPQ6.0.25\r\n" + Bulletin.TextEncoding.GetString(m.Original));
         var (_, envelope) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", m.Canonical.Bid, m.FullTitle, copy);
-        return TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        return TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, Compression.Default);
     }
 
     private static DirectoryEntry Entry(Made m, TransferObject? envelope) =>
@@ -48,7 +48,7 @@ public class CanonicalDeliveryTests
 
     private static List<MailcastFrame> DirectoryFramesOf(DirectorySigner? signer, string? station, params DirectoryEntry[] entries)
     {
-        var obj = TransferObject.ForDirectory(new BroadcastDirectory(Day, entries, signer: signer, station: station), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForDirectory(new BroadcastDirectory(Day, entries, signer: signer, station: station), ZstdDictionary.Dictionary1Id, Compression.Default);
         return [.. Enumerable.Range(0, obj.SourceSymbols).Select(i => obj.Frame((uint)i))];
     }
 
@@ -260,7 +260,7 @@ public class CanonicalDeliveryTests
         using var dir = new TempDirectory();
         var store = Open(dir.Path, Clock());
         var plain = TestBulletins.Make(9, 400);
-        var obj = TransferObject.ForBulletin(plain, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(plain, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(FrameOutcome.CompletedBulletin, Feed(store, obj).Outcome);
         Assert.Empty(store.Awaiting());
         Assert.Equal(plain, Assert.Single(store.Pending()));
@@ -437,7 +437,7 @@ public class CanonicalDeliveryTests
         var m = MakeCanonical(21);
         byte[] copy = Bulletin.TextEncoding.GetBytes("R:261019/0900Z 21@GB7ZZZ.#1.GBR.EURO LinBPQ6.0.25\r\n" + Bulletin.TextEncoding.GetString(m.Original));
         var (_, envelope) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", m.Canonical.Bid, "Line one\rline two", copy);
-        var env = TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var env = TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, Compression.Default);
         Feed(store, DirectoryFrames(SignerA, Entry(m, env)));
         Feed(store, env);
         Feed(store, m.Bulletin);

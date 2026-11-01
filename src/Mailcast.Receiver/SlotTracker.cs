@@ -17,11 +17,11 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
 
     /// <summary>
     /// Issue #144: the station whose slot this is, when the receiver follows more than one; null
-    /// when it follows one (GB7RDG alone, as before) or for a recording.
+    /// when it follows one (the usual case) or for a recording.
     /// </summary>
     public string? Station { get; init; }
 
-    /// <summary>The waveform GB7RDG's directory said this slot went out on, if a directory completed in it.</summary>
+    /// <summary>The waveform M0LTE's directory said this slot went out on, if a directory completed in it.</summary>
     public string? ListedWaveform { get; init; }
 
     /// <summary>
@@ -86,14 +86,14 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
 }
 
 /// <summary>
-/// Groups what the receiver hears into GB7RDG's slots and keeps the latest.
+/// Groups what the receiver hears into M0LTE's slots and keeps the latest.
 /// </summary>
 /// <remarks>
 /// <para>With a <see cref="Schedule"/>, each frame belongs to the slot whose start most recently
 /// passed (allowing <see cref="ClockAllowance"/> for a receiver clock that is a little slow), so
 /// a long slot is not split and a late one is not merged with the one before. A tone is only
 /// taken as a slot's if it began within <see cref="ToneWindow"/> of a slot's start: anything
-/// else near 1800 Hz is someone tuning up, not GB7RDG.</para>
+/// else near 1800 Hz is someone tuning up, not M0LTE.</para>
 /// <para>Without one (a recording, whose time of day is unknown) a slot starts with a tone, or
 /// with the first frame after <see cref="Gap"/> of quiet.</para>
 /// </remarks>

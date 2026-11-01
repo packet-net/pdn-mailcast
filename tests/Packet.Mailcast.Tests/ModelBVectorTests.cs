@@ -68,13 +68,13 @@ public class ModelBVectorTests
         var compression = Compression.Default;
 
         var bulletinObject = Convert.FromHexString((string)e["bulletinDictionary1"]!["objectHex"]!);
-        var (kind, content) = TransferObject.Unpack(bulletinObject, ZstdDictionary.Gb7rdg1Id, compression);
+        var (kind, content) = TransferObject.Unpack(bulletinObject, ZstdDictionary.Dictionary1Id, compression);
         Assert.Equal(ObjectKind.Bulletin, kind);
         var bulletin = Bulletin.Parse(content);
         Assert.True(bulletin.Canonical);
 
         var envelopeObject = Convert.FromHexString((string)e["envelopeObjectDictionary1"]!["objectHex"]!);
-        var (envKind, envContent) = TransferObject.Unpack(envelopeObject, ZstdDictionary.Gb7rdg1Id, compression);
+        var (envKind, envContent) = TransferObject.Unpack(envelopeObject, ZstdDictionary.Dictionary1Id, compression);
         Assert.Equal(ObjectKind.Envelope, envKind);
         var envelope = BulletinEnvelope.Parse(envContent);
 

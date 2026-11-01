@@ -2,9 +2,9 @@
 
 An hourly one-way HF transmission of packet BBS bulletins, and a receiver that drops each bulletin it hears into your own BBS.
 
-M0LTE sends its bulletins on 40 m every hour on the hour in daylight, transmitted from GB7RDG's station, when 40 m carries across the UK, each one more than once, in a slot of a few minutes. The receiver listens through a sound card on your radio, or through a public web SDR, and collects pieces of the transmission until each bulletin is complete. It then hands the bulletin to your LinBPQ or FBB mail as an ordinary forwarding partner. Your BBS already rejects bulletins it has seen, so this is just one more route for mail to reach you.
+M0LTE sends its bulletins on 40 m every hour on the hour in daylight, when 40 m carries across the UK, each one more than once, in a slot of a few minutes. The receiver listens through a sound card on your radio, or through a public web SDR, and collects pieces of the transmission until each bulletin is complete. It then hands the bulletin to your LinBPQ or FBB mail as an ordinary forwarding partner. Your BBS already rejects bulletins it has seen, so this is just one more route for mail to reach you.
 
-This is an experiment at an early stage: the libraries, the head end and the receiver exist, and GB7RDG has been on the air with them since 2026-10-05. The plan is in [docs/design.md](docs/design.md), and the figures in [docs/factsheet.md](docs/factsheet.md). To run a receiver, see [src/Mailcast.Receiver/README.md](src/Mailcast.Receiver/README.md).
+This is an experiment at an early stage: the libraries, the head end and the receiver exist, and M0LTE has been on the air with them since 2026-10-05. The plan is in [docs/design.md](docs/design.md), and the figures in [docs/factsheet.md](docs/factsheet.md). To run a receiver, see [src/Mailcast.Receiver/README.md](src/Mailcast.Receiver/README.md).
 
 ## Credits
 
@@ -27,8 +27,8 @@ The code so far:
 
 - `src/Mailcast.RaptorQ`: RaptorQ (RFC 6330), with no dependency on the rest of the repo.
 - `src/Packet.Mailcast`: the core library, published as `Packet.Mailcast` on nuget.org: the on-air frame format, the bulletin model, zstd compression with the trained dictionary, the directory, the head end's store and slot schedule, the daylight hours (a small sunrise and sunset calculator), and the receiver's symbol store.
-- FBB compressed (B1F) forwarding, both the calling and the answering side, comes from the `Packet.Fbb` NuGet package ([packet-net/pdn-fbb](https://github.com/packet-net/pdn-fbb)), which pdn-bbs uses too. The receiver uses it to hand bulletins to your BBS, and the head end to take them from GB7RDG's.
-- `src/Mailcast.HeadEnd`: the head end, `pdn-mailcast-headend`: takes bulletins from a BBS (GB7RDG's first) as a forwarding partner and sends them every daylight hour through the station's pdn-soundmodem, or renders a slot to a WAV file offline. See [docs/headend.md](docs/headend.md), and [docs/run-your-own-headend.md](docs/run-your-own-headend.md) to set one up for your own station; `scripts/build-headend-deb.sh linux-x64 VERSION` builds its .deb.
+- FBB compressed (B1F) forwarding, both the calling and the answering side, comes from the `Packet.Fbb` NuGet package ([packet-net/pdn-fbb](https://github.com/packet-net/pdn-fbb)), which pdn-bbs uses too. The receiver uses it to hand bulletins to your BBS, and the head end to take them from its BBS.
+- `src/Mailcast.HeadEnd`: the head end, `pdn-mailcast-headend`: takes bulletins from a BBS (GB7RDG's was the first) as a forwarding partner and sends them every daylight hour through the station's pdn-soundmodem, or renders a slot to a WAV file offline. See [docs/headend.md](docs/headend.md), and [docs/run-your-own-headend.md](docs/run-your-own-headend.md) to set one up for your own station; `scripts/build-headend-deb.sh linux-x64 VERSION` builds its .deb.
 - `src/Mailcast.Receiver`: the receiver, with pdn-soundmodem's MS110D modem embedded from NuGet. It can borrow a radio it shares with LinBPQ for each slot: see [Sharing a radio with LinBPQ](docs/receiver.md#sharing-a-radio-with-linbpq).
 - `tools/Mailcast.DictionaryTool`: imports bulletins from a copy of a LinBPQ mail store, trains a dictionary, and compares compressed sizes.
 - `tools/raptorq-vectors` and `tools/RaptorQ.InteropExport`: check our RaptorQ against the Rust `raptorq` crate, both ways. CI runs them; to run them by hand you also need cargo:
@@ -45,8 +45,8 @@ To retrain the dictionary from a copy of a LinBPQ store (`DIRMES.SYS` and `Mail/
 
 ```
 dotnet run --project tools/Mailcast.DictionaryTool -- import-bpq <copy-of-bpq-dir> <bulletin-dir>
-dotnet run --project tools/Mailcast.DictionaryTool -- train <bulletin-dir> src/Packet.Mailcast/Dictionaries/gb7rdg-1.zdict --size 65536 --no-7plus
-dotnet run --project tools/Mailcast.DictionaryTool -- evaluate <bulletin-dir> --dictionary src/Packet.Mailcast/Dictionaries/gb7rdg-1.zdict
+dotnet run --project tools/Mailcast.DictionaryTool -- train <bulletin-dir> src/Packet.Mailcast/Dictionaries/dictionary-1.zdict --size 65536 --no-7plus
+dotnet run --project tools/Mailcast.DictionaryTool -- evaluate <bulletin-dir> --dictionary src/Packet.Mailcast/Dictionaries/dictionary-1.zdict
 ```
 
 A retrained dictionary needs a new dictionary ID, since receivers decompress by ID.

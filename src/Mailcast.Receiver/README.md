@@ -1,6 +1,6 @@
 # pdn-mailcast receiver
 
-Hears M0LTE's experimental mailcasts on 40 m, transmitted from GB7RDG's station, sent every hour on the hour in daylight, and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
+Hears M0LTE's experimental mailcasts on 40 m, sent every hour on the hour in daylight, and passes each bulletin to your LinBPQ, like a forwarding partner would. It never transmits, and you don't need a radio.
 
 You need a Linux machine (a Pi is fine) running LinBPQ with its mail, or a Windows one: see [Windows](#windows). It doesn't have to be on the same machine as LinBPQ.
 

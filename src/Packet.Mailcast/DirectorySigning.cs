@@ -262,7 +262,7 @@ public sealed record DirectoryCheck(SignatureState State, string? SignedBy = nul
     /// </summary>
     public bool Usable => State == SignatureState.Trusted || (State == SignatureState.None && !Refused);
 
-    /// <summary>A few plain words: "signed by GB7RDG", "not signed", or "rejected: ...".</summary>
+    /// <summary>A few plain words: "signed by M0LTE", "not signed", or "rejected: ...".</summary>
     public string Describe() => State switch
     {
         SignatureState.Trusted => $"signed by {SignedBy}",

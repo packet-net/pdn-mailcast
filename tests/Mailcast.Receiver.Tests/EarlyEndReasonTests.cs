@@ -175,7 +175,7 @@ public class EarlyEndReasonTests
         // even though the stray object is never tracked as part of this slot's rotation. Built
         // directly as a bulletin's own frame, not picked out of a planned slot's frames, so it is
         // never one of that slot's own directory frames (there can be several, issue #69).
-        var strayTransfer = TransferObject.ForBulletin(Samples.Bulletin(99, from: "M0XYZ"), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var strayTransfer = TransferObject.ForBulletin(Samples.Bulletin(99, from: "M0XYZ"), ZstdDictionary.Dictionary1Id, Compression.Default);
         var stray = Ax25UiFrame.Build(Samples.Source, OnAir.Destination, strayTransfer.Frame(0).ToBytes());
         await f.HearAsync(stray);
 
@@ -207,7 +207,7 @@ public class EarlyEndReasonTests
         var strayDirectory = new BroadcastDirectory(
             DateOnly.FromDateTime(SlotStart.UtcDateTime).AddDays(-1),
             [new DirectoryEntry(0xDEADBEEF_00000001, 0, 100, "99_GB7XYZ", "Stray directory")]);
-        var strayTransfer = TransferObject.ForDirectory(strayDirectory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var strayTransfer = TransferObject.ForDirectory(strayDirectory, ZstdDictionary.Dictionary1Id, Compression.Default);
         var stray = Ax25UiFrame.Build(Samples.Source, OnAir.Destination, strayTransfer.Frame(0).ToBytes());
         await f.HearAsync(stray);
 

@@ -128,7 +128,7 @@ public sealed record ScheduleOptions
     public int DirectoryExtra { get; init; } = 2;
 
     /// <summary>The zstd dictionary to compress with.</summary>
-    public ushort DictionaryId { get; init; } = ZstdDictionary.Gb7rdg1Id;
+    public ushort DictionaryId { get; init; } = ZstdDictionary.Dictionary1Id;
 
     /// <summary>Bulletins whose serialised form is longer than this are not broadcast.</summary>
     public int MaxBulletinSize { get; init; } = 32 * 1024;
@@ -151,7 +151,7 @@ public sealed record ScheduleOptions
     /// 0.7 K, 5, 10, 17 and 25 hours later, so a bulletin goes out in five different hours of the
     /// day over a little more than a day. A web SDR receiver hears every third slot; two of the
     /// repeats fall in each of the two sets of every third slot that miss the first, so whichever
-    /// set it hears, it gets at least 1.4 K. On GB7RDG's volume this is about 3.3 minutes on the
+    /// set it hears, it gets at least 1.4 K. On M0LTE's volume this is about 3.3 minutes on the
     /// air in an average hour (a little more than before the directory's bigger floor, issue #69).
     /// </summary>
     public static ScheduleOptions Hourly { get; } = new()
@@ -185,10 +185,10 @@ public sealed record ScheduleOptions
 
     /// <summary>
     /// An hourly station that sends in daylight only. All of a day's carrying then has to fit in
-    /// the daylight slots, only 5 of them at GB7RDG in December, so each bulletin is carried less:
+    /// the daylight slots, only 5 of them at M0LTE in December, so each bulletin is carried less:
     /// 1.2 K and two spare symbols in its first slot, enough to rebuild it from that slot alone
     /// with about a fifth of the frames lost, then one repeat of 0.4 K 5 hours later (moved on to
-    /// the next daylight slot when that is dark) for a receiver that lost more. On GB7RDG's volume
+    /// the next daylight slot when that is dark) for a receiver that lost more. On M0LTE's volume
     /// that is about 4.4 minutes on the air in an average daylight slot in December, about 3.1 in
     /// October and just under 2 in June (a little more of each than before the directory's
     /// bigger floor, issue #69); the hourly station's five carryings would need more than the
@@ -208,7 +208,7 @@ public sealed record ScheduleOptions
 
     /// <summary>
     /// An hourly station that fills each slot to its airtime budget: the budget rule with its
-    /// defaults, which is GB7RDG's.
+    /// defaults, which is M0LTE's.
     /// </summary>
     public static ScheduleOptions HourlyBudget { get; } = HourlyDaylight with { Budget = new BudgetRule() };
 
@@ -858,7 +858,7 @@ public static class BroadcastScheduler
     /// P(Binomial(N, <see cref="WeakStationFrameRate"/>) &gt;= sourceSymbols) at least
     /// <see cref="WeakStationConfidence"/>. Found by counting up N from sourceSymbols: N is about
     /// 5 times sourceSymbols at these settings, so this is O(K), not a fixed small number of
-    /// steps; for GB7RDG's usual 14 to 20 bulletins in rotation K (so sourceSymbols) is 1, giving
+    /// steps; for M0LTE's usual 14 to 20 bulletins in rotation K (so sourceSymbols) is 1, giving
     /// N = 6, but a big enough rotation gives a bigger K and a proportionally bigger N (the
     /// budget rule's plan still caps the result to the slot's airtime budget if even that is too much).
     /// </summary>

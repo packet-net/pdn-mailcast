@@ -15,7 +15,7 @@ public class EnvelopeObjectTests
         CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", $"{seed}_TEST", "A title for envelope " + seed,
             Bulletin.TextEncoding.GetBytes($"R:261019/0850Z {seed}@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody {seed}.\r\n")).Envelope;
 
-    private static TransferObject Small(int seed) => TransferObject.ForBulletin(TestBulletins.Make(seed, 400), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+    private static TransferObject Small(int seed) => TransferObject.ForBulletin(TestBulletins.Make(seed, 400), ZstdDictionary.Dictionary1Id, Compression.Default);
 
     private static DirectoryEntry Entry(TransferObject bulletin, TransferObject? envelope) =>
         new(bulletin.ObjectId, bulletin.DictionaryId, 400, $"{bulletin.ObjectId % 100000}_TEST", "Title",
@@ -24,7 +24,7 @@ public class EnvelopeObjectTests
 
     private static List<MailcastFrame> DirectoryFrames(DirectorySigner? signer, params DirectoryEntry[] entries)
     {
-        var obj = TransferObject.ForDirectory(new BroadcastDirectory(Day, entries, signer: signer), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForDirectory(new BroadcastDirectory(Day, entries, signer: signer), ZstdDictionary.Dictionary1Id, Compression.Default);
         return [.. Enumerable.Range(0, obj.SourceSymbols).Select(i => obj.Frame((uint)i))];
     }
 
@@ -53,11 +53,11 @@ public class EnvelopeObjectTests
         Assert.Equal(240, MailcastFrame.FixedSymbolSize);
         Assert.Equal(0, MailcastFrame.FixedSymbolSize % MailcastFrame.StandardAlignment);
         var envelope = MakeEnvelope();
-        var obj = TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(ObjectKind.Envelope, obj.Kind);
         Assert.Equal((byte)5, obj.Bytes[0]);
         Assert.Equal(MailcastFrame.FixedSymbolSize, obj.Oti.SymbolSize);
-        Assert.Equal(ZstdDictionary.Gb7rdg1Id, obj.DictionaryId);
+        Assert.Equal(ZstdDictionary.Dictionary1Id, obj.DictionaryId);
         Assert.True(ContentType.IsKnown(5));
 
         var (kind, content) = TransferObject.Unpack(obj.Bytes, obj.DictionaryId, Compression.Default);
@@ -66,13 +66,13 @@ public class EnvelopeObjectTests
         Assert.Equal(envelope.Serialise(), content);
 
         // Deterministic: the same envelope is the same object.
-        Assert.Equal(obj.ObjectId, TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, Compression.Default).ObjectId);
+        Assert.Equal(obj.ObjectId, TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, Compression.Default).ObjectId);
     }
 
     [Fact]
     public void ForEnvelope_IgnoresAnyOtherSymbolSize_ItHasNoParameterForOne()
     {
-        var obj = TransferObject.ForEnvelope(MakeEnvelope(), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForEnvelope(MakeEnvelope(), ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.NotEqual(MailcastFrame.StandardSymbolSize, obj.Oti.SymbolSize);
     }
 
@@ -82,7 +82,7 @@ public class EnvelopeObjectTests
     public void EnvField_IsOneFieldAfterTheHash_InsideTheSignature_AndRoundTrips()
     {
         var bulletin = Small(1);
-        var envelope = TransferObject.ForEnvelope(MakeEnvelope(), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var envelope = TransferObject.ForEnvelope(MakeEnvelope(), ZstdDictionary.Dictionary1Id, Compression.Default);
         var entry = Entry(bulletin, envelope);
         var signed = new BroadcastDirectory(Day, [entry], signer: Signer);
         byte[] bytes = signed.Serialize();
@@ -133,8 +133,8 @@ public class EnvelopeObjectTests
     {
         var a = Small(3);
         var b = Small(4);
-        var ea = TransferObject.ForEnvelope(MakeEnvelope(3), ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var eb = TransferObject.ForEnvelope(MakeEnvelope(4), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var ea = TransferObject.ForEnvelope(MakeEnvelope(3), ZstdDictionary.Dictionary1Id, Compression.Default);
+        var eb = TransferObject.ForEnvelope(MakeEnvelope(4), ZstdDictionary.Dictionary1Id, Compression.Default);
         var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var directory = new BroadcastDirectory(Day, [Entry(a, ea), Entry(b, eb)], timetable, "ms110d-wn3", Signer);
         byte[] bytes = directory.Serialize();
@@ -159,7 +159,7 @@ public class EnvelopeObjectTests
         var store = Open(dir.Path, time);
         var bulletin = Small(5);
         var envelope = MakeEnvelope(5);
-        var eo = TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eo = TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, Compression.Default);
 
         Assert.Equal(FrameOutcome.CompletedDirectory, Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo))).Outcome);
         var result = Feed(store, eo);
@@ -185,7 +185,7 @@ public class EnvelopeObjectTests
         var log = new List<string>();
         var store = Open(dir.Path, Clock(), log);
         var bulletin = Small(6);
-        var eo = TransferObject.ForEnvelope(MakeEnvelope(6), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(6), ZstdDictionary.Dictionary1Id, Compression.Default);
 
         Assert.Equal(FrameOutcome.Withheld, Feed(store, eo).Outcome);
         Assert.Empty(store.EnvelopesFor(bulletin.ObjectId));
@@ -205,7 +205,7 @@ public class EnvelopeObjectTests
         using var dir = new TempDirectory();
         var store = Open(dir.Path, Clock());
         var bulletin = Small(7);
-        var eo = TransferObject.ForEnvelope(MakeEnvelope(7), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(7), ZstdDictionary.Dictionary1Id, Compression.Default);
 
         // Listed by a trusted directory with a different hash: refused.
         var wrong = Entry(bulletin, eo) with { Envelope = new EnvelopeLink(eo.ObjectId, "0000000000000000") };
@@ -231,7 +231,7 @@ public class EnvelopeObjectTests
         var time = Clock();
         var store = Open(dir.Path, time);
         var bulletin = Small(8);
-        var eo = TransferObject.ForEnvelope(MakeEnvelope(8), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(8), ZstdDictionary.Dictionary1Id, Compression.Default);
         Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo)));
         Feed(store, eo);
         Assert.NotEmpty(store.EnvelopesFor(bulletin.ObjectId));
@@ -254,7 +254,7 @@ public class EnvelopeObjectTests
         var time = Clock();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, TrustedKeys = [Trusted], ArchiveRetention = TimeSpan.Zero });
         var bulletin = Small(9);
-        var eo = TransferObject.ForEnvelope(MakeEnvelope(9), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(9), ZstdDictionary.Dictionary1Id, Compression.Default);
         Feed(store, DirectoryFrames(Signer, Entry(bulletin, eo)));
         Feed(store, eo);
 
@@ -280,8 +280,8 @@ public class EnvelopeObjectTests
         var signer2 = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, TrustedKeys = [Trusted, TrustedKey.Parse("TESTB", signer2.PublicKeyBase64)] });
         var bulletin = Small(10);
-        var ea = TransferObject.ForEnvelope(MakeEnvelope(10), ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var eb = TransferObject.ForEnvelope(MakeEnvelope(11), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var ea = TransferObject.ForEnvelope(MakeEnvelope(10), ZstdDictionary.Dictionary1Id, Compression.Default);
+        var eb = TransferObject.ForEnvelope(MakeEnvelope(11), ZstdDictionary.Dictionary1Id, Compression.Default);
         Feed(store, DirectoryFrames(Signer, Entry(bulletin, ea)));
         Feed(store, DirectoryFrames(signer2, Entry(bulletin, eb)));
 
@@ -301,7 +301,7 @@ public class EnvelopeObjectTests
     {
         using var dir = new TempDirectory();
         var store = Open(dir.Path, Clock());
-        var eo = TransferObject.ForEnvelope(MakeEnvelope(12), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var eo = TransferObject.ForEnvelope(MakeEnvelope(12), ZstdDictionary.Dictionary1Id, Compression.Default);
         AcceptResult last = null!;
         for (int i = 0; i < eo.SourceSymbols + 3 && last?.Outcome != FrameOutcome.Withheld; i++)
         {

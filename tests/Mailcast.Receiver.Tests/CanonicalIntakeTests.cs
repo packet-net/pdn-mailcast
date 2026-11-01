@@ -35,12 +35,12 @@ public class CanonicalIntakeTests
             System.Text.Encoding.Latin1.GetBytes("R:261019/0850Z 88@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody.\r\n"));
         var (_, envelope) = CanonicalForm.ToCanonicalBulletin('B', "G4ABC", "ALL", "WW", "88_TEST", "A title",
             System.Text.Encoding.Latin1.GetBytes("R:261019/0850Z 88@GB7AAA.#1.GBR.EURO LinBPQ6.0.25\r\n\r\nBody.\r\n"));
-        var bulletin = TransferObject.ForBulletin(canonical, ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var env = TransferObject.ForEnvelope(envelope, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var bulletin = TransferObject.ForBulletin(canonical, ZstdDictionary.Dictionary1Id, Compression.Default);
+        var env = TransferObject.ForEnvelope(envelope, ZstdDictionary.Dictionary1Id, Compression.Default);
         var entry = new DirectoryEntry(bulletin.ObjectId, bulletin.DictionaryId, 100, "88_TEST", "A title",
             Hash: ObjectId.LongHash(bulletin.DictionaryId, bulletin.Bytes),
             Envelope: new EnvelopeLink(env.ObjectId, ObjectId.LongHash(env.DictionaryId, env.Bytes)));
-        var directory = TransferObject.ForDirectory(new BroadcastDirectory(new DateOnly(2026, 10, 30), [entry], signer: Signer), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var directory = TransferObject.ForDirectory(new BroadcastDirectory(new DateOnly(2026, 10, 30), [entry], signer: Signer), ZstdDictionary.Dictionary1Id, Compression.Default);
 
         // The bulletin completes, then its envelope, which is held until a directory lists it.
         Offer(intake, bulletin);

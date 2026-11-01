@@ -10,7 +10,7 @@ public class StationDetailsTests
     private static readonly DirectorySigner Bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
     private static readonly SlotTimetable HalfPast = new(new TimeOnly(0, 30), 60);
 
-    private static TransferObject Big(int number) => TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+    private static TransferObject Big(int number) => TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
 
     private static BroadcastDirectory Directory(DateOnly day, DirectorySigner signer, string station, StationDetails? details, IReadOnlyList<StationAdvert>? adverts, TransferObject obj) =>
         new(day, [new DirectoryEntry(obj.ObjectId, obj.DictionaryId, 9000, $"{obj.ObjectId % 100000}_TEST", "Bulletin", Hash: ObjectId.LongHash(obj.DictionaryId, obj.Bytes))],
@@ -18,7 +18,7 @@ public class StationDetailsTests
 
     private static AcceptResult Feed(ReceiverStore store, BroadcastDirectory directory)
     {
-        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default);
         AcceptResult result = null!;
         for (uint esi = 0; esi < obj.SourceSymbols + 4; esi++)
         {

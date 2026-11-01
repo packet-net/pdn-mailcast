@@ -25,7 +25,7 @@ for (int i = 0; i < args.Length; i++)
         case "--help" or "-h":
             Console.WriteLine(
                 $"""
-                pdn-mailcast-receiver {ReceiverHost.Version}: hears mailcast stations' bulletins (GB7RDG on 40 m, and others) and hands each one to your BBS.
+                pdn-mailcast-receiver {ReceiverHost.Version}: hears mailcast stations' bulletins (on 40 m and elsewhere) and hands each one to your BBS.
 
                   --config PATH    the config file (default {ReceiverConfig.DefaultPath})
                   --decode FILE    decode one WAV recording, deliver what it completes, and exit

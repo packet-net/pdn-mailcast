@@ -7,7 +7,7 @@ using System.Threading.Channels;
 namespace Mailcast.Receiver;
 
 /// <summary>
-/// Measures the radio path from GB7RDG after each slot, from the channel probe after the tone and
+/// Measures the radio path from M0LTE after each slot, from the channel probe after the tone and
 /// from the bursts the receiver decoded, and keeps a day of the results for the status page's
 /// Channel tile.
 /// </summary>

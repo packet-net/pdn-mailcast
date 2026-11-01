@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The head end: takes GB7RDG's bulletins from its BBS, and once a day broadcasts them through the
+    The head end: takes bulletins from its BBS, and once a day broadcasts them through the
     station's own pdn-soundmodem (KISS for the frames, its HTTP API for the transmit lease and the
     calibration tone). It does not embed the modem; pdn-soundmodem's package is here only for the
     offline WAV render, which modulates frames exactly as the station would.

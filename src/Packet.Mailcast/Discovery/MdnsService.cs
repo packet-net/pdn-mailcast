@@ -214,7 +214,7 @@ public sealed class MdnsAnnouncer : IDisposable
 }
 
 /// <summary>A service found on the network.</summary>
-/// <param name="Name">The instance name, such as <c>GB7RDG-rx</c>.</param>
+/// <param name="Name">The instance name, such as <c>M0XYZ-rx</c>.</param>
 /// <param name="Address">The address to reach it on.</param>
 /// <param name="Port">Its TCP port.</param>
 /// <param name="Text">Its TXT strings.</param>

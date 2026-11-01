@@ -72,7 +72,7 @@ public class ReceiverStoreTests
         // As if the process died after storing the last symbol it needed, before rebuilding.
         using var dir = new TempDirectory();
         var bulletin = TestBulletins.Make(5, 6000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         var objectDir = Path.Combine(dir.Path, "objects",
             $"{ObjectId.Format(obj.ObjectId)}-{obj.DictionaryId:x4}-{Convert.ToHexStringLower(obj.Oti.ToBytes())}");
         Directory.CreateDirectory(objectDir);
@@ -100,7 +100,7 @@ public class ReceiverStoreTests
         // has a spare, drops it, and finishes without throwing away the good ones.
         using var dir = new TempDirectory();
         var bulletin = TestBulletins.Make(6, 20000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         int k = obj.SourceSymbols;
         Assert.True(k >= 6, $"K = {k}");
         var log = new List<string>();
@@ -136,7 +136,7 @@ public class ReceiverStoreTests
     {
         using var dir = new TempDirectory();
         var bulletin = TestBulletins.Make(16, 20000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         int k = obj.SourceSymbols;
         var log = new List<string>();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
@@ -168,7 +168,7 @@ public class ReceiverStoreTests
         new Random(5).NextBytes(junk);
         junk[0] = (byte)ObjectKind.Bulletin;
         var oti = new ObjectTransmissionInformation(junk.Length, MailcastFrame.StandardSymbolSize, 1, 1, MailcastFrame.StandardAlignment);
-        var obj = TransferObject.FromStored(junk, ZstdDictionary.Gb7rdg1Id, oti);
+        var obj = TransferObject.FromStored(junk, ZstdDictionary.Dictionary1Id, oti);
         var log = new List<string>();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
         AcceptResult result = new(FrameOutcome.Stored);
@@ -192,7 +192,7 @@ public class ReceiverStoreTests
     public void WrongRebuild_KeepsPiecesOnDiskAcrossARestart()
     {
         using var dir = new TempDirectory();
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(7, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(7, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         int k = obj.SourceSymbols;
         var store = new ReceiverStore(dir.Path, Compression.Default);
         var bad = obj.Frame(0);
@@ -220,7 +220,7 @@ public class ReceiverStoreTests
     public void RejectedSymbol_LeavesNoFolderBehind()
     {
         using var dir = new TempDirectory();
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(8, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(8, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         var frame = obj.Frame(0);
         var shortFrame = new MailcastFrame(frame.ObjectId, frame.DictionaryId, frame.Oti, 0, frame.Symbol[..10]);
         var store = new ReceiverStore(dir.Path, Compression.Default);
@@ -236,7 +236,7 @@ public class ReceiverStoreTests
         var time = new ManualTime(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
         var options = TestStores.Fast with { Time = time };
         var bulletin = TestBulletins.Make(9, 1000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         var store = new ReceiverStore(dir.Path, Compression.Default, options);
         for (uint esi = 0; !store.IsComplete(obj.ObjectId); esi++)
         {
@@ -259,7 +259,7 @@ public class ReceiverStoreTests
     {
         using var dir = new TempDirectory();
         var time = new ManualTime(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(10, 1000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(10, 1000), ZstdDictionary.Dictionary1Id, Compression.Default);
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time });
         for (uint esi = 0; !store.IsComplete(obj.ObjectId); esi++)
         {
@@ -277,8 +277,8 @@ public class ReceiverStoreTests
         using var dir = new TempDirectory();
         var time = new ManualTime(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
         var options = TestStores.Fast with { Time = time };
-        var a = TransferObject.ForBulletin(TestBulletins.Make(11, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var b = TransferObject.ForBulletin(TestBulletins.Make(12, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var a = TransferObject.ForBulletin(TestBulletins.Make(11, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
+        var b = TransferObject.ForBulletin(TestBulletins.Make(12, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         var store = new ReceiverStore(dir.Path, Compression.Default, options);
         store.Accept(a.Frame(0).ToBytes());
         time.Now += TimeSpan.FromDays(10);
@@ -302,7 +302,7 @@ public class ReceiverStoreTests
         var log = new List<string>();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time, MaxPartials = 3, Log = log.Add });
         var objects = Enumerable.Range(0, 5)
-            .Select(i => TransferObject.ForBulletin(TestBulletins.Make(20 + i, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default))
+            .Select(i => TransferObject.ForBulletin(TestBulletins.Make(20 + i, 9000), ZstdDictionary.Dictionary1Id, Compression.Default))
             .ToList();
         foreach (var obj in objects)
         {
@@ -320,7 +320,7 @@ public class ReceiverStoreTests
         using var dir = new TempDirectory();
         var log = new List<string>();
         var bulletin = TestBulletins.Make(30, 1000);
-        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
         for (uint esi = 0; !store.IsComplete(obj.ObjectId); esi++)
         {
@@ -340,7 +340,7 @@ public class ReceiverStoreTests
     public void UnknownDictionary_AtStartUp_IsSkippedNotFatal()
     {
         using var dir = new TempDirectory();
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(31, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(31, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
         for (uint esi = 0; esi < obj.SourceSymbols - 1; esi++)
         {
@@ -393,7 +393,7 @@ public class ReceiverStoreTests
         // keeps one.
         using var dir = new TempDirectory();
         var bulletin = TestBulletins.Make(8, 8000);
-        var withDictionary = TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var withDictionary = TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default);
         var without = TransferObject.ForBulletin(bulletin, Compression.NoDictionary, Compression.Default);
         Assert.NotEqual(withDictionary.ObjectId, without.ObjectId);
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast);
@@ -466,7 +466,7 @@ public class ReceiverStoreTests
 
         // A bulletin no directory, old or new, ever named: rebuilt from its own pieces alone.
         var orphan = TestBulletins.Make(999, 2000);
-        var obj = TransferObject.ForBulletin(orphan, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(orphan, ZstdDictionary.Dictionary1Id, Compression.Default);
         for (uint esi = 0; !store.IsComplete(obj.ObjectId); esi++)
         {
             store.Accept(obj.Frame(esi).ToBytes());
@@ -498,7 +498,7 @@ public class ReceiverStoreTests
 
         // A big bulletin no directory names, with only its first piece heard: genuinely partial.
         var partial = TestBulletins.Make(998, 9000);
-        var obj = TransferObject.ForBulletin(partial, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(partial, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.True(obj.SourceSymbols > 1);
         store.Accept(obj.Frame(0).ToBytes());
 
@@ -575,7 +575,7 @@ public class ReceiverStoreTests
     /// <summary>A big bulletin's object, several pieces long, so one piece leaves it part-received.</summary>
     private static TransferObject BigObject(int number)
     {
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.True(obj.SourceSymbols > 1);
         return obj;
     }
@@ -584,7 +584,7 @@ public class ReceiverStoreTests
     private static MailcastFrame DirectoryFrame(DateOnly date, params TransferObject[] listed)
     {
         var directory = new BroadcastDirectory(date, listed.Select((o, i) => new DirectoryEntry(o.ObjectId, o.DictionaryId, 9000, $"{i + 1}_TEST", $"Bulletin {i + 1}")));
-        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(1, obj.SourceSymbols);
         return obj.Frame(0);
     }
@@ -733,7 +733,7 @@ public class ReceiverStoreTests
         var many = Enumerable.Range(0, 300).Select(i => BigObject(1000 + i)).ToArray();
         var bigDirectory = TransferObject.ForDirectory(
             new BroadcastDirectory(Day1, many.Select((o, i) => new DirectoryEntry(o.ObjectId, o.DictionaryId, 9000, $"{i}_TEST", $"Bulletin number {i} with a title"))),
-            ZstdDictionary.Gb7rdg1Id, Compression.Default);
+            ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.True(bigDirectory.SourceSymbols > 1);
         Assert.Equal((byte)ObjectKind.Directory, bigDirectory.Frame(0).Symbol.Span[0]); // systematic: piece 0 starts with the type
         store.Accept(bigDirectory.Frame(0).ToBytes());

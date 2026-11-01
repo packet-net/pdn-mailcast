@@ -25,7 +25,7 @@ public sealed record RadioFilter(double LowHz, double HighHz, double DialKHz, bo
 }
 
 /// <summary>
-/// Finds a radio's receive filter from band noise, and the dial that centres GB7RDG's signal in
+/// Finds a radio's receive filter from band noise, and the dial that centres M0LTE's signal in
 /// it: for the settings page's "Measure my filter", and for typing the edges by hand (<see
 /// cref="DialFor"/>), which gives the same answer.
 /// </summary>
@@ -53,7 +53,7 @@ public static class FilterScan
     /// <summary>The lowest frequency a filter's edge is looked for, Hz: below this is where DC leakage and rumble live.</summary>
     public const double LowestSearchHz = 100;
 
-    /// <summary>The highest frequency, Hz: above this is above where GB7RDG's signal, or any SSB voice passband, would ever need to reach.</summary>
+    /// <summary>The highest frequency, Hz: above this is above where M0LTE's signal, or any SSB voice passband, would ever need to reach.</summary>
     public const double HighestSearchHz = 4000;
 
     /// <summary>How far below the passband's own level counts as the edge, dB.</summary>

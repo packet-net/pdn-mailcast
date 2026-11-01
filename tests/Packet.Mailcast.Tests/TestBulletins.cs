@@ -119,7 +119,7 @@ internal static class Ids
 {
     /// <summary>The object ID a bulletin gets with the standard settings.</summary>
     public static ulong Of(Bulletin bulletin) =>
-        TransferObject.ForBulletin(bulletin, ZstdDictionary.Gb7rdg1Id, Compression.Default).ObjectId;
+        TransferObject.ForBulletin(bulletin, ZstdDictionary.Dictionary1Id, Compression.Default).ObjectId;
 
     /// <summary>The directory's object ID in a plan.</summary>
     public static ulong DirectoryOf(SlotBroadcast plan) => plan.Objects[0].Transfer.ObjectId;

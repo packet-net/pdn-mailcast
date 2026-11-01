@@ -9,8 +9,8 @@ namespace Packet.Mailcast;
 [SuppressMessage("Naming", "CA1711", Justification = "It is a zstd dictionary, not a collection.")]
 public sealed class ZstdDictionary
 {
-    /// <summary>The dictionary trained on GB7RDG's bulletins of September and October 2026.</summary>
-    public const ushort Gb7rdg1Id = 1;
+    /// <summary>The dictionary trained on bulletins from the GB7RDG BBS of September and October 2026.</summary>
+    public const ushort Dictionary1Id = 1;
 
     /// <summary>Creates a dictionary entry. ID 0 is reserved for no dictionary.</summary>
     public ZstdDictionary(ushort id, byte[] content)
@@ -28,7 +28,7 @@ public sealed class ZstdDictionary
     public byte[] Content { get; }
 
     /// <summary>The dictionaries that ship with this library.</summary>
-    public static IReadOnlyList<ZstdDictionary> BuiltIn { get; } = [Load(Gb7rdg1Id, "gb7rdg-1.zdict")];
+    public static IReadOnlyList<ZstdDictionary> BuiltIn { get; } = [Load(Dictionary1Id, "dictionary-1.zdict")];
 
     private static ZstdDictionary Load(ushort id, string file)
     {

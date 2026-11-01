@@ -21,7 +21,7 @@ public class StationPinTests
 
     private static TransferObject Big(int number)
     {
-        var obj = TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForBulletin(TestBulletins.Make(number, 9000), ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.True(obj.SourceSymbols > 1);
         return obj;
     }
@@ -45,7 +45,7 @@ public class StationPinTests
     }
 
     private static AcceptResult Feed(ReceiverStore store, BroadcastDirectory directory) =>
-        Feed(store, TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default));
+        Feed(store, TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default));
 
     /// <summary>GB7RDG built in as <see cref="Rdg"/>, so tests can sign as it.</summary>
     private static (ReceiverStore Store, FakeTimeProvider Time, TempDirectory Dir) Open(TempDirectory? reuse = null)
@@ -198,7 +198,7 @@ public class StationPinTests
         Feed(store, Directory(OnTheHour, Rdg, "M0LTE", [moved, qo100], Big(51)));
         Assert.Equal([BpqAdvert, qo100], store.Adverts()); // one advert per frequency: HF and QO-100
         // ...a later one does.
-        var tomorrow = new BroadcastDirectory(Day.AddDays(1), [new DirectoryEntry(Big(52).ObjectId, ZstdDictionary.Gb7rdg1Id, 9000, "52_TEST", "B")], OnTheHour, signer: Rdg, station: "M0LTE", adverts: [moved]);
+        var tomorrow = new BroadcastDirectory(Day.AddDays(1), [new DirectoryEntry(Big(52).ObjectId, ZstdDictionary.Dictionary1Id, 9000, "52_TEST", "B")], OnTheHour, signer: Rdg, station: "M0LTE", adverts: [moved]);
         Feed(store, tomorrow);
         Assert.Equal([moved, qo100], store.Adverts());
     }
@@ -216,7 +216,7 @@ public class StationPinTests
         Assert.Empty(store.Adverts());
         Assert.Null(store.AdvertFirstSeen("G8BPQ"));
         // Heard again, it is back, as new.
-        var again = new BroadcastDirectory(Day.AddDays(3), [new DirectoryEntry(Big(54).ObjectId, ZstdDictionary.Gb7rdg1Id, 9000, "54_TEST", "B")], OnTheHour, signer: Rdg, station: "M0LTE", adverts: [BpqAdvert]);
+        var again = new BroadcastDirectory(Day.AddDays(3), [new DirectoryEntry(Big(54).ObjectId, ZstdDictionary.Dictionary1Id, 9000, "54_TEST", "B")], OnTheHour, signer: Rdg, station: "M0LTE", adverts: [BpqAdvert]);
         Feed(store, again);
         Assert.Equal([BpqAdvert], store.Adverts());
         Assert.Equal(Day.AddDays(3), store.AdvertFirstSeen("G8BPQ"));

@@ -4,7 +4,7 @@ Status: draft, 2026-10-04; built and on the air since 2026-10-05, every hour sin
 
 ## What it is
 
-Every hour on the hour in daylight, M0LTE sends its recent bulletins on 40 m, transmitted from GB7RDG's station. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
+Every hour on the hour in daylight, M0LTE sends its recent bulletins on 40 m. Nobody replies on air. Each listening station runs one program, the receiver, which hears some or all of the transmission, rebuilds each bulletin and forwards it into the local BBS as if it came from a forwarding partner. The BBS's own duplicate check (by BID) throws away anything it already has, so the sender never needs to know who is listening or what they hold.
 
 Two ideas make a one-way link work:
 
@@ -16,7 +16,7 @@ Two ideas make a one-way link work:
 | Question | Decision |
 |---|---|
 | What is sent | Bulletins only. No personal mail. |
-| Who sends | M0LTE, transmitted from GB7RDG's station, a Flex 6500 on 40 m. |
+| Who sends | M0LTE, a Flex 6500 on 40 m. |
 | When | Every hour on the hour in daylight, from 2 hours after sunrise to 30 minutes before sunset near Reading: 09:00 to 17:00 UTC in early October, 11:00 to 15:00 in midwinter, 06:00 to 19:00 in midsummer. A short slot of a few minutes. Until 2026-10-05 it was once a day at 12:00 UTC, which a head end can still be set to. |
 | Where | Centred on 7.0538 MHz (USB dial 7.052 MHz), occupying about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz. |
 | Receivers | Linux, with LinBPQ or FBB mail. |
@@ -54,13 +54,13 @@ The first on-air runs, on 2026-10-05, used 240-byte pieces rather than 940, whic
 
 From v0.2.0 M0LTE sends every hour on the hour instead. A bulletin goes out first in the slot after it arrives, with enough pieces to rebuild it from that slot alone (1.5 times its pieces, plus 2), then again 5, 10, 17 and 25 hours later with 0.7 times its pieces each time, always fresh ones. So it is heard in five different hours of the day over a little more than a day, and a listener who missed one hour gets it later. A web SDR receiver listens to every third slot, to stay inside its allowance; whichever third it hears, it gets at least 1.4 times each bulletin's pieces. [headend.md](headend.md) has the details and the settings.
 
-That is about twice as many pieces as the daily plan, plus a tone, idents and the directory every hour. On GB7RDG's volume, in 240-byte pieces, it comes to about 3.3 minutes on the air in an average hour (the directory's bigger floor, issue #69, gives a weak station a better chance of it in one slot, at a little more of this), under 6 in 19 hours out of 20, and about 8 in the busiest hour.
+That is about twice as many pieces as the daily plan, plus a tone, idents and the directory every hour. On M0LTE's volume, in 240-byte pieces, it comes to about 3.3 minutes on the air in an average hour (the directory's bigger floor, issue #69, gives a weak station a better chance of it in one slot, at a little more of this), under 6 in 19 hours out of 20, and about 8 in the busiest hour.
 
 ### Daylight
 
-40 m NVIS only carries over UK paths in daylight. On 2026-10-05, at GB7RDG (IO91lk, near Reading, sunrise about 06:10 UTC and sunset about 17:35), the slots at 07:12 and 18:00 UTC were heard by nobody, while those from 09:12 to 16:00 decoded well. From v0.3.0 GB7RDG keeps to the hourly slots that start between 2 hours after sunrise and 30 minutes before sunset. Sunrise and sunset come from a small solar calculator in the core library (NOAA's equations: the sun's declination, the equation of time and the hour angle), good to about a minute up to 60 degrees of latitude, so neither end needs the internet. Everything is UTC, so summer time plays no part.
+40 m NVIS only carries over UK paths in daylight. On 2026-10-05, at M0LTE (IO91lk, near Reading, sunrise about 06:10 UTC and sunset about 17:35), the slots at 07:12 and 18:00 UTC were heard by nobody, while those from 09:12 to 16:00 decoded well. From v0.3.0 M0LTE keeps to the hourly slots that start between 2 hours after sunrise and 30 minutes before sunset. Sunrise and sunset come from a small solar calculator in the core library (NOAA's equations: the sun's declination, the equation of time and the hour angle), good to about a minute up to 60 degrees of latitude, so neither end needs the internet. Everything is UTC, so summer time plays no part.
 
-With only 5 daylight slots in December, the hourly plan's five carryings would not fit, so in daylight a bulletin goes out twice: 1.2 times its pieces plus 2 in its first slot, then 0.4 times 5 hours later, or in the next daylight slot if that is dark. On GB7RDG's volume that is about 4.4 minutes in an average December daylight slot, about 3.1 in October and just under 2 in June (a little more of each than before the directory's bigger floor, issue #69, gave a weak station a better chance of it in one slot). The morning's first slot, which carries everything that came in overnight, is the long one, and in winter it reaches the 10 minute hard stop; the next slot sends the rest. [headend.md](headend.md) has the details.
+With only 5 daylight slots in December, the hourly plan's five carryings would not fit, so in daylight a bulletin goes out twice: 1.2 times its pieces plus 2 in its first slot, then 0.4 times 5 hours later, or in the next daylight slot if that is dark. On M0LTE's volume that is about 4.4 minutes in an average December daylight slot, about 3.1 in October and just under 2 in June (a little more of each than before the directory's bigger floor, issue #69, gave a weak station a better chance of it in one slot). The morning's first slot, which carries everything that came in overnight, is the long one, and in winter it reaches the 10 minute hard stop; the next slot sends the rest. [headend.md](headend.md) has the details.
 
 The head end's directory says when its slots are and what its daylight rule is, so a receiver that has heard it follows the head end even if its own settings differ.
 
@@ -77,7 +77,7 @@ To compare 1200 and 600 bps on real mail, slots can take turns between waveforms
 ## Each slot
 
 1. The head end listens first. If the channel is busy, it waits, up to a limit.
-2. It takes a transmit lease on GB7RDG's modem (see below), so nothing else can key the radio during the slot.
+2. It takes a transmit lease on M0LTE's modem (see below), so nothing else can key the radio during the slot.
 3. 10 seconds of steady tone at the centre frequency (30 for a daily station), then a CW ident.
 4. Bursts of up to 18 seconds, each with its own MS110D preamble, so a receiver that tunes in late or loses sync in a fade picks up at the next burst.
 5. A CW ident at least every 10 minutes and at the end.
@@ -94,10 +94,10 @@ How much of the 3 kHz segment the signal fills is still to be settled (see the f
 The tone gives each receiver three things:
 
 - a mark on its spectrogram showing whether the signal sits where it should in the passband;
-- its frequency offset from GB7RDG;
+- its frequency offset from M0LTE;
 - the slot's signal-to-noise ratio, logged.
 
-GB7RDG's Flex is normally GPS locked, so the tone is a true frequency reference. The head end checks the Flex's reference before the slot and says so in the log if it is running on its internal TCXO instead (it was, briefly, on 2026-09-28). Even unlocked it is close: in August the Wessex web SDR, which is GPS disciplined, measured GB7RDG's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so the tone is a check rather than a necessity.
+M0LTE's Flex is normally GPS locked, so the tone is a true frequency reference. The head end checks the Flex's reference before the slot and says so in the log if it is running on its internal TCXO instead (it was, briefly, on 2026-09-28). Even unlocked it is close: in August the Wessex web SDR, which is GPS disciplined, measured M0LTE's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so the tone is a check rather than a necessity.
 
 ### Power and duty
 
@@ -107,7 +107,7 @@ MS110D's PSK signal peaks at about twice its average power. If 40 W is the Flex'
 
 ## Keeping other traffic off the air during the slot
 
-GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports, on the same slice and the same transmitter. During the slot, none of that traffic may key the radio.
+M0LTE's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports, on the same slice and the same transmitter. During the slot, none of that traffic may key the radio.
 
 **What exists today:** `POST /api/config` applies a one-run configuration. That configuration could be one without LinBPQ's ports and with only the bulletin modem, and the next restart returns to the file. It works, but it costs two restarts a slot. Each restart drops LinBPQ's KISS links (they come back within about 25 seconds) and kills any HF sessions in progress. If the head end died mid-slot, the station would stay in its bulletin-only configuration until something restarted it, so it needs a systemd timer on the node as a backstop.
 
@@ -118,7 +118,7 @@ GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports
 - Receive carries on as normal, and KISS connections stay up.
 - If the head end dies, the lease runs out within a minute and normal service resumes on its own.
 
-## Head end (GB7RDG)
+## Head end (M0LTE)
 
 - **Source.** A forwarding partner of GB7RDG's BBS that accepts bulletins only and refuses everything else. pdn-bbs already has LinBPQ-compatible FBB B1F forwarding, which is reused here, so this keeps working when GB7RDG moves to packet.net.
 - **Selection.** BPQ's own forwarding rules choose what reaches the partner, so GB7RDG's existing filters apply unchanged. Bulletins over a size cap (32 KB to start) are skipped.
@@ -128,7 +128,7 @@ GB7RDG's pdn-soundmodem serves LinBPQ (later packet.net) on its other KISS ports
 
 ## On-air format
 
-Every frame is an AX.25 UI frame from `M0LTE`, transmitted from GB7RDG's station, which takes care of identification, to a fixed destination such as `MCAST`. The payload is:
+Every frame is an AX.25 UI frame from `M0LTE`, to a fixed destination such as `MCAST`. The payload is:
 
 | Field | Size | Meaning |
 |---|---|---|
@@ -287,7 +287,7 @@ Why 16 bytes: with the 8-byte ID alone, an attacker could make two bulletins sha
 
 A receiver checks each directory against the keys it trusts: those of the stations in its stations file (see below), and any in its `trustedKeys`. Signed by one of them, or not signed at all, it is used as always; a bulletin a trusted signed directory lists must also match its hash to be delivered. A bad signature, or another key, and the directory is used for nothing, and a bulletin only it lists is held until a good directory lists it. The receiver keeps each rebuilt bulletin's hash with its done marker, and the page says "signed by" only when that hash matched a trusted signed listing, including for one delivered before any list named it.
 
-From v0.16.0 the first line may also list the listeners whose daily reports reached GB7RDG lately, `reports=2026-10-15:G4ABC,G8BPQ;2026-10-14:M9TWM`: each callsign once, under the day of its newest report, for that day and the two before, at most 100 callsigns, the newest reports first; `reports=` alone means none. It is inside what the signature covers, and earlier receivers ignore it. See [headend.md](headend.md#reports-in-the-directory).
+From v0.16.0 the first line may also list the listeners whose daily reports reached the station lately, `reports=2026-10-15:G4ABC,G8BPQ;2026-10-14:M9TWM`: each callsign once, under the day of its newest report, for that day and the two before, at most 100 callsigns, the newest reports first; `reports=` alone means none. It is inside what the signature covers, and earlier receivers ignore it. See [headend.md](headend.md#reports-in-the-directory).
 
 From issue #146 every head end signs (it makes its key at install and will not start without one) and a receiver uses an unsigned directory for nothing, exactly as for one with a bad signature: no listing, timetable, adverts, delivery or envelope admission, and what only it lists is held. Removing `key=` and `sig=` therefore gains an attacker nothing. The wire format is unchanged, so released receivers, which still use unsigned directories, carry on as before. What this does not stop: a bulletin no directory lists is still delivered, as before; and a signed directory can be replayed the same day, which is no worse than before. The receiver's status page lists every trusted key with its source, and a learnt or hand-added key can be forgotten (a forgotten learnt key is learnt again when its station's directory is next heard); keys added by hand are kept in `store/pins.txt` with an `added` mark.
 
@@ -301,8 +301,8 @@ From issue #179 the first entry's line may also say where the station itself is 
 
 A head end also tells listeners about other stations it knows, one field each, `advert=G8BPQ;00:30/60;-;7053800;usb` (callsign, slots, daylight rule or `-`, the signal's centre in Hz, sideband), from `advertise` in its configuration; QO-100 slots are just another frequency. An advert only says when and where to listen: it never pins a key or delivers anything. Receivers take adverts from trusted signed directories only, one per station and frequency, so a station on HF and QO-100 is advertised once for each; when head ends disagree, a receiver keeps what it has unless a later-dated directory says otherwise. Receivers from before ignore all three fields like any field after the title, and the signature still checks for them.
 
-Each station's directories are its own (issue #144). A trusted signed directory belongs to the station its key is pinned to; an unsigned one is not used (issue #146; before that it belonged to GB7RDG when it named no station or GB7RDG, and to none when it named another). The receiver keeps the newest directory from each station, and a part-received bulletin is given up only when no station's newest directory lists it any more. A directory of no station still names and delivers bulletins, but gives nothing up and sets no station's timetable. Only GB7RDG's own directories change the timetable kept in `store/schedule.txt`; another station's timetable comes only from its own signed directories.
-A receiver listens at the slots of every station it knows: GB7RDG's from its directory or the config, any other's from its own signed directory or else an advert for it, except those in its `skipStations`. A station's frequency, sideband and place come from its own directory (`hz=`, `sideband=`, `locator=`), else an advert, and for GB7RDG alone 7.0538 MHz USB at IO91lk; a station whose own directory is heard here but says nothing of its frequency is taken to be within reach whatever an advert says. A receiver that can move its dial (rig, pdn-soundmodem's receive window, web SDR) hears any HF station by tuning for its slots, the dial keeping the signal where the config's dial keeps GB7RDG's; one that cannot hears a station if it falls in the passband it has; above 30 MHz (QO-100) needs a converter offset, which is issue #180. Path analysis is for skywave paths only (30 MHz and below). Sound cards, pdn-soundmodem and SDRconnect decode around all of their slots, a rig is retuned for all of them, and a web SDR shares its daily allowance between them, an equal part each, picking within its part by the one-station rule. Each slot is labelled with its station, and a frame counts for the slot, of whichever station, whose start most recently passed. The daily report still covers GB7RDG's slots alone. Fixed limits keep other stations from taking all of a receiver's listening: at most 6 stations besides GB7RDG, at most 8 adverts read from any directory, and only stations with at most one slot an hour; when more qualify, stations heard directly come first (by when their key was learnt), then advertised ones (by when first advertised), then by callsign.
+Each station's directories are its own (issue #144). A trusted signed directory belongs to the station its key is pinned to; an unsigned one is not used (issue #146; before that it belonged to the first station when it named no station, and to none when it named another). The receiver keeps the newest directory from each station, and a part-received bulletin is given up only when no station's newest directory lists it any more. A directory of no station still names and delivers bulletins, but gives nothing up and sets no station's timetable. Each station's timetable comes only from its own signed directories.
+A receiver listens at the slots of every station it knows: M0LTE's from its directory or the config, any other's from its own signed directory or else an advert for it, except those in its `skipStations`. A station's frequency, sideband and place come from its own directory (`hz=`, `sideband=`, `locator=`), else an advert, and for a station in the stations file, that entry; a station whose own directory is heard here but says nothing of its frequency is taken to be within reach whatever an advert says. A receiver that can move its dial (rig, pdn-soundmodem's receive window, web SDR) hears any HF station by tuning for its slots, the dial keeping the signal where the config's dial keeps M0LTE's; one that cannot hears a station if it falls in the passband it has; above 30 MHz (QO-100) needs a converter offset, which is issue #180. Path analysis is for skywave paths only (30 MHz and below). Sound cards, pdn-soundmodem and SDRconnect decode around all of their slots, a rig is retuned for all of them, and a web SDR shares its daily allowance between them, an equal part each, picking within its part by the one-station rule. Each slot is labelled with its station, and a frame counts for the slot, of whichever station, whose start most recently passed. The daily report still covers M0LTE's slots alone. Fixed limits keep other stations from taking all of a receiver's listening: at most 6 stations besides M0LTE, at most 8 adverts read from any directory, and only stations with at most one slot an hour; when more qualify, stations heard directly come first (by when their key was learnt), then advertised ones (by when first advertised), then by callsign.
 
 
 A receiver forgets which objects it has rebuilt after 14 days, and drops a partial object 14 days after its last new piece, or 24 hours after a directory heard since that piece leaves it out (the head end has retired it, so it can never be finished; a new piece or a later directory listing it again undoes this). The BBS's BID check remains the real duplicate filter.
@@ -320,7 +320,7 @@ One program and a small config.
 - **Audio.** A sound card on the receiver's radio, or an UberSDR web receiver such as `wessex.zapto.org`. pdn-soundmodem's library supports both. The receiver detects the MS110D speed automatically, so there are no mode settings.
 - **Decoding.** The library hands over each good frame. The receiver keeps every piece on disk, so partial bulletins survive restarts and add up across slots. If a rebuild does not match its object ID, the receiver keeps its pieces and, a few decodes per arriving piece, tries sets of them without the suspect ones; any set that rebuilds to the ID is accepted.
 - **Delivery.** Each rebuilt bulletin is checked against its object ID, decompressed, and offered to the local BBS over its telnet port as FBB B1F forwarding, again reusing pdn-bbs's code. The BBS accepts or rejects by BID as with any partner.
-- **Config.** The audio source, and the BBS host, port, login and password. Everything else is fixed, or comes from the head end: the slot times and daylight hours default to GB7RDG's, and once the receiver has heard the directory it uses what that says. A web SDR receiver listens to 8 of each day's daylight slots.
+- **Config.** The audio source, and the BBS host, port, login and password. Everything else is fixed, or comes from the head end: the slot times and daylight hours come from the stations file, and once the receiver has heard the directory it uses what that says. A web SDR receiver listens to 8 of each day's daylight slots.
 - **Packaging.** A .deb in the packet-net apt repo with a systemd service.
 
 ### Web page
@@ -368,12 +368,12 @@ The output is a plot of frame loss against receive filter width, one line per tr
 1. The filter study.
 2. The pdn-soundmodem changes: burst packing, the transmit lease, and the transmit filter if needed.
 3. The core library: RaptorQ, compression, the frame format and the directory, tested offline with pieces dropped at random.
-4. The head end, run first into a WAV file from real GB7RDG traffic and decoded through pdn-soundmodem's simulated Poor channel.
+4. The head end, run first into a WAV file from real M0LTE traffic and decoded through pdn-soundmodem's simulated Poor channel.
 5. The receiver with its web page, delivering into a test LinBPQ and a test FBB.
-6. A real test transmission from GB7RDG, received by Claude running the receiver against the Wessex web SDR.
+6. A real test transmission from M0LTE, received by Claude running the receiver against the Wessex web SDR.
 7. A trial with the three volunteers.
 
 ## Open questions
 
 - Which callsign the receiver logs into the local BBS as. It has to be a forwarding partner there, and a station that already forwards with GB7RDG directly may not want two sessions under one call. This gets settled by testing against LinBPQ and FBB.
-- Settled 2026-10-05: the Flex's transmit filter opens to 5700 Hz from GB7RDG's dial (7.04975 MHz), so the slice does not need to retune.
+- Settled 2026-10-05: the Flex's transmit filter opens to 5700 Hz from M0LTE's dial (7.04975 MHz), so the slice does not need to retune.

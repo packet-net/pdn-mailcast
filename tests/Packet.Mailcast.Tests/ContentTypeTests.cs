@@ -14,17 +14,17 @@ public class ContentTypeTests
     [Fact]
     public void BulletinsAndDirectories_AreExactlyWhatV020Sent_AndV020ReadsThem()
     {
-        var obj = TransferObject.ForBulletin(Sample, ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var compressed = Compression.Default.Compress(Sample.Serialize(), ZstdDictionary.Gb7rdg1Id);
+        var obj = TransferObject.ForBulletin(Sample, ZstdDictionary.Dictionary1Id, Compression.Default);
+        var compressed = Compression.Default.Compress(Sample.Serialize(), ZstdDictionary.Dictionary1Id);
         Assert.Equal([(byte)1, .. compressed], obj.Bytes.ToArray());
-        var (kind, content) = V020Reader.Unpack(obj.Bytes, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var (kind, content) = V020Reader.Unpack(obj.Bytes, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(1, kind);
         Assert.Equal(Sample, Bulletin.Parse(content));
 
         var directory = new BroadcastDirectory(new DateOnly(2026, 10, 5), [new DirectoryEntry(obj.ObjectId, obj.DictionaryId, 100, Sample.Bid, Sample.Title)], new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight));
-        var dirObj = TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var dirObj = TransferObject.ForDirectory(directory, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(2, dirObj.Bytes[0]);
-        var (dirKind, dirContent) = V020Reader.Unpack(dirObj.Bytes, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var (dirKind, dirContent) = V020Reader.Unpack(dirObj.Bytes, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(2, dirKind);
         var old = V020Reader.ParseDirectory(dirContent);
         Assert.Equal(directory.Date, old.Date);
@@ -35,8 +35,8 @@ public class ContentTypeTests
     public void ThisVersion_ReadsWhatV020Sent()
     {
         // A v0.2.0 head end's objects: the kind octet then zstd, and directory lines of five fields.
-        var compressed = Compression.Default.Compress(Sample.Serialize(), ZstdDictionary.Gb7rdg1Id);
-        var (kind, content) = TransferObject.Unpack([1, .. compressed], ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var compressed = Compression.Default.Compress(Sample.Serialize(), ZstdDictionary.Dictionary1Id);
+        var (kind, content) = TransferObject.Unpack([1, .. compressed], ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(ObjectKind.Bulletin, kind);
         Assert.Equal(Sample, Bulletin.Parse(content));
         var d = BroadcastDirectory.Parse(Encoding.Latin1.GetBytes("MAILCAST DIRECTORY 1\n2026-10-04\n0123456789abcdef\t1\t2345\t12345_GB7RDG\tA title\n"));
@@ -82,19 +82,19 @@ public class ContentTypeTests
     public void MetadataBlock_IsSkipped_ByThisVersion()
     {
         byte[] meta = Encoding.ASCII.GetBytes("X-Wrapper: test\n");
-        var obj = TransferObject.ForContent((byte)ObjectKind.Bulletin, Sample.Serialize(), meta, withMetadata: true, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var obj = TransferObject.ForContent((byte)ObjectKind.Bulletin, Sample.Serialize(), meta, withMetadata: true, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(0x81, obj.Bytes[0]);
         Assert.Equal(ObjectKind.Bulletin, obj.Kind);
         Assert.True(ContentType.TryRead(obj.Bytes, out byte type, out var metadata, out _));
         Assert.Equal(1, type);
         Assert.Equal(meta, metadata.ToArray());
-        var (kind, content) = TransferObject.Unpack(obj.Bytes, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var (kind, content) = TransferObject.Unpack(obj.Bytes, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(ObjectKind.Bulletin, kind);
         Assert.Equal(Sample, Bulletin.Parse(content));
 
         // An empty block is allowed too.
-        var empty = TransferObject.ForContent((byte)ObjectKind.Bulletin, Sample.Serialize(), [], withMetadata: true, ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        Assert.Equal(Sample, Bulletin.Parse(TransferObject.Unpack(empty.Bytes, ZstdDictionary.Gb7rdg1Id, Compression.Default).Content));
+        var empty = TransferObject.ForContent((byte)ObjectKind.Bulletin, Sample.Serialize(), [], withMetadata: true, ZstdDictionary.Dictionary1Id, Compression.Default);
+        Assert.Equal(Sample, Bulletin.Parse(TransferObject.Unpack(empty.Bytes, ZstdDictionary.Dictionary1Id, Compression.Default).Content));
     }
 
     [Fact]
@@ -104,8 +104,8 @@ public class ContentTypeTests
         // experiment to its BBS: it logs the object as one it cannot use and drops it.
         foreach (var (type, meta) in new (byte, bool)[] { (3, false), (0x70, false), (1, true) })
         {
-            var obj = TransferObject.ForContent(type, Sample.Serialize(), [1, 2, 3], meta, ZstdDictionary.Gb7rdg1Id, Compression.Default);
-            Assert.Throws<InvalidDataException>(() => V020Reader.Unpack(obj.Bytes, ZstdDictionary.Gb7rdg1Id, Compression.Default));
+            var obj = TransferObject.ForContent(type, Sample.Serialize(), [1, 2, 3], meta, ZstdDictionary.Dictionary1Id, Compression.Default);
+            Assert.Throws<InvalidDataException>(() => V020Reader.Unpack(obj.Bytes, ZstdDictionary.Dictionary1Id, Compression.Default));
         }
     }
 
@@ -158,24 +158,24 @@ public class ContentTypeTests
         var log = new List<string>();
         var store = new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Log = log.Add });
 
-        var dapps = TransferObject.ForContent((byte)ObjectKind.DappsMessage, Encoding.ASCII.GetBytes("a DAPPS message"), [], false, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var dapps = TransferObject.ForContent((byte)ObjectKind.DappsMessage, Encoding.ASCII.GetBytes("a DAPPS message"), [], false, ZstdDictionary.Dictionary1Id, Compression.Default);
         var result = FeedUntilDone(store, dapps);
         Assert.Equal(FrameOutcome.CompletedUnhandled, result.Outcome);
         Assert.Equal((byte)3, result.ContentType);
 
-        var experiment = TransferObject.ForContent(0x70, Encoding.ASCII.GetBytes("an experiment"), [9, 9], true, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var experiment = TransferObject.ForContent(0x70, Encoding.ASCII.GetBytes("an experiment"), [9, 9], true, ZstdDictionary.Dictionary1Id, Compression.Default);
         Assert.Equal(FrameOutcome.CompletedUnknown, FeedUntilDone(store, experiment).Outcome);
 
         // An experiment that is not even zstd inside is no error either: it is never decompressed.
         var junk = new byte[500];
         new Random(1).NextBytes(junk);
         junk[0] = 0x71;
-        var raw = TransferObject.FromStored(junk, ZstdDictionary.Gb7rdg1Id, new ObjectTransmissionInformation(junk.Length, MailcastFrame.StandardSymbolSize, 1, 1, MailcastFrame.StandardAlignment));
+        var raw = TransferObject.FromStored(junk, ZstdDictionary.Dictionary1Id, new ObjectTransmissionInformation(junk.Length, MailcastFrame.StandardSymbolSize, 1, 1, MailcastFrame.StandardAlignment));
         Assert.Equal(FrameOutcome.CompletedUnknown, FeedUntilDone(store, raw).Outcome);
 
         Assert.Empty(store.Pending());
 
-        var wrapped = TransferObject.ForContent((byte)ObjectKind.Bulletin, Sample.Serialize(), Encoding.ASCII.GetBytes("meta"), true, ZstdDictionary.Gb7rdg1Id, Compression.Default);
+        var wrapped = TransferObject.ForContent((byte)ObjectKind.Bulletin, Sample.Serialize(), Encoding.ASCII.GetBytes("meta"), true, ZstdDictionary.Dictionary1Id, Compression.Default);
         var delivered = FeedUntilDone(store, wrapped);
         Assert.Equal(FrameOutcome.CompletedBulletin, delivered.Outcome);
         Assert.Equal(Sample, Assert.Single(store.Pending()));

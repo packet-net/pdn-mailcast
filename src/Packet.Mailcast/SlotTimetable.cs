@@ -7,7 +7,7 @@ namespace Packet.Mailcast;
 /// The hours of daylight a head end sends in: a slot runs only if it starts between
 /// <see cref="AfterSunriseMinutes"/> after sunrise and <see cref="BeforeSunsetMinutes"/> before
 /// sunset at <see cref="Locator"/>. 40 m NVIS only carries over UK paths in daylight; on
-/// 2026-10-05 GB7RDG's slots an hour after sunrise and twenty minutes after sunset were heard by
+/// 2026-10-05 M0LTE's slots an hour after sunrise and twenty minutes after sunset were heard by
 /// nobody, and those from three hours after sunrise to two before sunset were.
 /// </summary>
 /// <remarks>

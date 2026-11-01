@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace Packet.Mailcast.Feedback;
 
 /// <summary>
-/// The listeners whose daily reports have reached GB7RDG lately, as the directory lists them
+/// The listeners whose daily reports have reached the station lately, as the directory lists them
 /// (issue #136): each callsign with the day of the newest report the head end has from it.
 /// </summary>
 /// <remarks>

@@ -275,13 +275,13 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
   <section class="wide" id="listenForBox">
     <details id="listenForDetails">
       <summary><h2>Listen for a station</h2> <span class="muted">a station nobody advertises yet</span></summary>
-      <p class="muted">Give the slots and frequency of a station and this receiver listens at them like it does for an advert heard on air (the same limits apply, and only if it can tune there). Once the station's own signed directory is heard its own timetable is used and the entry goes; an entry never heard in 7 days goes too. <b>Minute</b> and <b>every</b> are that station's slots, not GB7RDG's. The frequency is the centre of its signal, not the dial (GB7RDG is 7.0538 MHz, heard on a 7.052 dial); the receiver works out the dial.</p>
+      <p class="muted">Give the slots and frequency of a station and this receiver listens at them like it does for an advert heard on air (the same limits apply, and only if it can tune there). Once the station's own signed directory is heard its own timetable is used and the entry goes; an entry never heard in 7 days goes too. <b>Minute</b> and <b>every</b> are that station's slots. The frequency is the centre of its signal, not the dial; the receiver works out the dial.</p>
       <div id="listenForTable" class="muted">None added.</div>
       <form id="listenForAdd" class="row">
         <label>Callsign <input id="lfCall" size="10" autocomplete="off" spellcheck="false" placeholder="GM8BPQ" required></label>
         <label>Minute <input id="lfMinute" type="number" min="0" max="59" value="0" style="width:5em"></label>
         <label>Every (min) <input id="lfEvery" type="number" min="1" max="1440" value="60" style="width:5em"></label>
-        <label title="The centre of the signal, not the dial: GB7RDG is 7.0538 on a 7.052 dial">Signal centre (MHz) <input id="lfFreq" type="number" min="0.001" step="any" placeholder="7.0538" style="width:8em" required></label>
+        <label title="The centre of the signal, not the dial (for example 7.0538 on a 7.052 dial)">Signal centre (MHz) <input id="lfFreq" type="number" min="0.001" step="any" placeholder="7.0538" style="width:8em" required></label>
         <label>Sideband <select id="lfSide"><option value="usb">USB</option><option value="lsb">LSB</option></select></label>
         <label>Locator (optional) <input id="lfLoc" size="8" maxlength="6" autocomplete="off" spellcheck="false" placeholder="IO87"></label>
         <label><input id="lfDay" type="checkbox" checked> Daylight only</label>
@@ -420,10 +420,10 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
       <label>USB dial
         <input id="dial" readonly>
       </label>
-      <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal itself always stays on 7.0538 MHz. An SDR or a web SDR needs no change here.</div>
+      <div class="muted">The dial is set by <code>"dialKHz"</code> in receiver.json; the signal itself stays at the audio centre. An SDR or a web SDR needs no change here.</div>
       <div id="locatorSection" hidden>
         <label>Your locator
-          <input id="locator" maxlength="6" autocomplete="off" spellcheck="false" placeholder="IO91lk">
+          <input id="locator" maxlength="6" autocomplete="off" spellcheck="false" placeholder="e.g. JO01">
         </label>
         <div class="muted">Where your radio is, as a 4 or 6 character Maidenhead locator: <code>"locator"</code> in receiver.json. It names the radio path's hops and where they come down, and goes in the daily report. A web SDR says where it is itself.</div>
       </div>
@@ -1757,7 +1757,7 @@ async function loadSettings() {
   $("audioKind").value = kind;
   $("audioWhere").value = a;
   $("locator").value = settings.locator || "";
-  $("dial").value = `${mhz(settings.dialKHz)} MHz (signal centre 7.0538 MHz)`;
+  $("dial").value = `${mhz(settings.dialKHz)} MHz`;
   $("alsaOption").textContent = `Sound card on my radio (USB, dial ${mhz(settings.dialKHz)} MHz)`;
   updateFilter(kind);
   $("cards").innerHTML = settings.soundCards.map(c => `<option value="${esc(c)}">`).join("");
