@@ -393,7 +393,7 @@ public sealed class Intake : IAsyncDisposable
                 return;
             }
         }
-        _log($"intake: a frame to {OnAir.Destination} from {call} was ignored: not from an accepted source ({sources}); \"sources\" in the config file sets them");
+        _log($"intake: a frame to {OnAir.Destination} from {call} was ignored: not from an accepted source ({sources}); follow the station or add it to \"sources\" in the config file");
     }
 
     private void Dropped()
@@ -784,6 +784,11 @@ public sealed class Intake : IAsyncDisposable
             if (kept > 0)
             {
                 OutsidePieces?.Invoke(kept);
+            }
+            // Issue #228: a directory completed from outside may add stations, so the followed list and accepted sources are refreshed.
+            if (results.Any(r => r.Outcome == FrameOutcome.CompletedDirectory))
+            {
+                KeysChanged?.Invoke();
             }
         }
         catch (Exception e)

@@ -306,7 +306,7 @@ public sealed partial class StatusPage : IAsyncDisposable
                     await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(Status(), ReceiverConfig.JsonLine)).ConfigureAwait(false);
                     break;
                 case ("/api/settings", "GET"):
-                    await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(SettingsView(_host.Config), ReceiverConfig.JsonLine)).ConfigureAwait(false);
+                    await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(SettingsView(_host.Config, _host.SourcesFromFollowed), ReceiverConfig.JsonLine)).ConfigureAwait(false);
                     break;
                 case ("/api/settings", "POST"):
                     await SaveSettingsAsync(context).ConfigureAwait(false);
@@ -1402,13 +1402,14 @@ public sealed partial class StatusPage : IAsyncDisposable
     }
 
     /// <summary>The settings as the form shows them: the password is never sent back, only whether one is set.</summary>
-    internal static object SettingsView(ReceiverConfig config) => new
+    internal static object SettingsView(ReceiverConfig config, IReadOnlyList<string>? followed = null) => new
     {
         audio = config.Audio,
         locator = config.Locator,
         dialKHz = config.DialKHz,
         sources = config.AcceptedSources,
         sourcesSet = config.Sources is not null,
+        sourcesFollowed = followed ?? [],
         bbs = new
         {
             type = config.Bbs.Type,

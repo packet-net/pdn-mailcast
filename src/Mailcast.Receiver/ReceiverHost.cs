@@ -88,6 +88,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
+        RefreshSources(say: false); // said after the start-up banner (RunAsync)
     }
 
     /// <summary>
@@ -717,6 +718,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     {
         RetireHeardListenFor();
         ExpireListenFor();
+        RefreshSources();
         if (Slots.Schedule is not { } tracked)
         {
             return;
@@ -731,6 +733,68 @@ public sealed class ReceiverHost : IAsyncDisposable
             }
             Slots.Schedule = followed;
             WakeListenNow();
+        }
+    }
+
+    /// <summary>
+    /// Issue #228: the stations frames are accepted from besides the configured ones: every station this
+    /// receiver knows of (listed, pinned, advertised or asked for with listenFor, followed or not, skipped
+    /// or not), and the callsign each pinned station's newest trusted directory says its frames come from.
+    /// Sorted, without those already in the configured list. Updated by <see cref="RefreshSources"/>.
+    /// </summary>
+    public IReadOnlyList<string> SourcesFromFollowed => _sourcesFromFollowed;
+
+    private volatile IReadOnlyList<string> _sourcesFromFollowed = [];
+    private readonly object _sourcesGate = new();
+
+    /// <summary>Recomputes what <see cref="Intake"/> accepts frames from; call when followed stations, pins, adverts, listenFor or the config change.</summary>
+    internal void RefreshSources(bool say = true)
+    {
+        lock (_sourcesGate)
+        {
+            var config = Config;
+            var stations = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var pin in Intake.Pins())
+            {
+                stations.Add(pin.Station);
+            }
+            foreach (var d in Intake.StationDirectories())
+            {
+                if (d.Check.State == SignatureState.Trusted && d.Directory.Station is { } sending)
+                {
+                    stations.Add(sending);
+                }
+            }
+            foreach (var e in config.ListenFor ?? [])
+            {
+                if (e.Problem() is null && ListenForState.Get(e)?.Retired is null)
+                {
+                    stations.Add(e.Callsign);
+                }
+            }
+            foreach (var l in Listening)
+            {
+                stations.Add(l.Station);
+            }
+            foreach (var a in Intake.Adverts())
+            {
+                stations.Add(a.Callsign);
+            }
+            foreach (var (callsign, _) in Intake.AdvertsBeyondCap())
+            {
+                stations.Add(callsign);
+            }
+            var configured = config.AcceptedSources;
+            var accepted = configured.Plus(stations);
+            var extra = accepted.Where(c => !configured.Contains(c)).Order(StringComparer.Ordinal).ToList();
+            if (!extra.SequenceEqual(_sourcesFromFollowed))
+            {
+                _sourcesFromFollowed = extra;
+                if (say) _log(extra.Count > 0
+                    ? $"config: frames are also accepted from the stations this receiver knows of: {string.Join(", ", extra)}"
+                    : "config: frames are now accepted from the configured sources only");
+            }
+            Intake.Sources = accepted;
         }
     }
 
@@ -1036,6 +1100,10 @@ public sealed class ReceiverHost : IAsyncDisposable
             _log($"slots: following {followed.Describe()}");
         }
         _log(SourcesLine(Config));
+        if (SourcesFromFollowed.Count > 0)
+        {
+            _log($"config: frames are also accepted from the stations this receiver knows of: {string.Join(", ", SourcesFromFollowed)}");
+        }
         if (ConfigFile is { } file)
         {
             // Issue #154: which file, and what in it was not read, so nothing is ignored unseen.
@@ -1161,8 +1229,8 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>The start-up line saying which callsigns frames are accepted from, and whether that is the default for a file without "sources".</summary>
     internal static string SourcesLine(ReceiverConfig config) => config.Sources is null
-        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default; add \"sources\" to choose"
-        : $"config: frames are accepted from {config.Sources}, as \"sources\" says";
+        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default, and from the stations it knows of; add \"sources\" to choose"
+        : $"config: frames are accepted from {config.Sources}, as \"sources\" says, and from the stations it knows of";
 
     /// <summary>
     /// Issue #133: every <see cref="EarlyEndPoll"/>, writes the summary line of the slot tracked
@@ -1224,7 +1292,6 @@ public sealed class ReceiverHost : IAsyncDisposable
             bool audioChanged = AudioSettingsDiffer(_config, config);
             _config = config;
             ListenForState.Sync(config.ListenFor, _time.GetUtcNow());
-            Intake.Sources = config.AcceptedSources;
             // A running pipeline that carries on keeps its dial (pdn-soundmodem's, if it said one).
             ChannelWatch.AudioCentreHz = !audioChanged && _pipeline is { } running ? running.AudioCentreHz : config.AudioCentreHz;
             Bbs = new BbsClient(config.Bbs, _time, _log) { Version = Version };
@@ -1233,7 +1300,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 restart = _audioRestart;
             }
         }
-        _log($"config: now listening on {config.Audio}, delivering to {DescribeBbs(config.Bbs)}, accepting frames from {config.AcceptedSources}");
+        RefreshSources();
+        _log($"config: now listening on {config.Audio}, delivering to {DescribeBbs(config.Bbs)}, accepting frames from {Intake.Sources}");
         restart?.Cancel();
         Delivery.Nudge();
     }
