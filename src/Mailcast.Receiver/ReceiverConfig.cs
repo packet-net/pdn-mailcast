@@ -172,16 +172,15 @@ public sealed record ReceiverConfig
     public double AudioCentreHz => OnAir.AudioCentreHz(DialHz);
 
     /// <summary>
-    /// The callsigns accepted when the file has no <c>"sources"</c>, as files from before the
-    /// setting do: GB7RDG, and M0LTE, which the broadcast may move to. The only place in the
-    /// code these are written.
+    /// The extra callsigns accepted when the file has no <c>"sources"</c>: none. Every station the
+    /// receiver knows of is accepted anyway, GB7RDG and its sending callsign M0LTE from the start.
     /// </summary>
-    public static readonly CallsignList DefaultSources = CallsignList.Parse(["GB7RDG", "M0LTE"]);
+    public static readonly CallsignList DefaultSources = CallsignList.Parse([]);
 
     /// <summary>
-    /// <c>"sources"</c>: the base callsigns broadcast frames are accepted from, any SSID; frames
-    /// from anyone else are somebody else's traffic. Null when the file leaves it out, which
-    /// means <see cref="DefaultSources"/>; see <see cref="AcceptedSources"/>.
+    /// <c>"sources"</c>: extra base callsigns broadcast frames are accepted from, any SSID, besides
+    /// the stations the receiver knows of. Null when the file leaves it out (or says null), which
+    /// means <see cref="DefaultSources"/>, none; see <see cref="AcceptedSources"/>.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CallsignList? Sources { get; init; }
@@ -454,10 +453,6 @@ public sealed record ReceiverConfig
         }
 
         config ??= new ReceiverConfig();
-        if (config.Sources is null && Has(text, "sources"))
-        {
-            throw new ConfigException($"\"sources\" is null: give the callsigns the broadcast comes from, such as [\"GB7RDG\", \"M0LTE\"], or leave it out for {DefaultSources}");
-        }
         if (HasOnlySlotUtc(text))
         {
             config = config with { SlotUtcWithoutEveryMinutes = true };

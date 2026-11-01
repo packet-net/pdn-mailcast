@@ -18,9 +18,9 @@
   // my filter" works out for you. See docs/receiver.md.
   "dialKHz": 7052.0,
 
-  // The callsigns the broadcast is accepted from, any SSID. GB7RDG sends it today, and it may
-  // move to M0LTE. Frames from anyone else are ignored. Left out, it is these two.
-  "sources": ["GB7RDG", "M0LTE"],
+  // Optional: extra callsigns to accept frames from, any SSID. Stations the receiver knows of
+  // (GB7RDG and its directory's sender, pinned keys, adverts, listenFor) are accepted without it.
+  // "sources": ["G4ABC"],
 
   // Your BBS. "type" is "linBpq" or "fbb". For LinBPQ the port is the FBBPORT in its
   // Telnet port, and the login is the USER= name you made for the receiver.

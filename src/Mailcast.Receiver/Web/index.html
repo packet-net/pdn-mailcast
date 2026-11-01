@@ -442,7 +442,7 @@ MCR1 0.6.0 IO80qr wessex.zapto.org 12/12 1:BBS1
       <label>Accept frames from
         <input id="sources" autocomplete="off" spellcheck="false">
       </label>
-      <div class="muted" id="sourcesNote">The callsigns the mailcast is sent from, separated by commas: <code>"sources"</code> in receiver.json. Any SSID is accepted.</div>
+      <div class="muted" id="sourcesNote">Extra callsigns to accept the mailcast from, separated by commas (usually none): <code>"sources"</code> in receiver.json. Any SSID is accepted.</div>
       <div class="row">
         <label>BBS host <input id="host"></label>
         <label>Port <input id="port" type="number" min="1" max="65535"></label>
@@ -1761,8 +1761,7 @@ async function loadSettings() {
   updateFilter(kind);
   $("cards").innerHTML = settings.soundCards.map(c => `<option value="${esc(c)}">`).join("");
   $("sources").value = settings.sources.join(", ");
-  $("sourcesNote").innerHTML = 'The callsigns the mailcast is sent from, separated by commas: <code>"sources"</code> in receiver.json. Any SSID is accepted.'
-    + (settings.sourcesSet ? "" : " Your config file leaves it out, so these are the default.")
+  $("sourcesNote").innerHTML = 'Extra callsigns to accept the mailcast from, separated by commas (usually none): <code>"sources"</code> in receiver.json. Any SSID is accepted.'
     + ((settings.sourcesFollowed || []).length ? " Also accepted, because this receiver knows of them: " + esc(settings.sourcesFollowed.join(", ")) + "." : "");
   $("type").value = settings.bbs.type;
   $("host").value = settings.bbs.host;

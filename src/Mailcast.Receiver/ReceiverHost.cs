@@ -754,6 +754,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             var config = Config;
             var stations = new HashSet<string>(StringComparer.Ordinal);
+            // GB7RDG's key is built in (a pin, below), and its frames are sent from M0LTE: accepted from the start.
+            stations.Add(ReceiverStore.BuiltInSendingCallsign);
             foreach (var pin in Intake.Pins())
             {
                 stations.Add(pin.Station);
@@ -785,8 +787,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 stations.Add(callsign);
             }
             var configured = config.AcceptedSources;
-            var accepted = configured.Plus(stations);
-            var extra = accepted.Where(c => !configured.Contains(c)).Order(StringComparer.Ordinal).ToList();
+            var accepted = configured.Plus(stations.Order(StringComparer.Ordinal));
+            var extra = accepted.Where(c => !configured.Contains(c) && c != ReceiverStore.BuiltInStation && c != ReceiverStore.BuiltInSendingCallsign).Order(StringComparer.Ordinal).ToList();
             if (!extra.SequenceEqual(_sourcesFromFollowed))
             {
                 _sourcesFromFollowed = extra;
@@ -1227,10 +1229,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         return delivered;
     }
 
-    /// <summary>The start-up line saying which callsigns frames are accepted from, and whether that is the default for a file without "sources".</summary>
-    internal static string SourcesLine(ReceiverConfig config) => config.Sources is null
-        ? $"config: there is no \"sources\" in the config file, so frames are accepted from {ReceiverConfig.DefaultSources}, the default, and from the stations it knows of; add \"sources\" to choose"
-        : $"config: frames are accepted from {config.Sources}, as \"sources\" says, and from the stations it knows of";
+    /// <summary>The start-up line saying which extra callsigns frames are accepted from besides the stations it knows of.</summary>
+    internal static string SourcesLine(ReceiverConfig config) => config.AcceptedSources.Count == 0
+        ? "config: there is no \"sources\" in the config file, so no extra callsigns, and frames are accepted from the stations it knows of"
+        : $"config: frames are accepted from {config.AcceptedSources}, as \"sources\" says, and from the stations it knows of";
 
     /// <summary>
     /// Issue #133: every <see cref="EarlyEndPoll"/>, writes the summary line of the slot tracked

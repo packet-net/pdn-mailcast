@@ -16,12 +16,35 @@ public class SourcesTests
         return ReceiverConfig.Load(path);
     }
 
+    // What an older config file spells out.
+    private static readonly CallsignList Old = CallsignList.Parse(["GB7RDG", "M0LTE"]);
+
     [Fact]
-    public void Default_IsGb7rdgAndM0lte()
+    public void Default_IsNone()
     {
-        Assert.Equal(["GB7RDG", "M0LTE"], ReceiverConfig.DefaultSources);
+        Assert.Empty(ReceiverConfig.DefaultSources);
         Assert.Null(new ReceiverConfig().Sources);
         Assert.Equal(ReceiverConfig.DefaultSources, new ReceiverConfig().AcceptedSources);
+    }
+
+    [Fact]
+    public async Task FreshReceiver_WithNoSources_AcceptsTheBuiltInSender_AndNotOthers()
+    {
+        using var dir = new TempDirectory();
+        await using var host = new ReceiverHost(new ReceiverConfig { StateDirectory = dir.Path, Audio = "wav:/nonexistent.wav" }, TimeProvider.System, _ => { });
+        byte[] payload = Payload();
+
+        Assert.True(host.Intake.Offer(Ax25UiFrame.Build("M0LTE", OnAir.Destination, payload)));
+        Assert.True(host.Intake.Offer(Ax25UiFrame.Build("M0LTE-1", OnAir.Destination, payload)));
+        Assert.False(host.Intake.Offer(Ax25UiFrame.Build("G4XYZ", OnAir.Destination, payload)));
+    }
+
+    [Fact]
+    public void Config_WithAnEmptyList_OrNull_MeansNoExtras()
+    {
+        using var dir = new TempDirectory();
+        Assert.Empty(LoadJson(dir, """{ "sources": [] }""").AcceptedSources);
+        Assert.Empty(LoadJson(dir, """{ "sources": null }""").AcceptedSources);
     }
 
     [Theory]
@@ -33,7 +56,7 @@ public class SourcesTests
     {
         byte[] frame = Ax25UiFrame.Build(source, OnAir.Destination, Payload());
 
-        Assert.True(BroadcastFrame.TryGetPayload(frame, ReceiverConfig.DefaultSources, out var payload, out string? other));
+        Assert.True(BroadcastFrame.TryGetPayload(frame, Old, out var payload, out string? other));
         Assert.Equal(Payload(), payload.ToArray());
         Assert.Null(other);
     }
@@ -46,14 +69,14 @@ public class SourcesTests
     {
         byte[] frame = Ax25UiFrame.Build(source, OnAir.Destination, Payload());
 
-        Assert.False(BroadcastFrame.TryGetPayload(frame, ReceiverConfig.DefaultSources, out _, out string? other));
+        Assert.False(BroadcastFrame.TryGetPayload(frame, Old, out _, out string? other));
         Assert.Equal(expected, other);
     }
 
     [Fact]
     public void Frames_ToAnotherDestination_AreNotCountedAsAnotherSource()
     {
-        Assert.False(BroadcastFrame.TryGetPayload(Ax25UiFrame.Build("G4ABC", "ID", Payload()), ReceiverConfig.DefaultSources, out _, out string? other));
+        Assert.False(BroadcastFrame.TryGetPayload(Ax25UiFrame.Build("G4ABC", "ID", Payload()), Old, out _, out string? other));
         Assert.Null(other);
     }
 
@@ -62,7 +85,7 @@ public class SourcesTests
     {
         using var dir = new TempDirectory();
         var log = new List<string>();
-        await using var intake = new Intake(dir.Path, line => { lock (log) { log.Add(line); } });
+        await using var intake = new Intake(dir.Path, line => { lock (log) { log.Add(line); } }) { Sources = Old };
         byte[] payload = Payload();
 
         Assert.True(intake.Offer(Ax25UiFrame.Build("M0LTE-1", OnAir.Destination, payload)));
@@ -85,7 +108,7 @@ public class SourcesTests
     }
 
     [Fact]
-    public void Config_WithoutTheKey_UsesTheDefault_AndSavingLeavesItOut()
+    public void Config_WithoutTheKey_MeansNone_AndSavingLeavesItOut()
     {
         using var dir = new TempDirectory();
         var config = LoadJson(dir, """{ "audio": "ubersdr:wessex.zapto.org" }""");
@@ -93,7 +116,7 @@ public class SourcesTests
         Assert.Null(config.Sources);
         Assert.Equal(ReceiverConfig.DefaultSources, config.AcceptedSources);
         Assert.Contains("no \"sources\"", ReceiverHost.SourcesLine(config), StringComparison.Ordinal);
-        Assert.Contains("GB7RDG, M0LTE", ReceiverHost.SourcesLine(config), StringComparison.Ordinal);
+        Assert.Contains("no extra callsigns", ReceiverHost.SourcesLine(config), StringComparison.Ordinal);
 
         string path = Path.Combine(dir.Path, "receiver.json");
         config.Save(path);
@@ -117,8 +140,6 @@ public class SourcesTests
     }
 
     [Theory]
-    [InlineData("""[]""", "empty")]
-    [InlineData("""null""", "null")]
     [InlineData("""[""]""", "not a callsign")]
     [InlineData("""["GB7RDGX"]""", "not a callsign")]
     [InlineData("""["M0 LTE"]""", "not a callsign")]
@@ -139,12 +160,11 @@ public class SourcesTests
     }
 
     [Fact]
-    public void Example_SeedsGb7rdgAndM0lte()
+    public void Example_HasNoSources()
     {
         var config = ReceiverConfig.Load(Path.Combine(AppContext.BaseDirectory, "receiver.example.json"));
 
-        Assert.NotNull(config.Sources);
-        Assert.Equal(ReceiverConfig.DefaultSources, config.Sources);
+        Assert.Null(config.Sources);
     }
 
     [Fact]
@@ -155,7 +175,7 @@ public class SourcesTests
         var form = new StatusPage.SettingsForm("ubersdr:wessex.zapto.org", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS");
 
         var view = JsonSerializer.SerializeToElement(StatusPage.SettingsView(config), ReceiverConfig.JsonLine);
-        Assert.Equal(["GB7RDG", "M0LTE"], view.GetProperty("sources").EnumerateArray().Select(e => e.GetString()));
+        Assert.Empty(view.GetProperty("sources").EnumerateArray());
         Assert.False(view.GetProperty("sourcesSet").GetBoolean());
 
         // Left out of the form, a config without "sources" stays without it.
@@ -165,7 +185,7 @@ public class SourcesTests
         Assert.Equal(["M0LTE"], changed.Sources!);
         Assert.Equal(changed.Sources, StatusPage.Apply(changed, form).Sources);
 
-        Assert.Contains("empty", Assert.Throws<ConfigException>(() => StatusPage.Apply(config, form with { Sources = [] })).Message, StringComparison.Ordinal);
+        Assert.Empty(StatusPage.Apply(config, form with { Sources = [] }).AcceptedSources);
         Assert.Contains("not a callsign", Assert.Throws<ConfigException>(() => StatusPage.Apply(config, form with { Sources = ["NOT A CALL"] })).Message, StringComparison.Ordinal);
     }
 
@@ -177,8 +197,8 @@ public class SourcesTests
         await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
 
         // GB7RDG is always followed (its key is built in), so it is accepted whatever "sources" says (issue #228).
-        Assert.Equal(["G4ABC", "GB7RDG"], host.Intake.Sources);
+        Assert.Equal(["G4ABC", "GB7RDG", "M0LTE"], host.Intake.Sources);
         host.Reconfigure(config with { Sources = null });
-        Assert.Equal(ReceiverConfig.DefaultSources, host.Intake.Sources);
+        Assert.Equal(["GB7RDG", "M0LTE"], host.Intake.Sources);
     }
 }

@@ -6,7 +6,7 @@ namespace Mailcast.Receiver;
 
 /// <summary>
 /// The base callsigns broadcast frames are accepted from (<see cref="ReceiverConfig.Sources"/>):
-/// upper case, SSIDs dropped, no repeats, never empty. Compared by its callsigns, so two configs
+/// upper case, SSIDs dropped, no repeats; may be empty. Compared by its callsigns, so two configs
 /// read from the same file are equal.
 /// </summary>
 [JsonConverter(typeof(Converter))]
@@ -18,7 +18,7 @@ public sealed class CallsignList : IReadOnlyList<string>, IEquatable<CallsignLis
 
     /// <summary>
     /// Reads callsigns as a person or a config file gives them: "gb7rdg", "M0LTE-1" and "M0LTE"
-    /// give GB7RDG and M0LTE. Throws <see cref="ConfigException"/> for an empty list or one that
+    /// give GB7RDG and M0LTE. Throws <see cref="ConfigException"/> for one that
     /// is not an AX.25 callsign (1 to 6 letters and digits, with an SSID from 0 to 15 if any).
     /// </summary>
     public static CallsignList Parse(IEnumerable<string?> entries)
@@ -32,10 +32,6 @@ public sealed class CallsignList : IReadOnlyList<string>, IEquatable<CallsignLis
                 calls.Add(call);
             }
         }
-        if (calls.Count == 0)
-        {
-            throw new ConfigException("\"sources\" is empty: give the callsigns the broadcast comes from, such as [\"GB7RDG\", \"M0LTE\"], or leave it out for those; with none the receiver would accept nothing");
-        }
         return new CallsignList([.. calls]);
     }
 
@@ -47,7 +43,7 @@ public sealed class CallsignList : IReadOnlyList<string>, IEquatable<CallsignLis
         bool ssidOk = dash < 0 || (int.TryParse(given.AsSpan(dash + 1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int ssid) && ssid <= 15);
         if (call.Length is < 1 or > 6 || !call.All(char.IsAsciiLetterOrDigit) || !ssidOk)
         {
-            throw new ConfigException($"\"sources\": \"{(entry is null ? "null" : Ascii.Clean(entry))}\" is not a callsign: give 1 to 6 letters and digits, such as GB7RDG; an SSID (-0 to -15) is allowed and ignored");
+            throw new ConfigException($"\"sources\": \"{(entry is null ? "null" : Ascii.Clean(entry))}\" is not a callsign: give 1 to 6 letters and digits, such as G4ABC; an SSID (-0 to -15) is allowed and ignored");
         }
         return call;
     }
@@ -91,8 +87,8 @@ public sealed class CallsignList : IReadOnlyList<string>, IEquatable<CallsignLis
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    /// <summary>The callsigns for a person: "GB7RDG, M0LTE".</summary>
-    public override string ToString() => string.Join(", ", _calls);
+    /// <summary>The callsigns for a person: "G4ABC, M0XYZ"; "none" when empty.</summary>
+    public override string ToString() => _calls.Length == 0 ? "none" : string.Join(", ", _calls);
 
     /// <inheritdoc/>
     public bool Equals(CallsignList? other) => other is not null && _calls.AsSpan().SequenceEqual(other._calls);
@@ -116,7 +112,7 @@ public sealed class CallsignList : IReadOnlyList<string>, IEquatable<CallsignLis
     {
         public override CallsignList Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            const string Shape = "\"sources\" must be a list of callsigns, such as [\"GB7RDG\", \"M0LTE\"]";
+            const string Shape = "\"sources\" must be a list of callsigns, such as [\"G4ABC\", \"M0XYZ\"]";
             if (reader.TokenType != JsonTokenType.StartArray)
             {
                 throw new ConfigException(Shape);

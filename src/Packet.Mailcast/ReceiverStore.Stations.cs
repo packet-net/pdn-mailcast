@@ -357,6 +357,12 @@ public sealed partial class ReceiverStore
     /// </summary>
     public static StationDetails BuiltInDetails { get; } = new(7_053_800, Sideband.Usb, "IO91lk");
 
+    /// <summary>
+    /// The callsign GB7RDG's head end sends its frames from (since 2026-10-11), built in like <see cref="BuiltInDetails"/>
+    /// so a receiver that has not heard its directory yet accepts them.
+    /// </summary>
+    public const string BuiltInSendingCallsign = "M0LTE";
+
     // The advert taken for each station and place (callsign, frequency, sideband), and the date
     // of the directory it came from.
     private readonly Dictionary<(string Callsign, long FrequencyHz, Sideband Sideband), (StationAdvert Advert, DateOnly Date, DateOnly First)> _adverts = [];
