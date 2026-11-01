@@ -50,7 +50,7 @@ public class FollowedSourcesTests
     }
 
     [Fact]
-    public async Task AStationFollowedFromAnAdvert_IsAccepted_AndASkipRemovesIt()
+    public async Task AStationFollowedFromAnAdvert_IsAccepted_AndASkipKeepsIt()
     {
         var xyz = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
         using var dir = new TempDirectory();
@@ -74,11 +74,9 @@ public class FollowedSourcesTests
         Assert.Contains("G8BPQ", host.SourcesFromFollowed);
         Assert.True(Hears(host, "G8BPQ-1"));
 
-        // Told to skip it: not accepted any more.
+        // Told to skip it: its slots are not listened at, but its frames are still accepted.
         host.Reconfigure(host.Config with { SkipStations = ["G8BPQ"] });
-        Assert.DoesNotContain("G8BPQ", host.SourcesFromFollowed);
-        Assert.False(Hears(host, "G8BPQ"));
-        host.Reconfigure(host.Config with { SkipStations = null });
+        Assert.Contains("G8BPQ", host.SourcesFromFollowed);
         Assert.True(Hears(host, "G8BPQ"));
     }
 

@@ -738,8 +738,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// Issue #228: the stations frames are accepted from besides the configured ones: every station
-    /// this receiver follows, has a pinned key for, or was asked to listen for (not one it was told to
-    /// skip), sorted, without those already in the configured list. Updated by <see cref="RefreshSources"/>.
+    /// this receiver follows, has a pinned key for, or was asked to listen for (skipped ones too: skipping only stops listening at their slots), sorted, without those already in the configured list. Updated by <see cref="RefreshSources"/>.
     /// </summary>
     public IReadOnlyList<string> SourcesFromFollowed => _sourcesFromFollowed;
 
@@ -762,12 +761,13 @@ public sealed class ReceiverHost : IAsyncDisposable
                 stations.Add(BaseOf(e.Callsign));
             }
         }
-        foreach (var l in Listening.Where(l => l.Followed))
+        // A skipped station is not listened at, but its bulletins are still delivered when heard, so it stays accepted.
+        foreach (var l in Listening.Where(l => l.Followed || skip.Contains(BaseOf(l.Station))))
         {
             stations.Add(BaseOf(l.Station));
         }
         var configured = config.AcceptedSources;
-        var extra = stations.Where(c => c.Length > 0 && !skip.Contains(c) && !configured.Contains(c)).Order(StringComparer.Ordinal).ToList();
+        var extra = stations.Where(c => c.Length > 0 && !configured.Contains(c)).Order(StringComparer.Ordinal).ToList();
         var accepted = configured.Plus(extra);
         if (!extra.SequenceEqual(_sourcesFromFollowed))
         {
