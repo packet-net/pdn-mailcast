@@ -62,7 +62,7 @@ public class DialDecodeTests
     [InlineData(1278)] // an FT-450D's ~367-2190 Hz filter, centred there (dial about 7.05252 MHz)
     public async Task Decodes_WhereverTheDialPutsTheSignal(double centreHz)
     {
-        double dialHz = OnAir.DefaultSignalHz - centreHz;
+        double dialHz = StationFixture.SignalHz - centreHz;
         var log = new List<string>();
         var pipeline = AudioPipeline.ForInput(new NoInput(), log.Add, TimeProvider.System, watch: false, dialHz: dialHz);
         int frames = 0;

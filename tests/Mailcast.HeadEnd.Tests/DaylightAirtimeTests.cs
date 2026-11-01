@@ -132,7 +132,7 @@ public class DaylightAirtimeTests(ITestOutputHelper output)
 
     private static ScheduleOptions Gb7rdg(ScheduleOptions options) => options with
     {
-        Timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg),
+        Timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight),
     };
 
     [Theory]

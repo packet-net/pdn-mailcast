@@ -186,7 +186,7 @@ public class ChannelTests
         Assert.Equal(0.4, p.Modes[1].CentroidHz!.Value - p.Modes[0].CentroidHz!.Value, 0.08);
         Assert.True(p.Modes[0].SpreadHz < 0.1, $"a steady path spread {p.Modes[0].SpreadHz} Hz");
 
-        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex);
+        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex, transmitter: Fixture.OnAir);
         Assert.True(report.Enough);
         Assert.Equal(["1F", "2F"], report.Modes.Select(m => m.Label));
         Assert.Equal(0.4, report.Modes[1].DopplerShiftHz!.Value, 0.08);
@@ -225,7 +225,7 @@ public class ChannelTests
         Assert.True(p.DopplerSpreadHz < 0.1, $"Doppler spread {p.DopplerSpreadHz} Hz");
         Assert.True(p.FadeDb < 1.5, $"fade {p.FadeDb} dB");
         Assert.True(p.CoherenceS >= 10, $"coherence {p.CoherenceS} s");
-        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex);
+        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex, transmitter: Fixture.OnAir);
         Assert.Equal("1 path: 1 hop. Doppler spread under 0.1 Hz: steady (suits any speed).", report.Words);
         Assert.Null(report.VirtualHeightKm);
     }
@@ -296,7 +296,7 @@ public class ChannelTests
         Assert.Equal(1.93, p.Modes[1].DelayMs, 0.05);
         Assert.Equal(-17.1, p.Modes[1].PowerDb, 1.0);
 
-        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex);
+        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Wessex, transmitter: Fixture.OnAir);
         Assert.Equal(["1F", "2F"], report.Modes.Select(m => m.Label));
         Assert.InRange(report.VirtualHeightKm!.Value, 280, 305);
         // The recording predates GB7RDG's switch to the standard mini-probe pattern
@@ -321,7 +321,7 @@ public class ChannelTests
         Assert.Equal(4.01, p.Modes[2].DelayMs, 0.05);
         Assert.Equal(-22.1, p.Modes[2].PowerDb, 1.5);
 
-        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Ei4hq);
+        var report = ChannelReport.Summarise(Noon, Noon, [p], 1, Ei4hq, transmitter: Fixture.OnAir);
         Assert.Equal(["1F", "2F", "3F"], report.Modes.Select(m => m.Label));
         Assert.Equal(502, report.DistanceKm);
         Assert.Contains("3 hops 4.0 ms later, 22 dB weaker", report.Words, StringComparison.Ordinal);
@@ -428,7 +428,7 @@ public class ChannelTests
             })
             .ToList();
 
-        var report = ChannelReport.Summarise(Noon, Noon, pictures, pictures.Count, Wessex);
+        var report = ChannelReport.Summarise(Noon, Noon, pictures, pictures.Count, Wessex, transmitter: Fixture.OnAir);
         Assert.True(report.Enough);
         Assert.Equal(2, report.Modes.Count);
         Assert.Equal(0, report.Modes[0].DelayMs);
@@ -464,7 +464,7 @@ public class ChannelTests
                 Modes = [new ChannelMode { PowerDb = 0 }, new ChannelMode { DelayMs = 1.93, PowerDb = -16.6 }],
                 DopplerSpreadHz = 1.5,
             }));
-        Assert.Equal(ChannelReport.TooLittle, ChannelReport.Summarise(Noon, Noon, [], 3, Wessex).Words);
+        Assert.Equal(ChannelReport.TooLittle, ChannelReport.Summarise(Noon, Noon, [], 3, Wessex, transmitter: Fixture.OnAir).Words);
     }
 
     internal static CapturedBurst Captured(int seed, DateTimeOffset heard)
@@ -482,7 +482,7 @@ public class ChannelTests
         var log = new List<string>();
         var measured = new TaskCompletionSource<ChannelReport>(TaskCreationOptions.RunContinuationsAsynchronously);
         var bothKept = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using (var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, file, () => Wessex) { Rest = false })
+        await using (var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, file, () => Wessex) { Rest = false, Transmitter = _ => Fixture.OnAir })
         {
             // The timer that counts is the one set once both bursts are kept: one set after the
             // first alone is put off again by the second.
@@ -613,7 +613,7 @@ public class ChannelTests
             ProfileStartMs = double.NaN,
             ProfileStepMs = 0.1,
         };
-        var report = ChannelReport.Summarise(Noon, Noon, [odd, odd], 2, Wessex);
+        var report = ChannelReport.Summarise(Noon, Noon, [odd, odd], 2, Wessex, transmitter: Fixture.OnAir);
         string json = JsonSerializer.Serialize(report, ReceiverConfig.JsonLine);
         Assert.DoesNotContain("NaN", json, StringComparison.Ordinal);
         Assert.DoesNotContain("Infinity", json, StringComparison.Ordinal);

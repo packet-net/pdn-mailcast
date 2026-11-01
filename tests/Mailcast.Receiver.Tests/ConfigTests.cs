@@ -1,3 +1,5 @@
+using Packet.Mailcast;
+
 namespace Mailcast.Receiver.Tests;
 
 public class ConfigTests
@@ -13,11 +15,11 @@ public class ConfigTests
         Assert.Equal(8130, config.Web.Port);
         Assert.Equal("Q0CAST", config.Bbs.Login);
         Assert.True(config.Web.Lan);
-        Assert.Equal(7052.0, config.DialKHz);
-        Assert.Equal("00:00", config.SlotAnchor);
-        Assert.Equal(60, config.EveryMinutes);
+        Assert.Null(config.DialKHz);
+        Assert.Equal(7052.0, config.ResolvedDialKHz);
+        Assert.Null(config.Sources);
         Assert.False(config.WebSdrSlotsPerDayIgnored);
-        Assert.False(config.SlotUtcWithoutEveryMinutes);
+        Assert.Empty(config.SlotSettingsIgnored);
         Assert.Equal(new ArchiveSettings { Days = 30, MaxMegabytes = 50 }, config.Archive);
     }
 
@@ -49,7 +51,7 @@ public class ConfigTests
     }
 
     [Fact]
-    public void Slots_DefaultToEveryHourOnTheHour()
+    public void Slots_ComeFromTheStationsFile_NotTheConfig()
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
@@ -57,36 +59,41 @@ public class ConfigTests
 
         var config = ReceiverConfig.Load(path);
 
-        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg), config.Schedule);
-        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, config.WebSdrSlots.Count);
-        Assert.False(config.SlotUtcWithoutEveryMinutes);
+        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, StationFixture.Daylight), Fixture.Slots(config));
+        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, ListeningWindow.WebSdrSlots(Fixture.Slots(config)).Count);
+        Assert.Empty(config.SlotSettingsIgnored);
     }
 
     [Fact]
-    public void OldConfig_WithOnlySlotUtc_IsHourlyFromThatTime()
+    public void OldSlotSettings_AreIgnoredNotRefused_NamedInTheirOrder_AndLeftOutWhenSaved()
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
         File.WriteAllText(path, """
             {
-              // as the example was before hourly slots
+              // as the example was when the slots were one station's
               "audio": "ubersdr:wessex.zapto.org",
               "slotUtc": "12:00",
+              "minute": 30,
+              "everyMinutes": 120,
+              "daylight": { "locator": "IO92", "afterSunriseMinutes": 60, "beforeSunsetMinutes": 0 },
             }
             """);
 
         var config = ReceiverConfig.Load(path);
 
-        Assert.True(config.SlotUtcWithoutEveryMinutes);
-        Assert.Equal(new SlotSchedule(new TimeOnly(12, 0), 60, Packet.Mailcast.DaylightRule.Gb7rdg), config.Schedule);
-        // The same slots as 00:00 every hour, and the web SDR listens to the same ones too.
-        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60).FromAnchor.Order(), config.Schedule.FromAnchor.Order());
-        Assert.Equal(new ReceiverConfig().WebSdrSlots, config.WebSdrSlots);
+        Assert.Equal(["minute", "slotUtc", "everyMinutes", "daylight"], config.SlotSettingsIgnored);
+        // The slots are the stations file's, whatever the old settings said.
+        Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, StationFixture.Daylight), Fixture.Slots(config));
+        Assert.Empty(ReceiverConfig.UnknownKeys(File.ReadAllText(path)));
 
-        // Saved, it says so, and no note is needed any more.
         config.Save(path);
-        Assert.Contains("\"everyMinutes\": 60", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(config with { SlotUtcWithoutEveryMinutes = false }, ReceiverConfig.Load(path));
+        string saved = File.ReadAllText(path);
+        foreach (string key in new[] { "slotUtc", "minute", "everyMinutes", "daylight" })
+        {
+            Assert.DoesNotContain(key, saved, StringComparison.Ordinal);
+        }
+        Assert.Empty(ReceiverConfig.Load(path).SlotSettingsIgnored);
     }
 
     [Theory]
@@ -104,55 +111,14 @@ public class ConfigTests
         var config = ReceiverConfig.Load(path);
 
         Assert.True(config.WebSdrSlotsPerDayIgnored);
-        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, config.WebSdrSlots.Count);
+        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, ListeningWindow.WebSdrSlots(Fixture.Slots(config)).Count);
         config.Save(path);
         Assert.DoesNotContain("webSdrSlotsPerDay", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.False(ReceiverConfig.Load(path).WebSdrSlotsPerDayIgnored);
     }
 
     [Fact]
-    public void SlotUtcWithEveryMinutes_IsTakenAsGiven()
-    {
-        using var dir = new TempDirectory();
-        string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, """{ "slotUtc": "00:30", "everyMinutes": 120 }""");
-
-        var config = ReceiverConfig.Load(path);
-
-        Assert.False(config.SlotUtcWithoutEveryMinutes);
-        Assert.Equal(12, config.Schedule.SlotsPerDay);
-        Assert.Equal(12, config.WebSdrSlots.Count);
-        config.Save(path);
-        Assert.Contains("\"everyMinutes\": 120", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.DoesNotContain("slotStart", File.ReadAllText(path), StringComparison.Ordinal);
-        Assert.Equal(config with { SlotUtc = null, Minute = 30 }, ReceiverConfig.Load(path));
-    }
-
-    [Fact]
-    public void Minute_IsTheSameAsSlotUtcAt00MM()
-    {
-        using var dir = new TempDirectory();
-        string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, """{ "minute": 30, "everyMinutes": 120 }""");
-        var byMinute = ReceiverConfig.Load(path);
-        File.WriteAllText(path, """{ "slotUtc": "00:30", "everyMinutes": 120 }""");
-        var byOldKey = ReceiverConfig.Load(path);
-
-        Assert.Equal(new SlotSchedule(new TimeOnly(0, 30), 120, Packet.Mailcast.DaylightRule.Gb7rdg), byMinute.Schedule);
-        Assert.Equal(byOldKey.Schedule, byMinute.Schedule);
-
-        // Saving writes minute and drops the old key, for the old key's 00:MM; 12:00 has no minute and stays.
-        byOldKey.Save(path);
-        string saved = File.ReadAllText(path);
-        Assert.Contains("\"minute\": 30", saved, StringComparison.Ordinal);
-        Assert.DoesNotContain("slotUtc", saved, StringComparison.Ordinal);
-        Assert.Equal(byOldKey.Schedule, ReceiverConfig.Load(path).Schedule);
-        new ReceiverConfig { SlotUtc = "12:00", EveryMinutes = 1440 }.Save(path);
-        Assert.Contains("\"slotUtc\": \"12:00\"", File.ReadAllText(path), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Dial_DefaultsTo7052kHz_WithTheSignal1800HzAbove()
+    public void Dial_LeftOut_IsTheFirstStationsCentreLess1800Hz_AndNotSavedBack()
     {
         using var dir = new TempDirectory();
         string path = Path.Combine(dir.Path, "receiver.json");
@@ -160,10 +126,29 @@ public class ConfigTests
 
         var config = ReceiverConfig.Load(path);
 
-        Assert.Equal(7052.0, config.DialKHz);
+        Assert.Null(config.DialKHz);
+        Assert.Equal(7052.0, config.ResolvedDialKHz);
         Assert.Equal(7_052_000, config.DialHz);
         Assert.Equal(7_053_800, config.CentreHz);
         Assert.Equal(1800, config.AudioCentreHz);
+        config.Save(path);
+        Assert.DoesNotContain("dialKHz", File.ReadAllText(path), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dial_LeftOut_WithNoStation_IsRefusedForASoundCardAndSdrConnect_ButNotForAWebSdrOrSoundModem()
+    {
+        var none = new ReceiverConfig { Stations = StationsFile.Empty };
+
+        Assert.Null(none.ResolvedDialKHz);
+        foreach (string audio in new[] { Samples.SoundCard, "sdrconnect:192.168.1.20" })
+        {
+            var e = Assert.Throws<ConfigException>(() => (none with { Audio = audio }).Validate());
+            Assert.Equal("\"dialKHz\" is not set and the stations file lists no station to take it from: set \"dialKHz\" in the config file, the USB dial of your radio in kHz", e.Message);
+        }
+        (none with { Audio = "ubersdr:wessex.zapto.org" }).Validate();
+        (none with { Audio = "soundmodem" }).Validate();
+        (none with { Audio = Samples.SoundCard, DialKHz = 7052 }).Validate();
     }
 
     [Fact]
@@ -252,16 +237,6 @@ public class ConfigTests
     [InlineData("""{ "audio": null }""", "audio")]
     [InlineData("""{ "bbs": null }""", "bbs")]
     [InlineData("""{ "bbs": { "host": null } }""", "bbs")]
-    [InlineData("""{ "slotUtc": "noon" }""", "slotUtc")]
-    [InlineData("""{ "minute": 30, "slotUtc": "00:30" }""", "are both given")]
-    [InlineData("""{ "minute": 60 }""", "must be 0 to 59")]
-    [InlineData("""{ "minute": -1, "everyMinutes": 60 }""", "must be 0 to 59")]
-    [InlineData("""{ "slotUtc": "noon", "everyMinutes": 60 }""", "slotUtc")]
-    [InlineData("""{ "everyMinutes": 0 }""", "everyMinutes")]
-    [InlineData("""{ "everyMinutes": -60 }""", "everyMinutes")]
-    [InlineData("""{ "everyMinutes": 10 }""", "everyMinutes")]
-    [InlineData("""{ "everyMinutes": 50 }""", "everyMinutes")]
-    [InlineData("""{ "everyMinutes": 2880 }""", "everyMinutes")]
     [InlineData("""{ "dialKHz": 7.052 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": 0 }""", "dialKHz")]
     [InlineData("""{ "dialKHz": -7052 }""", "dialKHz")]
@@ -277,47 +252,6 @@ public class ConfigTests
 
         var e = Assert.Throws<ConfigException>(() => ReceiverConfig.Load(path));
 
-        Assert.Contains(mentioned, e.Message, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(15)]
-    [InlineData(60)]
-    [InlineData(180)]
-    [InlineData(1440)]
-    public void EveryMinutes_ThatDividesADay_IsAccepted(int minutes)
-    {
-        new ReceiverConfig { EveryMinutes = minutes, Daylight = null }.Validate();
-        new ReceiverConfig { EveryMinutes = minutes, SlotUtc = "12:00" }.Validate();
-    }
-
-    [Fact]
-    public void Daylight_DefaultsToGb7rdgs_CanBeTurnedOff_AndIsSavedBack()
-    {
-        using var dir = new TempDirectory();
-        string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, """{ "daylight": { "locator": "IO92", "afterSunriseMinutes": 60, "beforeSunsetMinutes": 0 } }""");
-        var config = ReceiverConfig.Load(path);
-        Assert.Equal(new Packet.Mailcast.DaylightRule("IO92", 60, 0), config.Schedule.Daylight);
-        config.Save(path);
-        Assert.Equal(config, ReceiverConfig.Load(path));
-
-        File.WriteAllText(path, """{ "daylight": null }""");
-        Assert.Null(ReceiverConfig.Load(path).Schedule.Daylight);
-        Assert.Equal(Packet.Mailcast.DaylightRule.Gb7rdg, new ReceiverConfig().Schedule.Daylight);
-        Assert.Equal(Packet.Mailcast.DaylightRule.Gb7rdg, ReceiverConfig.Load(Path.Combine(AppContext.BaseDirectory, "receiver.example.json")).Schedule.Daylight);
-    }
-
-    [Theory]
-    [InlineData("""{ "daylight": { "locator": "nowhere" } }""", "locator")]
-    [InlineData("""{ "daylight": { "afterSunriseMinutes": 900 } }""", "afterSunriseMinutes")]
-    [InlineData("""{ "everyMinutes": 1440 }""", "no slot in a whole year")]
-    public void Daylight_ThatCannotWork_IsRefused(string json, string mentioned)
-    {
-        using var dir = new TempDirectory();
-        string path = Path.Combine(dir.Path, "receiver.json");
-        File.WriteAllText(path, json);
-        var e = Assert.Throws<ConfigException>(() => ReceiverConfig.Load(path));
         Assert.Contains(mentioned, e.Message, StringComparison.Ordinal);
     }
 

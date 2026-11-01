@@ -13,17 +13,17 @@ public sealed record FeedbackSources
     /// <summary>The config's <c>feedback</c>, as in force now.</summary>
     public required Func<FeedbackSettings?> Settings { get; init; }
 
-    /// <summary>The slots of the station the report goes to (GB7RDG's), or null when there are none to report on (a recording).</summary>
-    public required Func<SlotSchedule?> Schedule { get; init; }
+    /// <summary>The slots of every station followed, or null when there are none to report on (a recording).</summary>
+    public required Func<FollowedSlots?> Followed { get; init; }
 
     /// <summary>The slots the receiver listens to on a UTC day, of every station it follows (issue #148).</summary>
     public required Func<DateOnly, IReadOnlyList<DateTimeOffset>> Listened { get; init; }
 
-    /// <summary>Whose slot this is, as a callsign (issue #148).</summary>
-    public Func<DateTimeOffset, string> Station { get; init; } = _ => ReceiverStore.BuiltInStation;
+    /// <summary>Whose slot this is, as a callsign (issue #148); null when none followed has it.</summary>
+    public Func<DateTimeOffset, string?> Station { get; init; } = _ => null;
 
-    /// <summary>The station the report goes to: its slots are the report's slot lines, and its directories say whether a report arrived.</summary>
-    public Func<string> OwnStation { get; init; } = () => ReceiverStore.BuiltInStation;
+    /// <summary>The stations file in force: the report's default address, and the names an older version kept state under.</summary>
+    public Func<StationsFile> Stations { get; init; } = () => StationsFile.Empty;
 
     /// <summary>The slot in progress or most recently heard.</summary>
     public required Func<SlotSummary?> LastSlot { get; init; }
@@ -113,7 +113,7 @@ public sealed record SentReport
 /// <summary>
 /// Sends the daily report: notes what each slot listened to brought, and about
 /// <see cref="AfterLastSlot"/> after the day's last daylight slot sends a <see cref="DailyReport"/>
-/// through the BBS as a public bulletin to MCAST at GB7RDG. Once per UTC day at most, kept in
+/// through the BBS as a public bulletin to the report address. Once per UTC day at most, kept in
 /// <see cref="FileName"/>.
 /// </summary>
 /// <remarks>
@@ -164,6 +164,7 @@ public sealed class FeedbackService
         _log = log;
         _path = Path.Combine(stateDirectory, FileName);
         _state = Load(_path, log);
+        Migrate(_state, _sources.Stations());
         foreach (var slot in _state.Seen.Concat(_state.Days.SelectMany(d => d.Slots)))
         {
             _seen[slot.Slot] = slot;
@@ -179,20 +180,20 @@ public sealed class FeedbackService
     /// <summary>
     /// What each station's slots came to on a UTC day (issue #148): slots listened to, heard,
     /// frames, bulletins completed, and the median tone SNR and virtual height where measured.
-    /// The report's own station first, then the rest by callsign. Empty before any slot.
+    /// By callsign. Empty before any slot.
     /// </summary>
     public IReadOnlyList<ReportStation> StationFigures(DateOnly day)
     {
         lock (_gate)
         {
-            return Figures(_seen.Values.Where(s => DateOnly.FromDateTime(s.Slot.UtcDateTime) == day), _sources.OwnStation(), _sources.OtherCopies(day));
+            return Figures(_seen.Values.Where(s => DateOnly.FromDateTime(s.Slot.UtcDateTime) == day), _sources.OtherCopies(day));
         }
     }
 
-    internal static IReadOnlyList<ReportStation> Figures(IEnumerable<SlotRecord> slots, string own, IReadOnlyDictionary<string, int>? otherCopies = null)
+    internal static IReadOnlyList<ReportStation> Figures(IEnumerable<SlotRecord> slots, IReadOnlyDictionary<string, int>? otherCopies = null)
     {
         otherCopies = otherCopies is null ? null : new Dictionary<string, int>(otherCopies, StringComparer.OrdinalIgnoreCase);
-        var figures = FiguresOf(slots, own, otherCopies).ToList();
+        var figures = FiguresOf(slots, otherCopies).ToList();
         // A station that sent another copy but has no slot noted still gets its line.
         foreach (var (station, count) in (otherCopies ?? new Dictionary<string, int>()).OrderBy(p => p.Key, StringComparer.Ordinal))
         {
@@ -204,11 +205,10 @@ public sealed class FeedbackService
         return figures;
     }
 
-    private static IEnumerable<ReportStation> FiguresOf(IEnumerable<SlotRecord> slots, string own, IReadOnlyDictionary<string, int>? otherCopies) =>
+    private static IEnumerable<ReportStation> FiguresOf(IEnumerable<SlotRecord> slots, IReadOnlyDictionary<string, int>? otherCopies) =>
     [
-        .. slots.GroupBy(s => s.Station ?? own, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => string.Equals(g.Key, own, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(g => g.Key, StringComparer.Ordinal)
+        .. slots.Where(s => s.Station is not null).GroupBy(s => s.Station!, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => new ReportStation(
                 g.Key,
                 g.Count(),
@@ -238,7 +238,10 @@ public sealed class FeedbackService
         }
     }
 
-    private bool Enabled => _sources.Settings() is { Enabled: true } s && FeedbackSettings.IsPlausibleCallsign(s.Callsign);
+    private bool Enabled => _sources.Settings() is { Enabled: true } s && FeedbackSettings.IsPlausibleCallsign(s.Callsign) && Address is not null;
+
+    /// <summary>The report's bulletin name and @ field: the setting's, else the stations file's.</summary>
+    private (string To, string At)? Address => (_sources.Settings() is { } settings ? settings.Address(_sources.Stations()) : null) ?? StationsFile.SplitAddress(_sources.Stations().Report);
 
     /// <summary>A bulletin was rebuilt.</summary>
     public void NoteRebuilt() => Count(d => d.Rebuilt++);
@@ -318,55 +321,52 @@ public sealed class FeedbackService
     {
         if (!Enabled)
         {
-            return new { enabled = false };
+            return new { enabled = false, to = Address is { } shown ? $"{shown.To}@{shown.At}" : null };
         }
         var last = Last;
         return new
         {
             enabled = true,
-            to = $"{FeedbackSettings.To}@{FeedbackSettings.At}",
+            to = Address is { } address ? $"{address.To}@{address.At}" : null,
             lastSent = last?.SentAt,
             lastAnswer = last is null ? null : Describe(last),
             answer = last?.Answer,
             next = Next(_time.GetUtcNow()),
             text = last is null ? null : last.Title + "\n" + last.Body.Replace("\r\n", "\n", StringComparison.Ordinal),
-            receipt = ReceiptView(),
+            receipts = ReceiptViews(),
         };
     }
 
     /// <summary>
-    /// Whether GB7RDG got the listener's reports, as its directory says (issue #136): null when no
-    /// directory heard has said, as from a head end before v0.16.0.
+    /// Whether each station got the listener's reports, as its directory says (issue #136): one entry for each
+    /// station whose directory has listed reports; none when no directory heard has, as from a head end before v0.16.0.
     /// </summary>
-    private object? ReceiptView()
+    private IReadOnlyList<object> ReceiptViews()
     {
-        ReceiptRecord? receipt;
+        List<ReceiptRecord> receipts;
         SentReport? last;
         lock (_gate)
         {
-            receipt = CurrentReceipt();
+            receipts = CurrentReceipts();
             last = _state.Last;
         }
-        if (receipt?.ListedOn is not { } listedOn)
+        return [.. receipts.Where(r => r.ListedOn is not null).Select(receipt => (object)new
         {
-            return null;
-        }
-        return new
-        {
+            station = receipt.Station,
             got = receipt.Got,
             gotSeen = receipt.GotSeen,
-            listedOn,
+            listedOn = receipt.ListedOn,
             gotLatest = receipt.Got is { } got && (last is null || got >= last.Day),
             text = DescribeReceipt(receipt, last),
-        };
+        })];
     }
 
-    /// <summary>The receipt kept for the callsign the report goes from now, if any.</summary>
-    private ReceiptRecord? CurrentReceipt() =>
-        _state.Receipt is { } r && _sources.Settings() is { } settings && r.Callsign == settings.From ? r : null;
+    /// <summary>The receipts kept for the callsign the report goes from now, by station.</summary>
+    private List<ReceiptRecord> CurrentReceipts() =>
+        _sources.Settings() is { } settings ? [.. _state.Receipts.Where(r => r.Callsign == settings.From).OrderBy(r => r.Station, StringComparer.Ordinal)] : [];
 
     /// <summary>
-    /// In words, for the page: GB7RDG got the latest report, or has not had it yet and which it
+    /// In words, for the page: the station got the latest report, or has not had it yet and which it
     /// last got. Null when there is nothing to say.
     /// </summary>
     internal static string? DescribeReceipt(ReceiptRecord receipt, SentReport? last)
@@ -377,27 +377,29 @@ public sealed class FeedbackService
         {
             return null;
         }
+        string who = receipt.Station;
         if (receipt.Got is { } got && (last is null || got >= last.Day))
         {
-            return string.Create(c, $"GB7RDG got your report for {got:yyyy-MM-dd}");
+            return string.Create(c, $"{who} got your report for {got:yyyy-MM-dd}");
         }
         if (last is not null && listedOn > last.Day)
         {
             return receipt.Got is { } before
-                ? string.Create(c, $"GB7RDG has not had your report for {last.Day:yyyy-MM-dd} yet. It has not had a report from you since the one for {before:yyyy-MM-dd}")
-                : string.Create(c, $"GB7RDG has not had your report for {last.Day:yyyy-MM-dd} yet, nor any other from you lately");
+                ? string.Create(c, $"{who} has not had your report for {last.Day:yyyy-MM-dd} yet. It has not had a report from you since the one for {before:yyyy-MM-dd}")
+                : string.Create(c, $"{who} has not had your report for {last.Day:yyyy-MM-dd} yet, nor any other from you lately");
         }
-        return receipt.Got is { } older ? string.Create(c, $"GB7RDG got your report for {older:yyyy-MM-dd}") : null;
+        return receipt.Got is { } older ? string.Create(c, $"{who} got your report for {older:yyyy-MM-dd}") : null;
     }
 
     /// <summary>
-    /// A directory was heard (one that may be used): notes whether its list of the reports that
-    /// reached GB7RDG has this listener's, and says so in the log the first time it lists a day's.
+    /// A directory of <paramref name="station"/> was heard (one that may be used): notes whether its list of
+    /// the reports that reached it has this listener's, and says so in the log the first time it lists a day's.
     /// A directory without the list, from a head end before v0.16.0, says nothing either way.
     /// </summary>
-    public void NoteDirectory(BroadcastDirectory directory)
+    public void NoteDirectory(BroadcastDirectory directory, string station)
     {
         ArgumentNullException.ThrowIfNull(directory);
+        ArgumentNullException.ThrowIfNull(station);
         if (directory.Reports is not { } reports || !Enabled || _sources.Settings() is not { } settings)
         {
             return;
@@ -405,8 +407,8 @@ public sealed class FeedbackService
         string call = settings.From;
         lock (_gate)
         {
-            var receipt = _state.Receipt is { } had && had.Callsign == call ? had : new ReceiptRecord { Callsign = call };
-            bool changed = !ReferenceEquals(receipt, _state.Receipt);
+            var receipt = _state.Receipts.Find(r => r.Callsign == call && r.Station == station) ?? new ReceiptRecord { Callsign = call, Station = station };
+            bool changed = !_state.Receipts.Contains(receipt);
             if (receipt.ListedOn is null || directory.Date > receipt.ListedOn)
             {
                 receipt.ListedOn = directory.Date;
@@ -418,11 +420,14 @@ public sealed class FeedbackService
                 receipt.GotSeen = _time.GetUtcNow();
                 changed = true;
                 _log(string.Create(CultureInfo.InvariantCulture,
-                    $"feedback: GB7RDG got the daily report from {call} for {day:yyyy-MM-dd}, as its directory for {directory.Date:yyyy-MM-dd} says"));
+                    $"feedback: {station} got the daily report from {call} for {day:yyyy-MM-dd}, as its directory for {directory.Date:yyyy-MM-dd} says"));
             }
             if (changed)
             {
-                _state.Receipt = receipt;
+                if (!_state.Receipts.Contains(receipt))
+                {
+                    _state.Receipts.Add(receipt);
+                }
                 Save();
             }
         }
@@ -431,7 +436,7 @@ public sealed class FeedbackService
     /// <summary>When the next report goes, or the last is offered again; null when off or with no slot ahead.</summary>
     public DateTimeOffset? Next(DateTimeOffset now)
     {
-        if (!Enabled || _sources.Schedule() is not { } schedule)
+        if (!Enabled || _sources.Followed() is not { } schedule)
         {
             return null;
         }
@@ -474,7 +479,7 @@ public sealed class FeedbackService
     }
 
     /// <summary>When a day's report goes: <see cref="AfterLastSlot"/> after its last slot; null with no slot.</summary>
-    public static DateTimeOffset? ReportTime(SlotSchedule schedule, DateOnly day)
+    public static DateTimeOffset? ReportTime(FollowedSlots schedule, DateOnly day)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         return schedule.ActiveOn(day) is { Count: > 0 } slots ? slots[^1] + AfterLastSlot : null;
@@ -515,13 +520,13 @@ public sealed class FeedbackService
         if (!Enabled)
         {
             // Nothing is sent or kept, but the status page still shows what each station came to.
-            if (_sources.Schedule() is not null)
+            if (_sources.Followed() is not null)
             {
                 NoteSlots(_time.GetUtcNow());
             }
             return;
         }
-        if (_sources.Schedule() is not { } schedule || _sources.Settings() is not { } settings)
+        if (_sources.Followed() is not { } schedule || _sources.Settings() is not { } settings || Address is not { } address)
         {
             return;
         }
@@ -529,7 +534,7 @@ public sealed class FeedbackService
         if (!_said)
         {
             _said = true;
-            _log($"feedback: on. A daily report from {settings.From} goes through the BBS as a public bulletin to {FeedbackSettings.To}@{FeedbackSettings.At}, "
+            _log($"feedback: on. A daily report from {settings.From} goes through the BBS as a public bulletin to {address.To}@{address.At}, "
                 + $"{AfterLastSlot.TotalMinutes:F0} minutes after the last daylight slot"
                 + (Next(now) is { } next ? $"; the next at {next:yyyy-MM-dd HH:mm} UTC" : ""));
         }
@@ -668,7 +673,7 @@ public sealed class FeedbackService
     }
 
     /// <summary>The report to send now, if one is due: one to offer again, or the newest day not yet sent.</summary>
-    private SentReport? Due(DateTimeOffset now, SlotSchedule schedule, FeedbackSettings settings)
+    private SentReport? Due(DateTimeOffset now, FollowedSlots schedule, FeedbackSettings settings)
     {
         var today = DateOnly.FromDateTime(now.UtcDateTime);
         var last = _state.Last;
@@ -705,9 +710,9 @@ public sealed class FeedbackService
 
     private DailyReport Build(DayRecord record, FeedbackSettings settings)
     {
-        string own = _sources.OwnStation();
-        // The slot lines are the report's own station's, as before; the others are in the station lines.
-        var slots = record.Slots.Where(s => s.Station is null || string.Equals(s.Station, own, StringComparison.OrdinalIgnoreCase)).Select(s => new ReportSlot(
+        // The slot lines are every slot listened to, whichever station's; the station lines say whose.
+        bool several = record.Slots.Where(s => s.Station is not null).Select(s => s.Station).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+        var slots = record.Slots.Select(s => new ReportSlot(
             TimeOnly.FromDateTime(s.Slot.UtcDateTime),
             s.Waveform,
             s.Frames,
@@ -715,13 +720,14 @@ public sealed class FeedbackService
             s.OffsetHz,
             s.Verdict is null ? [] : s.Verdict.Split('+'),
             // The measurement may have finished after the slot's window closed.
-            _sources.Channel(s.Slot) ?? s.Channel)).ToList();
+            _sources.Channel(s.Slot) ?? s.Channel,
+            several ? s.Station : null)).ToList();
         string? locator = _sources.Locator() is { } l && Maidenhead.TryParse(l, out _, out _)
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
             new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count, record.OutsidePieces > 0 ? record.OutsidePieces : null);
-        return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, own, _sources.OtherCopies(record.Day)));
+        return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, _sources.OtherCopies(record.Day)));
     }
 
     /// <summary>
@@ -749,7 +755,8 @@ public sealed class FeedbackService
         var now = _time.GetUtcNow();
         // The callsign it was made with, which its title and BID name, not the setting now.
         string from = report.From is { Length: > 0 } made ? made : _sources.Settings()?.From ?? "";
-        var mail = new Bulletin(FeedbackSettings.Type, from, FeedbackSettings.To, FeedbackSettings.At, report.Bid, report.Title,
+        var (to, at) = Address ?? (DailyReport.BulletinTo, "");
+        var mail = new Bulletin(FeedbackSettings.Type, from, to, at, report.Bid, report.Title,
             DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds()), [], report.Body);
         DeliveryOutcome outcome;
         string? failure;
@@ -860,6 +867,34 @@ public sealed class FeedbackService
         return record;
     }
 
+    /// <summary>
+    /// State an older version kept under a station's name: a name some station lists as <c>formerly</c> is read as
+    /// that station's, and a slot or receipt kept with no station (the one station it knew) as the legacy station's.
+    /// </summary>
+    private static void Migrate(State state, StationsFile stations)
+    {
+        string? legacy = stations.Legacy;
+        SlotRecord Slot(SlotRecord s) => (s.Station is null ? legacy : stations.Current(s.Station)) is { } now && now != s.Station ? s with { Station = now } : s;
+        foreach (var day in state.Days)
+        {
+            day.Slots = [.. day.Slots.Select(Slot)];
+        }
+        state.Seen = [.. state.Seen.Select(Slot)];
+        if (state.Receipt is { } old)
+        {
+            state.Receipt = null;
+            if (legacy is not null && !state.Receipts.Exists(r => r.Callsign == old.Callsign && r.Station == legacy))
+            {
+                old.Station = legacy;
+                state.Receipts.Add(old);
+            }
+        }
+        foreach (var receipt in state.Receipts)
+        {
+            receipt.Station = stations.Current(receipt.Station);
+        }
+    }
+
     private void Save()
     {
         try
@@ -907,17 +942,24 @@ public sealed class FeedbackService
 
         public string? ReceiverId { get; set; }
 
-        /// <summary>What GB7RDG's directories have said about this listener's reports (issue #136).</summary>
+        /// <summary>What each station's directories have said about this listener's reports (issue #136).</summary>
+        public List<ReceiptRecord> Receipts { get; set; } = [];
+
+        /// <summary>The one receipt an older version kept, for the one station it knew; read as the legacy station's (see <see cref="Migrate"/>) and not written again.</summary>
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public ReceiptRecord? Receipt { get; set; }
     }
 
-    /// <summary>What GB7RDG's directories have said about one callsign's reports.</summary>
+    /// <summary>What a station's directories have said about one callsign's reports.</summary>
     internal sealed class ReceiptRecord
     {
+        /// <summary>The station whose directories said it.</summary>
+        public string Station { get; set; } = "";
+
         /// <summary>The callsign, as the reports go from.</summary>
         public string Callsign { get; set; } = "";
 
-        /// <summary>The day of the newest report a directory has listed as reaching GB7RDG.</summary>
+        /// <summary>The day of the newest report a directory has listed as reaching the station.</summary>
         public DateOnly? Got { get; set; }
 
         /// <summary>When that was first heard.</summary>
@@ -963,7 +1005,7 @@ public sealed class FeedbackService
     {
         public DateTimeOffset Slot { get; init; }
 
-        /// <summary>Whose slot (issue #148); null in a feedback.json from before, when it was always the report's own station's.</summary>
+        /// <summary>Whose slot (issue #148); null in a feedback.json from before, read as the legacy station's (see <see cref="Migrate"/>).</summary>
         public string? Station { get; init; }
 
         /// <summary>Bulletins rebuilt while the slot was the one tracked (issue #148).</summary>

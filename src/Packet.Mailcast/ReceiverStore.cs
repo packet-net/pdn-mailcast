@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Mailcast.RaptorQ;
 using Packet.Mailcast.Propagation;
 
@@ -253,11 +254,21 @@ public sealed record ReceiverStoreOptions
     public bool PublishMailOnChange { get; init; } = true;
 
     /// <summary>
-    /// The transmitter keys pinned before any is learnt on the air: <see cref="TrustedKey.BuiltIn"/>
-    /// unless the owner adds more, each pinned to its label. Others are pinned the first time
-    /// their station's signed directory is heard (see <see cref="ReceiverStore"/>'s remarks).
+    /// The transmitter keys the owner adds to the stations file's, each pinned to its label when that is a
+    /// callsign. Others are pinned the first time their station's signed directory is heard
+    /// (see <see cref="ReceiverStore"/>'s remarks).
     /// </summary>
-    public IReadOnlyList<TrustedKey> TrustedKeys { get; init; } = TrustedKey.BuiltIn;
+    public IReadOnlyList<TrustedKey> TrustedKeys { get; init; } = [];
+
+    /// <summary>
+    /// The stations file: each station's key is trusted and pinned to its callsign, and a timetable
+    /// heard from one is kept across restarts. Names an older version kept state under (a station's
+    /// <c>formerly</c>) are read as that station.
+    /// </summary>
+    public StationsFile Stations { get; init; } = DefaultStations;
+
+    /// <summary>The default of <see cref="Stations"/>; a test project sets it for the many tests that are about something else. Never set in a program.</summary>
+    internal static StationsFile DefaultStations { get; set; } = StationsFile.Empty;
 
     /// <summary>The default of <see cref="UnsignedDirectoriesAreUsed"/>; a test project turns it on for the many tests that are about something else. Never set in a program.</summary>
     internal static bool DefaultUnsignedDirectoriesAreUsed { get; set; }
@@ -451,29 +462,7 @@ public sealed partial class ReceiverStore
                 WriteDone(id);
             }
         }
-        var scheduleFile = Path.Combine(root, "schedule.txt");
-        if (File.Exists(scheduleFile))
-        {
-            var lines = Bulletin.TextEncoding.GetString(File.ReadAllBytes(scheduleFile)).Split('\n');
-            if (lines.Length < 3 || lines[2].Trim() != ScheduleTrustedMark)
-            {
-                // Kept before unsigned directories were refused (issue #146), so an unsigned one may have set it.
-                Log("schedule.txt was not set by a signed directory, so it is dropped; the config's slots stand until one is heard");
-                File.Delete(scheduleFile);
-            }
-            else if (lines.Length >= 2
-                && DateOnly.TryParseExact(lines[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var heard)
-                && SlotTimetable.FromFields(lines[1].Split('\t')) is { } timetable)
-            {
-                HeardSchedule = timetable;
-                HeardScheduleDate = heard;
-            }
-            else
-            {
-                Log("schedule.txt unreadable, removed");
-                File.Delete(scheduleFile);
-            }
-        }
+        LoadSchedules();
         LoadOutbox();
         LoadAwaiting();
         LoadOtherCopies();
@@ -613,9 +602,84 @@ public sealed partial class ReceiverStore
 
     private const string ScheduleTrustedMark = "signed";
 
-    private void WriteSchedule(DateOnly date, SlotTimetable schedule) =>
-        DurableFile.WriteAtomically(Path.Combine(_root, "schedule.txt"), Bulletin.TextEncoding.GetBytes(
-            date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\n" + string.Join('\t', schedule.ToFields()) + "\n" + ScheduleTrustedMark + "\n"), flush: _options.FlushToDisk);
+    /// <summary>The older single timetable file: one station's, with the date and a "signed" mark, read as the stations file's <see cref="StationsFile.Legacy"/> station's.</summary>
+    private const string LegacyScheduleFile = "schedule.txt";
+
+    /// <summary>Where the timetables heard from the stations-file stations are kept: <c>CALL TAB date TAB slots= TAB daylight=</c>, one line each.</summary>
+    public const string SchedulesFile = "schedules.txt";
+
+    private readonly Dictionary<string, (DateOnly Date, SlotTimetable Timetable)> _heardSchedules = new(StringComparer.Ordinal);
+
+    private void LoadSchedules()
+    {
+        string file = Path.Combine(_root, SchedulesFile);
+        if (File.Exists(file))
+        {
+            foreach (string line in Bulletin.TextEncoding.GetString(File.ReadAllBytes(file)).Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var p = line.Split('\t');
+                if (p.Length >= 3 && StationAdvert.IsCallsign(p[0]) && _options.Stations.Find(p[0]) is not null
+                    && DateOnly.TryParseExact(p[1], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var heard)
+                    && SlotTimetable.FromFields(p[2..]) is { } timetable)
+                {
+                    _heardSchedules[p[0]] = (heard, timetable);
+                }
+                else
+                {
+                    Log($"{SchedulesFile}: skipped a line that is unreadable or for a station no longer in the stations file");
+                }
+            }
+        }
+        string legacy = Path.Combine(_root, LegacyScheduleFile);
+        if (!File.Exists(legacy))
+        {
+            return;
+        }
+        var lines = Bulletin.TextEncoding.GetString(File.ReadAllBytes(legacy)).Split('\n');
+        if (lines.Length < 3 || lines[2].Trim() != ScheduleTrustedMark)
+        {
+            // Kept before unsigned directories were refused (issue #146), so an unsigned one may have set it.
+            Log($"{LegacyScheduleFile} was not set by a signed directory, so it is dropped");
+            File.Delete(legacy);
+        }
+        else if (DateOnly.TryParseExact(lines[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var heard)
+            && SlotTimetable.FromFields(lines[1].Split('\t')) is { } timetable)
+        {
+            // The one timetable an older version kept belongs to the station that lists a former name.
+            if (_options.Stations.Legacy is { } owner)
+            {
+                if (!_heardSchedules.ContainsKey(owner))
+                {
+                    _heardSchedules[owner] = (heard, timetable);
+                    WriteSchedules();
+                }
+                Log($"{LegacyScheduleFile} is read as {owner}'s timetable");
+                File.Delete(legacy);
+            }
+        }
+        else
+        {
+            Log($"{LegacyScheduleFile} unreadable, removed");
+            File.Delete(legacy);
+        }
+    }
+
+    private void WriteSchedules()
+    {
+        var text = new StringBuilder();
+        foreach (var (station, (date, timetable)) in _heardSchedules.OrderBy(h => h.Key, StringComparer.Ordinal))
+        {
+            text.Append(station).Append('\t').Append(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append('\t').Append(string.Join('\t', timetable.ToFields())).Append('\n');
+        }
+        try
+        {
+            DurableFile.WriteAtomically(Path.Combine(_root, SchedulesFile), Bulletin.TextEncoding.GetBytes(text.ToString()), flush: _options.FlushToDisk);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log($"cannot write {SchedulesFile}, so the timetables heard are kept only until the receiver restarts: {e.Message}");
+        }
+    }
 
     /// <summary>Where each known directory (see <see cref="_knownDirectories"/>) is kept, one file per object ID in hex, under the store's folder.</summary>
     public const string KnownDirectoriesFolder = "directories";
@@ -648,13 +712,10 @@ public sealed partial class ReceiverStore
     public PskReading? PskReporter { get; private set; }
 
     /// <summary>
-    /// The head end's timetable from the newest directory heard that gave one, kept across
-    /// restarts in <c>schedule.txt</c>; null until one has been heard.
+    /// Each stations-file station's timetable from the newest directory of its heard that gave one,
+    /// kept across restarts in <see cref="SchedulesFile"/>.
     /// </summary>
-    public SlotTimetable? HeardSchedule { get; private set; }
-
-    /// <summary>The date of the directory <see cref="HeardSchedule"/> came from.</summary>
-    public DateOnly? HeardScheduleDate { get; private set; }
+    public IReadOnlyDictionary<string, SlotTimetable> HeardSchedules => _heardSchedules.ToDictionary(h => h.Key, h => h.Value.Timetable, StringComparer.Ordinal);
 
     /// <summary>How many objects have symbols held but are not yet rebuilt.</summary>
     public int PartialObjects => _instances.Values.Select(i => i.ObjectId).Distinct().Count();
@@ -1794,14 +1855,14 @@ public sealed partial class ReceiverStore
             }
             RememberDirectory(instance.ObjectId, directory, check);
             var released = AfterNewPin() ?? [];
-            if (directory.Schedule is { } schedule && StationOf(directory, check) == BuiltInStation && (HeardScheduleDate is null || directory.Date >= HeardScheduleDate))
+            if (directory.Schedule is { } schedule && StationOf(directory, check) is { } owner && _options.Stations.Find(owner) is not null
+                && (!_heardSchedules.TryGetValue(owner, out var heardBefore) || directory.Date >= heardBefore.Date))
             {
-                if (schedule != HeardSchedule || directory.Date != HeardScheduleDate)
+                if (!_heardSchedules.TryGetValue(owner, out heardBefore) || schedule != heardBefore.Timetable || directory.Date != heardBefore.Date)
                 {
-                    WriteSchedule(directory.Date, schedule);
+                    _heardSchedules[owner] = (directory.Date, schedule);
+                    WriteSchedules();
                 }
-                HeardSchedule = schedule;
-                HeardScheduleDate = directory.Date;
             }
             MarkDone(instance);
             var stopped = CheckRotation(directory, check, _options.Time.GetUtcNow());

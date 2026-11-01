@@ -83,20 +83,20 @@ public sealed partial class RetunerTests
             {
                 Audio = Samples.SoundCard,
                 StateDirectory = Dir,
-                Daylight = null,
+                Stations = StationFixture.EverySlot,
                 Rig = new RigSettings { Rigctld = Rig.Endpoint.ToString(), DedicatedRadio = dedicated },
                 Bpq = settings is null ? null : adjust?.Invoke(settings) ?? settings,
                 Hooks = hooks,
             };
             Config.Validate();
-            var slots = schedule ?? Config.Schedule;
+            var slots = schedule ?? Fixture.Slots(Config);
             // The hooks' lines go in with the rig's and LinBPQ's events too, to see the order.
             Hooks = hooks is null ? null : new SlotHooks(() => Config, Clock, line =>
             {
                 Log.Enqueue(line);
                 Events.Enqueue(line);
             });
-            Retuner = new Retuner(Config, () => slots, onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks, earlyEnd, dialAt);
+            Retuner = new Retuner(Config, () => Fixture.Of(slots), onRadio ?? (() => true), Clock, Log.Enqueue, RigTime, Hooks, earlyEnd, dialAt);
             Retuner.Waiting += d => Waits.Writer.TryWrite(d);
             Retuner.Rig!.Changed += RigChanges.Enqueue;
         }

@@ -17,17 +17,9 @@ public static class OnAir
     public const string Mode = "ms110d-wn4";
 
     /// <summary>
-    /// The signal centre the config's <see cref="ReceiverConfig.DialKHz"/> is written for, and
-    /// where a station is taken to be until it says otherwise: GB7RDG's 7.0538 MHz. Each station's
-    /// own frequency comes from its directory or an advert (issue #179); nothing else in the
-    /// receiver assumes this one.
-    /// </summary>
-    public const double DefaultSignalHz = 7_053_800;
-
-    /// <summary>
     /// Where the centre of the signal and the tone fall in a receiver's own audio for its USB
-    /// dial, the MS110D standard's own centre at the usual 7.052 MHz dial: 1800 Hz. A sound card
-    /// behind a rig filter 2.4 kHz or narrower can be set to 7.0523 MHz instead (docs/receiver.md),
+    /// dial, the MS110D standard's own centre: 1800 Hz. A sound card
+    /// behind a rig filter 2.4 kHz or narrower can be set 300 Hz higher instead (docs/receiver.md),
     /// which puts it at 1500 Hz. The receiver's own front end (<see cref="ChannelMaths.ToBaseband"/>)
     /// always mixes to this fixed 1800 Hz baseband reference regardless of the dial; what moves
     /// with the dial is <see cref="AudioCentreHz(double)"/>.
@@ -36,11 +28,11 @@ public static class OnAir
 
     /// <summary>
     /// Where a signal centred on <paramref name="signalHz"/> falls in a receiver's own audio for
-    /// USB dial <paramref name="dialHz"/>, Hz: <see cref="CentreAudioHz"/> (1800) for GB7RDG's
-    /// signal at the usual 7.052 MHz dial, or 1500 Hz at 7.0523 MHz. <paramref name="signalHz"/>
-    /// is the station's own (issue #179); left out it is <see cref="DefaultSignalHz"/>.
+    /// USB dial <paramref name="dialHz"/>, Hz: <see cref="CentreAudioHz"/> (1800) at the dial the
+    /// stations file's first station is meant to be heard on. <paramref name="signalHz"/>
+    /// is the station's own (issue #179).
     /// </summary>
-    public static double AudioCentreHz(double dialHz, double signalHz = DefaultSignalHz) => signalHz - dialHz;
+    public static double AudioCentreHz(double dialHz, double signalHz) => signalHz - dialHz;
 
     /// <summary>
     /// Half the signal's occupied width: MS110D with the standard's pulse shaping fills about

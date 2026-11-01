@@ -33,6 +33,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The shipped stations file: beside the program, and packaged to /usr/share/pdn-mailcast-receiver (scripts/build-receiver-deb.sh). -->
+    <None Include="stations.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Mailcast.Receiver.Tests" />
   </ItemGroup>
 

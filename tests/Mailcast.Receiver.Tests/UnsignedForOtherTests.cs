@@ -11,7 +11,15 @@ namespace Mailcast.Receiver.Tests;
 internal static class UnsignedForOtherTests
 {
     [ModuleInitializer]
-    internal static void Allow() => ReceiverStoreOptions.DefaultUnsignedDirectoriesAreUsed = true;
+    internal static void Allow()
+    {
+        ReceiverStoreOptions.DefaultUnsignedDirectoriesAreUsed = true;
+        // Nothing in the product knows a station: the tests that need one have this one, in daylight, as the config's and the store's.
+        ReceiverStoreOptions.DefaultStations = StationFixture.Stations;
+        ReceiverConfig.TestStations = StationFixture.Stations;
+        AudioPipeline.TestSignalHz = StationFixture.SignalHz;
+        AudioPipeline.TestDialHz = StationFixture.DialKHz * 1000;
+    }
 }
 
 /// <summary>What the receiver does with an unsigned directory when nothing says to use it (issue #146).</summary>
@@ -37,7 +45,7 @@ public class UnsignedDirectoryRefusedTests
         var said = log.Where(l => l.Contains("no signature", StringComparison.Ordinal)).ToList();
         Assert.Single(said);
         Assert.All(said, l => Assert.All(l, c => Assert.InRange(c, ' ', '~')));
-        Assert.Null(intake.HeardSchedule);
+        Assert.Empty(intake.HeardSchedules);
     }
 
     [Fact]
@@ -47,7 +55,7 @@ public class UnsignedDirectoryRefusedTests
         var config = new ReceiverConfig { Audio = "wav:/nonexistent.wav", StateDirectory = dir.Path, Bbs = new BbsSettings { Port = 8011, Login = "Q0CAST", Password = "x" } };
         var log = new List<string>();
         await using var host = new ReceiverHost(config, TimeProvider.System, log.Add, refuseUnsigned: true);
-        var before = host.Schedule;
+        var before = host.Intake.HeardSchedules.Count;
         foreach (byte[] frame in Samples.Frames([Samples.Bulletin(1)]))
         {
             host.Intake.Offer(frame);
@@ -55,8 +63,7 @@ public class UnsignedDirectoryRefusedTests
         await host.Intake.DrainAsync(CancellationToken.None);
         Assert.Null(host.Intake.DirectoryChecks().Newest);
         Assert.Equal("unsigned, not used", host.Intake.DirectoryChecks().LastHeard!.Check.Describe());
-        Assert.False(host.ScheduleFromDirectory);
-        Assert.Equal(before, host.Schedule);
+        Assert.Equal(before, host.Intake.HeardSchedules.Count);
         Assert.Empty(host.Intake.Pending());
     }
 }

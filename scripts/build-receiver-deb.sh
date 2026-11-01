@@ -55,13 +55,15 @@ bin="$pub/pdn-mailcast-receiver"
 echo "==> stage the package for $arch"
 rm -rf "$stage"
 install -d "$stage/DEBIAN" "$stage/usr/lib/pdn-mailcast" "$stage/usr/bin" "$stage/lib/systemd/system" \
-  "$stage/usr/share/pdn-mailcast" "$stage/usr/share/doc/pdn-mailcast-receiver"
+  "$stage/usr/share/pdn-mailcast" "$stage/usr/share/pdn-mailcast-receiver" "$stage/usr/share/doc/pdn-mailcast-receiver"
 install -m 0755 "$bin" "$stage/usr/lib/pdn-mailcast/pdn-mailcast-receiver"
 # Anything else publish left beside the binary (native libraries that will not bundle).
-find "$pub" -maxdepth 1 -type f ! -name pdn-mailcast-receiver ! -name '*.xml' ! -name '*.pdb' -exec install -m 0644 {} "$stage/usr/lib/pdn-mailcast/" \;
+find "$pub" -maxdepth 1 -type f ! -name pdn-mailcast-receiver ! -name stations.json ! -name '*.xml' ! -name '*.pdb' -exec install -m 0644 {} "$stage/usr/lib/pdn-mailcast/" \;
 ln -s ../lib/pdn-mailcast/pdn-mailcast-receiver "$stage/usr/bin/pdn-mailcast-receiver"
 install -m 0644 "$root/packaging/receiver/pdn-mailcast-receiver.service" "$stage/lib/systemd/system/"
 install -m 0644 "$root/src/Mailcast.Receiver/receiver.example.json" "$stage/usr/share/pdn-mailcast/"
+# The stations file the receiver reads (an operator's /etc/pdn-mailcast/stations.json is used instead of it).
+install -m 0644 "$root/src/Mailcast.Receiver/stations.json" "$stage/usr/share/pdn-mailcast-receiver/"
 install -m 0644 "$root/src/Mailcast.Receiver/README.md" "$stage/usr/share/doc/pdn-mailcast-receiver/README.md"
 cat > "$stage/usr/share/doc/pdn-mailcast-receiver/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/

@@ -26,7 +26,7 @@ public class ReportReceiptsTests(ITestOutputHelper output)
         var objects = TestBulletins.Day(3, count).Select(b => (Bulletin: b, Object: TransferObject.ForBulletin(b, ZstdDictionary.Gb7rdg1Id, Compression.Default))).ToList();
         var entries = objects.Select(o => new DirectoryEntry(o.Object.ObjectId, o.Object.DictionaryId, o.Bulletin.Serialize().Length, o.Bulletin.Bid, o.Bulletin.Title,
             Hash: signed ? ObjectId.LongHash(o.Object.DictionaryId, o.Object.Bytes) : null)).ToList();
-        return new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), "ms110d-wn4", signed ? Signer : null, reports);
+        return new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), "ms110d-wn4", signed ? Signer : null, reports);
     }
 
     [Fact]

@@ -135,7 +135,7 @@ public class EnvelopeObjectTests
         var b = Small(4);
         var ea = TransferObject.ForEnvelope(MakeEnvelope(3), ZstdDictionary.Gb7rdg1Id, Compression.Default);
         var eb = TransferObject.ForEnvelope(MakeEnvelope(4), ZstdDictionary.Gb7rdg1Id, Compression.Default);
-        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var timetable = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         var directory = new BroadcastDirectory(Day, [Entry(a, ea), Entry(b, eb)], timetable, "ms110d-wn3", Signer);
         byte[] bytes = directory.Serialize();
         Assert.Contains("env=", Bulletin.TextEncoding.GetString(bytes), StringComparison.Ordinal);

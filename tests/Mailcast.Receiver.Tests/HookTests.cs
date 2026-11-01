@@ -166,7 +166,7 @@ public sealed class HookTests
         {
             Audio = audio,
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Rig = rig ? new Retune.RigSettings { DedicatedRadio = true } : null,
         }, new FakeTimeProvider(At(9, 20)), _ => { });
 
@@ -238,8 +238,7 @@ public sealed class HookTests
             {
                 Audio = audio ?? Samples.SoundCard,
                 StateDirectory = dir,
-                Daylight = null,
-                    EveryMinutes = everyMinutes,
+                Stations = everyMinutes == 15 ? StationFixture.Many(("G8AAA", 0), ("G8BBB", 15)) : StationFixture.Custom(every: everyMinutes),
                 Hooks = new HooksSettings
                 {
                     Before = withBefore ? HookScript.Write(dir, "before.sh", Record, beforeExit) : null,

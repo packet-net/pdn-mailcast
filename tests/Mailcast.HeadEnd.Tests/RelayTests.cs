@@ -10,7 +10,7 @@ public class RelayTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset Slot = new(2026, 10, 31, 13, 0, 0, TimeSpan.Zero);
-    private static readonly SlotTimetable Timetable = new(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+    private static readonly SlotTimetable Timetable = new(TimeOnly.MinValue, 60, StationFixture.Daylight);
     private static readonly StationAdvert Other = new("GB7RDG", Timetable, 7053800, Sideband.Usb);
 
     private static ScheduleOptions Options(bool signed = true) => ScheduleOptions.HourlyBudget with

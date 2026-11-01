@@ -36,6 +36,7 @@ public sealed record ReportChannel(
 /// Empty if none was heard.
 /// </param>
 /// <param name="Channel">The channel measurement, if there was one.</param>
+/// <param name="Station">Whose slot it was, written as a thirteenth field (after the channel's twelve, or after six <c>-</c> with none) when the report has slots of more than one station; null otherwise.</param>
 public sealed record ReportSlot(
     TimeOnly Start,
     string? Waveform,
@@ -43,7 +44,8 @@ public sealed record ReportSlot(
     double? SnrDb,
     double? OffsetHz,
     IReadOnlyList<string> Verdicts,
-    ReportChannel? Channel = null);
+    ReportChannel? Channel = null,
+    string? Station = null);
 
 /// <summary>One station's figures for the day (issue #148): the slots of it that the receiver listened to, and what came of them.</summary>
 /// <param name="Station">The station's callsign.</param>
@@ -68,7 +70,7 @@ public sealed record ReportStation(
     int? OtherCopies = null);
 
 /// <summary>
-/// A listener's daily feedback report: what one receiver heard of GB7RDG's slots in a UTC day,
+/// A listener's daily feedback report: what one receiver heard of the stations' slots in a UTC day,
 /// small enough to go as a packet bulletin. See docs/receiver.md, "The daily report's format".
 /// </summary>
 /// <remarks>
@@ -102,7 +104,7 @@ public sealed record ReportStation(
 /// listened to, <c>S CALL listened heard frames completed snr height</c>, such as
 /// <c>S G8BPQ 4 3 212 6 -14 290</c>: slots listened to, slots heard (a tone or a frame), frames
 /// decoded, bulletins completed, the median tone SNR (dB) and the median virtual height (km),
-/// <c>-</c> for one not measured. The slot lines stay the report's own station's. A reader that
+/// <c>-</c> for one not measured. The slot lines are every slot listened to, whichever station's; when the report has slots of more than one station each slot line ends with a thirteenth field, the station's callsign (after six <c>-</c> where there is no channel measurement), and a reader that does not know it ignores it. A reader that
 /// predates these stops at the first line that does not start with a digit, so it never sees
 /// them; a reader ignores fields after the eighth on a station line, and lines it does not know
 /// after the station lines. The ninth field (issue #147) is how many objects heard from that
@@ -119,15 +121,9 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
 
     /// <summary>
     /// Who the report is addressed to: it goes as a public bulletin, type B, to MCAST, so anyone
-    /// on GB7RDG can list it. Nothing addressed to MCAST is ever taken in for the broadcast.
+    /// on the BBS it is sent to can list it. Nothing addressed to MCAST is ever taken in for the broadcast.
     /// </summary>
     public const string BulletinTo = "MCAST";
-
-    /// <summary>
-    /// The report's @ field: GB7RDG's full hierarchical address, so mail routing carries it to
-    /// GB7RDG and it stays there, rather than a flood area such as WW or GBR.
-    /// </summary>
-    public const string BulletinAt = "GB7RDG.#42.GBR.EURO";
 
     private const string Missing = "-";
 
@@ -251,6 +247,14 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             line.Append(' ').Append(Number(ch.DopplerSpreadHz, 2, "0.##"));
             line.Append(' ').Append(Number(ch.VirtualHeightKm, 0, "0"));
             line.Append(' ').Append(char.IsAsciiLetterLower(ch.Basis) ? ch.Basis : '-');
+        }
+        if (s.Station is { } station)
+        {
+            if (s.Channel is null)
+            {
+                line.Append(" - - - - - -");
+            }
+            line.Append(' ').Append(Token(station));
         }
         return line.ToString();
     }
@@ -391,7 +395,7 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
             channel = new ReportChannel(modes, delay, power, Double(f[8]), Double(f[9]), Double(f[10]), f[11][0]);
         }
         return new ReportSlot(start, Value(f[1]), frames, Double(f[3]), Double(f[4]),
-            f[5] == Missing ? [] : f[5].Split('+'), channel);
+            f[5] == Missing ? [] : f[5].Split('+'), channel, f.Length > 12 && StationAdvert.IsCallsign(f[12]) ? f[12] : null);
     }
 
     private static bool TryInt(string s, out int value) =>

@@ -4,7 +4,7 @@ using Packet.Mailcast;
 namespace Mailcast.Receiver;
 
 /// <summary>
-/// GB7RDG's slots: one starts at <paramref name="Anchor"/> UTC and then every
+/// One station's slots: one starts at <paramref name="Anchor"/> UTC and then every
 /// <paramref name="EveryMinutes"/>, round the clock, and with a <paramref name="Daylight"/> rule
 /// only those in daylight run.
 /// </summary>
@@ -96,29 +96,27 @@ public sealed record ListenedStation(string Station, SlotTimetable Timetable, lo
 
 /// <summary>
 /// The slots this receiver follows (issue #144): every followed station's, each with its own
-/// timetable. With one station, as before other stations were heard of, every answer is exactly that station's
-/// <see cref="SlotSchedule"/>'s.
+/// timetable. With one station, every answer is exactly that station's
+/// <see cref="SlotSchedule"/>'s. With none, there are no slots at all.
 /// </summary>
 public sealed class FollowedSlots
 {
-    /// <summary>The slots of the given stations, in order; at least one.</summary>
+    /// <summary>The slots of the given stations, in order; there may be none.</summary>
     public FollowedSlots(IReadOnlyList<(string Station, SlotSchedule Schedule)> stations)
     {
         ArgumentNullException.ThrowIfNull(stations);
-        ArgumentOutOfRangeException.ThrowIfZero(stations.Count);
         Stations = stations;
     }
 
-    /// <summary>One station's slots: GB7RDG's, unless named.</summary>
-    public static FollowedSlots One(SlotSchedule schedule, string station = Packet.Mailcast.ReceiverStore.BuiltInStation)
+    /// <summary>No station's slots.</summary>
+    public static FollowedSlots None { get; } = new([]);
+
+    /// <summary>One station's slots.</summary>
+    public static FollowedSlots One(SlotSchedule schedule, string station)
     {
         ArgumentNullException.ThrowIfNull(schedule);
         return new([(station, schedule)]);
     }
-
-    /// <summary>A single station's slots, as before other stations were heard of.</summary>
-    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(schedule))]
-    public static implicit operator FollowedSlots?(SlotSchedule? schedule) => schedule is null ? null : One(schedule);
 
     /// <summary>The stations followed, each with its slots.</summary>
     public IReadOnlyList<(string Station, SlotSchedule Schedule)> Stations { get; }
@@ -160,7 +158,7 @@ public sealed class FollowedSlots
     public DateTimeOffset? ActiveAtOrBefore(DateTimeOffset t) => Latest(s => s.Timetable.ActiveAtOrBefore(t));
 
     /// <summary>The first slot that runs starting at or after <paramref name="now"/> (<see cref="SlotSchedule.NextActiveStart"/>).</summary>
-    public DateTimeOffset NextActiveStart(DateTimeOffset now) => Stations.Min(s => s.Schedule.NextActiveStart(now));
+    public DateTimeOffset? NextActiveStart(DateTimeOffset now) => Stations.Count == 0 ? null : Stations.Min(s => s.Schedule.NextActiveStart(now));
 
     /// <summary>The latest slot that ran starting at or before <paramref name="now"/>, if any.</summary>
     public DateTimeOffset? LatestActiveStart(DateTimeOffset now) => Latest(s => s.LatestActiveStart(now));
@@ -176,7 +174,7 @@ public sealed class FollowedSlots
     /// The slots in words, for the page and the log: one station's as <see cref="SlotSchedule.Describe"/>,
     /// several as "GB7RDG every hour on the hour; G8BPQ every hour at 30 minutes past".
     /// </summary>
-    public string Describe() => OneStation ? First.Describe() : string.Join("; ", Stations.Select(s => $"{s.Station} {s.Schedule.Describe()}"));
+    public string Describe() => Stations.Count == 0 ? "no station" : OneStation ? First.Describe() : string.Join("; ", Stations.Select(s => $"{s.Station} {s.Schedule.Describe()}"));
 
     private DateTimeOffset? Earliest(Func<SlotSchedule, DateTimeOffset?> each) =>
         Stations.Select(s => each(s.Schedule)).Where(t => t is not null).DefaultIfEmpty(null).Min();

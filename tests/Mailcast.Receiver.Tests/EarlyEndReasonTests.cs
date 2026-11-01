@@ -34,7 +34,7 @@ public class EarlyEndReasonTests
         public Fixture(DateTimeOffset start)
         {
             Time = new FakeTimeProvider(start);
-            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Daylight = null };
+            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Stations = StationFixture.EverySlot };
             Host = new ReceiverHost(config, Time, _ => { });
         }
 
@@ -385,7 +385,7 @@ public class EarlyEndReasonTests
     {
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(SlotStart.AddSeconds(2));
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot };
         var bulletin = Samples.Bulletin(1);
         var wn4 = Samples.Frames([bulletin], ScheduleOptions.Hourly, SlotStart, "ms110d-wn4");
 

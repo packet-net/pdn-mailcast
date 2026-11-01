@@ -16,12 +16,15 @@ public class SourcesTests
         return ReceiverConfig.Load(path);
     }
 
+    /// <summary>Two callsigns to accept frames from, for the tests of the frame filter itself.</summary>
+    private static readonly CallsignList Both = CallsignList.Parse(["GB7RDG", "M0LTE"]);
+
     [Fact]
-    public void Default_IsGb7rdgAndM0lte()
+    public void Default_IsNone_TheStationsTheReceiverKnowsAreAcceptedAnyway()
     {
-        Assert.Equal(["GB7RDG", "M0LTE"], ReceiverConfig.DefaultSources);
         Assert.Null(new ReceiverConfig().Sources);
-        Assert.Equal(ReceiverConfig.DefaultSources, new ReceiverConfig().AcceptedSources);
+        Assert.Empty(new ReceiverConfig().AcceptedSources);
+        Assert.Same(CallsignList.None, new ReceiverConfig().AcceptedSources);
     }
 
     [Theory]
@@ -33,7 +36,7 @@ public class SourcesTests
     {
         byte[] frame = Ax25UiFrame.Build(source, OnAir.Destination, Payload());
 
-        Assert.True(BroadcastFrame.TryGetPayload(frame, ReceiverConfig.DefaultSources, out var payload, out string? other));
+        Assert.True(BroadcastFrame.TryGetPayload(frame, Both, out var payload, out string? other));
         Assert.Equal(Payload(), payload.ToArray());
         Assert.Null(other);
     }
@@ -46,14 +49,14 @@ public class SourcesTests
     {
         byte[] frame = Ax25UiFrame.Build(source, OnAir.Destination, Payload());
 
-        Assert.False(BroadcastFrame.TryGetPayload(frame, ReceiverConfig.DefaultSources, out _, out string? other));
+        Assert.False(BroadcastFrame.TryGetPayload(frame, Both, out _, out string? other));
         Assert.Equal(expected, other);
     }
 
     [Fact]
     public void Frames_ToAnotherDestination_AreNotCountedAsAnotherSource()
     {
-        Assert.False(BroadcastFrame.TryGetPayload(Ax25UiFrame.Build("G4ABC", "ID", Payload()), ReceiverConfig.DefaultSources, out _, out string? other));
+        Assert.False(BroadcastFrame.TryGetPayload(Ax25UiFrame.Build("G4ABC", "ID", Payload()), Both, out _, out string? other));
         Assert.Null(other);
     }
 
@@ -65,7 +68,7 @@ public class SourcesTests
         await using var intake = new Intake(dir.Path, line => { lock (log) { log.Add(line); } });
         byte[] payload = Payload();
 
-        Assert.True(intake.Offer(Ax25UiFrame.Build("M0LTE-1", OnAir.Destination, payload)));
+        Assert.True(intake.Offer(Ax25UiFrame.Build("GB7RDG-1", OnAir.Destination, payload)));
         Assert.False(intake.Offer(Ax25UiFrame.Build("G4ABC", OnAir.Destination, payload)));
         Assert.False(intake.Offer(Ax25UiFrame.Build("G4ABC-2", OnAir.Destination, payload)));
 
@@ -75,7 +78,7 @@ public class SourcesTests
             lines = [.. log.Where(l => l.Contains("G4ABC", StringComparison.Ordinal))];
         }
         string line = Assert.Single(lines);
-        Assert.Contains("not from an accepted source (GB7RDG, M0LTE)", line, StringComparison.Ordinal);
+        Assert.Contains("not from an accepted source (GB7RDG)", line, StringComparison.Ordinal);
 
         // Changed while running, as the settings page does.
         intake.Sources = CallsignList.Parse(["G4ABC"]);
@@ -91,9 +94,9 @@ public class SourcesTests
         var config = LoadJson(dir, """{ "audio": "ubersdr:wessex.zapto.org" }""");
 
         Assert.Null(config.Sources);
-        Assert.Equal(ReceiverConfig.DefaultSources, config.AcceptedSources);
+        Assert.Same(CallsignList.None, config.AcceptedSources);
         Assert.Contains("no \"sources\"", ReceiverHost.SourcesLine(config), StringComparison.Ordinal);
-        Assert.Contains("GB7RDG, M0LTE", ReceiverHost.SourcesLine(config), StringComparison.Ordinal);
+        Assert.Contains("the stations it knows of", ReceiverHost.SourcesLine(config), StringComparison.Ordinal);
 
         string path = Path.Combine(dir.Path, "receiver.json");
         config.Save(path);
@@ -139,12 +142,11 @@ public class SourcesTests
     }
 
     [Fact]
-    public void Example_SeedsGb7rdgAndM0lte()
+    public void Example_HasNoSources()
     {
         var config = ReceiverConfig.Load(Path.Combine(AppContext.BaseDirectory, "receiver.example.json"));
 
-        Assert.NotNull(config.Sources);
-        Assert.Equal(ReceiverConfig.DefaultSources, config.Sources);
+        Assert.Null(config.Sources);
     }
 
     [Fact]
@@ -155,7 +157,7 @@ public class SourcesTests
         var form = new StatusPage.SettingsForm("ubersdr:wessex.zapto.org", "linBpq", "127.0.0.1", 8011, "Q0CAST", null, "BBS");
 
         var view = JsonSerializer.SerializeToElement(StatusPage.SettingsView(config), ReceiverConfig.JsonLine);
-        Assert.Equal(["GB7RDG", "M0LTE"], view.GetProperty("sources").EnumerateArray().Select(e => e.GetString()));
+        Assert.Empty(view.GetProperty("sources").EnumerateArray());
         Assert.False(view.GetProperty("sourcesSet").GetBoolean());
 
         // Left out of the form, a config without "sources" stays without it.
@@ -179,6 +181,6 @@ public class SourcesTests
         // GB7RDG is always followed (its key is built in), so it is accepted whatever "sources" says (issue #228).
         Assert.Equal(["G4ABC", "GB7RDG"], host.Intake.Sources);
         host.Reconfigure(config with { Sources = null });
-        Assert.Equal(ReceiverConfig.DefaultSources, host.Intake.Sources);
+        Assert.Equal(["GB7RDG"], host.Intake.Sources);
     }
 }

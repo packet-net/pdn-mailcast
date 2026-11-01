@@ -247,9 +247,9 @@ public sealed class ConfigFile
         static string Said(string? value) => string.IsNullOrEmpty(value) ? "none" : value;
 
         Text("audio", before.Audio, after.Audio);
-        if (before.DialKHz != after.DialKHz)
+        if (before.ResolvedDialKHz != after.ResolvedDialKHz)
         {
-            changes.Add(string.Create(CultureInfo.InvariantCulture, $"dial {before.DialKHz:F2} -> {after.DialKHz:F2} kHz"));
+            changes.Add(string.Create(CultureInfo.InvariantCulture, $"dial {before.ResolvedDialKHz:F2} -> {after.ResolvedDialKHz:F2} kHz"));
         }
         Text("locator", before.Locator, after.Locator);
         Text("sources", before.AcceptedSources.ToString(), after.AcceptedSources.ToString());

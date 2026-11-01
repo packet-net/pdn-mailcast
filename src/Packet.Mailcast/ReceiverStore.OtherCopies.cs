@@ -144,7 +144,7 @@ public sealed partial class ReceiverStore
                 }
                 var time = DateTimeOffset.Parse(lines[0].Trim(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
                 string station = lines[2].Trim();
-                _otherCopies[id] = new OtherCopy(id, lines[1].Trim(), station == "-" ? null : station, time, kept);
+                _otherCopies[id] = new OtherCopy(id, lines[1].Trim(), station == "-" ? null : _options.Stations.Current(station), time, kept);
                 if (!_done.ContainsKey(id))
                 {
                     WriteDone(id);

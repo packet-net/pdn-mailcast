@@ -31,7 +31,7 @@ public class SlotWindowTests
         public Fixture(DateTimeOffset start, string audio)
         {
             Time = new FakeTimeProvider(start);
-            var config = new ReceiverConfig { Audio = audio, StateDirectory = Dir.Path, Daylight = null };
+            var config = new ReceiverConfig { Audio = audio, StateDirectory = Dir.Path, Stations = StationFixture.EverySlot };
             Host = new ReceiverHost(config, Time, Log.Enqueue);
         }
 

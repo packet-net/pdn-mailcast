@@ -211,7 +211,7 @@ public class DaylightConfigTests
     public void Daylight_ReachesTheScheduleTheSchedulerAndTheDirectory_WithLighterCarrying()
     {
         var config = Parse("""{"minute": 0, "everyMinutes": 60, "daylight": {"locator": "IO91lk", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30}}""");
-        var expected = new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+        var expected = new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight);
         Assert.Equal(expected, config.ToSlotTimetable());
         Assert.Equal(expected, config.ToSlotSchedule().Timetable);
         var options = config.ToScheduleOptions();
@@ -222,7 +222,7 @@ public class DaylightConfigTests
         // Shares given in the file still win.
         var set = Parse("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}}""", """{"slotShares": [1.5, 0.5, 0.5], "slotOffsets": [0, 5, 10]}""");
         Assert.Equal([1.5, 0.5, 0.5], set.ToScheduleOptions().SlotShares);
-        Assert.Equal(DaylightRule.Gb7rdg, set.ToSlotSchedule().Daylight);
+        Assert.Equal(StationFixture.Daylight, set.ToSlotSchedule().Daylight);
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class DaylightConfigTests
     {
         string example = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "headend.example.json"));
         var config = HeadEndConfig.Parse(ExampleConfig.Filled(example));
-        Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), config.ToSlotTimetable());
+        Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), config.ToSlotTimetable());
     }
 }
 

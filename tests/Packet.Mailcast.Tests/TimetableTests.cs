@@ -5,7 +5,7 @@ namespace Packet.Mailcast.Tests;
 /// <summary>Which slots run with a daylight rule, and the timetable's form in the directory.</summary>
 public class TimetableTests
 {
-    private static readonly SlotTimetable Gb7rdg = new(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+    private static readonly SlotTimetable Gb7rdg = new(TimeOnly.MinValue, 60, StationFixture.Daylight);
 
     private static DateTimeOffset T(string s) => DateTimeOffset.Parse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
 
@@ -28,24 +28,24 @@ public class TimetableTests
     public void Gb7rdg_TheSlotsHeardBy_Nobody_AreDark_AndTheOnesThatDecoded_AreNot()
     {
         // 2026-10-05 at GB7RDG: 07:12 and 18:00 UTC were heard by nobody, 09:12 to 16:00 decoded well.
-        Assert.False(DaylightRule.Gb7rdg.Allows(T("2026-10-05T07:12:00Z")));
-        Assert.False(DaylightRule.Gb7rdg.Allows(T("2026-10-05T18:00:00Z")));
-        Assert.True(DaylightRule.Gb7rdg.Allows(T("2026-10-05T09:12:00Z")));
-        Assert.True(DaylightRule.Gb7rdg.Allows(T("2026-10-05T16:00:00Z")));
+        Assert.False(StationFixture.Daylight.Allows(T("2026-10-05T07:12:00Z")));
+        Assert.False(StationFixture.Daylight.Allows(T("2026-10-05T18:00:00Z")));
+        Assert.True(StationFixture.Daylight.Allows(T("2026-10-05T09:12:00Z")));
+        Assert.True(StationFixture.Daylight.Allows(T("2026-10-05T16:00:00Z")));
     }
 
     [Fact]
     public void Window_IncludesBothEdges_AndNothingOutside()
     {
-        var window = DaylightRule.Gb7rdg.WindowOn(new DateOnly(2026, 10, 5));
+        var window = StationFixture.Daylight.WindowOn(new DateOnly(2026, 10, 5));
         var opens = window.Opens!.Value;
         var closes = window.Closes!.Value;
         Assert.Equal(window.Sun.Sunrise!.Value.AddMinutes(120), opens);
         Assert.Equal(window.Sun.Sunset!.Value.AddMinutes(-30), closes);
-        Assert.True(DaylightRule.Gb7rdg.Allows(opens));
-        Assert.True(DaylightRule.Gb7rdg.Allows(closes));
-        Assert.False(DaylightRule.Gb7rdg.Allows(opens.AddTicks(-1)));
-        Assert.False(DaylightRule.Gb7rdg.Allows(closes.AddTicks(1)));
+        Assert.True(StationFixture.Daylight.Allows(opens));
+        Assert.True(StationFixture.Daylight.Allows(closes));
+        Assert.False(StationFixture.Daylight.Allows(opens.AddTicks(-1)));
+        Assert.False(StationFixture.Daylight.Allows(closes.AddTicks(1)));
 
         // Offsets that open the window just before 09:00 run it; a minute more and the first is 10:00.
         int after = (int)Math.Floor((T("2026-10-05T09:00:00Z") - window.Sun.Sunrise.Value).TotalMinutes);
@@ -65,8 +65,8 @@ public class TimetableTests
         {
             for (int d = -2; d < 2; d++)
             {
-                var a = DaylightRule.Gb7rdg.WindowOn(change.AddDays(d)).Sun.Sunrise!.Value;
-                var b = DaylightRule.Gb7rdg.WindowOn(change.AddDays(d + 1)).Sun.Sunrise!.Value;
+                var a = StationFixture.Daylight.WindowOn(change.AddDays(d)).Sun.Sunrise!.Value;
+                var b = StationFixture.Daylight.WindowOn(change.AddDays(d + 1)).Sun.Sunrise!.Value;
                 Assert.InRange(Math.Abs((b - a - TimeSpan.FromDays(1)).TotalMinutes), 0, 3);
             }
             var before = Gb7rdg.ActiveSlotsOn(change.AddDays(-1));
@@ -105,9 +105,9 @@ public class TimetableTests
     {
         var settings = new DaylightSettings { Locator = "IO91lk", AfterSunriseMinutes = 600, BeforeSunsetMinutes = 600 };
         Assert.Contains("no slot in a whole year", settings.Problem(60, TimeOnly.MinValue), StringComparison.Ordinal);
-        Assert.Null(new DaylightSettings().Problem(60, TimeOnly.MinValue));
+        Assert.Null(new DaylightSettings { Locator = "IO91lk" }.Problem(60, TimeOnly.MinValue));
         Assert.Contains("locator", new DaylightSettings { Locator = "XX99" }.Problem(60, TimeOnly.MinValue), StringComparison.Ordinal);
-        Assert.Contains("-240 to 720", new DaylightSettings { AfterSunriseMinutes = 721 }.Problem(60, TimeOnly.MinValue), StringComparison.Ordinal);
+        Assert.Contains("-240 to 720", new DaylightSettings { Locator = "IO91lk", AfterSunriseMinutes = 721 }.Problem(60, TimeOnly.MinValue), StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => new DaylightRule("IO91lk", -241, 0));
     }
 
@@ -150,7 +150,7 @@ public class TimetableTests
     [Fact]
     public void Describe_SaysTheRuleInWords()
     {
-        Assert.Equal("from 120 minutes after sunrise to 30 minutes before sunset at IO91lk", DaylightRule.Gb7rdg.Describe());
+        Assert.Equal("from 120 minutes after sunrise to 30 minutes before sunset at IO91lk", StationFixture.Daylight.Describe());
         Assert.Equal("from 30 minutes before sunrise to sunset at IO91", new DaylightRule("io91", -30, 0).Describe());
         Assert.Equal("09:00, 10:00 and 11:00 UTC", SlotTimetable.Times([T("2026-10-05T09:00:00Z"), T("2026-10-05T10:00:00Z"), T("2026-10-05T11:00:00Z")]));
         Assert.Equal("none", SlotTimetable.Times([]));

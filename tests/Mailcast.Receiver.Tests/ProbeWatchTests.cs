@@ -84,7 +84,7 @@ public class ProbeWatchTests
         // -12 dB in 3 kHz: no MS110D burst decodes, so only the probe is kept.
         var time = new FakeTimeProvider(Noon.AddMinutes(3));
         var log = new List<string>();
-        await using var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, null, () => Wessex) { Rest = false };
+        await using var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, null, () => Wessex) { Rest = false, Transmitter = _ => Fixture.OnAir };
         watch.OfferProbe(Kept([new P(1.0, 0), new P(2.9, -3)], -12, 2, time.GetUtcNow()), Noon);
         watch.SlotOver();
         await watch.IdleAsync().WaitAsync(TimeSpan.FromSeconds(60));
@@ -157,7 +157,7 @@ public class ProbeWatchTests
         var withKept = new List<string>();
         var without = new List<string>();
         ChannelReport a, b;
-        await using (var watch = new ChannelWatch(time, line => { lock (withKept) { withKept.Add(line); } }, null, () => Wessex) { Rest = false })
+        await using (var watch = new ChannelWatch(time, line => { lock (withKept) { withKept.Add(line); } }, null, () => Wessex) { Rest = false, Transmitter = _ => Fixture.OnAir })
         {
             watch.OfferProbe(Kept([new P(1.0, 0)], 10, 4, time.GetUtcNow(), probe: false), Noon);
             watch.Offer(ChannelTests.Captured(7, time.GetUtcNow()), Noon);
@@ -166,7 +166,7 @@ public class ProbeWatchTests
             await watch.IdleAsync().WaitAsync(TimeSpan.FromSeconds(60));
             a = watch.Latest!;
         }
-        await using (var watch = new ChannelWatch(time, line => { lock (without) { without.Add(line); } }, null, () => Wessex) { Rest = false })
+        await using (var watch = new ChannelWatch(time, line => { lock (without) { without.Add(line); } }, null, () => Wessex) { Rest = false, Transmitter = _ => Fixture.OnAir })
         {
             watch.Offer(ChannelTests.Captured(7, time.GetUtcNow()), Noon);
             watch.Offer(ChannelTests.Captured(8, time.GetUtcNow()), Noon);
@@ -251,7 +251,7 @@ public class ProbeWatchTests
     {
         var time = new FakeTimeProvider(Noon.AddMinutes(3));
         var log = new List<string>();
-        await using var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, null, () => Wessex) { Rest = false };
+        await using var watch = new ChannelWatch(time, line => { lock (log) { log.Add(line); } }, null, () => Wessex) { Rest = false, Transmitter = _ => Fixture.OnAir };
         watch.OfferProbe(Kept([new P(1.0, 0)], 10, 4, time.GetUtcNow(), probe: false), Noon);
         watch.SlotOver();
         await watch.IdleAsync().WaitAsync(TimeSpan.FromSeconds(60));

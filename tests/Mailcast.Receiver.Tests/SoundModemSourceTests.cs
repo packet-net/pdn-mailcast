@@ -93,7 +93,7 @@ public class SoundModemSourceTests
         await using var fake = new FakeSoundModem();
         var log = new List<string>();
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            ReceiverConfig.DefaultDialKHz * 1000, line => { lock (log) { log.Add(line); } }, TimeProvider.System, pagePort: 18135);
+            StationFixture.DialKHz * 1000, StationFixture.SignalHz, line => { lock (log) { log.Add(line); } }, TimeProvider.System, pagePort: 18135);
         await using var _ = pipeline;
         await pipeline.OpenAsync(CancellationToken.None);
         var connection = await fake.NextAsync();
@@ -178,9 +178,9 @@ public class SoundModemSourceTests
     [Fact]
     public void AChannelTooSlowForTheSignal_IsOutOfReach()
     {
-        Assert.Null(AudioPipeline.SoundModemReach(12000, null, 7_052_000));
-        Assert.Null(AudioPipeline.SoundModemReach(8000, null, 7_052_000));
-        Assert.Contains("carries audio only up to 3000 Hz", AudioPipeline.SoundModemReach(6000, null, 7_052_000), StringComparison.Ordinal);
+        Assert.Null(AudioPipeline.SoundModemReach(12000, null, 7_052_000, StationFixture.SignalHz));
+        Assert.Null(AudioPipeline.SoundModemReach(8000, null, 7_052_000, StationFixture.SignalHz));
+        Assert.Contains("carries audio only up to 3000 Hz", AudioPipeline.SoundModemReach(6000, null, 7_052_000, StationFixture.SignalHz), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -193,7 +193,7 @@ public class SoundModemSourceTests
     [InlineData(48000, 7_052_800)]
     public void ADialWhoseChannelCarriesTheWholeSignal_IsInReach(int rate, double dialHz)
     {
-        Assert.Null(AudioPipeline.SoundModemReach(rate, dialHz, dialHz));
+        Assert.Null(AudioPipeline.SoundModemReach(rate, dialHz, dialHz, StationFixture.SignalHz));
     }
 
     // ---------- gaps and keyed spans ----------
@@ -251,7 +251,7 @@ public class SoundModemSourceTests
     private static async Task<(AudioPipeline Pipeline, FakeSoundModem.Connection Connection, Func<int> Fed)> StartAsync(FakeSoundModem fake, List<string>? log = null)
     {
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            ReceiverConfig.DefaultDialKHz * 1000, line => { if (log is not null) { lock (log) { log.Add(line); } } }, TimeProvider.System);
+            StationFixture.DialKHz * 1000, StationFixture.SignalHz, line => { if (log is not null) { lock (log) { log.Add(line); } } }, TimeProvider.System);
         await pipeline.OpenAsync(CancellationToken.None);
         var connection = await fake.NextAsync();
         int fed = 0;
@@ -464,7 +464,7 @@ public class SoundModemSourceTests
         await using var fake = new FakeSoundModem(dialHz: dialHz);
         var (pipeline, connection, fed) = await StartAsync(fake);
         await using var _ = pipeline;
-        double centre = OnAir.AudioCentreHz(dialHz ?? ReceiverConfig.DefaultDialKHz * 1000);
+        double centre = OnAir.AudioCentreHz(dialHz ?? StationFixture.DialKHz * 1000, StationFixture.SignalHz);
         Assert.Equal(OnAir.CentreAudioHz, pipeline.AudioCentreHz);
         int frames = 0;
         pipeline.Channel.FrameReceived += (_, _) => Interlocked.Increment(ref frames);
@@ -517,7 +517,7 @@ public class SoundModemSourceTests
         await using var _ = pipeline;
         int frames = 0;
         pipeline.Channel.FrameReceived += (_, _) => Interlocked.Increment(ref frames);
-        double centre = OnAir.AudioCentreHz(dialHz);
+        double centre = OnAir.AudioCentreHz(dialHz, StationFixture.SignalHz);
 
         // Asked for where the signal really is, so a headless Flex opens its filter for it.
         using (var identify = JsonDocument.Parse(await Within(connection.Said.Reader.ReadAsync().AsTask())))
@@ -614,7 +614,7 @@ public class SoundModemSourceTests
         await using var fake = new FakeSoundModem(dialHz: 7_052_300);
         var log = new List<string>();
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            ReceiverConfig.DefaultDialKHz * 1000, line => { lock (log) { log.Add(line); } }, TimeProvider.System);
+            StationFixture.DialKHz * 1000, StationFixture.SignalHz, line => { lock (log) { log.Add(line); } }, TimeProvider.System);
         await using var _ = pipeline;
 
         await pipeline.OpenAsync(CancellationToken.None);
@@ -641,7 +641,7 @@ public class SoundModemSourceTests
     {
         await using var fake = new FakeSoundModem(rateHz: rate, dialHz: dialHz);
         var pipeline = AudioPipeline.Create(new AudioSource(AudioSourceKind.SoundModem, fake.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            ReceiverConfig.DefaultDialKHz * 1000, _ => { }, TimeProvider.System);
+            StationFixture.DialKHz * 1000, StationFixture.SignalHz, _ => { }, TimeProvider.System);
         await using var _ = pipeline;
 
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.OpenAsync(CancellationToken.None));
@@ -683,7 +683,7 @@ public class SoundModemSourceTests
     {
         Audio = $"soundmodem:{port}",
         StateDirectory = dir.Path,
-        Daylight = null,
+        Stations = StationFixture.EverySlot,
         Web = new WebSettings { Port = 18135 },
     };
 

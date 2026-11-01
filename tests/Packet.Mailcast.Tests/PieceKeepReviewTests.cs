@@ -19,7 +19,7 @@ public class PieceKeepReviewTests
     private static TransferObject SignedDirectory(params TransferObject[] listed)
     {
         var entries = listed.Select((o, i) => new DirectoryEntry(o.ObjectId, o.DictionaryId, 3000, "B" + i, "t" + i, Hash: ObjectId.LongHash(o.DictionaryId, o.Bytes))).ToList();
-        var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), "ms110d-wn3", Signer);
+        var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), "ms110d-wn3", Signer);
         return TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240);
     }
 
@@ -52,7 +52,7 @@ public class PieceKeepReviewTests
             new DirectoryEntry(listed.ObjectId, listed.DictionaryId, 3000, "B1", "t1", Hash: ObjectId.LongHash(listed.DictionaryId, listed.Bytes)),
             new DirectoryEntry(wrongHash.ObjectId, wrongHash.DictionaryId, 3000, "B4", "t4", Hash: ObjectId.LongHash(listed.DictionaryId, listed.Bytes)),
         };
-        var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg), "ms110d-wn3", Signer);
+        var directory = new BroadcastDirectory(Day, entries, new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.Daylight), "ms110d-wn3", Signer);
         FeedAir(store, TransferObject.ForDirectory(directory, ZstdDictionary.Gb7rdg1Id, Compression.Default, 240));
 
         List<byte[]> All(TransferObject o) => [.. Enumerable.Range(0, o.SourceSymbols + 1).Select(i => o.Frame((uint)i).ToBytes())];

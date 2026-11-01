@@ -950,7 +950,7 @@ public sealed partial class StatusPage : IAsyncDisposable
                 toneHz = liveTone ?? (slot?.Tone is { } t ? t.FrequencyHz : null),
                 toneLive = liveTone is not null,
             },
-            schedule = Schedule(config, _host.Followed, _host.ScheduleFromDirectory, _host.Time.GetUtcNow()),
+            schedule = Schedule(config, _host.Followed, _host.Time.GetUtcNow()),
             // Issues #178 and #144: each station's pinned key, when its newest directory was dated,
             // and any directory refused for naming a pinned station under another key.
             sharing = SharingView(),
@@ -965,7 +965,7 @@ public sealed partial class StatusPage : IAsyncDisposable
                 from = l.Source,
                 followed = l.Followed,
                 why = l.NotFollowedBecause,
-                skipped = (config.SkipStations ?? []).Contains(l.Station, StringComparer.OrdinalIgnoreCase),
+                skipped = config.IsSkipped(l.Station),
                 byHand = l.Source == "added by hand",
             }),
             // Issue #224: "Listen for a station" entries, and which are no longer needed.
@@ -1322,7 +1322,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             publicKey = Convert.ToBase64String(k.Key.PublicKey),
             source = k.Source switch
             {
-                Packet.Mailcast.KeySource.BuiltIn => "built in",
+                Packet.Mailcast.KeySource.StationsFile => "stations file",
                 Packet.Mailcast.KeySource.Config => "config file",
                 Packet.Mailcast.KeySource.Learnt => "learnt on first hearing",
                 _ => "added on this page",
@@ -1347,16 +1347,24 @@ public sealed partial class StatusPage : IAsyncDisposable
         }),
     };
 
-    /// <summary>When the slots are, for the page, as the config file gives them.</summary>
-    internal static object Schedule(ReceiverConfig config, DateTimeOffset now) => Schedule(config, config.Schedule, false, now);
-
     /// <summary>
     /// When the slots are, for the page: in words, today's slots, the next slot and the one before
     /// it if that may still be on, and for a web SDR which slots it listens to and the next of
-    /// those. <paramref name="fromDirectory"/> says the schedule is GB7RDG's own, from its directory.
+    /// those.
     /// </summary>
-    internal static object Schedule(ReceiverConfig config, FollowedSlots followed, bool fromDirectory, DateTimeOffset now)
+    internal static object Schedule(ReceiverConfig config, FollowedSlots followed, DateTimeOffset now)
     {
+        if (followed.Stations.Count == 0)
+        {
+            return new
+            {
+                words = followed.Describe(),
+                followed = Array.Empty<object>(),
+                slotsPerDay = 0,
+                today = Array.Empty<string>(),
+                toneSeconds = OnAir.ToneSeconds,
+            };
+        }
         // Issue #144: the next slot, today's and the web SDR's are those of every station
         // followed; the timetable's own fields (every, anchor, daylight) are the first one's.
         var schedule = followed.First;
@@ -1371,8 +1379,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         return new
         {
             words = followed.Describe(),
-            from = fromDirectory ? "directory" : "config",
-            // Each station followed, with its slots in words; one entry, GB7RDG, until another station is heard of.
+            // Each station followed, with its slots in words.
             followed = followed.Stations.Select(f => new { station = f.Station, words = f.Schedule.Describe() }),
             everyMinutes = schedule.EveryMinutes,
             slotUtc = schedule.Anchor.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
@@ -1406,7 +1413,8 @@ public sealed partial class StatusPage : IAsyncDisposable
     {
         audio = config.Audio,
         locator = config.Locator,
-        dialKHz = config.DialKHz,
+        dialKHz = config.ResolvedDialKHz,
+        dialKHzSet = config.DialKHz is not null,
         sources = config.AcceptedSources,
         sourcesSet = config.Sources is not null,
         sourcesFollowed = followed ?? [],
@@ -1508,7 +1516,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         var next = current with
         {
             Audio = form.Audio.Trim(),
-            DialKHz = form.DialKHz ?? current.DialKHz,
+            DialKHz = form.DialKHz is { } dial && dial != current.ResolvedDialKHz ? dial : current.DialKHz,
             Locator = form.Locator is null ? current.Locator : form.Locator.Trim() is { Length: > 0 } locator ? locator : null,
             Bbs = current.Bbs with
             {
@@ -2239,7 +2247,7 @@ public sealed partial class StatusPage : IAsyncDisposable
 
     /// <summary>
     /// Issue #178: listens, or stops listening, at one station's slots, saved in the config
-    /// file's <c>skipStations</c>, as the page's buttons ask. GB7RDG's slots are always listened at.
+    /// file's <c>skipStations</c>, as the page's buttons ask.
     /// </summary>
     private async Task ListenToStationAsync(HttpListenerContext context)
     {
@@ -2249,9 +2257,9 @@ public sealed partial class StatusPage : IAsyncDisposable
             return;
         }
         string? station = form?.Station?.Trim().ToUpperInvariant();
-        if (form is null || !Packet.Mailcast.StationAdvert.IsCallsign(station) || station == Packet.Mailcast.ReceiverStore.BuiltInStation)
+        if (form is null || !Packet.Mailcast.StationAdvert.IsCallsign(station))
         {
-            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Give the callsign of a station other than GB7RDG." })).ConfigureAwait(false);
+            await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "Give the callsign of a station." })).ConfigureAwait(false);
             return;
         }
         var current = _host.Config;
@@ -2355,7 +2363,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             {
                 entry = entry with { Daylight = new Packet.Mailcast.DaylightSettings { Locator = entry.Locator } };
             }
-            problem ??= entry.Problem();
+            problem ??= entry.Problem(_host.Config.Stations);
             if (problem is null && _host.Intake.HeardTimetable(entry.Callsign) is not null)
             {
                 problem = $"{entry.Callsign}'s own signed directory has been heard here already, so its own timetable is used";
@@ -2394,7 +2402,7 @@ public sealed partial class StatusPage : IAsyncDisposable
     /// POST /api/filter/dial: the dial for a typed low and high edge, the same maths "Measure my
     /// filter" uses.
     /// </summary>
-    private static async Task FilterDialAsync(HttpListenerContext context)
+    private async Task FilterDialAsync(HttpListenerContext context)
     {
         var (answered, form) = await ReadJsonAsync<FilterEdgesForm>(context).ConfigureAwait(false);
         if (answered)
@@ -2406,7 +2414,7 @@ public sealed partial class StatusPage : IAsyncDisposable
             await RespondAsync(context, 400, "application/json", JsonSerializer.Serialize(new { error = "That was not a low and high edge." })).ConfigureAwait(false);
             return;
         }
-        var result = FilterScan.DialFor(form.LowHz, form.HighHz);
+        var result = FilterScan.DialFor(form.LowHz, form.HighHz, _host.Config.CentreHz);
         await RespondAsync(context, 200, "application/json", JsonSerializer.Serialize(FilterView(result), ReceiverConfig.JsonLine)).ConfigureAwait(false);
     }
 

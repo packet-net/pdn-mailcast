@@ -32,7 +32,7 @@ public class KeysTableTests
         Feed(store, TransferObject.ForDirectory(d, ZstdDictionary.Gb7rdg1Id, Compression.Default));
 
     private static ReceiverStore Open(TempDirectory dir, FakeTimeProvider time, params TrustedKey[] configured) => new(dir.Path, Compression.Default,
-        new ReceiverStoreOptions { FlushToDisk = false, Time = time, TrustedKeys = [.. TrustedKey.BuiltIn, .. configured] });
+        new ReceiverStoreOptions { FlushToDisk = false, Time = time, TrustedKeys = [.. new[] { StationFixture.Key }, .. configured] });
 
     private static FakeTimeProvider Clock() => new(new DateTimeOffset(2026, 10, 30, 9, 0, 0, TimeSpan.Zero));
 
@@ -43,7 +43,7 @@ public class KeysTableTests
         var time = Clock();
         var configured = TrustedKey.Parse("G9CFG", Bpq.PublicKeyBase64);
         var store = Open(dir, time, configured);
-        Assert.Equal([KeySource.BuiltIn, KeySource.Config], store.KeyRows().Select(r => r.Source));
+        Assert.Equal([KeySource.Config, KeySource.StationsFile], store.KeyRows().Select(r => r.Source)); // by callsign: G9CFG, GB7RDG
         Assert.All(store.KeyRows(), r => Assert.False(r.CanForget));
         Assert.All(store.KeyRows(), r => Assert.Null(r.LastHeard));
 
@@ -55,18 +55,18 @@ public class KeysTableTests
         Assert.Equal(time.GetUtcNow(), row.LastHeard);
         Assert.True(row.CanForget);
 
-        // The built-in GB7RDG first in the table.
-        Assert.Equal("GB7RDG", store.KeyRows()[0].Station);
+        // By callsign, no station first.
+        Assert.Equal(["G4NEW", "G9CFG", "GB7RDG"], store.KeyRows().Select(r => r.Station));
     }
 
     [Fact]
-    public void Forget_RefusesBuiltInAndConfigKeys_AndALearntKeyIsLearntAgainOnTheNextHearing()
+    public void Forget_RefusesStationsFileAndConfigKeys_AndALearntKeyIsLearntAgainOnTheNextHearing()
     {
         using var dir = new TempDirectory();
         var time = Clock();
         var configured = TrustedKey.Parse("G9CFG", Bpq.PublicKeyBase64);
         var store = Open(dir, time, configured);
-        Assert.NotNull(store.ForgetKey(TrustedKey.Gb7rdg.KeyId).Error);
+        Assert.NotNull(store.ForgetKey(StationFixture.Key.KeyId).Error);
         Assert.NotNull(store.ForgetKey(configured.KeyId).Error);
         Assert.NotNull(store.ForgetKey(0x1234).Error);
 
@@ -97,7 +97,7 @@ public class KeysTableTests
         Assert.NotNull(store.AddKey("has space", other.PublicKeyBase64).Error);
         Assert.NotNull(store.AddKey("G4ABC", "not base64!").Error);
         Assert.NotNull(store.AddKey("G4ABC", Convert.ToBase64String(new byte[10])).Error);
-        Assert.NotNull(store.AddKey("G4ABC", Convert.ToBase64String(TrustedKey.Gb7rdg.PublicKey)).Error); // already trusted
+        Assert.NotNull(store.AddKey("G4ABC", Convert.ToBase64String(StationFixture.Key.PublicKey)).Error); // already trusted
         Assert.Single(store.KeyRows());
 
         // A bulletin only a directory from a not yet trusted key lists is held ...
@@ -156,7 +156,7 @@ public class KeysTableTests
         Assert.NotEmpty(store.KeyConflicts);
         var change = store.AddKey("GB7RDG", second.PublicKeyBase64);
         Assert.Null(change.Error);
-        Assert.Equal($"GB7RDG already has key {KeyId.Format(TrustedKey.Gb7rdg.KeyId)}; both are now trusted.", change.Note);
+        Assert.Equal($"GB7RDG already has key {KeyId.Format(StationFixture.Key.KeyId)}; both are now trusted.", change.Note);
         Assert.Empty(store.KeyConflicts);
     }
 
@@ -167,7 +167,7 @@ public class KeysTableTests
         File.WriteAllText(Path.Combine(dir.Path, "schedule.txt"), "2026-10-29\n00:00/60\n");
         var log = new List<string>();
         var store = new ReceiverStore(dir.Path, Compression.Default, new ReceiverStoreOptions { FlushToDisk = false, Time = Clock(), Log = log.Add });
-        Assert.Null(store.HeardSchedule);
+        Assert.Empty(store.HeardSchedules);
         Assert.False(File.Exists(Path.Combine(dir.Path, "schedule.txt")));
         Assert.Contains(log, l => l.Contains("schedule.txt was not set by a signed directory", StringComparison.Ordinal));
     }

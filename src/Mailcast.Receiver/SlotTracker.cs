@@ -165,7 +165,7 @@ public sealed class SlotTracker
         lock (_gate)
         {
             DateTimeOffset? slot = null;
-            if (_schedule is { } schedule)
+            if (_schedule is { Stations.Count: > 0 } schedule)
             {
                 var nearest = schedule.NearestStart(began);
                 var off = (began - nearest).Duration();
@@ -205,7 +205,7 @@ public sealed class SlotTracker
         string? ended = null;
         lock (_gate)
         {
-            if (_schedule is { } schedule)
+            if (_schedule is { Stations.Count: > 0 } schedule)
             {
                 var slot = schedule.LatestStart(now + ClockAllowance);
                 if (_current?.Scheduled != slot)

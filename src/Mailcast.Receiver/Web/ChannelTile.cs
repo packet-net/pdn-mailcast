@@ -28,7 +28,7 @@ internal static class ChannelTile
         {
             slot = latest?.Slot,
             station = latest?.StationName,
-            stationLocator = latest?.Station is null ? Packet.Mailcast.ReceiverStore.BuiltInDetails.Locator : latest.StationLocator,
+            stationLocator = latest?.StationLocator,
             // False for a path above HF (QO-100): signal to noise, offset and frames only (issue #179).
             skywave = latest?.Skywave ?? true,
             measured = latest?.Measured,

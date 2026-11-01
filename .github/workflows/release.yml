@@ -208,6 +208,10 @@ jobs:
             fi
             # postinst seeds the config from this path; if it moves, install breaks.
             grep -q "$share/$example\$" <<<"$listing"
+            # the receiver reads its stations from here; without it nothing is trusted or followed
+            if [ "$pkg" = pdn-mailcast-receiver ]; then
+              grep -q "usr/share/pdn-mailcast-receiver/stations.json\$" <<<"$listing"
+            fi
             [ "$(dpkg-deb -f "$deb" Package)" = "$pkg" ]
             [ "$(dpkg-deb -f "$deb" Version)" = "$VERSION" ]
             [ "$(dpkg-deb -f "$deb" Architecture)" = "$ARCH" ]
@@ -298,7 +302,7 @@ jobs:
           test -f "$zip" || { echo "::error::$zip was not built"; exit 1; }
           listing="$(python3 -m zipfile -l "$zip")"
           echo "$listing"
-          for f in pdn-mailcast-receiver.exe receiver.example.json install-service.ps1 README.txt README.md LICENSE; do
+          for f in pdn-mailcast-receiver.exe receiver.example.json stations.json install-service.ps1 README.txt README.md LICENSE; do
             grep -q "pdn-mailcast-receiver/$f " <<<"$listing" || { echo "::error::$f is not in the zip"; exit 1; }
           done
           # A Windows PE executable, not a Linux one published by mistake.

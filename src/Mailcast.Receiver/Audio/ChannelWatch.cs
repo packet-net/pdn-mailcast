@@ -1,3 +1,4 @@
+using Packet.Mailcast;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -50,10 +51,11 @@ public sealed class ChannelWatch : IAsyncDisposable
     private readonly Action<string> _log;
     private readonly string? _path;
     private readonly Func<GroundPlace?> _place;
+    private readonly StationsFile _stations;
 
     /// <summary>
     /// Says which station a slot belongs to and where it is on the air and on the ground
-    /// (issue #179); null for GB7RDG, as every slot was before stations were named.
+    /// (issue #179); null for none known.
     /// </summary>
     internal Func<DateTimeOffset, StationOnAir?>? Transmitter { get; set; }
     private readonly Channel<object> _inbox = Channel.CreateUnbounded<object>(new UnboundedChannelOptions { SingleReader = true });
@@ -70,8 +72,9 @@ public sealed class ChannelWatch : IAsyncDisposable
     /// keeps them in memory only); <paramref name="place"/> says where the receiver is, for
     /// naming the hops.
     /// </summary>
-    public ChannelWatch(TimeProvider time, Action<string> log, string? statePath, Func<GroundPlace?> place)
+    public ChannelWatch(TimeProvider time, Action<string> log, string? statePath, Func<GroundPlace?> place, StationsFile? stations = null)
     {
+        _stations = stations ?? StationsFile.Empty;
         _time = time;
         _log = log;
         _path = statePath;
@@ -437,13 +440,33 @@ public sealed class ChannelWatch : IAsyncDisposable
             var saved = JsonSerializer.Deserialize<Saved>(File.ReadAllText(_path), ReceiverConfig.Json);
             if (saved?.Slots is { } slots)
             {
-                _history = [.. slots.Where(r => r is not null).OrderBy(r => r.Slot)];
+                _history = [.. slots.Where(r => r is not null).Select(Migrated).OrderBy(r => r.Slot)];
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
             _log($"channel: could not read {_path}, starting afresh: {Ascii.Clean(e.Message)}");
         }
+    }
+
+    /// <summary>
+    /// A report kept by an older version: its station named by a former name is the station that lists it,
+    /// and one with no station (every report once was the one station's) is the stations file's legacy station's.
+    /// </summary>
+    private ChannelReport Migrated(ChannelReport report)
+    {
+        string? station = report.Station is null ? _stations.Legacy : _stations.Current(report.Station);
+        if (station is null || station == report.Station)
+        {
+            return report;
+        }
+        var known = _stations.Find(station);
+        return report with
+        {
+            Station = station,
+            StationLocator = report.StationLocator ?? known?.Locator,
+            StationPlace = report.StationPlace ?? (known is null ? null : GroundPlace.FromLocator(known.Locator)),
+        };
     }
 
     private void Save(List<ChannelReport> history)

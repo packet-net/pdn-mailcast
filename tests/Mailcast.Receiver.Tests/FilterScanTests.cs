@@ -66,7 +66,7 @@ public class FilterScanTests
     {
         var audio = BandpassNoise(300, 2700, seconds: 3, seed: 1);
 
-        var (filter, problem) = FilterScan.Analyse(audio);
+        var (filter, problem) = FilterScan.Analyse(audio, StationFixture.SignalHz);
 
         Assert.Null(problem);
         Assert.NotNull(filter);
@@ -81,7 +81,7 @@ public class FilterScanTests
         // Tom's example: a filter from about 367 to 2190 Hz.
         var audio = BandpassNoise(367, 2190, seconds: 3, seed: 2);
 
-        var (filter, problem) = FilterScan.Analyse(audio);
+        var (filter, problem) = FilterScan.Analyse(audio, StationFixture.SignalHz);
 
         Assert.Null(problem);
         Assert.NotNull(filter);
@@ -97,7 +97,7 @@ public class FilterScanTests
     {
         var audio = WhiteNoise(seconds: 3, seed: 3);
 
-        var (filter, problem) = FilterScan.Analyse(audio);
+        var (filter, problem) = FilterScan.Analyse(audio, StationFixture.SignalHz);
 
         Assert.Null(filter);
         Assert.Contains("flat", problem, StringComparison.Ordinal);
@@ -113,7 +113,7 @@ public class FilterScanTests
             audio[i] += (float)(20 * Math.Sin(2 * Math.PI * 1500 * i / Rate));
         }
 
-        var (filter, problem) = FilterScan.Analyse(audio);
+        var (filter, problem) = FilterScan.Analyse(audio, StationFixture.SignalHz);
 
         Assert.Null(filter);
         Assert.NotNull(problem);
@@ -122,7 +122,7 @@ public class FilterScanTests
     [Fact]
     public void Analyse_NotEnoughAudio_SaysSo()
     {
-        var (filter, problem) = FilterScan.Analyse(new float[1000]);
+        var (filter, problem) = FilterScan.Analyse(new float[1000], StationFixture.SignalHz);
 
         Assert.Null(filter);
         Assert.Contains("Not enough audio", problem, StringComparison.Ordinal);
@@ -131,7 +131,7 @@ public class FilterScanTests
     [Fact]
     public void DialFor_TheFT450DExample_MatchesTomsWorkedAnswer()
     {
-        var (filter, problem) = FilterScan.DialFor(367, 2190);
+        var (filter, problem) = FilterScan.DialFor(367, 2190, StationFixture.SignalHz);
 
         Assert.Null(problem);
         Assert.NotNull(filter);
@@ -144,7 +144,7 @@ public class FilterScanTests
     public void DialFor_TheUsualWideFilter_GivesTheUsualDial()
     {
         // A filter centred on 1800 Hz (the usual dial's own audio centre) and 2.9 kHz wide.
-        var (filter, problem) = FilterScan.DialFor(350, 3250);
+        var (filter, problem) = FilterScan.DialFor(350, 3250, StationFixture.SignalHz);
 
         Assert.Null(problem);
         Assert.Equal(7052.0, filter!.DialKHz, 3);
@@ -156,11 +156,11 @@ public class FilterScanTests
     [InlineData(1000, 3000)] // centre 2000, accepted (the top edge)
     public void DialFor_AcceptsTheWholeAudioCentreRange(double lowHz, double highHz)
     {
-        var (filter, problem) = FilterScan.DialFor(lowHz, highHz);
+        var (filter, problem) = FilterScan.DialFor(lowHz, highHz, StationFixture.SignalHz);
 
         Assert.Null(problem);
         Assert.NotNull(filter);
-        double centreHz = OnAir.DefaultSignalHz - (filter!.DialKHz * 1000);
+        double centreHz = StationFixture.SignalHz - (filter!.DialKHz * 1000);
         Assert.InRange(centreHz, ReceiverConfig.LowestAudioCentreHz - 5, ReceiverConfig.HighestAudioCentreHz + 5);
     }
 
@@ -169,7 +169,7 @@ public class FilterScanTests
     [InlineData(1050, 3000)] // centre 2025, just over the ceiling
     public void DialFor_RefusesAFilterThatNeedsADialOutsideTheAcceptedRange(double lowHz, double highHz)
     {
-        var (filter, problem) = FilterScan.DialFor(lowHz, highHz);
+        var (filter, problem) = FilterScan.DialFor(lowHz, highHz, StationFixture.SignalHz);
 
         Assert.Null(filter);
         Assert.NotNull(problem);
@@ -178,7 +178,7 @@ public class FilterScanTests
     [Fact]
     public void DialFor_ARangeWithNoWidth_IsRefused()
     {
-        var (filter, problem) = FilterScan.DialFor(2000, 1000);
+        var (filter, problem) = FilterScan.DialFor(2000, 1000, StationFixture.SignalHz);
 
         Assert.Null(filter);
         Assert.NotNull(problem);
@@ -187,7 +187,7 @@ public class FilterScanTests
     [Fact]
     public void DialFor_RoundsToTheNearest10Hz()
     {
-        var (filter, _) = FilterScan.DialFor(400, 2203); // middle 1301.5, not a multiple of 10 Hz away from 7053800
+        var (filter, _) = FilterScan.DialFor(400, 2203, StationFixture.SignalHz); // middle 1301.5, not a multiple of 10 Hz away from 7053800
 
         Assert.NotNull(filter);
         double dialHz = filter!.DialKHz * 1000;

@@ -50,7 +50,7 @@ public sealed record BbsSettings
     public string Command { get; init; } = "BBS";
 }
 
-/// <summary>One transmitter key the owner trusts, besides the built-in ones (<see cref="TrustedKey.BuiltIn"/>).</summary>
+/// <summary>One transmitter key the owner trusts, besides those of the stations file.</summary>
 public sealed record TrustedKeySettings
 {
     /// <summary>What the page and the log call the transmitter, such as its callsign.</summary>
@@ -95,7 +95,7 @@ public sealed record ArchiveSettings
 /// <summary>
 /// The receiver's configuration file. Only what a station has to choose is here, and the
 /// callsigns the broadcast may come from; the broadcast's other details (its destination, the
-/// modem, where the signal sits above the dial) are fixed in <see cref="OnAir"/>.
+/// modem) are fixed in <see cref="OnAir"/>. The stations themselves are in the stations file (<see cref="Stations"/>).
 /// </summary>
 public sealed record ReceiverConfig
 {
@@ -116,9 +116,6 @@ public sealed record ReceiverConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Locator { get; init; }
 
-    /// <summary>The usual USB dial, in kHz: 7.052 MHz, which puts the signal's centre on 7.0538 MHz.</summary>
-    public const double DefaultDialKHz = 7052.0;
-
     /// <summary>
     /// The lowest audio centre accepted, Hz: below this a rig's own filter (or its sound card)
     /// cuts into the signal from below, and pdn-soundmodem's own guard against DC refuses it outright.
@@ -129,10 +126,26 @@ public sealed record ReceiverConfig
     public const double HighestAudioCentreHz = 2000;
 
     /// <summary>
-    /// The USB dial, in kHz. A web SDR is tuned here; a radio on a sound card should be set here.
-    /// The signal's centre is always <see cref="OnAir.CentreAudioHz"/> above it.
+    /// The stations file in force: the stations this receiver trusts and follows before it has heard
+    /// anything, and the daily report's address. Read beside the config (see <see cref="StationsFile.Locate"/>), not part of it.
     /// </summary>
-    public double DialKHz { get; init; } = DefaultDialKHz;
+    [JsonIgnore]
+    public StationsFile Stations { get; init; } = TestStations ?? StationsFile.Empty;
+
+    /// <summary>For tests: the stations file a config has, and <see cref="Parse"/> reads, when none is asked for. Never set in a program.</summary>
+    internal static StationsFile? TestStations { get; set; }
+
+    /// <summary>
+    /// <c>"dialKHz"</c>, the USB dial in kHz. A web SDR is tuned here; a radio on a sound card should be set here.
+    /// Left out (null), it is the first station's centre less <see cref="OnAir.CentreAudioHz"/>, which puts
+    /// that signal at 1800 Hz in the audio; see <see cref="ResolvedDialKHz"/>. Left out of a saved file while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? DialKHz { get; init; }
+
+    /// <summary>The dial in kHz: <see cref="DialKHz"/>, else the first station's centre less <see cref="OnAir.CentreAudioHz"/>, else null.</summary>
+    [JsonIgnore]
+    public double? ResolvedDialKHz => DialKHz ?? (Stations.First is { } first ? (first.FrequencyHz - OnAir.CentreAudioHz) / 1000 : null);
 
     /// <summary>
     /// The local oscillator of a downconverting LNB in front of the receiver, in Hz, as the
@@ -148,47 +161,40 @@ public sealed record ReceiverConfig
     /// <summary>The lowest and highest <see cref="LnbHz"/> accepted: any real LNB's oscillator, 1 to 40 GHz.</summary>
     public const long LowestLnbHz = 1_000_000_000, HighestLnbHz = 40_000_000_000;
 
-    /// <summary>The USB dial in Hz.</summary>
+    /// <summary>The USB dial in Hz; 0 when there is none (no <c>dialKHz</c> and no station).</summary>
     [JsonIgnore]
-    public double DialHz => DialKHz * 1000;
+    public double DialHz => (ResolvedDialKHz ?? 0) * 1000;
 
     /// <summary>
-    /// The signal centre in Hz that <see cref="DialKHz"/> is written for: <see cref="OnAir.DefaultSignalHz"/>
-    /// (GB7RDG's). It fixes where in the audio the dial puts a signal, 1800 Hz at the usual dial;
-    /// a station on another frequency (issue #179) is heard by moving the dial to keep the signal
-    /// at that audio centre, or, with the dial fixed, if its signal falls in the passband.
+    /// The signal centre in Hz that the dial is written for: the first station's, else (a dial given and no
+    /// station) <see cref="OnAir.CentreAudioHz"/> above it. It fixes where in the audio the dial puts a
+    /// signal, 1800 Hz at the first station's own dial; a station on another frequency (issue #179) is
+    /// heard by moving the dial to keep the signal at that audio centre, or, with the dial fixed, if its
+    /// signal falls in the passband.
     /// </summary>
     [JsonIgnore]
-    [SuppressMessage("Performance", "CA1822", Justification = "An instance property, so it reads beside DialKHz and AudioCentreHz.")]
-    public double CentreHz => OnAir.DefaultSignalHz;
+    public double CentreHz => Stations.First is { } first ? first.FrequencyHz : DialKHz is { } dial ? (dial * 1000) + OnAir.CentreAudioHz : 0;
 
     /// <summary>
     /// Where <see cref="CentreHz"/> falls in this receiver's own audio, Hz above zero: 1800 Hz at
-    /// the usual 7.052 MHz dial, or 1500 Hz at 7.0523 MHz, the alternative for a sound card behind
+    /// the first station's own dial, or 1500 Hz at 300 Hz above it, the alternative for a sound card behind
     /// a rig filter 2.4 kHz or narrower (see docs/receiver.md). What the tone detector, the
     /// spectrogram's marks and the channel probe look for.
     /// </summary>
     [JsonIgnore]
-    public double AudioCentreHz => OnAir.AudioCentreHz(DialHz);
+    public double AudioCentreHz => OnAir.AudioCentreHz(DialHz, CentreHz);
 
     /// <summary>
-    /// The callsigns accepted when the file has no <c>"sources"</c>, as files from before the
-    /// setting do: GB7RDG, and M0LTE, which the broadcast may move to. The only place in the
-    /// code these are written.
-    /// </summary>
-    public static readonly CallsignList DefaultSources = CallsignList.Parse(["GB7RDG", "M0LTE"]);
-
-    /// <summary>
-    /// <c>"sources"</c>: the base callsigns broadcast frames are accepted from, any SSID; frames
-    /// from anyone else are somebody else's traffic. Null when the file leaves it out, which
-    /// means <see cref="DefaultSources"/>; see <see cref="AcceptedSources"/>.
+    /// <c>"sources"</c>: base callsigns broadcast frames are accepted from besides every station this receiver
+    /// knows of (the stations file, pins, adverts, listen-for and directories), any SSID. Null when the file
+    /// leaves it out, which means none besides those; see <see cref="AcceptedSources"/>.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CallsignList? Sources { get; init; }
 
-    /// <summary>The callsigns frames are accepted from: <see cref="Sources"/>, or <see cref="DefaultSources"/> without it.</summary>
+    /// <summary>The callsigns frames are accepted from by the config alone: <see cref="Sources"/>, or none.</summary>
     [JsonIgnore]
-    public CallsignList AcceptedSources => Sources ?? DefaultSources;
+    public CallsignList AcceptedSources => Sources ?? CallsignList.None;
 
     /// <summary>The BBS the bulletins go to.</summary>
     public BbsSettings Bbs { get; init; } = new();
@@ -198,36 +204,6 @@ public sealed record ReceiverConfig
 
     /// <summary>How long the receiver keeps its own copy of each bulletin once the BBS has answered for it.</summary>
     public ArchiveSettings Archive { get; init; } = new();
-
-    /// <summary>
-    /// The minute past the hour GB7RDG's slots start at, 0 to 59: slots are counted from 00:MM
-    /// UTC. GB7RDG sends every hour on the hour, so 0 and <see cref="EveryMinutes"/> 60. Left
-    /// out, 0 (unless the older <see cref="SlotUtc"/> is given).
-    /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? Minute { get; init; }
-
-    /// <summary>
-    /// The older way to say <see cref="Minute"/>: a time of day as HH:mm that every slot is
-    /// counted from. Still read, so existing files work; saving writes <c>minute</c> instead
-    /// when it is 00:MM, and keeps this only for an anchor with no minute equivalent (12:00).
-    /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? SlotUtc { get; init; }
-
-    /// <summary>The anchor as HH:mm, from whichever of <see cref="Minute"/> and <see cref="SlotUtc"/> is given (00:00 if neither).</summary>
-    [JsonIgnore]
-    public string SlotAnchor => Packet.Mailcast.SlotAnchor.Text(SlotUtc, Minute, "00:00");
-
-    /// <summary>
-    /// Minutes from one slot's start to the next: it divides a day (1440) and is at least
-    /// <see cref="ShortestEveryMinutes"/>. A config from before hourly slots has only
-    /// <c>slotUtc</c> (12:00), and gets the default 60: the same hourly slots.
-    /// </summary>
-    public int EveryMinutes { get; init; } = 60;
-
-    /// <summary>The shortest gap between slots accepted, as the head end does.</summary>
-    public const int ShortestEveryMinutes = 15;
 
     /// <summary>How long before a slot a web SDR is opened.</summary>
     public static readonly TimeSpan WebSdrBefore = TimeSpan.FromMinutes(2);
@@ -249,13 +225,6 @@ public sealed record ReceiverConfig
     public static int MostWebSdrSlotsPerDay => WebSdrAllowanceMinutes / WebSdrMinutesPerSlot;
 
     /// <summary>
-    /// Set when the file had <c>slotUtc</c> but no <c>everyMinutes</c>, as before hourly slots;
-    /// it is read as hourly from that time, and the receiver says so in its log.
-    /// </summary>
-    [JsonIgnore]
-    public bool SlotUtcWithoutEveryMinutes { get; init; }
-
-    /// <summary>
     /// Set when the file had <c>webSdrSlotsPerDay</c>, from 0.5.1 and before. It is no longer
     /// used: the key is ignored, not refused, so those files keep working, and the receiver says
     /// so in its log. Saving the settings leaves it out.
@@ -263,27 +232,17 @@ public sealed record ReceiverConfig
     [JsonIgnore]
     public bool WebSdrSlotsPerDayIgnored { get; init; }
 
-    /// <summary>The first slot's start, parsed. Throws <see cref="ConfigException"/> for one that is not HH:mm.</summary>
-    [JsonIgnore]
-    public TimeOnly SlotStart => TimeOnly.TryParseExact(SlotAnchor, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)
-        ? t
-        : throw new ConfigException($"\"slotUtc\" \"{SlotUtc}\" is not a time like 00:00");
-
     /// <summary>
-    /// GB7RDG's daylight hours: its slots run only from <see cref="DaylightSettings.AfterSunriseMinutes"/>
-    /// after sunrise to <see cref="DaylightSettings.BeforeSunsetMinutes"/> before sunset at
-    /// <see cref="DaylightSettings.Locator"/>. Left out, GB7RDG's own (IO91lk, 120, 30); null for
-    /// every slot. A directory heard from the head end that gives its slots is used instead.
+    /// Set to the settings the file had from before slots came from the stations (<c>minute</c>,
+    /// <c>slotUtc</c>, <c>everyMinutes</c>, <c>daylight</c>): none is used now, the receiver says so in its log,
+    /// and saving the settings leaves them out.
     /// </summary>
-    public DaylightSettings? Daylight { get; init; } = new();
-
-    /// <summary>GB7RDG's slots, as this file gives them.</summary>
     [JsonIgnore]
-    public SlotSchedule Schedule => new(SlotStart, EveryMinutes, Daylight?.ToRule());
+    public IReadOnlyList<string> SlotSettingsIgnored => SlotKeysIgnored.Length == 0 ? [] : SlotKeysIgnored.Split(',');
 
-    /// <summary>The slots a web SDR would listen to without a daylight rule, by time of day, earliest first.</summary>
+    /// <summary><see cref="SlotSettingsIgnored"/> as one string, so that two configs read from the same file are equal.</summary>
     [JsonIgnore]
-    public IReadOnlyList<TimeOnly> WebSdrSlots => ListeningWindow.WebSdrSlots(Schedule);
+    internal string SlotKeysIgnored { get; init; } = "";
 
     /// <summary>Where the pieces heard, the rebuilt bulletins and the delivery record are kept.</summary>
     public string StateDirectory { get; init; } = DefaultStateDirectory;
@@ -334,13 +293,13 @@ public sealed record ReceiverConfig
 
     /// <summary>
     /// A short daily report of what this receiver heard, sent through the BBS as a public
-    /// bulletin to MCAST at GB7RDG. Null (the default) or not enabled sends nothing.
+    /// bulletin to <c>feedback.to</c>, by default the stations file's report address. Null (the default) or not enabled sends nothing.
     /// </summary>
     public FeedbackSettings? Feedback { get; init; }
 
     /// <summary>
-    /// Transmitter keys to trust as well as the built-in ones (GB7RDG's): a directory signed by
-    /// one of these, or by a built-in key, shows as "signed by" its label. Null (the default)
+    /// Transmitter keys to trust as well as the stations file's: a directory signed by
+    /// one of these, or by a station's key, shows as "signed by" its label. Null (the default)
     /// adds none. Left out of a saved file while null.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -349,11 +308,20 @@ public sealed record ReceiverConfig
     /// <summary>
     /// Stations, by callsign, whose slots this receiver does not listen at although a head end
     /// advertises them or their own directory gives them (issue #178). Their bulletins are still
-    /// delivered if heard. GB7RDG's slots are always listened at. Null (the default) skips none;
+    /// delivered if heard. Null (the default) skips none;
     /// left out of a saved file while null. The status page sets it too.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? SkipStations { get; init; }
+
+    /// <summary>Whether the listener chose not to listen at <paramref name="station"/>'s slots. A name from before the stations file (a station's <c>formerly</c>) is not that station: it skipped nothing then and skips nothing now.</summary>
+    public bool IsSkipped(string station) =>
+        (SkipStations ?? []).Any(s => string.Equals(s, station, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The <see cref="SkipStations"/> that are a station's former name, which are ignored.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<(string Name, string Now)> IgnoredSkips =>
+        [.. (SkipStations ?? []).Select(s => (Name: s, Now: Stations.Current(s.ToUpperInvariant()))).Where(p => !string.Equals(p.Name, p.Now, StringComparison.OrdinalIgnoreCase))];
 
     /// <summary>
     /// Stations to listen for by hand (issue #224): each is treated like an advert heard on air
@@ -364,7 +332,7 @@ public sealed record ReceiverConfig
     public IReadOnlyList<ListenForEntry>? ListenFor { get; init; }
 
     /// <summary>
-    /// Every key this receiver trusts: the built-in ones, then <see cref="TrustedKeys"/>. Throws
+    /// Every key this receiver trusts: the stations file's, then <see cref="TrustedKeys"/>. Throws
     /// <see cref="ConfigException"/> if one of those cannot be read.
     /// </summary>
     [JsonIgnore]
@@ -372,7 +340,7 @@ public sealed record ReceiverConfig
     {
         get
         {
-            var keys = new List<TrustedKey>(TrustedKey.BuiltIn);
+            var keys = new List<TrustedKey>(Stations.Stations.Select(st => st.Key));
             for (int i = 0; i < (TrustedKeys?.Count ?? 0); i++)
             {
                 var setting = TrustedKeys![i] ?? throw new ConfigException($"\"trustedKeys\" entry {i + 1} is null: give a \"label\" and a \"publicKey\"");
@@ -445,7 +413,7 @@ public sealed record ReceiverConfig
         catch (JsonException e) when (e.Path?.StartsWith("$.feedback", StringComparison.Ordinal) == true)
         {
             throw new ConfigException(System.Text.RegularExpressions.Regex.Match(e.Message, "property '([^']*)' could not be mapped") is { Success: true } unknown
-                ? $"the config file {path}: \"{unknown.Groups[1].Value}\" is not a setting of \"feedback\": it has only \"enabled\" and \"callsign\""
+                ? $"the config file {path}: \"{unknown.Groups[1].Value}\" is not a setting of \"feedback\": it has \"enabled\", \"callsign\" and \"to\""
                 : $"the config file {path} has a \"feedback\" setting that cannot be read (at {e.Path}): give it as {{ \"enabled\": true, \"callsign\": \"G4ABC\" }}");
         }
         catch (JsonException e)
@@ -454,13 +422,19 @@ public sealed record ReceiverConfig
         }
 
         config ??= new ReceiverConfig();
+        StationsFile stations;
+        try
+        {
+            stations = TestStations ?? StationsFile.Locate(path);
+        }
+        catch (FormatException e)
+        {
+            throw new ConfigException(e.Message);
+        }
+        config = config with { Stations = stations, SlotKeysIgnored = string.Join(",", RetiredSlotKeys.Where(k => Has(text, k))) };
         if (config.Sources is null && Has(text, "sources"))
         {
-            throw new ConfigException($"\"sources\" is null: give the callsigns the broadcast comes from, such as [\"GB7RDG\", \"M0LTE\"], or leave it out for {DefaultSources}");
-        }
-        if (HasOnlySlotUtc(text))
-        {
-            config = config with { SlotUtcWithoutEveryMinutes = true };
+            throw new ConfigException("\"sources\" is null: give the callsigns the broadcast comes from besides the stations it knows, such as [\"G4ABC\"], or leave it out for none");
         }
         if (Has(text, "webSdrSlotsPerDay"))
         {
@@ -470,20 +444,15 @@ public sealed record ReceiverConfig
         return config;
     }
 
-    /// <summary>Whether a config file gives <c>slotUtc</c> but not <c>everyMinutes</c>, as one from before hourly slots does.</summary>
-    private static bool HasOnlySlotUtc(string text)
-    {
-        using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-        return document.RootElement.ValueKind == JsonValueKind.Object
-            && document.RootElement.TryGetProperty("slotUtc", out _)
-            && !document.RootElement.TryGetProperty("everyMinutes", out _);
-    }
+    /// <summary>Slot settings from before each station had its own slots: ignored, with one log line.</summary>
+    private static readonly string[] RetiredSlotKeys = ["minute", "slotUtc", "everyMinutes", "daylight"];
 
     /// <summary>
     /// Top-level keys that are no longer settings but are still read without a word of their
     /// own here: the receiver says something else about each (see <see cref="WebSdrSlotsPerDayIgnored"/>).
     /// </summary>
-    private static readonly string[] RetiredKeys = ["webSdrSlotsPerDay"];
+    private static readonly string[] RetiredKeys = ["webSdrSlotsPerDay", .. RetiredSlotKeys];
+
 
     /// <summary>The top-level keys a config file may give: each setting's name as the file spells it.</summary>
     private static readonly HashSet<string> KnownKeys = typeof(ReceiverConfig)
@@ -544,14 +513,7 @@ public sealed record ReceiverConfig
     }
 
     /// <summary>The file <see cref="Save"/> writes, byte for byte.</summary>
-    internal byte[] ToFile() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(WithMinute(), Json) + "\n");
-
-    /// <summary>This config with the older <c>slotUtc</c> given as 00:MM turned into <c>minute</c>; anything else is as it is.</summary>
-    private ReceiverConfig WithMinute() =>
-        SlotUtc is { } old && Minute is null && old.Length == 5 && old.StartsWith("00:", StringComparison.Ordinal)
-            && int.TryParse(old.AsSpan(3), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int m) && m is >= 0 and <= 59
-            ? this with { SlotUtc = null, Minute = m }
-            : this;
+    internal byte[] ToFile() => System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this, Json) + "\n");
 
     /// <summary>Throws <see cref="ConfigException"/> if a setting cannot work.</summary>
     public void Validate()
@@ -581,28 +543,20 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException("\"stateDirectory\" is null");
         }
-        if (Packet.Mailcast.SlotAnchor.Problem(SlotUtc, Minute, "\"slotUtc\"", "\"minute\"") is { } anchorProblem)
-        {
-            throw new ConfigException(anchorProblem);
-        }
         _ = AudioSource.Parse(Audio);
         if (Locator is not null && !Maidenhead.TryParse(Locator.Trim(), out _, out _))
         {
             throw new ConfigException($"\"locator\" \"{Ascii.Clean(Locator)}\" is not a 4 or 6 character Maidenhead locator, such as IO91 or IO91lk");
         }
-        _ = SlotStart;
-        if (EveryMinutes < ShortestEveryMinutes || 1440 % EveryMinutes != 0)
+        var source = AudioSource.Parse(Audio);
+        if (ResolvedDialKHz is null && (source.IsSoundCard || source.Kind == AudioSourceKind.SdrConnect))
         {
-            throw new ConfigException($"\"everyMinutes\" {EveryMinutes} must divide a day (1440) and be at least {ShortestEveryMinutes}; GB7RDG's is 60");
+            throw new ConfigException("\"dialKHz\" is not set and the stations file lists no station to take it from: set \"dialKHz\" in the config file, the USB dial of your radio in kHz");
         }
-        if (Daylight?.Problem(EveryMinutes, SlotStart) is { } daylightProblem)
-        {
-            throw new ConfigException($"\"daylight\": {daylightProblem}; GB7RDG's is {{ \"locator\": \"IO91lk\", \"afterSunriseMinutes\": 120, \"beforeSunsetMinutes\": 30 }}");
-        }
-        if (!(AudioCentreHz >= LowestAudioCentreHz && AudioCentreHz <= HighestAudioCentreHz))
+        if (ResolvedDialKHz is not null && !(AudioCentreHz >= LowestAudioCentreHz && AudioCentreHz <= HighestAudioCentreHz))
         {
             throw new ConfigException(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                $"\"dialKHz\" {DialKHz} puts the signal's centre at {AudioCentreHz:F0} Hz in your audio, outside the {LowestAudioCentreHz:F0} to {HighestAudioCentreHz:F0} Hz this receiver can use; the usual dial is {DefaultDialKHz:F1} (1800 Hz)"));
+                $"\"dialKHz\" {ResolvedDialKHz} puts the signal's centre at {AudioCentreHz:F0} Hz in your audio, outside the {LowestAudioCentreHz:F0} to {HighestAudioCentreHz:F0} Hz this receiver can use; the usual dial puts it at {OnAir.CentreAudioHz:F0} Hz"));
         }
         if (LnbHz is { } lnb && (lnb < LowestLnbHz || lnb > HighestLnbHz))
         {
@@ -632,7 +586,7 @@ public sealed record ReceiverConfig
         {
             throw new ConfigException("\"stateDirectory\" is empty");
         }
-        if (ListenForEntry.FirstProblem(ListenFor) is { } listenForProblem)
+        if (ListenForEntry.FirstProblem(ListenFor, Stations) is { } listenForProblem)
         {
             throw new ConfigException(listenForProblem);
         }
@@ -640,6 +594,10 @@ public sealed record ReceiverConfig
         Bpq?.Validate();
         Hooks?.Validate();
         Feedback?.Validate();
+        if (Feedback is { Enabled: true } && Feedback.To is null && Stations.Report is null)
+        {
+            throw new ConfigException("\"feedback\" is enabled but there is no address to send the report to: set \"feedback\".\"to\" to a bulletin and BBS address such as \"MCAST@HOST.#42.GBR.EURO\"");
+        }
         _ = AllTrustedKeys;
         if (Rig is { DedicatedRadio: false } && Bpq is null && Hooks?.Before is null)
         {

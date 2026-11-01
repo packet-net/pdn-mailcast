@@ -63,7 +63,7 @@ public class SpeedTests
     {
         var time = new FakeTimeProvider(At(12, 0, 30));
         var log = new List<string>();
-        var slots = new SlotTracker(time, log.Add, Hourly);
+        var slots = new SlotTracker(time, log.Add, Fixture.Of(Hourly));
 
         for (int i = 0; i < 5; i++)
         {
@@ -98,7 +98,7 @@ public class SpeedTests
     public void Slot_WithNoOneWaveformAhead_IsMixed()
     {
         var time = new FakeTimeProvider(At(12, 1));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         slots.OnFrame(Wn4);
         time.Advance(TimeSpan.FromSeconds(30));
@@ -110,7 +110,7 @@ public class SpeedTests
     [Fact]
     public void Slot_WithNoWaveformKnown_SaysNone()
     {
-        var slots = new SlotTracker(new FakeTimeProvider(At(12, 1)), _ => { }, Hourly);
+        var slots = new SlotTracker(new FakeTimeProvider(At(12, 1)), _ => { }, Fixture.Of(Hourly));
 
         slots.OnFrame();
 
@@ -122,7 +122,7 @@ public class SpeedTests
     public void Slot_KeepsTheDirectorysWaveform_AndATonesStartKeepsTheCounts()
     {
         var time = new FakeTimeProvider(At(12, 0, 10));
-        var slots = new SlotTracker(time, _ => { }, Hourly);
+        var slots = new SlotTracker(time, _ => { }, Fixture.Of(Hourly));
 
         slots.OnDirectory(Directory(Wn4)); // nothing heard yet: nothing to put it on
         Assert.Null(slots.Last);

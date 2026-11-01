@@ -16,8 +16,8 @@ public class FollowedStationsTests
     [Fact]
     public void OneStation_AnswersExactlyAsItsOwnSchedule()
     {
-        var gb7rdg = new SlotSchedule(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
-        FollowedSlots one = gb7rdg;
+        var gb7rdg = new SlotSchedule(TimeOnly.MinValue, 60, StationFixture.Daylight);
+        FollowedSlots one = Fixture.Of(gb7rdg);
         Assert.True(one.OneStation);
         for (var t = At(0, 7); t < At(23, 59); t += TimeSpan.FromMinutes(37))
         {
@@ -25,7 +25,7 @@ public class FollowedStationsTests
             Assert.Equal(gb7rdg.LatestActiveStart(t), one.LatestActiveStart(t));
             Assert.Equal(gb7rdg.LatestStart(t), one.LatestStart(t));
             Assert.Equal(gb7rdg.NearestStart(t), one.NearestStart(t));
-            Assert.Equal(ListeningWindow.Next(t, gb7rdg), ListeningWindow.Next(t, one));
+            Assert.Equal(ListeningWindow.Next(t, Fixture.Of(gb7rdg)), ListeningWindow.Next(t, one));
         }
         Assert.Equal(gb7rdg.ActiveOn(Day), one.ActiveOn(Day));
         Assert.Equal(ListeningWindow.WebSdrSlotsOn(gb7rdg, Day), ListeningWindow.WebSdrSlotsOn(one, Day));
@@ -98,7 +98,7 @@ public class FollowedStationsTests
     public void SlotTracker_WithOneStation_NamesNone()
     {
         var time = new FakeTimeProvider(At(10, 33));
-        var tracker = new SlotTracker(time, _ => { }, OnTheHour);
+        var tracker = new SlotTracker(time, _ => { }, Fixture.Of(OnTheHour));
         tracker.OnFrame();
         Assert.Equal(At(10, 0), tracker.Last!.Scheduled);
         Assert.Null(tracker.Last.Station);
@@ -118,14 +118,14 @@ public class FollowedStationsTests
     {
         var bpq = DirectorySigner.FromPem(DirectorySigner.NewKeyPem()); // a throwaway key
         using var dir = new TempDirectory();
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot };
         var slot = At(10, 30);
         var log = new List<string>();
         await using var host = new ReceiverHost(config, new FakeTimeProvider(slot.AddMinutes(1)), line => { lock (log) { log.Add(line); } });
         Assert.True(host.Followed.OneStation);
 
         await HearAsync(host, ScheduleOptions.Hourly with { Timetable = new SlotTimetable(new TimeOnly(0, 30), 60), Signer = bpq, Station = "G8BPQ" }, slot, 1);
-        Assert.Equal(["GB7RDG", "G8BPQ"], host.Followed.Stations.Select(s => s.Station));
+        Assert.Equal(["G8BPQ", "GB7RDG"], host.Followed.Stations.Select(s => s.Station)); // heard directly first, then the stations file's
         Assert.Equal(slot, host.Slots.Schedule!.LatestStart(slot.AddMinutes(1)));
         Assert.Equal("G8BPQ", host.Slots.Schedule.StationAt(slot));
 
@@ -147,7 +147,7 @@ public class FollowedStationsTests
         Assert.Equal(moved, host.Slots.Schedule!.LatestStart(moved.AddMinutes(1)));
         lock (log)
         {
-            Assert.Contains(log, l => l.StartsWith("slots: now following GB7RDG every hour on the hour; G8BPQ every hour at 45 minutes past", StringComparison.Ordinal));
+            Assert.Contains(log, l => l.StartsWith("slots: now following G8BPQ every hour at 45 minutes past; M0ABC every hour at 50 minutes past; GB7RDG every hour on the hour", StringComparison.Ordinal));
             // Said once for each real change, never again for the same stations.
             Assert.Equal(log.Count(l => l.StartsWith("slots: now following", StringComparison.Ordinal)), log.Where(l => l.StartsWith("slots: now following", StringComparison.Ordinal)).Distinct().Count());
         }
@@ -162,7 +162,7 @@ public class FollowedStationsTests
         {
             Audio = "ubersdr:wessex.zapto.org",
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             TrustedKeys = [new TrustedKeySettings { Label = "M0XYZ", PublicKey = xyz.PublicKeyBase64 }],
         };
         var slot = At(10, 15);
@@ -177,8 +177,8 @@ public class FollowedStationsTests
             }, slot, 1);
             var listening = host.Listening;
             // Heard directly first, then advertised only.
-            Assert.Equal(["GB7RDG", "M0XYZ", "G8BPQ", "M0FAR"], listening.Select(l => l.Station));
-            Assert.Equal("its own directory", listening[1].Source);
+            Assert.Equal(["M0XYZ", "GB7RDG", "G8BPQ", "M0FAR"], listening.Select(l => l.Station));
+            Assert.Equal("its own directory", listening[0].Source);
             Assert.Equal("an advert", listening[2].Source);
             Assert.True(listening[2].Followed); // its HF advert, not its QO-100 one, decides
             Assert.Equal(7_053_800, listening[2].FrequencyHz);
@@ -186,17 +186,17 @@ public class FollowedStationsTests
             Assert.False(listening[3].Followed);
             Assert.Contains("10489.750 MHz USB, above HF", listening[3].NotFollowedBecause, StringComparison.Ordinal);
             Assert.Equal("JM75", listening[3].Locator);
-            Assert.Equal(["GB7RDG", "M0XYZ", "G8BPQ"], host.Followed.Stations.Select(s => s.Station));
+            Assert.Equal(["M0XYZ", "GB7RDG", "G8BPQ"], host.Followed.Stations.Select(s => s.Station));
         }
 
         // Told not to listen at G8BPQ's slots: its bulletins would still be delivered, but its slots are skipped.
         await using var skipping = new ReceiverHost(config with { SkipStations = ["G8BPQ"] }, new FakeTimeProvider(slot.AddMinutes(1)), _ => { });
-        Assert.Equal(["GB7RDG", "M0XYZ"], skipping.Followed.Stations.Select(s => s.Station));
+        Assert.Equal(["M0XYZ", "GB7RDG"], skipping.Followed.Stations.Select(s => s.Station));
         Assert.Equal("you chose not to listen at its slots", skipping.Listening.Single(l => l.Station == "G8BPQ").NotFollowedBecause);
     }
 
     [Fact]
-    public async Task Caps_AtMostSixStations_EightAdvertsADirectory_AndOneSlotAnHour()
+    public async Task Caps_AtMostSevenStations_EightAdvertsADirectory_AndOneSlotAnHour()
     {
         var xyz = DirectorySigner.FromPem(DirectorySigner.NewKeyPem()); // a throwaway key, pinned by hand
         using var dir = new TempDirectory();
@@ -204,7 +204,7 @@ public class FollowedStationsTests
         {
             Audio = "ubersdr:wessex.zapto.org",
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             TrustedKeys = [new TrustedKeySettings { Label = "M0XYZ", PublicKey = xyz.PublicKeyBase64 }],
         };
         var slot = At(10, 5);
@@ -224,12 +224,12 @@ public class FollowedStationsTests
         Assert.Contains("past the first 8 adverts", listening["G0AA9"].NotFollowedBecause, StringComparison.Ordinal);
         Assert.False(listening["G0AA10"].Followed);
 
-        // Eight eligible besides GB7RDG: M0XYZ, heard directly, then G0AA2 to G0AA8 by callsign,
-        // as they were first advertised together. Six are followed, the last two left out.
+        // Nine eligible: M0XYZ, heard directly, GB7RDG from the stations file, then G0AA2 to G0AA8 by
+        // callsign, as they were first advertised together. Seven are followed, the last two left out.
         Assert.Equal(7, host.Followed.Stations.Count);
-        Assert.Equal("M0XYZ", host.Followed.Stations[1].Station);
-        Assert.Contains("at most 6 stations besides GB7RDG", listening["G0AA7"].NotFollowedBecause, StringComparison.Ordinal);
-        Assert.Contains("at most 6 stations besides GB7RDG", listening["G0AA8"].NotFollowedBecause, StringComparison.Ordinal);
+        Assert.Equal(["M0XYZ", "GB7RDG"], host.Followed.Stations.Take(2).Select(s => s.Station));
+        Assert.Contains("at most 7 stations, and others were heard of first", listening["G0AA7"].NotFollowedBecause, StringComparison.Ordinal);
+        Assert.Contains("at most 7 stations, and others were heard of first", listening["G0AA8"].NotFollowedBecause, StringComparison.Ordinal);
         for (int i = 2; i <= 6; i++)
         {
             Assert.True(listening[$"G0AA{i}"].Followed);

@@ -62,7 +62,8 @@ public sealed class Intake : IAsyncDisposable
             _ => Dropped());
         _store = new ReceiverStore(Path.Combine(stateDirectory, "store"), Compression.Default,
             (options ?? new ReceiverStoreOptions()) with { Log = line => log("store: " + Ascii.Clean(line)), PublishMailOnChange = false });
-        _heardSchedule = _store.HeardSchedule;
+        _heardSchedules = _store.HeardSchedules;
+        _sources = CallsignList.None.Plus((options ?? new ReceiverStoreOptions()).Stations.Stations.Select(s => s.Callsign));
         _ionosphere = _store.Ionosphere;
         _pskReporter = _store.PskReporter;
         _time = (options ?? new ReceiverStoreOptions()).Time;
@@ -85,7 +86,7 @@ public sealed class Intake : IAsyncDisposable
     /// </summary>
     public (DirectoryCheck? Newest, HeardDirectoryCheck? LastHeard) DirectoryChecks() => _directoryChecks;
 
-    private SlotTimetable? _heardSchedule;
+    private IReadOnlyDictionary<string, SlotTimetable> _heardSchedules = new Dictionary<string, SlotTimetable>();
     private volatile IonoReading? _ionosphere;
     private readonly TimeProvider _time;
 
@@ -112,16 +113,15 @@ public sealed class Intake : IAsyncDisposable
     }
 
     /// <summary>
-    /// The head end's timetable from the newest directory that gave one, kept across restarts;
-    /// null until one has been heard.
+    /// Each stations-file station's timetable from the newest directory of its that gave one, kept across restarts.
     /// </summary>
-    public SlotTimetable? HeardSchedule
+    public IReadOnlyDictionary<string, SlotTimetable> HeardSchedules
     {
         get
         {
             lock (_gate)
             {
-                return _heardSchedule;
+                return _heardSchedules;
             }
         }
     }
@@ -161,7 +161,7 @@ public sealed class Intake : IAsyncDisposable
                 result = change(_store);
                 _progress = (_store.Directory, _store.Progress());
                 _directoryChecks = (_store.NewestCheck, _store.LastDirectoryHeard);
-                _heardSchedule = _store.HeardSchedule;
+                _heardSchedules = _store.HeardSchedules;
             }
             finally
             {
@@ -259,7 +259,7 @@ public sealed class Intake : IAsyncDisposable
     public event Action? KeysChanged;
 
     /// <summary>A directory gave a timetable different from the one held (raised on the worker).</summary>
-    public event Action<SlotTimetable>? ScheduleHeard;
+    public event Action<string, SlotTimetable>? ScheduleHeard;
 
     /// <summary>A bulletin has been rebuilt and is waiting in the outbox.</summary>
     public event Action<Bulletin>? BulletinCompleted;
@@ -321,7 +321,7 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>Broadcast frames that added a piece the store did not have.</summary>
     public long FramesStored => Interlocked.Read(ref _framesStored);
 
-    private volatile CallsignList _sources = ReceiverConfig.DefaultSources;
+    private volatile CallsignList _sources;
 
     /// <summary>
     /// The callsigns broadcast frames are accepted from: the config's
@@ -912,18 +912,22 @@ public sealed class Intake : IAsyncDisposable
                 {
                     DirectoryHeard?.Invoke(directory);
                 }
-                SlotTimetable? changed = null;
+                var changed = new List<(string Station, SlotTimetable Timetable)>();
                 lock (_gate)
                 {
-                    if (_store.HeardSchedule is { } heard && heard != _heardSchedule)
+                    var kept = _store.HeardSchedules;
+                    foreach (var (station, heard) in kept)
                     {
-                        _heardSchedule = heard;
-                        changed = heard;
+                        if (!_heardSchedules.TryGetValue(station, out var before) || before != heard)
+                        {
+                            changed.Add((station, heard));
+                        }
                     }
+                    _heardSchedules = kept;
                 }
-                if (changed is not null)
+                foreach (var (station, heard) in changed)
                 {
-                    ScheduleHeard?.Invoke(changed);
+                    ScheduleHeard?.Invoke(station, heard);
                 }
                 break;
             case FrameOutcome.AlreadyComplete when result.Directory is { } repeat:

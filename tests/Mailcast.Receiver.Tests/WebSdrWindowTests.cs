@@ -51,7 +51,7 @@ public class WebSdrWindowTests
             Clock = new SteppableClock(start);
             // Every slot, as before daylight hours, so the web SDR listens to 12 of the 24, every
             // other hour; the daylight tests below set their own.
-            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Daylight = null };
+            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Stations = StationFixture.EverySlot };
             config = configure?.Invoke(config) ?? config;
             Host = new ReceiverHost(config, Clock, line => Log.Enqueue(line));
             Host.ClockWaiting += () => Waits.Writer.TryWrite(true);
@@ -208,16 +208,16 @@ public class WebSdrWindowTests
     }
 
     [Fact]
-    public async Task OldConfig_IsHourlyFromItsSlotAndSaysSoInOneLine()
+    public async Task OldSlotSettings_AreIgnored_AndSaidSoInOneLine()
     {
+        // A config from before each station had its own slots: "minute", "everyMinutes" and "daylight" mean nothing now.
         await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 13, 20, 0, TimeSpan.Zero),
-            c => c with { SlotUtc = "12:00", SlotUtcWithoutEveryMinutes = true });
+            c => c with { SlotKeysIgnored = "minute,daylight" });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 13:58 UTC, ready for the 14:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
-        Assert.Single(rig.Log, l => l.Contains("read as every 60 minutes, at :00 past each hour", StringComparison.Ordinal)
-            && l.Contains("nothing needs changing", StringComparison.Ordinal));
-        Assert.Contains(rig.Log, l => l.Contains("12 of the 24 slots a day, at 00:00, 02:00", StringComparison.Ordinal));
+        Assert.Single(rig.Log, l => l == "config: \"minute\", \"daylight\" no longer used and ignored; each station's slots are in the stations file or its own directory");
+        Assert.All(rig.Log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public class WebSdrWindowTests
     {
         // A config from 0.5.1 and before, with "webSdrSlotsPerDay": 8: all 9 slots on 5 October all the same.
         await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero),
-            c => c with { Daylight = new Packet.Mailcast.DaylightSettings(), WebSdrSlotsPerDayIgnored = true });
+            c => c with { Stations = StationFixture.Stations, WebSdrSlotsPerDayIgnored = true });
         await rig.Waits.Reader.ReadAsync();
         rig.Clock.Advance(ReceiverHost.ClockCheck);
         await rig.Waits.Reader.ReadAsync();
@@ -267,7 +267,7 @@ public class WebSdrWindowTests
     [Fact]
     public async Task NoWebSdrSlotsPerDay_SaysNothingAboutIt()
     {
-        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Packet.Mailcast.DaylightSettings() });
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 6, 0, 0, TimeSpan.Zero), c => c with { Stations = StationFixture.Stations });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.DoesNotContain(rig.Log, l => l.Contains("webSdrSlotsPerDay", StringComparison.Ordinal));
@@ -290,7 +290,7 @@ public class WebSdrWindowTests
     public async Task Daylight_ListensToEveryDaylightSlotThatFits(string now, string state, string logged)
     {
         await using var rig = new Rig(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture),
-            c => c with { Daylight = new Packet.Mailcast.DaylightSettings() });
+            c => c with { Stations = StationFixture.Stations });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains(state, rig.Host.AudioState, StringComparison.Ordinal);
@@ -300,7 +300,7 @@ public class WebSdrWindowTests
     [Fact]
     public async Task Daylight_AfterTheDaysLastSlot_WaitsForTomorrowsFirst_AndSaysTomorrowsSlots()
     {
-        await using var rig = new Rig(new DateTimeOffset(2026, 12, 21, 16, 0, 0, TimeSpan.Zero), c => c with { Daylight = new Packet.Mailcast.DaylightSettings() });
+        await using var rig = new Rig(new DateTimeOffset(2026, 12, 21, 16, 0, 0, TimeSpan.Zero), c => c with { Stations = StationFixture.Stations });
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 10:58 UTC, ready for the 11:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
@@ -698,7 +698,7 @@ public class WebSdrWindowTests
         // opens for the 14:00 slot, a "Last try" about a failure two hours old would be stale.
         using var dir = new TempDirectory();
         var clock = new SteppableClock(new DateTimeOffset(2026, 10, 5, 12, 5, 0, TimeSpan.Zero));
-        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Daylight = null };
+        var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = dir.Path, Stations = StationFixture.EverySlot };
         await using var host = new ReceiverHost(config, clock, _ => { });
         int opened = 0;
         host.PipelineFactory = source => AudioPipeline.ForInput(
@@ -787,7 +787,7 @@ public class WebSdrWindowTests
         "the web SDR wessex.zapto.org is refusing us for now (daily limit reached, 10800 s used today); asking again later")]
     public async Task ClientLine_ThatSaysTheWebSdrDropped_GivesTheWordsAndWhy(string line, string words)
     {
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), StationFixture.DialKHz * 1000, StationFixture.SignalHz, _ => { });
 
         Assert.Equal(words, pipeline.DropSaid(line)?.Words);
         Assert.Null(pipeline.DropSaid("ubersdr: reconnected to wessex.zapto.org"));
@@ -796,7 +796,7 @@ public class WebSdrWindowTests
     [Fact]
     public async Task ClientLine_WebSdrReconnecting_SaysWhyItsLastStreamEnded()
     {
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), ReceiverConfig.DefaultDialKHz * 1000, _ => { });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("ubersdr:wessex.zapto.org"), StationFixture.DialKHz * 1000, StationFixture.SignalHz, _ => { });
 
         pipeline.DropSaid("ubersdr: stream from wessex.zapto.org ended (Connection reset by peer)");
         var drop = pipeline.DropSaid("ubersdr: reconnecting to wessex.zapto.org");

@@ -104,6 +104,27 @@ public class DailyReportTests
     }
 
     [Fact]
+    public void ASlotLine_NamesItsStation_AsAThirteenthField_AndAnOlderReaderIgnoresIt()
+    {
+        var header = new ReportHeader("0.6.0", null, "sc", 0, 0, new Dictionary<string, int>(), 0);
+        var report = new DailyReport("M0XYZ", Day, header,
+        [
+            new ReportSlot(new TimeOnly(9, 0), "W4", 5, 8, 0, ["IM"], null, "G8BPQ"),
+            new ReportSlot(new TimeOnly(11, 0), "W3", 40, 8, 0, ["IM"], new ReportChannel(1, null, null, 0.05, 0.4, null, 'b'), "GB7ABC"),
+        ]);
+
+        Assert.Equal("MCR1 0.6.0 - sc 0/0 0 0\r\n09 W4 5 8 +0.0 IM - - - - - - G8BPQ\r\n11 W3 40 8 +0.0 IM 1 - 0.05 0.4 - b GB7ABC\r\n", report.Body);
+        var read = DailyReport.Parse(report.Title, report.Body);
+        Assert.Equal(["G8BPQ", "GB7ABC"], read.Slots.Select(s => s.Station));
+        Assert.Null(read.Slots[0].Channel);
+        Assert.Equal(report.Body, read.Body);
+
+        // Without a station the lines are as ever, and a thirteenth field that is not a callsign is not one.
+        Assert.Equal("MCR1 0.6.0 - sc 0/0 0 0\r\n09 W4 5 8 +0.0 IM\r\n", (report with { Slots = [report.Slots[0] with { Station = null }] }).Body);
+        Assert.Null(DailyReport.Parse(report.Title, "MCR1 0.6.0 - sc 0/0 0 0\r\n09 W4 5 8 +0.0 IM - - - - - - from-a-newer-receiver\r\n").Slots[0].Station);
+    }
+
+    [Fact]
     public void Parse_AsABbsShowsIt_WithRoutingLinesAndBareLineEnds()
     {
         string body = "R:261006/1631Z 4711@GB7XYZ.#24.GBR.EURO BPQ6.0.25\n\nMCR1 0.6.0 IO91lk sc 3/3 0\n08 W4 180 12 -1.3 IG\n09 W3 22 6 +0.4 IM 1 - 0.1 0.3 - b fields-from-a-newer-receiver\n\n73 de a signature\n";

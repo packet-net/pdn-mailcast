@@ -3,8 +3,8 @@ namespace Packet.Mailcast;
 /// <summary>Where a trusted key came from (issue #146).</summary>
 public enum KeySource
 {
-    /// <summary>Compiled into the receiver (<see cref="TrustedKey.BuiltIn"/>).</summary>
-    BuiltIn,
+    /// <summary>A station in the stations file (<see cref="StationsFile"/>); changed only there.</summary>
+    StationsFile,
 
     /// <summary>The config file's <c>trustedKeys</c>; changed only there.</summary>
     Config,
@@ -40,7 +40,7 @@ public sealed record KeyChange(string? Error, IReadOnlyList<Bulletin> Released, 
 /// <summary>The keys table: every trusted key, adding one by hand and forgetting one (issue #146).</summary>
 public sealed partial class ReceiverStore
 {
-    /// <summary>Every trusted key with its station, source and when its directory was last heard. GB7RDG first, then by callsign.</summary>
+    /// <summary>Every trusted key with its station, source and when its directory was last heard. By callsign.</summary>
     public IReadOnlyList<KeyRow> KeyRows()
     {
         var heard = new Dictionary<ulong, DateTimeOffset>();
@@ -58,16 +58,16 @@ public sealed partial class ReceiverStore
         var rows = new List<KeyRow>();
         foreach (var pin in _pins)
         {
-            KeySource source = _options.TrustedKeys.Any(k => k.KeyId == pin.Key.KeyId)
-                ? (TrustedKey.BuiltIn.Any(k => k.KeyId == pin.Key.KeyId) ? KeySource.BuiltIn : KeySource.Config)
+            KeySource source = pin.FromStationsFile ? KeySource.StationsFile
+                : _options.TrustedKeys.Any(k => k.KeyId == pin.Key.KeyId) ? KeySource.Config
                 : pin.FromTrustedKeys ? KeySource.Config : pin.Added ? KeySource.Added : KeySource.Learnt;
             rows.Add(new KeyRow(pin.Station, pin.Key, source, heard.TryGetValue(pin.Key.KeyId, out var at) ? at : null));
         }
         foreach (var key in _options.TrustedKeys.Where(k => !_pins.Any(p => p.Key.KeyId == k.KeyId)))
         {
-            rows.Add(new KeyRow(key.Label, key, TrustedKey.BuiltIn.Any(k => k.KeyId == key.KeyId) ? KeySource.BuiltIn : KeySource.Config, heard.TryGetValue(key.KeyId, out var at) ? at : null));
+            rows.Add(new KeyRow(key.Label, key, KeySource.Config, heard.TryGetValue(key.KeyId, out var at) ? at : null));
         }
-        return [.. rows.OrderBy(r => r.Station != BuiltInStation).ThenBy(r => r.Station, StringComparer.Ordinal).ThenBy(r => r.Source)];
+        return [.. rows.OrderBy(r => r.Station, StringComparer.Ordinal).ThenBy(r => r.Source)];
     }
 
     /// <summary>
@@ -80,7 +80,7 @@ public sealed partial class ReceiverStore
         string station = (callsign ?? "").Trim().ToUpperInvariant();
         if (!StationAdvert.IsCallsign(station))
         {
-            return KeyChange.Refused("Give the station's callsign, like GB7RDG.");
+            return KeyChange.Refused("Give the station's callsign, like G4ABC.");
         }
         TrustedKey key;
         try
@@ -128,7 +128,7 @@ public sealed partial class ReceiverStore
         }
         if (!row.CanForget)
         {
-            return KeyChange.Refused(row.Source == KeySource.BuiltIn ? "A built-in key cannot be forgotten." : "A key from the config file is changed in the config file.");
+            return KeyChange.Refused(row.Source == KeySource.StationsFile ? "A key from the stations file is changed in the stations file." : "A key from the config file is changed in the config file.");
         }
         _pins.Remove(pin);
         UpdateKeys();
@@ -167,25 +167,27 @@ public sealed partial class ReceiverStore
             }
         }
 
-        // What the forgotten key's directories gave: adverts, and GB7RDG's timetable, from the ones left.
+        // What the forgotten key's directories gave: adverts, and the station's kept timetable, from the ones left.
         _adverts.Clear();
         _beyondCap.Clear();
         foreach (var (directory, check) in UsableDirectories().OrderBy(d => d.Directory.Date))
         {
             NoteAdverts(directory, check);
         }
-        var timetable = UsableDirectories()
-            .Where(d => d.Directory.Schedule is not null && StationOf(d.Directory, d.Check) == BuiltInStation)
-            .OrderBy(d => d.Directory.Date).Select(d => ((DateOnly, SlotTimetable)?)(d.Directory.Date, d.Directory.Schedule!)).LastOrDefault();
-        if (timetable is { } t)
+        if (_options.Stations.Find(pin.Station) is not null)
         {
-            WriteSchedule(t.Item1, t.Item2);
-            (HeardScheduleDate, HeardSchedule) = (t.Item1, t.Item2);
-        }
-        else
-        {
-            TryDelete(Path.Combine(_root, "schedule.txt"));
-            (HeardScheduleDate, HeardSchedule) = (null, null);
+            var timetable = UsableDirectories()
+                .Where(d => d.Directory.Schedule is not null && StationOf(d.Directory, d.Check) == pin.Station)
+                .OrderBy(d => d.Directory.Date).Select(d => ((DateOnly, SlotTimetable)?)(d.Directory.Date, d.Directory.Schedule!)).LastOrDefault();
+            if (timetable is { } t)
+            {
+                _heardSchedules[pin.Station] = (t.Item1, t.Item2);
+            }
+            else
+            {
+                _heardSchedules.Remove(pin.Station);
+            }
+            WriteSchedules();
         }
         WritePins("a forgotten key");
         Log($"key {KeyId.Format(keyId)} of {pin.Station} forgotten from the page");

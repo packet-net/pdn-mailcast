@@ -11,7 +11,7 @@ namespace Mailcast.HeadEnd.Tests;
 /// <summary>A waveform per slot: which slot gets which, switching the modem, and what says so afterwards.</summary>
 public class WaveformTests
 {
-    private static readonly SlotTimetable Hourly = new(TimeOnly.MinValue, 60, DaylightRule.Gb7rdg);
+    private static readonly SlotTimetable Hourly = new(TimeOnly.MinValue, 60, StationFixture.Daylight);
 
     private static Waveforms Alternating(bool setOnModem = true) =>
         new(["ms110d-wn4", "ms110d-wn3"], setOnModem, Hourly, mode => new LinearAirtime(TimeSpan.FromSeconds(1), TimeSpan.Zero, mode.EndsWith('3') ? 0.014 : 0.007));

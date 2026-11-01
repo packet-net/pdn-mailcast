@@ -14,6 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\StationFixture.cs" Link="StationFixture.cs" />
+    <Using Include="PdnMailcast.TestSupport" />
     <Using Include="Xunit" />
   </ItemGroup>
 

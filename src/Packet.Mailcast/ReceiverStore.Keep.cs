@@ -140,7 +140,9 @@ public sealed partial class ReceiverStore
                     int eq = part.IndexOf('=', StringComparison.Ordinal);
                     if (eq > 0)
                     {
-                        c.ByStation[Uri.UnescapeDataString(part[..eq])] = int.Parse(part[(eq + 1)..], CultureInfo.InvariantCulture);
+                        // A name an older version counted under is the station that lists it as "formerly".
+                        string station = _options.Stations.Current(Uri.UnescapeDataString(part[..eq]));
+                        c.ByStation[station] = c.ByStation.GetValueOrDefault(station) + int.Parse(part[(eq + 1)..], CultureInfo.InvariantCulture);
                     }
                 }
                 _air[id] = c;

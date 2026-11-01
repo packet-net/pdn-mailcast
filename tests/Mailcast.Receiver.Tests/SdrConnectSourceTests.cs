@@ -13,7 +13,7 @@ namespace Mailcast.Receiver.Tests;
 /// </summary>
 public class SdrConnectSourceTests
 {
-    private static readonly double Dial = ReceiverConfig.DefaultDialKHz * 1000;
+    private static readonly double Dial = StationFixture.DialKHz * 1000;
 
     // ---------- the setting ----------
 
@@ -83,8 +83,8 @@ public class SdrConnectSourceTests
     [Fact]
     public void Filter_HoldsTheSignalWithRoomEitherSide()
     {
-        var (low, high) = AudioPipeline.SdrConnectFilter(Dial);
-        double centre = OnAir.AudioCentreHz(Dial);
+        var (low, high) = AudioPipeline.SdrConnectFilter(Dial, StationFixture.SignalHz);
+        double centre = OnAir.AudioCentreHz(Dial, StationFixture.SignalHz);
 
         Assert.True(low < centre - OnAir.HalfWidthHz && low >= 100);
         Assert.True(high > centre + OnAir.HalfWidthHz);
@@ -100,13 +100,13 @@ public class SdrConnectSourceTests
         probe.Start();
         int closed = ((IPEndPoint)probe.LocalEndpoint).Port;
         probe.Stop();
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = StationFixture.SignalHz };
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {
             Audio = $"sdrconnect:127.0.0.1:{closed}",
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Web = new WebSettings { Port = 18137 },
         };
         await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
@@ -142,13 +142,13 @@ public class SdrConnectSourceTests
         page.Start();
         int pagePort = ((IPEndPoint)page.LocalEndpoint).Port;
         page.Stop();
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = StationFixture.SignalHz };
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {
             Audio = $"sdrconnect:127.0.0.1:{closed}",
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Web = new WebSettings { Port = pagePort },
         };
         await using var host = new ReceiverHost(config, TimeProvider.System, _ => { });
@@ -195,7 +195,7 @@ public class SdrConnectSourceTests
         probe.Start();
         int port = ((IPEndPoint)probe.LocalEndpoint).Port;
         probe.Stop();
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse($"sdrconnect:127.0.0.1:{port}"), Dial, _ => { });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse($"sdrconnect:127.0.0.1:{port}"), Dial, StationFixture.SignalHz, _ => { });
 
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.StartAsync(CancellationToken.None));
 
@@ -256,7 +256,7 @@ public class SdrConnectSourceTests
         {
             Audio = $"sdrconnect:127.0.0.1:{closed}",
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Web = new WebSettings { Port = 18139 },
         };
         var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 15, 15, 0, 0, TimeSpan.Zero));
@@ -313,7 +313,7 @@ public class SdrConnectSourceTests
     public async Task Start_SdrConnectThatWillNotBeTuned_SaysCanControlIsFalse()
     {
         await using var sdr = new FakeSdrConnect(canControl: false);
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), Dial, _ => { });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), Dial, StationFixture.SignalHz, _ => { });
 
         var e = await Assert.ThrowsAsync<AudioSourceException>(() => pipeline.StartAsync(CancellationToken.None));
 
@@ -385,9 +385,9 @@ public class SdrConnectSourceTests
     public async Task Listening_PointsTheRadioBelowTheDial_AndAToneComesOutAsUsbAudio(double dialKHz)
     {
         double dial = dialKHz * 1000;
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = StationFixture.SignalHz };
         var log = new List<string>();
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), dial, line => { lock (log) { log.Add(line); } });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), dial, StationFixture.SignalHz, line => { lock (log) { log.Add(line); } });
 
         await pipeline.StartAsync(CancellationToken.None);
         float[] audio = await ListenAsync(pipeline, 0.5);
@@ -396,7 +396,7 @@ public class SdrConnectSourceTests
         Assert.True(sdr.Sets.Any(s => s.Property == "device_center_frequency" && double.Parse(s.Value, System.Globalization.CultureInfo.InvariantCulture) == dial - 25_000),
             "LO sets: " + string.Join(", ", sdr.Sets.Where(s => s.Property == "device_center_frequency").Select(s => s.Value)));
         // The signal's centre where this dial puts it in USB audio, and not elsewhere.
-        double centre = OnAir.AudioCentreHz(dial);
+        double centre = OnAir.AudioCentreHz(dial, StationFixture.SignalHz);
         // 100 times: plainly the tone and nowhere else, with room for a hole a loaded machine makes.
         double at = Power(audio, centre);
         Assert.True(at > 100 * Power(audio, centre - 500), $"{at} vs {Power(audio, centre - 500)}");
@@ -418,8 +418,8 @@ public class SdrConnectSourceTests
     [Fact]
     public async Task DroppedConnection_IsTakenUpAgain_WithoutEndingThePipeline()
     {
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), Dial, _ => { });
+        await using var sdr = new FakeSdrConnect { ToneHz = StationFixture.SignalHz };
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse(sdr.Audio), Dial, StationFixture.SignalHz, _ => { });
         await pipeline.StartAsync(CancellationToken.None);
         await ListenAsync(pipeline, 0.2);
 
@@ -428,7 +428,7 @@ public class SdrConnectSourceTests
         await FakeSdrConnect.WaitForAsync(() => sdr.Connections >= 2 && sdr.Sets.Count(s => s.Property == "device_center_frequency") >= 2, "the receiver connect and tune again");
         // The time it was away comes through as silence first, as long as it was away on a
         // loaded machine; then the tone again.
-        double centre = OnAir.AudioCentreHz(Dial);
+        double centre = OnAir.AudioCentreHz(Dial, StationFixture.SignalHz);
         bool back = false;
         for (int tries = 0; tries < 40 && !back; tries++)
         {
@@ -452,13 +452,13 @@ public class SdrConnectSourceTests
         page.Start();
         int pagePort = ((IPEndPoint)page.LocalEndpoint).Port;
         page.Stop();
-        await using var sdr = new FakeSdrConnect { ToneHz = OnAir.DefaultSignalHz };
+        await using var sdr = new FakeSdrConnect { ToneHz = StationFixture.SignalHz };
         using var dir = new TempDirectory();
         var config = new ReceiverConfig
         {
             Audio = sdr.Audio,
             StateDirectory = dir.Path,
-            Daylight = null,
+            Stations = StationFixture.EverySlot,
             Web = new WebSettings { Port = pagePort },
         };
         var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
@@ -511,7 +511,7 @@ public class SdrConnectSourceTests
     [InlineData("sdrconnect: cannot reach 192.168.40.61:5454 (Connection refused (192.168.40.61:5454)); still trying (3 more failed attempt(s) since the last line)", "Connection refused (192.168.40.61:5454)")]
     public async Task ClientLine_ThatSaysItDropped_GivesTheWordsAndWhy(string line, string why)
     {
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("sdrconnect:192.168.40.61"), Dial, _ => { });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("sdrconnect:192.168.40.61"), Dial, StationFixture.SignalHz, _ => { });
 
         var drop = pipeline.DropSaid(line);
 
@@ -526,7 +526,7 @@ public class SdrConnectSourceTests
     [InlineData("sdrconnect: 10.0.0.9:5454: SDRconnect closed the connection; reconnecting")]
     public async Task ClientLine_ThatSaysNoDrop_OrAnotherSdrConnects_IsNotOne(string line)
     {
-        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("sdrconnect:192.168.40.61"), Dial, _ => { });
+        await using var pipeline = AudioPipeline.Create(AudioSource.Parse("sdrconnect:192.168.40.61"), Dial, StationFixture.SignalHz, _ => { });
 
         Assert.Null(pipeline.DropSaid(line));
     }

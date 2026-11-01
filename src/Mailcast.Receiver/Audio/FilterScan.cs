@@ -4,7 +4,7 @@ namespace Mailcast.Receiver;
 
 /// <summary>
 /// A radio's receive filter, measured from band noise: its edges, how wide it is, and the USB
-/// dial that puts GB7RDG's fixed signal (<see cref="OnAir.DefaultSignalHz"/>) in the middle of it.
+/// dial that puts a signal in the middle of it.
 /// </summary>
 /// <param name="LowHz">The filter's lower edge, Hz.</param>
 /// <param name="HighHz">Its upper edge, Hz.</param>
@@ -70,8 +70,8 @@ public static class FilterScan
 
     private const double BinHz = (double)OnAir.SampleRate / FftSize;
 
-    /// <summary>The dial that centres a signal (<paramref name="signalHz"/>, GB7RDG's unless given) in a filter from <paramref name="lowHz"/> to <paramref name="highHz"/>, or a problem if it cannot be used.</summary>
-    public static (RadioFilter? Filter, string? Problem) DialFor(double lowHz, double highHz, double signalHz = OnAir.DefaultSignalHz)
+    /// <summary>The dial that centres a signal (<paramref name="signalHz"/>) in a filter from <paramref name="lowHz"/> to <paramref name="highHz"/>, or a problem if it cannot be used.</summary>
+    public static (RadioFilter? Filter, string? Problem) DialFor(double lowHz, double highHz, double signalHz)
     {
         if (!(highHz > lowHz) || lowHz < 0)
         {
@@ -89,7 +89,7 @@ public static class FilterScan
     }
 
     /// <summary>Measures the filter in about 10 s of band noise at 48 kHz. A problem, not a filter, if it could not be measured.</summary>
-    public static (RadioFilter? Filter, string? Problem) Analyse(ReadOnlySpan<float> audio)
+    public static (RadioFilter? Filter, string? Problem) Analyse(ReadOnlySpan<float> audio, double signalHz)
     {
         if (audio.Length < FftSize * 4)
         {
@@ -121,7 +121,7 @@ public static class FilterScan
             return (null, "The noise looks too uneven to measure reliably (a tone or interference, rather than a clean hiss). Type the edges instead, or try again.");
         }
 
-        return DialFor(lowEdge.Value * BinHz, highEdge.Value * BinHz);
+        return DialFor(lowEdge.Value * BinHz, highEdge.Value * BinHz, signalHz);
     }
 
     /// <summary>The averaged power spectrum in dB, one bin for each of <see cref="FftSize"/>/2 up to the Nyquist edge, from non-overlapping Hann-windowed blocks.</summary>

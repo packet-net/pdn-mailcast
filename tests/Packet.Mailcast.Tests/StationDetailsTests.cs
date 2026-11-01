@@ -87,7 +87,7 @@ public class StationDetailsTests
         using var dir = new TempDirectory();
         var store = Open(dir);
         Assert.Null(store.HeardDetails("G8BPQ"));
-        Assert.Equal(7_053_800, ReceiverStore.BuiltInDetails.FrequencyHz);
+        Assert.Equal(7_053_800, StationFixture.Stations.First!.Details.FrequencyHz);
 
         Assert.Equal(FrameOutcome.CompletedDirectory, Feed(store, Directory(Day, Bpq, "G8BPQ", new StationDetails(7_047_000, Sideband.Usb, "IO83"), null, Big(3))).Outcome);
         Assert.Equal(new StationDetails(7_047_000, Sideband.Usb, "IO83"), store.HeardDetails("G8BPQ"));
