@@ -369,6 +369,31 @@ public class BudgetSchedulerTests
         Assert.Throws<ArgumentException>(() => new BroadcastDirectory(new DateOnly(2026, 10, 6), [entry], null, "ms110d wn4"));
     }
 
+    [Fact]
+    public void Directory_LongInterleaver_IsTheWaveformAndOneMoreField_SoReleasedReceiversSeeTheWaveformTheirModemReports()
+    {
+        var signer = DirectorySigner.FromPem(DirectorySigner.NewKeyPem());
+        var entry = new DirectoryEntry(0x0123456789abcdef, 1, 2345, "12345_GB7RDG", "Title text", Hash: "0011223344556677");
+        byte[] bytes = new BroadcastDirectory(new DateOnly(2026, 10, 6), [entry], new SlotTimetable(TimeOnly.MinValue, 60), "ms110d-wn4-long", signer).Serialize();
+        string text = Bulletin.TextEncoding.GetString(bytes);
+        Assert.Contains("\tslots=00:00/60\tmode=ms110d-wn4\tinterleaver=long\t", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("-long", text, StringComparison.Ordinal);
+
+        var parsed = BroadcastDirectory.Parse(bytes);
+        Assert.Equal("ms110d-wn4-long", parsed.Mode);
+        Assert.Equal(bytes, parsed.Serialize());
+        var trusted = new[] { TrustedKey.Parse("M0LTE", signer.PublicKeyBase64) };
+        Assert.Equal(SignatureState.Trusted, parsed.Check(trusted).State);
+
+        // Receivers from before read the plain waveform, the same entries, and a good signature.
+        var old = V0181Directory.Parse(bytes);
+        Assert.Equal("ms110d-wn4", old.Mode);
+        Assert.Equal(SignatureState.Trusted, old.Check(trusted).State);
+
+        // The short interleaver is sent as it always was.
+        Assert.Equal("ms110d-wn4", BroadcastDirectory.Parse(new BroadcastDirectory(new DateOnly(2026, 10, 6), [entry], null, "ms110d-wn4").Serialize()).Mode);
+    }
+
     /// <summary>
     /// Issue #69: a station decoding only a quarter of a slot's frames should still have a good
     /// chance (binomial, p = 0.25, at least 80%) of a whole directory from one slot, not just
