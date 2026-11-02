@@ -79,6 +79,15 @@ public sealed record SlotSettings
     public double ToneHz { get; init; } = 1800;
 
     /// <summary>
+    /// The RF frequency of the signal centre (the config's <c>frequencyHz</c>), or null when none is configured.
+    /// With a tuned lease the tone and probe audio frequency are worked out from it and the dial.
+    /// </summary>
+    public long? SignalHz { get; init; }
+
+    /// <summary>True when <see cref="SignalHz"/> is on the lower sideband.</summary>
+    public bool SignalLsb { get; init; }
+
+    /// <summary>
     /// A pause after the tone so the modem's CW ident, which falls due with the first transmission
     /// and which the station polls for every 5 s, goes out between the tone and the first burst.
     /// </summary>

@@ -35,6 +35,10 @@ Then `sudo pdn-mailcast-headend --check-config` and `sudo systemctl start pdn-ma
 
 Pick a time no other mailcast station on your frequency uses. M0LTE sends on the hour, so on 40 m start yours at half past: `"minute": 30` with `"everyMinutes": 60` gives a slot at 00:30, 01:30 and so on, and only those in daylight run. A slot lasts at most 10 minutes. The journal's `schedule:` line at start-up says when your slots are.
 
+## The radio
+
+If your station has a CAT rig and a rig section in pdn-soundmodem, you do nothing: for each slot pdn-soundmodem moves the radio so the bulletin modem's signal sits in the passband, and puts it back when the slot ends. There is no setting for it. A Flex or a station with no CAT is left alone, and the journal says so once. An older pdn-soundmodem does not retune; the journal says that once too, so upgrade it if your radio must move for the slot.
+
 ## The signing key
 
 Every head end signs its directories, and receivers use none that are unsigned. The package makes your key when you install it, so there is nothing to do. The journal's `signing:` line gives your public key (or run `sudo pdn-mailcast-headend --make-key` to see it again). The service will not start without the key. Keep the private key safe and backed up: a new key means telling every listener again.

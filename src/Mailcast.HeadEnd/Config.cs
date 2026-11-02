@@ -227,6 +227,8 @@ public sealed record HeadEndConfig
         WhenStillBusy = Slot.WhenStillBusy,
         ToneLength = TimeSpan.FromSeconds(Slot.Tone),
         ToneHz = Slot.ToneHz,
+        SignalHz = FrequencyHz,
+        SignalLsb = Sideband is not null && Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase),
         PauseAfterTone = TimeSpan.FromSeconds(Slot.PauseAfterToneSeconds),
         MaxBurst = TimeSpan.FromSeconds(Station.MaxBurstSeconds),
         FramesPerBurst = Station.FramesPerBurst,

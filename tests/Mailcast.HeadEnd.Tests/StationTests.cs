@@ -110,7 +110,7 @@ public class StationTests
                     : (HttpStatusCode.OK, """{"held": true, "subChannel": 4, "expires": "2026-10-05T12:02:00Z", "renewed": false, "seconds": 120, "capped": false, "channelBusy": false}"""));
         using var api = Client(handler);
 
-        var lease = await api.TakeLeaseAsync(4, 120, 10, CancellationToken.None);
+        var lease = await api.TakeLeaseAsync(4, 120, 10, false, CancellationToken.None);
         Assert.True(lease.Held);
         Assert.Equal(120, lease.Seconds);
         Assert.False(lease.ChannelBusy);
@@ -171,11 +171,63 @@ public class StationTests
     }
 
     [Fact]
+    public async Task StationApiClient_SendsTuneOnlyWhenAsked_AndReadsTheTuningAnswer()
+    {
+        using var handler = new Handler((request, body) => JsonNode.Parse(body)!["tune"] is not null
+            ? (HttpStatusCode.OK, """{"held": true, "seconds": 120, "tuned": true, "dialHz": 7047000, "note": "ok"}""")
+            : (HttpStatusCode.OK, """{"held": true, "seconds": 120}"""));
+        using var api = Client(handler);
+
+        var tuned = await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None);
+        Assert.True(tuned.Tuned);
+        Assert.Equal(7047000, tuned.DialHz);
+        var renewed = await api.TakeLeaseAsync(4, 120, 10, false, CancellationToken.None);
+        Assert.Null(renewed.Tuned);
+        Assert.True(handler.Requests[0].Body!["tune"]!.GetValue<bool>());
+        Assert.Null(handler.Requests[1].Body!["tune"]);
+    }
+
+    [Fact]
+    public async Task StationApiClient_ReadsAnOldStationAndAFailedTune()
+    {
+        using var old = new Handler((_, _) => (HttpStatusCode.OK, """{"held": true, "seconds": 120}"""));
+        using (var api = Client(old))
+        {
+            Assert.Null((await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None)).Tuned);
+        }
+        using var notTuned = new Handler((_, _) => (HttpStatusCode.OK, """{"held": true, "seconds": 120, "tuned": false, "note": "no rig"}"""));
+        using (var api = Client(notTuned))
+        {
+            var a = await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None);
+            Assert.False(a.Tuned);
+            Assert.Equal("no rig", a.TuneNote);
+        }
+        using var failed = new Handler((_, _) => (HttpStatusCode.InternalServerError, """{"failed": "rigctld refused", "tuneFailed": true, "subChannel": 2}"""));
+        using (var api = Client(failed))
+        {
+            var a = await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None);
+            Assert.False(a.Held);
+            Assert.True(a.TuneFailed);
+            Assert.Contains("rigctld refused", a.Problem, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task StationApiClient_DoesNotCallAnOtherRefusalATuneFailure()
+    {
+        using var handler = new Handler((_, _) => (HttpStatusCode.InternalServerError, """{"failed": "something else"}"""));
+        using var api = Client(handler);
+        var a = await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None);
+        Assert.False(a.Held);
+        Assert.False(a.TuneFailed);
+    }
+
+    [Fact]
     public async Task StationApiClient_ReportsAnotherHoldersLease()
     {
         using var handler = new Handler((_, _) => (HttpStatusCode.Conflict, """{"held": true, "subChannel": 2, "expires": "2026-10-05T12:01:00Z", "refused": "sub-channel 2 holds the transmit lease"}"""));
         using var api = Client(handler);
-        var lease = await api.TakeLeaseAsync(4, 120, 10, CancellationToken.None);
+        var lease = await api.TakeLeaseAsync(4, 120, 10, false, CancellationToken.None);
         Assert.False(lease.Held);
         Assert.Equal("sub-channel 2 holds the transmit lease until 2026-10-05T12:01:00Z", lease.Problem);
         Assert.Null(lease.ChannelBusy);
@@ -186,7 +238,7 @@ public class StationTests
     {
         using var handler = new Handler((_, _) => (HttpStatusCode.OK, "{}")) { Hang = true };
         using var api = Client(handler, TimeSpan.FromMilliseconds(50));
-        var e = await Assert.ThrowsAsync<HttpRequestException>(() => api.TakeLeaseAsync(4, 120, 10, CancellationToken.None));
+        var e = await Assert.ThrowsAsync<HttpRequestException>(() => api.TakeLeaseAsync(4, 120, 10, false, CancellationToken.None));
         Assert.Contains("did not answer", e.Message, StringComparison.Ordinal);
     }
 

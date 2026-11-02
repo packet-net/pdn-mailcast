@@ -58,6 +58,8 @@ public sealed class SlotRunner
     private readonly IJournal _journal;
     private readonly TimeProvider _time;
     private readonly IClockSync? _clock;
+    private int _saidNotTuned;
+    private int _saidNoRetune;
     private int _keepAudioNotOffered;
 
     /// <summary>How far before the slot the kept audio starts.</summary>
@@ -418,10 +420,22 @@ public sealed class SlotRunner
 
                     DateTimeOffset asked = Now;
                     LeaseAnswer first = await AskForLeaseAsync(cancellation);
+                    for (int retry = 0; first.TuneFailed && retry < 2 && !cancellation.IsCancellationRequested; retry++)
+                    {
+                        Say($"the station could not tune the rig ({first.Problem}); trying again in 2 s");
+                        await Task.Delay(TimeSpan.FromSeconds(2), owner._time, cancellation);
+                        asked = Now;
+                        first = await AskForLeaseAsync(cancellation);
+                    }
                     if (!first.Held)
                     {
+                        if (first.TuneFailed)
+                        {
+                            return Finish(SlotOutcome.Skipped, $"the station could not tune the rig for the slot, so nothing was sent: {first.Problem}", retryable: true);
+                        }
                         return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", retryable: true);
                     }
+                    SayTuning(first);
                     _leaseTaken = true;
                     LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
                     Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames go anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel");
@@ -551,12 +565,77 @@ public sealed class SlotRunner
             return null;
         }
 
+        private double? _tunedToneHz;
+
+        /// <summary>The calibration tone's (and probe's) audio frequency: slot.toneHz, or the signal centre's place in the audio when the rig was tuned.</summary>
+        private double ToneHz => _tunedToneHz ?? S.ToneHz;
+
+        /// <summary>
+        /// With the rig tuned to <paramref name="dialHz"/>, the signal centre (frequencyHz) sits at
+        /// frequencyHz - dial (USB) or dial - frequencyHz (LSB) in the audio; the tone and probe go
+        /// there, as slot.toneHz is the signal centre on an untuned station.
+        /// </summary>
+        private void PlaceTone(double dialHz, double? stationCentreHz)
+        {
+            if (stationCentreHz is double centre)
+            {
+                if (S.SignalHz is long configured)
+                {
+                    double computed = S.SignalLsb ? dialHz - configured : configured - dialHz;
+                    if (Math.Abs(computed - centre) > 50)
+                    {
+                        Say($"the station says the modem's audio centre is {centre:0} Hz but frequencyHz and the dial give {computed:0} Hz; using the station's");
+                    }
+                }
+                _tunedToneHz = centre;
+                Say($"calibration tone and probe follow the tuned dial: {centre:0} Hz audio");
+                return;
+            }
+            if (S.SignalHz is not long signal)
+            {
+                Say($"no frequencyHz configured, so the calibration tone stays at {S.ToneHz:0} Hz although the dial moved");
+                return;
+            }
+            double audio = S.SignalLsb ? dialHz - signal : signal - dialHz;
+            if (audio is < 200 or > 3500)
+            {
+                Say($"the tuned dial is {audio:0} Hz from the signal centre, outside the audio passband, so the calibration tone stays at {S.ToneHz:0} Hz");
+                return;
+            }
+            _tunedToneHz = audio;
+            Say($"calibration tone and probe follow the tuned dial: {audio:0} Hz audio");
+        }
+
+        /// <summary>Journals what the station said to the tuning request: the dial, or once per run why not.</summary>
+        private void SayTuning(LeaseAnswer answer)
+        {
+            if (answer.Tuned is true)
+            {
+                Say(answer.DialHz is double hz ? $"station tuned the rig for the slot, dial {hz / 1e6:0.000###} MHz" : "station tuned the rig for the slot");
+                if (answer.DialHz is double dial)
+                {
+                    PlaceTone(dial, answer.AudioCentreHz);
+                }
+            }
+            else if (answer.Tuned is false)
+            {
+                if (Interlocked.Exchange(ref owner._saidNotTuned, 1) == 0)
+                {
+                    Say($"station did not tune the rig for the slot: {(string.IsNullOrWhiteSpace(answer.TuneNote) ? "no reason given" : answer.TuneNote)}");
+                }
+            }
+            else if (Interlocked.Exchange(ref owner._saidNoRetune, 1) == 0)
+            {
+                Say("this pdn-soundmodem does not retune for the slot; upgrade it if your radio must move for the slot");
+            }
+        }
+
         private async Task<LeaseAnswer> AskForLeaseAsync(CancellationToken cancellation)
         {
             try
             {
                 return await owner._station.TakeLeaseAsync(
-                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), cancellation);
+                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), tune: true, cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
@@ -669,7 +748,7 @@ public sealed class SlotRunner
             DateTimeOffset giveUp = Now + S.ChannelWait;
             bool saidBusy = false;
             // The probe goes on the tone's own audio frequency, so it lands where the tone does on the air.
-            ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, S.ToneHz);
+            ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, ToneHz);
             while (_abort is null)
             {
                 bool? busy = await ChannelBusyAsync(cancellation);
@@ -692,7 +771,7 @@ public sealed class SlotRunner
                         {
                             _probeId = id;
                         }
-                        Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {S.ToneHz:0} Hz{(probe is null ? "" : ProbeLine(answer))}");
+                        Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {ToneHz:0} Hz{(probe is null ? "" : ProbeLine(answer))}");
                         if (_abort is null && S.PauseAfterTone > TimeSpan.Zero)
                         {
                             await Task.Delay(S.PauseAfterTone, owner._time, cancellation);
@@ -731,7 +810,7 @@ public sealed class SlotRunner
         {
             try
             {
-                return await owner._station.SendToneAsync(S.SubChannel, S.ToneHz, S.ToneLength.TotalSeconds, probe, cancellation);
+                return await owner._station.SendToneAsync(S.SubChannel, ToneHz, S.ToneLength.TotalSeconds, probe, cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
