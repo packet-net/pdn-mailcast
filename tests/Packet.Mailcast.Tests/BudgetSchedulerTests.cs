@@ -30,150 +30,67 @@ public class BudgetSchedulerTests
     private static Dictionary<string, ScheduledObject> ByBid(SlotBroadcast plan) =>
         plan.Objects.Where(o => o.Bid is not null).ToDictionary(o => o.Bid!, StringComparer.Ordinal);
 
-    private static CarriedBulletin Taken(CarriedBulletin c, int hoursAgo, string? from = null) =>
-        c with { TakenIn = Slot.AddHours(-hoursAgo), From = from, FirstSeen = DateOnly.FromDateTime(Slot.AddHours(-hoursAgo).UtcDateTime) };
-
     [Fact]
-    public void Fill_ServesTheOldestFirst_EachUpToItsCap_NotTheLeastCovered()
+    public void Fill_GivesTheLeastCoveredFirst_SoNewBulletinsGoFirst()
     {
-        var oldest = Taken(Held(1, 6000), 5);
-        var middle = Taken(AtCoverage(2, 6000, 1.0), 3);
-        var newest = Taken(Held(3, 6000), 1);
-        int k = oldest.Transfer.SourceSymbols;
+        var fresh = AtCoverage(1, 6000, 0);
+        var half = AtCoverage(2, 6000, 0.5);
+        var old = AtCoverage(3, 6000, 3.0);
+        int k = fresh.Transfer.SourceSymbols;
         Assert.True(k >= 8);
-        var rule = Options.Budget!;
-        int cap = BroadcastScheduler.CapSymbols(k, rule);
 
-        // Room for the directory and a few: all of it goes to the oldest, though the newest is less covered.
-        var tight = BroadcastScheduler.Plan([newest, middle, oldest], Slot, 1, Compression.Default, Options, null, Frames(10));
+        // Room for the directory (its floor, issue #69, comes first) and a few more: the rest goes to the new bulletin.
+        var tight = BroadcastScheduler.Plan([old, half, fresh], Slot, 1, Compression.Default, Options, null, Frames(10));
         var objects = ByBid(tight);
         int directory = tight.Objects[0].Count;
-        Assert.Equal(10 - directory, objects[oldest.Bid].Count);
-        Assert.True(objects[oldest.Bid].Count >= 2);
-        Assert.Equal(0, objects[middle.Bid].Count);
-        Assert.Equal(0, objects[newest.Bid].Count);
+        Assert.Equal(10 - directory, objects[fresh.Bid].Count);
+        Assert.True(objects[fresh.Bid].Count >= 2);
+        Assert.Equal(0, objects[half.Bid].Count);
+        Assert.Equal(0, objects[old.Bid].Count);
 
-        // A bit more: the oldest to its cap first, then the next, and the newest waits.
-        var more = BroadcastScheduler.Plan([newest, middle, oldest], Slot, 1, Compression.Default, Options, null, Frames(directory + cap + 3));
-        objects = ByBid(more);
-        Assert.Equal(cap, objects[oldest.Bid].Count);
-        Assert.Equal(3, objects[middle.Bid].Count);
-        Assert.Equal(0, objects[newest.Bid].Count);
+        // Room for a little more: the floors go first, the least covered first, so the new one
+        // and the half-covered one reach theirs and the well covered one waits.
+        var rule = Options.Budget!;
+        int floorFresh = BroadcastScheduler.FloorSymbols(k, rule);
+        int floorHalf = BroadcastScheduler.FloorSymbols(half.Transfer.SourceSymbols, rule);
+        var floors = BroadcastScheduler.Plan([old, half, fresh], Slot, 1, Compression.Default, Options, null, Frames(directory + floorFresh + floorHalf));
+        objects = ByBid(floors);
+        Assert.Equal(floorFresh, objects[fresh.Bid].Count);
+        Assert.Equal(floorHalf, objects[half.Bid].Count);
+        Assert.Equal(0, objects[old.Bid].Count);
 
-        // Plenty of room: every one to its cap.
-        var plenty = BroadcastScheduler.Plan([newest, middle, oldest], Slot, 1, Compression.Default, Options, null, Frames(1000));
+        // Plenty of room: every floor, then the rest to the least covered, each up to its cap.
+        var plenty = BroadcastScheduler.Plan([old, half, fresh], Slot, 1, Compression.Default, Options, null, Frames(1000));
         objects = ByBid(plenty);
-        Assert.Equal(cap, objects[oldest.Bid].Count);
-        Assert.Equal(cap, objects[newest.Bid].Count);
-        Assert.Equal(cap, objects[middle.Bid].Count);
+        Assert.Equal(BroadcastScheduler.CapSymbols(k, rule), objects[fresh.Bid].Count);
+        Assert.Equal(BroadcastScheduler.CapSymbols(half.Transfer.SourceSymbols, rule), objects[half.Bid].Count);
+        Assert.Equal(BroadcastScheduler.CapSymbols(old.Transfer.SourceSymbols, rule), objects[old.Bid].Count);
     }
 
     [Fact]
-    public void Fill_BulkSendersGoAfterEveryNormalBulletin_WhateverTheirAge()
-    {
-        var rule = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } };
-        var options = Options with { Budget = rule };
-        var oldBulk = Taken(Held(1, 6000), 9, "lu9dce-1");
-        var newNormal = Taken(Held(2, 6000), 1, "G4ABC");
-        var unknown = Taken(Held(3, 6000), 2, null);
-        int k = oldBulk.Transfer.SourceSymbols;
-        int cap = BroadcastScheduler.CapSymbols(k, rule);
-        var plan = BroadcastScheduler.Plan([oldBulk, newNormal, unknown], Slot, 1, Compression.Default, options, null, Frames(1000));
-        Assert.Equal(1, plan.BulkCarried);
-        Assert.Equal(2, plan.NormalCarried);
-
-        // Tight: the two normal ones (older first) take what there is; the bulk one gets nothing.
-        var tight = BroadcastScheduler.Plan([oldBulk, newNormal, unknown], Slot, 1, Compression.Default, options, null, Frames(12));
-        var objects = ByBid(tight);
-        Assert.Equal(0, objects[oldBulk.Bid].Count);
-        Assert.True(objects[unknown.Bid].Count >= objects[newNormal.Bid].Count);
-        Assert.True(objects[unknown.Bid].Count > 0);
-
-        // Just enough for both normal ones to their caps and a little more: the bulk one gets the rest.
-        int directory = tight.Objects[0].Count;
-        var more = BroadcastScheduler.Plan([oldBulk, newNormal, unknown], Slot, 1, Compression.Default, options, null, Frames(directory + (2 * cap) + 2));
-        objects = ByBid(more);
-        Assert.Equal(cap, objects[unknown.Bid].Count);
-        Assert.Equal(cap, objects[newNormal.Bid].Count);
-        Assert.True(objects[oldBulk.Bid].Count is > 0 and < 5);
-
-        Assert.True(rule.IsBulk("LU9DCE"));
-        Assert.True(rule.IsBulk("lu9dce-7"));
-        Assert.False(rule.IsBulk("LU9DCF"));
-        Assert.False(rule.IsBulk(null));
-        Assert.False(new BudgetRule().IsBulk("LU9DCE"));
-    }
-
-    [Fact]
-    public void Fill_ReachingTheTarget_MovesABulletinToTheLeftoverTier_ThenTheNextOneIsServed()
+    public void Floor_IsEnoughThatAnyThreeSlotsRebuild()
     {
         var rule = Options.Budget!;
-        Assert.Equal(4.0, rule.Target);
-        Assert.Equal(2.0, rule.SlotCap);
-        var first = Taken(Held(1, 6000), 5);
-        var second = Taken(Held(2, 6000), 3);
-        int k = first.Transfer.SourceSymbols;
-        var held = new List<CarriedBulletin> { first, second };
-        int directory = BroadcastScheduler.Plan(held, Slot, 1, Compression.Default, Options, null, Frames(1000)).Objects[0].Count;
-        var slot = Slot;
-        var counts = new List<(int First, int Second)>();
-        for (int i = 0; i < 3; i++, slot = slot.AddHours(1))
+        foreach (int k in new[] { 1, 2, 3, 5, 10, 17, 40 })
         {
-            // Room for one bulletin's cap and a little over, so the first is served before the second gets any.
-            var plan = BroadcastScheduler.Plan(held, slot, 1, Compression.Default, Options, null, Frames(directory + (2 * k) + 1));
-            var objects = ByBid(plan);
-            counts.Add((objects[first.Bid].Count, objects[second.Bid].Count));
-            held = [.. held.Select(c => c with { NextEsi = c.NextEsi + (uint)objects[c.Bid].Count, FirstSlot = c.FirstSlot ?? (objects[c.Bid].Count > 0 ? slot : null) })];
+            int floor = BroadcastScheduler.FloorSymbols(k, rule);
+            Assert.True(3 * floor >= k + 1, $"K {k}: floor {floor}");
+            Assert.True(floor <= BroadcastScheduler.CapSymbols(k, rule));
         }
-        // Two slots of 2 K finish the first (4 K); it then leaves the front tier and the second is served.
-        Assert.Equal(2 * k, counts[0].First);
-        Assert.Equal(2 * k, counts[1].First);
-        Assert.True(counts[0].Second <= 1);
-        Assert.True(counts[2].Second >= 2 * k - 1, $"{counts[2]}");
-        Assert.True(BroadcastScheduler.Leftover(held[0], slot, rule));
-        Assert.False(BroadcastScheduler.Leftover(held[1], slot, rule));
     }
 
     [Fact]
-    public void Fill_ReportsHowManyOfEachClassAreCarried_AndHowManyReachTheTarget()
-    {
-        var rule = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } };
-        var options = Options with { Budget = rule };
-        var nearly = Taken(AtCoverage(1, 6000, 3.5), 5, "G4ABC");
-        var fresh = Taken(Held(2, 6000), 3, "G4ABC");
-        var bulk = Taken(Held(3, 6000), 2, "LU9DCE");
-        var plan = BroadcastScheduler.Plan([nearly, fresh, bulk], Slot, 1, Compression.Default, options, null, Frames(1000));
-        Assert.Equal(2, plan.NormalCarried);
-        Assert.Equal(1, plan.BulkCarried);
-        Assert.Equal(1, plan.ReachedTarget);
-    }
-
-    [Fact]
-    public void NotStarted_ForFortyEightHoursAfterBeingTakenIn_RetiresUnsent()
-    {
-        var c = Taken(Held(1, 6000), 47);
-        Assert.True(BroadcastScheduler.InRotation(c, Slot, Options));
-        var late = Taken(Held(1, 6000), 48);
-        Assert.False(BroadcastScheduler.InRotation(late, Slot, Options));
-        Assert.True(BroadcastScheduler.NeverStarted(late, Slot));
-        // One that has been started is not touched by this; it ages from its first slot instead.
-        Assert.True(BroadcastScheduler.InRotation(late with { FirstSlot = Slot.AddHours(-2), NextEsi = 3 }, Slot, Options));
-        var plan = BroadcastScheduler.Plan([late], Slot, 1, Compression.Default, Options, null, Frames(1000));
-        Assert.Empty(plan.Directory.Entries);
-    }
-
-    [Fact]
-    public void Fill_CapsEachBulletinAtTwoKASlot_HoweverQuietTheSlot()
+    public void Fill_CapsEachBulletinAtSixTenthsOfKASlot_HoweverQuietTheSlot()
     {
         var only = Held(4, 9000);
         int k = only.Transfer.SourceSymbols;
         var plan = BroadcastScheduler.Plan([only], Slot, 1, Compression.Default, Options, null, Frames(1000));
         Assert.Equal(BroadcastScheduler.CapSymbols(k, Options.Budget!), ByBid(plan)[only.Bid].Count);
-        Assert.Equal(2 * k, ByBid(plan)[only.Bid].Count);
-        // A one-symbol bulletin still gets its two.
+        Assert.Equal((int)Math.Ceiling(0.6 * k), ByBid(plan)[only.Bid].Count);
+        // A one-symbol bulletin still gets its one.
         var tiny = Held(5, 100);
         Assert.Equal(1, tiny.Transfer.SourceSymbols);
-        Assert.Equal(2, ByBid(BroadcastScheduler.Plan([tiny], Slot, 1, Compression.Default, Options, null, Frames(1000)))[tiny.Bid].Count);
+        Assert.Equal(1, ByBid(BroadcastScheduler.Plan([tiny], Slot, 1, Compression.Default, Options, null, Frames(1000)))[tiny.Bid].Count);
     }
 
     [Fact]
@@ -204,20 +121,20 @@ public class BudgetSchedulerTests
     }
 
     [Fact]
-    public void Leftover_AfterTargetK_OrThirtySixHours_RetiredAfterTenK_OrFortyEightHours()
+    public void Leftover_AfterSixK_OrThirtySixHours_RetiredAfterTenK_OrFortyEightHours()
     {
         var rule = Options.Budget!;
         var c = Held(6, 6000);
         int k = c.Transfer.SourceSymbols;
-        Assert.Equal(4 * k, BroadcastScheduler.LeftoverSymbols(k, rule));
+        Assert.Equal(6 * k, BroadcastScheduler.LeftoverSymbols(k, rule));
         Assert.Equal(10 * k, BroadcastScheduler.RetireSymbols(k, rule));
         Assert.Equal(TimeSpan.FromHours(48), BroadcastScheduler.RetireAge(rule));
 
         bool Leftover(uint next, DateTimeOffset? first) => BroadcastScheduler.Leftover(c with { NextEsi = next, FirstSlot = first }, Slot, rule);
         bool Retired(uint next, DateTimeOffset? first) => BroadcastScheduler.Retired(c with { NextEsi = next, FirstSlot = first }, Slot, rule);
         Assert.False(Leftover(0, null) || Retired(0, null));
-        Assert.False(Leftover((uint)(4 * k) - 1, Slot));
-        Assert.True(Leftover((uint)(4 * k), Slot));
+        Assert.False(Leftover((uint)(6 * k) - 1, Slot));
+        Assert.True(Leftover((uint)(6 * k), Slot));
         Assert.False(Retired((uint)(10 * k) - 1, Slot));
         Assert.True(Retired((uint)(10 * k), Slot));
         Assert.False(Leftover((uint)(10 * k), Slot));
@@ -227,7 +144,7 @@ public class BudgetSchedulerTests
         Assert.True(Retired(3, Slot.AddHours(-48)));
         // No first slot, no age: one an older head end sent without recording it is still in rotation.
         Assert.False(BroadcastScheduler.Retired(c with { NextEsi = 3, FirstSlot = null }, Slot.AddDays(10), rule));
-        Assert.True(BroadcastScheduler.InRotation(c with { NextEsi = (uint)(4 * k), FirstSlot = Slot }, Slot, Options));
+        Assert.True(BroadcastScheduler.InRotation(c with { NextEsi = (uint)(6 * k), FirstSlot = Slot }, Slot, Options));
         Assert.False(BroadcastScheduler.InRotation(c with { NextEsi = (uint)(10 * k), FirstSlot = Slot }, Slot, Options));
 
         // Retired ones are neither sent nor listed; leftover ones are listed, and with room to
@@ -253,7 +170,7 @@ public class BudgetSchedulerTests
     {
         var c = Held(11, 6000);
         int k = c.Transfer.SourceSymbols;
-        var rule = new BudgetRule { Target = 12, RetireAfter = TimeSpan.FromHours(60) };
+        var rule = new BudgetRule { RetireCoverage = 12, RetireAfter = TimeSpan.FromHours(60) };
         Assert.Equal(12 * k, BroadcastScheduler.LeftoverSymbols(k, rule));
         Assert.Equal(12 * k, BroadcastScheduler.RetireSymbols(k, rule));
         Assert.Equal(TimeSpan.FromHours(60), BroadcastScheduler.RetireAge(rule));
@@ -272,10 +189,10 @@ public class BudgetSchedulerTests
         for (int trial = 0; trial < 60; trial++)
         {
             var normal = Enumerable.Range(0, rng.Next(1, 12))
-                .Select(i => AtCoverage((trial * 100) + i, 1000 + rng.Next(12000), rng.NextDouble() * 3.9))
+                .Select(i => AtCoverage((trial * 100) + i, 1000 + rng.Next(12000), rng.NextDouble() * 5.5))
                 .ToList();
             var leftover = Enumerable.Range(0, rng.Next(1, 8))
-                .Select(i => AtCoverage((trial * 100) + 50 + i, 1000 + rng.Next(12000), 4 + (rng.NextDouble() * 5.5)))
+                .Select(i => AtCoverage((trial * 100) + 50 + i, 1000 + rng.Next(12000), 6 + (rng.NextDouble() * 3.5)))
                 .ToList();
             int budget = 10 + rng.Next(200);
             var plan = BroadcastScheduler.Plan([.. normal, .. leftover], Slot, trial, Compression.Default, Options, null, Frames(budget));
@@ -300,7 +217,7 @@ public class BudgetSchedulerTests
 
         // A tight slot: the leftover tier gets nothing, the rest fill it, and both are listed.
         var busy = Enumerable.Range(0, 6).Select(i => AtCoverage(900 + i, 6000, 1)).ToList();
-        var spare = AtCoverage(950, 6000, 4.5);
+        var spare = AtCoverage(950, 6000, 6.5);
         var tight = BroadcastScheduler.Plan([.. busy, spare], Slot, 1, Compression.Default, Options, null, Frames(30));
         Assert.Equal(0, ByBid(tight)[spare.Bid].Count);
         Assert.True(tight.BulletinFrames > 0);
@@ -311,10 +228,10 @@ public class BudgetSchedulerTests
     public void Leftover_GoesAfterEveryOtherPiece_SoASlotCutShortLosesItFirst()
     {
         var rule = Options.Budget!;
-        var normal = Enumerable.Range(0, 5).Select(i => AtCoverage(700 + i, 3000 + (i * 1500), i * 0.7)).ToList();
-        // One crossing 4 K in this slot, whose pieces past 6 K come from the leftover tier's turn.
-        var crossing = AtCoverage(710, 6000, 3.8);
-        var leftover = Enumerable.Range(0, 4).Select(i => AtCoverage(720 + i, 2000 + (i * 2000), 4.5 + i)).ToList();
+        var normal = Enumerable.Range(0, 5).Select(i => AtCoverage(700 + i, 3000 + (i * 1500), i * 0.8)).ToList();
+        // One crossing 6 K in this slot, whose pieces past 6 K come from the leftover tier's turn.
+        var crossing = AtCoverage(710, 6000, 5.8);
+        var leftover = Enumerable.Range(0, 4).Select(i => AtCoverage(720 + i, 2000 + (i * 2000), 6.5 + i)).ToList();
         var held = new List<CarriedBulletin>([.. normal, crossing, .. leftover]);
         var plan = BroadcastScheduler.Plan(held, Slot, 3, Compression.Default, Options, null, Frames(1000));
         var byId = held.ToDictionary(c => c.Transfer.ObjectId);
@@ -345,7 +262,7 @@ public class BudgetSchedulerTests
     [Fact]
     public void Leftover_Alone_KeysNothing_ButIsStillListed()
     {
-        var spare = AtCoverage(12, 6000, 5);
+        var spare = AtCoverage(12, 6000, 7);
         var aged = AtCoverage(13, 3000, 2, Slot.AddHours(-40));
         var plan = BroadcastScheduler.Plan([spare, aged], Slot, 1, Compression.Default, Options, null, Frames(1000));
         Assert.Equal(0, plan.BulletinFrames);
@@ -369,8 +286,8 @@ public class BudgetSchedulerTests
             var a = store.Offer(TestBulletins.Make(15, 6000), new DateOnly(2026, 10, 6))!;
             int k = a.Transfer.SourceSymbols;
             var slot = Slot;
-            // Plenty of room in every slot: 2 K a slot, so two slots take it to 4 K, and three are plenty.
-            for (int i = 0; i < 3; i++, slot = slot.AddHours(1))
+            // Plenty of room in every slot: 0.6 K a slot, so twelve slots take it past 6 K.
+            for (int i = 0; i < 12; i++, slot = slot.AddHours(1))
             {
                 store.Commit(BroadcastScheduler.Plan(store.InRotation(slot), slot, 1, Compression.Default, Options, store.DirectoryNextEsi, Frames(1000)));
             }

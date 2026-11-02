@@ -9,11 +9,12 @@ public class ConcentrationTests
     private static string Json(string schedule) => $$"""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": { {{schedule}} } }""";
 
     [Fact]
-    public void Config_DefaultsAre2KASlot_4KTarget_AndNothingBulk()
+    public void Config_DefaultsAreUnchanged_AndNothingIsBulk()
     {
         var rule = HeadEndConfig.Parse(Json("")).ToScheduleOptions().Budget!;
-        Assert.Equal(2.0, rule.SlotCap);
-        Assert.Equal(4.0, rule.Target);
+        Assert.Equal(0.6, rule.SlotCap);
+        Assert.Equal(6.0, rule.RetireCoverage);
+        Assert.Equal(3, rule.SpreadSlots);
         Assert.Null(rule.Bulk);
         Assert.False(rule.IsBulk("LU9DCE"));
     }
@@ -21,10 +22,9 @@ public class ConcentrationTests
     [Fact]
     public void Config_BulkIsAListOfCallsigns_AnySsidAndCaseIgnored()
     {
-        var config = HeadEndConfig.Parse(Json("\"bulk\": [\"lu9dce\", \"G4XYZ-3\"], \"target\": 3, \"slotCap\": 1.5"));
+        var config = HeadEndConfig.Parse(Json("\"bulk\": [\"lu9dce\", \"G4XYZ-3\"], \"retireCoverage\": 5"));
         var rule = config.ToScheduleOptions().Budget!;
-        Assert.Equal(3.0, rule.Target);
-        Assert.Equal(1.5, rule.SlotCap);
+        Assert.Equal(5.0, rule.RetireCoverage);
         Assert.True(rule.IsBulk("LU9DCE"));
         Assert.True(rule.IsBulk("lu9dce-5"));
         Assert.True(rule.IsBulk("G4XYZ"));
@@ -34,22 +34,10 @@ public class ConcentrationTests
     }
 
     [Fact]
-    public void Config_BadBulkOrTarget_IsRefused()
+    public void Config_BadBulk_IsRefused()
     {
         Assert.Contains("bulk", Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(Json("\"bulk\": [\"not a callsign\"]"))).Message);
-        Assert.Contains("target", Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(Json("\"target\": 0"))).Message);
         Assert.Throws<ConfigException>(() => HeadEndConfig.Parse(Json("\"rule\": \"shares\", \"bulk\": [\"LU9DCE\"]")));
-    }
-
-    [Fact]
-    public void Config_OldRetireCoverageAndSpreadSlots_AreStillReadButIgnored()
-    {
-        var config = HeadEndConfig.Parse(Json("\"retireCoverage\": 6, \"spreadSlots\": 3, \"slotCap\": 0.6"));
-        Assert.Equal(6, config.Schedule.RetireCoverage);
-        Assert.Equal(3, config.Schedule.SpreadSlots);
-        var rule = config.ToScheduleOptions().Budget!;
-        Assert.Equal(4.0, rule.Target);
-        Assert.Equal(0.6, rule.SlotCap);
     }
 
     [Fact]
@@ -153,25 +141,51 @@ public class ConcentrationTests
         Assert.Equal(envelope.NextEsi, Assert.Single(second.Objects, o => o.EnvelopeFor is not null).FirstEsi);
     }
 
-    [Fact]
-    public void LeftoverPieces_AreNotCountedAsCarried_AndTheTargetIsReachedOnlyOnce()
+    private static CarriedBulletin Held(int seed, string from, double coverage, DateTimeOffset taken, ScheduleOptions options)
     {
-        var options = ScheduleOptions.HourlyBudget with { Budget = new BudgetRule { Target = 4, SlotCap = 2 } };
-        var budget = new SlotBudget(TimeSpan.FromSeconds(1000), lengths => TimeSpan.FromSeconds(lengths.Count));
-        var bulletin = Bulletins.Make(1, 6000);
+        var bulletin = Bulletins.Make(seed, 6000, 'B', from);
         var transfer = TransferObject.ForBulletin(bulletin, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
-        int k = transfer.SourceSymbols;
+        return new CarriedBulletin(bulletin.Bid, bulletin.Title, 6000, DateOnly.FromDateTime(taken.UtcDateTime), transfer, (uint)(coverage * transfer.SourceSymbols), coverage > 0 ? taken : null, From: from, TakenIn: taken);
+    }
+
+    [Fact]
+    public void Bulk_GoesAfterEveryNormalBulletin_ButLeastCoveredFirstWithinEachClass()
+    {
+        var options = ScheduleOptions.HourlyBudget with { Budget = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } } };
+        var budget = (int frames) => new SlotBudget(TimeSpan.FromSeconds(frames), lengths => TimeSpan.FromSeconds(lengths.Count));
         var slot = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
-        CarriedBulletin At(double coverage) => new(bulletin.Bid, bulletin.Title, 6000, new DateOnly(2026, 11, 2), transfer, (uint)(coverage * k), slot.AddHours(-3), From: "G4ABC", TakenIn: slot.AddHours(-5));
-        var fresh = new CarriedBulletin("1_X", "t", 100, new DateOnly(2026, 11, 2), TransferObject.ForBulletin(Bulletins.Make(2, 6000), options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment), 0, null, From: "G4ABC", TakenIn: slot.AddHours(-1));
-        // Crossing the target in this slot: counted as carried, and as reaching it.
-        var crossing = BroadcastScheduler.Plan([At(3.5), fresh], slot, 1, Compression.Default, options, null, budget);
-        Assert.Equal(2, crossing.NormalCarried);
-        Assert.Equal(1, crossing.ReachedTarget);
-        // Already in the leftover tier: it gets spare airtime, but is neither carried nor reaching anything.
-        var spare = BroadcastScheduler.Plan([At(4.5), fresh], slot, 1, Compression.Default, options, null, budget);
-        Assert.Equal(1, spare.NormalCarried);
-        Assert.Equal(0, spare.ReachedTarget);
-        Assert.True(spare.Objects.Single(o => o.Bid == bulletin.Bid).Count > 0);
+        var freshBulk = Held(1, "LU9DCE", 0, slot.AddHours(-1), options);
+        var coveredNormal = Held(2, "G4ABC", 2.0, slot.AddHours(-5), options);
+        var freshNormal = Held(3, "G4ABC", 0, slot.AddHours(-2), options);
+        var plan = BroadcastScheduler.Plan([freshBulk, coveredNormal, freshNormal], slot, 1, Compression.Default, options, null, budget(200));
+        Assert.Equal(2, plan.NormalCarried);
+        Assert.Equal(1, plan.BulkCarried);
+
+        // Tight: the normal ones take it all, the less covered first, though the bulk one is the least covered of all.
+        int directory = plan.Objects[0].Count;
+        var tight = BroadcastScheduler.Plan([freshBulk, coveredNormal, freshNormal], slot, 1, Compression.Default, options, null, budget(directory + 6));
+        int Count(SlotBroadcast p, CarriedBulletin c) => p.Objects.Single(o => o.Bid == c.Bid).Count;
+        Assert.Equal(0, Count(tight, freshBulk));
+        Assert.True(Count(tight, freshNormal) >= Count(tight, coveredNormal));
+        Assert.True(Count(tight, freshNormal) > 0);
+        Assert.Equal(0, tight.BulkCarried);
+
+        // Bulk bulletins are ordered least covered first among themselves.
+        var covered = Held(4, "LU9DCE", 1.0, slot.AddHours(-3), options);
+        var bulkOnly = BroadcastScheduler.Plan([covered, freshBulk], slot, 1, Compression.Default, options, null, budget(directory + 6));
+        Assert.True(Count(bulkOnly, freshBulk) > Count(bulkOnly, covered));
+    }
+
+    [Fact]
+    public void LeftoverPieces_AreNotCountedAsCarried()
+    {
+        var options = ScheduleOptions.HourlyBudget;
+        var budget = new SlotBudget(TimeSpan.FromSeconds(1000), lengths => TimeSpan.FromSeconds(lengths.Count));
+        var slot = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
+        var spare = Held(1, "G4ABC", 6.5, slot.AddHours(-5), options);
+        var fresh = Held(2, "G4ABC", 0, slot.AddHours(-1), options);
+        var plan = BroadcastScheduler.Plan([spare, fresh], slot, 1, Compression.Default, options, null, budget);
+        Assert.True(plan.Objects.Single(o => o.Bid == spare.Bid).Count > 0);
+        Assert.Equal(1, plan.NormalCarried);
     }
 }

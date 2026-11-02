@@ -168,9 +168,6 @@ public sealed record SlotReport
     /// <summary>How many of its bulk bulletins (<c>schedule.bulk</c> senders) the slot carried pieces of.</summary>
     public int BulkCarried { get; init; }
 
-    /// <summary>How many of the bulletins carried reached <c>schedule.target</c> K in all with this slot's pieces.</summary>
-    public int ReachedTarget { get; init; }
-
     /// <summary>How many of another station's objects the slot sent pieces of (relayed from what the receivers on the LAN heard, issue #218).</summary>
     public int RelayedObjects { get; init; }
 

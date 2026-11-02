@@ -346,8 +346,8 @@ public sealed class HeadEndService(
         }
         if (plan.Broadcast is { NormalCarried: > 0 } or { BulkCarried: > 0 })
         {
-            // One short line a slot on how many bulletins it carries, by class, and how many of them reach the target (issue #234).
-            journal.Write(string.Create(CultureInfo.InvariantCulture, $"carried: {plan.Broadcast.NormalCarried} normal and {plan.Broadcast.BulkCarried} bulk bulletins, {plan.Broadcast.ReachedTarget} reaching the target"));
+            // One short line a slot on how many bulletins it carries, by class, and by class (issue #234).
+            journal.Write(string.Create(CultureInfo.InvariantCulture, $"carried: {plan.Broadcast.NormalCarried} normal and {plan.Broadcast.BulkCarried} bulk bulletins"));
         }
         if (IonosphereLine(plan, time.GetUtcNow()) is { } line)
         {
@@ -360,7 +360,7 @@ public sealed class HeadEndService(
             journal.Write(spots);
         }
         SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation);
-        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0, ReachedTarget = plan.Broadcast?.ReachedTarget ?? 0 };
+        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0 };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
         status.SetBulletinsHeld(store.Count);

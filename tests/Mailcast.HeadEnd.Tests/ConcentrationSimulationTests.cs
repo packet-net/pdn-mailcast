@@ -18,21 +18,12 @@ namespace Mailcast.HeadEnd.Tests;
 /// </remarks>
 public class ConcentrationSimulationTests(ITestOutputHelper output)
 {
-    // The sweep: the rule as it is left at the schedule keys, "" for the defaults. The OLD-STRIP lines are the ones removed to run
-    // this same test on the commit before the change.
-    private static readonly (string Name, string Schedule)[] Configs = // OLD-STRIP
+    // The sweep: the rule as it stands, and the same with the bulk senders (LU9DCE) after everything else.
+    private static readonly (string Name, string Schedule)[] Configs =
     [
-        ("slotCap 0.6, target 3", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 0.6, \"target\": 3"),
-        ("slotCap 0.6, target 4", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 0.6, \"target\": 4"),
-        ("slotCap 0.6, target 6", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 0.6, \"target\": 6"),
-        ("slotCap 1, target 3", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 1, \"target\": 3"),
-        ("slotCap 1, target 4", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 1, \"target\": 4"),
-        ("slotCap 1, target 6", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 1, \"target\": 6"),
-        ("slotCap 2, target 3", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 2, \"target\": 3"),
-        ("slotCap 2, target 4 (the new defaults)", ", \"bulk\": [\"LU9DCE\"]"),
-        ("slotCap 2, target 6", ", \"bulk\": [\"LU9DCE\"], \"slotCap\": 2, \"target\": 6"),
+        ("old rule", ""),
+        ("old rule with bulk last", ", \"bulk\": [\"LU9DCE\"]"),
     ];
-    // OLD-STRIP-CONFIGS
 
     /// <summary>The chance a listener hears a slot at all, in the model that fits the real reports best.</summary>
     private const double MainP = 0.3;

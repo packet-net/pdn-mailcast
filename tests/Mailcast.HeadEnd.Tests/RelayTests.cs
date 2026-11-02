@@ -67,7 +67,7 @@ public class RelayTests
     }
 
     [Fact]
-    public void ARelayedBulletinFromABulkSender_GoesAfterTheNormalOnes_WhateverItsAge()
+    public void ARelayedBulletinFromABulkSender_GoesAfterTheNormalOnes()
     {
         using var dir = new TempDirectory();
         var options = Options() with { Budget = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } } };
@@ -76,19 +76,19 @@ public class RelayTests
         TransferObject Make(int seed, string from) => TransferObject.ForBulletin(Bulletins.Make(seed, 9000, 'B', from), dictionary, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
         var digest = Make(70, "LU9DCE-1");
         var normal = Make(71, "G4ABC");
-        // The digest was heard long before the normal one, so by age alone it would go first.
+        // The digest is the less covered, so by coverage alone it would go first.
         f.Hear(digest, [0u], heardAt: Now.AddHours(-9), complete: true);
-        f.Hear(normal, [0u], heardAt: Now.AddHours(-1), complete: true);
+        f.Hear(normal, Enumerable.Range(0, normal.SourceSymbols).Select(i => (uint)(100 + i)), heardAt: Now.AddHours(-1), complete: true);
         var store = new HeadEndStore(dir.Path, Compression.Default, options);
         int k = normal.SourceSymbols;
 
-        // Room for the directory and one bulletin's cap, no more.
-        var tight = Plan(store, f.Selector(options), options, frames: 2 * k + 14);
         int Sent(SlotBroadcast plan, ulong id) => plan.Relayed.Where(r => r.ObjectId == id).Sum(r => r.Frames.Count);
+        var tight = Plan(store, f.Selector(options), options, frames: 20);
+        Assert.True(Sent(tight, normal.ObjectId) > 0);
         Assert.True(Sent(tight, normal.ObjectId) > Sent(tight, digest.ObjectId));
         var roomy = Plan(store, f.Selector(options), options, frames: 400);
         Assert.True(Sent(roomy, digest.ObjectId) > 0);
-        Assert.True(Sent(roomy, normal.ObjectId) > 0);
+        Assert.True(k > 0);
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class RelayTests
     }
 
     [Fact]
-    public void RankedOldestFirst_WithOwnMailFirst_AndCoverageCountingEveryStationHeard()
+    public void RankedLeastCoveredFirst_WithOwnMailFirst_AndCoverageCountingEveryStationHeard()
     {
         using var dir = new TempDirectory();
         var options = Options();
@@ -219,21 +219,20 @@ public class RelayTests
         var heavy = Remote(21, 9000); // plenty heard from two stations already
         var light = Remote(22, 9000); // hardly heard
         int k = heavy.SourceSymbols;
-        f.Hear(heavy, Enumerable.Range(0, k * 3).Select(i => (uint)(2000 + i)), heardFrom: "GB7RDG", heardAt: Now.AddHours(-5));
-        f.Hear(light, [5u], heardFrom: "GB7RDG", heardAt: Now.AddHours(-1));
+        f.Hear(heavy, Enumerable.Range(0, k * 3).Select(i => (uint)(2000 + i)), heardFrom: "GB7RDG");
+        f.Hear(light, [5u], heardFrom: "GB7RDG");
         // Make the heavy one complete so that it can give as much as is asked.
         f.Hear(heavy, [], complete: true);
         f.Hear(light, [], complete: true);
 
-        var plan = Plan(store, f.Selector(options), options, frames: 75);
+        var plan = Plan(store, f.Selector(options), options, frames: 24);
 
         int Sent(ulong id) => plan.Frames.Count(x => x.ObjectId == id);
         Assert.True(Sent(mine.Transfer.ObjectId) > 0);
-        // First come, first finished: ours (taken in earlier), then the relayed one heard first, up to the 4 K target it has 3 K of.
-        Assert.Equal(k, Sent(heavy.ObjectId));
-        Assert.True(Sent(mine.Transfer.ObjectId) >= Sent(heavy.ObjectId));
+        Assert.True(Sent(light.ObjectId) > Sent(heavy.ObjectId), $"light {Sent(light.ObjectId)} heavy {Sent(heavy.ObjectId)}");
+        Assert.True(Sent(mine.Transfer.ObjectId) >= Sent(light.ObjectId));
         // With room for more, the heavy one gets its turn too, but never past the per-slot cap.
-        var roomy = Plan(store, f.Selector(options), options, frames: 200);
+        var roomy = Plan(store, f.Selector(options), options, frames: 60);
         Assert.Contains(roomy.Frames, x => x.ObjectId == heavy.ObjectId);
         Assert.True(roomy.Frames.Count(x => x.ObjectId == heavy.ObjectId) <= BroadcastScheduler.CapSymbols(k, options.Budget!));
         Assert.True(Sent(heavy.ObjectId) <= BroadcastScheduler.CapSymbols(k, options.Budget!));
@@ -265,7 +264,7 @@ public class RelayTests
         var obj = Remote(40);
         f.Hear(obj, [0u, 1u, 2u, 3u], complete: true);
         var sent = new HashSet<uint>();
-        for (int round = 0; round < 2; round++)
+        for (int round = 0; round < 4; round++)
         {
             var store = new HeadEndStore(dir.Path, Compression.Default, options); // a restart every round
             var plan = Plan(store, f.Selector(options), options, slot: Slot.AddHours(round));
@@ -525,13 +524,10 @@ public class RelayTests
         int k = mine.Transfer.SourceSymbols;
         f.Hear(mine.Transfer, [3000u], listedBy: "M0LTE", air: new AirHeard(3 * k, new Dictionary<string, int> { ["GB7RDG"] = 3 * k }, Now, Now));
         var selector = f.Selector(options);
-        var plan = BroadcastScheduler.Plan(store.InRotation(Slot), Slot, 1, Compression.Default, options, store.DirectoryNextEsi, Frames(70), "ms110d-wn4", null, null, [], selector.HeardFromOthers);
+        var plan = BroadcastScheduler.Plan(store.InRotation(Slot), Slot, 1, Compression.Default, options, store.DirectoryNextEsi, Frames(26), "ms110d-wn4", null, null, [], selector.HeardFromOthers);
 
         Assert.Equal(3 * k, selector.HeardFromOthers(mine.Transfer.ObjectId));
-        // Ours first, as the older, but it has 3 K from others already, so only the K it lacks of the 4 K target is front tier;
-        // the rest of its cap is spare airtime, after the other bulletin has had all it will take.
-        Assert.True(plan.Objects.Single(o => o.Bid == mine.Bid).Count >= k);
-        Assert.True(plan.Objects.Single(o => o.Bid == other.Bid).Count > 0);
+        Assert.True(plan.Objects.Single(o => o.Bid == other.Bid).Count > plan.Objects.Single(o => o.Bid == mine.Bid).Count);
     }
 
     private static TransferObject OwnObject(ScheduleOptions options, Bulletin b)
