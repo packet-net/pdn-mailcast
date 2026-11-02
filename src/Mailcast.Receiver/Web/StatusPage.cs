@@ -1013,7 +1013,8 @@ public sealed partial class StatusPage : IAsyncDisposable
                 frameCounts = slot.FrameCounts,
                 // The same, most first and in words, for the page.
                 heard = slot.FrameCounts.OrderByDescending(c => c.Value).Select(c => new { waveform = c.Key, words = Waveform.Words(c.Key), frames = c.Value }),
-                listedWaveform = slot.ListedWaveform,
+                // The waveform alone, to compare with what the modem locked to; the words say which interleaver.
+                listedWaveform = slot.ListedWaveform is { } named ? Waveform.Plain(named) : null,
                 listedWords = slot.ListedWaveform is { } listed ? Waveform.Words(listed) : null,
                 tone = slot.Tone is not { } tone ? null : new
                 {

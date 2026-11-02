@@ -36,11 +36,24 @@ public static class Waveform
         }
     }
 
-    /// <summary>For the page and the log: <c>1200 bps (WN4)</c>.</summary>
-    public static string Words(string name) =>
-        Bps(name) is { } bps && Number(name) is { } wn
-            ? string.Create(CultureInfo.InvariantCulture, $"{bps} bps (WN{wn})")
+    /// <summary>The ending a head end's directory gives a waveform sent on the long interleaver: <c>ms110d-wn4-long</c>.</summary>
+    public const string LongSuffix = "-long";
+
+    /// <summary>The waveform alone, as the modem's autobaud names it: <c>ms110d-wn4</c> for <c>ms110d-wn4-long</c>.</summary>
+    public static string Plain(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return name.Length > LongSuffix.Length && name.EndsWith(LongSuffix, StringComparison.Ordinal) ? name[..^LongSuffix.Length] : name;
+    }
+
+    /// <summary>For the page and the log: <c>1200 bps (WN4)</c>, or <c>1200 bps (WN4, long interleaver)</c>.</summary>
+    public static string Words(string name)
+    {
+        string plain = Plain(name);
+        return Bps(plain) is { } bps && Number(plain) is { } wn
+            ? string.Create(CultureInfo.InvariantCulture, $"{bps} bps (WN{wn}{(plain.Length != name.Length ? ", long interleaver" : "")})")
             : Ascii.Clean(name);
+    }
 }
 
 /// <summary>One MS110D burst: the waveform the modem's autobaud locked to, and the frames read from it.</summary>

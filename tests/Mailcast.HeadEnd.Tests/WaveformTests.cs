@@ -60,8 +60,83 @@ public class WaveformTests
     [InlineData("ms110d-wn9", null)]
     [InlineData("ms110d-wn4x", null)]
     [InlineData("afsk1200", null)]
-    public void SetHardwarePayload_IsTheWaveformNumberAndTheShortInterleaver(string mode, byte[]? payload) =>
+    [InlineData("ms110d-wn4-long", new byte[] { 4, 1 })]
+    [InlineData("ms110d-wn3-long", new byte[] { 3, 1 })]
+    [InlineData("ms110d-wn0-long", new byte[] { 0, 1 })]
+    [InlineData("ms110d-wn13-long", new byte[] { 13, 1 })]
+    [InlineData("ms110d-wn9-long", null)]
+    [InlineData("ms110d-wn-long", null)]
+    [InlineData("ms110d-wn4-long-long", null)]
+    [InlineData("ms110d-wn4long", null)]
+    [InlineData("ms110d-wn4-Long", null)]
+    [InlineData("ms110d-wn4-short", null)]
+    public void SetHardwarePayload_IsTheWaveformNumberAndTheInterleaver(string mode, byte[]? payload) =>
         Assert.Equal(payload, Waveforms.SetHardwarePayload(mode));
+
+    [Fact]
+    public void LongInterleaver_EveryWaveformTheModemSendsHasOne_AsTheModemItselfAgrees()
+    {
+        foreach (int wn in new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 13 })
+        {
+            string mode = $"ms110d-wn{wn}-long";
+            byte[] payload = Waveforms.SetHardwarePayload(mode)!;
+            // The modem the station runs takes the same payload, and says so.
+            var modem = (IHardwareControllable)ModemCatalog.Create($"ms110d-wn{wn}", 48000, _ => { });
+            Assert.True(modem.TrySetHardware(payload, out string outcome), outcome);
+            Assert.Contains("long interleaver", outcome, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("ms110d-wn4-long")]
+    [InlineData("ms110d-wn3-long")]
+    [InlineData("ms110d-wn2-long")]
+    public void LongAirtime_IsWhatTheModemRenders_InWholeInterleaverBlocks(string mode)
+    {
+        var modem = (IFramePackingModem)Waveforms.CreateModem(mode, 48000);
+        IAirtime airtime = Waveforms.Measure(mode);
+        Assert.IsType<Ms110dAirtime>(airtime);
+        foreach (int count in new[] { 1, 2, 3, 5, 8, 13 })
+        {
+            // 240-octet symbols as AX.25 UI frames, as a slot sends them.
+            var frames = Enumerable.Range(0, count).Select(_ => new byte[271 + MailcastFrame.Ax25UiOverhead]).ToList();
+            double rendered = modem.ModulateFrames(frames, 0).Length / 48000.0;
+            Assert.Equal(rendered, airtime.Burst([.. frames.Select(f => f.Length)]).TotalSeconds, 0.001);
+        }
+        // Padded to whole blocks: one frame takes as long as two on WN4, and never less than on the short interleaver.
+        if (mode == "ms110d-wn4-long")
+        {
+            Assert.Equal(airtime.Burst([290]), airtime.Burst([290, 290]));
+        }
+        IAirtime shortInterleaver = Waveforms.Measure(mode[..^"-long".Length]);
+        Assert.IsType<LinearAirtime>(shortInterleaver);
+        Assert.True(airtime.Burst([290]) > shortInterleaver.Burst([290]));
+    }
+
+    [Theory]
+    [InlineData("ms110d-wn4-long ms110d-wn3")]
+    [InlineData("ms110d-wn4 ms110d-wn4-long ms110d-wn3")]
+    public void Modes_WithTheLongInterleaver_TakeTurns_AndEachHourGetsEachModeOverAsManyDays(string list)
+    {
+        string[] modes = list.Split(' ');
+        var waveforms = new Waveforms(modes, true, Hourly, Waveforms.Measure);
+        var days = Enumerable.Range(0, modes.Length).Select(d => Hourly.ActiveSlotsOn(new DateOnly(2026, 11, 2).AddDays(d))).ToList();
+        var hours = days.SelectMany(d => d).Select(s => s.Hour).Distinct().ToList();
+        foreach (int hour in hours)
+        {
+            var got = days.SelectMany(d => d).Where(s => s.Hour == hour).Select(waveforms.ModeFor).ToList();
+            if (got.Count == modes.Length)
+            {
+                Assert.Equal(modes.OrderBy(m => m, StringComparer.Ordinal), got.OrderBy(m => m, StringComparer.Ordinal));
+            }
+        }
+        foreach (var slot in days[0])
+        {
+            var waveform = waveforms.For(slot);
+            Assert.Equal(Waveforms.SetHardwarePayload(waveform.Mode), waveform.SetHardware);
+            Assert.Equal(waveform.Mode.EndsWith("-long", StringComparison.Ordinal) ? (byte)1 : (byte)0, waveform.SetHardware![1]);
+        }
+    }
 
     [Fact]
     public void Config_ModesDefaultToTheStationsOwn_AndAreChecked()
@@ -76,6 +151,18 @@ public class WaveformTests
 
         var bad = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"modes": ["ms110d-wn4", "vara"]}}"""));
         Assert.Contains("'vara' is not an MS110D waveform", bad.Message, StringComparison.Ordinal);
+
+        var trial = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"modes": ["ms110d-wn4-long", "ms110d-wn3"]}}""");
+        Assert.Equal(["ms110d-wn4-long", "ms110d-wn3"], trial.Modes);
+        var noSuch = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"modes": ["ms110d-wn9-long"]}}"""));
+        Assert.Contains("'ms110d-wn9-long' is not an MS110D waveform the modem can switch to", noSuch.Message, StringComparison.Ordinal);
+        // The station's own mode is pdn-soundmodem's name, which has no -long.
+        var station = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "ms110d-wn4-long"}}"""));
+        Assert.Contains("\"station\".\"mode\" is the modem's own mode, which has no -long", station.Message, StringComparison.Ordinal);
+        // With modes set too, that is the only problem given.
+        var longStation = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "ms110d-wn4-long"}, "schedule": {"modes": ["ms110d-wn4-long", "ms110d-wn3"]}}"""));
+        Assert.Contains("\"station\".\"mode\" is the modem's own mode, which has no -long", longStation.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("needs an MS110D broadcast modem", longStation.Message, StringComparison.Ordinal);
         Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"modes": []}}"""));
         Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "afsk1200"}, "schedule": {"modes": ["ms110d-wn4"]}}"""));
     }

@@ -517,6 +517,10 @@ public sealed record HeadEndConfig
         {
             problems.Add("\"slot\".\"toneSeconds\" must be 0 to 60 (the station caps a test at 60 s, 30 s unless its txTest.maxSeconds says more)");
         }
+        if (Station.Mode.EndsWith(Waveforms.LongSuffix, StringComparison.Ordinal))
+        {
+            problems.Add($"\"station\".\"mode\" is the modem's own mode, which has no -long; put '{Station.Mode}' in \"schedule\".\"modes\" instead");
+        }
         if (Station.SubChannel is < 0 or > 15)
         {
             problems.Add("\"station\".\"subChannel\" must be 0 to 15");
@@ -682,10 +686,11 @@ public sealed record HeadEndConfig
             }
             if (modes.FirstOrDefault(m => Waveforms.SetHardwarePayload(m) is null) is { } bad)
             {
-                problems.Add($"\"schedule\".\"modes\": '{bad}' is not an MS110D waveform the modem can switch to (ms110d-wn0 to ms110d-wn8, or ms110d-wn13)");
+                problems.Add($"\"schedule\".\"modes\": '{bad}' is not an MS110D waveform the modem can switch to (ms110d-wn0 to ms110d-wn8, or ms110d-wn13; add -long for the long interleaver)");
                 return;
             }
-            if (Waveforms.SetHardwarePayload(Station.Mode) is null)
+            // A -long station.mode already has its own, clearer, problem above.
+            if (Waveforms.SetHardwarePayload(Station.Mode) is null && !Station.Mode.EndsWith(Waveforms.LongSuffix, StringComparison.Ordinal))
             {
                 problems.Add($"\"schedule\".\"modes\" needs an MS110D broadcast modem, and \"station\".\"mode\" is '{Station.Mode}'");
                 return;

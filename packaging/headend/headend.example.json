@@ -21,7 +21,8 @@
   // taken in retires unsent.
   // "shares" is the earlier rule, with "slotShares", "slotOffsets", "extraSymbols" and
   // "carryOverSlots". "modes" lists waveforms the slots take in turn, such as
-  // ["ms110d-wn4", "ms110d-wn3"]; left out, every slot goes on "station"."mode".
+  // ["ms110d-wn4", "ms110d-wn3"], or ["ms110d-wn4-long", "ms110d-wn3"] with the long interleaver
+  // on WN4 (receivers need nothing); left out, every slot goes on "station"."mode".
   "schedule": {
     "rule": "budget",
     "budgetMinutes": 10,

@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using M0LTE.Il2p;
+using M0LTE.Ms110d;
 using Packet.SoundModem.Modems;
 
 namespace Mailcast.HeadEnd.Slot;
@@ -50,6 +53,60 @@ public sealed class LinearAirtime(TimeSpan perBurst, TimeSpan perFrame, double s
         double perFrame = 17 * perOctet;
         double perBurst = Math.Max(0, Seconds(small) - (small * perOctet) - perFrame);
         return new LinearAirtime(TimeSpan.FromSeconds(perBurst), TimeSpan.FromSeconds(perFrame), perOctet);
+    }
+}
+
+/// <summary>
+/// An MS110D burst's airtime as pdn-soundmodem's modem renders it: every frame's IL2P+CRC bits
+/// back to back after one preamble, then the EOM, rounded up to whole interleaver blocks. With the
+/// long interleaver a block is several seconds (6.83 s at WN3 and WN4, 10.24 s at WN1 and WN2), so
+/// a burst one bit over a block boundary takes a whole block more; a linear model would miss it.
+/// </summary>
+/// <remarks>
+/// Sized with the transmitter's own <see cref="Ms110dModulator.BurstSeconds"/>, the same sum the
+/// modem packs its bursts by, and the frames encoded as the modem encodes them (all-zero frames,
+/// as <see cref="LinearAirtime.Measure"/> uses, which IL2P sends whole: never shorter than a real
+/// one). The tests check it against bursts the modem renders.
+/// </remarks>
+public sealed class Ms110dAirtime : IAirtime
+{
+    private readonly Ms110dModulator _modulator;
+    private readonly ConcurrentDictionary<int, int> _bits = new();
+
+    /// <summary>The model for one waveform and interleaver.</summary>
+    /// <exception cref="ArgumentException">A combination the modem does not send.</exception>
+    public Ms110dAirtime(int waveform, Ms110dInterleaverKind interleaver)
+    {
+        var settings = new Ms110dTxSettings { WaveformNumber = waveform, Interleaver = interleaver };
+        _modulator = new Ms110dModulator(settings);
+        // What the modem renders beyond the transmitter's own sum (its filters' tails at 48 kHz),
+        // measured on one real burst.
+        const int sampleRate = 48000;
+        var modem = new Ms110dModem(sampleRate, _ => { }, settings);
+        double rendered = modem.Modulate(new byte[100], 0).Length / (double)sampleRate;
+        Tail = TimeSpan.FromSeconds(Math.Max(0, rendered - _modulator.BurstSeconds(FrameBits(100))));
+    }
+
+    /// <summary>How much longer a rendered burst is than the transmitter's sum for it.</summary>
+    public TimeSpan Tail { get; }
+
+    private static int FrameBits(int length) =>
+        Il2pFramer.FrameBits(Il2pCodec.Encode(new byte[length], appendCrc: true), preambleBits: 0).Length;
+
+    /// <inheritdoc />
+    public TimeSpan Burst(IReadOnlyList<int> frameLengths)
+    {
+        ArgumentNullException.ThrowIfNull(frameLengths);
+        if (frameLengths.Count == 0)
+        {
+            return TimeSpan.Zero;
+        }
+        int bits = 0;
+        foreach (int length in frameLengths)
+        {
+            bits += _bits.GetOrAdd(length, FrameBits);
+        }
+        return TimeSpan.FromSeconds(_modulator.BurstSeconds(bits)) + Tail;
     }
 }
 
