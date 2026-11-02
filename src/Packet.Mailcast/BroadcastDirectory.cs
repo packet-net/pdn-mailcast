@@ -162,7 +162,10 @@ public sealed record EnvelopeLink(ulong ObjectId, string Hash)
 /// The first entry's line may also name the waveform the slot went out on,
 /// <c>mode=ms110d-wn3</c>, so that a recording or a receiver's log says which slot used which
 /// waveform. Receivers decode any MS110D waveform by itself, so it is for the record only, and
-/// earlier readers ignore it like any field after the title.
+/// earlier readers ignore it like any field after the title. A slot on the long interleaver
+/// (<c>ms110d-wn4-long</c> in the head end's configuration) is sent as <c>mode=ms110d-wn4</c> and a
+/// further field, <c>interleaver=long</c>, so that receivers from before still see the waveform
+/// their own modem reports; <see cref="Mode"/> reads the two back as <c>ms110d-wn4-long</c>.
 /// </para>
 /// <para>
 /// From v0.14.0 a head end with a signing key signs the directory. Each entry's line then also
@@ -223,6 +226,10 @@ public sealed class BroadcastDirectory
     private const string PublicKeyField = "pubkey=";
     private const string KeyField = "key=";
     private const string SignatureField = "sig=";
+
+    // The long interleaver: sent beside the plain waveform, read back onto the mode's name.
+    private const string LongSuffix = "-long";
+    private const string LongInterleaverField = "interleaver=long";
 
     private readonly DirectorySigner? _signer;
     private byte[]? _serialized;
@@ -348,8 +355,9 @@ public sealed class BroadcastDirectory
     public SlotTimetable? Schedule { get; }
 
     /// <summary>
-    /// The waveform the slot went out on, as pdn-soundmodem names it (<c>ms110d-wn4</c>), when the
-    /// head end said and there is an entry to carry it; null otherwise.
+    /// The waveform the slot went out on, as pdn-soundmodem names it (<c>ms110d-wn4</c>), with
+    /// <c>-long</c> after it for the long interleaver (<c>ms110d-wn4-long</c>), when the head end
+    /// said and there is an entry to carry it; null otherwise.
     /// </summary>
     public string? Mode { get; }
 
@@ -390,7 +398,14 @@ public sealed class BroadcastDirectory
             }
             if (i == 0 && Mode is { } mode)
             {
-                text.Append("\tmode=").Append(mode);
+                if (mode.Length > LongSuffix.Length && mode.EndsWith(LongSuffix, StringComparison.Ordinal))
+                {
+                    text.Append("\tmode=").Append(mode.AsSpan(0, mode.Length - LongSuffix.Length)).Append('\t').Append(LongInterleaverField);
+                }
+                else
+                {
+                    text.Append("\tmode=").Append(mode);
+                }
             }
             if (i == 0 && Reports is { } reports)
             {
@@ -556,6 +571,10 @@ public sealed class BroadcastDirectory
             {
                 schedule = SlotTimetable.FromFields(parts[5..]);
                 mode = parts[5..].FirstOrDefault(f => f.StartsWith("mode=", StringComparison.Ordinal) && f.Length > 5)?[5..];
+                if (mode is not null && parts.AsSpan(5).Contains(LongInterleaverField))
+                {
+                    mode += LongSuffix;
+                }
                 reports = ReportReceipts.FromFields(parts[5..]);
                 station = parts[5..].FirstOrDefault(f => f.StartsWith(StationField, StringComparison.Ordinal))?[StationField.Length..];
                 station = StationAdvert.IsCallsign(station) ? station : null;

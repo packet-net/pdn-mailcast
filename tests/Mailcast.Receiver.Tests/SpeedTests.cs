@@ -51,6 +51,16 @@ public class SpeedTests
     }
 
     [Fact]
+    public void Waveform_OnTheLongInterleaver_IsTheWaveformAlone_InWordsToo()
+    {
+        Assert.Equal("1200 bps (WN4, long interleaver)", Waveform.Words("ms110d-wn4-long"));
+        Assert.Equal("ms110d-wn4", Waveform.Plain("ms110d-wn4-long"));
+        Assert.Equal("ms110d-wn4", Waveform.Plain("ms110d-wn4"));
+        Assert.Equal("1200 bps (WN4)", Waveform.Words("ms110d-wn4"));
+        Assert.Equal("-long", Waveform.Plain("-long"));
+    }
+
+    [Fact]
     public void Waveform_NotInTheTable_IsGivenByName()
     {
         Assert.Null(Waveform.Bps("ms110d-wn11"));

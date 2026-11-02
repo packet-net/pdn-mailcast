@@ -35,7 +35,7 @@ public sealed class WavRenderer
     public WavSummary Render(IReadOnlyList<SlotFrame> frames, string path, DateTimeOffset start)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        IModem modem = ModemCatalog.Create(_mode, _sampleRate, _ => { });
+        IModem modem = Waveforms.CreateModem(_mode, _sampleRate);
         var clock = new SampleClock(start, _sampleRate);
         var identifier = new StationIdentifier(
             _settings.Callsign, modeSuffix: null, toneHz: _settings.ToneHz, wordsPerMinute: 20,

@@ -16,9 +16,9 @@ namespace Mailcast.HeadEnd.Tests;
 /// </summary>
 public class BudgetTests(ITestOutputHelper output)
 {
-    private static readonly ConcurrentDictionary<string, LinearAirtime> Measured = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, IAirtime> Measured = new(StringComparer.Ordinal);
 
-    private static LinearAirtime Measure(string mode) => Measured.GetOrAdd(mode, LinearAirtime.Measure);
+    private static IAirtime Measure(string mode) => Measured.GetOrAdd(mode, Waveforms.Measure);
 
     // The hours (UTC) GB7RDG's bulletins of 27 September to 5 October were written in.
     private static readonly int[] Hours =
@@ -112,7 +112,11 @@ public class BudgetTests(ITestOutputHelper output)
 
     /// <summary>One simulated slot.</summary>
     /// <param name="Leftover">The bulletins in the leftover tier as the slot was planned, of those <paramref name="InRotation"/> counts.</param>
-    private sealed record SlotResult(DateTimeOffset Slot, string Mode, int Frames, int BulletinsSent, int NewBulletins, int InRotation, TimeSpan OnAir, IReadOnlyDictionary<string, int> Symbols, int DirectoryFrames, IReadOnlySet<string> Leftover);
+    private sealed record SlotResult(DateTimeOffset Slot, string Mode, int Frames, int BulletinsSent, int NewBulletins, int InRotation, TimeSpan OnAir, IReadOnlyDictionary<string, int> Symbols, int DirectoryFrames, IReadOnlySet<string> Leftover)
+    {
+        /// <summary>The slot's frames as AX.25 UI frames, in sending order; empty for one that keys nothing.</summary>
+        public IReadOnlyList<int> Lengths { get; init; } = [];
+    }
 
     /// <summary>Bulletins arriving over <paramref name="days"/> days, <paramref name="perDay"/> a day, at the hours GB7RDG's arrive.</summary>
     private static List<(DateTimeOffset At, Bulletin Bulletin)> Arrivals(DateTimeOffset start, int days, int perDay, int seed = 2026)
@@ -151,7 +155,10 @@ public class BudgetTests(ITestOutputHelper output)
             var symbols = plan.Objects.Where(o => o.Bid is not null && o.Count > 0).ToDictionary(o => o.Bid!, o => o.Count, StringComparer.Ordinal);
             int fresh = symbols.Keys.Count(seen.Add);
             Assert.Equal(leftover.Count, plan.LeftoverBulletins);
-            results.Add(new SlotResult(slot, waveform.Mode, plan.BulletinFrames == 0 ? 0 : plan.Frames.Count, symbols.Count, fresh, inRotation.Count, headEnd.OnAir(plan, waveform), symbols, plan.BulletinFrames == 0 ? 0 : plan.Objects[0].Count, leftover));
+            results.Add(new SlotResult(slot, waveform.Mode, plan.BulletinFrames == 0 ? 0 : plan.Frames.Count, symbols.Count, fresh, inRotation.Count, headEnd.OnAir(plan, waveform), symbols, plan.BulletinFrames == 0 ? 0 : plan.Objects[0].Count, leftover)
+            {
+                Lengths = plan.BulletinFrames == 0 ? [] : [.. plan.Frames.Select(f => f.ToBytes().Length + MailcastFrame.Ax25UiOverhead)],
+            });
         }
         return results;
     }
@@ -231,6 +238,51 @@ public class BudgetTests(ITestOutputHelper output)
             double frames = byMode.Values.Single();
             Assert.InRange(frames, modes.Contains("wn3", StringComparison.Ordinal) ? 60 : 130, modes.Contains("wn3", StringComparison.Ordinal) ? 90 : 170);
         }
+    }
+
+    /// <summary>
+    /// The long interleaver pads every burst to whole blocks of several seconds, so a full slot on it
+    /// carries fewer frames, and the planner must know it or the slot overruns. Each full slot's plan is
+    /// also timed with the bursts the modem itself renders for it, not only the model the planner used.
+    /// </summary>
+    [Fact]
+    public void BusyDay_OnTheLongInterleaver_FillsEverySlot_AndRealBurstsStayInsideMaxMinutes()
+    {
+        using var headEnd = new HeadEnd("\"modes\": [\"ms110d-wn4\", \"ms110d-wn4-long\", \"ms110d-wn3\"]");
+        var arrivals = Arrivals(October, 3, 60);
+        var results = Simulate(headEnd, October, 3, arrivals);
+        Print(results);
+        TimeSpan max = TimeSpan.FromMinutes(headEnd.Config.Slot.Max);
+
+        Assert.Contains(results, r => r.Mode == "ms110d-wn4-long");
+        Assert.All(results, r => Assert.True(r.OnAir <= headEnd.Config.FillLimit, $"{r.Slot:HH:mm} on {r.Mode} would take {r.OnAir.TotalMinutes:0.00} min"));
+        Assert.All(results, r => Assert.True(r.OnAir + headEnd.Config.Margin <= max));
+        Assert.All(results.Skip(3), r => Assert.True(r.OnAir > headEnd.Config.FillLimit - TimeSpan.FromSeconds(60), $"{r.Slot:HH:mm} on {r.Mode} is only {r.OnAir.TotalMinutes:0.00} min"));
+
+        // The busiest long slot, its bursts rendered by the modem as the station would send them.
+        var slot = results.Where(r => r.Mode == "ms110d-wn4-long").MaxBy(r => r.Frames)!;
+        var model = new SlotAirtime(headEnd.Settings, headEnd.Waveforms.For(slot.Slot).Airtime);
+        int[] lengths = [.. slot.Lengths];
+        var sizes = model.BurstSizes(lengths);
+        var modem = (Packet.SoundModem.Modems.IFramePackingModem)Waveforms.CreateModem("ms110d-wn4-long", 48000);
+        TimeSpan rendered = TimeSpan.Zero;
+        int next = 0;
+        foreach (int n in sizes)
+        {
+            rendered += TimeSpan.FromSeconds(modem.ModulateFrames([.. lengths.Skip(next).Take(n).Select(l => new byte[l])], 0).Length / 48000.0);
+            next += n;
+        }
+        TimeSpan real = model.Slot(lengths, sizes) - model.Bursts(lengths, sizes) + rendered;
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"busiest wn4-long slot {slot.Slot:HH:mm}: {lengths.Length} frames in {sizes.Count} bursts ({string.Join(" ", sizes)}), {model.Slot(lengths, sizes).TotalMinutes:0.00} min planned, {real.TotalMinutes:0.00} min with the modem's own bursts, {(real + headEnd.Config.Margin).TotalMinutes:0.00} of {max.TotalMinutes:0} min with the margin"));
+        Assert.True(real + headEnd.Config.Margin <= max, $"{real.TotalMinutes:0.00} min");
+        Assert.Equal(model.Bursts(lengths, sizes).TotalSeconds, rendered.TotalSeconds, 0.01);
+
+        // Fewer frames than the short interleaver at the same rate, more than at half the rate.
+        var byMode = results.Skip(3).Where(r => r.Frames > 0).GroupBy(r => r.Mode).ToDictionary(g => g.Key, g => g.Average(r => r.Frames), StringComparer.Ordinal);
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"a full slot: {byMode["ms110d-wn4"]:0} frames on WN4, {byMode["ms110d-wn4-long"]:0} on WN4 long, {byMode["ms110d-wn3"]:0} on WN3"));
+        Assert.True(byMode["ms110d-wn4-long"] < byMode["ms110d-wn4"]);
+        Assert.True(byMode["ms110d-wn4-long"] > byMode["ms110d-wn3"]);
     }
 
     [Fact]

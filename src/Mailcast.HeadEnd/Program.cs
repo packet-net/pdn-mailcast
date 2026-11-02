@@ -300,7 +300,7 @@ public static partial class Program
             }
             var store = new RotationStore(scratch, Compression.Default, scheduleOptions, journal);
             SlotSettings settings = config.ToSlotSettings();
-            Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
+            Waveforms waveforms = config.ToWaveforms(Waveforms.Measure);
             // The head end's own list of reports, read but never written, when it reads the BBS's.
             ReportLog? reports = config.Intake.Reports is null ? null
                 : new ReportLog(Directory.Exists(config.StateDirectory) ? config.StateDirectory : scratch, journal, readOnly: true);
@@ -308,11 +308,12 @@ public static partial class Program
 
             SlotPlan plan = planner.Plan(slot);
             SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
-            var airtime = (LinearAirtime)waveform.Airtime;
+            IAirtime airtime = waveform.Airtime;
             var runner = new SlotRunner(settings, new NullStation(), new NullKiss(), null, airtime, journal, TimeProvider.System);
             var bursts = runner.BurstSizes(plan.Frames, airtime);
-            journal.Write(string.Create(CultureInfo.InvariantCulture,
-                $"airtime on {waveform.Mode}: {airtime.PerBurst.TotalSeconds:0.00} s a burst, {airtime.Burst([1003]).TotalSeconds - airtime.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)"));
+            journal.Write(airtime is LinearAirtime linear
+                ? string.Create(CultureInfo.InvariantCulture, $"airtime on {waveform.Mode}: {linear.PerBurst.TotalSeconds:0.00} s a burst, {linear.Burst([1003]).TotalSeconds - linear.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)")
+                : string.Create(CultureInfo.InvariantCulture, $"airtime on {waveform.Mode}: {airtime.Burst([1003]).TotalSeconds:0.00} s for a burst of one full frame (1003 octets), in whole interleaver blocks"));
             journal.Write(string.Create(CultureInfo.InvariantCulture,
                 $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation{(plan.LeftoverInRotation > 0 ? string.Create(CultureInfo.InvariantCulture, $" ({plan.LeftoverInRotation} leftover)") : "")}, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {waveform.Mode}, about {runner.Airtime(plan.Frames, bursts, airtime).TotalMinutes:0.0} min of bursts, {runner.Model(airtime).Slot([.. plan.Frames.Select(f => runner.Ax25(f).Length)], bursts).TotalMinutes:0.0} min on the air with the tone and idents{(scheduleOptions.Budget is null ? "" : string.Create(CultureInfo.InvariantCulture, $" (filled to {config.FillLimit.TotalMinutes:0.0})"))}"));
 
@@ -397,7 +398,7 @@ public static partial class Program
             journal.Write("config: schedule.symbolSize is ignored (pieces are always 240 octets); harmless to keep");
         }
         SlotSettings settings = config.ToSlotSettings();
-        Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
+        Waveforms waveforms = config.ToWaveforms(Waveforms.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);
         var schedule = config.ToSlotSchedule();
         var ionoSettings = config.Ionosphere.ToSettings();
