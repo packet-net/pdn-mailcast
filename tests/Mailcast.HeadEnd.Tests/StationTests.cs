@@ -202,7 +202,7 @@ public class StationTests
             Assert.False(a.Tuned);
             Assert.Equal("no rig", a.TuneNote);
         }
-        using var failed = new Handler((_, _) => (HttpStatusCode.InternalServerError, """{"failed": "rigctld refused"}"""));
+        using var failed = new Handler((_, _) => (HttpStatusCode.InternalServerError, """{"failed": "rigctld refused", "tuneFailed": true}"""));
         using (var api = Client(failed))
         {
             var a = await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None);
@@ -210,6 +210,16 @@ public class StationTests
             Assert.True(a.TuneFailed);
             Assert.Contains("rigctld refused", a.Problem, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task StationApiClient_DoesNotCallAnOtherRefusalATuneFailure()
+    {
+        using var handler = new Handler((_, _) => (HttpStatusCode.InternalServerError, """{"failed": "something else"}"""));
+        using var api = Client(handler);
+        var a = await api.TakeLeaseAsync(4, 120, 10, true, CancellationToken.None);
+        Assert.False(a.Held);
+        Assert.False(a.TuneFailed);
     }
 
     [Fact]

@@ -186,7 +186,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
         {
             return new LeaseAnswer(false, 0, $"sub-channel {holder.ToJsonString()} holds the transmit lease until {json["expires"]?.ToString() ?? "unknown"}", busy);
         }
-        bool tuneFailed = tune && status is HttpStatusCode.Conflict or HttpStatusCode.InternalServerError;
+        bool tuneFailed = json?["tuneFailed"] is JsonNode tf && tf.GetValueKind() == JsonValueKind.True;
         return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy) { TuneFailed = tuneFailed };
     }
 
