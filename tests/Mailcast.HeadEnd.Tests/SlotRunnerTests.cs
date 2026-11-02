@@ -494,6 +494,59 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Run_AsksToTuneOnTheFirstTakeOnly_AndJournalsTheDial()
+    {
+        var rig = new Rig();
+        rig.Station.TunedAnswer = true;
+        // A slot long enough to renew the lease more than once.
+        var report = rig.Run(60);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.True(rig.Station.TuneAsked[0]);
+        Assert.True(rig.Station.TuneAsked.Count > 1);
+        Assert.All(rig.Station.TuneAsked.Skip(1), asked => Assert.False(asked));
+        Assert.Single(rig.Journal.Lines, l => l.Contains("station tuned the rig for the slot, dial 7.047 MHz", StringComparison.Ordinal));
+        Assert.All(rig.Journal.Lines, l => Assert.True(l.All(char.IsAscii), l));
+    }
+
+    [Fact]
+    public void Run_SaysOncePerRunWhyTheStationDidNotTune()
+    {
+        var rig = new Rig();
+        rig.Station.TunedAnswer = false;
+        rig.Run(5);
+        rig.Run(5);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("did not tune the rig for the slot: no rig, nothing to tune", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_SaysOncePerRunWhenTheStationDoesNotKnowTune()
+    {
+        var rig = new Rig();
+        rig.Station.TunedAnswer = null;
+        rig.Run(5);
+        rig.Run(5);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("this pdn-soundmodem does not retune for the slot; upgrade it if your radio must move for the slot", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_SkipsTheSlotWhenTheStationCannotTune_AndTriesAgainNextTime()
+    {
+        var rig = new Rig();
+        rig.Station.TuneRefusal = "HTTP 500: rigctld: connection refused";
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.True(report.Retryable);
+        Assert.Contains("could not tune the rig for the slot", report.Reason, StringComparison.Ordinal);
+        Assert.Contains("rigctld: connection refused", report.Reason, StringComparison.Ordinal);
+        Assert.Empty(rig.Station.Keyups);
+        Assert.Empty(rig.Station.Frames);
+        Assert.Empty(rig.Station.Releases);
+
+        rig.Station.TuneRefusal = null;
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+    }
+
+    [Fact]
     public void Run_SkipsWhenTheLeaseIsRefused_WithoutKeying()
     {
         var rig = new Rig();

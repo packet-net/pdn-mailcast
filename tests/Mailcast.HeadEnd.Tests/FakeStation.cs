@@ -37,6 +37,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Each lease request's time and whether it was granted.</summary>
     public List<(DateTimeOffset At, bool Granted)> LeaseRequests { get; } = [];
 
+    /// <summary>Whether each lease request asked to tune.</summary>
+    public List<bool> TuneAsked { get; } = [];
+
+    /// <summary>What the station says about tuning when asked: true, false, or null for an older pdn-soundmodem with no tuned field.</summary>
+    public bool? TunedAnswer { get; set; }
+
+    /// <summary>When set, a take that asks to tune is refused with this reason.</summary>
+    public string? TuneRefusal { get; set; }
+
     public List<DateTimeOffset> Releases { get; } = [];
 
     public List<DateTimeOffset> DropRequests { get; } = [];
@@ -124,9 +133,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Keys the radio for something else that was already on the air when the slot began, as a keyup a lease does not cut short.</summary>
     public void KeyOtherTraffic(TimeSpan length) => _ = KeyAsync(length, "other traffic, already on the air", CancellationToken.None);
 
-    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation)
+    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, bool tune, CancellationToken cancellation)
     {
         await Task.Yield();
+        TuneAsked.Add(tune);
+        if (tune && TuneRefusal is not null)
+        {
+            LeaseRequests.Add((_time.GetUtcNow(), false));
+            return new LeaseAnswer(false, 0, TuneRefusal) { TuneFailed = true };
+        }
         bool refuse = (RefuseFirstLease && LeaseRequests.Count == 0)
             || (RefuseAfterRequests is int n && LeaseRequests.Count >= n);
         LeaseRequests.Add((_time.GetUtcNow(), !refuse));
@@ -138,7 +153,12 @@ public sealed class FakeStation : IStationApi, IKissConnector
         _maxCarrierWait = TimeSpan.FromSeconds(maxCarrierWaitSeconds);
         int granted = Math.Min(seconds, 300);
         _expires = _time.GetUtcNow() + TimeSpan.FromSeconds(granted);
-        return new LeaseAnswer(true, granted, null, ChannelBusy);
+        return new LeaseAnswer(true, granted, null, ChannelBusy)
+        {
+            Tuned = tune ? TunedAnswer : null,
+            DialHz = tune && TunedAnswer == true ? 7_047_000 : null,
+            TuneNote = tune && TunedAnswer == false ? "no rig, nothing to tune" : null,
+        };
     }
 
     public async Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation)

@@ -645,7 +645,7 @@ public static partial class Program
 
     private sealed class NullStation : IStationApi
     {
-        public Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation) => throw new NotSupportedException();
+        public Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, bool tune, CancellationToken cancellation) => throw new NotSupportedException();
 
         public Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation) => throw new NotSupportedException();
 

@@ -13,6 +13,21 @@ namespace Mailcast.HeadEnd.Station;
 /// <param name="ChannelBusy">The station's carrier sense for the holder's sub-channel; null if it did not say.</param>
 public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem, bool? ChannelBusy = null)
 {
+    /// <summary>
+    /// Whether the station tuned the rig for the lease: true or false when its answer carried a
+    /// <c>tuned</c> field, null when it did not (a pdn-soundmodem that does not retune) or none was asked.
+    /// </summary>
+    public bool? Tuned { get; init; }
+
+    /// <summary>The dial the station tuned to, in Hz, when it said.</summary>
+    public double? DialHz { get; init; }
+
+    /// <summary>The station's note on the tuning (why it did not tune), when it gave one.</summary>
+    public string? TuneNote { get; init; }
+
+    /// <summary>True when the take was refused because the station could not tune the rig, so nothing is tuned and nothing may be sent.</summary>
+    public bool TuneFailed { get; init; }
+
     /// <summary>A refusal or failure.</summary>
     public static LeaseAnswer No(string problem) => new(false, 0, problem);
 }
@@ -78,7 +93,11 @@ public interface IStationApi
     /// station to send the holder's frames anyway once they have waited
     /// <paramref name="maxCarrierWaitSeconds"/> for a clear channel.
     /// </summary>
-    Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation);
+    /// <remarks>
+    /// <paramref name="tune"/> adds <c>"tune": true</c>: the station moves the rig so the holder's modem sits
+    /// at its own dial for as long as the lease is held (first take only; renewals leave it out).
+    /// </remarks>
+    Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, bool tune, CancellationToken cancellation);
 
     /// <summary>Reads the lease and the channel-busy flag (<c>GET /api/txlease</c>).</summary>
     Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation);
@@ -139,7 +158,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, CancellationToken cancellation)
+    public async Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, bool tune, CancellationToken cancellation)
     {
         var body = new JsonObject
         {
@@ -147,18 +166,28 @@ public sealed class StationApiClient : IStationApi, IDisposable
             ["seconds"] = seconds,
             ["maxCarrierWaitSeconds"] = maxCarrierWaitSeconds,
         };
+        if (tune)
+        {
+            body["tune"] = true;
+        }
         var (status, json, text) = await LeaseCallAsync(HttpMethod.Post, body, cancellation).ConfigureAwait(false);
         bool? busy = Busy(json);
         if (status == HttpStatusCode.OK && json?["held"]?.GetValue<bool>() == true)
         {
             double granted = json["seconds"] is JsonNode s ? s.GetValue<double>() : seconds;
-            return new LeaseAnswer(true, granted, null, busy);
+            return new LeaseAnswer(true, granted, null, busy)
+            {
+                Tuned = json["tuned"] is JsonNode t && t.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? t.GetValue<bool>() : null,
+                DialHz = json["dialHz"] is JsonNode d && d.GetValueKind() == JsonValueKind.Number ? d.GetValue<double>() : null,
+                TuneNote = Text(json, "note"),
+            };
         }
         if (status == HttpStatusCode.Conflict && json?["subChannel"] is JsonNode holder)
         {
             return new LeaseAnswer(false, 0, $"sub-channel {holder.ToJsonString()} holds the transmit lease until {json["expires"]?.ToString() ?? "unknown"}", busy);
         }
-        return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy);
+        bool tuneFailed = tune && status is HttpStatusCode.Conflict or HttpStatusCode.InternalServerError;
+        return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy) { TuneFailed = tuneFailed };
     }
 
     /// <inheritdoc />

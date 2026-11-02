@@ -58,6 +58,8 @@ public sealed class SlotRunner
     private readonly IJournal _journal;
     private readonly TimeProvider _time;
     private readonly IClockSync? _clock;
+    private int _saidNotTuned;
+    private int _saidNoRetune;
     private int _keepAudioNotOffered;
 
     /// <summary>How far before the slot the kept audio starts.</summary>
@@ -417,11 +419,16 @@ public sealed class SlotRunner
                     }
 
                     DateTimeOffset asked = Now;
-                    LeaseAnswer first = await AskForLeaseAsync(cancellation);
+                    LeaseAnswer first = await AskForLeaseAsync(tune: true, cancellation);
                     if (!first.Held)
                     {
+                        if (first.TuneFailed)
+                        {
+                            return Finish(SlotOutcome.Skipped, $"the station could not tune the rig for the slot, so nothing was sent: {first.Problem}", retryable: true);
+                        }
                         return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", retryable: true);
                     }
+                    SayTuning(first);
                     _leaseTaken = true;
                     LeaseUntil = asked + TimeSpan.FromSeconds(first.Seconds);
                     Say($"transmit lease taken for sub-channel {S.SubChannel}, {first.Seconds:0} s, renewed every {S.RenewEvery.TotalSeconds:0} s; frames go anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel");
@@ -551,12 +558,34 @@ public sealed class SlotRunner
             return null;
         }
 
-        private async Task<LeaseAnswer> AskForLeaseAsync(CancellationToken cancellation)
+        /// <summary>Journals what the station said to the tuning request: the dial, or once per run why not.</summary>
+        private void SayTuning(LeaseAnswer answer)
+        {
+            if (answer.Tuned is true)
+            {
+                Say(answer.DialHz is double hz ? $"station tuned the rig for the slot, dial {hz / 1e6:0.000###} MHz" : "station tuned the rig for the slot");
+            }
+            else if (answer.Tuned is false)
+            {
+                if (Interlocked.Exchange(ref owner._saidNotTuned, 1) == 0)
+                {
+                    Say($"station did not tune the rig for the slot: {(string.IsNullOrWhiteSpace(answer.TuneNote) ? "no reason given" : answer.TuneNote)}");
+                }
+            }
+            else if (Interlocked.Exchange(ref owner._saidNoRetune, 1) == 0)
+            {
+                Say("this pdn-soundmodem does not retune for the slot; upgrade it if your radio must move for the slot");
+            }
+        }
+
+        private async Task<LeaseAnswer> AskForLeaseAsync(CancellationToken cancellation) => await AskForLeaseAsync(tune: false, cancellation);
+
+        private async Task<LeaseAnswer> AskForLeaseAsync(bool tune, CancellationToken cancellation)
         {
             try
             {
                 return await owner._station.TakeLeaseAsync(
-                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), cancellation);
+                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), tune, cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
