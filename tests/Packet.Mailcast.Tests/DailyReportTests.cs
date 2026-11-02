@@ -191,11 +191,11 @@ public class DailyReportTests
         Assert.Equal(expected, read.Header.Touched);
     }
 
-    /// <summary>The tenth field is written after a ninth and an eighth ("-" where not known), and not at all when null, so a report without it is unchanged.</summary>
+    /// <summary>The tenth field is written after a ninth and an eighth ("-" for an eighth not known, 0 for a ninth), and not at all when null, so a report without it is unchanged.</summary>
     [Theory]
     [InlineData(null, null, null, "MCR1 0.6.0 - sc 3/1 0 2")]
-    [InlineData(3, null, 4, "MCR1 0.6.0 - sc 3/1 0 2 3 - 4")]
-    [InlineData(null, null, 4, "MCR1 0.6.0 - sc 3/1 0 2 - - 4")]
+    [InlineData(3, null, 4, "MCR1 0.6.0 - sc 3/1 0 2 3 0 4")]
+    [InlineData(null, null, 4, "MCR1 0.6.0 - sc 3/1 0 2 - 0 4")]
     [InlineData(3, 5, 4, "MCR1 0.6.0 - sc 3/1 0 2 3 5 4")]
     [InlineData(3, 5, null, "MCR1 0.6.0 - sc 3/1 0 2 3 5")]
     public void Header_TouchedField_RoundTrips(int? givenUp, int? outside, int? touched, string expected)
@@ -204,17 +204,18 @@ public class DailyReportTests
         var report = new DailyReport("G4ABC", Day, header, []);
         Assert.Equal(expected + "\r\n", report.Body);
         var read = DailyReport.Parse(report.Title, report.Body);
-        Assert.Equal((givenUp, outside, touched), (read.Header.GivenUp, read.Header.OutsidePieces, read.Header.Touched));
+        Assert.Equal((givenUp, touched is not null && outside is null ? 0 : outside, touched), (read.Header.GivenUp, read.Header.OutsidePieces, read.Header.Touched));
     }
 
-    /// <summary>A reader from before the tenth field (it reads up to the ninth and ignores the rest) still reads a report that has one.</summary>
+    /// <summary>
+    /// A golden header with a tenth field. Checked by hand against the v0.21.0 and v0.31.0 parsers, which
+    /// read the first nine fields the same and ignore the tenth; this reader keeps reading the first nine as before.
+    /// </summary>
     [Fact]
-    public void Parse_OldReaderSimulation_IgnoresTheTenthField()
+    public void Parse_GoldenHeaderWithATenthField_FirstNineFieldsReadAsBefore()
     {
-        string body = "MCR1 0.6.0 - sc 3/1 0 2 3 5 4\r\n";
-        // The reader that stops at the ninth field (the one before this) sees the same first nine fields.
-        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", body);
-        Assert.Equal((3, 1, 2, 3, 5), (read.Header.Rebuilt, read.Header.Delivered, read.Header.AlreadyHad ?? -1, read.Header.GivenUp ?? -1, read.Header.OutsidePieces ?? -1));
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", "MCR1 0.6.0 - sc 3/1 0 2 3 5 4\r\n");
+        Assert.Equal((3, 1, 2, 3, 5, 4), (read.Header.Rebuilt, read.Header.Delivered, read.Header.AlreadyHad ?? -1, read.Header.GivenUp ?? -1, read.Header.OutsidePieces ?? -1, read.Header.Touched ?? -1));
     }
 
     [Theory]

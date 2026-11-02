@@ -61,7 +61,6 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.PskReporterHeard += _ => Slots.OnPskReporterHeard();
         // Issue #133: the bulletins of the slot now on, for its summary line.
         Intake.BulletinCompleted += _ => Slots.OnBulletinCompleted();
-        Intake.GivenUp += dropped => Slots.OnGivenUp(dropped.Count(d => d.GaveUp), dropped.Count(d => !d.GaveUp));
         Delivery.SessionFinished += report => Slots.OnDelivered(
             report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted),
             report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.AlreadyHad));
@@ -214,7 +213,12 @@ public sealed class ReceiverHost : IAsyncDisposable
             Audio = () => ReportAudio.For(AudioSource.Parse(Config.Audio)),
         }, new SwitchableSession(this), Config.StateDirectory, _time, _log);
         Intake.BulletinCompleted += _ => feedback.NoteRebuilt();
-        Intake.GivenUp += feedback.NoteGivenUp;
+        // The slot summary says what the report counted, so the journal and the report agree (issue #240).
+        Intake.GivenUp += dropped =>
+        {
+            var (given, touched) = feedback.NoteGivenUp(dropped);
+            Slots.OnGivenUp(given, touched);
+        };
         Intake.OutsidePieces += feedback.NoteOutsidePieces;
         // Each station's directories say whether the report reached it (issue #136).
         Intake.DirectoryHeard += directory =>

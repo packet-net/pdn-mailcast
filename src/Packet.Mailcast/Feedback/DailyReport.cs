@@ -225,7 +225,7 @@ public sealed partial record DailyReport(string Callsign, DateOnly Day, ReportHe
         // Field 10 (issue #240) needs fields 8 and 9 before it, as "-" where not known.
         bool tenth = h.Touched is not null;
         string givenUp = h.GivenUp is { } g ? string.Create(CultureInfo.InvariantCulture, $" {g}") : h.OutsidePieces is not null || tenth ? " " + Missing : "";
-        string outside = h.OutsidePieces is { } o ? string.Create(CultureInfo.InvariantCulture, $" {o}") : tenth ? " " + Missing : "";
+        string outside = h.OutsidePieces is { } o ? string.Create(CultureInfo.InvariantCulture, $" {o}") : tenth ? " 0" : "";
         string touched = h.Touched is { } t ? string.Create(CultureInfo.InvariantCulture, $" {t}") : "";
         return string.Create(CultureInfo.InvariantCulture,
             $"{Tag}{FormatVersion} {Token(h.ReceiverVersion)} {Token(h.Locator)} {Token(h.Audio)} {h.Rebuilt}/{h.Delivered} {errors} {alreadyHad}{givenUp}{outside}{touched}");
@@ -537,6 +537,6 @@ public static class ReportErrors
 /// Part-received bulletins dropped in the day with under half their pieces (issue #240), which are
 /// not counted in <paramref name="GivenUp"/>. Null when none or not known: read from a header with no tenth field,
 /// or <c>-</c> there; and, written, null leaves the field out. A tenth field is written after a ninth and an eighth,
-/// as <c>-</c> where those are null.
+/// as <c>-</c> for an eighth that is null and <c>0</c> for a ninth that is null (none is a known zero).
 /// </param>
 public sealed record ReportHeader(string ReceiverVersion, string? Locator, string Audio, int Rebuilt, int Delivered, IReadOnlyDictionary<string, int> Errors, int? AlreadyHad, int? GivenUp = null, int? OutsidePieces = null, int? Touched = null);

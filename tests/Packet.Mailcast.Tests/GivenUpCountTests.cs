@@ -86,19 +86,43 @@ public class GivenUpCountTests
         var log = new List<string>();
         var store = Open(dir.Path, time, log);
         string bid = "1_SAME";
-        // One copy is delivered; the other, under another object, is a partial.
+        // One copy is delivered; the other, under another object, is a partial already marked as no longer sent.
         var delivered = Object(12, bid);
         var partial = Object(13, bid);
         List(store, (delivered, bid), (partial, bid));
+        time.Advance(TimeSpan.FromMinutes(5));
         Feed(store, partial, (partial.SourceSymbols + 1) / 2 + 1);
+        time.Advance(TimeSpan.FromHours(1));
+        List(store, (delivered, bid)); // the next directory leaves the partial out
         Feed(store, delivered, delivered.SourceSymbols);
         store.Acknowledge(bid, BbsVerdict.Accepted);
+        time.Advance(TimeSpan.FromHours(25));
+        store.DropNoLongerSent();
+
+        Assert.Empty(store.TakeGivenUp());
+        // The delivery removes the stopped partial as another copy before it can be dropped, so the drop branch never sees it.
+        Assert.Contains(log, l => l.Contains("other copy", StringComparison.Ordinal));
+        Assert.DoesNotContain(log, l => l.Contains("counted as", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TwoCopiesDroppedTogether_AreOneBulletin_TheFurthestWins()
+    {
+        using var dir = new TempDirectory();
+        var time = Clock();
+        var store = Open(dir.Path, time);
+        var a = Object(31, "1_SAME");
+        var b = Object(32, "1_SAME");
+        List(store, (a, "1_SAME"), (b, "1_SAME"));
         time.Advance(TimeSpan.FromMinutes(5));
+        Feed(store, a, 1);
+        Feed(store, b, (b.SourceSymbols + 1) / 2);
 
         Retire(store, time);
 
-        Assert.Empty(store.TakeGivenUp());
-        Assert.DoesNotContain(log, l => l.EndsWith("counted as given up", StringComparison.Ordinal));
+        var one = Assert.Single(store.TakeGivenUp());
+        Assert.True(one.GaveUp);
+        Assert.Equal(b.ObjectId, one.ObjectId);
     }
 
     [Fact]
@@ -106,7 +130,8 @@ public class GivenUpCountTests
     {
         using var dir = new TempDirectory();
         var time = Clock();
-        var store = Open(dir.Path, time);
+        var log = new List<string>();
+        var store = Open(dir.Path, time, log);
         var finished = Object(21, "1_SAME");
         var partial = Object(22, "1_SAME");
         List(store, (finished, "1_SAME"), (partial, "1_SAME"));
@@ -117,5 +142,6 @@ public class GivenUpCountTests
         Retire(store, time);
 
         Assert.Empty(store.TakeGivenUp());
+        Assert.Contains(log, l => l.Contains("dropped with", StringComparison.Ordinal) && l.EndsWith("not counted, a copy of the bulletin was delivered or is done", StringComparison.Ordinal));
     }
 }

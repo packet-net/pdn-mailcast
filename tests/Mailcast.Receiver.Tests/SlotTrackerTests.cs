@@ -336,7 +336,7 @@ public class SlotTrackerTests
 
         var line = Assert.Single(lines, l => l.Contains("ended", StringComparison.Ordinal));
         Assert.Equal("slot: the 11:00 UTC slot ended: 125 frames, 120 on 1200 bps (WN4) and 5 on 600 bps (WN3); 29.4 KB decoded from them; "
-            + "tone SNR 14 dB, +1.2 Hz off; bulletins 3 completed, 1 delivered, 2 already had, 1 given up, 2 touched; directory heard, signed", line);
+            + "tone SNR 14 dB, +1.2 Hz off; bulletins 3 completed, 1 delivered, 2 already had, 1 given up, 2 touched (under half their pieces); directory heard, signed", line);
         Assert.True(line.All(ch => ch is >= ' ' and <= '~'));
         Assert.True(slots.Last!.Ended);
         Assert.Equal(29_400, slots.Last.BytesDecoded);

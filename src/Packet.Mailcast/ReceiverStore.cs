@@ -1571,7 +1571,10 @@ public sealed partial class ReceiverStore
         {
             return [];
         }
-        var taken = _givenUp.ToList();
+        // One bulletin once, by BID: of several copies dropped together, the one that got furthest.
+        var taken = _givenUp.Where(d => d.Bid is null)
+            .Concat(_givenUp.Where(d => d.Bid is not null).GroupBy(d => d.Bid!, StringComparer.OrdinalIgnoreCase).Select(g => g.MaxBy(d => d.Held)!))
+            .ToList();
         _givenUp.Clear();
         return taken;
     }
@@ -1628,6 +1631,11 @@ public sealed partial class ReceiverStore
             if (counted is null)
             {
                 verdict = "not counted, nothing of it was held";
+            }
+            else if (held.Any(i => i.Withheld is not null))
+            {
+                counted = null;
+                verdict = "not counted, it was complete but withheld";
             }
             else if (bid is not null && BidIsDone(bid))
             {

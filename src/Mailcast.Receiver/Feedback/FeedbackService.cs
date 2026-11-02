@@ -264,30 +264,67 @@ public sealed class FeedbackService
         }
     }
 
+    /// <summary>How long a counted BID is remembered, so a bulletin is not counted again on a later day (issue #240).</summary>
+    internal static readonly TimeSpan CountedRetention = TimeSpan.FromDays(14);
+
     /// <summary>
     /// Part-received bulletins were dropped because the head end had stopped sending them
     /// (issue #240). One that held at least half its pieces counts as given up, any other as
-    /// touched, on today's UTC date. Each bulletin counts once in all, by BID (else object ID),
-    /// whichever it was and whichever day: one already counted, either way, is not counted again.
+    /// touched, on today's UTC date. Each bulletin counts once, by BID (else object ID), for
+    /// <see cref="CountedRetention"/>: given up wins, so a bulletin counted as touched is counted as
+    /// given up instead if it later shows real progress and its day's report has not gone yet.
+    /// Returns how many were newly counted as given up and as touched, which is what the journal's
+    /// slot summary should say. With the report off nothing is remembered and every drop counts.
     /// </summary>
-    public void NoteGivenUp(IReadOnlyList<DroppedPartial> dropped)
+    public (int GivenUp, int Touched) NoteGivenUp(IReadOnlyList<DroppedPartial> dropped)
     {
         ArgumentNullException.ThrowIfNull(dropped);
         if (dropped.Count == 0)
         {
-            return;
+            return (0, 0);
         }
+        if (!Enabled)
+        {
+            return (dropped.Count(d => d.GaveUp), dropped.Count(d => !d.GaveUp));
+        }
+        int given = 0, touched = 0;
         Count(d =>
         {
+            var now = _time.GetUtcNow();
+            foreach (var old in _state.Counted.Where(kv => now - new DateTimeOffset(kv.Value.Day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) > CountedRetention).Select(kv => kv.Key).ToList())
+            {
+                _state.Counted.Remove(old);
+            }
             foreach (var one in dropped)
             {
-                string key = one.Bid ?? ObjectId.Format(one.ObjectId);
-                if (!_state.Days.Exists(other => other.GivenUp.Contains(key, StringComparer.OrdinalIgnoreCase) || other.Touched.Contains(key, StringComparer.OrdinalIgnoreCase)))
+                string key = (one.Bid ?? ObjectId.Format(one.ObjectId)).ToUpperInvariant();
+                if (_state.Counted.TryGetValue(key, out var seen))
                 {
-                    (one.GaveUp ? d.GivenUp : d.Touched).Add(key);
+                    var earlier = _state.Days.Find(x => x.Day == seen.Day);
+                    bool sent = _state.Last is { } last && last.Day >= seen.Day;
+                    if (seen.GaveUp || !one.GaveUp || earlier is null || sent)
+                    {
+                        continue;
+                    }
+                    earlier.Touched.RemoveAll(k => string.Equals(k, key, StringComparison.OrdinalIgnoreCase));
+                }
+                else if (_state.Days.Exists(other => other.GivenUp.Contains(key, StringComparer.OrdinalIgnoreCase) || other.Touched.Contains(key, StringComparer.OrdinalIgnoreCase)))
+                {
+                    continue; // counted before the counted list was kept
+                }
+                (one.GaveUp ? d.GivenUp : d.Touched).Add(key);
+                _state.Counted[key] = new CountedBid { Day = d.Day, GaveUp = one.GaveUp };
+                if (one.GaveUp)
+                {
+                    given++;
+                }
+                else
+                {
+                    touched++;
                 }
             }
         });
+        return (given, touched);
     }
 
     /// <summary>
@@ -336,7 +373,17 @@ public sealed class FeedbackService
             next = Next(_time.GetUtcNow()),
             text = last is null ? null : last.Title + "\n" + last.Body.Replace("\r\n", "\n", StringComparison.Ordinal),
             receipts = ReceiptViews(),
+            givenUpToday = Today(r => r.GivenUp.Count),
+            touchedToday = Today(r => r.Touched.Count),
         };
+    }
+
+    private int Today(Func<DayRecord, int> count)
+    {
+        lock (_gate)
+        {
+            return _state.Days.Find(d => d.Day == DateOnly.FromDateTime(_time.GetUtcNow().UtcDateTime)) is { } record ? count(record) : 0;
+        }
     }
 
     /// <summary>
@@ -942,6 +989,9 @@ public sealed class FeedbackService
 
         public SentReport? Last { get; set; }
 
+        /// <summary>Each bulletin counted as given up or touched (issue #240), by upper-case BID or object ID, kept <see cref="CountedRetention"/>, so it counts once whatever the day.</summary>
+        public Dictionary<string, CountedBid> Counted { get; set; } = new(StringComparer.Ordinal);
+
         public string? ReceiverId { get; set; }
 
         /// <summary>What each station's directories have said about this listener's reports (issue #136).</summary>
@@ -950,6 +1000,14 @@ public sealed class FeedbackService
         /// <summary>The one receipt an older version kept, for the one station it knew; read as the legacy station's (see <see cref="Migrate"/>) and not written again.</summary>
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public ReceiptRecord? Receipt { get; set; }
+    }
+
+    /// <summary>When and how a bulletin was counted (issue #240).</summary>
+    internal sealed class CountedBid
+    {
+        public DateOnly Day { get; set; }
+
+        public bool GaveUp { get; set; }
     }
 
     /// <summary>What a station's directories have said about one callsign's reports.</summary>

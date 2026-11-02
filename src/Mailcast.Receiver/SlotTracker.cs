@@ -508,9 +508,13 @@ public sealed class SlotTracker
         {
             bulletins += string.Create(c, $", {slot.AlreadyHad} already had");
         }
-        if (slot.GivenUp > 0 || slot.Touched > 0)
+        if (slot.GivenUp > 0)
         {
-            bulletins += string.Create(c, $", {slot.GivenUp} given up, {slot.Touched} touched");
+            bulletins += string.Create(c, $", {slot.GivenUp} given up");
+        }
+        if (slot.Touched > 0)
+        {
+            bulletins += string.Create(c, $", {slot.Touched} touched (under half their pieces)");
         }
         parts.Add(bulletins);
         parts.Add(slot.HeardDirectory is { } directory
