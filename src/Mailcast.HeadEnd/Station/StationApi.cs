@@ -22,6 +22,9 @@ public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem, boo
     /// <summary>The dial the station tuned to, in Hz, when it said.</summary>
     public double? DialHz { get; init; }
 
+    /// <summary>The audio centre of the holder's modem in Hz (<c>audioCentreHz</c>), when the station tuned and said.</summary>
+    public double? AudioCentreHz { get; init; }
+
     /// <summary>The station's note on the tuning (why it did not tune), when it gave one.</summary>
     public string? TuneNote { get; init; }
 
@@ -95,7 +98,7 @@ public interface IStationApi
     /// </summary>
     /// <remarks>
     /// <paramref name="tune"/> adds <c>"tune": true</c>: the station moves the rig so the holder's modem sits
-    /// at its own dial for as long as the lease is held (first take only; renewals leave it out).
+    /// at its own dial for as long as the lease is held (sent with every take, renewals included, so a late renewal that becomes a fresh take is tuned too).
     /// </remarks>
     Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, bool tune, CancellationToken cancellation);
 
@@ -178,16 +181,21 @@ public sealed class StationApiClient : IStationApi, IDisposable
             return new LeaseAnswer(true, granted, null, busy)
             {
                 Tuned = json["tuned"] is JsonNode t && t.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? t.GetValue<bool>() : null,
+                AudioCentreHz = json["audioCentreHz"] is JsonNode c && c.GetValueKind() == JsonValueKind.Number ? c.GetValue<double>() : null,
                 DialHz = json["dialHz"] is JsonNode d && d.GetValueKind() == JsonValueKind.Number ? d.GetValue<double>() : null,
                 TuneNote = Text(json, "note"),
             };
+        }
+        bool tuneFailed = json?["tuneFailed"] is JsonNode tf && tf.GetValueKind() == JsonValueKind.True;
+        if (tuneFailed)
+        {
+            return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy) { TuneFailed = true };
         }
         if (status == HttpStatusCode.Conflict && json?["subChannel"] is JsonNode holder)
         {
             return new LeaseAnswer(false, 0, $"sub-channel {holder.ToJsonString()} holds the transmit lease until {json["expires"]?.ToString() ?? "unknown"}", busy);
         }
-        bool tuneFailed = json?["tuneFailed"] is JsonNode tf && tf.GetValueKind() == JsonValueKind.True;
-        return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy) { TuneFailed = tuneFailed };
+        return new LeaseAnswer(false, 0, $"HTTP {(int)status}: {Describe(json, text)}", busy);
     }
 
     /// <inheritdoc />

@@ -419,7 +419,14 @@ public sealed class SlotRunner
                     }
 
                     DateTimeOffset asked = Now;
-                    LeaseAnswer first = await AskForLeaseAsync(tune: true, cancellation);
+                    LeaseAnswer first = await AskForLeaseAsync(cancellation);
+                    for (int retry = 0; first.TuneFailed && retry < 2 && !cancellation.IsCancellationRequested; retry++)
+                    {
+                        Say($"the station could not tune the rig ({first.Problem}); trying again in 2 s");
+                        await Task.Delay(TimeSpan.FromSeconds(2), owner._time, cancellation);
+                        asked = Now;
+                        first = await AskForLeaseAsync(cancellation);
+                    }
                     if (!first.Held)
                     {
                         if (first.TuneFailed)
@@ -568,8 +575,22 @@ public sealed class SlotRunner
         /// frequencyHz - dial (USB) or dial - frequencyHz (LSB) in the audio; the tone and probe go
         /// there, as slot.toneHz is the signal centre on an untuned station.
         /// </summary>
-        private void PlaceTone(double dialHz)
+        private void PlaceTone(double dialHz, double? stationCentreHz)
         {
+            if (stationCentreHz is double centre)
+            {
+                if (S.SignalHz is long configured)
+                {
+                    double computed = S.SignalLsb ? dialHz - configured : configured - dialHz;
+                    if (Math.Abs(computed - centre) > 50)
+                    {
+                        Say($"the station says the modem's audio centre is {centre:0} Hz but frequencyHz and the dial give {computed:0} Hz; using the station's");
+                    }
+                }
+                _tunedToneHz = centre;
+                Say($"calibration tone and probe follow the tuned dial: {centre:0} Hz audio");
+                return;
+            }
             if (S.SignalHz is not long signal)
             {
                 Say($"no frequencyHz configured, so the calibration tone stays at {S.ToneHz:0} Hz although the dial moved");
@@ -590,11 +611,11 @@ public sealed class SlotRunner
         {
             if (answer.Tuned is true)
             {
+                Say(answer.DialHz is double hz ? $"station tuned the rig for the slot, dial {hz / 1e6:0.000###} MHz" : "station tuned the rig for the slot");
                 if (answer.DialHz is double dial)
                 {
-                    PlaceTone(dial);
+                    PlaceTone(dial, answer.AudioCentreHz);
                 }
-                Say(answer.DialHz is double hz ? $"station tuned the rig for the slot, dial {hz / 1e6:0.000###} MHz" : "station tuned the rig for the slot");
             }
             else if (answer.Tuned is false)
             {
@@ -609,14 +630,12 @@ public sealed class SlotRunner
             }
         }
 
-        private async Task<LeaseAnswer> AskForLeaseAsync(CancellationToken cancellation) => await AskForLeaseAsync(tune: false, cancellation);
-
-        private async Task<LeaseAnswer> AskForLeaseAsync(bool tune, CancellationToken cancellation)
+        private async Task<LeaseAnswer> AskForLeaseAsync(CancellationToken cancellation)
         {
             try
             {
                 return await owner._station.TakeLeaseAsync(
-                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), tune, cancellation);
+                    S.SubChannel, (int)Math.Ceiling(S.LeaseLength.TotalSeconds), (int)Math.Floor(S.MaxCarrierWait.TotalSeconds), tune: true, cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {

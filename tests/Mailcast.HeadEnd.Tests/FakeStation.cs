@@ -37,6 +37,9 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Each lease request's time and whether it was granted.</summary>
     public List<(DateTimeOffset At, bool Granted)> LeaseRequests { get; } = [];
 
+    /// <summary>The audio centre the station reports when it tunes, or null to leave it out.</summary>
+    public double? AudioCentre { get; set; }
+
     /// <summary>The audio frequency of each tone request.</summary>
     public List<double> ToneHzAsked { get; } = [];
 
@@ -48,6 +51,9 @@ public sealed class FakeStation : IStationApi, IKissConnector
 
     /// <summary>When set, a take that asks to tune is refused with this reason.</summary>
     public string? TuneRefusal { get; set; }
+
+    /// <summary>How many tuning refusals to give before granting; unlimited by default.</summary>
+    public int TuneRefusalsLeft { get; set; } = int.MaxValue;
 
     public List<DateTimeOffset> Releases { get; } = [];
 
@@ -140,7 +146,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
     {
         await Task.Yield();
         TuneAsked.Add(tune);
-        if (tune && TuneRefusal is not null)
+        if (tune && TuneRefusal is not null && TuneRefusalsLeft-- > 0)
         {
             LeaseRequests.Add((_time.GetUtcNow(), false));
             return new LeaseAnswer(false, 0, TuneRefusal) { TuneFailed = true };
@@ -159,6 +165,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
         return new LeaseAnswer(true, granted, null, ChannelBusy)
         {
             Tuned = tune ? TunedAnswer : null,
+            AudioCentreHz = tune && TunedAnswer == true ? AudioCentre : null,
             DialHz = tune && TunedAnswer == true ? 7_047_000 : null,
             TuneNote = tune && TunedAnswer == false ? "no rig, nothing to tune" : null,
         };

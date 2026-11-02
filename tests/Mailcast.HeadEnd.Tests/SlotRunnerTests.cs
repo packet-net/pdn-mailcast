@@ -494,7 +494,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Run_AsksToTuneOnTheFirstTakeOnly_AndJournalsTheDial()
+    public void Run_AsksToTuneOnEveryTake_AndJournalsTheDial()
     {
         var rig = new Rig();
         rig.Station.TunedAnswer = true;
@@ -503,7 +503,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
         Assert.True(rig.Station.TuneAsked[0]);
         Assert.True(rig.Station.TuneAsked.Count > 1);
-        Assert.All(rig.Station.TuneAsked.Skip(1), asked => Assert.False(asked));
+        Assert.All(rig.Station.TuneAsked, asked => Assert.True(asked));
         Assert.Single(rig.Journal.Lines, l => l.Contains("station tuned the rig for the slot, dial 7.047 MHz", StringComparison.Ordinal));
         Assert.All(rig.Journal.Lines, l => Assert.True(l.All(char.IsAscii), l));
     }
@@ -536,6 +536,27 @@ public class SlotRunnerTests(ITestOutputHelper output)
         none.Run(5);
         Assert.All(none.Station.ToneHzAsked, hz => Assert.Equal(1800, hz));
         Assert.Single(none.Journal.Lines, l => l.Contains("no frequencyHz configured, so the calibration tone stays at 1800 Hz", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_UsesTheStationsAudioCentre_AndNotesADisagreement()
+    {
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_048_500 });
+        rig.Station.TunedAnswer = true;
+        rig.Station.AudioCentre = 1600;
+        rig.Run(5);
+        Assert.All(rig.Station.ToneHzAsked, hz => Assert.Equal(1600, hz));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("audio centre is 1600 Hz but frequencyHz and the dial give 1500 Hz", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_RetriesATuningRefusalBeforeSkipping()
+    {
+        var rig = new Rig();
+        rig.Station.TuneRefusal = "HTTP 409: rig busy";
+        rig.Station.TuneRefusalsLeft = 1;
+        Assert.Equal(SlotOutcome.Completed, rig.Run(5).Outcome);
+        Assert.True(rig.Station.TuneAsked.Count >= 2);
     }
 
     [Fact]
