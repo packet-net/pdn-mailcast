@@ -509,6 +509,36 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Run_PlacesTheToneAndProbeFromTheTunedDial()
+    {
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_048_500 });
+        rig.Station.TunedAnswer = true;
+        rig.Run(5);
+        Assert.All(rig.Station.ToneHzAsked, hz => Assert.Equal(1500, hz));
+        Assert.All(rig.Station.ToneRequests, t => Assert.Equal(1500, t.Probe?.AudioHz ?? 1500));
+
+        var lsb = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_045_500, SignalLsb = true });
+        lsb.Station.TunedAnswer = true;
+        lsb.Run(5);
+        Assert.All(lsb.Station.ToneHzAsked, hz => Assert.Equal(1500, hz));
+    }
+
+    [Fact]
+    public void Run_KeepsToneHzWhenUntunedOrWithoutAFrequency()
+    {
+        var untuned = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_048_500 });
+        untuned.Station.TunedAnswer = false;
+        untuned.Run(5);
+        Assert.All(untuned.Station.ToneHzAsked, hz => Assert.Equal(1800, hz));
+
+        var none = new Rig();
+        none.Station.TunedAnswer = true;
+        none.Run(5);
+        Assert.All(none.Station.ToneHzAsked, hz => Assert.Equal(1800, hz));
+        Assert.Single(none.Journal.Lines, l => l.Contains("no frequencyHz configured, so the calibration tone stays at 1800 Hz", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Run_SaysOncePerRunWhyTheStationDidNotTune()
     {
         var rig = new Rig();

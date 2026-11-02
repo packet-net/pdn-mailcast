@@ -37,6 +37,9 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Each lease request's time and whether it was granted.</summary>
     public List<(DateTimeOffset At, bool Granted)> LeaseRequests { get; } = [];
 
+    /// <summary>The audio frequency of each tone request.</summary>
+    public List<double> ToneHzAsked { get; } = [];
+
     /// <summary>Whether each lease request asked to tune.</summary>
     public List<bool> TuneAsked { get; } = [];
 
@@ -222,6 +225,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
     public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation)
     {
         ToneRequests.Add((_time.GetUtcNow(), seconds, probe));
+        ToneHzAsked.Add(toneHz);
         if (!ToneAvailable)
         {
             await Task.Yield();
