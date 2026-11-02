@@ -61,7 +61,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         Intake.PskReporterHeard += _ => Slots.OnPskReporterHeard();
         // Issue #133: the bulletins of the slot now on, for its summary line.
         Intake.BulletinCompleted += _ => Slots.OnBulletinCompleted();
-        Intake.GivenUp += ids => Slots.OnGivenUp(ids.Count);
+        Intake.GivenUp += dropped => Slots.OnGivenUp(dropped.Count(d => d.GaveUp), dropped.Count(d => !d.GaveUp));
         Delivery.SessionFinished += report => Slots.OnDelivered(
             report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.Accepted),
             report.Outcomes.Count(o => o.Verdict == DeliveryVerdict.AlreadyHad));

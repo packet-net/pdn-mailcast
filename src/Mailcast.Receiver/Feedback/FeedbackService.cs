@@ -265,24 +265,26 @@ public sealed class FeedbackService
     }
 
     /// <summary>
-    /// Part-received bulletins were given up: dropped because the head end had stopped sending
-    /// them. Counted on today's UTC date, the day they were dropped, each object once.
+    /// Part-received bulletins were dropped because the head end had stopped sending them
+    /// (issue #240). One that held at least half its pieces counts as given up, any other as
+    /// touched, on today's UTC date. Each bulletin counts once in all, by BID (else object ID),
+    /// whichever it was and whichever day: one already counted, either way, is not counted again.
     /// </summary>
-    public void NoteGivenUp(IReadOnlyList<ulong> objectIds)
+    public void NoteGivenUp(IReadOnlyList<DroppedPartial> dropped)
     {
-        ArgumentNullException.ThrowIfNull(objectIds);
-        if (objectIds.Count == 0)
+        ArgumentNullException.ThrowIfNull(dropped);
+        if (dropped.Count == 0)
         {
             return;
         }
         Count(d =>
         {
-            foreach (ulong id in objectIds)
+            foreach (var one in dropped)
             {
-                string key = ObjectId.Format(id);
-                if (!_state.Days.Exists(other => other.GivenUp.Contains(key)))
+                string key = one.Bid ?? ObjectId.Format(one.ObjectId);
+                if (!_state.Days.Exists(other => other.GivenUp.Contains(key, StringComparer.OrdinalIgnoreCase) || other.Touched.Contains(key, StringComparer.OrdinalIgnoreCase)))
                 {
-                    d.GivenUp.Add(key);
+                    (one.GaveUp ? d.GivenUp : d.Touched).Add(key);
                 }
             }
         });
@@ -726,7 +728,7 @@ public sealed class FeedbackService
             ? l[..4].ToUpperInvariant() + l[4..].ToLowerInvariant()
             : null;
         var header = new ReportHeader(_sources.Version, locator, _sources.Audio(), record.Rebuilt, record.Delivered,
-            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count, record.OutsidePieces > 0 ? record.OutsidePieces : null);
+            new Dictionary<string, int>(record.Errors, StringComparer.Ordinal), record.AlreadyHad, record.GivenUp.Count, record.OutsidePieces > 0 ? record.OutsidePieces : null, record.Touched.Count > 0 ? record.Touched.Count : null);
         return new DailyReport(settings.From, record.Day, header, slots, Figures(record.Slots, _sources.OtherCopies(record.Day)));
     }
 
@@ -989,10 +991,16 @@ public sealed class FeedbackService
         public int AlreadyHad { get; set; }
 
         /// <summary>
-        /// The objects given up (dropped because the head end stopped sending them), by ID in hex, so each is
-        /// counted once. Empty in a feedback.json from before this was kept, as for <see cref="AlreadyHad"/>.
+        /// The objects given up (dropped because the head end stopped sending them), by BID (else object ID in hex), so each is
+        /// counted once, with at least half their pieces (issue #240). Empty in a feedback.json from before this was kept, as for <see cref="AlreadyHad"/>.
         /// </summary>
         public List<string> GivenUp { get; set; } = [];
+
+        /// <summary>
+        /// The bulletins dropped with under half their pieces (issue #240), by BID (else object ID), so each is
+        /// counted once. Empty in a feedback.json from before this was kept.
+        /// </summary>
+        public List<string> Touched { get; set; } = [];
 
         /// <summary>Pieces handed in from outside that day (issue #214); zero in a feedback.json from before.</summary>
         public int OutsidePieces { get; set; }

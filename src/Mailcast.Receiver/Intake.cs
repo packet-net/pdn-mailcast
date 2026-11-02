@@ -299,12 +299,13 @@ public sealed class Intake : IAsyncDisposable
     public event Action<BroadcastDirectory>? DirectoryHeard;
 
     /// <summary>
-    /// Part-received bulletins given up: dropped because the head end stopped sending them (see
-    /// <see cref="ReceiverStore.NoLongerSentRetention"/>), each once, as it is dropped. Raised
+    /// Part-received bulletins dropped because the head end stopped sending them (see
+    /// <see cref="ReceiverStore.NoLongerSentRetention"/>), each once, as it is dropped; each says
+    /// whether it held enough to count as given up or only as touched (issue #240). Raised
     /// outside the store's lock, on the worker or on whichever thread asked for
     /// <see cref="HeldBulletins"/>.
     /// </summary>
-    public event Action<IReadOnlyList<ulong>>? GivenUp;
+    public event Action<IReadOnlyList<DroppedPartial>>? GivenUp;
 
     /// <summary>Issue #49: the ionosonde reading for the slot now on was received.</summary>
     public event Action<IonoReading>? IonosphereHeard;
@@ -598,7 +599,7 @@ public sealed class Intake : IAsyncDisposable
     public IReadOnlyList<HeldBulletin> HeldBulletins()
     {
         IReadOnlyList<HeldBulletin> held;
-        IReadOnlyList<ulong> givenUp;
+        IReadOnlyList<DroppedPartial> givenUp;
         lock (_gate)
         {
             _store.DropNoLongerSent();
@@ -609,7 +610,7 @@ public sealed class Intake : IAsyncDisposable
         return held;
     }
 
-    private void RaiseGivenUp(IReadOnlyList<ulong> givenUp)
+    private void RaiseGivenUp(IReadOnlyList<DroppedPartial> givenUp)
     {
         if (givenUp.Count == 0)
         {
@@ -738,7 +739,7 @@ public sealed class Intake : IAsyncDisposable
         var outcomes = new List<OutsideOutcome>(frames.Count);
         var results = new List<AcceptResult>(frames.Count);
         MailParts? parts = null;
-        IReadOnlyList<ulong> givenUp = [];
+        IReadOnlyList<DroppedPartial> givenUp = [];
         int kept = 0;
         lock (_gate)
         {
@@ -825,7 +826,7 @@ public sealed class Intake : IAsyncDisposable
     {
         AcceptResult result;
         MailParts? parts = null;
-        IReadOnlyList<ulong> givenUp = [];
+        IReadOnlyList<DroppedPartial> givenUp = [];
         try
         {
             lock (_gate)
