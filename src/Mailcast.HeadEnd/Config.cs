@@ -334,6 +334,7 @@ public sealed record HeadEndConfig
                     SlotCap = Schedule.SlotCap ?? 0.6,
                     SpreadSlots = Schedule.SpreadSlots ?? 3,
                     RetireCoverage = Schedule.RetireCoverage ?? 6.0,
+                    Bulk = Schedule.Bulk is { Count: > 0 } bulk ? new HashSet<string>(bulk.Select(BudgetRule.BaseCallsign), StringComparer.Ordinal) : null,
                     RetireAfter = TimeSpan.FromHours(Schedule.RetireHours is > 0 and < 100_000 ? Schedule.RetireHours.Value : 36),
                 }
                 : null,
@@ -634,7 +635,7 @@ public sealed record HeadEndConfig
         }
         if (Rule == ScheduleRule.Shares && Schedule.UsesBudgetKeys)
         {
-            problems.Add("\"schedule\": \"budgetMinutes\", \"slotCap\", \"spreadSlots\", \"retireCoverage\", \"retireHours\" and \"marginSeconds\" belong to the \"budget\" rule; set \"rule\": \"budget\" to use them");
+            problems.Add("\"schedule\": \"budgetMinutes\", \"slotCap\", \"spreadSlots\", \"retireCoverage\", \"retireHours\", \"bulk\" and \"marginSeconds\" belong to the \"budget\" rule; set \"rule\": \"budget\" to use them");
             return;
         }
         if (Schedule.BudgetMinutes is { } budgetMinutes && !(budgetMinutes > 0 && budgetMinutes <= 180))
@@ -660,6 +661,11 @@ public sealed record HeadEndConfig
         if (Schedule.RetireCoverage is { } coverage && !(coverage > 0 && coverage <= 1000))
         {
             problems.Add("\"schedule\".\"retireCoverage\" must be above 0 (a multiple of a bulletin's K)");
+            return;
+        }
+        if (Schedule.Bulk is { } bulk && bulk.FirstOrDefault(c => !StationAdvert.IsCallsign(BudgetRule.BaseCallsign(c ?? ""))) is { } notCallsign)
+        {
+            problems.Add($"\"schedule\".\"bulk\" must list callsigns; \"{notCallsign}\" is not one");
             return;
         }
         if (Schedule.RetireHours is { } hours && !(hours > 0 && hours < 100_000))
@@ -918,7 +924,7 @@ public sealed record ScheduleConfig
 
     /// <summary>Whether any key of the budget rule is set.</summary>
     [JsonIgnore]
-    public bool UsesBudgetKeys => BudgetMinutes is not null || SlotCap is not null || SpreadSlots is not null || RetireCoverage is not null || RetireHours is not null || MarginSeconds is not null;
+    public bool UsesBudgetKeys => BudgetMinutes is not null || SlotCap is not null || SpreadSlots is not null || RetireCoverage is not null || Bulk is not null || RetireHours is not null || MarginSeconds is not null;
 
     /// <summary>
     /// How bulletins are carried: <c>budget</c> fills each slot to its airtime budget, <c>shares</c>
@@ -944,6 +950,12 @@ public sealed record ScheduleConfig
     /// (the leftover tier) until 10 K, when it retires; set above 10, it retires here instead. Left out, 6.
     /// </summary>
     public double? RetireCoverage { get; init; }
+
+    /// <summary>
+    /// Senders (callsigns, an SSID is ignored) whose bulletins are bulk: carried after every normal bulletin, the least covered first
+    /// within each class. Left out, nothing is bulk.
+    /// </summary>
+    public IReadOnlyList<string>? Bulk { get; init; }
 
     /// <summary>
     /// This many hours after its first slot, a bulletin goes only in airtime nothing else wants

@@ -67,6 +67,31 @@ public class RelayTests
     }
 
     [Fact]
+    public void ARelayedBulletinFromABulkSender_GoesAfterTheNormalOnes()
+    {
+        using var dir = new TempDirectory();
+        var options = Options() with { Budget = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } } };
+        var f = new Fixture();
+        var dictionary = ScheduleOptions.HourlyBudget.DictionaryId;
+        TransferObject Make(int seed, string from) => TransferObject.ForBulletin(Bulletins.Make(seed, 9000, 'B', from), dictionary, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
+        var digest = Make(70, "LU9DCE-1");
+        var normal = Make(71, "G4ABC");
+        // The digest is the less covered, so by coverage alone it would go first.
+        f.Hear(digest, [0u], heardAt: Now.AddHours(-9), complete: true);
+        f.Hear(normal, Enumerable.Range(0, normal.SourceSymbols).Select(i => (uint)(100 + i)), heardAt: Now.AddHours(-1), complete: true);
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        int k = normal.SourceSymbols;
+
+        int Sent(SlotBroadcast plan, ulong id) => plan.Relayed.Where(r => r.ObjectId == id).Sum(r => r.Frames.Count);
+        var tight = Plan(store, f.Selector(options), options, frames: 20);
+        Assert.True(Sent(tight, normal.ObjectId) > 0);
+        Assert.True(Sent(tight, normal.ObjectId) > Sent(tight, digest.ObjectId));
+        var roomy = Plan(store, f.Selector(options), options, frames: 400);
+        Assert.True(Sent(roomy, digest.ObjectId) > 0);
+        Assert.True(k > 0);
+    }
+
+    [Fact]
     public void AnObjectHeardOnAir_IsRelayedUnchanged_AndNeverFromThoseHandedIn()
     {
         using var dir = new TempDirectory();

@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <None Include="..\..\packaging\headend\headend.example.json" Link="headend.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Data\*.csv" CopyToOutputDirectory="PreserveNewest" />
     <None Include="LinBpq\*.cfg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

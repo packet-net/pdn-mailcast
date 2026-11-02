@@ -171,6 +171,12 @@ public sealed record SlotReport
     /// <summary>How many of <see cref="BulletinsInRotation"/> were in the budget rule's leftover tier: listed, but sent only in airtime nothing else wanted.</summary>
     public int LeftoverInRotation { get; init; }
 
+    /// <summary>How many of this head end's normal bulletins the slot carried pieces of (issue #234).</summary>
+    public int NormalCarried { get; init; }
+
+    /// <summary>How many of its bulk bulletins (<c>schedule.bulk</c> senders) the slot carried pieces of.</summary>
+    public int BulkCarried { get; init; }
+
     /// <summary>How many of another station's objects the slot sent pieces of (relayed from what the receivers on the LAN heard, issue #218).</summary>
     public int RelayedObjects { get; init; }
 

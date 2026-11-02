@@ -16,7 +16,7 @@ public sealed class TempDirectory : IDisposable
 /// <summary>Made-up bulletins with text that compresses roughly like real ones.</summary>
 public static class Bulletins
 {
-    public static Bulletin Make(int seed, int bodySize, char type = 'B')
+    public static Bulletin Make(int seed, int bodySize, char type = 'B', string from = "G4ABC")
     {
         var rng = new Random(seed);
         var body = new StringBuilder("\r\n");
@@ -32,7 +32,7 @@ public static class Bulletins
         }
         string bid = string.Create(CultureInfo.InvariantCulture, $"{1000 + seed}_GB7XYZ");
         string routing = string.Create(CultureInfo.InvariantCulture, $"R:261004/1000Z {1000 + seed}@GB7XYZ.#42.GBR.EURO BPQ6.0.25\r\n");
-        return Bulletin.FromMessageText(type, "G4ABC", "ALL", "WW", bid, $"Bulletin {seed}", new DateTimeOffset(2026, 10, 4, 10, 0, 0, TimeSpan.Zero), routing + body);
+        return Bulletin.FromMessageText(type, from, "ALL", "WW", bid, $"Bulletin {seed}", new DateTimeOffset(2026, 10, 4, 10, 0, 0, TimeSpan.Zero), routing + body);
     }
 }
 
