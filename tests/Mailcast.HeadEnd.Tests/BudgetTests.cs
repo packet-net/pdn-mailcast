@@ -30,7 +30,7 @@ public class BudgetTests(ITestOutputHelper output)
     /// as the store would count them. (The store itself writes every state durably, which is too
     /// slow for days of slots; <see cref="StrandedBulletins_ComeBackFromTheirNextEsi"/> goes through it.)
     /// </summary>
-    private sealed class HeadEnd : IDisposable
+    internal sealed class HeadEnd : IDisposable
     {
         private readonly TempDirectory _state = new();
         private readonly Dictionary<string, CarriedBulletin> _held = new(StringComparer.Ordinal);
@@ -55,14 +55,16 @@ public class BudgetTests(ITestOutputHelper output)
 
         public StoreSlotPlanner Planner { get; }
 
-        public void Offer(Bulletin bulletin, DateOnly seen)
+        public void Offer(Bulletin bulletin, DateOnly seen, DateTimeOffset? takenIn = null)
         {
             if (!_held.ContainsKey(bulletin.Bid))
             {
                 var transfer = TransferObject.ForBulletin(bulletin, Options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
-                _held[bulletin.Bid] = new CarriedBulletin(bulletin.Bid, bulletin.Title, bulletin.Serialize().Length, seen, transfer, 0);
+                _held[bulletin.Bid] = new CarriedBulletin(bulletin.Bid, bulletin.Title, bulletin.Serialize().Length, seen, transfer, 0, From: bulletin.From, TakenIn: takenIn); // OLD-STRIP
             }
         }
+
+        public IEnumerable<CarriedBulletin> AllHeld => _held.Values;
 
         public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot) =>
             [.. _held.Values.Where(c => BroadcastScheduler.InRotation(c, slot, Options))];
@@ -98,7 +100,7 @@ public class BudgetTests(ITestOutputHelper output)
         public void Dispose() => _state.Dispose();
     }
 
-    private static HeadEndConfig Gb7rdg(string schedule = "") => HeadEndConfig.Parse($$"""
+    internal static HeadEndConfig Gb7rdg(string schedule = "") => HeadEndConfig.Parse($$"""
         {
           "callsign": "M0LTE",
           "station": { "apiKey": "k", "mode": "ms110d-wn4", "maxBurstSeconds": 18 },
@@ -142,7 +144,7 @@ public class BudgetTests(ITestOutputHelper output)
         {
             while (next < arrivals.Count && arrivals[next].At <= slot)
             {
-                headEnd.Offer(arrivals[next].Bulletin, DateOnly.FromDateTime(arrivals[next].At.UtcDateTime));
+                headEnd.Offer(arrivals[next].Bulletin, DateOnly.FromDateTime(arrivals[next].At.UtcDateTime), arrivals[next].At);
                 next++;
             }
             var inRotation = headEnd.InRotation(slot);
@@ -234,7 +236,7 @@ public class BudgetTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void QuietDay_SpreadsEachBulletinOverTheDay_ABusyDayFillsEverySlot()
+    public void QuietDay_FinishesEachBulletinInAFewSlots_ABusyDayFillsEverySlotAndServesTheOldestFirst()
     {
         // Quiet: two bulletins overnight, the 2026-10-06 morning's.
         using var quiet = new HeadEnd();
@@ -246,19 +248,16 @@ public class BudgetTests(ITestOutputHelper output)
 
         var options = quiet.Options;
         var k = two.ToDictionary(b => b.Item2.Bid, b => quiet.Held(b.Item2.Bid).Transfer.SourceSymbols, StringComparer.Ordinal);
-        // No slot gives a bulletin more than its cap, so each is spread over several slots, and
-        // every slot is short rather than long: no bulletin eats a slot.
+        // No slot gives a bulletin more than its cap, and each has had its 4 K in its first two slots, with room to spare.
         Assert.All(calm.SelectMany(r => r.Symbols), s => Assert.True(s.Value <= BroadcastScheduler.CapSymbols(k[s.Key], options.Budget!)));
-        Assert.All(calm, r => Assert.True(r.OnAir < TimeSpan.FromMinutes(2), $"{r.Slot:HH:mm}: {r.OnAir.TotalMinutes:0.0} min"));
-        Assert.True(calm.Count(r => r.BulletinsSent == 2) >= 8, "both bulletins in nearly every slot");
-        // Any three slots carry more than K of each: a listener who hears three rebuilds them.
         foreach (var (bid, kk) in k)
         {
-            var perSlot = calm.Select(r => r.Symbols.GetValueOrDefault(bid)).OrderBy(x => x).ToList();
-            Assert.True(perSlot.Take(3).Sum() >= kk + 1, $"{bid}: the three thinnest slots carry {perSlot.Take(3).Sum()} of K {kk}");
+            var carrying = calm.Where(r => r.Symbols.ContainsKey(bid)).ToList();
+            Assert.Equal(2 * kk, carrying[0].Symbols[bid]);
+            Assert.Equal(2 * kk, carrying[1].Symbols[bid]);
         }
 
-        // Busy: fifty overnight. Every slot is full, and the slot after a bulletin arrives always carries some of it.
+        // Busy: fifty overnight. Every slot is full, and the bulletins are started in the order they were taken in.
         using var busy = new HeadEnd();
         var fifty = Enumerable.Range(0, 50).Select(i => (day.AddHours(1).AddMinutes(i), Bulletins.Make(100 + i, i % 4 == 0 ? 12000 : 3500))).ToList();
         fifty.Add((day.AddHours(13).AddMinutes(30), Bulletins.Make(999, 2000)));
@@ -266,9 +265,12 @@ public class BudgetTests(ITestOutputHelper output)
         output.WriteLine("busy day");
         Print(rush);
         Assert.All(rush, r => Assert.True(r.OnAir > busy.Config.FillLimit - TimeSpan.FromSeconds(30) && r.OnAir <= busy.Config.FillLimit, $"{r.Slot:HH:mm}: {r.OnAir.TotalMinutes:0.0} min"));
-        var afternoon = rush.Single(r => r.Slot == day.AddHours(14));
-        Assert.True(afternoon.Symbols.ContainsKey(Bulletins.Make(999, 2000).Bid), "a bulletin arriving mid-afternoon goes in the next slot");
-        Assert.Equal(51, rush.SelectMany(r => r.Symbols.Keys).Distinct(StringComparer.Ordinal).Count());
+        var firstSlot = fifty.Select(f => (f.Item2.Bid, Slot: rush.Where(r => r.Symbols.ContainsKey(f.Item2.Bid)).Select(r => (DateTimeOffset?)r.Slot).FirstOrDefault())).ToList();
+        var started = firstSlot.Where(f => f.Slot is not null).Select(f => f.Slot!.Value).ToList();
+        Assert.True(started.Count >= 3);
+        Assert.Equal(started.Order(), started);
+        // Those started are a handful, not all fifty a little: the later ones wait their turn.
+        Assert.True(started.Count < 51);
     }
 
     [Theory]
@@ -375,9 +377,9 @@ public class BudgetTests(ITestOutputHelper output)
         Assert.All(gone, c => Assert.True(c.NextEsi <= BroadcastScheduler.RetireSymbols(c.Transfer.SourceSymbols, rule)));
         if (perDay == 10 && start != "2026-12-18")
         {
-            // Spare airtime goes to the leftover tier: well past 6 K on a light day, the slots fuller.
+            // Spare airtime goes to the leftover tier: well past the 4 K target on a light day, the slots fuller.
             Assert.True(coverage > 7.5, $"{coverage:0.0} K");
-            Assert.True(mean > 5.9, $"{mean:0.00} min");
+            Assert.True(mean > 5.5, $"{mean:0.00} min");
         }
     }
 

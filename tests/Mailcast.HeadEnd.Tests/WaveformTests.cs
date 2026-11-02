@@ -97,7 +97,7 @@ public class WaveformTests
         // Without a tone there is no clear-channel wait, but the carrier wait is still kept back.
         Assert.Equal(TimeSpan.FromSeconds(11), HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60, "toneSeconds": 0}}""").Margin);
 
-        var tuned = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"budgetMinutes": 6, "slotCap": 0.5, "retireCoverage": 4, "retireHours": 24}}""");
+        var tuned = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"budgetMinutes": 6, "slotCap": 0.5, "target": 3, "retireHours": 24}}""");
         Assert.Equal(TimeSpan.FromMinutes(6), tuned.FillLimit);
         Assert.Equal(new BudgetRule { SlotCap = 0.5, Target = 3, RetireAfter = TimeSpan.FromHours(24) }, tuned.ToScheduleOptions().Budget);
         Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(41), HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 30}}""").FillLimit);
