@@ -6,7 +6,8 @@ namespace Packet.Mailcast;
 /// <param name="Bid">The bulletin ID for a bulletin; the object ID in hex for any other type.</param>
 /// <param name="Title">The subject line for a bulletin; a plain description of the type for any other.</param>
 /// <param name="Size">The serialised bulletin's length, or the object's octets for any other type.</param>
-public sealed record RelayListing(string Bid, string Title, int Size);
+/// <param name="From">The sender of a bulletin, to tell the bulk senders (issue #234); null for any other type.</param>
+public sealed record RelayListing(string Bid, string Title, int Size, string? From = null);
 
 /// <summary>
 /// What this head end has already sent of an object it relays (issue #218): every ESI of its own, so that it never

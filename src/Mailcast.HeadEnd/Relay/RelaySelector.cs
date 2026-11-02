@@ -274,7 +274,7 @@ public sealed class RelaySelector
                 var bulletin = Bulletin.Parse(content);
                 if (Valid(bulletin.Bid, bulletin.Title))
                 {
-                    return new RelayListing(bulletin.Bid, bulletin.Title, content.Length);
+                    return new RelayListing(bulletin.Bid, bulletin.Title, content.Length, bulletin.From);
                 }
                 Say(transfer.ObjectId, $"relay: {generic} listed under its object ID: its BID or title cannot go in a directory");
                 return new RelayListing(generic, ContentType.Describe((byte)kind), content.Length);

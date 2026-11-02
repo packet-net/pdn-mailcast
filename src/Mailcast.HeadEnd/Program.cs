@@ -396,6 +396,10 @@ public static partial class Program
         {
             journal.Write("config: schedule.symbolSize is ignored (pieces are always 240 octets); harmless to keep");
         }
+        if (config.Schedule.RetireCoverage is not null || config.Schedule.SpreadSlots is not null)
+        {
+            journal.Write("config: schedule.retireCoverage and schedule.spreadSlots are ignored (the target is schedule.target, 4 K); harmless to keep");
+        }
         SlotSettings settings = config.ToSlotSettings();
         Waveforms waveforms = config.ToWaveforms(LinearAirtime.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);
@@ -574,7 +578,7 @@ public static partial class Program
             return $"carrying: fixed shares {string.Join(", ", options.SlotShares.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture)))} K in slots {string.Join(", ", options.SlotOffsets)} after the first; {modes}";
         }
         return string.Create(CultureInfo.InvariantCulture,
-            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any {rule.SpreadSlots} slots rebuild it and at most {rule.SlotCap:0.##} K, after {rule.RetireCoverage:0.##} K or {rule.RetireAfter.TotalHours:0.#} h only in airtime nothing else wants (the leftover tier), retired after {Math.Max(BroadcastScheduler.LeftoverCoverage, rule.RetireCoverage):0.##} K or {BroadcastScheduler.RetireAge(rule).TotalHours:0.#} h; {modes}");
+            $"carrying: each slot filled to {config.FillLimit.TotalMinutes:0.0} min on the air ({config.Schedule.BudgetMinutes ?? config.Slot.Max:0.#} min budget, at most {config.Slot.Max:0.#} min less {config.Margin.TotalSeconds:0} s for the clear-channel and carrier waits, and less any lateness), oldest first{(rule.Bulk is { Count: > 0 } ? $", bulk senders ({string.Join(" ", rule.Bulk.Order(StringComparer.Ordinal))}) last" : "")}, at most {rule.SlotCap:0.##} K of a bulletin a slot until it has had {rule.Target:0.##} K, then {(rule.RetireAfter.TotalHours < 1000 ? $"(or {rule.RetireAfter.TotalHours:0.#} h after its first slot) " : "")}only in airtime nothing else wants (the leftover tier), retired after {Math.Max(BroadcastScheduler.LeftoverCoverage, rule.Target):0.##} K or {BroadcastScheduler.RetireAge(rule).TotalHours:0.#} h; {modes}");
     }
 
     private static async Task<int> RunNowAsync(HeadEndConfig config)

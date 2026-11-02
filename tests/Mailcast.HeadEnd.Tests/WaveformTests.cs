@@ -86,8 +86,8 @@ public class WaveformTests
         var hourly = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}}""");
         Assert.Equal(ScheduleRule.Budget, hourly.Rule);
         var rule = hourly.ToScheduleOptions().Budget!;
-        Assert.Equal(0.6, rule.SlotCap);
-        Assert.Equal(6.0, rule.RetireCoverage);
+        Assert.Equal(2.0, rule.SlotCap);
+        Assert.Equal(4.0, rule.Target);
         Assert.Equal(TimeSpan.FromHours(36), rule.RetireAfter);
         // A 10 minute budget and hard stop, less the 2 minute clear-channel wait, the gather and one carrier wait.
         Assert.Equal(TimeSpan.FromSeconds(131), hourly.Margin);
@@ -99,7 +99,7 @@ public class WaveformTests
 
         var tuned = HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"budgetMinutes": 6, "slotCap": 0.5, "retireCoverage": 4, "retireHours": 24}}""");
         Assert.Equal(TimeSpan.FromMinutes(6), tuned.FillLimit);
-        Assert.Equal(new BudgetRule { SlotCap = 0.5, RetireCoverage = 4, RetireAfter = TimeSpan.FromHours(24) }, tuned.ToScheduleOptions().Budget);
+        Assert.Equal(new BudgetRule { SlotCap = 0.5, Target = 3, RetireAfter = TimeSpan.FromHours(24) }, tuned.ToScheduleOptions().Budget);
         Assert.Equal(TimeSpan.FromMinutes(10) - TimeSpan.FromSeconds(41), HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60}, "schedule": {"marginSeconds": 30}}""").FillLimit);
 
         // The rule before, by name or by its keys, and a daily station by default.

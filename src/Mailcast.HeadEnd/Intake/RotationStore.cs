@@ -26,9 +26,12 @@ public sealed class RotationStore
     private readonly HeadEndStore _store;
     private readonly Lock _gate = new();
 
-    public RotationStore(string root, Compression compression, ScheduleOptions options, IJournal journal)
+    private readonly TimeProvider _time;
+
+    public RotationStore(string root, Compression compression, ScheduleOptions options, IJournal journal, TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(journal);
+        _time = time ?? TimeProvider.System;
         _store = new HeadEndStore(root, compression, options, journal.Write);
     }
 
@@ -59,7 +62,9 @@ public sealed class RotationStore
         lock (_gate)
         {
             int before = _store.Count;
-            CarriedBulletin? carried = _store.Offer(bulletin, today);
+            // Taken in now, or at the start of the day it is said to be taken in on if that is not today.
+            var now = _time.GetUtcNow();
+            CarriedBulletin? carried = _store.Offer(bulletin, today, DateOnly.FromDateTime(now.UtcDateTime) == today ? now : BroadcastScheduler.Midnight(today));
             return carried is null ? OfferOutcome.TooLarge
                 : _store.Count > before ? OfferOutcome.Added
                 : OfferOutcome.AlreadyHeld;

@@ -49,6 +49,7 @@ public sealed class HeadEndStore
     private readonly Dictionary<ulong, (DateOnly Day, uint NextEsi)> _directoryEsis = [];
     private readonly string _relayed;
     private readonly Dictionary<ulong, RelayEntry> _relay = [];
+    private readonly HashSet<string> _neverStartedLogged = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Opens or creates a store.</summary>
     public HeadEndStore(string root, Compression compression, ScheduleOptions? options = null, Action<string>? log = null)
@@ -141,9 +142,11 @@ public sealed class HeadEndStore
     /// Offers a bulletin. The first time a BID is offered it is compressed, coded and kept, with
     /// <paramref name="seen"/> as its first-seen day and no first slot yet, as a canonical bulletin with its envelope (issue #142); later offers of the same BID return what
     /// was kept, unchanged, whatever their content. Returns null if the bulletin is over
-    /// <see cref="ScheduleOptions.MaxBulletinSize"/>.
+    /// <see cref="ScheduleOptions.MaxBulletinSize"/>. <paramref name="takenIn"/> is when it was taken in (issue #234), the start of
+    /// <paramref name="seen"/> if left out; it is nudged on by a millisecond at a time until no other bulletin has the same, so that
+    /// the order bulletins were taken in is always kept.
     /// </summary>
-    public CarriedBulletin? Offer(Bulletin bulletin, DateOnly seen)
+    public CarriedBulletin? Offer(Bulletin bulletin, DateOnly seen, DateTimeOffset? takenIn = null)
     {
         ArgumentNullException.ThrowIfNull(bulletin);
         string key = KeyOf(bulletin.Bid);
@@ -192,7 +195,12 @@ public sealed class HeadEndStore
                 }
             }
         }
-        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, nextEsi, firstSlot, envelopeObject, envelopeNext, shuffle);
+        var taken = new DateTimeOffset(((takenIn ?? BroadcastScheduler.Midnight(seen)).UtcTicks / TimeSpan.TicksPerMillisecond) * TimeSpan.TicksPerMillisecond, TimeSpan.Zero);
+        while (_entries.Values.Any(e => e.Carried.TakenAt == taken))
+        {
+            taken = taken.AddMilliseconds(1);
+        }
+        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, nextEsi, firstSlot, envelopeObject, envelopeNext, shuffle, bulletin.From, taken);
         var dir = Path.Combine(_bulletins, key);
         Directory.CreateDirectory(dir);
         DurableFile.WriteAtomically(Path.Combine(dir, "object.bin"), transfer.Bytes);
@@ -222,11 +230,23 @@ public sealed class HeadEndStore
     /// FirstSlot, so a restart puts each back where it was). Pass them to
     /// <see cref="BroadcastScheduler.Plan(IEnumerable{CarriedBulletin}, DateTimeOffset, int, Compression, ScheduleOptions?, Func{ulong, uint}?, SlotBudget?, string?)"/>.
     /// </summary>
-    public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot) =>
-        _entries.Values
-            .Select(e => e.Carried)
-            .Where(c => BroadcastScheduler.InRotation(c, slot, _options))
-            .ToList();
+    public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot)
+    {
+        var inRotation = new List<CarriedBulletin>();
+        foreach (var c in _entries.Values.Select(e => e.Carried))
+        {
+            if (!BroadcastScheduler.InRotation(c, slot, _options))
+            {
+                if (_options.Budget is not null && BroadcastScheduler.NeverStarted(c, slot) && _neverStartedLogged.Add(c.Bid))
+                {
+                    _log?.Invoke($"retired unsent: {c.Bid} from {c.From ?? "unknown"} was taken in {c.TakenAt.UtcDateTime:yyyy-MM-dd HH:mm}Z and not started within {BroadcastScheduler.LeftoverHours} h");
+                }
+                continue;
+            }
+            inRotation.Add(c);
+        }
+        return inRotation;
+    }
 
     /// <summary>Records that a plan's frames have been sent, so the next plan continues with fresh ESIs.</summary>
     public void Commit(SlotBroadcast broadcast)
@@ -506,6 +526,14 @@ public sealed class HeadEndStore
         text.Append("Title: ").Append(c.Title).Append('\n');
         text.Append(CultureInfo.InvariantCulture, $"Size: {c.Size}\n");
         text.Append(CultureInfo.InvariantCulture, $"FirstSeen: {c.FirstSeen:yyyy-MM-dd}\n");
+        if (c.From is not null)
+        {
+            text.Append("From: ").Append(c.From).Append('\n');
+        }
+        if (c.TakenIn is DateTimeOffset takenIn)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"TakenIn: {takenIn.UtcDateTime:yyyy-MM-ddTHH:mm:ss.fffZ}\n");
+        }
         text.Append("Object: ").Append(ObjectId.Format(c.Transfer.ObjectId)).Append('\n');
         text.Append(CultureInfo.InvariantCulture, $"Dictionary: {c.Transfer.DictionaryId}\n");
         text.Append("Oti: ").Append(Convert.ToHexStringLower(c.Transfer.Oti.ToBytes())).Append('\n');
@@ -596,7 +624,11 @@ public sealed class HeadEndStore
                 firstSlot,
                 envelope,
                 envelopeNextEsi,
-                shuffle);
+                shuffle,
+                fields.GetValueOrDefault("From"),
+                fields.TryGetValue("TakenIn", out var takenText)
+                    ? DateTimeOffset.ParseExact(takenText, "yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
+                    : null);
             return new Entry(dir, carried);
         }
         catch (Exception e) when (e is FormatException or ArgumentException or KeyNotFoundException or OverflowException)

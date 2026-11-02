@@ -329,9 +329,9 @@ public sealed record HeadEndConfig
             Budget = Rule == ScheduleRule.Budget
                 ? new BudgetRule
                 {
-                    SlotCap = Schedule.SlotCap ?? 0.6,
-                    SpreadSlots = Schedule.SpreadSlots ?? 3,
-                    RetireCoverage = Schedule.RetireCoverage ?? 6.0,
+                    SlotCap = Schedule.SlotCap ?? 2.0,
+                    Target = Schedule.Target ?? 4.0,
+                    Bulk = Schedule.Bulk is { Count: > 0 } bulk ? new HashSet<string>(bulk.Select(BudgetRule.BaseCallsign), StringComparer.Ordinal) : null,
                     RetireAfter = TimeSpan.FromHours(Schedule.RetireHours is > 0 and < 100_000 ? Schedule.RetireHours.Value : 36),
                 }
                 : null,
@@ -646,14 +646,14 @@ public sealed record HeadEndConfig
             problems.Add("\"schedule\".\"slotCap\" must be above 0 (a multiple of a bulletin's K)");
             return;
         }
-        if (Schedule.SpreadSlots is < 1 or > 100)
+        if (Schedule.Target is { } target && !(target > 0 && target <= 1000))
         {
-            problems.Add("\"schedule\".\"spreadSlots\" must be 1 to 100");
+            problems.Add("\"schedule\".\"target\" must be above 0 (a multiple of a bulletin's K)");
             return;
         }
-        if (Schedule.RetireCoverage is { } coverage && !(coverage > 0 && coverage <= 1000))
+        if (Schedule.Bulk is { } bulk && bulk.FirstOrDefault(c => !StationAdvert.IsCallsign(BudgetRule.BaseCallsign(c ?? ""))) is { } notCallsign)
         {
-            problems.Add("\"schedule\".\"retireCoverage\" must be above 0 (a multiple of a bulletin's K)");
+            problems.Add($"\"schedule\".\"bulk\" must list callsigns; \"{notCallsign}\" is not one");
             return;
         }
         if (Schedule.RetireHours is { } hours && !(hours > 0 && hours < 100_000))
@@ -911,7 +911,7 @@ public sealed record ScheduleConfig
 
     /// <summary>Whether any key of the budget rule is set.</summary>
     [JsonIgnore]
-    public bool UsesBudgetKeys => BudgetMinutes is not null || SlotCap is not null || SpreadSlots is not null || RetireCoverage is not null || RetireHours is not null || MarginSeconds is not null;
+    public bool UsesBudgetKeys => BudgetMinutes is not null || SlotCap is not null || SpreadSlots is not null || RetireCoverage is not null || Target is not null || Bulk is not null || RetireHours is not null || MarginSeconds is not null;
 
     /// <summary>
     /// How bulletins are carried: <c>budget</c> fills each slot to its airtime budget, <c>shares</c>
@@ -926,17 +926,32 @@ public sealed record ScheduleConfig
     /// <summary>Time kept back from <c>slot.maxMinutes</c>. Left out, <c>slot.channelWaitSeconds</c> (none without a tone).</summary>
     public double? MarginSeconds { get; init; }
 
-    /// <summary>The most of one bulletin a slot carries, as a multiple of its K. Left out, 0.6.</summary>
+    /// <summary>The most of one bulletin a slot carries, as a multiple of its K. Left out, 2.</summary>
     public double? SlotCap { get; init; }
 
-    /// <summary>Each slot first gives every bulletin in rotation enough that any this many slots rebuild it. Left out, 3.</summary>
+    /// <summary>
+    /// Ignored since issue #234 (the floor of "any this many slots rebuild it" went with the concentrating rule). Still read so
+    /// that an old file loads; the head end says once at start-up that it is ignored.
+    /// </summary>
     public int? SpreadSlots { get; init; }
 
     /// <summary>
-    /// After this many K of it have been sent, a bulletin goes only in airtime nothing else wants
-    /// (the leftover tier) until 10 K, when it retires; set above 10, it retires here instead. Left out, 6.
+    /// A bulletin is carried until this many K of it have been on the air in all (its own pieces and other stations' of the
+    /// same object), then goes only in airtime nothing else wants (the leftover tier) until 10 K, when it retires; set above 10,
+    /// it retires here instead. Left out, 4.
+    /// </summary>
+    public double? Target { get; init; }
+
+    /// <summary>
+    /// Ignored since issue #234, replaced by <c>target</c> (a different meaning: it was where the leftover tier began after
+    /// the pieces were spread thin). Still read so that an old file loads; the head end says once at start-up that it is ignored.
     /// </summary>
     public double? RetireCoverage { get; init; }
+
+    /// <summary>
+    /// Senders (callsigns, an SSID is ignored) whose bulletins are bulk: carried after all the others. Left out, nothing is bulk.
+    /// </summary>
+    public IReadOnlyList<string>? Bulk { get; init; }
 
     /// <summary>
     /// This many hours after its first slot, a bulletin goes only in airtime nothing else wants
