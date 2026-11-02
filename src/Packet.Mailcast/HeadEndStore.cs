@@ -237,9 +237,11 @@ public sealed class HeadEndStore
         {
             if (!BroadcastScheduler.InRotation(c, slot, _options))
             {
-                if (_options.Budget is not null && BroadcastScheduler.NeverStarted(c, slot) && _neverStartedLogged.Add(c.Bid))
+                if (_options.Budget is not null && BroadcastScheduler.NeverStarted(c, slot)
+                    && slot - BroadcastScheduler.UnstartedSince(c) < TimeSpan.FromHours(BroadcastScheduler.LeftoverHours) + TimeSpan.FromMinutes(_options.SlotMinutes)
+                    && _neverStartedLogged.Add(c.Bid))
                 {
-                    _log?.Invoke($"retired unsent: {c.Bid} from {c.From ?? "unknown"} was taken in {c.TakenAt.UtcDateTime:yyyy-MM-dd HH:mm}Z and not started within {BroadcastScheduler.LeftoverHours} h");
+                    _log?.Invoke($"retired unsent: {c.Bid} from {c.From ?? "unknown"} was taken in {BroadcastScheduler.UnstartedSince(c).UtcDateTime:yyyy-MM-dd HH:mm}Z and not started within {BroadcastScheduler.LeftoverHours} h");
                 }
                 continue;
             }
@@ -558,6 +560,21 @@ public sealed class HeadEndStore
         DurableFile.WriteAtomically(Path.Combine(entry.Dir, "state.txt"), Bulletin.TextEncoding.GetBytes(text.ToString()));
     }
 
+    // The sender of a bulletin held from before the state kept it, from the object itself (as the relay does), so that a held
+    // digest of a bulk sender is bulk from the first slot. Null if the object is not a readable bulletin.
+    private string? SenderOf(TransferObject transfer)
+    {
+        try
+        {
+            var (kind, content) = TransferObject.Unpack(transfer.Bytes, transfer.DictionaryId, _compression);
+            return kind == ObjectKind.Bulletin ? Bulletin.Parse(content).From : null;
+        }
+        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or ArgumentException or FormatException)
+        {
+            return null;
+        }
+    }
+
     private Entry? Load(string dir)
     {
         var statePath = Path.Combine(dir, "state.txt");
@@ -625,7 +642,7 @@ public sealed class HeadEndStore
                 envelope,
                 envelopeNextEsi,
                 shuffle,
-                fields.GetValueOrDefault("From"),
+                fields.GetValueOrDefault("From") ?? SenderOf(transfer),
                 fields.TryGetValue("TakenIn", out var takenText)
                     ? DateTimeOffset.ParseExact(takenText, "yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
                     : null);

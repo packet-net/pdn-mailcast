@@ -104,18 +104,18 @@ public class HeadEndCanonicalTests : IDisposable
             if (carries)
             {
                 slotsWithBulletin++;
-                Assert.Equal(carried.Envelope!.SourceSymbols, envelopeFrames.Count);
+                Assert.Equal(carried.Envelope!.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot, envelopeFrames.Count);
             }
             else
             {
                 Assert.Empty(envelopeFrames);
             }
             Assert.All(envelopeFrames, f => Assert.True(seen.Add(f.EncodingSymbolId), "an envelope ESI was repeated"));
-            Assert.Equal(carries ? carried.Envelope!.SourceSymbols : 0, plan.BulletinFrames == 0 ? 0 : envelopeFrames.Count);
+            Assert.Equal(carries ? carried.Envelope!.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot : 0, plan.BulletinFrames == 0 ? 0 : envelopeFrames.Count);
             store.Commit(plan);
         }
         Assert.True(slotsWithBulletin >= 2);
-        Assert.Equal(slotsWithBulletin * carried.Envelope!.SourceSymbols, seen.Count);
+        Assert.Equal(slotsWithBulletin * carried.Envelope!.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot, seen.Count);
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class HeadEndCanonicalTests : IDisposable
         var held = reopened.InRotation(Day);
         var again = held.Single(c => c.Bid == first.Bid);
         Assert.Equal(first.Envelope!.ObjectId, again.Envelope!.ObjectId);
-        Assert.Equal((uint)first.Envelope.SourceSymbols, again.EnvelopeNextEsi);
+        Assert.Equal((uint)(first.Envelope.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot), again.EnvelopeNextEsi);
         var legacy = held.Single(c => c.Bid == old.Bid);
         Assert.Null(legacy.Envelope);
         Assert.Equal(MailcastFrame.StandardSymbolSize, legacy.Transfer.Oti.SymbolSize);
@@ -194,7 +194,7 @@ public class HeadEndCanonicalTests : IDisposable
             var held = store.InRotation(today);
             Assert.Equal(held[0].EnvelopeNextEsi, held[1].EnvelopeNextEsi);
         }
-        Assert.Equal(3 * a.Envelope.SourceSymbols, seen.Count);
+        Assert.Equal(3 * a.Envelope.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot, seen.Count);
         Assert.Equal((uint)seen.Count, new HeadEndStore(_root, Compression.Default, options).InRotation(Day.AddDays(2))[0].EnvelopeNextEsi);
     }
 

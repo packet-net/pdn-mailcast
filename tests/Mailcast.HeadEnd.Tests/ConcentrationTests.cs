@@ -103,4 +103,75 @@ public class ConcentrationTests
         Assert.Equal(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero), held[0].TakenIn);
         Assert.Equal(clock.GetUtcNow(), held[1].TakenIn);
     }
+
+    [Fact]
+    public void AHeldBulletinWithoutFromOrTakenIn_GetsItsSenderFromItsObject_AndRetiresNoEarlierThan48HoursAfterItsDayEnds()
+    {
+        using var dir = new TempDirectory();
+        var options = ScheduleOptions.HourlyBudget with { Budget = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } } };
+        var day = new DateOnly(2026, 11, 2);
+        var original = new HeadEndStore(dir.Path, Compression.Default, options).Offer(Bulletins.Make(1, 3000, from: "LU9DCE"), day, new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero))!;
+        // As a store from before this change left it: no From, no TakenIn.
+        foreach (string state in Directory.EnumerateFiles(Path.Combine(dir.Path, "bulletins"), "state.txt", SearchOption.AllDirectories))
+        {
+            File.WriteAllLines(state, File.ReadAllLines(state).Where(l => !l.StartsWith("From:", StringComparison.Ordinal) && !l.StartsWith("TakenIn:", StringComparison.Ordinal)));
+        }
+        var lines = new List<string>();
+        var held = new HeadEndStore(dir.Path, Compression.Default, options, lines.Add);
+        var c = Assert.Single(held.InRotation(new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero)));
+        Assert.Equal("LU9DCE", c.From);
+        Assert.True(options.Budget!.IsBulk(c.From));
+        Assert.Null(c.TakenIn);
+        Assert.Equal(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero), c.TakenAt);
+
+        // 48 hours after the end of its first-seen day, not after the start of it.
+        var end = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero);
+        Assert.Single(held.InRotation(end.AddHours(47)));
+        Assert.Empty(lines);
+        Assert.Empty(held.InRotation(end.AddHours(48)));
+        Assert.Empty(held.InRotation(end.AddHours(60)));
+        Assert.Single(lines);
+        Assert.Empty(held.InRotation(end.AddHours(72))); // too late to be news again
+        Assert.Single(lines);
+    }
+
+    [Fact]
+    public void ABulletinThatIsCarried_SendsItsEnvelopeSeveralTimesASlot_WithFreshPieces()
+    {
+        using var dir = new TempDirectory();
+        var options = ScheduleOptions.HourlyBudget;
+        var store = new HeadEndStore(dir.Path, Compression.Default, options);
+        var c = store.Offer(Bulletins.Make(1, 6000), new DateOnly(2026, 11, 2), new DateTimeOffset(2026, 11, 2, 7, 0, 0, TimeSpan.Zero))!;
+        Assert.NotNull(c.Envelope);
+        var slot = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
+        var budget = new SlotBudget(TimeSpan.FromSeconds(1000), lengths => TimeSpan.FromSeconds(lengths.Count));
+        var first = BroadcastScheduler.Plan(store.InRotation(slot), slot, 1, Compression.Default, options, store.DirectoryNextEsi, budget);
+        var envelope = Assert.Single(first.Objects, o => o.EnvelopeFor is not null);
+        Assert.Equal(c.Envelope!.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot, envelope.Count);
+        store.Commit(first);
+        var second = BroadcastScheduler.Plan(store.InRotation(slot.AddHours(1)), slot.AddHours(1), 1, Compression.Default, options, store.DirectoryNextEsi, budget);
+        Assert.Equal(envelope.NextEsi, Assert.Single(second.Objects, o => o.EnvelopeFor is not null).FirstEsi);
+    }
+
+    [Fact]
+    public void LeftoverPieces_AreNotCountedAsCarried_AndTheTargetIsReachedOnlyOnce()
+    {
+        var options = ScheduleOptions.HourlyBudget with { Budget = new BudgetRule { Target = 4, SlotCap = 2 } };
+        var budget = new SlotBudget(TimeSpan.FromSeconds(1000), lengths => TimeSpan.FromSeconds(lengths.Count));
+        var bulletin = Bulletins.Make(1, 6000);
+        var transfer = TransferObject.ForBulletin(bulletin, options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
+        int k = transfer.SourceSymbols;
+        var slot = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
+        CarriedBulletin At(double coverage) => new(bulletin.Bid, bulletin.Title, 6000, new DateOnly(2026, 11, 2), transfer, (uint)(coverage * k), slot.AddHours(-3), From: "G4ABC", TakenIn: slot.AddHours(-5));
+        var fresh = new CarriedBulletin("1_X", "t", 100, new DateOnly(2026, 11, 2), TransferObject.ForBulletin(Bulletins.Make(2, 6000), options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment), 0, null, From: "G4ABC", TakenIn: slot.AddHours(-1));
+        // Crossing the target in this slot: counted as carried, and as reaching it.
+        var crossing = BroadcastScheduler.Plan([At(3.5), fresh], slot, 1, Compression.Default, options, null, budget);
+        Assert.Equal(2, crossing.NormalCarried);
+        Assert.Equal(1, crossing.ReachedTarget);
+        // Already in the leftover tier: it gets spare airtime, but is neither carried nor reaching anything.
+        var spare = BroadcastScheduler.Plan([At(4.5), fresh], slot, 1, Compression.Default, options, null, budget);
+        Assert.Equal(1, spare.NormalCarried);
+        Assert.Equal(0, spare.ReachedTarget);
+        Assert.True(spare.Objects.Single(o => o.Bid == bulletin.Bid).Count > 0);
+    }
 }

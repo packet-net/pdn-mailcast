@@ -445,13 +445,20 @@ public static class BroadcastScheduler
     }
 
     /// <summary>
+    /// When a bulletin's wait for its first slot began: when it was taken in, or for one held from before, the end of its first-seen
+    /// day, so that it never retires up to a day early.
+    /// </summary>
+    public static DateTimeOffset UnstartedSince(CarriedBulletin carried) =>
+        carried.TakenIn ?? Midnight(carried.FirstSeen).AddDays(1);
+
+    /// <summary>
     /// Whether a bulletin was taken in <see cref="LeftoverHours"/> or more before <paramref name="slot"/> and has
     /// not been carried in any slot yet (issue #234): it retires unsent, so a queue of bulk bulletins never grows without end.
     /// </summary>
     public static bool NeverStarted(CarriedBulletin carried, DateTimeOffset slot)
     {
         ArgumentNullException.ThrowIfNull(carried);
-        return carried.FirstSlot is null && carried.NextEsi == 0 && slot - carried.TakenAt >= TimeSpan.FromHours(LeftoverHours);
+        return carried.FirstSlot is null && carried.NextEsi == 0 && slot - UnstartedSince(carried) >= TimeSpan.FromHours(LeftoverHours);
     }
 
     /// <summary>
@@ -810,7 +817,7 @@ public static class BroadcastScheduler
         int? directoryCap = null;
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, leftover.Count(l => l), directoryCap, relays.Count(r => r.Listing is not null && r.Transfer is not null), Concentration(allItems, counts, bulletins.Count, options.Budget));
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, leftover.Count(l => l), directoryCap, relays.Count(r => r.Listing is not null && r.Transfer is not null), Concentration(allItems, counts, main, bulletins.Count, options.Budget));
             if (budget is null || options.Budget is null
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {
@@ -853,15 +860,23 @@ public static class BroadcastScheduler
     /// from <paramref name="firstEsi"/>, so that a listener who hears them all rebuilds it.
     /// </summary>
     private static IEnumerable<MailcastFrame> EnvelopeFrames(TransferObject envelope, uint firstEsi) =>
-        Enumerable.Range(0, envelope.SourceSymbols).Select(i => envelope.Frame(firstEsi + (uint)i));
+        Enumerable.Range(0, envelope.SourceSymbols * EnvelopeCopiesPerSlot).Select(i => envelope.Frame(firstEsi + (uint)i));
+
+    /// <summary>
+    /// How many times its K pieces of a bulletin's envelope go out in each slot that carries it (issue #234). A bulletin is carried in
+    /// two or three slots now, not a dozen, so each carries three fresh runs of the envelope: a weak listener's chance of the envelope
+    /// stays about what it was when it had one run in each of a dozen slots.
+    /// </summary>
+    public const int EnvelopeCopiesPerSlot = 3;
 
     // The slot's own bulletins carried, by class, and how many of them are at the target once this slot's pieces are counted (issue #234).
-    private static (int Normal, int Bulk, int Reached) Concentration(List<FillItem> items, int[] counts, int ownCount, BudgetRule? rule)
+    private static (int Normal, int Bulk, int Reached) Concentration(List<FillItem> items, int[] counts, int[] main, int ownCount, BudgetRule? rule)
     {
         int normal = 0, bulk = 0, reached = 0;
         for (int i = 0; i < ownCount; i++)
         {
-            if (counts[i] <= 0)
+            // Only pieces from before the leftover tier's turn count: a bulletin in the leftover tier is not being finished.
+            if (counts[i] <= 0 || main[i] <= 0)
             {
                 continue;
             }
@@ -873,7 +888,7 @@ public static class BroadcastScheduler
             {
                 normal++;
             }
-            if (rule is not null && items[i].Sent + counts[i] >= LeftoverSymbols(items[i].K, rule))
+            if (rule is not null && items[i].Sent < LeftoverSymbols(items[i].K, rule) && items[i].Sent + main[i] >= LeftoverSymbols(items[i].K, rule))
             {
                 reached++;
             }
@@ -1111,7 +1126,7 @@ public static class BroadcastScheduler
             if (counts[i] > 0 && c.Envelope is { } envelope && envelopeSeen.Add(envelope.ObjectId))
             {
                 uint first = bulletins.Where(b => b.Carried.Envelope?.ObjectId == envelope.ObjectId).Max(b => b.Carried.EnvelopeNextEsi);
-                scheduled.Add(new ScheduledObject(envelope, index, first, envelope.SourceSymbols, EnvelopeFor: c.Bid));
+                scheduled.Add(new ScheduledObject(envelope, index, first, envelope.SourceSymbols * EnvelopeCopiesPerSlot, EnvelopeFor: c.Bid));
             }
         }
         int envelopeFrames = scheduled.Skip(1 + bulletinObjects).Sum(s => s.Count);
