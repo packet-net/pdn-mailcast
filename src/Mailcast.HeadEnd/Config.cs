@@ -683,7 +683,8 @@ public sealed record HeadEndConfig
                 problems.Add($"\"schedule\".\"modes\": '{bad}' is not an MS110D waveform the modem can switch to (ms110d-wn0 to ms110d-wn8, or ms110d-wn13; add -long for the long interleaver)");
                 return;
             }
-            if (Waveforms.SetHardwarePayload(Station.Mode) is null || Station.Mode.EndsWith(Waveforms.LongSuffix, StringComparison.Ordinal))
+            // A -long station.mode already has its own, clearer, problem above.
+            if (Waveforms.SetHardwarePayload(Station.Mode) is null && !Station.Mode.EndsWith(Waveforms.LongSuffix, StringComparison.Ordinal))
             {
                 problems.Add($"\"schedule\".\"modes\" needs an MS110D broadcast modem, and \"station\".\"mode\" is '{Station.Mode}'");
                 return;

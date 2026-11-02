@@ -159,6 +159,10 @@ public class WaveformTests
         // The station's own mode is pdn-soundmodem's name, which has no -long.
         var station = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "ms110d-wn4-long"}}"""));
         Assert.Contains("\"station\".\"mode\" is the modem's own mode, which has no -long", station.Message, StringComparison.Ordinal);
+        // With modes set too, that is the only problem given.
+        var longStation = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "ms110d-wn4-long"}, "schedule": {"modes": ["ms110d-wn4-long", "ms110d-wn3"]}}"""));
+        Assert.Contains("\"station\".\"mode\" is the modem's own mode, which has no -long", longStation.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("needs an MS110D broadcast modem", longStation.Message, StringComparison.Ordinal);
         Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k"}, "schedule": {"modes": []}}"""));
         Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""{"callsign": "M0LTE", "station": {"apiKey": "k", "mode": "afsk1200"}, "schedule": {"modes": ["ms110d-wn4"]}}"""));
     }
