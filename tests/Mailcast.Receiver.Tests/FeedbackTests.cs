@@ -305,28 +305,85 @@ public class FeedbackTests
         Assert.Equal(0, report.Header.GivenUp);
     }
 
+    private static DroppedPartial Dropped(ulong id, string? bid, int held, int needed = 10) => new(id, bid, held, needed);
+
     /// <summary>
-    /// The header's eighth field counts the bulletins given up because the head end stopped
-    /// sending them, each object once however often it is reported, and is kept across a restart.
+    /// The header's eighth field counts the bulletins given up (at least half their pieces) and the
+    /// tenth the ones only touched, each bulletin once however often it is reported, by BID in any
+    /// letter case or else by object ID, and is kept across a restart.
     /// </summary>
     [Fact]
-    public async Task GivenUp_CountsEachObjectOnce_InTheReportsHeader()
+    public async Task GivenUp_CountsEachBulletinOnce_AndStraysApart_InTheReportsHeader()
     {
         using var dir = new TempDirectory();
         var rig = new Rig(dir.Path);
         var service = rig.Start();
         await rig.ListenAsync(service, Day, only: 1);
-        service.NoteGivenUp([0x1111UL, 0x2222UL, 0x1111UL]);
+        service.NoteGivenUp([Dropped(0x1111UL, "1_A", 5), Dropped(0x2222UL, "2_B", 4), Dropped(0x1112UL, "1_a", 9), Dropped(0x9999UL, null, 5), Dropped(0x9999UL, null, 6)]);
         service = rig.Start();
-        service.NoteGivenUp([0x2222UL, 0x3333UL]);
+        service.NoteGivenUp([Dropped(0x2223UL, "2_b", 10), Dropped(0x3333UL, "3_C", 1)]);
         service.NoteGivenUp([]);
 
         await rig.AtAsync(service, ReportAt);
 
         var mail = Assert.Single(rig.Bbs.Sent);
         var report = DailyReport.Parse(mail.Title, mail.Body);
-        Assert.Equal(3, report.Header.GivenUp);
-        Assert.EndsWith(" 0 3", mail.Body.Split("\r\n")[0], StringComparison.Ordinal);
+        Assert.Equal(3, report.Header.GivenUp); // 1_A, the object with no BID, and 2_B (4 of 10 first, then 10: given up wins)
+        Assert.Equal(1, report.Header.Touched); // 3_C
+        Assert.EndsWith(" 0 3 0 1", mail.Body.Split("\r\n")[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>A touched bulletin counted as given up instead if it progresses before its report goes; the counts say what was added.</summary>
+    [Fact]
+    public async Task Touched_BecomesGivenUp_IfItProgressesBeforeTheReportGoes_AndTheReturnedCountsAreWhatWasAdded()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 1);
+        Assert.Equal((0, 1), service.NoteGivenUp([Dropped(0x1111UL, "1_A", 2)]));
+        Assert.Equal((0, 0), service.NoteGivenUp([Dropped(0x1112UL, "1_a", 3)])); // still a stray: not again
+        Assert.Equal((1, 0), service.NoteGivenUp([Dropped(0x1113UL, "1_A", 7)]));
+        Assert.Equal((0, 0), service.NoteGivenUp([Dropped(0x1114UL, "1_A", 8)]));
+        await rig.AtAsync(service, ReportAt);
+
+        var report = DailyReport.Parse(rig.Bbs.Sent[0].Title, rig.Bbs.Sent[0].Body);
+        Assert.Equal((1, null), (report.Header.GivenUp, report.Header.Touched));
+    }
+
+    /// <summary>A BID is remembered past the day records, so it is not counted again a week later.</summary>
+    [Fact]
+    public async Task ABid_IsNotCountedAgain_AWeekLater_ButIsAfterFourteenDays()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 1);
+        Assert.Equal((1, 0), service.NoteGivenUp([Dropped(0x1111UL, "1_A", 9)]));
+        rig.Time.SetUtcNow(new DateTimeOffset(Day.AddDays(7).ToDateTime(new TimeOnly(10, 0)), TimeSpan.Zero));
+        Assert.Equal((0, 0), service.NoteGivenUp([Dropped(0x1112UL, "1_A", 9)]));
+        rig.Time.SetUtcNow(new DateTimeOffset(Day.AddDays(20).ToDateTime(new TimeOnly(10, 0)), TimeSpan.Zero));
+        Assert.Equal((1, 0), service.NoteGivenUp([Dropped(0x1113UL, "1_A", 9)]));
+    }
+
+    /// <summary>A bulletin counted on one day, as given up or as touched, is not counted again on another.</summary>
+    [Fact]
+    public async Task GivenUp_AndTouched_CountAnyBulletinOnlyOnce_AcrossDays()
+    {
+        using var dir = new TempDirectory();
+        var rig = new Rig(dir.Path);
+        var service = rig.Start();
+        await rig.ListenAsync(service, Day, only: 1);
+        service.NoteGivenUp([Dropped(0x1111UL, "1_A", 1), Dropped(0x2222UL, "2_B", 8)]);
+        await rig.AtAsync(service, ReportAt);
+        await rig.ListenAsync(service, Day.AddDays(1), only: 1);
+        service.NoteGivenUp([Dropped(0x1112UL, "1_A", 9), Dropped(0x2223UL, "2_b", 9), Dropped(0x3333UL, "3_C", 7)]);
+        await rig.AtAsync(service, ReportAt.AddDays(1));
+
+        var first = DailyReport.Parse(rig.Bbs.Sent[0].Title, rig.Bbs.Sent[0].Body);
+        Assert.Equal((1, 1), (first.Header.GivenUp, first.Header.Touched));
+        var second = DailyReport.Parse(rig.Bbs.Sent[1].Title, rig.Bbs.Sent[1].Body);
+        Assert.Equal((1, null), (second.Header.GivenUp, second.Header.Touched)); // only 3_C is new
     }
 
     /// <summary>A directory for <paramref name="date"/> with one bulletin, listing <paramref name="reports"/> (null: a head end before v0.16.0).</summary>

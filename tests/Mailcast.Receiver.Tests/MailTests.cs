@@ -686,7 +686,7 @@ public class MailTests
         await using var _p = page;
         using var _c = http;
         var givenUp = new List<ulong>();
-        host.Intake.GivenUp += ids => givenUp.AddRange(ids);
+        host.Intake.GivenUp += ids => givenUp.AddRange(ids.Select(d => d.ObjectId));
         host.Intake.Offer(FirstPieceOf(Samples.Bulletin(901, bodyLines: 200)));
         await host.Intake.DrainAsync(CancellationToken.None);
 

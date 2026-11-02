@@ -1485,6 +1485,8 @@ function mailSummary(m) {
   if (m.delivered) parts.push(`${m.delivered} delivered`);
   if (m.alreadyHad) parts.push(`${m.alreadyHad} already had`);
   if (m.refused) parts.push(`${m.refused} refused`);
+  const fb = status && status.feedback;
+  if (fb && fb.enabled && (fb.givenUpToday || fb.touchedToday)) parts.push(`today ${fb.givenUpToday || 0} given up, ${fb.touchedToday || 0} touched (under half their pieces)`);
   let note = (parts.length ? parts.join(", ") : "Nothing held yet.")
     + ` (each kept ${m.archive.days} days, ${m.archive.maxMegabytes} MB at most). Click one to read it.`;
   if (status && status.directory && status.directory.stale) note += ` Newest list heard is from ${status.directory.date}.`;

@@ -63,6 +63,9 @@ public sealed record SlotSummary(DateTimeOffset Started, ToneReport? Tone, int F
     /// <summary>Issue #133: part-received bulletins given up while this slot was the one tracked.</summary>
     public int GivenUp { get; init; }
 
+    /// <summary>Issue #240: part-received bulletins dropped with under half their pieces (strays), not counted as given up.</summary>
+    public int Touched { get; init; }
+
     /// <summary>Issue #133: whether the journal has had this slot's summary line.</summary>
     public bool Ended { get; init; }
 
@@ -348,11 +351,11 @@ public sealed class SlotTracker
     }
 
     /// <summary>Issue #133: <paramref name="count"/> part-received bulletins were given up.</summary>
-    public void OnGivenUp(int count)
+    public void OnGivenUp(int count, int touched = 0)
     {
-        if (count > 0)
+        if (count > 0 || touched > 0)
         {
-            Change(s => s with { GivenUp = s.GivenUp + count });
+            Change(s => s with { GivenUp = s.GivenUp + count, Touched = s.Touched + touched });
         }
     }
 
@@ -508,6 +511,10 @@ public sealed class SlotTracker
         if (slot.GivenUp > 0)
         {
             bulletins += string.Create(c, $", {slot.GivenUp} given up");
+        }
+        if (slot.Touched > 0)
+        {
+            bulletins += string.Create(c, $", {slot.Touched} touched (under half their pieces)");
         }
         parts.Add(bulletins);
         parts.Add(slot.HeardDirectory is { } directory

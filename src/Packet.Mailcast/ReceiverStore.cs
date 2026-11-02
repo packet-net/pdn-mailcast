@@ -208,6 +208,22 @@ public sealed record ObjectProgress(DirectoryEntry Entry, bool Complete, int Rec
 /// </param>
 public sealed record HeldBulletin(ulong ObjectId, string? Bid, string? Title, bool Complete, int Received, int Needed, DateTimeOffset? NoLongerSentSince = null, DateTimeOffset? ClearedAt = null, string? Signature = null, string? SignedBy = null, bool Withheld = false);
 
+/// <summary>
+/// A part-received bulletin dropped because the head end stopped sending it (issue #240).
+/// </summary>
+/// <param name="ObjectId">The object.</param>
+/// <param name="Bid">Its BID if a directory heard names it, else null.</param>
+/// <param name="Held">How many pieces the fullest copy held.</param>
+/// <param name="Needed">How many pieces (K) it needed.</param>
+public sealed record DroppedPartial(ulong ObjectId, string? Bid, int Held, int Needed)
+{
+    /// <summary>
+    /// True when it held at least half its K pieces (ceil(K/2)): a real near miss, given up.
+    /// Otherwise it is a stray, only touched.
+    /// </summary>
+    public bool GaveUp => Held >= (Needed + 1) / 2;
+}
+
 /// <summary>Settings for a <see cref="ReceiverStore"/>.</summary>
 public sealed record ReceiverStoreOptions
 {
@@ -411,7 +427,7 @@ public sealed partial class ReceiverStore
     private readonly HashSet<ulong> _mismatchSaid = [];
     private readonly string _stoppedDir;
     private readonly Dictionary<ulong, DateTimeOffset> _stopped = [];
-    private readonly List<ulong> _givenUp = [];
+    private readonly List<DroppedPartial> _givenUp = [];
     private readonly HashSet<string> _unusable = [];
     private DateTimeOffset _lastExpiry;
 
@@ -1543,19 +1559,60 @@ public sealed partial class ReceiverStore
     public void DropNoLongerSent() => DropNoLongerSent(_options.Time.GetUtcNow());
 
     /// <summary>
-    /// The objects given up (dropped because the head end stopped sending them) since the last
-    /// call, oldest first, so the owner can count them outside whatever lock guards the store.
+    /// The part-received bulletins dropped because the head end stopped sending them since the
+    /// last call, oldest first, so the owner can count them outside whatever lock guards the
+    /// store. Each says how much of it was held: see <see cref="DroppedPartial.GaveUp"/>. A bulletin
+    /// whose BID was delivered (under any object) or is already done is left out, as it was not lost.
     /// Held in memory only.
     /// </summary>
-    public IReadOnlyList<ulong> TakeGivenUp()
+    public IReadOnlyList<DroppedPartial> TakeGivenUp()
     {
         if (_givenUp.Count == 0)
         {
             return [];
         }
-        var taken = _givenUp.ToList();
+        // One bulletin once, by BID: of several copies dropped together, the one that got furthest.
+        var taken = _givenUp.Where(d => d.Bid is null)
+            .Concat(_givenUp.Where(d => d.Bid is not null).GroupBy(d => d.Bid!, StringComparer.OrdinalIgnoreCase).Select(g => g.MaxBy(d => d.Held)!))
+            .ToList();
         _givenUp.Clear();
         return taken;
+    }
+
+    /// <summary>Whether a copy of the bulletin with this BID was delivered, or is done, under any object.</summary>
+    private bool BidIsDone(string bid)
+    {
+        if (DeliveredObject(bid) is not null)
+        {
+            return true;
+        }
+        foreach (var (directory, _, _) in _knownDirectories.Values)
+        {
+            foreach (var entry in directory.Entries)
+            {
+                if (string.Equals(entry.Bid, bid, StringComparison.OrdinalIgnoreCase) && _done.ContainsKey(entry.ObjectId))
+                {
+                    return true;
+                }
+            }
+        }
+        return Directory is { } current && current.Entries.Any(e => string.Equals(e.Bid, bid, StringComparison.OrdinalIgnoreCase) && _done.ContainsKey(e.ObjectId));
+    }
+
+    private string? BidOf(ulong objectId)
+    {
+        string? bid = Directory?.Find(objectId)?.Bid;
+        if (bid is null)
+        {
+            foreach (var (directory, _, _) in _knownDirectories.Values)
+            {
+                if (directory.Find(objectId) is { } entry)
+                {
+                    return entry.Bid;
+                }
+            }
+        }
+        return bid;
     }
 
     private void DropNoLongerSent(DateTimeOffset now)
@@ -1568,15 +1625,39 @@ public sealed partial class ReceiverStore
         {
             var held = _instances.Values.Where(i => i.ObjectId == id).ToList();
             var fullest = held.MaxBy(i => i.Symbols.Count);
+            string? bid = BidOf(id);
+            DroppedPartial? counted = fullest is null ? null : new DroppedPartial(id, bid, fullest.Symbols.Count, fullest.Oti.SourceBlockSymbols(0));
+            string verdict;
+            if (counted is null)
+            {
+                verdict = "not counted, nothing of it was held";
+            }
+            else if (held.Any(i => i.Withheld is not null))
+            {
+                counted = null;
+                verdict = "not counted, it was complete but withheld";
+            }
+            else if (bid is not null && BidIsDone(bid))
+            {
+                counted = null;
+                verdict = "not counted, a copy of the bulletin was delivered or is done";
+            }
+            else
+            {
+                verdict = counted.GaveUp ? "counted as given up" : "counted as touched only";
+            }
             Log(fullest is null
-                ? $"partial object {Describe(id)} dropped: the head end stopped sending it at {since.UtcDateTime:yyyy-MM-dd HH:mm} UTC"
-                : $"partial object {Describe(id)} dropped with {fullest.Symbols.Count} of {fullest.Oti.SourceBlockSymbols(0)} pieces: the head end stopped sending it at {since.UtcDateTime:yyyy-MM-dd HH:mm} UTC");
+                ? $"partial object {Describe(id)} dropped: the head end stopped sending it at {since.UtcDateTime:yyyy-MM-dd HH:mm} UTC; {verdict}"
+                : $"partial object {Describe(id)} dropped with {fullest.Symbols.Count} of {fullest.Oti.SourceBlockSymbols(0)} pieces: the head end stopped sending it at {since.UtcDateTime:yyyy-MM-dd HH:mm} UTC; {verdict}");
             foreach (var instance in held)
             {
                 Remove(instance);
             }
             ForgetStopped(id); // Remove has, unless there was nothing to remove
-            _givenUp.Add(id);
+            if (counted is not null)
+            {
+                _givenUp.Add(counted);
+            }
         }
     }
 

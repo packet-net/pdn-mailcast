@@ -644,7 +644,10 @@ public class ReceiverStoreTests
         Assert.Equal(stays.ObjectId, Assert.Single(store.HeldBulletins(), h => !h.Complete).ObjectId);
         Assert.Contains(log, l => l.Contains(ObjectId.Format(unnamed.ObjectId) + " dropped with 1 of", StringComparison.Ordinal));
         Assert.Empty(Directory.EnumerateFiles(Path.Combine(dir.Path, "stopped")));
-        Assert.Equal(new[] { named.ObjectId, unnamed.ObjectId }.Order(), store.TakeGivenUp().Order());
+        var dropped = store.TakeGivenUp();
+        Assert.Equal(new[] { named.ObjectId, unnamed.ObjectId }.Order(), dropped.Select(d => d.ObjectId).Order());
+        Assert.All(dropped, d => Assert.False(d.GaveUp)); // one stray piece each: touched, not given up
+        Assert.Contains(log, l => l.Contains(ObjectId.Format(named.ObjectId) + " (1_TEST) dropped with 1 of", StringComparison.Ordinal) && l.EndsWith("counted as touched only", StringComparison.Ordinal));
         Assert.Empty(store.TakeGivenUp()); // each handed over once
     }
 
@@ -712,7 +715,7 @@ public class ReceiverStoreTests
         var again = new ReceiverStore(dir.Path, Compression.Default, options);
         Assert.Equal(2, again.PartialObjects);
         Assert.DoesNotContain(again.HeldBulletins(), h => h.ObjectId == gone.ObjectId);
-        Assert.Equal([gone.ObjectId], again.TakeGivenUp()); // the two whose mark was undone are not given up
+        Assert.Equal([gone.ObjectId], again.TakeGivenUp().Select(d => d.ObjectId)); // the two whose mark was undone are not given up
         Assert.Single(Directory.EnumerateDirectories(Path.Combine(dir.Path, "objects")), d => Path.GetFileName(d).StartsWith(ObjectId.Format(requeued.ObjectId), StringComparison.Ordinal));
     }
 
@@ -755,7 +758,7 @@ public class ReceiverStoreTests
 
         time.Advance(TimeSpan.FromHours(25));
         store.DropNoLongerSent();
-        Assert.Equal([namedOnly.ObjectId], store.TakeGivenUp());
+        Assert.Equal([namedOnly.ObjectId], store.TakeGivenUp().Select(d => d.ObjectId));
         Assert.Equal(2, store.PartialObjects); // the other two wait out the usual 14 days
     }
 

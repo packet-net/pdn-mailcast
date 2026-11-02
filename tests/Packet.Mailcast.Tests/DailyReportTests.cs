@@ -181,6 +181,44 @@ public class DailyReportTests
     }
 
     [Theory]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 5", null)] // no tenth field: none, or an older sender's
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 5 -", null)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 - 7", 7)]
+    [InlineData("MCR1 0.6.0 - sc 3/0 0 2 4 5 7 a-later-field", 7)]
+    public void Parse_TouchedField_KnownOrNot(string headerLine, int? expected)
+    {
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", headerLine + "\r\n");
+        Assert.Equal(expected, read.Header.Touched);
+    }
+
+    /// <summary>The tenth field is written after a ninth and an eighth ("-" for an eighth not known, 0 for a ninth), and not at all when null, so a report without it is unchanged.</summary>
+    [Theory]
+    [InlineData(null, null, null, "MCR1 0.6.0 - sc 3/1 0 2")]
+    [InlineData(3, null, 4, "MCR1 0.6.0 - sc 3/1 0 2 3 0 4")]
+    [InlineData(null, null, 4, "MCR1 0.6.0 - sc 3/1 0 2 - 0 4")]
+    [InlineData(3, 5, 4, "MCR1 0.6.0 - sc 3/1 0 2 3 5 4")]
+    [InlineData(3, 5, null, "MCR1 0.6.0 - sc 3/1 0 2 3 5")]
+    public void Header_TouchedField_RoundTrips(int? givenUp, int? outside, int? touched, string expected)
+    {
+        var header = new ReportHeader("0.6.0", null, "sc", 3, 1, new Dictionary<string, int>(), 2, givenUp, outside, touched);
+        var report = new DailyReport("G4ABC", Day, header, []);
+        Assert.Equal(expected + "\r\n", report.Body);
+        var read = DailyReport.Parse(report.Title, report.Body);
+        Assert.Equal((givenUp, touched is not null && outside is null ? 0 : outside, touched), (read.Header.GivenUp, read.Header.OutsidePieces, read.Header.Touched));
+    }
+
+    /// <summary>
+    /// A golden header with a tenth field. Checked by hand against the v0.21.0 and v0.31.0 parsers, which
+    /// read the first nine fields the same and ignore the tenth; this reader keeps reading the first nine as before.
+    /// </summary>
+    [Fact]
+    public void Parse_GoldenHeaderWithATenthField_FirstNineFieldsReadAsBefore()
+    {
+        var read = DailyReport.Parse("MCR G4ABC 2026-10-06", "MCR1 0.6.0 - sc 3/1 0 2 3 5 4\r\n");
+        Assert.Equal((3, 1, 2, 3, 5, 4), (read.Header.Rebuilt, read.Header.Delivered, read.Header.AlreadyHad ?? -1, read.Header.GivenUp ?? -1, read.Header.OutsidePieces ?? -1, read.Header.Touched ?? -1));
+    }
+
+    [Theory]
     [InlineData("MCR G4ABC 2026-10-06", "MCR1 0.6.0 - sc 0/0 0 0 x\r\n")]
     [InlineData("Hello", "MCR1 0.6.0 - sc 0/0 0\r\n")]
     [InlineData("MCR G4ABC 2026-13-01", "MCR1 0.6.0 - sc 0/0 0\r\n")]
