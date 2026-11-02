@@ -863,13 +863,7 @@ public static class BroadcastScheduler
     /// from <paramref name="firstEsi"/>, so that a listener who hears them all rebuilds it.
     /// </summary>
     private static IEnumerable<MailcastFrame> EnvelopeFrames(TransferObject envelope, uint firstEsi) =>
-        Enumerable.Range(0, envelope.SourceSymbols * EnvelopeCopiesPerSlot).Select(i => envelope.Frame(firstEsi + (uint)i));
-
-    /// <summary>
-    /// How many times its K pieces of a bulletin's envelope go out in each slot that carries it (issue #234): three fresh runs, so a
-    /// weak listener is likelier to get the envelope from the slots that carry the bulletin.
-    /// </summary>
-    public const int EnvelopeCopiesPerSlot = 3;
+        Enumerable.Range(0, envelope.SourceSymbols).Select(i => envelope.Frame(firstEsi + (uint)i));
 
     // The slot's own bulletins carried, normal and bulk, counting only the pieces from before the leftover tier's turn (issue #234).
     private static (int Normal, int Bulk) Carried(List<FillItem> items, int[] main, int ownCount)
@@ -1014,7 +1008,9 @@ public static class BroadcastScheduler
         }
         anyRoom = room.Any(r => r > 0);
         main = counts;
-        foreach (var limit in new[] { floor, room, spare })
+        // Strictly bulk last (issue #234): the normal class gets its floor and its share before any bulk piece, then bulk gets its
+        // own floor and share from what is left, then the leftover tier's turn, normal before bulk.
+        foreach (var (limit, bulkOnly) in new (int[] Limit, bool? Bulk)[] { (floor, false), (room, false), (floor, true), (room, true), (spare, null) })
         {
             if (limit == spare)
             {
@@ -1027,7 +1023,7 @@ public static class BroadcastScheduler
             var queue = new PriorityQueue<int, (bool Bulk, double Coverage, int Order)>();
             for (int i = 0; i < bulletins.Count; i++)
             {
-                if (counts[i] < limit[i])
+                if (counts[i] < limit[i] && (bulkOnly is null || bulkOnly == bulletins[i].Bulk))
                 {
                     queue.Enqueue(i, (bulletins[i].Bulk, Coverage(bulletins[i], counts[i]), i));
                 }
@@ -1051,7 +1047,7 @@ public static class BroadcastScheduler
                     return counts;
                 }
                 counts[i]++;
-                if (counts[i] < limit[i])
+                if (counts[i] < limit[i] && (bulkOnly is null || bulkOnly == bulletins[i].Bulk))
                 {
                     queue.Enqueue(i, (bulletins[i].Bulk, Coverage(bulletins[i], counts[i]), i));
                 }
@@ -1111,7 +1107,7 @@ public static class BroadcastScheduler
             if (counts[i] > 0 && c.Envelope is { } envelope && envelopeSeen.Add(envelope.ObjectId))
             {
                 uint first = bulletins.Where(b => b.Carried.Envelope?.ObjectId == envelope.ObjectId).Max(b => b.Carried.EnvelopeNextEsi);
-                scheduled.Add(new ScheduledObject(envelope, index, first, envelope.SourceSymbols * EnvelopeCopiesPerSlot, EnvelopeFor: c.Bid));
+                scheduled.Add(new ScheduledObject(envelope, index, first, envelope.SourceSymbols, EnvelopeFor: c.Bid));
             }
         }
         int envelopeFrames = scheduled.Skip(1 + bulletinObjects).Sum(s => s.Count);

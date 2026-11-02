@@ -116,7 +116,7 @@ public class ConcentrationSimulationTests(ITestOutputHelper output)
         int days = span * passes;
         var start = new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero);
 
-        using var headEnd = new BudgetTests.HeadEnd("\"modes\": [\"ms110d-wn4\"]" + schedule);
+        using var headEnd = new BudgetTests.HeadEnd("\"modes\": [\"ms110d-wn4\"]" + schedule, realStore: true);
         var timetable = headEnd.Config.ToSlotTimetable();
         var trace = new Trace([], [], arrivals.ToDictionary(a => a.Bulletin.Bid, a => a.Bulk, StringComparer.Ordinal), start.AddDays(span), span, 0);
         var active = new HashSet<string>(StringComparer.Ordinal);

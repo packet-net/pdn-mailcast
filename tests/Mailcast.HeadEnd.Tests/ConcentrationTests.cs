@@ -123,24 +123,6 @@ public class ConcentrationTests
         Assert.Single(lines);
     }
 
-    [Fact]
-    public void ABulletinThatIsCarried_SendsItsEnvelopeSeveralTimesASlot_WithFreshPieces()
-    {
-        using var dir = new TempDirectory();
-        var options = ScheduleOptions.HourlyBudget;
-        var store = new HeadEndStore(dir.Path, Compression.Default, options);
-        var c = store.Offer(Bulletins.Make(1, 6000), new DateOnly(2026, 11, 2), new DateTimeOffset(2026, 11, 2, 7, 0, 0, TimeSpan.Zero))!;
-        Assert.NotNull(c.Envelope);
-        var slot = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
-        var budget = new SlotBudget(TimeSpan.FromSeconds(1000), lengths => TimeSpan.FromSeconds(lengths.Count));
-        var first = BroadcastScheduler.Plan(store.InRotation(slot), slot, 1, Compression.Default, options, store.DirectoryNextEsi, budget);
-        var envelope = Assert.Single(first.Objects, o => o.EnvelopeFor is not null);
-        Assert.Equal(c.Envelope!.SourceSymbols * BroadcastScheduler.EnvelopeCopiesPerSlot, envelope.Count);
-        store.Commit(first);
-        var second = BroadcastScheduler.Plan(store.InRotation(slot.AddHours(1)), slot.AddHours(1), 1, Compression.Default, options, store.DirectoryNextEsi, budget);
-        Assert.Equal(envelope.NextEsi, Assert.Single(second.Objects, o => o.EnvelopeFor is not null).FirstEsi);
-    }
-
     private static CarriedBulletin Held(int seed, string from, double coverage, DateTimeOffset taken, ScheduleOptions options)
     {
         var bulletin = Bulletins.Make(seed, 6000, 'B', from);
@@ -187,5 +169,29 @@ public class ConcentrationTests
         var plan = BroadcastScheduler.Plan([spare, fresh], slot, 1, Compression.Default, options, null, budget);
         Assert.True(plan.Objects.Single(o => o.Bid == spare.Bid).Count > 0);
         Assert.Equal(1, plan.NormalCarried);
+    }
+
+    [Fact]
+    public void Bulk_GetsNothing_UntilEveryNormalBulletinHasHadItsFloorAndItsShare()
+    {
+        var options = ScheduleOptions.HourlyBudget with { Budget = new BudgetRule { Bulk = new HashSet<string> { "LU9DCE" } } };
+        var slot = new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero);
+        var normal = Enumerable.Range(0, 3).Select(i => Held(10 + i, "G4ABC", 1.0, slot.AddHours(-5), options)).ToList();
+        var bulk = Held(20, "LU9DCE", 0, slot.AddHours(-1), options);
+        int Count(SlotBroadcast p, CarriedBulletin c) => p.Objects.Single(o => o.Bid == c.Bid).Count;
+        SlotBudget Budget(int frames) => new(TimeSpan.FromSeconds(frames), lengths => TimeSpan.FromSeconds(lengths.Count));
+        int directory = BroadcastScheduler.Plan([.. normal, bulk], slot, 1, Compression.Default, options, null, Budget(1000)).Objects[0].Count;
+
+        // A budget that fits exactly what the normal bulletins alone take: the bulk one, added, gets nothing and they lose nothing.
+        var normalOnly = BroadcastScheduler.Plan(normal, slot, 1, Compression.Default, options, null, Budget(1000));
+        int exact = normalOnly.Frames.Count;
+        var plan = BroadcastScheduler.Plan([.. normal, bulk], slot, 1, Compression.Default, options, null, Budget(exact));
+        Assert.Equal(0, Count(plan, bulk));
+        Assert.All(normal, c => Assert.True(Count(plan, c) > 0));
+
+        // With room to spare beyond that, bulk gets some, and the normal ones still have everything they had.
+        var more = BroadcastScheduler.Plan([.. normal, bulk], slot, 1, Compression.Default, options, null, Budget(exact + 6));
+        Assert.True(Count(more, bulk) > 0);
+        Assert.All(normal, c => Assert.Equal(Count(normalOnly, c), Count(more, c)));
     }
 }

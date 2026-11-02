@@ -36,8 +36,9 @@ public class BudgetTests(ITestOutputHelper output)
         private readonly Dictionary<string, CarriedBulletin> _held = new(StringComparer.Ordinal);
         private readonly Dictionary<ulong, uint> _directories = [];
 
-        public HeadEnd(string schedule = "")
+        public HeadEnd(string schedule = "", bool realStore = false)
         {
+            _realStore = realStore;
             Config = Gb7rdg(schedule);
             Options = Config.ToScheduleOptions();
             Settings = Config.ToSlotSettings();
@@ -55,14 +56,26 @@ public class BudgetTests(ITestOutputHelper output)
 
         public StoreSlotPlanner Planner { get; }
 
+        /// <summary>Takes a bulletin in, through the real store when asked (<c>realStore</c>), so it is canonical, has its envelope and its own piece order, and the envelope's airtime is counted.</summary>
         public void Offer(Bulletin bulletin, DateOnly seen, DateTimeOffset? takenIn = null)
         {
-            if (!_held.ContainsKey(bulletin.Bid))
+            if (!_held.ContainsKey(bulletin.Bid) && !_realStore)
             {
                 var transfer = TransferObject.ForBulletin(bulletin, Options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
                 _held[bulletin.Bid] = new CarriedBulletin(bulletin.Bid, bulletin.Title, bulletin.Serialize().Length, seen, transfer, 0, From: bulletin.From, TakenIn: takenIn);
             }
+            else if (!_held.ContainsKey(bulletin.Bid))
+            {
+                _offers ??= new HeadEndStore(Path.Combine(_state.Path, "offers"), Compression.Default, Options);
+                if (_offers.Offer(bulletin, seen, takenIn) is { } carried)
+                {
+                    _held[bulletin.Bid] = carried;
+                }
+            }
         }
+
+        private HeadEndStore? _offers;
+        private readonly bool _realStore;
 
         public IReadOnlyList<CarriedBulletin> InRotation(DateTimeOffset slot) =>
             [.. _held.Values.Where(c => BroadcastScheduler.InRotation(c, slot, Options))];
@@ -87,6 +100,10 @@ public class BudgetTests(ITestOutputHelper output)
                 }
                 var c = _held[o.Bid];
                 _held[o.Bid] = c with { NextEsi = o.NextEsi, FirstSlot = c.FirstSlot ?? slot };
+            }
+            foreach (var o in plan.Objects.Where(o => o.EnvelopeFor is not null && o.Count > 0))
+            {
+                _held[o.EnvelopeFor!] = _held[o.EnvelopeFor!] with { EnvelopeNextEsi = o.NextEsi };
             }
             return (plan, waveform);
         }

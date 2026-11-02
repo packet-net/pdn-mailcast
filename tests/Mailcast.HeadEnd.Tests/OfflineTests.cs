@@ -55,11 +55,6 @@ public class OfflineTests
             Assert.Equal(Station.Ax25Ui.Encode("MCAST", "M0LTE", []).AsSpan(0, 16).ToArray(), ax25[..16]);
             var result = receiver.Accept(ax25.AsSpan(16));
             delivered.AddRange(result.Delivered ?? []);
-            // With the envelope's three runs a slot, an envelope can complete before its bulletin does; the bulletin then goes straight out.
-            if (result.Outcome == FrameOutcome.CompletedBulletin && result.Bulletin is { } straight)
-            {
-                delivered.Add(straight);
-            }
         }
         // Sent canonical (issue #142) by a signed directory that links no envelope, so each is delivered bare:
         // the receiver's own routing line, then the original R: line exactly, with the body and title.
