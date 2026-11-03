@@ -23,6 +23,13 @@ public enum BbsKind
     /// a binary session with no telnet processing.
     /// </summary>
     Fbb,
+
+    /// <summary>
+    /// XRouter's mailbox as a full BBS (PMSTYPE=4), reached on its Telnet port. XRouter prompts
+    /// "Callsign:" and "Password:", checked against USERPASS.SYS; the receiver answers both, then
+    /// sends the command for the mailbox, normally BBS.
+    /// </summary>
+    XRouter,
 }
 
 /// <summary>Where the receiver hands bulletins over.</summary>
@@ -46,7 +53,7 @@ public sealed record BbsSettings
     /// <summary>The password for the login.</summary>
     public string Password { get; init; } = "";
 
-    /// <summary>LinBPQ only: the node command that reaches the mail application, normally BBS.</summary>
+    /// <summary>LinBPQ and XRouter: the node command that reaches the mail application, normally BBS.</summary>
     public string Command { get; init; } = "BBS";
 }
 

@@ -458,12 +458,26 @@ Tested against FBB 7.0.11 (Ubuntu's `fbb` package) in docker; see `tests/Mailcas
 
 FBB answers "already have" for a bulletin it already holds, so a second receiver, or one that lost its state, never puts a bulletin in twice.
 
+### XRouter
+
+Tested against XRouter 505p (`ghcr.io/packethacking/xrouter`) in docker; see `tests/Mailcast.Receiver.Tests/XRouter`.
+
+1. Make the mailbox a full BBS: `PMSTYPE=4` and `PMSHADDR` in `XROUTER.CFG`, and a `TELNETPORT`.
+
+2. Add the line `Q0CAST <password>` to `USERPASS.SYS`.
+
+3. XRouter's usual telnet access only lets real callsigns in, and Q0CAST is not one. In `ACCESS.SYS`, give the receiver's address flag 2 (password needed, any login), for example `127.0.0.1 2` when the receiver runs on the same machine.
+
+4. In the receiver's config use `"type": "xRouter"`, XRouter's host and telnet port (usually 23), the password, and `"command": "BBS"`.
+
+XRouter takes compressed FBB forwarding, but over its telnet port, so the receiver escapes the bytes telnet would otherwise eat. XRouter goes silent on a title over 70 characters, so the receiver cuts titles to 70 for it, and XRouter itself keeps only the first 60. It answers "already have" for a bulletin it holds, as the others do.
+
 ### Testing the login
 
 The settings page's **Test BBS login** button tries the host, port, login and password shown (or typed in but not yet saved), the same way the receiver logs in to send mail, but exchanges no mail: it connects, logs in, enters the BBS command, and stops once it knows how far it got. It says plainly:
 
 - logged in as a forwarding partner: the login works;
-- the password is wrong: LinBPQ asked for the password again after it was sent, or FBB said so;
+- the password is wrong: LinBPQ asked for the password again after it was sent, or FBB or XRouter said so (XRouter says the same for a login it does not know);
 - the login was not recognised: LinBPQ asked for the login again, because no `USER=` line on that port has it. LinBPQ's logins are case-sensitive, so check the case too;
 - the port is LinBPQ's ordinary telnet port (`TCPPORT`), not its `FBBPORT`. The ordinary port asks for the login and password one at a time, so the receiver can't use it;
 - the login works but is not set up as a BBS forwarding partner, such as Q0CAST added to the Telnet port but not to the mail configuration's Users;

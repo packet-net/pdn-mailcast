@@ -1912,7 +1912,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     }
 
     internal static string DescribeBbs(BbsSettings bbs) =>
-        $"{(bbs.Type == BbsKind.LinBpq ? "LinBPQ" : "FBB")} at {bbs.Host}:{bbs.Port} as {bbs.Login}";
+        $"{BbsClient.Name(bbs.Type)} at {bbs.Host}:{bbs.Port} as {bbs.Login}";
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()

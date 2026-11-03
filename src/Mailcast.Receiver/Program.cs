@@ -32,7 +32,7 @@ for (int i = 0; i < args.Length; i++)
                   --version        print the version
                   --service        run as the Windows service install-service.ps1 makes (Windows only)
 
-                See README.md for the config file and how to set up LinBPQ or FBB.
+                See README.md for the config file and how to set up LinBPQ, FBB or XRouter.
                 """);
             return 0;
         default:

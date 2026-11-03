@@ -19,7 +19,7 @@ Two ideas make a one-way link work:
 | Who sends | M0LTE, a Flex 6500 on 40 m. |
 | When | Every hour on the hour in daylight, from 2 hours after sunrise to 30 minutes before sunset near Reading: 09:00 to 17:00 UTC in early October, 11:00 to 15:00 in midwinter, 06:00 to 19:00 in midsummer. A short slot of a few minutes. Until 2026-10-05 it was once a day at 12:00 UTC, which a head end can still be set to. |
 | Where | Centred on 7.0538 MHz (USB dial 7.052 MHz), occupying about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz. |
-| Receivers | Linux, with LinBPQ or FBB mail. |
+| Receivers | Linux, with LinBPQ, FBB or XRouter mail. |
 | Receiver packaging | One program with pdn-soundmodem's library embedded from NuGet. No separate pdn-soundmodem install and no KISS link. |
 | Fountain code | RaptorQ (RFC 6330). |
 | Compression | zstd with a trained dictionary. |

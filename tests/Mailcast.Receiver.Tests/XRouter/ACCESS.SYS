@@ -1,0 +1,3 @@
+; Telnet logins from docker's network need a password but not a real callsign, so Q0CAST can log in.
+172.16.0.0/12 2
+0.0.0.0/0 7
