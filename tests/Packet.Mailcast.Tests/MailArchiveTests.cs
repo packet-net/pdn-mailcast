@@ -180,7 +180,7 @@ public class MailArchiveTests
         Assert.Equal(ResendOutcome.Resent, store.Resend(id).Outcome);
         store.Acknowledge(bulletin.Bid, BbsVerdict.Refused, "FS R");
         Assert.Equal(BbsVerdict.Refused, Assert.Single(store.Mail.NewestFirst).Verdict);
-        Assert.Equal(BbsVerdict.Refused, Assert.Single(new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast).Mail.NewestFirst).Verdict);
+        Assert.Equal(BbsVerdict.Refused, Assert.Single(new ReceiverStore(dir.Path, Compression.Default, TestStores.Fast with { Time = time }).Mail.NewestFirst).Verdict);
     }
 
     [Fact]
