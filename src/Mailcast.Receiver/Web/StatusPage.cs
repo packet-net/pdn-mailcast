@@ -1492,7 +1492,7 @@ public sealed partial class StatusPage : IAsyncDisposable
     /// callsigns are upper case, so for FBB it is upper-cased as before.
     /// </summary>
     internal static string BbsLogin(BbsKind kind, string login) =>
-        kind == BbsKind.Fbb ? login.Trim().ToUpperInvariant() : login.Trim();
+        kind != BbsKind.LinBpq ? login.Trim().ToUpperInvariant() : login.Trim();
 
     /// <summary>Applies a settings form to <paramref name="current"/>; throws <see cref="ConfigException"/> for one that cannot work.</summary>
     internal static ReceiverConfig Apply(ReceiverConfig current, SettingsForm form)
@@ -1503,7 +1503,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         }
         if (!Enum.TryParse<BbsKind>(form.Type, ignoreCase: true, out var kind))
         {
-            throw new ConfigException($"\"{form.Type}\" is not a kind of BBS this receiver knows; use linBpq or fbb");
+            throw new ConfigException($"\"{form.Type}\" is not a kind of BBS this receiver knows; use linBpq, fbb or xRouter");
         }
         bool elsewhere = kind != current.Bbs.Type
             || form.Port != current.Bbs.Port
@@ -2087,7 +2087,7 @@ public sealed partial class StatusPage : IAsyncDisposable
         if (form.Type is { Length: > 0 } type && !Enum.TryParse(type, ignoreCase: true, out kind))
         {
             await RespondAsync(context, 400, "application/json",
-                JsonSerializer.Serialize(new { error = $"\"{Ascii.Clean(type)}\" is not a kind of BBS this receiver knows; use linBpq or fbb" })).ConfigureAwait(false);
+                JsonSerializer.Serialize(new { error = $"\"{Ascii.Clean(type)}\" is not a kind of BBS this receiver knows; use linBpq, fbb or xRouter" })).ConfigureAwait(false);
             return;
         }
         string host = string.IsNullOrWhiteSpace(form.Host) ? current.Host : form.Host.Trim();

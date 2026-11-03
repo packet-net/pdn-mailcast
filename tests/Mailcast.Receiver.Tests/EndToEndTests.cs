@@ -125,6 +125,46 @@ public class EndToEndTests(ITestOutputHelper output)
         AssertEachOnceInFbb(await fbb.ReadAllBulletinsAsync(cancellation));
     }
 
+    /// <summary>
+    /// The same slot delivered twice into a real XRouter's mailbox (PMSTYPE=4) over its telnet
+    /// port: the first receiver's bulletins are all taken, the second's all already had.
+    /// </summary>
+    [Fact]
+    public async Task Slot_DeliveredTwiceToXRouter_SecondReceiverGetsAlreadyHadAndEachBulletinArrivesOnce()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+        var cancellation = deadline.Token;
+        using var dir = new TempDirectory();
+        var (wav, _, _) = WriteSlot(dir.Path);
+
+        await using var xrouter = await XRouterContainer.StartAsync(cancellation);
+        var bbs = new BbsSettings { Type = BbsKind.XRouter, Host = "127.0.0.1", Port = xrouter.TelnetPort, Login = XRouterContainer.Login, Password = XRouterContainer.Password };
+
+        var first = await DecodeAsync(Path.Combine(dir.Path, "first"), wav, bbs, cancellation);
+        Assert.Null(first.Failure);
+        foreach (var bulletin in Bulletins)
+        {
+            Assert.Equal(DeliveryVerdict.Accepted, first.Verdicts[bulletin.Bid]);
+        }
+
+        var second = await DecodeAsync(Path.Combine(dir.Path, "second"), wav, bbs, cancellation);
+        Assert.Null(second.Failure);
+        foreach (var bulletin in Bulletins)
+        {
+            Assert.Equal(DeliveryVerdict.AlreadyHad, second.Verdicts[bulletin.Bid]);
+        }
+
+        string held = await xrouter.ReadAllAsync(cancellation);
+        output.WriteLine(held);
+        foreach (var bulletin in Bulletins)
+        {
+            // XRouter keeps only the first 60 characters of a title.
+            Assert.Contains(bulletin.Title.Length > 60 ? bulletin.Title[..60] : bulletin.Title, held, StringComparison.Ordinal);
+            Assert.Contains(bulletin.Bid, held, StringComparison.Ordinal);
+            Assert.Contains(bulletin.Body.Split('\n')[0].TrimEnd(), held, StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>In FBB: each bulletin once, with its BID, headers and text.</summary>
     private void AssertEachOnceInFbb(IReadOnlyList<(string Listing, string Text)> messages)
     {

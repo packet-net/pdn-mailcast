@@ -114,6 +114,9 @@ public sealed record BbsLoginTestResult(BbsLoginTestOutcome Outcome, string Said
 /// </remarks>
 public sealed partial class BbsClient : IBbsSession
 {
+    /// <summary>The longest title XRouter's mailbox takes in an FBB transfer.</summary>
+    internal const int XRouterLongestTitle = 70;
+
     /// <summary>The longest a BID can be in an FBB proposal.</summary>
     public const int MaxBidLength = 12;
 
@@ -145,8 +148,8 @@ public sealed partial class BbsClient : IBbsSession
     public TimeSpan TestTimeout { get; init; } = TimeSpan.FromSeconds(20);
 
     /// <summary>
-    /// Tests the configured login: connects, logs in and enters the BBS command (for LinBPQ) or
-    /// answers FBB's prompts, far enough to see whether it reaches the forwarding prompt as a
+    /// Tests the configured login: connects, logs in and enters the BBS command (for LinBPQ),
+    /// answers FBB's prompts, or answers XRouter's prompts and enters the BBS command, far enough to see whether it reaches the forwarding prompt as a
     /// partner would. Exchanges no mail, proposes nothing, and never starts the FBB session
     /// proper; it just closes the connection once it knows, which is as polite as a connection
     /// that commits to nothing needs to be.
@@ -205,7 +208,10 @@ public sealed partial class BbsClient : IBbsSession
         return Classify(text, closed);
     }
 
-    /// <summary>FBB prompts for both; a leading dot asks for a binary session.</summary>
+    /// <summary>
+    /// FBB prompts for both; a leading dot asks for a binary session. XRouter prompts for both too,
+    /// takes the callsign without a dot, then wants the command for its mailbox.
+    /// </summary>
     private async Task<BbsLoginTestResult> TestFbbAsync(NetworkStream stream, CancellationToken cancellation)
     {
         var (first, closed1) = await ReadTestReplyAsync(stream,
@@ -215,7 +221,7 @@ public sealed partial class BbsClient : IBbsSession
             LogHeard("login test", first, closed1);
             return Classify(first, closed1);
         }
-        await stream.WriteAsync(Encoding.Latin1.GetBytes("." + _settings.Login + "\r"), cancellation).ConfigureAwait(false);
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(CallsignLine()), cancellation).ConfigureAwait(false);
         var (second, closed2) = await ReadTestReplyAsync(stream,
             t => t.Contains("assword", StringComparison.OrdinalIgnoreCase) || Settled(t), cancellation).ConfigureAwait(false);
         if (closed2 || !second.Contains("assword", StringComparison.OrdinalIgnoreCase))
@@ -223,12 +229,19 @@ public sealed partial class BbsClient : IBbsSession
             LogHeard("login test", first + second, closed2);
             return Classify(second, closed2);
         }
-        await stream.WriteAsync(Encoding.Latin1.GetBytes(_settings.Password + "\r"), cancellation).ConfigureAwait(false);
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(_settings.Password + "\r" + CommandLine()), cancellation).ConfigureAwait(false);
         LogSent("login test");
         var (text, closed) = await ReadTestReplyAsync(stream, Settled, cancellation).ConfigureAwait(false);
         LogHeard("login test", first + second + text, closed);
         return Classify(text, closed);
     }
+
+    /// <summary>What answers a callsign prompt: FBB's wants a dot in front for a binary session, XRouter's does not.</summary>
+    private string CallsignLine() => (_settings.Type == BbsKind.XRouter ? "" : ".") + _settings.Login + "\r";
+
+    /// <summary>XRouter's command for its mailbox, after the password; FBB needs none.</summary>
+    private string CommandLine() =>
+        _settings.Type == BbsKind.XRouter && _settings.Command.Length > 0 ? _settings.Command + "\r" : "";
 
     /// <summary>Reads until <paramref name="stop"/> says the reply is settled, or the connection closes or the deadline passes.</summary>
     private static async Task<(string Text, bool Closed)> ReadTestReplyAsync(NetworkStream stream, Func<string, bool> stop, CancellationToken cancellation)
@@ -305,6 +318,15 @@ public sealed partial class BbsClient : IBbsSession
             }
             return null;
         }
+        if (_settings.Type == BbsKind.XRouter)
+        {
+            // XRouter says "Bad password!" and hangs up for an unknown callsign and a wrong
+            // password alike (505p, in docker).
+            return FbbPasswordRefusals.Any(r => text.Contains(r, StringComparison.OrdinalIgnoreCase))
+                ? (BbsLoginTestOutcome.WrongPassword,
+                    $"XRouter did not take \"{login}\" with this password; check {login} and its password are a line in XRouter's USERPASS.SYS")
+                : null;
+        }
         if (FbbPasswordRefusals.Any(r => text.Contains(r, StringComparison.OrdinalIgnoreCase)))
         {
             return (BbsLoginTestOutcome.WrongPassword,
@@ -329,15 +351,28 @@ public sealed partial class BbsClient : IBbsSession
     /// even its length, ever goes into a log, the page or the API. Every line goes with a bare CR,
     /// as Latin-1, on every platform, Windows included.
     /// </summary>
-    internal string SentDescription() => _settings.Type == BbsKind.LinBpq
-        ? $"the login \"{Ascii.Clean(_settings.Login)}\", a password"
+    internal string SentDescription() => _settings.Type switch
+    {
+        BbsKind.LinBpq => $"the login \"{Ascii.Clean(_settings.Login)}\", a password"
             + (_settings.Command.Length > 0 ? $" and the command \"{Ascii.Clean(_settings.Command)}\"" : " and no command")
-            + ", each line ending in CR, all at once"
-        : $"the login \".{Ascii.Clean(_settings.Login)}\" at FBB's callsign prompt and a password at its password prompt, each line ending in CR";
+            + ", each line ending in CR, all at once",
+        BbsKind.XRouter => $"the login \"{Ascii.Clean(_settings.Login)}\" at XRouter's callsign prompt, a password at its password prompt"
+            + (_settings.Command.Length > 0 ? $" and the command \"{Ascii.Clean(_settings.Command)}\"" : " and no command")
+            + ", each line ending in CR",
+        _ => $"the login \".{Ascii.Clean(_settings.Login)}\" at FBB's callsign prompt and a password at its password prompt, each line ending in CR",
+    };
+
+    /// <summary>The kind of BBS, as the log and the page name it.</summary>
+    internal static string Name(BbsKind kind) => kind switch
+    {
+        BbsKind.LinBpq => "LinBPQ",
+        BbsKind.XRouter => "XRouter",
+        _ => "FBB",
+    };
 
     /// <summary>Logs what was sent to log in, as <see cref="SentDescription"/> gives it.</summary>
     private void LogSent(string what) =>
-        _log($"bbs: {what}: sent {(_settings.Type == BbsKind.LinBpq ? "LinBPQ" : "FBB")} at {Ascii.Clean(_settings.Host)}:{_settings.Port} {SentDescription()}");
+        _log($"bbs: {what}: sent {Name(_settings.Type)} at {Ascii.Clean(_settings.Host)}:{_settings.Port} {SentDescription()}");
 
     /// <summary>Logs what the BBS answered a login with, as <see cref="Shown"/> gives it.</summary>
     private void LogHeard(string what, string text, bool closed) =>
@@ -427,6 +462,20 @@ public sealed partial class BbsClient : IBbsSession
             {
                 return new BbsLoginTestResult(BbsLoginTestOutcome.Ok,
                     "Logged in; FBB can't confirm the BBS flag at login, so check it's set.");
+            }
+        }
+        else if (_settings.Type == BbsKind.XRouter)
+        {
+            // XRouter's mailbox sends its SID and a "[n] B,H,...,? >" prompt to any login; any
+            // caller that answers with a SID may forward to it.
+            if (text.Contains('[', StringComparison.Ordinal) && text.TrimEnd().EndsWith('>'))
+            {
+                return new BbsLoginTestResult(BbsLoginTestOutcome.Ok, "OK, logged in to XRouter's mailbox.");
+            }
+            if (text.TrimEnd().EndsWith('>') || text.TrimEnd().EndsWith('}'))
+            {
+                return new BbsLoginTestResult(BbsLoginTestOutcome.UnexpectedReply,
+                    $"Logged in to XRouter, but \"{_settings.Command}\" did not reach its mailbox; set PMSTYPE=4 and use BBS.", FirstLine(text));
             }
         }
         else if (text.TrimEnd().EndsWith('>'))
@@ -600,14 +649,19 @@ public sealed partial class BbsClient : IBbsSession
     /// bulletin to MCAST at GB7RDG's full address. A message of type P would go as a personal
     /// one, FA P from @at to MID.
     /// </summary>
-    internal static FbbOutboundMessage ToOutbound(Bulletin bulletin, string fallbackAt) => new()
+    /// <remarks>
+    /// <paramref name="longestTitle"/> cuts the title for a BBS that cannot take FBB's 80
+    /// characters: XRouter (505p, in docker) takes a header for a title of up to
+    /// <see cref="XRouterLongestTitle"/> characters, and goes silent on a longer one.
+    /// </remarks>
+    internal static FbbOutboundMessage ToOutbound(Bulletin bulletin, string fallbackAt, int longestTitle = int.MaxValue) => new()
     {
         MessageType = bulletin.Type is 'P' or 'B' or 'T' ? bulletin.Type : 'B',
         From = FaProposal.NormalizeCallsign(bulletin.From),
         AtBbs = bulletin.At.Length > 0 ? (bulletin.At.Length > 40 ? bulletin.At[..40] : bulletin.At) : fallbackAt,
         To = FaProposal.NormalizeCallsign(bulletin.To),
         Bid = bulletin.Bid,
-        Title = bulletin.Title.Replace('\0', ' '),
+        Title = bulletin.Title.Length > longestTitle ? bulletin.Title[..longestTitle].Replace('\0', ' ') : bulletin.Title.Replace('\0', ' '),
         Body = Bulletin.TextEncoding.GetBytes(bulletin.MessageText),
     };
 
@@ -738,10 +792,12 @@ public sealed partial class BbsClient : IBbsSession
 
             // FBB prompts for both. A leading dot asks for a binary session (drv_tcp.c,
             // tcp_check_call), without which FBB would read 0xFF octets in a transfer as telnet.
+            // XRouter prompts the same way, takes the callsign as it is, and then wants the
+            // command for its mailbox, whose answer is the SID, the welcome and the prompt.
             byte[] rest = await ExpectAsync("allsign", cancellation).ConfigureAwait(false);
-            await SendAsync("." + settings.Login + "\r", cancellation).ConfigureAwait(false);
+            await SendAsync(owner.CallsignLine(), cancellation).ConfigureAwait(false);
             rest = await ExpectAsync("assword", cancellation, rest).ConfigureAwait(false);
-            await SendAsync(settings.Password + "\r", cancellation).ConfigureAwait(false);
+            await SendAsync(settings.Password + "\r" + owner.CommandLine(), cancellation).ConfigureAwait(false);
             return rest;
         }
 
@@ -772,15 +828,18 @@ public sealed partial class BbsClient : IBbsSession
                 if (read == 0)
                 {
                     ClosedAtLogin = true;
-                    throw new SessionFailedException($"FBB closed the connection while the receiver waited for \"{prompt}\"; " + LoginHint());
+                    throw new SessionFailedException($"{Name(owner._settings.Type)} closed the connection while the receiver waited for \"{prompt}\"; " + LoginHint());
                 }
                 seen.AddRange(buffer.AsSpan(0, read).ToArray());
             }
         }
 
-        private string LoginHint() => owner._settings.Type == BbsKind.LinBpq
-            ? $"check that \"{owner._settings.Login}\" and its password match a USER= line in LinBPQ's Telnet port, that the port is its FBBPORT, and that \"{owner._settings.Command}\" reaches the mail application"
-            : $"check that {owner._settings.Login} is a BBS user on FBB with this password";
+        private string LoginHint() => owner._settings.Type switch
+        {
+            BbsKind.LinBpq => $"check that \"{owner._settings.Login}\" and its password match a USER= line in LinBPQ's Telnet port, that the port is its FBBPORT, and that \"{owner._settings.Command}\" reaches the mail application",
+            BbsKind.XRouter => $"check that {owner._settings.Login} and its password are in XRouter's USERPASS.SYS and that \"{owner._settings.Command}\" reaches its mailbox (PMSTYPE=4)",
+            _ => $"check that {owner._settings.Login} is a BBS user on FBB with this password",
+        };
 
         /// <summary>
         /// Feeds received bytes to the session. The session is made once the BBS's prompt has
@@ -809,20 +868,21 @@ public sealed partial class BbsClient : IBbsSession
                 int sid = text.IndexOf('[', StringComparison.Ordinal);
                 if (sid < 0 || !text.AsSpan(sid).TrimEnd().EndsWith(">", StringComparison.Ordinal))
                 {
-                    if (owner._settings.Type == BbsKind.LinBpq && owner.Refusal(text) is { } refusal)
+                    if (owner._settings.Type != BbsKind.Fbb && owner.Refusal(text) is { } refusal)
                     {
                         throw new SessionFailedException($"{refusal.Clause}; it said {owner.Quoted(text)}");
                     }
                     if (text.Contains("Invalid command", StringComparison.OrdinalIgnoreCase))
                     {
-                        throw new SessionFailedException($"LinBPQ did not know the command \"{owner._settings.Command}\"; " + LoginHint());
+                        throw new SessionFailedException($"{Name(owner._settings.Type)} did not know the command \"{owner._settings.Command}\"; " + LoginHint());
                     }
                     return;
                 }
 
                 var call = PromptCall().Match(text, sid);
                 string fallbackAt = call.Success ? call.Groups[1].Value.ToUpperInvariant() : "WW";
-                var messages = bulletins.Select(b => (Bulletin: b, Message: ToOutbound(b, fallbackAt))).ToList();
+                var messages = bulletins.Select(b => (Bulletin: b, Message: ToOutbound(b, fallbackAt,
+                    owner._settings.Type == BbsKind.XRouter ? XRouterLongestTitle : int.MaxValue))).ToList();
                 _bids = new Dictionary<FbbOutboundMessage, string>(ReferenceEqualityComparer.Instance);
                 foreach (var (bulletin, message) in messages)
                 {
@@ -897,7 +957,9 @@ public sealed partial class BbsClient : IBbsSession
                 return $"the BBS offered {Ascii.Clean(sid.Raw)}, which is not compressed FBB forwarding. "
                     + (owner._settings.Type == BbsKind.LinBpq
                         ? $"In LinBPQ's mail configuration, make {owner._settings.Login} a BBS user and tick FBB Blocked, Allow Binary and Use B1 Protocol on its forwarding page"
-                        : $"In FBB, give {owner._settings.Login} the BBS flag");
+                        : owner._settings.Type == BbsKind.XRouter
+                            ? "XRouter's mailbox did not offer compressed FBB forwarding"
+                            : $"In FBB, give {owner._settings.Login} the BBS flag");
             }
             return "protocol error: " + Ascii.Clean(errorLine);
         }
@@ -908,6 +970,26 @@ public sealed partial class BbsClient : IBbsSession
         /// <summary>A write the BBS has <see cref="IdleTimeout"/> to take, as a read has to answer.</summary>
         private async Task WriteAsync(ReadOnlyMemory<byte> data, CancellationToken cancellation)
         {
+            if (owner._settings.Type == BbsKind.XRouter && data.Span.IndexOfAny((byte)0xFF, (byte)'\r') >= 0)
+            {
+                // XRouter's Telnet port reads 0xFF as telnet's IAC, which turned a compressed
+                // transfer into "Received binary frame is not DATA (DT)" (505p, in docker); a
+                // doubled IAC is a literal 0xFF.
+                var escaped = new List<byte>(data.Length + 16);
+                foreach (byte b in data.Span)
+                {
+                    escaped.Add(b);
+                    if (b == 0xFF)
+                    {
+                        escaped.Add(0xFF);
+                    }
+                    else if (b == '\r')
+                    {
+                        escaped.Add(0);
+                    }
+                }
+                data = escaped.ToArray();
+            }
             using var idle = Linked(owner.IdleTimeout, cancellation);
             await _stream!.WriteAsync(data, idle.Token).ConfigureAwait(false);
         }
