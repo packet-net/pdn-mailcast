@@ -551,7 +551,7 @@ To know when there is a new version, the receiver reads packet-net's apt package
 
 ### The Channel tile
 
-Once a slot is over, the receiver works out what the path from M0LTE was like, two ways.
+Once a slot is over, the receiver works out what the path from M0LTE was like, two ways. [How the channel probe works](channel-probe.md) explains the probe and the sums in more depth.
 
 - From the channel probe: 1.5 s after the tone, M0LTE sends 6.5 s of a known test signal made for measuring paths. The receiver finds it from where the tone ended, and reads every path's delay to a few microseconds and its Doppler, down to about -15 dB signal to noise, well below anything it can decode. Its fades are part of the path and count, however deep; if the probe is cut short or the audio drops out, it measures what was heard.
 - From the data bursts it decoded: each one can be made again exactly, so it is a known signal too, about 20 times a second. This works down to about 1 dB.
