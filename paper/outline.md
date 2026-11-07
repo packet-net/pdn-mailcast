@@ -80,9 +80,10 @@ Each part names its source and the table or figure it needs.
 
 ## Data to gather before writing
 
-- [ ] CT 150 survey results (per receiver and slot), before CT 150 is changed or retired.
-- [ ] Head end slot history: what was sent each slot, frames and airtime. Check how long the journal and recent-slots.json keep it, and archive them like the reports.
-- [ ] The survey charts Tom posted on Discord on 22 October (the images).
-- [ ] Listener reports missing from 8 to 18 October: ask listeners for copies from their own BBS.
+- [x] CT 150 survey results: `data/web-sdr-survey-2026-10/`.
+- [x] Head end slot history: `data/headend-gb7rdg/` (journal to 7 November; the station keeps months more).
+- [x] The 22 October survey tables: rebuilt from the data by `paper/figures/heard_share.py`.
 - [ ] SA6DAZ MS110D path-test results.
 - [ ] Consent from each listener named in the paper.
+
+Not pursued: listeners' own copies of the reports missing from 8 to 18 October (Tom, 2026-11-07). The paper notes the gap; 124 reports remain.

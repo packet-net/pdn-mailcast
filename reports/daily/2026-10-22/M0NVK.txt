@@ -5,6 +5,7 @@ Type: B (bulletin)
 Bid: 6295F5M0NVK
 Source: GB7RDG BBS, read over telnet for issue #138 (research/138 corpus, msg-4407.txt)
 Check: none available (the BBS showed no size for this message)
+Agrees with: 1 other copy (posted by Eoin M0NVK on the OARC Discord, #packet-hf, message 1563170830538510377)
 
 R:261022/1630Z 15389@GB7IOW.#48.GBR.EURO LinBPQ6.0.26
 
