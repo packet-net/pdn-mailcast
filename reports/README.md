@@ -1,12 +1,13 @@
 # Listener reports
 
-Every mailcast receiver can send a short daily report of what it heard: one line per slot with the frames decoded, the tone's signal to noise, the propagation verdicts and the measured radio path. Reports go as public bulletins to `MCAST@GB7RDG.#42.GBR.EURO` (see [receiver.md](../docs/receiver.md#sending-a-daily-report) for the format). GB7RDG only keeps bulletins for about a week, so this folder is the permanent record.
+Every mailcast receiver can send a short daily report of what it heard: one line per slot with the frames decoded, the tone's signal to noise, the propagation verdicts and the measured radio path. Reports go as public bulletins to `MCAST@GB7RDG.#42.GBR.EURO` (see [receiver.md](../docs/receiver.md#sending-a-daily-report) for the format). GB7RDG kept bulletins for only about a week until 7 November 2026 (180 days since), so this folder is the permanent record.
 
 ## What's here
 
 - `daily/YYYY-MM-DD/CALL.txt`: one report per listener per day.
 - `data/reports.csv`, `data/slots.csv`, `data/stations.csv`: the same reports as tables, one row per report, per slot and per station line. These are generated; don't edit them by hand.
 - `import-gb7rdg.py`: copies new reports from GB7RDG's mail store.
+- `sync-gb7rdg.sh` and `systemd/`: run the import on gb7rdg-node every 3 hours and push to GitHub.
 
 ## A report file
 
@@ -53,16 +54,27 @@ Listeners can fill gaps from their own BBS, which keeps a copy of each report th
 
 ## Adding reports
 
-From GB7RDG (needs ssh and sudo on the node; read-only there):
+New reports on GB7RDG arrive by themselves: see the next section. The workflow `reports.yml` regenerates the tables whenever reports land on main.
+
+From anywhere else (a listener's own BBS, an email): make `daily/YYYY-MM-DD/CALL.txt` with at least the `Title`, `From` and `Source` lines, a blank line, then the message text as the BBS showed it, and push it to main. A report already in `daily/` is never overwritten by the import. To check a file before pushing, `dotnet run --project tools/Mailcast.ReportArchive -- reports` stops and names any report it can't read.
+
+## Automatic copying from GB7RDG
+
+`mailcast-report-archive.timer` on gb7rdg-node runs `sync-gb7rdg.sh` every 3 hours as `tf`. It pulls main, runs `import-gb7rdg.py local` (read-only on LinBPQ, through `sudo -n cat`), commits any new reports and pushes. It pushes with a deploy key that can write to this repository and nothing else.
+
+Setup, once, on the node:
 
 ```
-reports/import-gb7rdg.py
-dotnet run --project tools/Mailcast.ReportArchive -- reports
+ssh-keygen -t ed25519 -N "" -C gb7rdg-node-reports -f ~/.ssh/pdn-mailcast-reports
+# add ~/.ssh/pdn-mailcast-reports.pub as a deploy key with write access on packet-net/pdn-mailcast
+printf 'Host github-reports\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/pdn-mailcast-reports\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+git clone --depth 1 --filter=blob:none --sparse git@github-reports:packet-net/pdn-mailcast.git ~/pdn-mailcast-reports
+git -C ~/pdn-mailcast-reports sparse-checkout set reports
+sudo cp ~/pdn-mailcast-reports/reports/systemd/mailcast-report-archive.* /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now mailcast-report-archive.timer
 ```
 
-Run it at least every few days, or reports expire before they are copied. A report already in `daily/` is never overwritten.
-
-From anywhere else (a listener's own BBS, an email): make `daily/YYYY-MM-DD/CALL.txt` with at least the `Title`, `From` and `Source` lines, a blank line, then the message text as the BBS showed it. Then regenerate the tables. The tool stops and names the file if it can't read a report.
+`journalctl -u mailcast-report-archive` shows each run.
 
 ## The tables
 

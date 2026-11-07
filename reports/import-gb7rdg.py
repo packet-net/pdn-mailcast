@@ -2,11 +2,12 @@
 """Copies new daily reports from GB7RDG's LinBPQ mail store into reports/daily.
 
 Usage: reports/import-gb7rdg.py [SSH_TARGET]   (default tf@gb7rdg-node; needs sudo there)
+       reports/import-gb7rdg.py local          (on the node itself, as sync-gb7rdg.sh runs it)
 
 Read-only on the node: it reads DIRMES.SYS (LinBPQ's message index) and the m_NNNNNN.mes files of
 messages titled "MCR CALL YYYY-MM-DD". A report already in reports/daily is left alone. GB7RDG
-expires bulletins after about a week, so run this at least every few days, then regenerate the
-tables with `dotnet run --project tools/Mailcast.ReportArchive -- reports`.
+keeps bulletins for 180 days. On the node, sync-gb7rdg.sh runs this every few hours and pushes
+what it finds; the reports workflow then regenerates the tables.
 """
 import datetime
 import os
@@ -18,11 +19,12 @@ import sys
 TARGET = sys.argv[1] if len(sys.argv) > 1 else "tf@gb7rdg-node"
 BPQ = "/opt/oarc/bpq"
 DAILY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daily")
-TITLE = re.compile(rb"MCR ([A-Z0-9/]+) (2026-\d\d-\d\d|20\d\d-\d\d-\d\d)")
+TITLE = re.compile(rb"MCR ([A-Z0-9/]+) (20\d\d-\d\d-\d\d)")
 
 
 def fetch(path: str) -> bytes:
-    return subprocess.run(["ssh", TARGET, "sudo", "cat", path], check=True, capture_output=True).stdout
+    command = ["sudo", "-n", "cat", path] if TARGET == "local" else ["ssh", TARGET, "sudo", "cat", path]
+    return subprocess.run(command, check=True, capture_output=True).stdout
 
 
 def text(b: bytes) -> str:

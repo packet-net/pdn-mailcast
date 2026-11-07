@@ -1,0 +1,37 @@
+name: reports
+# Regenerates reports/data from reports/daily whenever reports arrive (gb7rdg-node pushes them, see
+# reports/README.md) and commits the tables if they changed.
+on:
+  push:
+    branches: [main]
+    paths: ['reports/daily/**', 'tools/Mailcast.ReportArchive/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reports
+  cancel-in-progress: false
+
+jobs:
+  tables:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always write.
+      - name: Choose where setup-dotnet installs
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Regenerate the tables
+        run: dotnet run -c Release --project tools/Mailcast.ReportArchive -- reports
+      - name: Commit them if they changed
+        run: |
+          if [ -z "$(git status --porcelain -- reports/data)" ]; then exit 0; fi
+          git add -- reports/data
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Reports: regenerate tables"
+          git pull -q --rebase origin main
+          git push -q origin HEAD:main
