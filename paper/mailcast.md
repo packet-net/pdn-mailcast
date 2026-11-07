@@ -65,7 +65,7 @@ UK HF packet today runs 300 baud AFSK or BPSK, carried as IL2P, in channels abou
 | WN7 | 4800 bps | 8PSK | 3/4 | 7.68 s | 13 / 19 dB |
 | WN8 | 6400 bps | 16QAM | 3/4 | 7.68 s | 16 / 23 dB |
 
-*Table 0. The MS110D Appendix D waveforms used in this work, all at 2400 symbols a second in 3 kHz (from the M0LTE.Ms110d waveform reference, after the standard's Tables D-II, D-XXXVII and D-LXIV). The target SNR is the standard's requirement in 3 kHz, not what the implementation achieves. Mailcast used WN3 and WN4; the Sweden path tests used the rest.*
+*Table 1. The MS110D Appendix D waveforms used in this work, all at 2400 symbols a second in 3 kHz (from the M0LTE.Ms110d waveform reference, after the standard's Tables D-II, D-XXXVII and D-LXIV). The target SNR is the standard's requirement in 3 kHz, not what the implementation achieves. Mailcast used WN3 and WN4; the Sweden path tests used the rest.*
 
 The costs are bandwidth and signal level. MS110D fills about 3 kHz, so it cannot sit on the existing narrow packet channels, and many rigs' filters cut into it (section 6.5). And it needs more signal than the slowest modes: in simulation WN4 needs about 1.5 dB signal to noise in 3 kHz on a steady signal and 12 to 16 dB on a fading path for 10% frame loss, WN3 a few dB less. The fountain code turns part of that loss into "takes a few more slots" rather than "never arrives".
 
@@ -184,7 +184,7 @@ The clear-channel check found the channel busy at the start of 150 of 258 slots 
 | M9PSY | 534 | 119 | 96% | 69% | 11 | 220 |
 | GI3JMC | 544 | 119 | 1% | 0% | -10 | 0 |
 
-*Table 1. Web SDR survey, 6 to 20 October. "Bulletins rebuilt" counts each bulletin once, when the receiver first completed it; 224 bulletins had been taken in before the survey's last slot. G4WNC was unreachable for 61 of its slots.*
+*Table 2. Web SDR survey, 6 to 20 October. "Bulletins rebuilt" counts each bulletin once, when the receiver first completed it; 224 bulletins had been taken in before the survey's last slot. G4WNC was unreachable for 61 of its slots.*
 
 Distance alone does not decide reception. Two SDRs over 500 km away, in Ireland and Fife, heard nearly as well as the best one 135 km away, while the two nearest, within 90 km of Reading, heard 1% and 13%. G4WNC, the nearest, had decoded 38 of 41 frames on 5 October, so its later silence says more about that SDR than about the path. We cannot separate the path from each SDR's own antenna and local noise with this data, but the tone's signal to noise tracks the share of frames heard far better than distance does.
 
@@ -209,7 +209,7 @@ The two weeks also differed: the nearer strong SDRs heard much more in the secon
 | M0NVK (WESSEX SDR) | - | 9 to 10 Oct | 2 | 13 | 92% | 77% | 77% | - | 24 | 19 |
 | G7TAJ (WESSEX SDR) | - | 26 to 27 Oct | 2 | 14 | 93% | 66% | 66% | - | 27 | 46 |
 
-*Table 2. Listeners' daily reports, 8 October to 7 November, on their own equipment (M9TWM's own UberSDR counts as his) and, below, the days some listened through a public web SDR. Nine report-days with no audio at all are left out. The listeners cover different dates, so the table compares dates as much as stations.*
+*Table 3. Listeners' daily reports, 8 October to 7 November, on their own equipment (M9TWM's own UberSDR counts as his) and, below, the days some listened through a public web SDR. Nine report-days with no audio at all are left out. The listeners cover different dates, so the table compares dates as much as stations.*
 
 The picture matches the survey. On their own equipment three listeners heard about half the frames or more and five heard 13 to 24%; MM0MQN, in central Scotland, sent only two reports. All but MM0MQN heard frames in most slots, from 64% of slots for G7TAJ to 98% for GM4CXF in Ayrshire. GM8BPQ, on Lewis in the Outer Hebrides about 850 km from Reading, heard frames in three slots out of four.
 
@@ -236,7 +236,7 @@ Listeners' own setups mattered a great deal. Several shared a radio with a packe
 | GM8BPQ | 10% | 21% | 1.8 | 2.1 |
 | MM0MQN | 2% | 6% | 0.3 | 0.6 |
 
-*Table 3. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
+*Table 4. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
 
 WN3 is heard a little more often than WN4 by most receivers, but sends half as many frames a minute, so WN4 delivered more data a minute to every receiver except the three weakest: G8BPQ and GM8BPQ, where WN3 more than doubled the share heard, and MM0MQN. For those the order reverses, though only modestly (3.5 against 2.9 frames a minute for G8BPQ). Alternating the two cost most receivers some throughput to help a few; choosing the waveform per slot, or per listener group, from the channel measurement and the daily reports is future work.
 
@@ -287,7 +287,7 @@ By hour of day, report slots with frames ranged from 73% at 09:00 UTC to 88% at 
 | PSK Reporter | good | 1673 | 76% | 38% |
 | PSK Reporter | unknown | 34 | 68% | 29% |
 
-*Table 4. The verdict the head end logged as each slot began, against what the survey and report receivers heard in that slot. 56 receiver-slots had no verdict logged.*
+*Table 5. The verdict the head end logged as each slot began, against what the survey and report receivers heard in that slot. 56 receiver-slots had no verdict logged.*
 
 The ionosonde verdict separates slots modestly: receivers heard 43% of frames in slots it called good and 35% in those it called marginal. Marginal verdicts cluster at the first and last slots of the day, and almost all the unknown verdicts fall in November, when the ionosonde feed was often stale, so the unknown row largely reflects the November drop. PSK Reporter called 40 m open in essentially every slot. FT8 decodes far below what MS110D needs, so "open for FT8" says little about a 1200 bps link; the median SNR of the spots behind each verdict may predict better, and is left for later analysis.
 
@@ -301,7 +301,7 @@ Daz SA6DAZ, near Gothenburg (JO67fm, about 1,100 km from Reading), lent his stat
 
 **Mailcast in Sweden.** From 30 October to 7 November the receiver listened to 65 daylight slots. It heard frames in 46 of them, 875 frames in all, and completed 30 bulletins. Tone signal to noise ranged from about -3 to +14 dB. Its median virtual height was 310 km (51 measurements), higher than the UK receivers' 266 km, as a longer one-hop path off the same layer would suggest under the model. On 6 November at 14:00 UTC its probe resolved three paths: one hop off the E layer, one hop off the F layer 0.5 ms later at about the same strength, and two F hops 1.6 ms after that, 8 dB down.
 
-**Path tests.** Between mailcast slots, from 30 October to 1 November, the head end sent 136 rounds of test bursts to the same station, each round a tone and probe and then one burst of each of eleven MS110D waveform and interleaver combinations, recorded and decoded in Sweden. At 6 to 9 dB signal to noise in 3 kHz the faster waveforms were still useful: WN5 (1600 bps) decoded 95% of its frames, WN13 (2400 bps) 89% and WN6 (3200 bps) 82%, while WN7 (4800 bps) managed 12% and WN8 (6400 bps, 16QAM) none. At 12 to 15 dB WN8 decoded 58%. The robust end, WN1 to WN4, decoded most frames from around 0 dB upwards. These are close to the standard's targets in Table 0, given that the path was fading.
+**Path tests.** Between mailcast slots, from 30 October to 1 November, the head end sent 136 rounds of test bursts to the same station, each round a tone and probe and then one burst of each of eleven MS110D waveform and interleaver combinations, recorded and decoded in Sweden. At 6 to 9 dB signal to noise in 3 kHz the faster waveforms were still useful: WN5 (1600 bps) decoded 95% of its frames, WN13 (2400 bps) 89% and WN6 (3200 bps) 82%, while WN7 (4800 bps) managed 12% and WN8 (6400 bps, 16QAM) none. At 12 to 15 dB WN8 decoded 58%. The robust end, WN1 to WN4, decoded most frames from around 0 dB upwards. These are close to the standard's targets in Table 1, given that the path was fading.
 
 So a single transmitter on 40 m reaches well into Scandinavia in daylight, at least in autumn, and the channel there often supports waveforms two to three times faster than mailcast used.
 
