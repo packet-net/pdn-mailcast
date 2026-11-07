@@ -24,18 +24,19 @@ All SDRs together: 45% of frames heard over 883 receiver-slots.
 
 ## Listeners' daily reports, 8 October to 7 November 2026
 
-124 reports from 8 listeners; 8 report-days with no audio at all are left out below.
+129 reports from 9 listeners; 9 report-days with no audio at all are left out below.
 
 | Listener | locator | audio | days | slots listened | slots with frames | frames heard | median tone SNR (dB) | bulletins rebuilt |
 |---|---|---|---|---|---|---|---|---|
 | M7TAW | IO91ma | sound card | 10 | 79 | 82% | 62% | 13 | 159 |
 | M0NVK | IO90hr | sdrconnect | 12 | 88 | 84% | 58% | 20 | 143 |
-| GM4CXF | IO75qn | sound card | 12 | 91 | 98% | 48% | 11 | 152 |
+| GM4CXF | IO75qn | sound card | 13 | 99 | 98% | 50% | 11 | 165 |
+| M9TWM | IO93fj | m9twm-1.tunnel.ubersdr.org | 9 | 72 | 89% | 24% | 5 | 63 |
 | G8BPQ | IO92kx | sound card | 23 | 172 | 82% | 23% | 4 | 163 |
-| M9TWM | IO93fj | m9twm-1.tunnel.ubersdr.org | 8 | 64 | 88% | 21% | 5 | 41 |
 | G7TAJ | IO81le | sound card | 20 | 153 | 65% | 18% | 8 | 125 |
 | EI7KX | IO83jj | nope.tunnel.ubersdr.org | 6 | 41 | 88% | 18% | 4 | 43 |
 | GM8BPQ | IO68vl | sound card | 25 | 184 | 76% | 14% | 4 | 99 |
+| MM0MQN | IO86bd | sound card | 2 | 12 | 33% | 3% | -4 | 0 |
 
 ### WN4 (1200 bps) against WN3 (600 bps)
 
@@ -50,13 +51,14 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 | G7TAJ | 17% | 20% |
 | G8BPQ | 15% | 36% |
 | GI3JMC | 0% | 0% |
-| GM4CXF | 46% | 51% |
+| GM4CXF | 48% | 54% |
 | GM8BPQ | 10% | 21% |
 | M0NVK | 58% | 57% |
 | M7TAW | 62% | 61% |
 | M9PSY | 66% | 73% |
-| M9TWM | 18% | 26% |
+| M9TWM | 21% | 29% |
 | M9TWM-1 | 21% | 28% |
+| MM0MQN | 2% | 6% |
 | STUEY3D | 69% | 75% |
 | WESSEX | 80% | 81% |
 
@@ -64,42 +66,42 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 
 | Hour | slots | slots with frames | frames heard |
 |---|---|---|---|
-| 09 | 88 | 73% | 30% |
-| 10 | 111 | 75% | 31% |
-| 11 | 112 | 82% | 30% |
-| 12 | 114 | 83% | 32% |
-| 13 | 113 | 82% | 27% |
-| 14 | 113 | 85% | 34% |
-| 15 | 113 | 79% | 27% |
-| 16 | 108 | 81% | 27% |
+| 09 | 91 | 73% | 30% |
+| 10 | 114 | 75% | 31% |
+| 11 | 115 | 83% | 30% |
+| 12 | 117 | 84% | 32% |
+| 13 | 117 | 82% | 28% |
+| 14 | 117 | 84% | 34% |
+| 15 | 117 | 78% | 27% |
+| 16 | 112 | 80% | 27% |
 
 ### The measured channel (report slots with a channel measurement)
 
-- Slots measured: 719 (591 from the probe, 128 from the bursts).
-- Propagation modes seen: 1: 237, 2: 333, 3: 130, 4: 19.
-- virtual height (km): median 266, quartiles 243 to 290, n=402.
-- second mode's delay (ms): median 1.6, quartiles 1.4 to 1.8, n=415.
-- second mode's power against the first (dB): median -12, quartiles -15 to -6, n=415.
-- delay spread (ms): median 0.41, quartiles 0.29 to 0.57, n=719.
-- Doppler spread (Hz): median 0.34, quartiles 0.24 to 0.54, n=718.
+- Slots measured: 743 (610 from the probe, 133 from the bursts).
+- Propagation modes seen: 1: 243, 2: 345, 3: 135, 4: 20.
+- virtual height (km): median 266, quartiles 244 to 290, n=420.
+- second mode's delay (ms): median 1.6, quartiles 1.4 to 1.8, n=433.
+- second mode's power against the first (dB): median -11, quartiles -15 to -6, n=433.
+- delay spread (ms): median 0.42, quartiles 0.29 to 0.58, n=743.
+- Doppler spread (Hz): median 0.34, quartiles 0.24 to 0.52, n=742.
 
 ### The sounding probe (report slots)
 
-- Report slots that sent frames: 852.
-- Measured from the probe: 591, of which 60 decoded no data frame at all.
-- Measured from the data bursts (no probe result): 128.
-- No measurement: 133 (41 of them with frames).
+- Report slots that sent frames: 880.
+- Measured from the probe: 610, of which 64 decoded no data frame at all.
+- Measured from the data bursts (no probe result): 133.
+- No measurement: 137 (41 of them with frames).
 - Lowest tone SNR at which the probe gave a measurement: -16 dB; median 6 dB.
-- Median virtual height by hour (km): 09:00 271 (n=25), 10:00 260 (n=55), 11:00 263 (n=53), 12:00 270 (n=50), 13:00 256 (n=51), 14:00 278 (n=60), 15:00 261 (n=56), 16:00 265 (n=52).
+- Median virtual height by hour (km): 09:00 270 (n=26), 10:00 260 (n=56), 11:00 263 (n=55), 12:00 270 (n=52), 13:00 256 (n=53), 14:00 277 (n=64), 15:00 261 (n=59), 16:00 265 (n=55).
 
 ### The head end's propagation verdicts against what was heard (survey and report slots)
 
 | Source | verdict | receiver-slots | with frames | frames heard |
 |---|---|---|---|---|
-| ionosonde | good | 801 | 83% | 44% |
-| ionosonde | marginal | 666 | 63% | 35% |
+| ionosonde | good | 822 | 83% | 43% |
+| ionosonde | marginal | 673 | 63% | 35% |
 | ionosonde | unknown | 232 | 78% | 26% |
 | ionosonde | not logged | 56 | 23% | 14% |
-| PSK Reporter | good | 1665 | 75% | 38% |
+| PSK Reporter | good | 1693 | 75% | 38% |
 | PSK Reporter | unknown | 34 | 68% | 29% |
 | PSK Reporter | not logged | 56 | 23% | 14% |

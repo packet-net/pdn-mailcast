@@ -1,0 +1,28 @@
+Title: MCR MM0MQN 2026-10-28
+From: MM0MQN
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 6301T7MM0MQN
+Source: GB7RDG's LinBPQ mail store, message 4543 (m_004543.mes), copied 2026-11-02 for an MS110D path study; title, sender and BID from GB7RDG's older message index (DIRMES.SYS.bak.1), read 2026-11-07
+Check: stored size matches the BBS's index
+
+MID: 6301T7MM0MQN
+Date: 2026/10/28 20:45
+Type: Bulletin
+From: MM0MQN@MM0MQN.#72.GBR.EURO
+To: MCAST@GB7RDG.#42.GBR.EURO
+Subject: MCR MM0MQN 2026-10-28
+Mbo: GB7NDH
+Content-Type: text/plain
+Content-Transfer-Encoding: 8bit
+Body: 352
+
+R:261028/2045Z 45789@GB7NDH.#74.GBR.EURO LinBPQ6.0.25
+R:261028/2045Z 562@MM0MQN.#72.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.22.0 IO86bd sc 0/0 0 0 0
+13 W3 1 -6 +0.0 IU+PU 1 - 0.1 0.27 - b
+14 - 0 -5 -0.1 IU+PU 2 1.2/-13 0.29 0.38 241 p
+15 - 0 -5 +0.3 IU+PU 3 1.4/-10 0.91 0.5 261 p
+16 - 0 -3 +0.0 IU+PU 3 1.3/-9 0.64 0.52 251 p
+S GB7RDG 4 4 1 0 -5 251

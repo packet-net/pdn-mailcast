@@ -31,7 +31,7 @@ MCR1 0.32.0 IO68vl sc 0/0 14:RIG14 0 0
 
 `Source` says where this copy came from. `Check` says whether its length was checked against the size the BBS recorded for it, which catches a copy that was cut short. `Agrees with` counts other copies we found with the same report lines.
 
-## Where the first 124 came from
+## Where the first 129 came from
 
 The archive was started on 2026-11-07, after many reports had already expired from GB7RDG. They were gathered from, best first:
 
@@ -41,8 +41,9 @@ The archive was started on 2026-11-07, after many reports had already expired fr
 | GB7RDG and GB7NOT read over telnet on 29 and 30 October for issue #138 | 62 |
 | GB7RDG's mail store as dumped or read in earlier work sessions | 13 |
 | Pasted by M0LTE from his own BBS (M7TAW's via GB7PTR, and M0NVK's) | 15 |
+| GB7RDG's mail store as copied on 2 November for an MS110D path study, with titles from GB7RDG's older message index | 5 |
 
-84 of the 124 passed the length check; the rest came from a source that recorded no size. Where two sources held the same report, the report lines agreed every time.
+89 of the 129 passed the length check; the rest came from a source that recorded no size. Where two sources held the same report, the report lines agreed every time.
 
 Known gaps:
 
@@ -50,7 +51,7 @@ Known gaps:
 - Some reports never reached GB7RDG at all, because mail routing to it failed for some listeners. M7TAW's from 24 October and several of M0NVK's are here only because M0LTE pasted them from another BBS.
 - The first two reports (8 October, G8BPQ and GM8BPQ) went as personal mail to M0LTE, before reports became public bulletins later that day.
 
-Listeners can fill gaps from their own BBS, which keeps a copy of each report they sent.
+GB7RDG's older message index (`DIRMES.SYS` backups) names 12 reports whose text is gone: M9TWM for 9 and 13 to 21 October, and M7TAW for 19 and 20 October.
 
 ## Adding reports
 
