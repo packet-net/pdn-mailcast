@@ -83,6 +83,15 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 - delay spread (ms): median 0.41, quartiles 0.29 to 0.57, n=719.
 - Doppler spread (Hz): median 0.34, quartiles 0.24 to 0.54, n=718.
 
+### The sounding probe (report slots)
+
+- Report slots that sent frames: 852.
+- Measured from the probe: 591, of which 60 decoded no data frame at all.
+- Measured from the data bursts (no probe result): 128.
+- No measurement: 133 (41 of them with frames).
+- Lowest tone SNR at which the probe gave a measurement: -16 dB; median 6 dB.
+- Median virtual height by hour (km): 09:00 271 (n=25), 10:00 260 (n=55), 11:00 263 (n=53), 12:00 270 (n=50), 13:00 256 (n=51), 14:00 278 (n=60), 15:00 261 (n=56), 16:00 265 (n=52).
+
 ### The head end's propagation verdicts against what was heard (survey and report slots)
 
 | Source | verdict | receiver-slots | with frames | frames heard |

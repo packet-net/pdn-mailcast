@@ -188,6 +188,22 @@ for k, label, nd in [("virtual_height_km", "virtual height (km)", 0), ("two_f_de
         q = statistics.quantiles(xs, n=4)
         print(f"- {label}: median {xs[len(xs) // 2]:.{nd}f}, quartiles {q[0]:.{nd}f} to {q[2]:.{nd}f}, n={len(xs)}.")
 
+# The sounding probe against the data bursts as the source of the channel measurement.
+print("\n### The sounding probe (report slots)\n")
+keyed_rows = [r for r in rows if sent[(r["day"], r["slot_utc"])][0] > 0]
+by = collections.Counter((r["channel_basis"] or "none", "frames" if int(r["frames"] or 0) else "no frames") for r in keyed_rows)
+print(f"- Report slots that sent frames: {len(keyed_rows)}.")
+print(f"- Measured from the probe: {by[('probe', 'frames')] + by[('probe', 'no frames')]}, of which {by[('probe', 'no frames')]} decoded no data frame at all.")
+print(f"- Measured from the data bursts (no probe result): {by[('bursts', 'frames')]}.")
+print(f"- No measurement: {by[('none', 'frames')] + by[('none', 'no frames')]} ({by[('none', 'frames')]} of them with frames).")
+low = sorted(float(r["snr_db"]) for r in keyed_rows if r["channel_basis"] == "probe" and r["snr_db"])
+print(f"- Lowest tone SNR at which the probe gave a measurement: {low[0]:.0f} dB; median {statistics.median(low):.0f} dB.")
+hh = collections.defaultdict(list)
+for r in keyed_rows:
+    if r["virtual_height_km"]:
+        hh[r["slot_utc"][:2]].append(float(r["virtual_height_km"]))
+print("- Median virtual height by hour (km): " + ", ".join(f"{h}:00 {statistics.median(v):.0f} (n={len(v)})" for h, v in sorted(hh.items())) + ".")
+
 # Propagation verdicts against what was heard. The verdict is the one the head end logged as the
 # slot began (a receiver only learns it by decoding it, so its own copy is biased towards strong
 # receivers); every receiver-slot of the survey and the reports counts.
