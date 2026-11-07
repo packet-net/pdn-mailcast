@@ -1,0 +1,17 @@
+Title: MCR M0NVK 2026-11-04
+From: M0NVK
+To: MCAST
+Type: B (bulletin)
+Bid: 6308F5M0NVK
+Source: pasted by M0LTE on 2026-11-07, as read from a BBS
+Check: none available
+
+MCR1 0.33.1 IO90hr sdrconnect 9/0 0 7 4 0 1
+10 W3 30 - - IU+PG 4 1.7/-13 0.6 0.66 259 b
+11 W4 76 24 +5.9 IU+PG 4 1.7/-5 1.18 0.41 252 p
+12 W3 31 19 +6.0 IU+PG 3 1.8/-13 0.48 0.76 264 p
+13 W4 59 16 +5.6 IU+PG 4 1.7/-10 1.84 0.36 251 p
+14 W3 18 11 +5.5 IU+PU 3 - 0.81 1.2 - p
+15 W4 63 25 +6.0 IU+PU 3 1.6/-20 0.27 0.11 237 p
+16 W3 3 - - IU+PU 1 - 0.18 1.41 - b
+S M0LTE 7 7 280 9 19 252 0

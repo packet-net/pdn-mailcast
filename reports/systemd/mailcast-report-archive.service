@@ -1,0 +1,9 @@
+[Unit]
+Description=Copy mailcast daily reports from GB7RDG to GitHub
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=tf
+ExecStart=/home/tf/pdn-mailcast-reports/reports/sync-gb7rdg.sh

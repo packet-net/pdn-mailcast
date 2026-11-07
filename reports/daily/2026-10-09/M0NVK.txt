@@ -1,0 +1,11 @@
+Title: MCR M0NVK 2026-10-09
+From: M0NVK
+Source: GB7RDG's LinBPQ mail store (m_004061.mes), dumped by an earlier Claude Code session; recovered from that session's log
+Check: none available (the dump kept no size)
+
+MCR1 0.8.6 - wessex.zapto.org 9/0 0
+12 W3 53 - - IG+PG 3 2.0/-22 0.25 0.22 301 b
+13 W4 89 24 +1.7 IG+PG 2 1.9/-12 0.45 0.29 292 p
+14 W3 72 27 +2.0 IG+PG 3 1.9/-12 0.66 0.38 286 p
+15 W4 94 24 +1.3 IG+PG 2 2.1/-13 0.45 0.6 316 b
+16 W3 24 -3 +1.4 IM+PG 2 2.0/-15 0.36 0.33 307 p

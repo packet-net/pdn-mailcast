@@ -1,0 +1,20 @@
+Title: MCR M7TAW 2026-10-30
+From: M7TAW
+To: MCAST
+Type: B (bulletin)
+Bid: 6303YBM7TAW
+Source: pasted by M0LTE on 2026-11-07, as read from GB7PTR
+Check: none available
+
+R:261030/1630Z 253@GB7PTR.#48.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.23.0 IO91ma sc 21/21 0 0 15
+09 W3 72 2 +2.6 IM+PG 1 - 0.3 0.37 - p
+10 W4 146 14 +2.5 IM+PG 1 - 0.29 0.29 - p
+11 W3 65 20 +2.6 IG+PG 2 1.9/-16 0.38 0.24 282 p
+12 W4 91 14 +2.5 IG+PG 2 - 0.28 0.33 - p
+13 W3 58 5 +2.5 IU+PG 1 - 0.5 0.23 - b
+14 W4 130 14 +2.5 IG+PG 2 2.2/-13 0.54 0.28 330 p
+15 W3 74 14 +2.5 IM+PG 1 - 0.35 0.41 - p
+16 W4 43 1 +2.1 IU+PG 1 - 0.51 0.18 - b
+S GB7RDG 8 8 679 21 14 306

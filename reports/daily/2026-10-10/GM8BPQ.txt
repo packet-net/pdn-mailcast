@@ -1,0 +1,14 @@
+Title: MCR GM8BPQ 2026-10-10
+From: GM8BPQ@GB7BPQ.#76.GBR.EU
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 6283G6GM8BPQ
+Source: GB7RDG, read by an earlier Claude Code session; recovered from that session's log
+Check: body length matches the BBS's stated 181 bytes
+Agrees with: 1 other copy
+
+R:261011/1232Z 1541@GB7BPQ.#76.GBR.EU LinBPQ6.0.25
+
+MCR1 0.8.10 - sc 6/1 6:BBS6 0
+15 W3 22 - - IG+PG 2 1.5/-2 0.73 0.27 228 b
+16 W4 54 11 +18.7 IM+PU 2 1.3/-15 0.27 0.19 200 p

@@ -1,0 +1,14 @@
+Title: MCR M0NVK 2026-10-16
+From: M0NVK
+Source: pasted by M0LTE on 2026-11-07 (report text only, no BBS headers)
+Check: none available
+
+MCR1 0.15.0 IO90hr sdrconnect 31/1 0 30 2
+09 W3 72 18 +6.2 IM+PG 2 2.2/-13 0.46 0.5 336 p
+10 W4 125 20 +5.1 IM+PG 2 1.9/-9 0.64 0.83 291 p
+11 W3 70 24 +4.8 IG+PG 3 1.7/-17 0.32 0.19 262 p
+12 W4 134 19 +5.4 IG+PG 2 1.8/-12 0.42 0.31 277 p
+13 W3 74 19 +4.9 IG+PG 2 1.7/-14 0.31 0.26 255 p
+14 W4 128 16 +4.6 IG+PG 3 1.9/-15 0.52 0.55 291 p
+15 W3 58 13 +5.2 IG+PG 2 1.8/-13 0.4 0.18 268 p
+16 W4 95 5 +5.7 IU+PG 2 1.8/-16 0.2 0.34 273 b

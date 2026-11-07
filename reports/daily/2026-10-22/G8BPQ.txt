@@ -1,0 +1,20 @@
+Title: MCR G8BPQ 2026-10-22
+From: G8BPQ@GB7NOT.#23.GBR.EU
+To: MCAST
+Type: B (bulletin)
+Bid: 62958WG8BPQ
+Source: GB7RDG BBS, read over telnet for issue #138 (research/138 corpus, msg-4322.txt)
+Check: body length matches the BBS's stated 299 bytes
+Agrees with: 1 other copy
+
+R:261023/0815Z 1723@GB7BPQ.#76.GBR.EU LinBPQ6.0.26
+R:261022/1630Z 2436@GB7NOT.#23.GBR.EU LinBPQ6.0.26
+
+MCR1 0.16.2 IO92kx sc 0/0 21:AUD3,RIG18 0 13
+09 - 0 - - IU+PU
+11 - 0 - - IU+PU
+12 - 0 8 +0.3 IU+PU 1 - 0.28 0.26 - p
+13 - 0 - - IU+PU
+14 - 0 - - IU+PU
+15 - 0 - - IU+PU
+16 - 0 - - IU+PU

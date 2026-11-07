@@ -1,0 +1,49 @@
+name: reports
+# Regenerates reports/data from reports/daily whenever reports arrive (gb7rdg-node pushes them, see
+# reports/README.md) and commits the tables if they changed.
+on:
+  push:
+    branches: [main]
+    # The parser too: a change there can change how archived reports read.
+    paths: ['reports/daily/**', 'tools/Mailcast.ReportArchive/**', 'src/Packet.Mailcast/Feedback/**', '.github/workflows/reports.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reports
+  cancel-in-progress: false
+
+jobs:
+  tables:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always write.
+      - name: Choose where setup-dotnet installs
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Always from the tip of main, not the commit that triggered the run: reports pushed since are
+      # then included, and a push that loses a race is simply redone from the new tip.
+      - name: Regenerate and commit the tables
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          for attempt in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            dotnet run -c Release --project tools/Mailcast.ReportArchive -- reports
+            if [ -z "$(git status --porcelain -- reports/data)" ]; then exit 0; fi
+            git add -- reports/data
+            git commit -q -m "Reports: regenerate tables"
+            if git push -q origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 10))
+          done
+          echo "::error::could not push the tables after 5 tries"
+          exit 1

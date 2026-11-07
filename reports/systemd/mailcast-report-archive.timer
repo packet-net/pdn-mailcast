@@ -1,0 +1,10 @@
+[Unit]
+Description=Copy mailcast daily reports from GB7RDG to GitHub every 3 hours
+
+[Timer]
+OnCalendar=*-*-* 00/3:20:00 UTC
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

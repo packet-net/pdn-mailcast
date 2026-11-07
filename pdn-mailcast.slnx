@@ -15,5 +15,6 @@
     <Project Path="tools/Mailcast.DictionaryTool/Mailcast.DictionaryTool.csproj" />
     <Project Path="tools/RaptorQ.InteropExport/RaptorQ.InteropExport.csproj" />
     <Project Path="tools/Mailcast.ModelBVectors/Mailcast.ModelBVectors.csproj" />
+    <Project Path="tools/Mailcast.ReportArchive/Mailcast.ReportArchive.csproj" />
   </Folder>
 </Solution>

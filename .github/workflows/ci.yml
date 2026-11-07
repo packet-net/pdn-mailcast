@@ -2,7 +2,10 @@ name: ci
 on:
   push:
     branches: [main]
+    # Reports and the paper's notes change nothing CI tests (the reports workflow has its own job).
+    paths-ignore: ['reports/**', 'paper/**']
   pull_request:
+    paths-ignore: ['reports/**', 'paper/**']
 
 permissions:
   contents: read
