@@ -1,0 +1,14 @@
+Bid: 425WW1852
+Title: [425ENG] 425 DX News 1852
+Size: 13825
+FirstSeen: 2026-10-30
+Object: 2a3de56aa17ab698
+Dictionary: 1
+Oti: 00000015f20000f001000104
+NextEsi: 87
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: f53b27ae082ebd7f
+EnvelopeOti: 00000000c30000f001000104
+EnvelopeNextEsi: 12
+FirstSlot: 2026-10-31T09:00Z

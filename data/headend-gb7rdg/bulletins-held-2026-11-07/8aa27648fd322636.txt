@@ -1,0 +1,16 @@
+Bid: 26914_LU9DCE
+Title: CQ NEWS 03-NOV
+Size: 24285
+FirstSeen: 2026-11-04
+From: LU9DCE
+TakenIn: 2026-11-04T02:46:17.916Z
+Object: e40969cbc25eeb2b
+Dictionary: 1
+Oti: 00000006d50000f001000104
+NextEsi: 44
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: d8efa7a0d8222444
+EnvelopeOti: 00000000790000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-11-04T11:00Z

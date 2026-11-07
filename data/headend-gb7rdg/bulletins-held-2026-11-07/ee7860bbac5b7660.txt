@@ -1,0 +1,9 @@
+Bid: 55762_PY2BIL
+Title: Amateur Radio Newsline Report 2557 for Friday, October 30th
+Size: 16952
+FirstSeen: 2026-10-30
+Object: 7838d77e51915842
+Dictionary: 1
+Oti: 0000001c090000f001000104
+NextEsi: 102
+FirstSlot: 2026-10-30T13:00Z

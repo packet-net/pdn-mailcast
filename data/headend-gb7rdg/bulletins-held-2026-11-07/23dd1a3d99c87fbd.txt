@@ -1,0 +1,16 @@
+Bid: 5890_NS2B
+Title: PCL Packet Net
+Size: 2026
+FirstSeen: 2026-11-02
+From: NS2B
+TakenIn: 2026-11-02T17:16:00.050Z
+Object: 839d80bb7f20be68
+Dictionary: 1
+Oti: 000000042b0000f001000104
+NextEsi: 30
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 9ffb4812627ce35c
+EnvelopeOti: 00000000760000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-03T10:00Z

@@ -1,0 +1,12 @@
+Bid: 26489_LU9DCE
+Title: CQ NEWS 30-OCT
+Size: 24285
+FirstSeen: 2026-10-30
+Object: 9edafc07a4e2830c
+Dictionary: 1
+Oti: 00000006d40000f001000104
+NextEsi: 30
+Envelope: e7bc48106d0c1f1f
+EnvelopeOti: 000000006f0000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-10-31T09:00Z

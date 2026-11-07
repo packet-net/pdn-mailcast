@@ -1,0 +1,16 @@
+Bid: 26876_LU9DCE
+Title: LINUX TODAY 03-NOV
+Size: 4560
+FirstSeen: 2026-11-03
+From: LU9DCE
+TakenIn: 2026-11-03T22:46:13.936Z
+Object: 0312fc3cf00248e9
+Dictionary: 1
+Oti: 00000001b60000f001000104
+NextEsi: 15
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: d60cda2ab84f7f8f
+EnvelopeOti: 00000000730000f001000104
+EnvelopeNextEsi: 8
+FirstSlot: 2026-11-04T10:00Z

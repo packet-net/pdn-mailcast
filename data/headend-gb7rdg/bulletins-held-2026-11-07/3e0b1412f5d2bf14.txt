@@ -1,0 +1,15 @@
+Bid: 22798_VE2PKT
+Title: Solar and Geomagnetic Activity
+Size: 2720
+FirstSeen: 2026-11-02
+From: VA2OM
+Object: 42ed56fec87fa59a
+Dictionary: 1
+Oti: 000000046e0000f001000104
+NextEsi: 35
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: e6853825cad54d5f
+EnvelopeOti: 000000008e0000f001000104
+EnvelopeNextEsi: 12
+FirstSlot: 2026-11-02T11:00Z

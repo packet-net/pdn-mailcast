@@ -1,0 +1,9 @@
+Bid: 16201_KE0GB
+Title: Packet with Tandy Color Computer
+Size: 1240
+FirstSeen: 2026-10-28
+Object: 32ba742fcc0d5f05
+Dictionary: 1
+Oti: 00000002600000f001000104
+NextEsi: 14
+FirstSlot: 2026-10-28T09:00Z

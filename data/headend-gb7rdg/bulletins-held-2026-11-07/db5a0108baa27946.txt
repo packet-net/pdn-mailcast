@@ -1,0 +1,9 @@
+Bid: 21937_VE2PKT
+Title: BBS Traffic repport of the week
+Size: 9833
+FirstSeen: 2026-10-25
+Object: a2d8d55d2568f84a
+Dictionary: 1
+Oti: 00000006bb0000f001000104
+NextEsi: 29
+FirstSlot: 2026-10-25T10:00Z

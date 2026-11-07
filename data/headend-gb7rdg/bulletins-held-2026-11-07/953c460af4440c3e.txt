@@ -1,0 +1,9 @@
+Bid: 26254_LU9DCE
+Title: LINUX TODAY 28-OCT
+Size: 4904
+FirstSeen: 2026-10-28
+Object: 782559c85a5e5728
+Dictionary: 1
+Oti: 00000001ff0000f001000104
+NextEsi: 15
+FirstSlot: 2026-10-28T11:00Z

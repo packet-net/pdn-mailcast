@@ -1,0 +1,12 @@
+Bid: AE4B64C29CAE
+Title: Le ultime notizie dallo spazio.
+Size: 352
+FirstSeen: 2026-10-30
+Object: 0e519db526a08216
+Dictionary: 1
+Oti: 00000000f80000f001000104
+NextEsi: 6
+Envelope: 73bf2a0640eae7fd
+EnvelopeOti: 00000000f90000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-10-30T16:00Z

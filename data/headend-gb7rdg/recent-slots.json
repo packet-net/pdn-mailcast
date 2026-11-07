@@ -1,0 +1,1562 @@
+[
+  {
+    "slot": "2026-11-06T10:00:00+00:00",
+    "day": "2026-11-06",
+    "start": "2026-11-06T10:00:00.3271742+00:00",
+    "end": "2026-11-06T10:07:57.3537034+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 87,
+    "framesSent": 87,
+    "framesQueued": 87,
+    "bursts": 14,
+    "bulletinsInRotation": 18,
+    "leftoverInRotation": 10,
+    "normalCarried": 3,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 57.9375,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 15,
+    "requestedBy": null,
+    "mode": "ms110d-wn3",
+    "estimatedSeconds": 467.1,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 5.6,
+      "mufd100": 6.188424930998825,
+      "mufd500": 6.486073595895633,
+      "mufd1000": 7.184686301626213,
+      "skipZoneKm": 950,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-06T06:15:00+00:00",
+      "ageMinutes": 225,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "closed",
+      "at500": "closed",
+      "at1000": "open"
+    },
+    "ionosphereFrames": 2,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-06T10:00:00.3190577+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1365,
+            "stations": 174,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 2010,
+            "stations": 173,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 57,
+            "stations": 49,
+            "snrMedianDb": -8,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 76,
+            "stations": 35,
+            "snrMedianDb": -18,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 79,
+            "stations": 29,
+            "snrMedianDb": -19,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 2,
+            "stations": 3,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-06T11:00:00+00:00",
+    "day": "2026-11-06",
+    "start": "2026-11-06T11:00:00.2007301+00:00",
+    "end": "2026-11-06T11:04:13.1841887+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 80,
+    "framesSent": 80,
+    "framesQueued": 80,
+    "bursts": 7,
+    "bulletinsInRotation": 11,
+    "leftoverInRotation": 3,
+    "normalCarried": 3,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 51.46875,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 8,
+    "requestedBy": null,
+    "mode": "ms110d-wn4-long",
+    "estimatedSeconds": 251.1,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 5.6,
+      "mufd100": 6.188424930998825,
+      "mufd500": 6.486073595895633,
+      "mufd1000": 7.184686301626213,
+      "skipZoneKm": 950,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-06T06:15:00+00:00",
+      "ageMinutes": 285,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "closed",
+      "at500": "closed",
+      "at1000": "open"
+    },
+    "ionosphereFrames": 0,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-06T11:00:00.1956018+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1233,
+            "stations": 163,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1394,
+            "stations": 165,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 40,
+            "stations": 33,
+            "snrMedianDb": -7,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 111,
+            "stations": 45,
+            "snrMedianDb": -16,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 77,
+            "stations": 32,
+            "snrMedianDb": -22,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 2,
+            "stations": 3,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-06T12:00:00+00:00",
+    "day": "2026-11-06",
+    "start": "2026-11-06T12:00:00.2292912+00:00",
+    "end": "2026-11-06T12:07:25.0170806+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 82,
+    "framesSent": 82,
+    "framesQueued": 82,
+    "bursts": 13,
+    "bulletinsInRotation": 11,
+    "leftoverInRotation": 3,
+    "normalCarried": 3,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 53.625,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 14,
+    "requestedBy": null,
+    "mode": "ms110d-wn3",
+    "estimatedSeconds": 440.8,
+    "ionosphere": {
+      "state": "GOOD",
+      "foF2": 11.2,
+      "mufd100": 11.799636538682016,
+      "mufd500": 13.268058139038157,
+      "mufd1000": 16.499113734379844,
+      "skipZoneKm": 0,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-06T11:30:00+00:00",
+      "ageMinutes": 30,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "reliable",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 2,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-06T12:00:00.2234763+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 888,
+            "stations": 147,
+            "snrMedianDb": -7,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1082,
+            "stations": 149,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 46,
+            "stations": 42,
+            "snrMedianDb": -10,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 65,
+            "stations": 35,
+            "snrMedianDb": -15,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 67,
+            "stations": 31,
+            "snrMedianDb": -18,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 1,
+            "stations": 2,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-06T13:00:00+00:00",
+    "day": "2026-11-06",
+    "start": "2026-11-06T13:00:00.2119489+00:00",
+    "end": "2026-11-06T13:03:33.6548865+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 65,
+    "framesSent": 65,
+    "framesQueued": 65,
+    "bursts": 6,
+    "bulletinsInRotation": 8,
+    "leftoverInRotation": 0,
+    "normalCarried": 3,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 48.796875,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 7,
+    "requestedBy": null,
+    "mode": "ms110d-wn4-long",
+    "estimatedSeconds": 212.7,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 11.2,
+      "mufd100": 11.799636538682016,
+      "mufd500": 13.268058139038157,
+      "mufd1000": 16.499113734379844,
+      "skipZoneKm": 0,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-06T11:30:00+00:00",
+      "ageMinutes": 90,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "reliable",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 2,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-06T13:00:00.2069343+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 965,
+            "stations": 153,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1006,
+            "stations": 154,
+            "snrMedianDb": -7,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 44,
+            "stations": 37,
+            "snrMedianDb": -7,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 52,
+            "stations": 34,
+            "snrMedianDb": -15,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 61,
+            "stations": 29,
+            "snrMedianDb": -18,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 0,
+            "stations": 0,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-06T14:00:00+00:00",
+    "day": "2026-11-06",
+    "start": "2026-11-06T14:00:00.1915224+00:00",
+    "end": "2026-11-06T14:06:00.205205+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 65,
+    "framesSent": 65,
+    "framesQueued": 65,
+    "bursts": 11,
+    "bulletinsInRotation": 8,
+    "leftoverInRotation": 1,
+    "normalCarried": 3,
+    "bulkCarried": 4,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 54.953125,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 11,
+    "requestedBy": null,
+    "mode": "ms110d-wn3",
+    "estimatedSeconds": 357.8,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 11.2,
+      "mufd100": 11.799636538682016,
+      "mufd500": 13.268058139038157,
+      "mufd1000": 16.499113734379844,
+      "skipZoneKm": 0,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-06T11:30:00+00:00",
+      "ageMinutes": 150,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "reliable",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 2,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-06T14:00:00.186484+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1054,
+            "stations": 156,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1293,
+            "stations": 161,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 30,
+            "stations": 30,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 75,
+            "stations": 33,
+            "snrMedianDb": -15,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 69,
+            "stations": 31,
+            "snrMedianDb": -18,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 1,
+            "stations": 2,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-06T15:00:00+00:00",
+    "day": "2026-11-06",
+    "start": "2026-11-06T15:00:00.1778265+00:00",
+    "end": "2026-11-06T15:03:32.0385723+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 65,
+    "framesSent": 65,
+    "framesQueued": 65,
+    "bursts": 6,
+    "bulletinsInRotation": 8,
+    "leftoverInRotation": 1,
+    "normalCarried": 3,
+    "bulkCarried": 4,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 49.125,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 6,
+    "requestedBy": null,
+    "mode": "ms110d-wn4-long",
+    "estimatedSeconds": 212.7,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 11.2,
+      "mufd100": 11.799636538682016,
+      "mufd500": 13.268058139038157,
+      "mufd1000": 16.499113734379844,
+      "skipZoneKm": 0,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-06T11:30:00+00:00",
+      "ageMinutes": 210,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "reliable",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 2,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-06T15:00:00.1733758+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1233,
+            "stations": 161,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1325,
+            "stations": 162,
+            "snrMedianDb": -7,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 51,
+            "stations": 42,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 74,
+            "stations": 35,
+            "snrMedianDb": -17,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 94,
+            "stations": 33,
+            "snrMedianDb": -17,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 2,
+            "stations": 3,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-07T10:00:00+00:00",
+    "day": "2026-11-07",
+    "start": "2026-11-07T10:00:00.3564424+00:00",
+    "end": "2026-11-07T10:04:08.6188302+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 76,
+    "framesSent": 76,
+    "framesQueued": 76,
+    "bursts": 7,
+    "bulletinsInRotation": 11,
+    "leftoverInRotation": 2,
+    "normalCarried": 4,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 50,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 8,
+    "requestedBy": null,
+    "mode": "ms110d-wn4-long",
+    "estimatedSeconds": 244.3,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 6.35,
+      "mufd100": 6.939430315276323,
+      "mufd500": 7.342066305371451,
+      "mufd1000": 8.267772068299719,
+      "skipZoneKm": 330,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-07T06:00:00+00:00",
+      "ageMinutes": 240,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "closed",
+      "at500": "open",
+      "at1000": "open"
+    },
+    "ionosphereFrames": 2,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-07T10:00:00.3518086+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1086,
+            "stations": 168,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1123,
+            "stations": 176,
+            "snrMedianDb": -8,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 48,
+            "stations": 45,
+            "snrMedianDb": -7,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 91,
+            "stations": 42,
+            "snrMedianDb": -15,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 93,
+            "stations": 36,
+            "snrMedianDb": -18,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 2,
+            "stations": 3,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-07T11:00:00+00:00",
+    "day": "2026-11-07",
+    "start": "2026-11-07T11:00:00.2168649+00:00",
+    "end": "2026-11-07T11:07:02.078729+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 74,
+    "framesSent": 74,
+    "framesQueued": 74,
+    "bursts": 12,
+    "bulletinsInRotation": 11,
+    "leftoverInRotation": 2,
+    "normalCarried": 4,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 55.859375,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 13,
+    "requestedBy": null,
+    "mode": "ms110d-wn3",
+    "estimatedSeconds": 407.6,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 6.35,
+      "mufd100": 6.939430315276323,
+      "mufd500": 7.342066305371451,
+      "mufd1000": 8.267772068299719,
+      "skipZoneKm": 330,
+      "station": "DB049",
+      "soundingTimeUtc": "2026-11-07T06:00:00+00:00",
+      "ageMinutes": 300,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "closed",
+      "at500": "open",
+      "at1000": "open"
+    },
+    "ionosphereFrames": 0,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-07T11:00:00.2108461+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1466,
+            "stations": 173,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1466,
+            "stations": 173,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 43,
+            "stations": 38,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 78,
+            "stations": 36,
+            "snrMedianDb": -17,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 89,
+            "stations": 36,
+            "snrMedianDb": -22,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 0,
+            "stations": 0,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-07T12:00:00+00:00",
+    "day": "2026-11-07",
+    "start": "2026-11-07T12:00:00.1667888+00:00",
+    "end": "2026-11-07T12:04:06.0907083+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 76,
+    "framesSent": 76,
+    "framesQueued": 76,
+    "bursts": 7,
+    "bulletinsInRotation": 12,
+    "leftoverInRotation": 3,
+    "normalCarried": 4,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 51.421875,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 8,
+    "requestedBy": null,
+    "mode": "ms110d-wn4-long",
+    "estimatedSeconds": 244.3,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 4.5,
+      "mufd100": 5.095867022353975,
+      "mufd500": 6.170656610125462,
+      "mufd1000": 8.550265642942863,
+      "skipZoneKm": 710,
+      "station": "FF051",
+      "soundingTimeUtc": "2026-11-07T07:00:00+00:00",
+      "ageMinutes": 300,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "closed",
+      "at500": "closed",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 0,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-07T12:00:00.1617949+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 933,
+            "stations": 149,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 826,
+            "stations": 146,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 25,
+            "stations": 26,
+            "snrMedianDb": -10,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 68,
+            "stations": 35,
+            "snrMedianDb": -17,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 73,
+            "stations": 30,
+            "snrMedianDb": -21,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 0,
+            "stations": 0,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-07T13:00:00+00:00",
+    "day": "2026-11-07",
+    "start": "2026-11-07T13:00:00.1768608+00:00",
+    "end": "2026-11-07T13:07:05.3042184+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 76,
+    "framesSent": 76,
+    "framesQueued": 76,
+    "bursts": 13,
+    "bulletinsInRotation": 12,
+    "leftoverInRotation": 4,
+    "normalCarried": 3,
+    "bulkCarried": 5,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 56.875,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 14,
+    "requestedBy": null,
+    "mode": "ms110d-wn3",
+    "estimatedSeconds": 421,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 7.575,
+      "mufd100": 8.180414903979697,
+      "mufd500": 10.252242714478404,
+      "mufd1000": 14.78849739680036,
+      "skipZoneKm": 0,
+      "station": "FF051",
+      "soundingTimeUtc": "2026-11-07T08:00:00+00:00",
+      "ageMinutes": 300,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "open",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 0,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-07T13:00:00.1712393+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 778,
+            "stations": 138,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 761,
+            "stations": 140,
+            "snrMedianDb": -8,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 29,
+            "stations": 28,
+            "snrMedianDb": -11,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 54,
+            "stations": 34,
+            "snrMedianDb": -16,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 54,
+            "stations": 26,
+            "snrMedianDb": -20,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 1,
+            "stations": 2,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-07T14:00:00+00:00",
+    "day": "2026-11-07",
+    "start": "2026-11-07T14:00:00.556977+00:00",
+    "end": "2026-11-07T14:04:15.6058485+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 79,
+    "framesSent": 79,
+    "framesQueued": 79,
+    "bursts": 7,
+    "bulletinsInRotation": 12,
+    "leftoverInRotation": 5,
+    "normalCarried": 5,
+    "bulkCarried": 2,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 52.25,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 8,
+    "requestedBy": null,
+    "mode": "ms110d-wn4-long",
+    "estimatedSeconds": 251.1,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 8.225,
+      "mufd100": 8.832662648188403,
+      "mufd500": 11.139211308698309,
+      "mufd1000": 16.183179425155235,
+      "skipZoneKm": 0,
+      "station": "FF051",
+      "soundingTimeUtc": "2026-11-07T09:00:00+00:00",
+      "ageMinutes": 300,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "reliable",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 0,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-07T14:00:00.5508698+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 938,
+            "stations": 152,
+            "snrMedianDb": -5,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1148,
+            "stations": 153,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 51,
+            "stations": 46,
+            "snrMedianDb": -10,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 74,
+            "stations": 36,
+            "snrMedianDb": -19,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 76,
+            "stations": 31,
+            "snrMedianDb": -19,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "closed",
+            "spots": 1,
+            "stations": 2,
+            "snrMedianDb": null,
+            "closedBy": "otherDistances"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  },
+  {
+    "slot": "2026-11-07T15:00:00+00:00",
+    "day": "2026-11-07",
+    "start": "2026-11-07T15:00:00.1768057+00:00",
+    "end": "2026-11-07T15:07:22.3409287+00:00",
+    "outcome": "Completed",
+    "reason": null,
+    "framesPlanned": 79,
+    "framesSent": 79,
+    "framesQueued": 79,
+    "bursts": 13,
+    "bulletinsInRotation": 12,
+    "leftoverInRotation": 5,
+    "normalCarried": 5,
+    "bulkCarried": 2,
+    "relayedObjects": 0,
+    "relayedFrames": 0,
+    "toneSent": true,
+    "probeSent": true,
+    "probeId": "zc255-2400-rrc015-v1",
+    "reference": "NOT GPS locked (External ref locked)",
+    "paTemperatureMaxC": 56.71875,
+    "leaseTaken": true,
+    "retryable": false,
+    "leaseRenewals": 14,
+    "requestedBy": null,
+    "mode": "ms110d-wn3",
+    "estimatedSeconds": 433.9,
+    "ionosphere": {
+      "state": "UNKNOWN",
+      "foF2": 9.2,
+      "mufd100": 9.80776585789351,
+      "mufd500": 12.125092199252583,
+      "mufd1000": 17.192373001206686,
+      "skipZoneKm": 0,
+      "station": "FF051",
+      "soundingTimeUtc": "2026-11-07T10:00:00+00:00",
+      "ageMinutes": 300,
+      "source": "propquest",
+      "method": "estimated",
+      "at100": "reliable",
+      "at500": "reliable",
+      "at1000": "reliable"
+    },
+    "ionosphereFrames": 0,
+    "pskReporter": {
+      "state": "GOOD",
+      "observedUtc": "2026-11-07T15:00:00.1711056+00:00",
+      "ageMinutes": 0,
+      "windowMinutes": 30,
+      "feedDown": false,
+      "forty": {
+        "band": "40m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 1016,
+            "stations": 151,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 1073,
+            "stations": 156,
+            "snrMedianDb": -6,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "open",
+            "spots": 47,
+            "stations": 37,
+            "snrMedianDb": -8,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "eighty": {
+        "band": "80m",
+        "bins": [
+          {
+            "km": 100,
+            "fromKm": 30,
+            "toKm": 250,
+            "verdict": "open",
+            "spots": 70,
+            "stations": 35,
+            "snrMedianDb": -16,
+            "closedBy": "none"
+          },
+          {
+            "km": 500,
+            "fromKm": 250,
+            "toKm": 700,
+            "verdict": "open",
+            "spots": 86,
+            "stations": 30,
+            "snrMedianDb": -19,
+            "closedBy": "none"
+          },
+          {
+            "km": 1000,
+            "fromKm": 700,
+            "toKm": 1200,
+            "verdict": "noData",
+            "spots": 3,
+            "stations": 4,
+            "snrMedianDb": null,
+            "closedBy": "none"
+          }
+        ],
+        "skipZoneKm": 0
+      },
+      "at100": "open",
+      "at500": "open",
+      "at1000": "open",
+      "skipZoneKm": 0
+    },
+    "pskReporterFrames": 2
+  }
+]

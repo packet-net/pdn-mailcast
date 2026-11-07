@@ -1,0 +1,9 @@
+Bid: TNJ511_DB0HB
+Title: AGCW-Telegramm 44/26 vom 2026-10-26
+Size: 3172
+FirstSeen: 2026-10-27
+Object: 45370b310e6826ea
+Dictionary: 1
+Oti: 00000005770000f001000104
+NextEsi: 21
+FirstSlot: 2026-10-27T09:00Z

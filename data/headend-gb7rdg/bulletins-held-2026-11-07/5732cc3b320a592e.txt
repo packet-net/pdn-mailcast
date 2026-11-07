@@ -1,0 +1,9 @@
+Bid: 16991_KC2NJV
+Title: MESH NEWS
+Size: 1573
+FirstSeen: 2026-10-30
+Object: 70811698eefffed5
+Dictionary: 1
+Oti: 00000001e60000f001000104
+NextEsi: 18
+FirstSlot: 2026-10-30T09:00Z

@@ -1,0 +1,15 @@
+Bid: 26734_LU9DCE
+Title: DX NEWS 01-NOV
+Size: 812
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: 883b33ce32c8716c
+Dictionary: 1
+Oti: 00000000550000f001000104
+NextEsi: 9
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 7352a924332423f1
+EnvelopeOti: 00000000740000f001000104
+EnvelopeNextEsi: 9
+FirstSlot: 2026-11-02T09:00Z

@@ -1,0 +1,9 @@
+Bid: 9051_GB7CIP
+Title: 25 Pin D-Type Parallel Port
+Size: 4680
+FirstSeen: 2026-10-25
+Object: 93c6a4eda631d9e2
+Dictionary: 1
+Oti: 000000063a0000f001000104
+NextEsi: 23
+FirstSlot: 2026-10-25T09:00Z

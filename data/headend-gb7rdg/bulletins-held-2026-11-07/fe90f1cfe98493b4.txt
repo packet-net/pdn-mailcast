@@ -1,0 +1,9 @@
+Bid: 2449G4TNU
+Title: RSGB Main News - 25 Oct 2026
+Size: 11584
+FirstSeen: 2026-10-25
+Object: aaef7d1d9f1a4f6a
+Dictionary: 1
+Oti: 00000012f70000f001000104
+NextEsi: 74
+FirstSlot: 2026-10-25T10:00Z

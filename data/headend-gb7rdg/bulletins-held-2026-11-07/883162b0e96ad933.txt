@@ -1,0 +1,15 @@
+Bid: 22797_VE2PKT
+Title: Latest solar radio flux report
+Size: 1817
+FirstSeen: 2026-11-02
+From: VA2OM
+Object: 1230f4c722c2d4b2
+Dictionary: 1
+Oti: 00000001c80000f001000104
+NextEsi: 19
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: e02fd7ce14b842ec
+EnvelopeOti: 00000000930000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-02T11:00Z

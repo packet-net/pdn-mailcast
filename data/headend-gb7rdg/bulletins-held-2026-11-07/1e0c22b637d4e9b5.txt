@@ -1,0 +1,16 @@
+Bid: 26311_MM0UHR
+Title: Brandmeister TG 235419 Packet Net - 2026-10-27
+Size: 2136
+FirstSeen: 2026-11-07
+From: MM0UHR
+TakenIn: 2026-11-07T09:46:53.979Z
+Object: aa3c4d58259828a4
+Dictionary: 1
+Oti: 000000045d0000f001000104
+NextEsi: 18
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: ace29a9ed13bb750
+EnvelopeOti: 00000001280000f001000104
+EnvelopeNextEsi: 12
+FirstSlot: 2026-11-07T10:00Z

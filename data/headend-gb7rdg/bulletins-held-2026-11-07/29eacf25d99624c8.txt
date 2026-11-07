@@ -1,0 +1,9 @@
+Bid: 26391_LU9DCE
+Title: CQ NEWS 29-OCT
+Size: 24555
+FirstSeen: 2026-10-29
+Object: cf4762a56ed74811
+Dictionary: 1
+Oti: 00000007070000f001000104
+NextEsi: 39
+FirstSlot: 2026-10-30T09:00Z

@@ -1,0 +1,9 @@
+Bid: 5189_NS2B
+Title: PCL Packet Net
+Size: 2553
+FirstSeen: 2026-10-25
+Object: 8908f42c0927b2bb
+Dictionary: 1
+Oti: 00000004ea0000f001000104
+NextEsi: 28
+FirstSlot: 2026-10-25T16:00Z

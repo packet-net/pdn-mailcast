@@ -1,0 +1,9 @@
+Bid: 19_IW2OHX
+Title: IW2OHX BBS: new forwarding partners and routes
+Size: 1737
+FirstSeen: 2026-10-29
+Object: 237b1b86aa903e41
+Dictionary: 1
+Oti: 000000030a0000f001000104
+NextEsi: 23
+FirstSlot: 2026-10-30T09:00Z

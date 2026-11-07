@@ -1,0 +1,15 @@
+Bid: 26722_LU9DCE
+Title: CQ NEWS 01-NOV
+Size: 24285
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: fcdbd172a6b789fe
+Dictionary: 1
+Oti: 00000006d30000f001000104
+NextEsi: 52
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: c11ad964a9fccfc8
+EnvelopeOti: 00000000780000f001000104
+EnvelopeNextEsi: 13
+FirstSlot: 2026-11-02T09:00Z

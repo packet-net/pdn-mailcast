@@ -1,0 +1,9 @@
+Bid: 25984_LU9DCE
+Title: IARU 25-OCT
+Size: 4923
+FirstSeen: 2026-10-25
+Object: 2bdb54d5403e7f82
+Dictionary: 1
+Oti: 00000002a30000f001000104
+NextEsi: 13
+FirstSlot: 2026-10-25T12:00Z

@@ -1,0 +1,16 @@
+Bid: 10143_GB7CIP
+Title: Re: Digital ATV experience
+Size: 4543
+FirstSeen: 2026-11-04
+From: G8MNY
+TakenIn: 2026-11-04T10:16:22.008Z
+Object: 3c18093bc24cd971
+Dictionary: 1
+Oti: 00000008c70000f001000104
+NextEsi: 78
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 5e42ff1902c4e52c
+EnvelopeOti: 00000000830000f001000104
+EnvelopeNextEsi: 13
+FirstSlot: 2026-11-04T11:00Z

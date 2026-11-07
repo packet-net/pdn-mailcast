@@ -1,0 +1,9 @@
+Bid: 9242_GB7CIP
+Title: Serial Interface Connections                     (Updated M
+Size: 7330
+FirstSeen: 2026-10-27
+Object: 4b22bf000bd0b47d
+Dictionary: 1
+Oti: 00000007ce0000f001000104
+NextEsi: 24
+FirstSlot: 2026-10-27T10:00Z

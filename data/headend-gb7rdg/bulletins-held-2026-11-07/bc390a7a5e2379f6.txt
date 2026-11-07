@@ -1,0 +1,9 @@
+Bid: 25986_LU9DCE
+Title: ARCHLINUX UPDATES 25-OCT
+Size: 7624
+FirstSeen: 2026-10-27
+Object: 2ee543a679e614dd
+Dictionary: 1
+Oti: 000000061c0000f001000104
+NextEsi: 12
+FirstSlot: 2026-10-27T15:00Z

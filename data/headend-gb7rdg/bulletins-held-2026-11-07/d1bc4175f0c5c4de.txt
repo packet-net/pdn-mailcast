@@ -1,0 +1,15 @@
+Bid: 26671_LU9DCE
+Title: LINUX TODAY 01-NOV
+Size: 4560
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: 5f264e81d0a0fcd3
+Dictionary: 1
+Oti: 00000001b60000f001000104
+NextEsi: 12
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 63b8878764cb0709
+EnvelopeOti: 000000007d0000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-01T12:00Z

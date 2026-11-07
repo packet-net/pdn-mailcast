@@ -1,0 +1,18 @@
+pdn-mailcast reception survey, 2026-10-16 (UTC). GB7RDG, IO91lk, 7.0538 MHz.
+
+Each cell: frames heard in the slot, then tone SNR in 3 kHz ('nt' = no tone heard),
+then 'bN' if N bulletins completed in it. 'off' = that receiver was not listening.
+Blank = no receiver on that SDR at that hour. wave = the slot's waveform by the
+head end's turn rule.
+
+hour  wave        G4WNC        G4EYR      STUEY3D       WESSEX      M9TWM-1        EI4HQ        M9PSY       GI3JMC
+km                   83           89           97          135          221          502          534          544
+------------------------------------------------------------------------------------------------------------------
+09:00 WN3           off  34 -13dB b1  73 +17dB b1  73 +13dB b1   32 +8dB b1  73 +12dB b1  72 +17dB b1      0 -10dB
+10:00 WN4           off         0 nt 133 +27dB b8 136 +33dB b7       4 +2dB    118 nt b6 122 +10dB b6      0 -11dB
+11:00 WN3           off         0 nt     61 +26dB  74 +30dB b1   19 -4dB b2  65 +12dB b2  70 +11dB b2         0 nt
+12:00 WN4           off       0 -3dB    137 +16dB    130 +30dB   80 +5dB b3    118 +15dB      60 +5dB         0 nt
+13:00 WN3           off         0 nt  75 +16dB b1  75 +26dB b1       2 +7dB  68 +14dB b1     59 +18dB         0 nt
+14:00 WN4           off         0 nt 133 +15dB b1 140 +23dB b1   12 +1dB b2 133 +18dB b1  86 +12dB b1         0 nt
+15:00 WN3           off      27 +1dB  75 +20dB b4  74 +17dB b4      27 +6dB  68 +17dB b2  23 +15dB b1       0 -7dB
+16:00 WN4           off      37 +2dB   93 +6dB b1     98 nt b1   76 +4dB b3  111 +4dB b3   51 +3dB b1       0 -9dB

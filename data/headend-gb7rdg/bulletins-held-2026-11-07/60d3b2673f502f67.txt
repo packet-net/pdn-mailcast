@@ -1,0 +1,9 @@
+Bid: 26161_LU9DCE
+Title: IARU 27-OCT
+Size: 4917
+FirstSeen: 2026-10-27
+Object: d1bc0b258b50db7b
+Dictionary: 1
+Oti: 00000002920000f001000104
+NextEsi: 6
+FirstSlot: 2026-10-27T12:00Z

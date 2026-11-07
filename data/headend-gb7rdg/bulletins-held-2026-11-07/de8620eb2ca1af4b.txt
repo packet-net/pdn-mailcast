@@ -1,0 +1,16 @@
+Bid: 6122_GB7COV
+Title: Empty files from DM4RW
+Size: 356
+FirstSeen: 2026-11-07
+From: G4LML
+TakenIn: 2026-11-07T11:46:55.099Z
+Object: 1c0b1019594d06c6
+Dictionary: 1
+Oti: 00000000e40000f001000104
+NextEsi: 4
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 0b4122455afe6e44
+EnvelopeOti: 00000000960000f001000104
+EnvelopeNextEsi: 4
+FirstSlot: 2026-11-07T12:00Z

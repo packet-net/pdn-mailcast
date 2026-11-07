@@ -1,0 +1,9 @@
+Bid: 26296_LU9DCE
+Title: AMATEUR RADIO 28-OCT
+Size: 11387
+FirstSeen: 2026-10-28
+Object: ec0cfa989da824e2
+Dictionary: 1
+Oti: 00000009be0000f001000104
+NextEsi: 66
+FirstSlot: 2026-10-29T09:00Z

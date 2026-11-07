@@ -1,0 +1,15 @@
+Bid: 26596_LU9DCE
+Title: AMATEUR RADIO 31-OCT
+Size: 11139
+FirstSeen: 2026-10-31
+From: LU9DCE
+Object: 4dfbb1a44b5fd709
+Dictionary: 1
+Oti: 0000000a5d0000f001000104
+NextEsi: 53
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: cfb6c68ce43b6c31
+EnvelopeOti: 00000000700000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-11-01T09:00Z

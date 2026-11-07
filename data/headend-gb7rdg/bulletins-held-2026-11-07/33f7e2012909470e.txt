@@ -1,0 +1,12 @@
+Bid: 26469_LU9DCE
+Title: QRP 30-OCT
+Size: 5943
+FirstSeen: 2026-10-30
+Object: 92344aeca9d231c1
+Dictionary: 1
+Oti: 00000006c30000f001000104
+NextEsi: 20
+Envelope: 595387a63378440c
+EnvelopeOti: 000000006e0000f001000104
+EnvelopeNextEsi: 6
+FirstSlot: 2026-10-30T15:00Z

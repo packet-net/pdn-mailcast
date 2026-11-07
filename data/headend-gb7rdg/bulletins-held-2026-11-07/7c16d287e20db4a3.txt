@@ -1,0 +1,15 @@
+Bid: 152_IW2OHX
+Title: IW2OHX gateway: URONode retired, WAMPES connector
+Size: 3219
+FirstSeen: 2026-10-31
+From: IW2OHX
+Object: 62651a6e18aca41a
+Dictionary: 1
+Oti: 00000005920000f001000104
+NextEsi: 29
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 5236db54f237dddb
+EnvelopeOti: 00000000b10000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-11-01T09:00Z

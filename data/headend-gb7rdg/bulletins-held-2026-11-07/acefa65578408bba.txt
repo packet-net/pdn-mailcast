@@ -1,0 +1,15 @@
+Bid: 22699_VE2PKT
+Title: BBS Traffic repport of the week
+Size: 9388
+FirstSeen: 2026-11-02
+From: VE2PKT
+Object: f30ee13cecb2362a
+Dictionary: 1
+Oti: 000000060e0000f001000104
+NextEsi: 53
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: fbde2e9babf2eb76
+EnvelopeOti: 000000013a0000f001000104
+EnvelopeNextEsi: 22
+FirstSlot: 2026-11-02T11:00Z

@@ -1,0 +1,14 @@
+Bid: ARLD043O
+Title: ARLD043 DX news
+Size: 2394
+FirstSeen: 2026-10-30
+Object: 8e78e14db7cd1a24
+Dictionary: 1
+Oti: 00000004530000f001000104
+NextEsi: 19
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 6aed9efd011ac863
+EnvelopeOti: 00000001440000f001000104
+EnvelopeNextEsi: 22
+FirstSlot: 2026-10-31T09:00Z

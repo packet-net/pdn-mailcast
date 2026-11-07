@@ -1,0 +1,16 @@
+Bid: 27006_LU9DCE
+Title: ONALLBANDS 04-NOV
+Size: 4861
+FirstSeen: 2026-11-05
+From: LU9DCE
+TakenIn: 2026-11-05T20:16:37.807Z
+Object: 52ea53616189dfce
+Dictionary: 1
+Oti: 00000004800000f001000104
+NextEsi: 36
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 5b77171792d3cbe0
+EnvelopeOti: 00000000720000f001000104
+EnvelopeNextEsi: 12
+FirstSlot: 2026-11-06T10:00Z
