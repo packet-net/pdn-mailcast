@@ -48,10 +48,24 @@ The station is a Flex 6500 at about 40 W. Each frame is an AX.25 UI frame, from 
 UK HF packet today runs 300 baud AFSK or BPSK, carried as IL2P, in channels about 500 Hz wide, with ARQ: every frame is acknowledged and repeated until it gets through. Winlink stations use PACTOR or VARA, which are proprietary, or ARDOP, which is open; all three are built around a two-way session whose speed is negotiated by feedback. A one-way transmission has none of that to lean on. What it needs from the modem is different:
 
 - **No negotiation.** Every MS110D burst starts with a preamble that says which waveform and interleaver follow, so a receiver that has never heard the station decodes whatever comes, at whatever speed (autobaud). The sender can change speed slot by slot without telling anyone, which is how mailcast alternated 600 and 1200 bps and later changed interleaver.
-- **A ladder of speeds in one channel.** Appendix D defines waveforms from 75 bps to several kbit/s in the same 3 kHz, with one receiver. WN3 and WN4 are near the robust end of that ladder; faster ones are there for when a path allows (section 6.10).
+- **A ladder of speeds in one channel.** Appendix D defines waveforms from 75 bps to 16 kbit/s in the same 3 kHz (pdn-soundmodem implements them up to 6400 bps), with one receiver. WN3 and WN4 are near the robust end of that ladder; faster ones are there for when a path allows (table below, and section 6.10).
 - **Built for the HF channel.** A serial-tone waveform with known probe symbols every few dozen data symbols, an adaptive equaliser, strong convolutional coding and an interleaver handles several milliseconds of multipath and fades of a hertz or so. The 300 baud modes avoid multipath by slowing down instead, at a quarter of WN4's rate.
 - **Frames that are perfect or absent.** IL2P frames with a CRC inside the 110D stream either arrive intact or are thrown away: an erasure channel, which is what a fountain code needs.
 - **Open and specified.** MIL-STD-188-110D is a public standard (Distribution A), so anyone can build a compatible receiver from the document. pdn-soundmodem's implementation is held, in simulation, to the standard's own performance figures on its Poor HF channel, and WN0 to WN4 had all been decoded over the air before mailcast began.
+
+| Waveform | Rate | Modulation | Code rate | Long interleaver | Standard's target SNR, steady / Poor channel |
+|---|---|---|---|---|---|
+| WN1 | 150 bps | BPSK | 1/8 | 10.24 s | -3 / 3 dB |
+| WN2 | 300 bps | BPSK | 1/4 | 10.24 s | 0 / 5 dB |
+| **WN3** | **600 bps** | BPSK | 1/3 | 6.83 s | 3 / 7 dB |
+| **WN4** | **1200 bps** | BPSK | 2/3 | 6.83 s | 5 / 10 dB |
+| WN5 | 1600 bps | BPSK | 3/4 | 7.68 s | 6 / 11 dB |
+| WN13 | 2400 bps | QPSK | 9/16 | 7.68 s | 6 / 11 dB |
+| WN6 | 3200 bps | QPSK | 3/4 | 7.68 s | 9 / 14 dB |
+| WN7 | 4800 bps | 8PSK | 3/4 | 7.68 s | 13 / 19 dB |
+| WN8 | 6400 bps | 16QAM | 3/4 | 7.68 s | 16 / 23 dB |
+
+*Table 0. The MS110D Appendix D waveforms used in this work, all at 2400 symbols a second in 3 kHz (from the M0LTE.Ms110d waveform reference, after the standard's Tables D-II, D-XXXVII and D-LXIV). The target SNR is the standard's requirement in 3 kHz, not what the implementation achieves. Mailcast used WN3 and WN4; the Sweden path tests used the rest.*
 
 The costs are bandwidth and signal level. MS110D fills about 3 kHz, so it cannot sit on the existing narrow packet channels, and many rigs' filters cut into it (section 6.5). And it needs more signal than the slowest modes: in simulation WN4 needs about 1.5 dB signal to noise in 3 kHz on a steady signal and 12 to 16 dB on a fading path for 10% frame loss, WN3 a few dB less. The fountain code turns part of that loss into "takes a few more slots" rather than "never arrives".
 
@@ -287,9 +301,9 @@ Daz SA6DAZ, near Gothenburg (JO67fm, about 1,100 km from Reading), lent his stat
 
 **Mailcast in Sweden.** From 30 October to 7 November the receiver listened to 65 daylight slots. It heard frames in 46 of them, 875 frames in all, and completed 30 bulletins. Tone signal to noise ranged from about -3 to +14 dB. Its median virtual height was 310 km (51 measurements), higher than the UK receivers' 266 km, as a longer one-hop path off the same layer would suggest under the model. On 6 November at 14:00 UTC its probe resolved three paths: one hop off the E layer, one hop off the F layer 0.5 ms later at about the same strength, and two F hops 1.6 ms after that, 8 dB down.
 
-**Path tests.** Between mailcast slots, from 30 October to 1 November, the head end sent 136 rounds of test bursts to the same station, each round a tone and probe and then one burst of each of eleven MS110D waveform and interleaver combinations, recorded and decoded in Sweden. At 6 to 9 dB signal to noise in 3 kHz the faster waveforms were still useful: WN5 decoded 95% of its frames and WN6 82%, while WN7 managed 12% and WN8 none. At 12 to 15 dB WN8 decoded 58%. The robust end, WN1 to WN4, decoded most frames from around 0 dB upwards. *[Rates per waveform number to add.]*
+**Path tests.** Between mailcast slots, from 30 October to 1 November, the head end sent 136 rounds of test bursts to the same station, each round a tone and probe and then one burst of each of eleven MS110D waveform and interleaver combinations, recorded and decoded in Sweden. At 6 to 9 dB signal to noise in 3 kHz the faster waveforms were still useful: WN5 (1600 bps) decoded 95% of its frames, WN13 (2400 bps) 89% and WN6 (3200 bps) 82%, while WN7 (4800 bps) managed 12% and WN8 (6400 bps, 16QAM) none. At 12 to 15 dB WN8 decoded 58%. The robust end, WN1 to WN4, decoded most frames from around 0 dB upwards. These are close to the standard's targets in Table 0, given that the path was fading.
 
-So a single transmitter on 40 m reaches well into Scandinavia in daylight, at least in autumn, and the channel there often supports waveforms several times faster than mailcast used.
+So a single transmitter on 40 m reaches well into Scandinavia in daylight, at least in autumn, and the channel there often supports waveforms two to three times faster than mailcast used.
 
 ## 7. Lessons from operation
 
