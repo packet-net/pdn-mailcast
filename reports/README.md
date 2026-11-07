@@ -31,7 +31,7 @@ MCR1 0.32.0 IO68vl sc 0/0 14:RIG14 0 0
 
 `Source` says where this copy came from. `Check` says whether its length was checked against the size the BBS recorded for it, which catches a copy that was cut short. `Agrees with` counts other copies we found with the same report lines.
 
-## Where the first 129 came from
+## Where the first 131 came from
 
 The archive was started on 2026-11-07, after many reports had already expired from GB7RDG. They were gathered from, best first:
 
@@ -42,8 +42,9 @@ The archive was started on 2026-11-07, after many reports had already expired fr
 | GB7RDG's mail store as dumped or read in earlier work sessions | 13 |
 | Pasted by M0LTE from his own BBS (M7TAW's via GB7PTR, and M0NVK's) | 15 |
 | GB7RDG's mail store as copied on 2 November for an MS110D path study, with titles from GB7RDG's older message index | 5 |
+| Sent by M0NVK to M0LTE in Discord direct messages, never having reached GB7RDG | 2 |
 
-89 of the 129 passed the length check; the rest came from a source that recorded no size. Where two sources held the same report, the report lines agreed every time.
+89 of the 131 passed the length check; the rest came from a source that recorded no size. Where two sources held the same report, the report lines agreed every time.
 
 Known gaps:
 

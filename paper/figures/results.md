@@ -24,13 +24,13 @@ All SDRs together: 45% of frames heard over 883 receiver-slots.
 
 ## Listeners' daily reports, 8 October to 7 November 2026
 
-129 reports from 12 listeners; 9 report-days with no audio at all are left out below.
+131 reports from 12 listeners; 9 report-days with no audio at all are left out below.
 
 Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 November; November from 2 November, when the long interleaver, 31 s bursts and the bulk tier began.
 
 | Listener | locator | dates | days | slots listened | slots with frames | frames heard | October | November | median tone SNR (dB) | bulletins rebuilt |
 |---|---|---|---|---|---|---|---|---|---|---|
-| M0NVK via WESSEX | - | 10-09 to 10-10 | 2 | 13 | 92% | 77% | 77% | - | 24 | 19 |
+| M0NVK via WESSEX | - | 10-09 to 10-13 | 4 | 29 | 97% | 89% | 89% | - | 26 | 53 |
 | M7TAW via WESSEX | - | 10-21 to 10-26 | 3 | 19 | 89% | 75% | 75% | - | 22 | 48 |
 | G7TAJ via WESSEX | - | 10-26 to 10-27 | 2 | 14 | 93% | 66% | 66% | - | 27 | 46 |
 | M7TAW | IO91ma | 10-24 to 10-31 | 7 | 56 | 86% | 57% | 57% | - | 10 | 111 |
@@ -60,7 +60,7 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 | GM4CXF | 48% | 54% | 9.4 | 5.5 |
 | GM8BPQ | 10% | 21% | 1.8 | 2.1 |
 | M0NVK | 55% | 54% | 10.7 | 5.4 |
-| M0NVK via WESSEX | 77% | 77% | 14.0 | 7.2 |
+| M0NVK via WESSEX | 90% | 88% | 16.8 | 8.4 |
 | M7TAW | 55% | 60% | 10.7 | 5.9 |
 | M7TAW via WESSEX | 80% | 64% | 15.6 | 6.4 |
 | M9PSY | 66% | 75% | 12.3 | 7.2 |
@@ -74,42 +74,42 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 
 | Hour | slots | slots with frames | frames heard |
 |---|---|---|---|
-| 09 | 91 | 73% | 30% |
-| 10 | 114 | 75% | 31% |
-| 11 | 115 | 83% | 30% |
-| 12 | 117 | 84% | 32% |
-| 13 | 112 | 86% | 28% |
-| 14 | 112 | 88% | 34% |
-| 15 | 112 | 81% | 27% |
-| 16 | 107 | 84% | 27% |
+| 09 | 93 | 73% | 31% |
+| 10 | 116 | 76% | 32% |
+| 11 | 117 | 83% | 31% |
+| 12 | 119 | 84% | 33% |
+| 13 | 114 | 86% | 29% |
+| 14 | 114 | 88% | 35% |
+| 15 | 114 | 82% | 28% |
+| 16 | 109 | 84% | 28% |
 
 ### The measured channel (report slots with a channel measurement)
 
-- Slots measured: 743 (610 from the probe, 133 from the bursts).
-- Propagation modes seen: 1: 243, 2: 345, 3: 135, 4: 20.
-- virtual height (km): median 266, quartiles 244 to 290, n=420.
-- second mode's delay (ms): median 1.6, quartiles 1.4 to 1.8, n=433.
-- second mode's power against the first (dB): median -11, quartiles -15 to -6, n=433.
-- delay spread (ms): median 0.42, quartiles 0.29 to 0.58, n=743.
-- Doppler spread (Hz): median 0.34, quartiles 0.24 to 0.52, n=742.
+- Slots measured: 759 (624 from the probe, 135 from the bursts).
+- Propagation modes seen: 1: 243, 2: 355, 3: 141, 4: 20.
+- virtual height (km): median 268, quartiles 246 to 290, n=436.
+- second mode's delay (ms): median 1.6, quartiles 1.4 to 1.8, n=449.
+- second mode's power against the first (dB): median -12, quartiles -15 to -6, n=449.
+- delay spread (ms): median 0.42, quartiles 0.29 to 0.57, n=759.
+- Doppler spread (Hz): median 0.33, quartiles 0.24 to 0.52, n=757.
 
 ### The sounding probe (report slots)
 
-- Report slots that sent frames: 880.
-- Measured from the probe: 610, of which 64 decoded no data frame at all.
-- Measured from the data bursts (no probe result): 133.
+- Report slots that sent frames: 896.
+- Measured from the probe: 624, of which 64 decoded no data frame at all.
+- Measured from the data bursts (no probe result): 135.
 - No measurement: 137 (41 of them with frames).
 - Lowest tone SNR at which the probe gave a measurement: -16 dB; median 6 dB.
-- Median virtual height by hour (km): 09:00 270 (n=26), 10:00 260 (n=56), 11:00 263 (n=55), 12:00 270 (n=52), 13:00 256 (n=53), 14:00 277 (n=64), 15:00 261 (n=59), 16:00 265 (n=55).
+- Median virtual height by hour (km): 09:00 271 (n=28), 10:00 260 (n=58), 11:00 263 (n=57), 12:00 270 (n=54), 13:00 258 (n=55), 14:00 277 (n=66), 15:00 262 (n=61), 16:00 267 (n=57).
 
 ### The head end's propagation verdicts against what was heard (survey and report slots)
 
 | Source | verdict | receiver-slots | with frames | frames heard |
 |---|---|---|---|---|
-| ionosonde | good | 822 | 83% | 43% |
-| ionosonde | marginal | 653 | 65% | 35% |
+| ionosonde | good | 833 | 83% | 44% |
+| ionosonde | marginal | 658 | 65% | 35% |
 | ionosonde | unknown | 232 | 78% | 26% |
 | ionosonde | not logged | 56 | 23% | 14% |
-| PSK Reporter | good | 1673 | 76% | 38% |
+| PSK Reporter | good | 1689 | 76% | 39% |
 | PSK Reporter | unknown | 34 | 68% | 29% |
 | PSK Reporter | not logged | 56 | 23% | 14% |

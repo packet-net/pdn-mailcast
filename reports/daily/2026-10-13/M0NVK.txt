@@ -1,0 +1,14 @@
+Title: MCR M0NVK 2026-10-13
+From: M0NVK
+Source: sent by Eoin M0NVK to M0LTE in a Discord direct message, 2026-10-13 19:15 BST (message 1559630747118080181), as his receiver wrote it; it never reached GB7RDG (his HF link was down)
+Check: none available
+
+MCR1 0.9.1 IO80qr wessex.zapto.org 15/0 0 15
+09 W4 127 20 +1.3 IM+PG 2 2.2/-15 0.37 0.1 339 p
+10 W3 72 24 +2.1 IG+PG 2 2.0/-16 0.29 0.16 299 p
+11 W4 123 28 +1.8 IG+PG 3 1.8/-14 0.46 0.15 274 p
+12 W3 70 30 +1.8 IG+PG 3 1.9/-15 0.34 0.15 287 b
+13 W4 132 23 +0.9 IG+PG 3 1.8/-15 0.43 0.23 280 p
+14 W3 71 25 +0.9 IG+PG 2 1.8/-13 0.39 - 268 p
+15 W4 138 26 +1.2 IG+PG 3 1.8/-11 0.57 0.38 274 p
+16 W3 75 28 +1.7 IG+PG 2 1.9/-12 0.47 0.26 287 b

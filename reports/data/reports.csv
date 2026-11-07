@@ -15,9 +15,11 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-10-11,GM8BPQ,0.9.1,,sc,17,22,0,,,,BBS20,8,8,207,bbs-read-log,size-verified,daily/2026-10-11/GM8BPQ.txt
 2026-10-12,G7TAJ,0.9.1,,sc,7,0,7,,,,,8,6,125,bbs-read-log,size-verified,daily/2026-10-12/G7TAJ.txt
 2026-10-12,G8BPQ,0.9.1,,sc,25,25,0,,,,,8,8,322,bbs-read,none,daily/2026-10-12/G8BPQ.txt
+2026-10-12,M0NVK,0.9.1,IO80qr,wessex.zapto.org,19,0,19,,,,,8,8,837,other,none,daily/2026-10-12/M0NVK.txt
 2026-10-13,G7TAJ,0.10.0,IO81le,sc,18,0,18,,,,,8,8,217,bbs-store-dump,none,daily/2026-10-13/G7TAJ.txt
 2026-10-13,G8BPQ,0.10.0,IO92kx,sc,14,14,0,,,,,8,8,306,bbs-read,none,daily/2026-10-13/G8BPQ.txt
 2026-10-13,GM8BPQ,0.10.0,IO68vl,sc,13,13,0,,,,,8,8,325,bbs-store-dump,none,daily/2026-10-13/GM8BPQ.txt
+2026-10-13,M0NVK,0.9.1,IO80qr,wessex.zapto.org,15,0,15,,,,,8,8,808,other,none,daily/2026-10-13/M0NVK.txt
 2026-10-14,G7TAJ,0.12.0,IO81le,sc,7,0,7,,,,,8,8,137,bbs-read-log,size-verified,daily/2026-10-14/G7TAJ.txt
 2026-10-14,G8BPQ,0.12.0,IO92kx,sc,11,11,0,,,,,8,8,231,bbs-read,none,daily/2026-10-14/G8BPQ.txt
 2026-10-15,G8BPQ,0.13.0,IO92kx,sc,14,14,0,0,,,,8,8,284,bbs-read,none,daily/2026-10-15/G8BPQ.txt

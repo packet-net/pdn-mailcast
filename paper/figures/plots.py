@@ -30,6 +30,12 @@ J = os.path.join(root, "data/headend-gb7rdg/headend-journal-to-2026-11-07.txt")
 SURVEY = os.path.join(root, "data/web-sdr-survey-2026-10/slots.csv")
 R_SLOTS = os.path.join(root, "reports/data/slots.csv")
 R_DAYS = os.path.join(root, "reports/data/reports.csv")
+
+# The paper's data runs to 7 November 2026; reports added to the archive later are left out so its
+# figures stay fixed.
+CUTOFF = "2026-11-07"
+def upto(rows):
+    return [r for r in rows if r["day"] <= CUTOFF]
 OUT = os.path.join(root, "paper/figures/plots")
 os.makedirs(OUT, exist_ok=True)
 
@@ -163,7 +169,7 @@ for r in survey_rows:
 SDRS = sorted(sv, key=lambda k: sv[k]["km"])
 
 # --- Listeners' reports (as results.py) ---------------------------------------------------------
-day_rows = list(csv.DictReader(open(R_DAYS, newline="")))
+day_rows = list(upto(csv.DictReader(open(R_DAYS, newline=""))))
 deaf = {(r["callsign"], r["day"]) for r in day_rows if "AUD" in r["errors"] and r["slots_heard"] == "0"}
 SDR_NAMES = {"wessex.zapto.org": "WESSEX", "nope.tunnel.ubersdr.org": "a web SDR"}
 OWN_SDRS = {"m9twm-1.tunnel.ubersdr.org"}  # M9TWM's own UberSDR, the survey's M9TWM-1
@@ -177,7 +183,7 @@ def who(call, d):
     return f"{call} via {SDR_NAMES.get(a, a.split('.')[0])}"
 
 
-rows = [dict(r, who=who(r["callsign"], r["day"])) for r in csv.DictReader(open(R_SLOTS, newline=""))
+rows = [dict(r, who=who(r["callsign"], r["day"])) for r in upto(csv.DictReader(open(R_SLOTS, newline="")))
         if r["station"] in ("", "M0LTE", "GB7RDG") and (r["callsign"], r["day"]) not in deaf
         and sent.get((r["day"], r["slot_utc"]), (0,))[0] > 0]
 
