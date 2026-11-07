@@ -255,3 +255,15 @@ Truncated in the archive (body lost; fetch from Discord by timestamp, all #packe
 - Attribution: use the names and callsigns above as shown in the archive. Eoin's Discord name is "Eoin M0NVK" (GB7IOW); Steve is G7TAJ (GB7BWR node); John is G8BPQ (GB7BPQ and GB7NOT); Jim is GM4CXF; Anthony is M7TAW (now GB7PTR); Perry is M0PYL; Mike Quin is MM0MQN; Vic is EI5IYB; Daz is SA6DAZ; Andy is G3AGM; Robin is M0JQQ; Mike is G6PHF; Chris is G6FCI. Ask each person before naming them publicly if the publication needs consent.
 - For the survey chart and the daily report data, the two raw sources are Tom's own packet mail archive on GB7RDG (the MCAST reports) and the survey images Tom posted 2026-10-22 21:23 and 21:25 (not opened).
 - Items worth getting from the Discord client directly (the archive cannot supply them): the full text of the code blocks listed in Section 4, the two survey images, and Eoin's two "HF 600 Baud Channel Summary" .docx files.
+
+## 6. From the full channel export (added 2026-11-07)
+
+Tom exported #packet-hf (6 October to 6 November, 1149 messages with all attachments) on 2026-11-07. The raw export and the 99 attachments are kept outside the repo, since they hold everyone's chat. What it settled:
+
+- **The 22 October tables** (Tom, 21:23 and 21:25 UTC) were tables, not charts. They are rebuilt from the archived data by `paper/figures/heard_share.py` (output in `paper/figures/heard-share-tables.md`). A share is frames heard over frames sent in the slots the listener was listening to. With that rule every survey figure is within 2 points of Tom's; the gaps in the listener rows are reports that expired from GB7RDG before the archive began (G7TAJ and GM8BPQ for 16 to 18 October, M0NVK for 18 October).
+- **Eoin M0NVK's "Yesterday results"** (23 October 12:42 UTC) is his MCR report for 22 October, identical to the copy already in `reports/daily/2026-10-22/M0NVK.txt`. No other report was pasted in the channel.
+- **Why M7TAW's reports never reached GB7RDG** (Anthony M7TAW, 26 October 11:17 UTC, message 1564236639947989043): his BBS connected to GB7IOW (M0NVK) and offered five MCAST reports as FBB proposals (`FA B M7TAW GB7RDG.#42.GBR.EURO MCAST 6292P0M7TAW 493` and four more); GB7IOW answered each with "Invalid Command", because M7TAW was not set up there as a forwarding partner, and the session was dropped. Eoin did not want to add him as a BBS partner without ETCC registration; Anthony pointed out that a Foundation station under 5 W on its own callsign does not need it, and applied anyway. A good example for the paper of report routing failing for reasons outside mailcast.
+- **G7TAJ's receiver pastes**, in full:
+  - 7 October 13:46 UTC: "Last slot / -1.5 Hz, 7.2 dB / Tone at 1798.5 Hz (it should be at 1800 Hz), signal to noise in 3 kHz, 10 s long."
+  - 13 October 12:08 UTC: "1200 bps (WN4) / Last burst at 12:06:35, 1 frame. / Last slot / 1200 bps (WN4), 14 frames / GB7RDG says / 1200 bps (WN4), which agrees"
+- **Eoin's .docx summaries** were written by his LLM (Tom, 2026-11-07): background only, not a source.
