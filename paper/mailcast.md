@@ -356,6 +356,33 @@ Daz SA6DAZ, near Gothenburg (JO67fm, about 1,100 km from Reading), lent his stat
 
 So a single transmitter on 40 m reaches well into Scandinavia in daylight, at least in autumn, and the channel there often supports waveforms two to three times faster than mailcast used.
 
+### 6.11 Space weather and the ionosphere
+
+We compared reception with the daily geomagnetic and solar indices (Kp and Ap, F10.7 solar flux, sunspot number, flares) and with the ionosonde's foF2 that the head end logged as each slot began. The full analysis is in `paper/notes/space-weather.md`.
+
+| foF2 at the slot | Survey SDRs: share heard | Receiver-slots |
+|---|---|---|
+| under 6 MHz | 13% | 40 |
+| 6 to 7 MHz | 34% | 227 |
+| above 7 MHz | 48 to 53% | 560 |
+
+*Table 6. Survey reception, 6 to 20 October, against the F2 critical frequency at the slot (Dourbes or Fairford ionosonde).*
+
+- **foF2 is the one ionospheric measure that clearly goes with reception.** Below about 7 MHz, close to the 7.05 MHz carrier, near-vertical signals pass through the layer, and receivers heard about a third as much as above 8 MHz. This holds within each hour of the day, so it is not just the daily cycle. It is clear for receivers within about 250 km (rank correlation +0.3 to +0.5) and absent for those 500 to 850 km away, whose more oblique paths are supported by a lower foF2.
+- **Day to day, Kp, Ap, F10.7 and sunspot number show nothing measurable** (daily share against Ap: rank correlation +0.07 over 15 survey days, -0.06 over 23 listener days, both with wide intervals). The one strong storm, Kp 7.3 on the evening of 10 October, left a one-day dip: the four strong survey SDRs heard 75% on the 10th, 48% on the 11th and 93% on the 12th. Four M-class flares fell inside slots with no visible effect. One storm and four flares are anecdotes, not a result.
+- **The November drop was not space weather.** A smaller storm (Kp 5.7) from the evening of 31 October pushed foF2 below 7 MHz in every slot on 1 November, and reception and even the tone were poor until it passed. But from 3 to 7 November foF2 was 7.8 to 9.7 MHz and tones as strong as before, while matched by receiver, hour and foF2, receivers heard only about a third of the frames their late-October rates predict (section 6.3).
+- **The probe's virtual height barely follows foF2** (rank correlation -0.13, 430 slots), a little higher when foF2 is close to the carrier, as group delay near the critical frequency would suggest.
+
+Measured layer heights (hmF2) could not be fetched for comparison: the GIRO service was unavailable throughout.
+
+![Share heard against foF2](figures/plots/space-weather-fof2.png)
+
+*Figure 12. Share of frames heard against the ionosonde's foF2 at the slot, for near and distant receivers.*
+
+![Reception and space weather over the period](figures/plots/space-weather-context.png)
+
+*Figure 13. Kp, F10.7 solar flux and foF2 (at each slot, and continuously) above daily reception for M9PSY, four survey SDRs and five listeners, 1 October to 7 November, with the 31 October storm and the 2 November change marked. The 10 October storm (Kp 7.3) shows as a one-day dip; the lasting fall from 2 November does not follow the ionosphere.*
+
 ## 7. Lessons from operation
 
 **Sharing a radio is the hard part.** Most listeners already run a packet node, and the receiver has to borrow the radio for each slot: stop the node transmitting, retune, and put everything back. Rig modes caught people out (a Xiegu G90 needs its UD mode rather than USB for its wider filter), as did receive filters narrower than the signal (section 6.5). The receiver now defaults the rig to PKTUSB, and places the signal in the middle of whatever filter the rig has rather than asking anyone to widen it.
