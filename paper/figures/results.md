@@ -1,4 +1,4 @@
-## Head end, 5 October to 7 November 2026
+## Head end, 6 October to 7 November 2026 (the 5 October test slots were logged without a time and are not counted)
 
 - Days with slots: 33; slots run 259, completed 252, cut short 6, skipped 1 (by each day's last tally).
 - Slots that sent frames: 254; frames sent: 25397; bursts: 5182.
@@ -24,43 +24,51 @@ All SDRs together: 45% of frames heard over 883 receiver-slots.
 
 ## Listeners' daily reports, 8 October to 7 November 2026
 
-129 reports from 9 listeners; 9 report-days with no audio at all are left out below.
+129 reports from 12 listeners; 9 report-days with no audio at all are left out below.
 
-| Listener | locator | audio | days | slots listened | slots with frames | frames heard | median tone SNR (dB) | bulletins rebuilt |
-|---|---|---|---|---|---|---|---|---|
-| M7TAW | IO91ma | sound card | 10 | 79 | 82% | 62% | 13 | 159 |
-| M0NVK | IO90hr | sdrconnect | 12 | 88 | 84% | 58% | 20 | 143 |
-| GM4CXF | IO75qn | sound card | 13 | 99 | 98% | 50% | 11 | 165 |
-| M9TWM | IO93fj | m9twm-1.tunnel.ubersdr.org | 9 | 72 | 89% | 24% | 5 | 63 |
-| G8BPQ | IO92kx | sound card | 23 | 172 | 82% | 23% | 4 | 163 |
-| G7TAJ | IO81le | sound card | 20 | 153 | 65% | 18% | 8 | 125 |
-| EI7KX | IO83jj | nope.tunnel.ubersdr.org | 6 | 41 | 88% | 18% | 4 | 43 |
-| GM8BPQ | IO68vl | sound card | 25 | 184 | 76% | 14% | 4 | 99 |
-| MM0MQN | IO86bd | sound card | 2 | 12 | 33% | 3% | -4 | 0 |
+Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 November; November from 2 November, when the long interleaver, 31 s bursts and the bulk tier began.
+
+| Listener | locator | dates | days | slots listened | slots with frames | frames heard | October | November | median tone SNR (dB) | bulletins rebuilt |
+|---|---|---|---|---|---|---|---|---|---|---|
+| M0NVK via WESSEX | - | 10-09 to 10-10 | 2 | 13 | 92% | 77% | 77% | - | 24 | 19 |
+| M7TAW via WESSEX | - | 10-21 to 10-26 | 3 | 19 | 89% | 75% | 75% | - | 22 | 48 |
+| G7TAJ via WESSEX | - | 10-26 to 10-27 | 2 | 14 | 93% | 66% | 66% | - | 27 | 46 |
+| M7TAW | IO91ma | 10-24 to 10-31 | 7 | 56 | 86% | 57% | 57% | - | 10 | 111 |
+| M0NVK | IO90hr | 10-15 to 11-06 | 10 | 71 | 87% | 55% | 67% | 37% | 20 | 124 |
+| GM4CXF | IO75qn | 10-25 to 11-06 | 13 | 99 | 98% | 50% | 66% | 21% | 11 | 165 |
+| M9TWM | IO93fj | 10-08 to 10-30 | 9 | 72 | 89% | 24% | 24% | - | 5 | 63 |
+| G8BPQ | IO92kx | 10-08 to 10-31 | 23 | 168 | 84% | 23% | 23% | - | 4 | 163 |
+| EI7KX via a web SDR | - | 11-02 to 11-07 | 6 | 41 | 88% | 18% | - | 18% | 4 | 43 |
+| GM8BPQ | IO68vl | 10-08 to 11-07 | 25 | 180 | 77% | 14% | 17% | 2% | 4 | 99 |
+| G7TAJ | IO81le | 10-08 to 11-03 | 18 | 135 | 64% | 13% | 14% | 5% | 8 | 79 |
+| MM0MQN | IO86bd | 10-28 to 10-29 | 2 | 12 | 33% | 3% | 3% | - | -4 | 0 |
 
 ### WN4 (1200 bps) against WN3 (600 bps)
 
-Share of frames heard, per receiver, over slots of each waveform it listened to (survey and reports).
+Share of frames heard, per receiver, over slots of each waveform it listened to (survey and reports), and frames heard per minute of slot time on that waveform. WN4 includes its long-interleaver slots from 2 November.
 
-| Receiver | WN4 | WN3 |
-|---|---|---|
-| EI4HQ | 76% | 83% |
-| EI7KX | 19% | 16% |
-| G4EYR | 12% | 15% |
-| G4WNC | 0% | 2% |
-| G7TAJ | 17% | 20% |
-| G8BPQ | 15% | 36% |
-| GI3JMC | 0% | 0% |
-| GM4CXF | 48% | 54% |
-| GM8BPQ | 10% | 21% |
-| M0NVK | 58% | 57% |
-| M7TAW | 62% | 61% |
-| M9PSY | 66% | 73% |
-| M9TWM | 21% | 29% |
-| M9TWM-1 | 21% | 28% |
-| MM0MQN | 2% | 6% |
-| STUEY3D | 69% | 75% |
-| WESSEX | 80% | 81% |
+| Receiver | WN4 share | WN3 share | WN4 frames/min | WN3 frames/min |
+|---|---|---|---|---|
+| EI4HQ | 76% | 83% | 14.2 | 8.0 |
+| EI7KX via a web SDR | 19% | 16% | 3.8 | 1.7 |
+| G4EYR | 12% | 16% | 2.2 | 1.5 |
+| G4WNC | 0% | 2% | 0.1 | 0.2 |
+| G7TAJ | 12% | 15% | 2.3 | 1.5 |
+| G7TAJ via WESSEX | 64% | 70% | 12.3 | 6.8 |
+| G8BPQ | 15% | 36% | 2.9 | 3.5 |
+| GI3JMC | 0% | 0% | 0.0 | 0.0 |
+| GM4CXF | 48% | 54% | 9.4 | 5.5 |
+| GM8BPQ | 10% | 21% | 1.8 | 2.1 |
+| M0NVK | 55% | 54% | 10.7 | 5.4 |
+| M0NVK via WESSEX | 77% | 77% | 14.0 | 7.2 |
+| M7TAW | 55% | 60% | 10.7 | 5.9 |
+| M7TAW via WESSEX | 80% | 64% | 15.6 | 6.4 |
+| M9PSY | 66% | 75% | 12.3 | 7.2 |
+| M9TWM | 21% | 29% | 3.9 | 2.8 |
+| M9TWM-1 | 21% | 29% | 3.9 | 2.8 |
+| MM0MQN | 2% | 6% | 0.3 | 0.6 |
+| STUEY3D | 69% | 76% | 12.9 | 7.4 |
+| WESSEX | 80% | 82% | 14.9 | 7.9 |
 
 ### By hour of day (UTC), all report slots
 
@@ -70,10 +78,10 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 | 10 | 114 | 75% | 31% |
 | 11 | 115 | 83% | 30% |
 | 12 | 117 | 84% | 32% |
-| 13 | 117 | 82% | 28% |
-| 14 | 117 | 84% | 34% |
-| 15 | 117 | 78% | 27% |
-| 16 | 112 | 80% | 27% |
+| 13 | 112 | 86% | 28% |
+| 14 | 112 | 88% | 34% |
+| 15 | 112 | 81% | 27% |
+| 16 | 107 | 84% | 27% |
 
 ### The measured channel (report slots with a channel measurement)
 
@@ -99,9 +107,9 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 | Source | verdict | receiver-slots | with frames | frames heard |
 |---|---|---|---|---|
 | ionosonde | good | 822 | 83% | 43% |
-| ionosonde | marginal | 673 | 63% | 35% |
+| ionosonde | marginal | 653 | 65% | 35% |
 | ionosonde | unknown | 232 | 78% | 26% |
 | ionosonde | not logged | 56 | 23% | 14% |
-| PSK Reporter | good | 1693 | 75% | 38% |
+| PSK Reporter | good | 1673 | 76% | 38% |
 | PSK Reporter | unknown | 34 | 68% | 29% |
 | PSK Reporter | not logged | 56 | 23% | 14% |

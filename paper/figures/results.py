@@ -55,7 +55,7 @@ with open(J, encoding="latin-1") as f:
         elif m := busy.search(line):
             busy_slots.add(m[1])
 
-print("## Head end, 5 October to 7 November 2026\n")
+print("## Head end, 6 October to 7 November 2026 (the 5 October test slots were logged without a time and are not counted)\n")
 keyed = [k for k, v in sent.items() if v[0] > 0]
 by_mode = collections.Counter()
 for k, (n, b, mode, how) in sent.items():
@@ -104,15 +104,29 @@ day_rows = list(csv.DictReader(open(R_DAYS, newline="")))
 for r in day_rows:
     if "AUD" in r["errors"] and r["slots_heard"] == "0":
         deaf.add((r["callsign"], r["day"]))
-rows = [r for r in csv.DictReader(open(R_SLOTS, newline=""))
-        if r["station"] in ("", "M0LTE", "GB7RDG") and (r["callsign"], r["day"]) not in deaf and (r["day"], r["slot_utc"]) in sent]
+# A listener's days on a public web SDR are kept apart from days on their own equipment: they
+# measure the SDR, not the listener's station.
+SDR_NAMES = {"wessex.zapto.org": "WESSEX", "nope.tunnel.ubersdr.org": "a web SDR"}
+OWN_SDRS = {"m9twm-1.tunnel.ubersdr.org"}  # M9TWM's own UberSDR, the survey's M9TWM-1
+audio_of = {(r["callsign"], r["day"]): r["audio"] for r in day_rows}
+def who(call, day):
+    a = audio_of.get((call, day), "sc")
+    if a in ("sc", "sdrconnect", "soundmodem", "") or a in OWN_SDRS:
+        return call
+    return f"{call} via {SDR_NAMES.get(a, a.split('.')[0])}"
+# Only slots in which the head end sent something count as listened to.
+rows = [dict(r, who=who(r["callsign"], r["day"])) for r in csv.DictReader(open(R_SLOTS, newline=""))
+        if r["station"] in ("", "M0LTE", "GB7RDG") and (r["callsign"], r["day"]) not in deaf
+        and sent.get((r["day"], r["slot_utc"]), (0,))[0] > 0]
 
-ls = collections.defaultdict(lambda: dict(days=set(), slots=0, heard=0, frames=0, sent=0, snr=[]))
+ls = collections.defaultdict(lambda: dict(days=set(), slots=0, heard=0, frames=0, sent=0, snr=[], oct=[0, 0], nov=[0, 0]))
 for r in rows:
-    s = ls[r["callsign"]]
+    s = ls[r["who"]]
     s["days"].add(r["day"]); s["slots"] += 1
-    fr = int(r["frames"] or 0)
-    s["frames"] += fr; s["sent"] += sent[(r["day"], r["slot_utc"])][0]
+    fr = int(r["frames"] or 0); n = sent[(r["day"], r["slot_utc"])][0]
+    s["frames"] += fr; s["sent"] += n
+    part = s["nov"] if r["day"] >= "2026-11-02" else s["oct"]
+    part[0] += fr; part[1] += n
     if fr:
         s["heard"] += 1
     if r["snr_db"]:
@@ -121,40 +135,42 @@ loc = {}
 rebuilt = collections.Counter()
 for r in day_rows:
     if r["locator"]:
-        loc[r["callsign"]] = (r["locator"], r["audio"])
+        loc[r["callsign"]] = r["locator"]
     if (r["callsign"], r["day"]) not in deaf:
-        rebuilt[r["callsign"]] += int(r["rebuilt"] or 0)
+        rebuilt[who(r["callsign"], r["day"])] += int(r["rebuilt"] or 0)
 
 print("\n## Listeners' daily reports, 8 October to 7 November 2026\n")
 print(f"{len(day_rows)} reports from {len(ls)} listeners; {len(deaf)} report-days with no audio at all are left out below.\n")
-print("| Listener | locator | audio | days | slots listened | slots with frames | frames heard | median tone SNR (dB) | bulletins rebuilt |")
-print("|---|---|---|---|---|---|---|---|---|")
+print("Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 November; November from 2 November, when the long interleaver, 31 s bursts and the bulk tier began.\n")
+print("| Listener | locator | dates | days | slots listened | slots with frames | frames heard | October | November | median tone SNR (dB) | bulletins rebuilt |")
+print("|---|---|---|---|---|---|---|---|---|---|---|")
 for n, s in sorted(ls.items(), key=lambda kv: -kv[1]["frames"] / max(kv[1]["sent"], 1)):
-    lc, au = loc.get(n, ("-", "-"))
-    au = "sound card" if au == "sc" else au
-    print(f"| {n} | {lc} | {au} | {len(s['days'])} | {s['slots']} | {pct(s['heard'], s['slots'])} | {pct(s['frames'], s['sent'])} | {fmt(med(s['snr']))} | {rebuilt[n]} |")
+    d = sorted(s["days"])
+    dates = f"{d[0][5:]} to {d[-1][5:]}" if len(d) > 1 else d[0][5:]
+    lc = loc.get(n.split()[0], "-") if " via " not in n else "-"
+    print(f"| {n} | {lc} | {dates} | {len(d)} | {s['slots']} | {pct(s['heard'], s['slots'])} | {pct(s['frames'], s['sent'])} | {pct(*s['oct'])} | {pct(*s['nov'])} | {fmt(med(s['snr']))} | {rebuilt[n]} |")
 
 # Waveform: share heard on WN4 slots against WN3 slots, for receivers that heard something of both.
 print("\n### WN4 (1200 bps) against WN3 (600 bps)\n")
-print("Share of frames heard, per receiver, over slots of each waveform it listened to (survey and reports).\n")
+print("Share of frames heard, per receiver, over slots of each waveform it listened to (survey and reports), and frames heard per minute of slot time on that waveform. WN4 includes its long-interleaver slots from 2 November.\n")
 wf = collections.defaultdict(lambda: collections.Counter())
 def add_wf(name, day, hhmm, fr):
     n, _, mode, _ = sent[(day, hhmm)]
     mode = "wn4" if mode.startswith("ms110d-wn4") else "wn3" if mode == "ms110d-wn3" else None
-    if mode:
-        wf[name][mode + "_f"] += fr; wf[name][mode + "_s"] += n
+    if mode and n > 0 and (day, hhmm) in minutes:
+        wf[name][mode + "_f"] += fr; wf[name][mode + "_s"] += n; wf[name][mode + "_m"] += minutes[(day, hhmm)]
 for r in csv.DictReader(open(SURVEY, newline="")):
     d, h = r["slot_utc"].split()
     if r["listening"] == "yes" and (d, h) in sent:
         add_wf("M9PSY" if r["sdr"].startswith("M9PSY") else r["sdr"], d, h, int(r["frames_heard"] or 0))
 for r in rows:
-    add_wf(r["callsign"], r["day"], r["slot_utc"], int(r["frames"] or 0))
-print("| Receiver | WN4 | WN3 |")
-print("|---|---|---|")
+    add_wf(r["who"], r["day"], r["slot_utc"], int(r["frames"] or 0))
+print("| Receiver | WN4 share | WN3 share | WN4 frames/min | WN3 frames/min |")
+print("|---|---|---|---|---|")
 for n, c in sorted(wf.items()):
     if c["wn4_f"] + c["wn3_f"] == 0 or not c["wn4_s"] or not c["wn3_s"]:
         continue
-    print(f"| {n} | {pct(c['wn4_f'], c['wn4_s'])} | {pct(c['wn3_f'], c['wn3_s'])} |")
+    print(f"| {n} | {pct(c['wn4_f'], c['wn4_s'])} | {pct(c['wn3_f'], c['wn3_s'])} | {c['wn4_f'] / c['wn4_m']:.1f} | {c['wn3_f'] / c['wn3_m']:.1f} |")
 
 # Hour of day.
 print("\n### By hour of day (UTC), all report slots\n")
