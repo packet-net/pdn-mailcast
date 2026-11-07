@@ -38,6 +38,7 @@ R_DAYS = os.path.join(root, "reports/data/reports.csv")
 SW = os.path.join(root, "data/space-weather")
 PLOTS = os.path.join(root, "paper/figures/plots")
 CHANGE = "2026-11-02"  # long interleaver, 31 s bursts and the bulk tier began on this day
+STEP = ("2026-10-31", "15:00")  # first slot after the head end (0.28.1) and modem were updated at 14:15 on 31 Oct
 F_TX = 7.0538
 random.seed(20261107)
 
@@ -230,10 +231,26 @@ for r in csv.DictReader(open(R_SLOTS, newline="")):
                      vh=float(r["virtual_height_km"]) if r["virtual_height_km"] else None, km=d_km, own=" via " not in w,
                      basis=r["channel_basis"]))
 
+# M9PSY through the whole period: the original receiver on CT 150 (end-fed wire at Dalgety Bay,
+# 533 km) kept running after the survey. From 21 October it is the only receiver in the CT 150
+# journal, so its "slot ended" lines give frames heard and tone SNR per slot with no PID matching.
+# Not used by results.py; same share definition.
+RJ = os.path.join(root, "data/web-sdr-survey-2026-10/receiver-journal.txt")
+ended = re.compile(r"^(\d{4}-\d\d-\d\d)T\S+ \S+ pdn-mailcast-receiver\[\d+\]: slot: (?:\S+'s )?(?:the )?(\d\d:\d\d) UTC slot ended: (nothing heard|(\d+) frames)(?:.*?tone SNR (-?\d+) dB)?")
+with open(RJ, encoding="utf-8", errors="replace") as f:
+    for line in f:
+        m = ended.search(line)
+        if not m or m[1] < "2026-10-21" or sent.get((m[1], m[2]), (0,))[0] <= 0:
+            continue
+        recs.append(dict(src="ct150", rx="M9PSY", day=m[1], hhmm=m[2], heard=int(m[4] or 0), sent=sent[(m[1], m[2])][0],
+                         snr=float(m[5]) if m[5] else None, vh=None, km=533, own=True))
+
 for r in recs:
     r["mode"] = family(sent[(r["day"], r["hhmm"])][2])
     r["hour"] = int(r["hhmm"][:2])
-    r["nov"] = r["day"] >= CHANGE
+    r["nov"] = r["day"] >= CHANGE  # period C
+    r["pre"] = (r["day"], r["hhmm"]) < STEP  # period A
+    r["period"] = "A" if r["pre"] else ("C" if r["nov"] else "B")
 
 # ---------------------------------------------------------------------------------------------
 # Space weather: GFZ Kp/ap/Ap/SN/F10.7, NOAA flares
@@ -328,7 +345,7 @@ for (day, hhmm), v in sent.items():
         continue
     j = jiono.get((day, hhmm))
     fo_pq, m_pq = pq_at("DB049", day, hhmm)
-    fo_ff, _ = pq_at("FF051", day, hhmm, -15, 25)
+    fo_ff, _ = pq_at("FF051", day, hhmm, -30, 40)
     t = dt.datetime.fromisoformat(f"{day}T{hhmm}") + dt.timedelta(minutes=4)
     slot_info[(day, hhmm)] = dict(
         fof2_j=j["fof2"] if j else None, j_station=j["station"] if j else None, j_age=j["age"] if j else None,
@@ -338,8 +355,16 @@ for (day, hhmm), v in sent.items():
     si = slot_info[(day, hhmm)]
     # The foF2 used below: the journal's reading when it is under an hour old (as the brief asks),
     # otherwise Dourbes from PROPquest at the slot time.
-    si["fof2"] = si["fof2_j"] if (j and j["age"] <= 60) else fo_pq
-    si["fof2_basis"] = "journal" if (j and j["age"] <= 60) else ("propquest" if fo_pq else None)
+    # Fallbacks: Dourbes, then Fairford (within 30 min before to 40 min after the slot's start),
+    # from PROPquest. Fairford sat 0.16 MHz below Dourbes at the same slots (median).
+    if j and j["age"] <= 60:
+        si["fof2"], si["fof2_basis"] = si["fof2_j"], "journal"
+    elif fo_pq:
+        si["fof2"], si["fof2_basis"] = fo_pq, "propquest DB049"
+    elif fo_ff:
+        si["fof2"], si["fof2_basis"] = fo_ff, "propquest FF051"
+    else:
+        si["fof2"], si["fof2_basis"] = None, None
 
 for r in recs:
     r.update({k: slot_info[(r["day"], r["hhmm"])][k] for k in ("fof2", "fof2_pq", "fof2_j", "hmf2", "kp", "kp24", "zen")})
@@ -375,8 +400,10 @@ ages = [v["j_age"] for v in slot_info.values() if v["j_age"] is not None]
 out(f"\nSlots that sent frames: {len(slot_info)}. Journal ionosonde readings at those slots: {sum(1 for v in slot_info.values() if v['fof2_j'])} "
     f"({', '.join(f'{k[0]} by {k[1]}: {n}' for k, n in stations.most_common())}); age median {med(ages)} min, "
     f"{sum(1 for a in ages if a > 60)} over 60 min.")
-out(f"foF2 used per slot: from the journal {sum(1 for v in slot_info.values() if v['fof2_basis'] == 'journal')}, "
-    f"from PROPquest Dourbes {sum(1 for v in slot_info.values() if v['fof2_basis'] == 'propquest')}, none {sum(1 for v in slot_info.values() if not v['fof2_basis'])}.")
+basis = collections.Counter(v["fof2_basis"] or "none" for v in slot_info.values())
+basis_nov = collections.Counter(v["fof2_basis"] or "none" for (d, h), v in slot_info.items() if d >= CHANGE)
+out(f"foF2 used per slot: " + ", ".join(f"{k} {n}" for k, n in basis.most_common()) + ". From 2 November: " + ", ".join(f"{k} {n}" for k, n in basis_nov.most_common())
+    + " (Dourbes sent almost nothing to PROPquest or GIRO after 1 November midday, and the head end's own readings were hours old).")
 if diffs:
     out(f"Journal Dourbes foF2 minus PROPquest Dourbes foF2 at the slot's first 10 min: median {med(diffs):+.2f} MHz, "
         f"middle half {np.percentile(diffs, 25):+.2f} to {np.percentile(diffs, 75):+.2f} MHz, n={len(diffs)} "
@@ -386,17 +413,24 @@ if ffp:
     out(f"Fairford minus Dourbes (PROPquest, same slot): median {med([a - b for a, b in ffp]):+.2f} MHz, n={len(ffp)}.")
 
 # Noon foF2 and daylight through the period (seasonal trend).
-noon = {}
+def day_series(d, h0, h1):
+    """Daytime soundings for a day: Dourbes if it sent at least 20 between 09 and 17 UTC, else Fairford."""
+    db = [v[0] for t, v in pq["DB049"].items() if t.date().isoformat() == d and 9 <= t.hour < 17]
+    st = "DB049" if len(db) >= 20 else "FF051"
+    return [v[0] for t, v in pq[st].items() if t.date().isoformat() == d and h0 <= t.hour < h1], st
+
+
+noon, slot_fo, day_st = {}, {}, {}
 for d in gdays:
-    vals = [v[0] for t, v in pq["DB049"].items() if t.date().isoformat() == d and 11 <= t.hour < 13]
+    vals, st = day_series(d, 11, 13)
     if vals:
         noon[d] = med(vals)
-slot_fo = {}
-for d in gdays:
-    vals = [v[0] for t, v in pq["DB049"].items() if t.date().isoformat() == d and 9 <= t.hour < 17]
+    vals, st = day_series(d, 9, 17)
     if vals:
         slot_fo[d] = (med(vals), sum(1 for x in vals if x < F_TX) / len(vals))
-out("\n### Season: Dourbes foF2 and daylight at Reading, by week\n")
+        day_st[d] = st
+out("\n### Season: foF2 (Dourbes, or Fairford on days Dourbes was silent) and daylight at Reading, by week\n")
+out("Days on Fairford: " + (", ".join(d for d in gdays if day_st.get(d) == "FF051") or "none") + ". Fairford reports hourly, Dourbes every 5 min.\n")
 out("| Week from | median foF2 11-13 UTC (MHz) | median foF2 09-17 UTC (MHz) | share of 09-17 UTC soundings with foF2 below 7.05 MHz | daylight at Reading (h) | noon zenith angle (deg) | mean Ap | max Kp |")
 out("|---|---|---|---|---|---|---|---|")
 wk_start = dt.date(2026, 10, 1)
@@ -429,8 +463,10 @@ def in_bin(x, b):
 
 own = [r for r in recs if r["own"]]
 GROUPS = [("Survey web SDRs (6 to 20 Oct)", [r for r in recs if r["src"] == "survey"]),
-          ("Listeners, own equipment, to 1 Nov", [r for r in own if r["src"] == "reports" and not r["nov"]]),
-          ("Listeners, own equipment, from 2 Nov", [r for r in own if r["src"] == "reports" and r["nov"]])]
+          ("Listeners, own equipment, to 31 Oct 14:00", [r for r in own if r["src"] == "reports" and r["pre"]]),
+          ("Listeners, own equipment, from 2 Nov", [r for r in own if r["src"] == "reports" and r["nov"]]),
+          ("M9PSY on CT 150, 21 Oct to 31 Oct 14:00", [r for r in recs if r["src"] == "ct150" and r["pre"]]),
+          ("M9PSY on CT 150, from 2 Nov", [r for r in recs if r["src"] == "ct150" and r["nov"]])]
 out("\n## 1. foF2 at the slot against reception (receiver-slots)\n")
 out("Share = frames heard / frames sent, pooled over the receiver-slots in the bin; 95% interval from resampling whole days. "
     "'Any' = receiver-slots with at least one frame. SNR = median tone SNR where the tone was measured.\n")
@@ -455,7 +491,7 @@ for gname, rs in GROUPS:
         out(f"\n({len(nofo)} receiver-slots had no foF2 and are not in the table.)")
     out("")
 
-out("### Rank correlation with foF2, per receiver (receiver-slot level; per-slot share)\n")
+out("### Rank correlation with foF2, per receiver (receiver-slot level; per-slot share; period A, to 31 Oct 14:00)\n")
 out("Spearman rho [approximate 95% interval] (n receiver-slots). Slots are not independent (same day, same hour), so the intervals are too narrow if anything.\n")
 out("| Receiver | km | share vs foF2 | tone SNR vs foF2 | share vs hour-matched foF2 anomaly |")
 out("|---|---|---|---|---|")
@@ -470,7 +506,8 @@ for r in recs:
     r["fof2_anom"] = r["fof2"] - hour_med[(r["hhmm"][:2], r["day"] >= "2026-10-22")] if r["fof2"] is not None else None
 by_rx = collections.defaultdict(list)
 for r in recs:
-    by_rx[r["rx"]].append(r)
+    if r["pre"]:  # period A only: the later steps would masquerade as a foF2 effect
+        by_rx[r["rx"]].append(r)
 rx_rows = []
 for rx, rs in sorted(by_rx.items(), key=lambda kv: (kv[1][0]["km"] or 0)):
     if len(rs) < 20:
@@ -482,11 +519,11 @@ for rx, rs in sorted(by_rx.items(), key=lambda kv: (kv[1][0]["km"] or 0)):
     rx_rows.append((rx, rs[0]["km"], a, b, c))
 
 # Pooled over every receiver, within hour.
-out("\n### Within the same hour of day (all own-equipment receivers and survey SDRs, receiver-slots)\n")
+out("\n### Within the same hour of day (all own-equipment receivers and survey SDRs, receiver-slots, period A)\n")
 out("| Hour (UTC) | receiver-slots | share, foF2 < 7 | n | share, foF2 7 to 8 | n | share, foF2 >= 8 | n |")
 out("|---|---|---|---|---|---|---|---|")
 for h in range(9, 17):
-    rs = [r for r in own if r["hour"] == h and r["fof2"] is not None]
+    rs = [r for r in own if r["hour"] == h and r["fof2"] is not None and r["pre"]]
     cells = []
     for b in [(0, 7.0), (7.0, 8.0), (8.0, 99)]:
         sub = [r for r in rs if in_bin(r["fof2"], b)]
@@ -522,7 +559,7 @@ def daily(src, rxs, lo="0", hi="9"):
 
 
 DAILY = [("Survey: WESSEX, STUEY3D, EI4HQ, M9PSY (6 to 20 Oct)", daily("survey", CONSIST["survey"])),
-         ("Listeners on own equipment, 8 Oct to 1 Nov", daily("reports", CONSIST["reports"], hi="2026-11-01")),
+         ("Listeners on own equipment, 8 to 30 Oct", daily("reports", CONSIST["reports"], hi="2026-10-30")),
          ("Listeners on own equipment, 8 Oct to 7 Nov", daily("reports", CONSIST["reports"]))]
 out("Each day: pooled share over the named receivers present that day, and the median over those receivers of (their share that day / their share over the whole period), which is less sensitive to which receivers reported. "
     "Kp max (prev) = largest 3-hourly Kp from 12 UTC the day before to the end of the day.\n")
@@ -568,14 +605,15 @@ for b_, m_, e_, cls in flares:
 # 3. The November drop
 # =============================================================================================
 out("\n## 3. The November drop\n")
-NOVRX = ["GM4CXF", "GM8BPQ", "M0NVK", "G7TAJ"]
-out("Receivers on their own equipment with slots both before and after 2 November. 'Late Oct' = 20 Oct to 1 Nov (closest in season). Share by waveform; tone SNR median.\n")
+NOVRX = ["GM4CXF", "GM8BPQ", "M0NVK", "G7TAJ", "M9PSY"]
+out("Receivers on their own equipment with slots both before and after 2 November, and M9PSY (the CT 150 receiver on a web SDR: survey rows to 20 Oct, its own journal from 21 Oct). Periods: A = to 31 Oct 14:00 (before the head end and modem update at 14:15); B = 31 Oct 15:00 to 1 Nov (after that update, and the storm); C = from 2 Nov (31 s bursts, long interleaver on WN4, bulk tier). Share by waveform (receiver-slots in brackets); tone SNR median.\n")
 out("| Receiver | km | period | days | receiver-slots | share all | WN4 (short) | WN4-long | WN3 | tone SNR median (dB) | tone measured | median foF2 at its slots | median max Kp 24 h |")
 out("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 nov_tab = []
 for rx in NOVRX:
     rs = [r for r in recs if r["rx"] == rx]
-    for label, sub in [("Oct (to 1 Nov)", [r for r in rs if not r["nov"]]), ("late Oct", [r for r in rs if "2026-10-20" <= r["day"] < CHANGE]), ("Nov (from 2 Nov)", [r for r in rs if r["nov"]])]:
+    for label, sub in [("A: to 31 Oct 14:00", [r for r in rs if r["pre"]]), ("A, late: 20 to 31 Oct 14:00", [r for r in rs if r["pre"] and r["day"] >= "2026-10-20"]),
+                       ("B: 31 Oct 15:00 to 1 Nov", [r for r in rs if r["period"] == "B"]), ("C: from 2 Nov", [r for r in rs if r["nov"]])]:
         if not sub:
             continue
         cells = []
@@ -615,13 +653,13 @@ out("Expected = November frames sent x the same receiver's October share in the 
     "O/E 1.0 means November reception was as October's at the same conditions. 95% interval from resampling November days (October rates held fixed).\n")
 out("| Waveform in November | October baseline | stratum | Nov receiver-slots matched | observed | expected | O/E | 95% interval |")
 out("|---|---|---|---|---|---|---|---|")
-base_all = [r for r in recs if r["rx"] in NOVRX and not r["nov"]]
+base_all = [r for r in recs if r["rx"] in NOVRX and r["pre"]]
 nov_all = [r for r in recs if r["rx"] in NOVRX and r["nov"]]
 oe_rows = []
 for wf_label, test_modes, base_modes in [("WN3 (same waveform, 31 s bursts)", {"WN3"}, {"WN3"}),
                                          ("WN4-long vs October WN4", {"WN4-long"}, {"WN4"}),
                                          ("all", {"WN3", "WN4-long"}, {"WN3", "WN4"})]:
-    for base_label, base in [("all Oct", base_all), ("late Oct", [r for r in base_all if r["day"] >= "2026-10-20"])]:
+    for base_label, base in [("A", base_all), ("A, from 20 Oct", [r for r in base_all if r["day"] >= "2026-10-20"])]:
         for s_label, key in [("receiver x foF2 bin", lambda r: (r["rx"], fo_bin(r["fof2"]), r["mode"].replace("-long", ""))),
                              ("receiver x hour", lambda r: (r["rx"], r["hour"], r["mode"].replace("-long", ""))),
                              ("receiver x hour x foF2 >= 8", lambda r: (r["rx"], r["hour"], (r["fof2"] or 0) >= 8, r["mode"].replace("-long", "")))]:
@@ -638,55 +676,97 @@ for wf_label, test_modes, base_modes in [("WN3 (same waveform, 31 s bursts)", {"
             out(f"| {wf_label} | {base_label} | {s_label} | {len(used)} | {o} | {e:.0f} | {o / e:.2f} | {fmt(lo, 2)} to {fmt(hi, 2)} |")
             oe_rows.append((wf_label, base_label, s_label, len(used), o, e, lo, hi))
 
+# Period B (31 Oct 15:00 to 1 Nov: after the update, during and after the storm) against A.
+test_b = [r for r in recs if r["rx"] in NOVRX and r["period"] == "B"]
+for s_label, key in [("receiver x foF2 bin", lambda r: (r["rx"], fo_bin(r["fof2"]), r["mode"])),
+                     ("receiver x hour", lambda r: (r["rx"], r["hour"], r["mode"]))]:
+    o, e, used = oe(base_all, test_b, key)
+    if e:
+        def stat_b(pick, key=key):
+            o2, e2, _ = oe(base_all, pick, key)
+            return o2 / e2 if e2 else None
+        lo, hi = boot_by_day(used, stat_b, 1000)
+        out(f"| period B (same waveforms as A) | A | {s_label} | {len(used)} | {o} | {e:.0f} | {o / e:.2f} | {fmt(lo, 2)} to {fmt(hi, 2)} (2 days only) |")
+
 out("\n### Tone SNR (independent of waveform and coding) at matched hours\n")
-out("Per receiver and hour: median tone SNR in October and in November; the table gives the median of the per-hour differences, and the pooled median SNR. "
-    "A receiver-slot without a measured tone is left out.\n")
-out("| Receiver | hours with both | Oct slots with tone | Nov slots with tone | median SNR Oct (dB) | median SNR Nov (dB) | median per-hour difference Nov-Oct (dB) | tone detected Oct | tone detected Nov |")
-out("|---|---|---|---|---|---|---|---|---|")
+out("Per receiver and hour of day: median tone SNR in period A and in the later period; the table gives the pooled medians over the hours both periods have, and the median of the per-hour differences. "
+    "'Tone detected' counts receiver-slots with any tone measurement; a receiver-slot without one is left out of the medians.\n")
+out("| Receiver | later period | hours with both | A slots with tone | later slots with tone | median SNR A (dB) | median SNR later (dB) | median per-hour difference (dB) | tone detected A | tone detected later |")
+out("|---|---|---|---|---|---|---|---|---|---|")
 snr_rows = []
 for rx in NOVRX:
     rs = [r for r in recs if r["rx"] == rx]
-    a = [r for r in rs if not r["nov"]]
-    b = [r for r in rs if r["nov"]]
-    hrs = sorted({r["hour"] for r in a if r["snr"] is not None} & {r["hour"] for r in b if r["snr"] is not None})
-    dif = []
-    for h in hrs:
-        dif.append(med([r["snr"] for r in b if r["hour"] == h and r["snr"] is not None]) - med([r["snr"] for r in a if r["hour"] == h and r["snr"] is not None]))
-    sa = [r["snr"] for r in a if r["snr"] is not None and r["hour"] in hrs]
-    sb = [r["snr"] for r in b if r["snr"] is not None and r["hour"] in hrs]
-    out(f"| {rx} | {len(hrs)} | {len(sa)} | {len(sb)} | {fmt(med(sa))} | {fmt(med(sb))} | {fmt(med(dif), 1)} | "
-        f"{pct(sum(1 for r in a if r['snr'] is not None), len(a))} | {pct(sum(1 for r in b if r['snr'] is not None), len(b))} |")
-    snr_rows.append((rx, sa, sb, med(dif) if dif else None))
+    a = [r for r in rs if r["pre"]]
+    for plabel, b in [("B", [r for r in rs if r["period"] == "B"]), ("C", [r for r in rs if r["nov"]])]:
+        hrs = sorted({r["hour"] for r in a if r["snr"] is not None} & {r["hour"] for r in b if r["snr"] is not None})
+        dif = []
+        for h in hrs:
+            dif.append(med([r["snr"] for r in b if r["hour"] == h and r["snr"] is not None]) - med([r["snr"] for r in a if r["hour"] == h and r["snr"] is not None]))
+        sa = [r["snr"] for r in a if r["snr"] is not None and r["hour"] in hrs]
+        sb = [r["snr"] for r in b if r["snr"] is not None and r["hour"] in hrs]
+        if not b:
+            continue
+        out(f"| {rx} | {plabel} | {len(hrs)} | {len(sa)} | {len(sb)} | {fmt(med(sa))} | {fmt(med(sb))} | {fmt(med(dif), 1)} | "
+            f"{pct(sum(1 for r in a if r['snr'] is not None), len(a))} | {pct(sum(1 for r in b if r['snr'] is not None), len(b))} |")
+        if plabel == "C":
+            snr_rows.append((rx, sa, sb, med(dif) if dif else None))
 
-out("\n### Share heard against tone SNR, before and after 2 November (all own-equipment listeners)\n")
+out("\n### Share heard against tone SNR, period A against period C (listeners on their own equipment)\n")
 out("If the drop were the path, November slots would sit at lower SNR but on the October curve; if it were the station's coding or burst change, the same SNR would give a lower share.\n")
-out("| Tone SNR (dB) | Oct receiver-slots | Oct share | Nov receiver-slots | Nov share | Nov WN3 share | Oct WN3 share |")
+out("| Tone SNR (dB) | A receiver-slots | A share | C receiver-slots | C share | C WN3 share | A WN3 share |")
 out("|---|---|---|---|---|---|---|")
 SNRB = [(-99, 0.5), (0.5, 3), (3, 6), (6, 9), (9, 99)]
 snr_curve = []
 for lo_, hi_ in SNRB:
-    a = [r for r in own if r["src"] == "reports" and not r["nov"] and r["snr"] is not None and lo_ <= r["snr"] < hi_]
+    a = [r for r in own if r["src"] == "reports" and r["pre"] and r["snr"] is not None and lo_ <= r["snr"] < hi_]
     b = [r for r in own if r["src"] == "reports" and r["nov"] and r["snr"] is not None and lo_ <= r["snr"] < hi_]
     a3 = [r for r in a if r["mode"] == "WN3"]
     b3 = [r for r in b if r["mode"] == "WN3"]
-    lab = "0" if lo_ < 0 else (f">= {lo_:g}" if hi_ == 99 else f"{lo_:g} to {hi_:g}")
+    lab = "< 0.5" if lo_ < 0 else (f">= {lo_:g}" if hi_ == 99 else f"{lo_:g} to {hi_:g}")
     out(f"| {lab} | {len(a)} | {pct(sum(r['heard'] for r in a), sum(r['sent'] for r in a))} | {len(b)} | {pct(sum(r['heard'] for r in b), sum(r['sent'] for r in b))} | "
         f"{pct(sum(r['heard'] for r in b3), sum(r['sent'] for r in b3))} | {pct(sum(r['heard'] for r in a3), sum(r['sent'] for r in a3))} |")
     snr_curve.append((lab, share(a), len(a), share(b), len(b), share(a3), len(a3), share(b3), len(b3)))
 
 # Day by day around the change for the two receivers that span it best.
-out("\n### GM4CXF and GM8BPQ day by day around the change\n")
-out("| Day | GM4CXF share | GM4CXF WN3 | GM4CXF tone SNR median | GM8BPQ share | GM8BPQ WN3 | GM8BPQ tone SNR median | median foF2 at slots | max Kp |")
-out("|---|---|---|---|---|---|---|---|---|")
-for d in sorted({r["day"] for r in recs if r["rx"] in ("GM4CXF", "GM8BPQ") and r["day"] >= "2026-10-25"}):
+DAYRX = ("GM4CXF", "GM8BPQ", "M9PSY", "M0NVK")
+out("\n### Day by day around the change\n")
+out("Share (and tone SNR median in dB) per receiver per day, with the receiver version in its report. foF2 = median at the day's slots; the ionosonde basis changes on 1 November (see section 0).\n")
+ver = {(r["callsign"], r["day"]): r["receiver_version"] for r in day_rows}
+out("| Day | " + " | ".join(DAYRX) + " | median foF2 at slots | share of slots with foF2 < 7.05 | max Kp |")
+out("|---|" + "---|" * len(DAYRX) + "---|---|---|")
+for d in sorted({r["day"] for r in recs if r["rx"] in DAYRX and r["day"] >= "2026-10-24"}):
     cells = []
-    for rx in ("GM4CXF", "GM8BPQ"):
-        x = [r for r in recs if r["rx"] == rx and r["day"] == d]
-        x3 = [r for r in x if r["mode"] == "WN3"]
-        cells += [pct(sum(r["heard"] for r in x), sum(r["sent"] for r in x)), pct(sum(r["heard"] for r in x3), sum(r["sent"] for r in x3)),
-                  fmt(med([r["snr"] for r in x if r["snr"] is not None]))]
-    fo = med([v["fof2"] for (dd, _), v in slot_info.items() if dd == d and v["fof2"] is not None])
-    out(f"| {d} | " + " | ".join(cells) + f" | {fmt(fo, 1)} | {max(gfz[d]['kp']):.1f} |")
+    for rx in DAYRX:
+        x = [r for r in recs if r["rx"] == rx and r["day"] == d and r["own"]]
+        if not x:
+            cells.append("-")
+            continue
+        v = ver.get((rx, d))
+        cells.append(f"{pct(sum(r['heard'] for r in x), sum(r['sent'] for r in x))} ({fmt(med([r['snr'] for r in x if r['snr'] is not None]))})" + (f" v{v}" if v else ""))
+    fos = [v["fof2"] for (dd, _), v in slot_info.items() if dd == d and v["fof2"] is not None]
+    out(f"| {d} | " + " | ".join(cells) + f" | {fmt(med(fos), 1)} | {pct(sum(1 for x in fos if x < F_TX), len(fos)) if fos else '-'} | {max(gfz[d]['kp']):.1f} |")
+
+out("\n### Slot by slot, 30 October to 3 November, with what changed at the station\n")
+out("Pooled over GM4CXF, GM8BPQ, G7TAJ, G8BPQ, M0NVK (own equipment) and M9PSY. Station changes from the head end journal (version start lines, the 2 Nov 10:15 burst limit) and paper/notes/evolution-timeline.md.\n")
+EVENTS = {("2026-10-31", "12:45"): "head end 0.27.0 (relay of LAN receivers' pieces)",
+          ("2026-10-31", "14:15"): "head end 0.28.1",
+          ("2026-10-31", "18:15"): "head end 0.29.0; Kp 5.7 from 18 UTC",
+          ("2026-11-01", "23:10"): "head end 0.30.0",
+          ("2026-11-02", "10:15"): "bursts up to 31 s (was 18 s)",
+          ("2026-11-02", "11:00"): "WN4 slots on the long interleaver",
+          ("2026-11-02", "13:00"): "head end 0.32.0, bulk senders last"}
+STEPRX = {"GM4CXF", "GM8BPQ", "G7TAJ", "G8BPQ", "M0NVK", "M9PSY"}
+out("| Slot | waveform | frames sent | bursts | receivers | share | tone SNR median (dB) | foF2 (MHz) | Kp | event before this slot |")
+out("|---|---|---|---|---|---|---|---|---|---|")
+step_rows = []
+ev_keys = sorted(EVENTS)
+for (d, h) in sorted(k for k in slot_info if "2026-10-30" <= k[0] <= "2026-11-03"):
+    x = [r for r in recs if (r["day"], r["hhmm"]) == (d, h) and r["rx"] in STEPRX and r["own"]]
+    ev = "; ".join(EVENTS[k] for k in ev_keys if k <= (d, h) and not any(k <= (pd, ph) for (pd, ph) in step_rows))
+    si = slot_info[(d, h)]
+    out(f"| {d} {h} | {family(sent[(d, h)][2])} | {sent[(d, h)][0]} | {sent[(d, h)][1]} | {len(x)} | {pct(sum(r['heard'] for r in x), sum(r['sent'] for r in x))} | "
+        f"{fmt(med([r['snr'] for r in x if r['snr'] is not None]))} | {fmt(si['fof2'], 1)} | {fmt(si['kp'], 1)} | {ev or ''} |")
+    step_rows.append((d, h))
 
 # =============================================================================================
 # 4. Virtual height against the ionosonde
@@ -762,25 +842,41 @@ ax[0].set_ylim(0, 9)
 td = [dt.datetime.fromisoformat(d) + dt.timedelta(hours=12) for d in gdays]
 ax[1].plot(td, [gfz[d]["f107"] for d in gdays], color=S1, lw=2)
 ax[1].set_ylabel("F10.7 (sfu)")
-pts = sorted(pq["DB049"].items())
-ax[2].plot([t for t, v in pts], [v[0] for t, v in pts], color=S1, lw=0.7, alpha=0.55, label="Dourbes, every 5 min (PROPquest)")
+for st, lab, ls in (("DB049", "Dourbes, every 5 min", "-"), ("FF051", "Fairford, hourly (Dourbes silent)", "-")):
+    seg_t, seg_v = [], []
+    for t, v in sorted(pq[st].items()):
+        if day_st.get(t.date().isoformat(), "DB049") == st:
+            if seg_t and (t - seg_t[-1]) > dt.timedelta(hours=3):
+                seg_t.append(seg_t[-1] + dt.timedelta(minutes=1)); seg_v.append(np.nan)
+            seg_t.append(t); seg_v.append(v[0])
+    ax[2].plot(seg_t, seg_v, color=MUTED if st == "DB049" else INK2, lw=0.7 if st == "DB049" else 1.0, label=lab)
 sx = [dt.datetime.fromisoformat(f"{d}T{h}") for (d, h), v in sorted(slot_info.items()) if v["fof2"] is not None]
 sy = [v["fof2"] for k, v in sorted(slot_info.items()) if v["fof2"] is not None]
-ax[2].scatter(sx, sy, s=10, color=S2, zorder=3, edgecolors=SURF, linewidths=0.6, label="at each Mailcast slot")
-ax[2].axhline(F_TX, color=INK2, lw=0.9, ls="--")
-ax[2].text(td[0], F_TX + 0.25, "7.05 MHz: below this, near-vertical 40 m escapes", color=INK2, fontsize=7.5)
+ax[2].scatter(sx, sy, s=11, color=S1, zorder=3, edgecolors=SURF, linewidths=0.6, label="at each Mailcast slot")
+ax[2].axhline(F_TX, color=INK, lw=0.9, ls="--")
+ax[2].text(dt.datetime(2026, 10, 1, 2), F_TX - 0.35, "7.05 MHz: below this, near-vertical 40 m escapes", color=INK, fontsize=7, va="top",
+           bbox=dict(boxstyle="square,pad=0.15", fc=SURF, ec="none", alpha=0.85))
 ax[2].set_ylabel("foF2 (MHz)")
 ax[2].set_ylim(2, 13)
-ax[2].legend(loc="upper right", fontsize=7.5, ncol=2)
-# Listeners' daily share (own equipment, consistent set) and survey.
+ax[2].legend(loc="upper left", fontsize=7, ncol=3)
+# Daily share: the survey's four strong SDRs, the listeners on their own equipment, and M9PSY all along.
+m9 = collections.defaultdict(lambda: [0, 0])
+for r in recs:
+    if r["rx"] == "M9PSY":
+        m9[r["day"]][0] += r["heard"]; m9[r["day"]][1] += r["sent"]
+m9_days = sorted(m9)
+ax[3].plot([dt.datetime.fromisoformat(d) + dt.timedelta(hours=12) for d in m9_days], [100 * m9[d][0] / m9[d][1] for d in m9_days], color=S1, lw=2, marker="o", ms=3.5, label="M9PSY, 533 km, all along")
 for (name, rows), col, lab in [(DAILY[0], S3, "survey web SDRs (4)"), (DAILY[2], S2, "listeners, own equipment (5)")]:
-    ax[3].plot([dt.datetime.fromisoformat(r["day"]) + dt.timedelta(hours=12) for r in rows], [r["share"] * 100 for r in rows], color=col, lw=2, marker="o", ms=4, label=lab)
+    ax[3].plot([dt.datetime.fromisoformat(r["day"]) + dt.timedelta(hours=12) for r in rows], [r["share"] * 100 for r in rows], color=col, lw=2, marker="o", ms=3.5, label=lab)
 ax[3].set_ylabel("frames heard (%)")
 ax[3].set_ylim(0, 100)
-ax[3].legend(loc="upper left", fontsize=7.5, ncol=2)
+ax[3].legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=7.5, ncol=3)
+step_t = dt.datetime(2026, 10, 31, 14, 15)
 for a in ax:
+    a.axvline(step_t, color=INK2, lw=0.9, ls=":")
     a.axvline(change_t, color=INK2, lw=0.9)
-ax[3].text(change_t + dt.timedelta(hours=6), 88, "2 Nov: long interleaver,\n31 s bursts, bulk tier", fontsize=7.5, color=INK2, va="top")
+ax[0].text(step_t - dt.timedelta(hours=4), 8.8, "31 Oct 14:15:\nhead end and\nmodem update", fontsize=7, color=INK2, va="top", ha="right")
+ax[0].text(change_t + dt.timedelta(hours=4), 8.8, "2 Nov: 31 s bursts,\nlong interleaver,\nbulk tier", fontsize=7, color=INK2, va="top")
 ax[3].xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
 ax[3].xaxis.set_major_locator(mdates.DayLocator(bymonthday=[1, 8, 15, 22, 29]))
 ax[3].set_xlim(dt.datetime(2026, 10, 1), dt.datetime(2026, 11, 8))
@@ -791,7 +887,7 @@ save(fig, "context")
 fig, ax = plt.subplots(1, 2, figsize=(8.4, 3.4))
 cols = [S3, S1, S2]
 w = 0.26
-for gi, (gname, rows) in enumerate(fig1.items()):
+for gi, (gname, rows) in enumerate(list(fig1.items())[:3]):
     xs = [BINS.index(b) + (gi - 1) * w for b, *_ in rows]
     ys = [sh * 100 for b, sh, *_ in rows]
     err = [[(sh - lo) * 100 if lo is not None else 0 for b, sh, lo, hi, *_ in rows], [(hi - sh) * 100 if hi is not None else 0 for b, sh, lo, hi, *_ in rows]]
@@ -810,24 +906,25 @@ ax[0].set_ylabel("frames heard (%)")
 ax[0].set_title("Share heard by foF2")
 ax[1].set_ylabel("median tone SNR (dB)")
 ax[1].set_title("Tone SNR by foF2")
-ax[0].legend(fontsize=7, loc="upper left")
-ax[0].text(0.99, 0.98, "bars: 95% interval, days resampled\nnumbers: receiver-slots", transform=ax[0].transAxes, ha="right", va="top", fontsize=6.5, color=INK2)
-ax[1].text(0.99, 0.02, "survey SNR is the collector's 3 kHz figure;\nreports' is the receiver's own; not comparable", transform=ax[1].transAxes, ha="right", va="bottom", fontsize=6.5, color=INK2)
-fig.tight_layout()
+h, l = ax[0].get_legend_handles_labels()
+fig.tight_layout(rect=(0, 0.1, 1, 1))
+fig.legend(h, l, loc="lower center", ncol=3, fontsize=7.5, bbox_to_anchor=(0.5, 0.03))
+fig.text(0.5, 0.0, "Lines on the bars: 95% interval from resampling whole days. Numbers in the bars: receiver-slots. Each series is a different set of receivers, so compare shapes, not levels.", ha="center", fontsize=6.5, color=INK2)
+ax[0].set_ylim(0, 60)
 save(fig, "fof2")
 
 # Chart 3: daily share against Ap.
 fig, ax = plt.subplots(1, 2, figsize=(8.4, 3.3), sharey=True)
 for a, (name, rows), col in [(ax[0], DAILY[0], S3), (ax[1], DAILY[2], S2)]:
-    pre = [r for r in rows if r["day"] < CHANGE]
-    post = [r for r in rows if r["day"] >= CHANGE]
-    a.scatter([r["Ap"] for r in pre], [r["share"] * 100 for r in pre], s=30, color=col, edgecolors=SURF, linewidths=1, label="to 1 Nov", zorder=3)
+    pre = [r for r in rows if r["day"] < STEP[0]]
+    post = [r for r in rows if r["day"] >= STEP[0]]
+    a.scatter([r["Ap"] for r in pre], [r["share"] * 100 for r in pre], s=30, color=col, edgecolors=SURF, linewidths=1, label="to 30 Oct", zorder=3)
     if post:
-        a.scatter([r["Ap"] for r in post], [r["share"] * 100 for r in post], s=34, facecolors=SURF, edgecolors=col, linewidths=1.6, label="from 2 Nov", zorder=3)
+        a.scatter([r["Ap"] for r in post], [r["share"] * 100 for r in post], s=34, facecolors=SURF, edgecolors=col, linewidths=1.6, label="from 31 Oct", zorder=3)
         a.legend(fontsize=7.5, loc="upper right")
     rho = spearman([r["Ap"] for r in pre], [r["share"] for r in pre])
-    a.set_title(name.split(" (")[0].replace("Survey: ", "Survey SDRs: ").replace(", 8 Oct to 7 Nov", ""), fontsize=9)
-    a.text(0.02, 0.97, f"to 1 Nov: Spearman {rho[0]:+.2f}, 95% {rho[2]:+.2f} to {rho[3]:+.2f}, n={rho[1]} days", transform=a.transAxes, fontsize=7, color=INK2, va="top")
+    title = "Survey web SDRs (4), 6 to 20 Oct" if a is ax[0] else "Listeners on own equipment (5), 8 Oct to 7 Nov"
+    a.set_title(f"{title}\nSpearman to 30 Oct {rho[0]:+.2f} (95% {rho[2]:+.2f} to {rho[3]:+.2f}), {rho[1]} days", fontsize=8.5)
     a.set_xlabel("daily Ap")
     a.set_xscale("log")
     a.set_xticks([2, 5, 10, 20, 50])
@@ -841,20 +938,18 @@ save(fig, "daily-ap")
 fig, ax = plt.subplots(1, 2, figsize=(8.4, 3.4))
 labs = [c[0] for c in snr_curve]
 xs = range(len(labs))
-for idx, (col, lab, off) in enumerate([(S1, "to 1 Nov", 1), (S2, "from 2 Nov", 3)]):
+for idx, (col, lab, off) in enumerate([(S1, "to 31 Oct 14:00", 1), (S2, "from 2 Nov", 3)]):
     ys = [c[off] * 100 if c[off] is not None and c[off + 1] >= 5 else np.nan for c in snr_curve]
     ax[0].plot(xs, ys, color=col, lw=2, marker="o", ms=5, label=lab)
     for x, c in zip(xs, snr_curve):
         if c[off] is not None and c[off + 1] >= 5:
-            ax[0].annotate(f"{c[off + 1]}", (x, c[off] * 100), textcoords="offset points", xytext=(0, 6 if idx == 0 else -11), ha="center", fontsize=6.5, color=INK2)
+            ax[0].annotate(f"{c[off + 1]}", (x, c[off] * 100), textcoords="offset points", xytext=(0, 7) if idx == 0 else (9, -3), ha="center" if idx == 0 else "left", fontsize=6.5, color=INK2)
 ax[0].set_xticks(list(xs))
 ax[0].set_xticklabels(labs, fontsize=8)
 ax[0].set_xlabel("tone SNR at the receiver (dB)")
 ax[0].set_ylabel("frames heard (%)")
 ax[0].set_ylim(0, 100)
 ax[0].set_title("Share heard at the same tone SNR")
-ax[0].legend(fontsize=7.5, loc="upper left")
-ax[0].text(0.99, 0.02, "listeners on own equipment, all waveforms;\nnumbers: receiver-slots", transform=ax[0].transAxes, ha="right", va="bottom", fontsize=6.5, color=INK2)
 # Right: tone SNR per receiver, Oct vs Nov (box-free: median dots with interquartile lines).
 for i, (rx, sa, sb, dif) in enumerate(snr_rows):
     for j, (vals, col) in enumerate([(sa, S1), (sb, S2)]):
@@ -862,15 +957,17 @@ for i, (rx, sa, sb, dif) in enumerate(snr_rows):
             q = np.percentile(vals, [25, 50, 75])
             y = i + (j - 0.5) * 0.3
             ax[1].plot([q[0], q[2]], [y, y], color=col, lw=2, solid_capstyle="round")
-            ax[1].scatter([q[1]], [y], s=40, color=col, edgecolors=SURF, linewidths=1, zorder=3, label=["to 1 Nov", "from 2 Nov"][j] if i == 0 else None)
+            ax[1].scatter([q[1]], [y], s=40, color=col, edgecolors=SURF, linewidths=1, zorder=3, label=["to 31 Oct 14:00", "from 2 Nov"][j] if i == 0 else None)
             ax[1].text(q[2] + 0.3, y, f"n={len(vals)}", va="center", fontsize=6.5, color=INK2)
 ax[1].set_yticks(range(len(snr_rows)))
 ax[1].set_yticklabels([r[0] for r in snr_rows])
 ax[1].invert_yaxis()
 ax[1].set_xlabel("tone SNR (dB), median and middle half")
 ax[1].set_title("Tone SNR at the same hours, before and after")
-ax[1].legend(fontsize=7.5, loc="lower right")
-fig.tight_layout()
+ax[1].legend(fontsize=7.5, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2)
+ax[0].legend(fontsize=7.5, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2)
+fig.tight_layout(rect=(0, 0.04, 1, 1))
+fig.text(0.5, 0.0, "Left: listeners on their own equipment, all waveforms; numbers are receiver-slots. Right: medians over the hours of day both periods have.", ha="center", fontsize=6.5, color=INK2)
 save(fig, "november")
 
 # Chart 5: virtual height against foF2.
@@ -879,12 +976,13 @@ pre = [r for r in vh if r["fof2"] is not None and not r["nov"]]
 post = [r for r in vh if r["fof2"] is not None and r["nov"]]
 ax.scatter([r["fof2"] for r in pre], [r["vh"] for r in pre], s=12, color=S1, alpha=0.6, edgecolors="none", label="to 1 Nov")
 ax.scatter([r["fof2"] for r in post], [r["vh"] for r in post], s=14, facecolors="none", edgecolors=S2, linewidths=0.9, label="from 2 Nov")
-bx = [(b[0] + min(b[1], 12)) / 2 if b[0] else 5.5 for b, *_ in vh_bins]
-ax.plot(bx, [m for b, n, m, q1, q3 in vh_bins], color=INK, lw=2, label="median per foF2 bin")
+vb = [v for v in vh_bins if v[1] >= 10]
+ax.plot([(b[0] + min(b[1], 11)) / 2 if b[0] else 5.5 for b, *_ in vb], [m for b, n, m, q1, q3 in vb], color=INK, lw=2, marker="s", ms=4,
+        label="median per 1 MHz foF2 bin (10+ slots)")
 ax.axvline(F_TX, color=INK2, lw=0.9, ls="--")
 ax.set_xlabel("foF2 at the slot (MHz)")
 ax.set_ylabel("virtual height from the probe (km)")
 ax.set_title("Measured virtual height against foF2")
-ax.legend(fontsize=7.5, loc="upper right")
+ax.legend(fontsize=7.5, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=3)
 fig.tight_layout()
 save(fig, "vheight")
