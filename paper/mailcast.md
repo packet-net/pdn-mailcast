@@ -37,6 +37,11 @@ The system is called mailcast. The transmitting side is a *head end*, here runni
 
 ### 3.1 The signal
 
+![How a bulletin travels](figures/plots/fig08-system-diagram.png)
+
+*Figure 1. How a bulletin travels: GB7RDG BBS, head end, pdn-soundmodem, Flex 6500, 40 m NVIS, listener's radio or web SDR, receiver, listener's BBS as Q0CAST; the daily report returns by packet mail to MCAST@GB7RDG.*
+
+
 The head end transmits MIL-STD-188-110D Appendix D serial-tone waveforms in a 3 kHz channel centred on 7.0538 MHz. Listeners tune 7.052 MHz USB, which puts the signal at 1800 Hz in their audio. The signal occupies about 7.0522 to 7.0554 MHz, clear of the UK HF packet channels at 7.0503, 7.05095 and 7.0516 MHz.
 
 Two waveforms are used, slot by slot in turn: WN4 (BPSK at 2400 baud, rate 2/3 coding, 1200 bps) and WN3 (rate 1/3, 600 bps). Since 2 November WN4 has used the long interleaver. The receiver reads each burst's waveform from its preamble, so a listener needs no setting for it. The modem is pdn-soundmodem, an open-source software modem, which carries IL2P frames with a CRC inside the 110D bit stream. A frame either arrives intact or is thrown away, which is exactly the kind of loss a fountain code handles best.
@@ -75,6 +80,10 @@ The costs are bandwidth and signal level. MS110D fills about 3 kHz, so it cannot
 
 A slot lasts at most 10 minutes. The head end first listens for a clear channel, for up to 2 minutes, then sends a 10 s calibration tone, 1.5 s of silence, a 6.5 s sounding probe (section 3.4), a CW ident, and its frames in bursts of up to 18 s (31 s since 2 November). Each burst is its own transmission with its own preamble. The timetable is sent in every slot, so receivers follow it without being told.
 
+![Anatomy of a slot](figures/plots/fig09-slot-anatomy.png)
+
+*Figure 2. Anatomy of a slot: clear-channel wait of up to 2 min, 10 s tone, 1.5 s gap, 6.5 s probe, CW ident, data bursts (31 s from 2 November, 18 s before), closing ident, about 7.8 min on air inside the 10 min limit.*
+
 ### 3.4 The sounding probe
 
 Since 7 October every slot has opened with a channel sounding: the 10 s tone, then a 6.5 s probe on the tone's own audio frequency. The probe is a Zadoff-Chu sequence of length 255 at 2400 chips per second, shaped with a root-raised-cosine pulse (roll-off 0.15) to fill 420 to 3180 Hz, and repeated 61 times back to back. A Zadoff-Chu sequence correlates to exactly zero against any cyclic shift of itself, so when it arrives by several paths each one shows up as a separate peak. One period lasts 106.25 ms, so any echo up to that late reads out unambiguously; one chip is 0.417 ms, so paths about that far apart are resolved; and each period gives a fresh estimate, so over 6 s the receiver also sees each path's Doppler shift and spread. Averaging 58 periods on top of the 255-chip correlation gain makes the probe measurable at about -15 dB signal to noise in 3 kHz, far below anything the data waveforms can decode.
@@ -85,6 +94,10 @@ The receiver has no absolute timing, only the delays between modes, but that is 
 
 When the probe cannot be measured, the receiver falls back to the decoded data bursts as the known signal, which works only down to about +1 dB.
 
+![Mirror model](figures/plots/fig11-mirror-model.png)
+
+*Figure 3. Mirror model: 1F and 2F paths to a receiver 300 km away, and the 1F to 2F delay against virtual height for 100 to 800 km, with the measured median gap of 1.6 ms reading as about 260 km.*
+
 ### 3.5 Framing and coding
 
 Each bulletin is compressed with zstd using a 64 KB dictionary trained on earlier UK bulletins, which brings bulletins to about 30% of their size. The result is cut into 240-byte symbols and coded with RaptorQ (RFC 6330), one source block per bulletin. A RaptorQ encoder can make as many different symbols as it likes, and any K of them, plus a couple more, rebuild a bulletin that is K symbols long. A median bulletin in this study was 5.3 kB of text, about seven symbols once compressed.
@@ -92,6 +105,10 @@ Each bulletin is compressed with zstd using a 64 KB dictionary trained on earlie
 Each frame carries one symbol, 271 bytes in all: a version byte, flags, an 8-byte object ID, the dictionary ID, the RaptorQ transmission information, the symbol's number, the symbol and a CRC-32. The object ID is the first 8 bytes of a SHA-256 hash over the dictionary ID and the object, so every object checks itself.
 
 Every slot also carries a *directory*: the bulletins in rotation, the timetable and the slot's waveform. Since 15 October directories are signed with Ed25519, and a receiver holds back anything that only an unsigned or unverified directory lists.
+
+![Fountain coding](figures/plots/fig10-fountain-coding.png)
+
+*Figure 4. Fountain coding: a bulletin is compressed and cut into K source pieces; each slot sends new pieces, and a listener who hears any K+2 of them across several slots rebuilds it.*
 
 ### 3.6 How much is sent, and for how long
 
@@ -146,10 +163,14 @@ Mailcast was not designed once and then measured. It went from a first test tran
 | 5 Oct 16:00 | Modem drive doubled, data bursts from about 12 W to 41 W. | The Flex's meters showed the data bursts far below the tone's power. |
 | 6 Oct 11:00 | Slots alternate WN4 and WN3, the order shifting each day so every hour gets both. | To compare the two on real mail; receivers follow by autobaud. |
 | 26 Oct | The standard's mini-probe pattern only. | The earlier pattern sent false block boundaries that receivers written to the standard could not decode. |
-| 2 Nov 11:00 | WN4 on the long interleaver (bursts padded to whole 6.83 s blocks); WN3 unchanged. | It rides out longer fades. *[Tom: what prompted the change? Issue #234 records "not now" for this trial the same morning.]* |
-| 2 Nov 10:15 | Bursts of up to 31 s instead of 18 s. | *[Tom: reason not recorded. 31 s holds four long-interleaver blocks with the preamble, and fewer bursts save each burst's preamble.]* WN3 slots went from 73 to about 86 frames, and long WN4 slots carried 161 frames. |
+| 2 Nov 11:00 | WN4 on the long interleaver (bursts padded to whole 6.83 s blocks); WN3 unchanged. | The Sweden path tests (section 6.10): on 31 October WN4 with the long interleaver got 60% of its frames through in the morning against 36% for the short one, and 40% against 31% over the day. Proposed with the 2 November review of the daily reports and approved by Tom the same morning. |
+| 2 Nov 10:15 | Bursts of up to 31 s instead of 18 s. | To fit four long-interleaver blocks (about 28 s with the preamble) in one burst; Tom approved "about 28", and 31 s is what both the head end and the modem needed to allow it. Fewer bursts also save preambles: WN3 slots went from 73 to about 86 frames, and long WN4 slots carried 161 frames. |
 
 Two things follow for reading the results. Most of the reports come from after 15 October, so they describe the filled slots with the leftover tier, alternating WN4 and WN3. And the long interleaver ran only in the last six days, too short to compare with the short interleaver on the air; the Sweden path tests (section 6.10) compared them directly.
+
+![Frames sent and slot time per day, stacked by waveform, with the strategy changes of 6 October, 15 October and 2 November; 5 October's test slots shown on their own.](figures/plots/fig06-headend-per-day.png)
+
+*Figure 5. Frames sent and slot time per day, stacked by waveform, with the strategy changes of 6 October, 15 October and 2 November; 5 October's test slots shown on their own.*
 
 ## 5. Data
 
@@ -186,11 +207,23 @@ The clear-channel check found the channel busy at the start of 150 of 258 slots 
 
 *Table 2. Web SDR survey, 6 to 20 October. "Bulletins rebuilt" counts each bulletin once, when the receiver first completed it; 224 bulletins had been taken in before the survey's last slot. G4WNC was unreachable for 61 of its slots.*
 
+![Share of frames heard by each survey SDR against its median tone SNR and against its distance from Reading](figures/plots/fig01-survey-snr-vs-distance.png)
+
+*Figure 6. Share of frames heard by each survey SDR against its median tone SNR and against its distance from Reading: SNR ranks the SDRs almost perfectly (rank correlation 0.98), distance not at all (0.02).*
+
 Distance alone does not decide reception. Two SDRs over 500 km away, in Ireland and Fife, heard nearly as well as the best one 135 km away, while the two nearest, within 90 km of Reading, heard 1% and 13%. G4WNC, the nearest, had decoded 38 of 41 frames on 5 October, so its later silence says more about that SDR than about the path. We cannot separate the path from each SDR's own antenna and local noise with this data, but the tone's signal to noise tracks the share of frames heard far better than distance does.
 
 The four strongest SDRs rebuilt 198 to 223 of the 224 bulletins. Weak receivers rebuilt a good part too: M9TWM-1 decoded only a quarter of the frames sent but rebuilt 131 (58%), and G4EYR heard 13% and rebuilt 80 (36%). This is the fountain code doing its job: a bulletin was spread over several slots and several hours, and a receiver that heard a bit of each often ended up with enough.
 
+![Bulletins rebuilt by each survey SDR against its share of frames heard](figures/plots/fig07-bulletins-rebuilt-vs-share.png)
+
+*Figure 7. Bulletins rebuilt by each survey SDR against its share of frames heard: SDRs hearing 13 to 24% of frames still rebuilt 80 to 131 of the 224 bulletins taken in before the survey's last slot.*
+
 The two weeks also differed: the nearer strong SDRs heard much more in the second week (WESSEX 65% then 90%, STUEY3D 51% then 85%), while the distant ones changed little (`paper/figures/heard-share-tables.md`). Most of the difference is two bad days, 6 October (both heard nothing while EI4HQ heard 78%) and 11 October; from 12 October both heard 85 to 98% most days. The receivers' software also changed several times during the survey.
+
+![Daily share of frames heard by each survey SDR, 6 to 20 October](figures/plots/fig02-survey-daily-heatmap.png)
+
+*Figure 8. Daily share of frames heard by each survey SDR, 6 to 20 October: weak days on 6 and 11 October, and the nearer strong SDRs better in week 2.*
 
 ### 6.3 Who heard it: listeners' reports
 
@@ -213,7 +246,11 @@ The two weeks also differed: the nearer strong SDRs heard much more in the secon
 
 The picture matches the survey. On their own equipment three listeners heard about half the frames or more and five heard 13 to 24%; MM0MQN, in central Scotland, sent only two reports. All but MM0MQN heard frames in most slots, from 64% of slots for G7TAJ to 98% for GM4CXF in Ayrshire. GM8BPQ, on Lewis in the Outer Hebrides about 850 km from Reading, heard frames in three slots out of four.
 
-**Reception fell sharply from 2 November.** Every listener who reported on both sides of that date heard much less afterwards: GM4CXF from 66% to 21%, M0NVK from 67% to 37%, G7TAJ from 14% to 5%, GM8BPQ from 17% to 2%. Several things changed that day: WN4 moved to the long interleaver, bursts lengthened from 18 s to 31 s, one sender's digests were sent last, and the first slot moved from 09:00 to 10:00 as the days shortened. The drop is as large on WN3, whose coding did not change (GM4CXF 73% to 22%, GM8BPQ 20% to 3%), so the long interleaver alone does not explain it. The longer bursts, which apply to both waveforms, the season, and the station itself all remain possible causes; section 6.11 looks at the space weather. *[To resolve before publication.]*
+**Reception fell sharply from 2 November.** Every listener who reported on both sides of that date heard much less afterwards: GM4CXF from 66% to 21%, M0NVK from 67% to 37%, G7TAJ from 14% to 5%, GM8BPQ from 17% to 2%. Several things changed that day: WN4 moved to the long interleaver, bursts lengthened from 18 s to 31 s, one sender's digests were sent last, and the first slot moved from 09:00 to 10:00 as the days shortened. The drop is as large on WN3, whose coding did not change (GM4CXF 73% to 22%, GM8BPQ 20% to 3%), so the long interleaver alone does not explain it. Three explanations remain. The longer bursts apply to both waveforms and roughly double the frames in each, so a missed preamble, a deep fade or a transmit glitch now loses twice as much at once. Short transmit-side holes of 25 to 50 ms had been found on GB7RDG in late October, reduced but not eliminated by a modem change on 30 October, and longer bursts are more exposed to them. And the season moved on. Section 6.11 looks at the space weather. *[To resolve before publication: compare frames heard per burst before and after 2 November, and check the transmit-timing logs.]*
+
+![Listeners' daily share of frames heard on their own equipment, 8 October to 7 November, with October and November shares](figures/plots/fig03-listeners-daily-share.png)
+
+*Figure 9. Listeners' daily share of frames heard on their own equipment, 8 October to 7 November, with October and November shares: the November drop for GM4CXF, M0NVK, GM8BPQ and G7TAJ after the 2 November changes.*
 
 Listeners' own setups mattered a great deal. Several shared a radio with a packet node, and the reports and the channel discussion show time lost to receive filters narrower than the signal, the wrong rig mode, and audio levels.
 
@@ -239,6 +276,10 @@ Listeners' own setups mattered a great deal. Several shared a radio with a packe
 *Table 4. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
 
 WN3 is heard a little more often than WN4 by most receivers, but sends half as many frames a minute, so WN4 delivered more data a minute to every receiver except the three weakest: G8BPQ and GM8BPQ, where WN3 more than doubled the share heard, and MM0MQN. For those the order reverses, though only modestly (3.5 against 2.9 frames a minute for G8BPQ). Alternating the two cost most receivers some throughput to help a few; choosing the waveform per slot, or per listener group, from the channel measurement and the daily reports is future work.
+
+![Frames heard per minute of slot time on WN4 (1200 bps) and WN3 (600 bps) for every receiver that heard both](figures/plots/fig04-wn4-vs-wn3-frames-per-minute.png)
+
+*Figure 10. Frames heard per minute of slot time on WN4 (1200 bps) and WN3 (600 bps) for every receiver that heard both: strong receivers get about twice as much through on WN4; for weak ones the two are close.*
 
 ### 6.5 Through an ordinary rig's filters
 
@@ -274,6 +315,10 @@ Receivers measure the path in each slot from the sounding probe, or failing that
 - **Doppler spread.** Median 0.34 Hz, quartiles 0.24 to 0.52 Hz.
 
 Against the mid-latitude test channels of ITU-R F.1487, the two-path delay of 1.6 ms lies between the moderate (1 ms) and disturbed (2 ms) channels, and the Doppler spread between the quiet (0.1 Hz) and moderate (0.5 Hz) ones: a channel the 110D equaliser is designed for, fading slowly. In this data reception looks limited more by signal to noise and interference than by the channel's shape, though we have not tested that directly.
+
+![Distributions of virtual height, second mode's delay, delay spread and Doppler spread over 743 measured report slots, with median and quartiles.](figures/plots/fig05-channel-distributions.png)
+
+*Figure 11. Distributions of virtual height, second mode's delay, delay spread and Doppler spread over 743 measured report slots, with median and quartiles.*
 
 By hour of day, report slots with frames ranged from 73% at 09:00 UTC to 88% at 14:00, and the share of frames heard from 27% to 34%, with no strong pattern across the daylight window. The 09:00 slot ran only in October, before the November drop, so it is if anything flattered. The median virtual height stayed between 256 and 277 km from hour to hour, again with no clear trend over the day.
 
@@ -325,7 +370,7 @@ The idea rests on content addressing. If two stations encode the same bulletin t
 2. **Every station encodes identically.** The canonical bulletin, the compression (zstd 1.5.7, dictionary 1) and the RaptorQ coding are all fixed, and test vectors are reproduced independently in Python and Rust. This was confirmed on air on 30 October.
 3. **Stations do not send the same symbols.** Each station sends its own scrambled order of symbol numbers, so two stations rarely duplicate each other.
 
-Everything else is built: each station signs its own directory, receivers follow every station they can hear, a receiver rebuilds a bulletin with its own station's routing line, and a second copy of a bulletin already delivered is dropped and counted. A head end can also relay what its local receivers have heard from other stations. What remains is the on-air trial with a second station, John G8BPQ's GM8BPQ on 40 m at half past each hour (with a QO-100 trial to follow), to measure how much combining gains in practice.
+Everything else is built: each station signs its own directory, receivers follow every station they can hear, a receiver rebuilds a bulletin with its own station's routing line, and a second copy of a bulletin already delivered is dropped and counted. A head end can also relay what its local receivers have heard from other stations. What remains is the on-air trial. A second head end, GM8BPQ, is being set up by John Wiseman G8BPQ, on 40 m at half past each hour; QO-100 reception through a dish and LNB is already supported by the receiver. Neither the two-station trial nor the QO-100 trial had taken place at the time of writing, so how much combining gains in practice is not yet measured.
 
 ## 9. Future work
 
