@@ -2,7 +2,7 @@
 
 Tom Fanning, M0LTE
 
-*Draft, 7 November 2026. Figures come from the data in this repository and are reproduced by `paper/figures/results.py` and `paper/figures/heard_share.py`. Listener callsigns are as they appear in public bulletins; consent to name them is still to be asked.*
+*Draft, 7 November 2026. Figures come from the data in this repository and are reproduced by the scripts in `paper/figures/`. Listeners are named by callsign, with their consent.*
 
 ## Abstract
 
