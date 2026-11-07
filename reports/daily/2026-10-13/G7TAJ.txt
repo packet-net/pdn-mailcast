@@ -1,0 +1,17 @@
+Title: MCR G7TAJ 2026-10-13
+From: G7TAJ@GB7BEX.#38.GBR.EU
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Source: GB7RDG's LinBPQ mail store (m_004131.mes), dumped by an earlier Claude Code session; recovered from that session's log
+Check: none available (the dump kept no size)
+Agrees with: 1 other copy
+
+MCR1 0.10.0 IO81le sc 18/0 0 18
+09 W4 19 4 +6.8 IM+PU 2 0.5/-1 0.29 0.17 - p
+10 W3 2 7 +7.1 IU+PU 1 - 0.31 0.14 - p
+11 W4 14 - - IU+PU
+12 W3 7 - - IU+PU
+13 W4 23 4 +6.1 IG+PU 2 - 0.29 0.12 - p
+14 W3 17 8 +6.0 IU+PU 1 - 0.3 0.12 - p
+15 W4 91 11 +6.3 IG+PG 2 1.4/-14 0.32 0.11 211 p
+16 W3 44 8 +6.6 IU+PG 2 1.7/-14 0.37 0.12 260 p

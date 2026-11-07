@@ -1,0 +1,18 @@
+Title: MCR EI7KX 2026-11-06
+From: EI7KX
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 63102AEI7KX
+Source: GB7RDG's LinBPQ mail store, message 4700 (m_004700.mes), copied 2026-11-07
+Check: stored size matches the BBS's index
+
+R:261106/1530Z 403@EI7KX.EI7KX.IRL.EURO LinBPQ6.0.26
+
+MCR1 0.33.1 IO83jj nope.tunnel.ubersdr.org 1/1 0 0 5 0 2
+10 W3 14 -3 +0.5 IU+PG 2 1.7/-2 0.82 0.69 267 p
+11 W4 11 5 +0.0 IU+PU 2 1.4/-11 0.35 0.75 223 b
+12 W3 9 8 +0.0 IU+PU 2 1.9/-21 0.28 0.71 293 p
+13 W4 5 3 -0.3 IU+PU 3 2.4/-10 1.24 1.22 368 p
+14 W3 1 1 +0.0 IU+PU 2 1.7/-7 0.72 0.48 271 p
+15 - 0 2 +0.2 IU+PU 3 1.7/-11 0.66 0.74 270 p
+S M0LTE 6 6 40 1 3 270 0

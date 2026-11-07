@@ -1,0 +1,19 @@
+Title: MCR GM4CXF 2026-11-05
+From: GM4CXF
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 6309NKGM4CXF
+Source: GB7RDG's LinBPQ mail store, message 4699 (m_004699.mes), copied 2026-11-07
+Check: stored size matches the BBS's index
+
+R:261105/1630Z 254@GB7CXF.#78.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.32.0 IO75qn sc 11/10 0 0 1
+10 W4 20 17 -0.1 IU+PU 2 1.4/-13 0.34 0.26 252 p
+11 W3 19 11 -0.2 IU+PG 3 1.2/-8 0.8 0.59 235 p
+12 W4 18 - - IU+PU
+13 W3 41 15 -0.3 IU+PG 2 1.2/-5 0.56 0.5 236 p
+14 W4 18 14 -0.1 IU+PU 1 - 0.27 0.23 - p
+15 W3 9 10 -0.4 IU+PU 2 1.7/-5 0.97 0.43 293 p
+16 W4 47 16 -0.8 IU+PU 2 - 0.78 0.95 - p
+S M0LTE 7 7 172 11 14 244 0

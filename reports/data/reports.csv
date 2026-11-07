@@ -1,0 +1,125 @@
+day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_up,outside_pieces,touched,errors,slots,slots_heard,frames,source_kind,check_kind,file
+2026-10-08,G7TAJ,0.8.2,,sc,0,0,,,,,,7,5,2,bbs-read-log,size-verified,daily/2026-10-08/G7TAJ.txt
+2026-10-08,G8BPQ,0.8.1,,sc,1,1,,,,,AUD1 BBS6,7,7,22,bbs-store,size-verified,daily/2026-10-08/G8BPQ.txt
+2026-10-08,GM8BPQ,0.8.1,,sc,2,2,,,,,AUD1,7,6,40,bbs-store,size-verified,daily/2026-10-08/GM8BPQ.txt
+2026-10-08,M9TWM,0.8.2,IO93fj,m9twm-1.tunnel.ubersdr.org,0,0,,,,,,8,6,25,bbs-read,size-verified,daily/2026-10-08/M9TWM.txt
+2026-10-09,G7TAJ,0.8.6,,sc,3,0,,,,,,8,6,76,bbs-read-log,size-verified,daily/2026-10-09/G7TAJ.txt
+2026-10-09,G8BPQ,0.8.6,,sc,14,14,,,,,AUD884,8,8,177,bbs-read,none,daily/2026-10-09/G8BPQ.txt
+2026-10-09,GM8BPQ,0.8.6,,sc,17,17,,,,,AUD883,8,8,254,bbs-read-log,size-verified,daily/2026-10-09/GM8BPQ.txt
+2026-10-09,M0NVK,0.8.6,,wessex.zapto.org,9,0,,,,,,5,5,332,bbs-store-dump,none,daily/2026-10-09/M0NVK.txt
+2026-10-10,G7TAJ,0.8.10,,sc,0,0,0,,,,AUD53,5,2,2,bbs-read-log,size-verified,daily/2026-10-10/G7TAJ.txt
+2026-10-10,GM8BPQ,0.8.10,,sc,6,1,0,,,,BBS6,2,2,76,bbs-read-log,size-verified,daily/2026-10-10/GM8BPQ.txt
+2026-10-10,M0NVK,0.8.8,IO80qr,wessex.zapto.org,10,0,,,,,,8,8,571,bbs-store-dump,none,daily/2026-10-10/M0NVK.txt
+2026-10-11,G7TAJ,0.8.11,,sc,0,0,0,,,,,8,3,10,bbs-read-log,size-verified,daily/2026-10-11/G7TAJ.txt
+2026-10-11,G8BPQ,0.9.1,,sc,1,1,0,,,,BBS6,8,4,72,bbs-read,none,daily/2026-10-11/G8BPQ.txt
+2026-10-11,GM8BPQ,0.9.1,,sc,17,22,0,,,,BBS20,8,8,207,bbs-read-log,size-verified,daily/2026-10-11/GM8BPQ.txt
+2026-10-12,G7TAJ,0.9.1,,sc,7,0,7,,,,,8,6,125,bbs-read-log,size-verified,daily/2026-10-12/G7TAJ.txt
+2026-10-12,G8BPQ,0.9.1,,sc,25,25,0,,,,,8,8,322,bbs-read,none,daily/2026-10-12/G8BPQ.txt
+2026-10-13,G7TAJ,0.10.0,IO81le,sc,18,0,18,,,,,8,8,217,bbs-store-dump,none,daily/2026-10-13/G7TAJ.txt
+2026-10-13,G8BPQ,0.10.0,IO92kx,sc,14,14,0,,,,,8,8,306,bbs-read,none,daily/2026-10-13/G8BPQ.txt
+2026-10-13,GM8BPQ,0.10.0,IO68vl,sc,13,13,0,,,,,8,8,325,bbs-store-dump,none,daily/2026-10-13/GM8BPQ.txt
+2026-10-14,G7TAJ,0.12.0,IO81le,sc,7,0,7,,,,,8,8,137,bbs-read-log,size-verified,daily/2026-10-14/G7TAJ.txt
+2026-10-14,G8BPQ,0.12.0,IO92kx,sc,11,11,0,,,,,8,8,231,bbs-read,none,daily/2026-10-14/G8BPQ.txt
+2026-10-15,G8BPQ,0.13.0,IO92kx,sc,14,14,0,0,,,,8,8,284,bbs-read,none,daily/2026-10-15/G8BPQ.txt
+2026-10-15,M0NVK,0.14.0,IO90hr,sdrconnect,0,0,0,0,,,AUD12,8,2,63,pasted,none,daily/2026-10-15/M0NVK.txt
+2026-10-16,G8BPQ,0.15.0,IO92kx,sc,11,11,0,2,,,,7,7,197,bbs-read,none,daily/2026-10-16/G8BPQ.txt
+2026-10-16,M0NVK,0.15.0,IO90hr,sdrconnect,31,1,30,2,,,,8,8,756,pasted,none,daily/2026-10-16/M0NVK.txt
+2026-10-17,G8BPQ,0.16.2,IO92kx,sc,6,6,0,0,,,,7,7,153,bbs-read,none,daily/2026-10-17/G8BPQ.txt
+2026-10-17,M0NVK,0.15.0,IO90hr,sdrconnect,12,1,11,2,,,,8,8,770,pasted,none,daily/2026-10-17/M0NVK.txt
+2026-10-18,G8BPQ,0.16.2,IO92kx,sc,7,7,0,0,,,AUD11 RIG21,8,6,112,bbs-read,none,daily/2026-10-18/G8BPQ.txt
+2026-10-19,G7TAJ,0.16.2,IO81le,sc,10,0,10,2,,,,8,8,214,bbs-read,size-verified,daily/2026-10-19/G7TAJ.txt
+2026-10-19,G8BPQ,0.16.2,IO92kx,sc,2,2,0,0,,,AUD1 RIG2,1,1,30,bbs-read,size-verified,daily/2026-10-19/G8BPQ.txt
+2026-10-19,GM8BPQ,0.16.2,IO68vl,sc,2,2,0,5,,,RIG16,8,8,99,bbs-read,size-verified,daily/2026-10-19/GM8BPQ.txt
+2026-10-19,M0NVK,0.16.2,IO90hr,sdrconnect,0,0,0,0,,,AUD1791,8,0,0,bbs-read,none,daily/2026-10-19/M0NVK.txt
+2026-10-20,G7TAJ,0.16.2,IO81le,sc,12,0,12,0,,,,8,8,230,bbs-read,size-verified,daily/2026-10-20/G7TAJ.txt
+2026-10-20,G8BPQ,0.16.2,IO92kx,sc,3,3,0,3,,,AUD1161 RIG16,8,8,199,bbs-read,size-verified,daily/2026-10-20/G8BPQ.txt
+2026-10-20,GM8BPQ,0.16.2,IO68vl,sc,1,1,0,2,,,RIG16,8,7,118,bbs-read,size-verified,daily/2026-10-20/GM8BPQ.txt
+2026-10-20,M0NVK,0.16.2,IO90hr,sdrconnect,0,0,0,0,,,AUD1791,8,0,0,bbs-read,none,daily/2026-10-20/M0NVK.txt
+2026-10-21,G7TAJ,0.16.2,IO81le,sc,0,0,0,0,,,,8,1,0,bbs-read,size-verified,daily/2026-10-21/G7TAJ.txt
+2026-10-21,G8BPQ,0.16.2,IO92kx,sc,6,6,0,9,,,AUD155 RIG16,8,7,101,bbs-read,size-verified,daily/2026-10-21/G8BPQ.txt
+2026-10-21,GM8BPQ,0.16.2,IO68vl,sc,6,6,0,6,,,RIG16,8,8,124,bbs-read,size-verified,daily/2026-10-21/GM8BPQ.txt
+2026-10-21,M7TAW,0.16.2,IO80qr,wessex.zapto.org,11,11,0,0,,,,8,8,724,bbs-read,none,daily/2026-10-21/M7TAW.txt
+2026-10-22,G7TAJ,0.16.2,IO81le,sc,0,0,0,0,,,,8,0,0,bbs-read,size-verified,daily/2026-10-22/G7TAJ.txt
+2026-10-22,G8BPQ,0.16.2,IO92kx,sc,0,0,0,13,,,AUD3 RIG18,7,1,0,bbs-read,size-verified,daily/2026-10-22/G8BPQ.txt
+2026-10-22,GM8BPQ,0.16.2,IO68vl,sc,11,11,0,13,,,AUD44 RIG16,8,4,171,bbs-read,size-verified,daily/2026-10-22/GM8BPQ.txt
+2026-10-22,M0NVK,0.16.2,IO90hr,sdrconnect,5,0,5,0,,,AUD2,8,3,147,bbs-read,none,daily/2026-10-22/M0NVK.txt
+2026-10-22,M7TAW,0.16.2,IO80qr,wessex.zapto.org,2,2,0,0,,,,8,4,130,bbs-read,none,daily/2026-10-22/M7TAW.txt
+2026-10-22,M9TWM,0.16.2,,m9twm-1.tunnel.ubersdr.org,0,0,0,0,,,AUD224,8,0,0,bbs-read,size-verified,daily/2026-10-22/M9TWM.txt
+2026-10-23,G7TAJ,0.17.1,IO81le,sc,0,0,0,0,,,AUD977,8,0,0,bbs-read,size-verified,daily/2026-10-23/G7TAJ.txt
+2026-10-23,G8BPQ,0.17.1,IO92kx,sc,1,1,0,0,,,RIG16,8,8,58,bbs-read,size-verified,daily/2026-10-23/G8BPQ.txt
+2026-10-23,GM8BPQ,0.17.1,IO68vl,sc,4,4,0,0,,,AUD8 RIG17,8,8,104,bbs-read,size-verified,daily/2026-10-23/GM8BPQ.txt
+2026-10-23,M0NVK,0.17.1,IO90hr,sdrconnect,15,4,11,2,,,,8,8,459,bbs-read,none,daily/2026-10-23/M0NVK.txt
+2026-10-23,M9TWM,0.17.1,IO93fj,m9twm-1.tunnel.ubersdr.org,10,0,10,0,,,,8,8,176,bbs-read,size-verified,daily/2026-10-23/M9TWM.txt
+2026-10-24,G7TAJ,0.17.1,IO81le,sc,0,0,0,0,,,AUD140,8,0,0,bbs-read,size-verified,daily/2026-10-24/G7TAJ.txt
+2026-10-24,G8BPQ,0.17.1,IO92kx,sc,1,1,0,18,,,RIG16,8,8,58,bbs-read,size-verified,daily/2026-10-24/G8BPQ.txt
+2026-10-24,GM8BPQ,0.17.1,IO68vl,sc,2,2,0,3,,,RIG16,8,8,108,bbs-read,size-verified,daily/2026-10-24/GM8BPQ.txt
+2026-10-24,M0NVK,0.17.1,IO90hr,sdrconnect,0,0,0,9,,,AUD200,8,0,0,bbs-read,none,daily/2026-10-24/M0NVK.txt
+2026-10-24,M7TAW,0.17.1,IO91ma,sc,20,20,0,0,,,,8,8,454,pasted,none,daily/2026-10-24/M7TAW.txt
+2026-10-24,M9TWM,0.18.0,IO93fj,m9twm-1.tunnel.ubersdr.org,3,0,3,4,,,,8,8,79,bbs-read,size-verified,daily/2026-10-24/M9TWM.txt
+2026-10-25,G7TAJ,0.17.1,IO81le,sc,0,0,0,0,,,AUD127,7,0,0,bbs-read,size-verified,daily/2026-10-25/G7TAJ.txt
+2026-10-25,G8BPQ,0.18.0,IO92kx,sc,0,0,0,0,,,RIG16,8,8,184,bbs-read,size-verified,daily/2026-10-25/G8BPQ.txt
+2026-10-25,GM4CXF,0.18.0,IO75qn,sc,24,24,0,0,,,BBS6,8,8,626,bbs-read,none,daily/2026-10-25/GM4CXF.txt
+2026-10-25,GM8BPQ,0.18.0,IO68vl,sc,0,0,0,3,,,RIG16,8,8,145,bbs-read,size-verified,daily/2026-10-25/GM8BPQ.txt
+2026-10-25,M7TAW,0.18.0,IO91ma,sc,23,23,0,0,,,,8,8,594,pasted,none,daily/2026-10-25/M7TAW.txt
+2026-10-25,M9TWM,0.18.0,IO93fj,m9twm-1.tunnel.ubersdr.org,1,0,1,0,,,,8,8,165,bbs-read,size-verified,daily/2026-10-25/M9TWM.txt
+2026-10-26,G7TAJ,0.20.0,,wessex.zapto.org,35,0,35,0,,,,7,7,696,bbs-read,size-verified,daily/2026-10-26/G7TAJ.txt
+2026-10-26,G8BPQ,0.20.0,IO92kx,sc,6,6,0,10,,,RIG17,8,8,185,bbs-read,size-verified,daily/2026-10-26/G8BPQ.txt
+2026-10-26,GM4CXF,0.18.0,IO75qn,sc,15,15,0,0,,,,8,8,587,bbs-read,none,daily/2026-10-26/GM4CXF.txt
+2026-10-26,GM8BPQ,0.20.0,IO68vl,sc,0,0,0,5,,,AUD527 RIG14,6,1,15,bbs-read,size-verified,daily/2026-10-26/GM8BPQ.txt
+2026-10-26,M7TAW,0.20.0,IO80qr,wessex.zapto.org,35,16,19,0,,,,7,7,731,pasted,none,daily/2026-10-26/M7TAW.txt
+2026-10-26,M9TWM,0.20.0,IO93fj,m9twm-1.tunnel.ubersdr.org,4,0,4,2,,,,8,7,170,bbs-read,size-verified,daily/2026-10-26/M9TWM.txt
+2026-10-27,G7TAJ,0.21.0,,wessex.zapto.org,11,0,11,3,,,,7,6,334,bbs-read,size-verified,daily/2026-10-27/G7TAJ.txt
+2026-10-27,G8BPQ,0.21.0,IO92kx,sc,10,10,0,21,,,RIG16,8,8,216,bbs-read,size-verified,daily/2026-10-27/G8BPQ.txt
+2026-10-27,GM4CXF,0.21.0,IO75qn,sc,13,13,0,1,,,,8,8,570,bbs-read,none,daily/2026-10-27/GM4CXF.txt
+2026-10-27,GM8BPQ,0.21.0,IO68vl,sc,1,1,0,0,,,HOOK1 RIG18,8,7,116,bbs-read,size-verified,daily/2026-10-27/GM8BPQ.txt
+2026-10-27,M7TAW,0.21.0,IO91ma,sc,12,12,0,0,,,,8,7,526,pasted,none,daily/2026-10-27/M7TAW.txt
+2026-10-27,M9TWM,0.21.0,IO93fj,m9twm-1.tunnel.ubersdr.org,9,0,9,23,,,,8,8,183,bbs-read,size-verified,daily/2026-10-27/M9TWM.txt
+2026-10-28,G7TAJ,0.22.0,IO81le,sc,1,0,1,0,,,,8,8,193,bbs-read,size-verified,daily/2026-10-28/G7TAJ.txt
+2026-10-28,G8BPQ,0.22.0,IO92kx,sc,1,1,0,22,,,RIG16,8,8,186,bbs-read,size-verified,daily/2026-10-28/G8BPQ.txt
+2026-10-28,GM4CXF,0.21.0,IO75qn,sc,22,22,0,0,,,,8,8,665,bbs-read,none,daily/2026-10-28/GM4CXF.txt
+2026-10-28,GM8BPQ,0.22.0,IO68vl,sc,0,0,0,41,,,HOOK1 RIG17,8,7,94,bbs-read,size-verified,daily/2026-10-28/GM8BPQ.txt
+2026-10-28,M0NVK,0.17.1,IO90hr,sdrconnect,17,0,17,0,,,,8,8,747,bbs-read,none,daily/2026-10-28/M0NVK.txt
+2026-10-28,M7TAW,0.22.0,IO91ma,sc,8,8,0,0,,,AUD1 RIG84,8,8,482,pasted,none,daily/2026-10-28/M7TAW.txt
+2026-10-28,M9TWM,0.22.0,IO93fj,m9twm-1.tunnel.ubersdr.org,0,0,0,17,,,,8,8,238,bbs-read,size-verified,daily/2026-10-28/M9TWM.txt
+2026-10-29,G7TAJ,0.22.0,IO81le,sc,6,0,6,0,,,,8,6,114,bbs-read,size-verified,daily/2026-10-29/G7TAJ.txt
+2026-10-29,G8BPQ,0.22.0,IO92kx,sc,14,14,0,2,,,RIG16,8,7,275,bbs-read,size-verified,daily/2026-10-29/G8BPQ.txt
+2026-10-29,GM8BPQ,0.22.0,IO68vl,sc,2,1,1,5,,,RIG17,8,7,65,bbs-read,size-verified,daily/2026-10-29/GM8BPQ.txt
+2026-10-29,M7TAW,0.22.0,IO91ma,sc,11,11,0,0,,,,8,8,253,pasted,none,daily/2026-10-29/M7TAW.txt
+2026-10-30,G7TAJ,0.25.0,IO81le,sc,9,0,9,0,,,,8,7,213,bbs-store,size-verified,daily/2026-10-30/G7TAJ.txt
+2026-10-30,G8BPQ,0.23.0,IO92kx,sc,13,13,0,20,,,RIG17,8,8,289,bbs-store,size-verified,daily/2026-10-30/G8BPQ.txt
+2026-10-30,GM4CXF,0.23.0,IO75qn,sc,18,18,0,3,,,,8,8,716,bbs-store,size-verified,daily/2026-10-30/GM4CXF.txt
+2026-10-30,GM8BPQ,0.23.0,IO68vl,sc,12,12,0,10,,,RIG21,8,8,237,bbs-store,size-verified,daily/2026-10-30/GM8BPQ.txt
+2026-10-30,M7TAW,0.23.0,IO91ma,sc,21,21,0,15,,,,8,8,679,pasted,none,daily/2026-10-30/M7TAW.txt
+2026-10-30,M9TWM,0.23.0,IO93fj,m9twm-1.tunnel.ubersdr.org,14,0,14,23,,,,8,8,287,bbs-store,size-verified,daily/2026-10-30/M9TWM.txt
+2026-10-31,G7TAJ,0.25.0,IO81le,sc,5,0,4,25,,,,8,8,172,bbs-store,size-verified,daily/2026-10-31/G7TAJ.txt
+2026-10-31,G8BPQ,0.28.1,IO92kx,sc,2,1,1,7,,,RIG15,8,7,205,bbs-store,size-verified,daily/2026-10-31/G8BPQ.txt
+2026-10-31,GM4CXF,0.23.0,IO75qn,sc,13,13,0,0,,,,8,8,610,bbs-store,size-verified,daily/2026-10-31/GM4CXF.txt
+2026-10-31,GM8BPQ,0.28.1,IO68vl,sc,1,1,0,28,,,RIG18,8,6,127,bbs-store,size-verified,daily/2026-10-31/GM8BPQ.txt
+2026-10-31,M7TAW,0.26.1,IO91ma,sc,16,12,0,0,,,,8,8,572,pasted,none,daily/2026-10-31/M7TAW.txt
+2026-11-01,G7TAJ,0.29.1,IO81le,sc,0,0,1,5,,,,8,2,23,bbs-store,size-verified,daily/2026-11-01/G7TAJ.txt
+2026-11-01,G8BPQ,0.29.1,IO92kx,sc,0,0,0,0,,,AUD1 HOOK3 RIG3,5,0,0,bbs-store,size-verified,daily/2026-11-01/G8BPQ.txt
+2026-11-01,GM4CXF,0.29.1,IO75qn,sc,2,1,0,0,,,,8,6,215,bbs-store,size-verified,daily/2026-11-01/GM4CXF.txt
+2026-11-01,GM8BPQ,0.29.1,IO68vl,sc,1,0,0,3,,,AUD11 HOOK2 RIG11,8,4,19,bbs-store,size-verified,daily/2026-11-01/GM8BPQ.txt
+2026-11-02,EI7KX,0.29.1,IO83jj,nope.tunnel.ubersdr.org,1,0,0,0,,,,8,8,93,bbs-store,size-verified,daily/2026-11-02/EI7KX.txt
+2026-11-02,G7TAJ,0.30.0,IO81le,sc,1,0,1,8,,,,8,7,50,bbs-store,size-verified,daily/2026-11-02/G7TAJ.txt
+2026-11-02,GM4CXF,0.30.0,IO75qn,sc,15,7,0,0,,,,8,8,224,bbs-store,size-verified,daily/2026-11-02/GM4CXF.txt
+2026-11-02,GM8BPQ,0.30.0,IO68vl,sc,0,1,0,0,,,RIG13,8,8,29,bbs-store,size-verified,daily/2026-11-02/GM8BPQ.txt
+2026-11-03,EI7KX,0.29.1,IO83jj,nope.tunnel.ubersdr.org,15,12,0,3,,,,7,7,194,bbs-store,size-verified,daily/2026-11-03/EI7KX.txt
+2026-11-03,G7TAJ,0.32.0,IO81le,sc,0,0,0,5,0,3,,13,6,31,bbs-store,size-verified,daily/2026-11-03/G7TAJ.txt
+2026-11-03,GM4CXF,0.32.0,IO75qn,sc,7,15,0,1,,,,7,7,121,bbs-store,size-verified,daily/2026-11-03/GM4CXF.txt
+2026-11-03,GM8BPQ,0.32.0,IO68vl,sc,0,0,0,0,,,,7,4,3,bbs-store,size-verified,daily/2026-11-03/GM8BPQ.txt
+2026-11-03,M0NVK,0.17.1,IO90hr,sdrconnect,18,0,18,0,,,,7,7,297,pasted,none,daily/2026-11-03/M0NVK.txt
+2026-11-04,EI7KX,0.33.1,IO83jj,nope.tunnel.ubersdr.org,5,5,0,7,0,6,AUD1,7,5,125,bbs-store,size-verified,daily/2026-11-04/EI7KX.txt
+2026-11-04,GM4CXF,0.32.0,IO75qn,sc,6,6,0,6,0,1,,7,7,161,bbs-store,size-verified,daily/2026-11-04/GM4CXF.txt
+2026-11-04,GM8BPQ,0.32.0,IO68vl,sc,0,0,0,0,,,AUD404 RIG14,7,3,6,bbs-store,size-verified,daily/2026-11-04/GM8BPQ.txt
+2026-11-04,M0NVK,0.33.1,IO90hr,sdrconnect,9,0,7,4,0,1,,7,7,280,pasted,none,daily/2026-11-04/M0NVK.txt
+2026-11-05,EI7KX,0.33.1,IO83jj,nope.tunnel.ubersdr.org,14,14,0,0,,,BBS7,7,7,216,bbs-store,size-verified,daily/2026-11-05/EI7KX.txt
+2026-11-05,GM4CXF,0.32.0,IO75qn,sc,11,10,0,1,,,,7,7,172,bbs-store,size-verified,daily/2026-11-05/GM4CXF.txt
+2026-11-05,GM8BPQ,0.32.0,IO68vl,sc,0,0,0,0,,,RIG14,7,5,11,bbs-store,size-verified,daily/2026-11-05/GM8BPQ.txt
+2026-11-05,M0NVK,0.33.1,IO90hr,sdrconnect,10,0,12,1,,,,7,7,306,pasted,none,daily/2026-11-05/M0NVK.txt
+2026-11-06,EI7KX,0.33.1,IO83jj,nope.tunnel.ubersdr.org,1,1,0,5,0,2,,6,6,40,bbs-store,size-verified,daily/2026-11-06/EI7KX.txt
+2026-11-06,GM4CXF,0.33.1,IO75qn,sc,6,8,0,3,0,1,,6,6,142,bbs-store,size-verified,daily/2026-11-06/GM4CXF.txt
+2026-11-06,GM8BPQ,0.32.0,IO68vl,sc,0,0,0,0,,,RIG12,6,6,10,bbs-store,size-verified,daily/2026-11-06/GM8BPQ.txt
+2026-11-06,M0NVK,0.33.1,IO90hr,sdrconnect,7,0,7,2,,,,6,6,182,pasted,none,daily/2026-11-06/M0NVK.txt
+2026-11-07,EI7KX,0.33.1,IO83jj,nope.tunnel.ubersdr.org,7,6,0,1,,,AUD1,6,6,106,bbs-store,size-verified,daily/2026-11-07/EI7KX.txt
+2026-11-07,GM8BPQ,0.32.0,IO68vl,sc,1,0,0,0,,,RIG12,6,6,21,bbs-store,size-verified,daily/2026-11-07/GM8BPQ.txt

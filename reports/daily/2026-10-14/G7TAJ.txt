@@ -1,0 +1,21 @@
+Title: MCR G7TAJ 2026-10-14
+From: G7TAJ@GB7BEX.#38.GBR.EU
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 628790G7TAJ
+Source: GB7RDG, read by an earlier Claude Code session; recovered from that session's log
+Check: body length matches the BBS's stated 443 bytes
+Agrees with: 1 other copy
+
+R:261014/1659Z 14798@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261014/1659Z 9726@GB7BWR.#45.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.12.0 IO81le sc 7/0 0 7
+09 W3 9 - - IG+PU 1 - 0.42 0.48 - b
+10 W4 10 0 +5.7 IU+PU 1 - 0.41 1.01 - b
+11 W3 18 8 +6.5 IU+PU 3 1.7/-12 0.45 0.44 264 p
+12 W4 4 1 +5.3 IU+PU 1 - 0.3 0.96 - p
+13 W3 18 -3 +6.9 IG+PU 1 - 0.41 0.25 - b
+14 W4 34 - - IG+PU
+15 W3 19 4 +7.2 IG+PG
+16 W4 25 12 +5.8 IG+PG 2 1.8/-15 0.36 0.14 267 p

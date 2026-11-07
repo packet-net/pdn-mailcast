@@ -1,0 +1,14 @@
+Title: MCR M0NVK 2026-10-15
+From: M0NVK
+Source: pasted by M0LTE on 2026-11-07 (report text only, no BBS headers)
+Check: none available
+
+MCR1 0.14.0 IO90hr sdrconnect 0/0 12:AUD12 0 0
+09 - 0 - - IU+PU
+10 - 0 - - IU+PU
+11 - 0 - - IU+PU
+12 - 0 - - IU+PU
+13 - 0 - - IU+PU
+14 - 0 - - IU+PU
+15 - 0 -15 +5.0 IU+PU
+16 W3 63 21 +5.4 IU+PG 2 1.7/-13 0.38 0.19 262 p
