@@ -4,7 +4,8 @@
 //
 // Reads every reports/daily/YYYY-MM-DD/CALL.txt (a few header lines we write, a blank line, then
 // the report as the BBS held it) with the receiver's own parser, and writes reports.csv, slots.csv
-// and stations.csv in reports/data. Fails, naming the file, on any report it cannot read.
+// and stations.csv in reports/data. A report it cannot read is left out of the tables and named
+// on stderr (as a GitHub Actions warning), so one bad file never holds up the rest.
 
 using System.Globalization;
 using System.Text;
@@ -35,9 +36,22 @@ foreach (var file in files)
         .Where(p => p.Length == 2)
         .GroupBy(p => p[0])
         .ToDictionary(g => g.Key, g => g.First()[1].Trim());
-    if (split < 0 || !head.TryGetValue("Title", out var title) || !DailyReport.TryParse(title, text[(split + 2)..], out var r) || r is null)
+    DailyReport? r = null;
+    try
     {
-        Console.Error.WriteLine($"{file}: not a daily report this can read");
+        if (split >= 0 && head.TryGetValue("Title", out var title))
+        {
+            DailyReport.TryParse(title, text[(split + 2)..], out r);
+        }
+    }
+    catch (Exception e) when (e is ArgumentException or InvalidOperationException or OverflowException or IndexOutOfRangeException)
+    {
+        r = null;
+    }
+
+    if (r is null)
+    {
+        Console.Error.WriteLine($"::warning file=reports/{Path.GetRelativePath(root, file).Replace('\\', '/')}::not a daily report this can read; left out of the tables");
         failed++;
         continue;
     }
@@ -65,17 +79,12 @@ foreach (var file in files)
     }
 }
 
-if (failed > 0)
-{
-    return 1;
-}
-
 var data = Directory.CreateDirectory(Path.Combine(root, "data")).FullName;
 var utf8 = new UTF8Encoding(false);
 File.WriteAllText(Path.Combine(data, "reports.csv"), reports.ToString().Replace("\r\n", "\n", StringComparison.Ordinal), utf8);
 File.WriteAllText(Path.Combine(data, "slots.csv"), slots.ToString().Replace("\r\n", "\n", StringComparison.Ordinal), utf8);
 File.WriteAllText(Path.Combine(data, "stations.csv"), stations.ToString().Replace("\r\n", "\n", StringComparison.Ordinal), utf8);
-Console.WriteLine($"read {files.Count} reports; wrote {data}");
+Console.WriteLine($"read {files.Count - failed} of {files.Count} reports; wrote {data}");
 return 0;
 
 static string N(int? v) => v is { } x ? x.ToString(CultureInfo.InvariantCulture) : "";

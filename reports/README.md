@@ -56,7 +56,7 @@ Listeners can fill gaps from their own BBS, which keeps a copy of each report th
 
 New reports on GB7RDG arrive by themselves: see the next section. The workflow `reports.yml` regenerates the tables whenever reports land on main.
 
-From anywhere else (a listener's own BBS, an email): make `daily/YYYY-MM-DD/CALL.txt` with at least the `Title`, `From` and `Source` lines, a blank line, then the message text as the BBS showed it, and push it to main. A report already in `daily/` is never overwritten by the import. To check a file before pushing, `dotnet run --project tools/Mailcast.ReportArchive -- reports` stops and names any report it can't read.
+From anywhere else (a listener's own BBS, an email): make `daily/YYYY-MM-DD/CALL.txt` with at least the `Title`, `From` and `Source` lines, a blank line, then the message text as the BBS showed it, and push it to main. A report already in `daily/` is never overwritten by the import. To check a file before pushing, run `dotnet run --project tools/Mailcast.ReportArchive -- reports`: it names any report it can't read and leaves it out of the tables.
 
 ## Automatic copying from GB7RDG
 

@@ -37,11 +37,12 @@ def main() -> int:
     added = 0
     for m in TITLE.finditer(index):
         # A DIRMES.SYS record, as LinBPQ 6.0.25 writes it: type, status, number (int32),
-        # length (int32), ..., via at 22, from at 62, to at 69, BID at 76, title at 89.
+        # length (int32), ..., from at 62, to at 69, BID at 76, title at 89.
         i = m.start() - 89
         if i < 0:
             continue
-        kind, number, length = chr(index[i]), *struct.unpack("<ii", index[i + 2:i + 10])
+        kind, status = chr(index[i]), chr(index[i + 1])
+        number, length = struct.unpack("<ii", index[i + 2:i + 10])
         frm, to, bid, title = text(index[i + 62:i + 69]), text(index[i + 69:i + 76]), text(index[i + 76:i + 89]), text(index[i + 89:i + 150])
         call, day = m.group(1).decode(), m.group(2).decode()
         if kind not in "BP" or title != f"MCR {call} {day}" or frm != call:
@@ -53,19 +54,27 @@ def main() -> int:
         try:
             raw = fetch(f"{BPQ}/Mail/{name}")
         except subprocess.CalledProcessError:
-            print(f"{title}: {name} is gone from the mail store", file=sys.stderr)
+            # A killed message's file goes at the next housekeeping, before its index entry does.
+            if status != "K":
+                print(f"{title}: {name} is gone from the mail store", file=sys.stderr)
+            continue
+        if len(raw) != length:
+            # Still being written, or damaged: try again next run rather than keep a bad copy.
+            print(f"{title}: {name} is {len(raw)} bytes, the index says {length}; not copied", file=sys.stderr)
             continue
         body = raw.decode("latin-1").replace("\r\n", "\n")
         if body.startswith("MID:"):
             body = body.partition("\n\n")[2]
-        if "MCR1" not in body:
+        if not re.search(r"^MCR\d+ ", body, re.M):
+            print(f"{title}: {name} has no MCR header line; not copied", file=sys.stderr)
             continue
-        check = "stored size matches the BBS's index" if len(raw) == length else "STORED SIZE DOES NOT MATCH THE INDEX"
+        check = "stored size matches the BBS's index"
         head = [f"Title: {title}", f"From: {frm}", f"To: {to}@GB7RDG.#42.GBR.EURO" if to == "MCAST" else f"To: {to}",
                 f"Type: {'B (bulletin)' if kind == 'B' else 'P (personal mail)'}", f"Bid: {bid}",
                 f"Source: GB7RDG's LinBPQ mail store, message {number} ({name}), copied {today}", f"Check: {check}"]
         os.makedirs(os.path.dirname(out), exist_ok=True)
-        with open(out, "w", newline="\n") as f:
+        # latin-1 both ways keeps the BBS's bytes as they were, whatever they are.
+        with open(out, "w", encoding="latin-1", newline="\n") as f:
             f.write("\n".join(head) + "\n\n" + body.strip("\n") + "\n")
         print(f"added {day}/{call}.txt")
         added += 1
