@@ -1,0 +1,16 @@
+Bid: 27221_LU9DCE
+Title: DX NEWS 06-NOV
+Size: 812
+FirstSeen: 2026-11-07
+From: LU9DCE
+TakenIn: 2026-11-07T09:46:54.005Z
+Object: 6a1a1045feed2371
+Dictionary: 1
+Oti: 00000000520000f001000104
+NextEsi: 6
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: e839bd1dadf2254d
+EnvelopeOti: 000000008a0000f001000104
+EnvelopeNextEsi: 6
+FirstSlot: 2026-11-07T10:00Z

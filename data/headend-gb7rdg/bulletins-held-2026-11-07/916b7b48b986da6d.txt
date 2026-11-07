@@ -1,0 +1,15 @@
+Bid: 26694_LU9DCE
+Title: SPACE 01-NOV
+Size: 8574
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: 7dd5295aab4e01a7
+Dictionary: 1
+Oti: 00000007170000f001000104
+NextEsi: 47
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 90bf3de7cdb7ecbc
+EnvelopeOti: 000000006f0000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-11-01T15:00Z

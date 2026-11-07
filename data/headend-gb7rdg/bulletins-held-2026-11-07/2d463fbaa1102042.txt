@@ -1,0 +1,9 @@
+Bid: 26021_LU9DCE
+Title: CQ NEWS 25-OCT
+Size: 24555
+FirstSeen: 2026-10-25
+Object: 88cc20323b4d14db
+Dictionary: 1
+Oti: 00000007080000f001000104
+NextEsi: 40
+FirstSlot: 2026-10-26T10:00Z

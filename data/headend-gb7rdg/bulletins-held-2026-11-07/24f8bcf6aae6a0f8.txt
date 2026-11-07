@@ -1,0 +1,15 @@
+Bid: 26610_LU9DCE
+Title: DX NEWS 31-OCT
+Size: 812
+FirstSeen: 2026-10-31
+From: LU9DCE
+Object: 8643765f7e8b95a8
+Dictionary: 1
+Oti: 00000000520000f001000104
+NextEsi: 6
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: edea605f9cdfe2d4
+EnvelopeOti: 00000000750000f001000104
+EnvelopeNextEsi: 6
+FirstSlot: 2026-11-01T09:00Z

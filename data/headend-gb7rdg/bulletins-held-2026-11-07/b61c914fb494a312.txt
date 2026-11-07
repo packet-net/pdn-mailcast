@@ -1,0 +1,15 @@
+Bid: 26698_LU9DCE
+Title: QRP 01-NOV
+Size: 6009
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: 936ee3cf40bed1c4
+Dictionary: 1
+Oti: 00000006c10000f001000104
+NextEsi: 47
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 3317f978b6855129
+EnvelopeOti: 000000006c0000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-11-01T15:00Z

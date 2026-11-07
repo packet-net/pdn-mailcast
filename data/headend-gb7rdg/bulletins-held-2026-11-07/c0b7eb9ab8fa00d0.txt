@@ -1,0 +1,9 @@
+Bid: 26207_LU9DCE
+Title: DX NEWS 27-OCT
+Size: 1164
+FirstSeen: 2026-10-28
+Object: 01bd54a2ce8667d4
+Dictionary: 1
+Oti: 00000000a80000f001000104
+NextEsi: 6
+FirstSlot: 2026-10-28T09:00Z

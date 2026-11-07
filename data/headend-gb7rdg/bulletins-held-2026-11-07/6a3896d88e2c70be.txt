@@ -1,0 +1,9 @@
+Bid: 9151_GB7CIP
+Title: IBM Video Connections
+Size: 1558
+FirstSeen: 2026-10-26
+Object: 8e9194e7c01f9d1f
+Dictionary: 1
+Oti: 000000021e0000f001000104
+NextEsi: 16
+FirstSlot: 2026-10-26T10:00Z

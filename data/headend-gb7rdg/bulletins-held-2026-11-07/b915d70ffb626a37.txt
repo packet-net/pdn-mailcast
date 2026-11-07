@@ -1,0 +1,16 @@
+Bid: 26812_LU9DCE
+Title: AMATEUR RADIO 02-NOV
+Size: 12388
+FirstSeen: 2026-11-03
+From: LU9DCE
+TakenIn: 2026-11-03T08:16:07.348Z
+Object: 8098ad5f3d97c01e
+Dictionary: 1
+Oti: 0000000bb90000f001000104
+NextEsi: 67
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 4785816a3d66873e
+EnvelopeOti: 000000008b0000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-03T10:00Z

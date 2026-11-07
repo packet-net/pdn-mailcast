@@ -1,0 +1,15 @@
+Bid: 26598_LU9DCE
+Title: ONALLBANDS 31-OCT
+Size: 4958
+FirstSeen: 2026-10-31
+From: LU9DCE
+Object: a887a1e38c9f3c67
+Dictionary: 1
+Oti: 000000049a0000f001000104
+NextEsi: 21
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: e2641fe737e51d13
+EnvelopeOti: 00000000790000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-11-01T09:00Z

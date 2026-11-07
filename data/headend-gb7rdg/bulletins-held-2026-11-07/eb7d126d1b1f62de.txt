@@ -1,0 +1,16 @@
+Bid: TNW5NI_DB0HB
+Title: AGCW-Telegramm 45/26 vom 2026-11-02
+Size: 2171
+FirstSeen: 2026-11-03
+From: DJ6UX
+TakenIn: 2026-11-03T22:46:13.906Z
+Object: f871ae14fd8b20b1
+Dictionary: 1
+Oti: 00000004520000f001000104
+NextEsi: 36
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 910b1c8c918eed3c
+EnvelopeOti: 00000001f10000f001000104
+EnvelopeNextEsi: 36
+FirstSlot: 2026-11-04T10:00Z

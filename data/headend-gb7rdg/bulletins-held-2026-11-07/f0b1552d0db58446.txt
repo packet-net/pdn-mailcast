@@ -1,0 +1,12 @@
+Bid: 26483_LU9DCE
+Title: AMATEUR RADIO 30-OCT
+Size: 11117
+FirstSeen: 2026-10-30
+Object: ba82894f84fa5e4d
+Dictionary: 1
+Oti: 000000098a0000f001000104
+NextEsi: 28
+Envelope: 2c0b11e2504daad7
+EnvelopeOti: 00000000930000f001000104
+EnvelopeNextEsi: 8
+FirstSlot: 2026-10-30T16:00Z

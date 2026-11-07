@@ -1,0 +1,9 @@
+Bid: 6594HP2BWJ
+Title: Conectar
+Size: 1142
+FirstSeen: 2026-10-25
+Object: 4820547a68e6f6e3
+Dictionary: 1
+Oti: 00000001ab0000f001000104
+NextEsi: 7
+FirstSlot: 2026-10-25T09:00Z

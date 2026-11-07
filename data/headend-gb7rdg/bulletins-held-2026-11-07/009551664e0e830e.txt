@@ -1,0 +1,16 @@
+Bid: 26789_LU9DCE
+Title: STORM PREDICTION CENTER 02-NOV
+Size: 10570
+FirstSeen: 2026-11-02
+From: LU9DCE
+TakenIn: 2026-11-02T15:45:59.046Z
+Object: fcaf6ef041f5cad9
+Dictionary: 1
+Oti: 0000000a7d0000f001000104
+NextEsi: 49
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 3e07047b828943bf
+EnvelopeOti: 000000006e0000f001000104
+EnvelopeNextEsi: 8
+FirstSlot: 2026-11-02T16:00Z

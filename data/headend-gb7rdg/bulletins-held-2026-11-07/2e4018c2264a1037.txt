@@ -1,0 +1,16 @@
+Bid: 528_IW2OHX
+Title: Re: Try the FPAC ROSE node F6BVP-8 from NetRom
+Size: 1933
+FirstSeen: 2026-11-07
+From: IW2OHX
+TakenIn: 2026-11-07T14:00:00.380Z
+Object: a81fe4aaea1a4c4f
+Dictionary: 1
+Oti: 00000003700000f001000104
+NextEsi: 6
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: b8d60f26f00a221f
+EnvelopeOti: 00000000d20000f001000104
+EnvelopeNextEsi: 2
+FirstSlot: 2026-11-07T14:00Z

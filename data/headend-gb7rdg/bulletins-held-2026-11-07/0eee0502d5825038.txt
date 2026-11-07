@@ -1,0 +1,16 @@
+Bid: 27017_LU9DCE
+Title: DX NEWS 04-NOV
+Size: 812
+FirstSeen: 2026-11-06
+From: LU9DCE
+TakenIn: 2026-11-06T01:46:40.173Z
+Object: 287a1cfaa4d9e56c
+Dictionary: 1
+Oti: 00000000520000f001000104
+NextEsi: 10
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 94c6cdf1d85df0c6
+EnvelopeOti: 00000000810000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-06T10:00Z

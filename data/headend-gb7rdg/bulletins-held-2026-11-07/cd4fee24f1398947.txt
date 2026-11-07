@@ -1,0 +1,16 @@
+Bid: 24599_F6BVP
+Title: Live DX spots on the web (F6BVP-3)
+Size: 1117
+FirstSeen: 2026-11-07
+From: F6BVP
+TakenIn: 2026-11-07T08:16:53.035Z
+Object: d3323de67776d893
+Dictionary: 1
+Oti: 000000026d0000f001000104
+NextEsi: 12
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 2fecbea02fe262bd
+EnvelopeOti: 00000000cd0000f001000104
+EnvelopeNextEsi: 6
+FirstSlot: 2026-11-07T10:00Z

@@ -1,0 +1,9 @@
+Bid: 22059_VE2PKT
+Title: Solar and Geomagnetic Activity
+Size: 2709
+FirstSeen: 2026-10-26
+Object: 6c36bdee2697a338
+Dictionary: 1
+Oti: 00000003f70000f001000104
+NextEsi: 25
+FirstSlot: 2026-10-26T11:00Z

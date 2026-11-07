@@ -1,0 +1,12 @@
+Bid: 70_IW2OHX
+Title: IW2OHX Pactor BBS update
+Size: 1633
+FirstSeen: 2026-10-30
+Object: 6867afb38fe8458d
+Dictionary: 1
+Oti: 00000002b20000f001000104
+NextEsi: 12
+Envelope: 0e7f779032d4cb7b
+EnvelopeOti: 000000008e0000f001000104
+EnvelopeNextEsi: 6
+FirstSlot: 2026-10-30T15:00Z

@@ -1,0 +1,16 @@
+Bid: 24548_F6BVP
+Title: Try the FPAC ROSE node F6BVP-8 from NetRom
+Size: 1896
+FirstSeen: 2026-11-07
+From: F6BVP
+TakenIn: 2026-11-07T13:16:55.889Z
+Object: 6d71e76bd24361c1
+Dictionary: 1
+Oti: 000000039e0000f001000104
+NextEsi: 6
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 82108918a1bbab67
+EnvelopeOti: 00000000ca0000f001000104
+EnvelopeNextEsi: 2
+FirstSlot: 2026-11-07T14:00Z

@@ -1,0 +1,15 @@
+Bid: 26721_LU9DCE
+Title: ONALLBANDS 01-NOV
+Size: 4958
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: 814e82765e05d2ed
+Dictionary: 1
+Oti: 00000004970000f001000104
+NextEsi: 32
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 7858401a7e3cf32a
+EnvelopeOti: 00000000990000f001000104
+EnvelopeNextEsi: 13
+FirstSlot: 2026-11-02T09:00Z

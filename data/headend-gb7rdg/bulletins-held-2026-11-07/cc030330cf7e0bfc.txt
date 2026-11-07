@@ -1,0 +1,9 @@
+Bid: 26150_LU9DCE
+Title: LINUX TODAY 27-OCT
+Size: 4847
+FirstSeen: 2026-10-27
+Object: 11b2d74a5058f7b0
+Dictionary: 1
+Oti: 000000020d0000f001000104
+NextEsi: 8
+FirstSlot: 2026-10-27T11:00Z

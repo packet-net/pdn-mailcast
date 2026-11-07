@@ -1,0 +1,15 @@
+Bid: 6550_HP2DFA
+Title: WSPR TOP10 BEACON  DISTANCE/SPOT OCT30
+Size: 3431
+FirstSeen: 2026-10-31
+From: HP2PCE
+Object: 82fe949f6747e535
+Dictionary: 1
+Oti: 00000004d60000f001000104
+NextEsi: 29
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 9db1be381ce7330a
+EnvelopeOti: 00000000b00000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-01T09:00Z

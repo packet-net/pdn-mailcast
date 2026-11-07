@@ -1,0 +1,14 @@
+Bid: 425CAL1852
+Title: [425ENG] 425 DX News 1852 Cal
+Size: 9653
+FirstSeen: 2026-10-30
+Object: 8659eca1f78f185a
+Dictionary: 1
+Oti: 00000008bb0000f001000104
+NextEsi: 37
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 64d01e1e5b9d40b9
+EnvelopeOti: 00000000df0000f001000104
+EnvelopeNextEsi: 11
+FirstSlot: 2026-10-31T09:00Z

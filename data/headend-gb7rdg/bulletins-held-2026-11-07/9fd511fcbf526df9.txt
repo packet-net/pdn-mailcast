@@ -1,0 +1,16 @@
+Bid: 6032_NS2B
+Title: PCL NET SCRIBE NOV 2 2026
+Size: 12169
+FirstSeen: 2026-11-04
+From: NK5LA
+TakenIn: 2026-11-04T06:46:20.198Z
+Object: 63ef0666910f25a6
+Dictionary: 1
+Oti: 000000146d0000f001000104
+NextEsi: 168
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 96aa11d5a942a06e
+EnvelopeOti: 00000000db0000f001000104
+EnvelopeNextEsi: 12
+FirstSlot: 2026-11-04T10:00Z

@@ -1,0 +1,12 @@
+Bid: AE4BB0D32CAE
+Title: Astro space IT
+Size: 403
+FirstSeen: 2026-10-30
+Object: 25008139f806277d
+Dictionary: 1
+Oti: 00000001110000f001000104
+NextEsi: 8
+Envelope: 7edd0fa1d71b967f
+EnvelopeOti: 00000000bd0000f001000104
+EnvelopeNextEsi: 8
+FirstSlot: 2026-10-31T09:00Z

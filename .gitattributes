@@ -1,2 +1,3 @@
 tests/Packet.Mailcast.Tests/Vectors/** text eol=lf
 reports/** text eol=lf
+data/** -text

@@ -1,0 +1,14 @@
+Bid: 26560_LU9DCE
+Title: IARU 31-OCT
+Size: 4635
+FirstSeen: 2026-10-31
+Object: 7b36e661359e95a9
+Dictionary: 1
+Oti: 000000025b0000f001000104
+NextEsi: 8
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 65a4a2b110d248cc
+EnvelopeOti: 00000000720000f001000104
+EnvelopeNextEsi: 5
+FirstSlot: 2026-10-31T12:00Z

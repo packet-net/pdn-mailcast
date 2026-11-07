@@ -1,0 +1,15 @@
+Bid: 6554_HP2DFA
+Title: WSPR TOP 1O SPOTTERS  BY BAND OCT30
+Size: 4688
+FirstSeen: 2026-10-31
+From: HP2PCE
+Object: 29bdd9da4329e346
+Dictionary: 1
+Oti: 000000048b0000f001000104
+NextEsi: 26
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 8e73e1566ebfd1b6
+EnvelopeOti: 00000000b60000f001000104
+EnvelopeNextEsi: 12
+FirstSlot: 2026-11-01T09:00Z

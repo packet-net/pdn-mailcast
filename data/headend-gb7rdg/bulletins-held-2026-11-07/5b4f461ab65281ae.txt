@@ -1,0 +1,14 @@
+Bid: OPDX102026EN
+Title: BAD NEWS: OPDX ML to QRT
+Size: 3985
+FirstSeen: 2026-10-31
+Object: 7efec4a528e5fc40
+Dictionary: 1
+Oti: 000000065f0000f001000104
+NextEsi: 15
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 5efad25a1c23a224
+EnvelopeOti: 00000000be0000f001000104
+EnvelopeNextEsi: 5
+FirstSlot: 2026-10-31T16:00Z

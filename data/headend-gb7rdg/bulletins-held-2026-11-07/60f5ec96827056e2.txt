@@ -1,0 +1,9 @@
+Bid: 26017_LU9DCE
+Title: AMATEUR RADIO 25-OCT
+Size: 11461
+FirstSeen: 2026-10-25
+Object: 8eccf25428412efd
+Dictionary: 1
+Oti: 00000009900000f001000104
+NextEsi: 50
+FirstSlot: 2026-10-25T16:00Z

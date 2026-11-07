@@ -1,0 +1,12 @@
+Bid: 17022_KC2NJV
+Title: EMERGENCY SERVICES NEWS
+Size: 3429
+FirstSeen: 2026-10-30
+Object: 31946da6fef3a661
+Dictionary: 1
+Oti: 00000003ea0000f001000104
+NextEsi: 13
+Envelope: 836758c93c7e3731
+EnvelopeOti: 00000000750000f001000104
+EnvelopeNextEsi: 6
+FirstSlot: 2026-10-30T15:00Z

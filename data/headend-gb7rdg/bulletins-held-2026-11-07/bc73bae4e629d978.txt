@@ -1,0 +1,15 @@
+Bid: CX2SA_QRT_10
+Title: NOV/18/2026 - BBS & NODE QRT
+Size: 814
+FirstSeen: 2026-11-01
+From: CX2SA
+Object: 95face6c8e8d97fd
+Dictionary: 1
+Oti: 000000014a0000f001000104
+NextEsi: 11
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: 1927473bf616e3df
+EnvelopeOti: 00000000e10000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-01T10:00Z

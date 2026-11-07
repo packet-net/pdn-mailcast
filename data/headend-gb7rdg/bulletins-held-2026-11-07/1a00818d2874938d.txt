@@ -1,0 +1,14 @@
+Bid: UQ0DB0FHN03P
+Title: New freeware for SCS modems
+Size: 1004
+FirstSeen: 2026-10-30
+Object: 28f14798fc94d01d
+Dictionary: 1
+Oti: 000000022c0000f001000104
+NextEsi: 11
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: ac9f1a38cbd74e77
+EnvelopeOti: 000000014b0000f001000104
+EnvelopeNextEsi: 14
+FirstSlot: 2026-10-31T09:00Z

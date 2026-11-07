@@ -1,0 +1,15 @@
+Bid: 26687_LU9DCE
+Title: IARU 01-NOV
+Size: 4635
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: 4f72e81b8be86681
+Dictionary: 1
+Oti: 000000025d0000f001000104
+NextEsi: 16
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: dadccb2717dcb17d
+EnvelopeOti: 000000007c0000f001000104
+EnvelopeNextEsi: 9
+FirstSlot: 2026-11-01T12:00Z

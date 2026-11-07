@@ -1,0 +1,15 @@
+Bid: 6719HP2BWJ
+Title: Un iceberg ha escapado rápidamente del mar de Weddell
+Size: 1382
+FirstSeen: 2026-11-01
+From: HP2BWJ
+Object: 82e299b855ebc2b0
+Dictionary: 1
+Oti: 00000002d20000f001000104
+NextEsi: 34
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: d4b546d7dfa60248
+EnvelopeOti: 00000000f90000f001000104
+EnvelopeNextEsi: 24
+FirstSlot: 2026-11-02T09:00Z

@@ -1,0 +1,9 @@
+Bid: 26445_LU9DCE
+Title: LINUX TODAY 30-OCT
+Size: 4830
+FirstSeen: 2026-10-30
+Object: 53e4c4ea5127def6
+Dictionary: 1
+Oti: 00000001ed0000f001000104
+NextEsi: 17
+FirstSlot: 2026-10-30T11:00Z

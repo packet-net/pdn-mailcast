@@ -1,0 +1,15 @@
+Bid: 26717_LU9DCE
+Title: AMATEUR RADIO 01-NOV
+Size: 11431
+FirstSeen: 2026-11-01
+From: LU9DCE
+Object: a2e121a72b244f54
+Dictionary: 1
+Oti: 0000000aad0000f001000104
+NextEsi: 71
+EsiOrder: shuffled
+EsiStation: M0LTE
+Envelope: fa3fa72492299ca2
+EnvelopeOti: 00000000710000f001000104
+EnvelopeNextEsi: 10
+FirstSlot: 2026-11-01T16:00Z
