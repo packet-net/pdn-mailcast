@@ -209,9 +209,6 @@ public sealed class EveningRule : IEquatable<EveningRule>
     /// <summary>A receiver's own locator: evening slots that start after sunset there are left out. Null for the head end's own rule.</summary>
     public string? ListenerLocator { get; }
 
-    /// <summary>The same rule without a listener's sunset: what the head end sends.</summary>
-    public EveningRule ForEveryone => ListenerLocator is null ? this : new EveningRule(UntilUtc);
-
     /// <summary>The same rule, ending at sunset at <paramref name="locator"/> as well.</summary>
     public EveningRule EndingAtSunsetAt(string locator) => new(UntilUtc, locator);
 
@@ -327,8 +324,8 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
     /// <summary>Whether the slot starting at <paramref name="slot"/> is one of the evening slots (<see cref="Evening"/>), which never count against the daylight strategy.</summary>
     public bool IsEvening(DateTimeOffset slot) => Daylight is { } daylight && Evening is { } evening && evening.Allows(slot, daylight);
 
-    /// <summary>The same timetable without its evening slots: what a receiver from before them follows.</summary>
-    public SlotTimetable WithoutEvening => Evening is null ? this : this with { Evening = null };
+    /// <summary>The same timetable without its evening slots: what a receiver from before them follows. A method, so that a record's printing does not follow it round.</summary>
+    public SlotTimetable WithoutEvening() => Evening is null ? this : this with { Evening = null };
 
     /// <summary>The slots that run on a UTC day, daylight and evening, earliest first.</summary>
     public IReadOnlyList<DateTimeOffset> ActiveSlotsOn(DateOnly day) =>

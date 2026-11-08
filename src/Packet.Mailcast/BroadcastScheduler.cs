@@ -572,7 +572,7 @@ public static class BroadcastScheduler
         var slots = new DateTimeOffset[options.SlotOffsets.Count];
         slots[0] = first;
         // The shares rule carries in daylight slots only; evening slots never count against it.
-        var timetable = options.Timetable?.WithoutEvening;
+        var timetable = options.Timetable?.WithoutEvening();
         for (int c = 1; c < slots.Length; c++)
         {
             var nominal = first + (length * options.SlotOffsets[c]);
@@ -608,7 +608,7 @@ public static class BroadcastScheduler
         var end = CarryingSlots(first, options)[^1];
         for (int i = 0; i < options.CarryOverSlots && end != DateTimeOffset.MaxValue; i++)
         {
-            end = options.Timetable!.WithoutEvening.NextActiveAfter(end) ?? DateTimeOffset.MaxValue;
+            end = options.Timetable!.WithoutEvening().NextActiveAfter(end) ?? DateTimeOffset.MaxValue;
         }
         return end == DateTimeOffset.MaxValue || DateTimeOffset.MaxValue - end < length ? DateTimeOffset.MaxValue : end + length;
     }

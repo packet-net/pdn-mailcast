@@ -84,7 +84,7 @@ public class EveningSlotTests
         Assert.Equal(["slots=00:00/60", "daylight=IO91lk/120/30", "evening=22:00"], Gb7rdg.ToFields());
         Assert.Equal(Gb7rdg, SlotTimetable.FromFields(Gb7rdg.ToFields()));
 
-        var daylightOnly = Gb7rdg.WithoutEvening;
+        var daylightOnly = Gb7rdg.WithoutEvening();
         Assert.Equal(daylightOnly, SlotTimetable.FromFields(["slots=00:00/60", "daylight=IO91lk/120/30", "evening=sunset+30/22:00"]));
         Assert.Equal(daylightOnly, SlotTimetable.FromFields(["slots=00:00/60", "daylight=IO91lk/120/30", "evening=25:00"]));
         // Without a daylight rule every slot runs, so an evening means nothing and is not written or read.
@@ -164,7 +164,7 @@ public class EveningSlotTests
         var old = V0181Directory.Parse(bytes);
         Assert.Equal(parsed.Entries, old.Entries);
         Assert.Equal(SignatureState.Trusted, old.Check([key]).State);
-        Assert.Equal(Gb7rdg.WithoutEvening, BeforeEveningFromFields(first.Split('\t')[5..]));
+        Assert.Equal(Gb7rdg.WithoutEvening(), BeforeEveningFromFields(first.Split('\t')[5..]));
         Assert.Equal(StationFixture.Daylight, BeforeEveningFromFields(first.Split('\t')[5..])!.Daylight);
     }
 

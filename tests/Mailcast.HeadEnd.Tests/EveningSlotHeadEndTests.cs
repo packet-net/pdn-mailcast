@@ -37,7 +37,7 @@ public class EveningSlotHeadEndTests
             Program.DescribeEvening(config, config.ToWaveforms(_ => new LinearAirtime(TimeSpan.Zero, TimeSpan.Zero, 0.01))));
 
         var without = Parse("""{"minute": 0, "everyMinutes": 60, "daylight": {"locator": "IO91lk"}}""");
-        Assert.Equal(Expected.WithoutEvening, without.ToSlotTimetable());
+        Assert.Equal(Expected.WithoutEvening(), without.ToSlotTimetable());
         Assert.Null(without.ToSlotSchedule().Timetable.Evening);
         Assert.DoesNotContain("evening", without.ToSlotSchedule().DescribeDay(new DateOnly(2026, 11, 8)), StringComparison.Ordinal);
         Assert.Null(Program.DescribeEvening(without, without.ToWaveforms(_ => new LinearAirtime(TimeSpan.Zero, TimeSpan.Zero, 0.01))));

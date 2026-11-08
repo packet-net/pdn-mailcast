@@ -697,7 +697,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             _log("slots: \"eveningSlots\" is false and this receiver's place is not known (no \"locator\"), so it skips every evening slot");
         }
-        return timetable.WithoutEvening;
+        return timetable.WithoutEvening();
     }
 
     /// <summary>
