@@ -299,6 +299,8 @@ for c, a in sorted(w3.items()):
         print(f"- {c}: {pct(a[0], a[1])} then {pct(a[2], a[3])}")
 
 print("\nMedian Doppler spread measured by listeners (Hz), by period, all bases and probe only:\n")
+pre = [float(r["doppler_spread_hz"]) for r in rows if r["doppler_spread_hz"] and (r["day"] < "2026-10-31" or (r["day"] == "2026-10-31" and r["slot_utc"] < "15:00"))]
+print(f"- Before the transmitter's reference fault (to 31 Oct 14:00): {med(pre):.2f} (n={len(pre)})")
 for lo, hi, label in (("2026-10-25", "2026-10-30", "25 to 30 Oct"), ("2026-10-31", "2026-11-01", "31 Oct to 1 Nov"),
                       ("2026-11-02", "2026-11-02", "2 Nov"), ("2026-11-03", "2026-11-07", "3 to 7 Nov")):
     sel = [r for r in rows if lo <= r["day"] <= hi and r["doppler_spread_hz"]]
