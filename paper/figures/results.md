@@ -24,7 +24,7 @@ All SDRs together: 45% of frames heard over 883 receiver-slots.
 
 ## Listeners' daily reports, 8 October to 7 November 2026
 
-131 reports from 12 listeners; 9 report-days with no audio at all are left out below.
+131 reports from 9 listeners; 9 report-days with no audio at all are left out below.
 
 Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 November; November from 2 November, when the long interleaver, 31 s bursts and the bulk tier began.
 
@@ -113,3 +113,45 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 | PSK Reporter | good | 1689 | 76% | 39% |
 | PSK Reporter | unknown | 34 | 68% | 29% |
 | PSK Reporter | not logged | 56 | 23% | 14% |
+
+### The November drop
+
+Share of frames heard in slots with a tone of 8 dB or more, from 25 October, listeners on their own equipment:
+
+| Bursts | WN3 | WN4 | Both | Receiver-slots |
+|---|---|---|---|---|
+| 18 s bursts | 67% | 57% | 61% | 122 |
+| 31 s bursts | 24% | 25% | 24% | 56 |
+
+GM4CXF slot by slot on 2 November:
+
+- 09:00 wn4, 146 frames in 24 bursts: heard 62%, tone 10 dB, Doppler spread 0.52 Hz
+- 10:00 wn3, 73 frames in 24 bursts: heard 53%, tone 13 dB, Doppler spread 0.99 Hz
+- 11:00 wn4-long, 161 frames in 14 bursts: heard 12%, tone 13 dB, Doppler spread 0.28 Hz
+- 12:00 wn3, 85 frames in 14 bursts: heard 9%, tone 15 dB, Doppler spread 0.94 Hz
+- 13:00 wn4-long, 161 frames in 14 bursts: heard 20%, tone 11 dB, Doppler spread 0.83 Hz
+- 14:00 wn3, 85 frames in 14 bursts: heard 21%, tone - dB, Doppler spread 0.95 Hz
+- 15:00 wn4-long, 161 frames in 14 bursts: heard 7%, tone 10 dB, Doppler spread 1.35 Hz
+- 16:00 wn3, 87 frames in 14 bursts: heard 5%, tone - dB, Doppler spread 0.88 Hz
+
+WN3 share heard, 25 October to 1 November against 2 to 7 November (own equipment):
+
+- G7TAJ: 18% then 10%
+- GM4CXF: 73% then 22%
+- GM8BPQ: 20% then 3%
+- M0NVK: 96% then 29%
+
+Median Doppler spread measured by listeners (Hz), by period, all bases and probe only:
+
+- 25 to 30 Oct: 0.28 (n=256), probe only 0.29 (n=206)
+- 31 Oct to 1 Nov: 0.42 (n=46), probe only 0.40 (n=43)
+- 2 Nov: 0.91 (n=31), probe only 0.91 (n=21)
+- 3 to 7 Nov: 0.67 (n=109), probe only 0.63 (n=83)
+
+### Sweden (SA6DAZ, JO67fm)
+
+- Daylight slots listened to, 30 October to 7 November: 65; with frames: 46; frames: 875; bulletins completed: 30.
+- Tone SNR range: -9 to 14 dB.
+- Virtual height: median 310 km over 43 measurements.
+- Slots with an E-layer path: 2026-11-06 14:00.
+- Path tests: see data/sweden-sa6daz/path-test-summary.txt (136 rounds, frames decoded per waveform by measured SNR).

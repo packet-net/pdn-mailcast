@@ -570,7 +570,7 @@ def fig_slot():
     fig, (a, b) = plt.subplots(2, 1, figsize=(W, 2.9), gridspec_kw=dict(height_ratios=[1, 1], hspace=1.05))
     fig.subplots_adjust(top=0.80)
     title(fig, "Anatomy of a slot",
-          "One hourly slot, drawn with the longest clear-channel wait. Times as configured from 2 November.")
+          "One hourly slot, drawn with the longest clear-channel wait.\nTop bar: the 31 s bursts of 2 to 7 November (otherwise bursts are up to 18 s).")
     for ax in (a, b):
         ax.set_yticks([])
         ax.spines["left"].set_visible(False)
@@ -611,12 +611,11 @@ def fig_slot():
                arrowprops=dict(arrowstyle="-", color=MUTED, lw=0.6), annotation_clip=False)
     x = 22.5
     for k in range(2):
-        b.add_patch(Rectangle((x, 0.2), 31, 0.6, fc=BLUE, ec="none"))
-        b.add_patch(Rectangle((x, 0.2), 18, 0.6, fc="none", ec=SURFACE, lw=1.2, ls=(0, (2, 2))))
+        b.add_patch(Rectangle((x, 0.2), 18, 0.6, fc=BLUE, ec="none"))
+        b.add_patch(Rectangle((x + 18, 0.2), 13, 0.6, fc="none", ec=MUTED, lw=1.0, ls=(0, (2, 2))))
         if k == 0:
-            b.text(x + 24.5, 0.5, "data burst,\nup to 31 s", ha="center", va="center", fontsize=6.8, color=SURFACE)
-            b.annotate("18 s limit before 2 Nov", xy=(x + 18, 0.8), xytext=(x + 18, 1.12), ha="center", fontsize=6.8,
-                       color=INK2, arrowprops=dict(arrowstyle="-", color=MUTED, lw=0.6), annotation_clip=False)
+            b.text(x + 9, 0.5, "data burst,\nup to 18 s", ha="center", va="center", fontsize=6.8, color=SURFACE)
+            b.text(x + 24.5, 0.5, "to 31 s,\n2 to 7 Nov", ha="center", va="center", fontsize=6.8, color=INK2)
         x += 31 + 2.5
     b.set_xlim(0, 60)
     b.text(55, 1.12, "next burst after a gap", ha="center", fontsize=6.8, color=INK2)

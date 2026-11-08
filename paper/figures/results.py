@@ -146,7 +146,7 @@ for r in day_rows:
         rebuilt[who(r["callsign"], r["day"])] += int(r["rebuilt"] or 0)
 
 print("\n## Listeners' daily reports, 8 October to 7 November 2026\n")
-print(f"{len(day_rows)} reports from {len(ls)} listeners; {len(deaf)} report-days with no audio at all are left out below.\n")
+print(f"{len(day_rows)} reports from {len({r['callsign'] for r in day_rows})} listeners; {len(deaf)} report-days with no audio at all are left out below.\n")
 print("Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 November; November from 2 November, when the long interleaver, 31 s bursts and the bulk tier began.\n")
 print("| Listener | locator | dates | days | slots listened | slots with frames | frames heard | October | November | median tone SNR (dB) | bulletins rebuilt |")
 print("|---|---|---|---|---|---|---|---|---|---|---|")
@@ -256,3 +256,78 @@ for src, label in (("ionosonde", "ionosonde"), ("pskreporter", "PSK Reporter")):
         if v in g:
             x = g[v]
             print(f"| {label} | {v} | {x['slots']} | {pct(x['heard'], x['slots'])} | {pct(x['frames'], x['sent'])} |")
+
+# --- The November drop (section 6.3) -------------------------------------------------------------
+# Matched tone strength: slots with a tone of 8 dB or more, from 25 October, own equipment, split by
+# the head end's bursts per slot (24 = short bursts as before; 16 or fewer = the 31 s bursts sent
+# from 2 November 11:00 to 7 November 16:00).
+print("\n### The November drop\n")
+acc = collections.defaultdict(lambda: [0, 0, 0])
+for r in rows:
+    if r["day"] < "2026-10-25" or not r["snr_db"] or float(r["snr_db"]) < 8 or " via " in r["who"]:
+        continue
+    n, b, mode, _ = sent[(r["day"], r["slot_utc"])]
+    era = "31 s bursts" if b <= 16 else "18 s bursts"
+    wf = "WN3" if mode == "ms110d-wn3" else "WN4"
+    for key in ((era, wf), (era, "both")):
+        a = acc[key]; a[0] += int(r["frames"] or 0); a[1] += n; a[2] += 1
+print("Share of frames heard in slots with a tone of 8 dB or more, from 25 October, listeners on their own equipment:\n")
+print("| Bursts | WN3 | WN4 | Both | Receiver-slots |")
+print("|---|---|---|---|---|")
+for era in ("18 s bursts", "31 s bursts"):
+    print(f"| {era} | {pct(acc[(era, 'WN3')][0], acc[(era, 'WN3')][1])} | {pct(acc[(era, 'WN4')][0], acc[(era, 'WN4')][1])} | {pct(acc[(era, 'both')][0], acc[(era, 'both')][1])} | {acc[(era, 'both')][2]} |")
+
+print("\nGM4CXF slot by slot on 2 November:\n")
+for r in rows:
+    if r["callsign"] == "GM4CXF" and r["day"] == "2026-11-02":
+        n, b, mode, _ = sent[(r["day"], r["slot_utc"])]
+        print(f"- {r['slot_utc']} {mode.replace('ms110d-', '')}, {n} frames in {b} bursts: heard {pct(int(r['frames'] or 0), n)}, tone {r['snr_db'] or '-'} dB, Doppler spread {r['doppler_spread_hz'] or '-'} Hz")
+
+print("\nWN3 share heard, 25 October to 1 November against 2 to 7 November (own equipment):\n")
+w3 = collections.defaultdict(lambda: [0, 0, 0, 0])
+for r in rows:
+    if " via " in r["who"] or r["day"] < "2026-10-25":
+        continue
+    n, b, mode, _ = sent[(r["day"], r["slot_utc"])]
+    if mode != "ms110d-wn3":
+        continue
+    a = w3[r["callsign"]]
+    i = 2 if r["day"] >= "2026-11-02" else 0
+    a[i] += int(r["frames"] or 0); a[i + 1] += n
+for c, a in sorted(w3.items()):
+    if a[1] and a[3]:
+        print(f"- {c}: {pct(a[0], a[1])} then {pct(a[2], a[3])}")
+
+print("\nMedian Doppler spread measured by listeners (Hz), by period, all bases and probe only:\n")
+for lo, hi, label in (("2026-10-25", "2026-10-30", "25 to 30 Oct"), ("2026-10-31", "2026-11-01", "31 Oct to 1 Nov"),
+                      ("2026-11-02", "2026-11-02", "2 Nov"), ("2026-11-03", "2026-11-07", "3 to 7 Nov")):
+    sel = [r for r in rows if lo <= r["day"] <= hi and r["doppler_spread_hz"]]
+    pr = [float(r["doppler_spread_hz"]) for r in sel if r["channel_basis"] == "probe"]
+    print(f"- {label}: {med([float(r['doppler_spread_hz']) for r in sel]):.2f} (n={len(sel)}), probe only {fmt(med(pr), 2)} (n={len(pr)})")
+
+# --- Sweden (section 6.10) ----------------------------------------------------------------------------
+SE = os.path.join(root, "data/sweden-sa6daz/receiver-slot-and-channel-lines.txt")
+print("\n### Sweden (SA6DAZ, JO67fm)\n")
+ended = re.compile(r"slot: the (\d\d:\d\d) UTC slot ended: (?:(\d+) frames?|nothing heard)")
+done_b = re.compile(r"bulletins (\d+) completed")
+tone = re.compile(r"tone SNR (-?\d+) dB")
+height = re.compile(r"Reflection about (\d+) km")
+slots_se = frames_se = with_fr = bull = 0; tones = []; heights = []; elayer = set()
+for line in open(SE, encoding="utf-8", errors="replace"):
+    if m := ended.search(line):
+        slots_se += 1
+        f = int(m[2] or 0); frames_se += f; with_fr += f > 0
+        if b := done_b.search(line):
+            bull += int(b[1])
+        if t := tone.search(line):
+            tones.append(int(t[1]))
+    if "channel: the" in line:
+        if h := height.search(line):
+            heights.append(int(h[1]))
+        if "off the E layer" in line:
+            elayer.add(line[:10] + " " + re.search(r"the (\d\d:\d\d) UTC slot", line)[1])
+print(f"- Daylight slots listened to, 30 October to 7 November: {slots_se}; with frames: {with_fr}; frames: {frames_se}; bulletins completed: {bull}.")
+print(f"- Tone SNR range: {min(tones)} to {max(tones)} dB.")
+print(f"- Virtual height: median {med(heights):.0f} km over {len(heights)} measurements.")
+print(f"- Slots with an E-layer path: {', '.join(sorted(elayer))}.")
+print("- Path tests: see data/sweden-sa6daz/path-test-summary.txt (136 rounds, frames decoded per waveform by measured SNR).")
