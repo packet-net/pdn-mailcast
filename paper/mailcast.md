@@ -194,6 +194,8 @@ Mailcast was not designed once and then measured. It went from a first test tran
 
 Both 2 November waveform changes were undone in the configuration at 23:14 UTC on 7 November, after reception fell sharply with them in place, so the last slot sent that way was 16:00 on 7 November and the first sent the old way 10:00 on 8 November. They turned out not to be the cause: the transmitter's frequency reference was (section 6.3).
 
+One later change is outside this paper's data: from 8 November (v0.34.0) the head end adds evening slots on WN3 after Reading sunset, ending before 22:00 UTC, aimed at listeners further away such as Sweden. They carry everything in rotation on their own piece numbering, so they do not count against the daylight sending strategy, and receivers can opt out.
+
 Two things follow for reading the results. Most of the reports come from after 15 October, so they describe the filled slots with the leftover tier, alternating WN4 and WN3. And the long interleaver ran only from 2 to 7 November, all of it under the transmitter's reference fault (section 6.3), so it cannot be compared with the short interleaver on the air; the Sweden path tests (section 6.10) compared them directly.
 
 ![Frames sent and slot time per day, stacked by waveform, with the strategy changes of 6 October, 15 October and 2 November; 5 October's test slots shown on their own.](figures/plots/fig06-headend-per-day.png)
@@ -280,7 +282,7 @@ Slot by slot, from 15:00 on 31 October to the end of 1 November reception was po
 
 **The cause was the transmitter's frequency reference.** Since 26 October the Flex 6500 had taken its 10 MHz reference from an external GPS-disciplined oscillator. That oscillator keeps its 10 MHz output running when it loses GPS lock, so the Flex went on reporting "external reference locked" while its frequency wandered. Every receiver, near and far, saw the result as a Doppler spread of about 1 Hz on GB7RDG's signal, against 0.2 to 0.3 Hz in October. The fault most likely began on the afternoon of 31 October, when reception first fell, overlapping the storm of section 6.11.
 
-The test came on 8 November. The 10:00 slot (WN3, 600 bps) was the first back on 18 s bursts and the short interleaver, and reception was still poor: WESSEX heard 7 of 51 frames with its tone at 25 dB, EI4HQ 10 at 22 dB, STUEY3D 8 at 16 dB, with the probe reading 1.15 to 1.34 Hz of Doppler spread. Tom power-cycled the GPS oscillator and the Flex at about 10:50. At 11:00 (WN4, 1200 bps, also 18 s bursts) WESSEX, EI4HQ and STUEY3D each heard all 51 frames, M9TWM-1 41 and M9PSY 34, the Doppler spread was back at 0.13 to 0.29 Hz everywhere, and every recorded burst ran to its normal end; the more robust waveform had failed before the restart and the faster one succeeded after it. At 13:00 (WN4, 86 frames) WESSEX heard 74, STUEY3D 73, EI4HQ 71 and M9TWM-1 59; the 12:00 slot was lost to a separate fault.
+The test came on 8 November. The 10:00 slot (WN3, 600 bps) was the first back on 18 s bursts and the short interleaver, and reception was still poor: WESSEX heard 7 of 51 frames with its tone at 25 dB, EI4HQ 10 at 22 dB, STUEY3D 8 at 16 dB, with the probe reading 1.15 to 1.34 Hz of Doppler spread. Tom power-cycled the GPS oscillator and the Flex at about 10:50. At 11:00 (WN4, 1200 bps, also 18 s bursts) WESSEX, EI4HQ and STUEY3D each heard all 51 frames, M9TWM-1 41 and M9PSY 34, the Doppler spread was back at 0.13 to 0.29 Hz everywhere, and every recorded burst ran to its normal end; the more robust waveform had failed before the restart and the faster one succeeded after it. At 13:00 (WN4, 86 frames) WESSEX heard 74, STUEY3D 73, EI4HQ 71 and M9TWM-1 59; the 12:00 slot was lost to a separate fault. Over the rest of the day, 11:00 to 15:00 (312 frames sent), the resumed web SDR survey's receivers heard: WESSEX 95%, STUEY3D 93%, EI4HQ 94%, M9TWM-1 79%, M9PSY 56% and G4EYR 17%, back at or above their October levels, with the Doppler spread measured on the bursts at 0.17 to 0.34 Hz everywhere. Of the listeners who had reported by that evening, GM4CXF heard 56% of the frames sent after the restart, against 16% at 10:00.
 
 | Receiver | 10:00, before the restart | 11:00, after |
 |---|---|---|
@@ -464,7 +466,7 @@ What remains is the on-air trial. A second head end, GM8BPQ, is being set up by 
 - Choosing each slot's waveform from the channel measurement, and faster waveforms when the channel allows.
 - Using the daily reports, rather than a return channel, to steer how much of each bulletin is sent.
 - Comparing the probe's virtual heights with the ionosonde's h'F for the same hour, which is also a virtual height and so directly comparable.
-- 80 m in the evenings, and QO-100.
+- Measuring what the 40 m evening slots (from 8 November) deliver to distant listeners, 80 m in the evenings, and QO-100.
 - Moving the transmitter to a better-fed site: GB7WEM, which takes international mail from GB7CIP over UHF, would carry bulletins sooner than Reading, which collects them over HF.
 - Personal mail as well as bulletins (under consultation), and other traffic as new object types, such as DAPPS messages.
 - Measuring the cost of a narrow transmit filter, before stations with ordinary rigs join Model B.
