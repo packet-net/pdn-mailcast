@@ -86,6 +86,10 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             Retuner = new Retuner(config, () => Followed, () => AudioSource.Parse(Config.Audio).IsSoundCard, time, log, Hooks, EarlyEndReason, slot => PointAtSlot(slot));
         }
+        if (Retuner is { } retuner)
+        {
+            RadioTunedSince = () => retuner.TunedSince;
+        }
         ListenNow = new ListenNowService(time, config.StateDirectory);
         Feedback = CreateFeedback();
         RefreshSources(say: false); // said after the start-up banner (RunAsync)
@@ -351,21 +355,46 @@ public sealed class ReceiverHost : IAsyncDisposable
     internal static readonly TimeSpan QuietBeforeEarlyEnd = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// How long after a slot's scheduled start its window is given back when nothing at all has
-    /// been heard (<see cref="NothingHeardReason"/>). Over 147 GB7RDG slots the tone began a
-    /// median 16 s after the slot and never later than 36 s, and the first burst follows it by
-    /// about 25 s: by 2 minutes a slot this receiver can hear has always made itself known.
+    /// How long after a slot's scheduled start (or after the radio was first on the slot's
+    /// frequency, if that was later) its window is given back when nothing at all has been heard
+    /// (<see cref="NothingHeardReason"/>). Over 147 GB7RDG slots the tone began a median 16 s
+    /// after the slot and never later than 36 s, but the head end's own timing allows much more:
+    /// it may wait up to 2 minutes for a clear channel (<c>slot.channelWaitSeconds</c> 120, then
+    /// <c>whenStillBusy</c> "go"), the station may wait up to 60 s more before keying the tone,
+    /// the 10 s tone is only reported once it ends, and under "go" the first burst can start
+    /// about 2 min 10 s in with no tone at all. 3 min 30 s covers all of that with a margin.
     /// </summary>
-    internal static readonly TimeSpan NothingHeardBy = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan NothingHeardBy = TimeSpan.FromSeconds(210);
 
     /// <summary>
     /// Issue #49: why the listening window for the slot starting at <paramref name="slotStart"/>
     /// can end now, before its usual close; null while it should keep going. Conservative:
     /// anything unknown or incomplete keeps it open. With no slot tracked yet matching
     /// <paramref name="slotStart"/>, it ends only if nothing at all has been heard by
-    /// <see cref="NothingHeardBy"/> after the slot's start (<see cref="NothingHeardReason"/>).
+    /// <see cref="NothingHeardBy"/> (<see cref="NothingHeardReason"/>). Decided once: after a
+    /// slot's window has been ended early, every later ask for that slot gets the same answer, so
+    /// the retuner (giving the rig and LinBPQ back) and the slot window check (a sound card
+    /// resting, "after") never disagree, whichever polls first.
     /// </summary>
     internal string? EarlyEndReason(DateTimeOffset slotStart)
+    {
+        if (LastEarlyEnd is { } decided && decided.Slot == slotStart)
+        {
+            return decided.Reason;
+        }
+        if (EarlyEndCheck(slotStart) is not { } reason)
+        {
+            return null;
+        }
+        NoteEarlyEnd(slotStart, reason);
+        return reason;
+    }
+
+    /// <summary>
+    /// The check behind <see cref="EarlyEndReason"/>, looked at afresh each time and deciding
+    /// nothing: why the window can end now, or null.
+    /// </summary>
+    internal string? EarlyEndCheck(DateTimeOffset slotStart)
     {
         var slot = Slots.Last;
         if (slot is null || slot.Scheduled != slotStart)
@@ -410,40 +439,69 @@ public sealed class ReceiverHost : IAsyncDisposable
             // A burst may still be coming; be conservative while the head end may send something new.
             return null;
         }
-        string reason = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture,
             $"the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for {quiet.TotalSeconds:F0} s");
-        NoteEarlyEnd(slotStart, reason);
-        return reason;
     }
 
     /// <summary>
     /// Why the window of the slot starting at <paramref name="slotStart"/> can be given back now
     /// although nothing in it has been heard; null while it should keep going. Only once
-    /// <see cref="NothingHeardBy"/> has passed since the slot's start with no tone, probe or
-    /// frame heard since a minute before it (<see cref="SlotTracker.ClockAllowance"/>; any
-    /// broadcast frame from an accepted source counts, whichever station's it is), and only
-    /// when the audio has been listening without a break since the slot's start: a receiver
-    /// started, or a source reopened or reconnected, after that could not have heard the tone,
-    /// so it keeps the whole window as before. A head end that skipped this slot and retries it
-    /// 5 minutes later is missed; it counts nothing as sent for a skipped slot, so its bulletins
-    /// go out again in the next one.
+    /// <see cref="NothingHeardBy"/> has passed with no tone (nor any steady tone the tone
+    /// detector saw, measured or not), probe or frame heard since a minute before the slot
+    /// (<see cref="SlotTracker.ClockAllowance"/>). Any broadcast frame from an accepted source
+    /// counts, whichever station's it is, from the moment it was decoded, so one still queued for
+    /// the store is not missed. The time is counted from the slot's start, or from when this
+    /// receiver was first on the slot's frequency without a break if that was later: the audio
+    /// listening (<see cref="ListeningSince"/>) and, when a retuner moves the radio the audio
+    /// comes from, the rig tuned or pdn-soundmodem's receive window granted
+    /// (<see cref="RadioTunedSince"/>). Never while the audio is not listening or such a radio is
+    /// not tuned: that window runs as before. A head end that skipped this slot and retries it 5
+    /// minutes later is missed; it counts nothing as sent for a skipped slot, so its bulletins go
+    /// out again in the next one.
     /// </summary>
     private string? NothingHeardReason(DateTimeOffset slotStart)
     {
         var now = _time.GetUtcNow();
         if (now < slotStart + NothingHeardBy || now >= slotStart + ReceiverConfig.WebSdrAfter
             || Slots.Last?.Scheduled == slotStart
-            || ListeningSince is not { } since || since > slotStart
-            || Slots.LastHeard is { } heard && heard >= slotStart - SlotTracker.ClockAllowance)
+            || OnFrequencySince() is not { } since)
+        {
+            return null;
+        }
+        var by = (since > slotStart ? since : slotStart) + NothingHeardBy;
+        var heardFrom = slotStart - SlotTracker.ClockAllowance;
+        if (now < by || Slots.LastHeard >= heardFrom || Intake.LastOffered >= heardFrom)
         {
             return null;
         }
         var followed = Followed;
         string from = (followed.OneStation ? followed.Stations[0].Station : followed.StationAt(slotStart)) ?? "the station";
-        string reason = $"nothing heard from {from} by {(slotStart + NothingHeardBy).UtcDateTime:HH:mm} (no tone, probe or frame)";
-        NoteEarlyEnd(slotStart, reason);
-        return reason;
+        return $"nothing heard from {from} by {by.UtcDateTime:HH:mm:ss} (no tone, probe or frame)";
     }
+
+    /// <summary>
+    /// Since when this receiver has been listening on the slot's frequency without a break: the
+    /// later of <see cref="ListeningSince"/> and, when a retuner moves the radio the audio comes
+    /// from, <see cref="RadioTunedSince"/>; null while either is not.
+    /// </summary>
+    private DateTimeOffset? OnFrequencySince()
+    {
+        if (ListeningSince is not { } listening)
+        {
+            return null;
+        }
+        if (RadioTunedSince is not { } tunedSince || (Retuner is not null && !RetunerRunsHooks))
+        {
+            return listening;
+        }
+        return tunedSince() is { } tuned ? (tuned > listening ? tuned : listening) : null;
+    }
+
+    /// <summary>
+    /// When the retuner last put the radio on the bulletin frequency (<see cref="Retuner.TunedSince"/>),
+    /// or null while it is not there; null itself without a retuner. Tests may set it.
+    /// </summary>
+    internal Func<DateTimeOffset?>? RadioTunedSince { get; set; }
 
     private DateTimeOffset? _listeningSince;
 
@@ -468,11 +526,21 @@ public sealed class ReceiverHost : IAsyncDisposable
         get { lock (_gate) { return _lastEarlyEnd; } }
     }
 
+    private DateTimeOffset? _lastEarlyEndAt;
+
+    /// <summary>When <see cref="LastEarlyEnd"/> was decided, for the slot's summary line.</summary>
+    internal DateTimeOffset? LastEarlyEndAt
+    {
+        get { lock (_gate) { return _lastEarlyEndAt; } }
+    }
+
     private void NoteEarlyEnd(DateTimeOffset slot, string reason)
     {
+        var now = _time.GetUtcNow();
         lock (_gate)
         {
             _lastEarlyEnd = (slot, reason);
+            _lastEarlyEndAt = now;
         }
     }
 
@@ -1336,7 +1404,7 @@ public sealed class ReceiverHost : IAsyncDisposable
                 {
                     Slots.OnListening(open);
                 }
-                Slots.EndIfOver(LastEarlyEnd?.Slot);
+                Slots.EndIfOver(LastEarlyEnd?.Slot, LastEarlyEndAt);
             }
             catch (Exception e)
             {
@@ -2009,6 +2077,8 @@ public sealed class ReceiverHost : IAsyncDisposable
         // On the audio thread, while the modem is still locked to the burst the frame came on.
         pipeline.Channel.FrameReceived += (_, frame) => Intake.Offer(frame, pipeline.FrameWaveform);
         pipeline.Tone.ToneMeasured += Slots.OnTone;
+        // Any steady tone, measured or not (a 30 s tone, or a 10 s one broken up by fading), is a sign the slot is heard.
+        pipeline.Tone.SteadyRunEnded += _ => Slots.OnSteadyTone();
     }
 
     internal static string DescribeBbs(BbsSettings bbs) =>

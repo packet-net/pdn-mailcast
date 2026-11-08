@@ -37,7 +37,7 @@ public sealed partial class RetunerTests
     }
 
     [Fact]
-    public async Task NothingHeard_GivesBackRigAndReleasesLinBpq_AtTwoMinutes_ThenRunsAfterHook()
+    public async Task NothingHeard_GivesBackRigAndReleasesLinBpq_AtThreeAndAHalfMinutes_ThenRunsAfterHook()
     {
         // The receiver's own check, on the retuner's clock: its audio listening since well before the slot.
         using var scripts = new TempDirectory();
@@ -49,17 +49,24 @@ public sealed partial class RetunerTests
         {
             ListeningSince = At(11, 0),
         };
+        // Counted from when this retuner put the rig on the bulletin frequency, as the host does with its own.
+        host.RadioTunedSince = () => s.Retuner.TunedSince;
         try
         {
             s.Start();
             await s.StepUntil(() => s.Retuner.Stage == RetuneStage.Tuned, "tuned for 12:00");
 
-            await s.RunTo(At(12, 3));
+            await s.RunTo(At(12, 3, 25));
+            Assert.Equal(RetuneStage.Tuned, s.Retuner.Stage);
+            Assert.True(s.Retuner.TunedSince <= At(12, 0));
+
+            await s.RunTo(At(12, 4, 30));
 
             Assert.Equal(["before 2026-10-05T12:00:00Z 7052.0 7053.8 none", "after 2026-10-05T12:00:00Z 7052.0 7053.8 1"], HookScript.Runs(record));
             Assert.Equal(PacketDialHz, s.Rig.DialHz);
             Assert.Equal(0, s.Node!.XmitOff(2));
-            Assert.Contains("retune: ending the 12:00 UTC slot early: nothing heard from GB7RDG by 12:02 (no tone, probe or frame)", s.Log);
+            Assert.Contains("retune: ending the 12:00 UTC slot early: nothing heard from GB7RDG by 12:03:30 (no tone, probe or frame)", s.Log);
+            Assert.Null(s.Retuner.TunedSince);
         }
         finally
         {

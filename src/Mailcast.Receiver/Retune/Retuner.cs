@@ -282,6 +282,24 @@ public sealed class Retuner : IAsyncDisposable
         }
     }
 
+    private DateTimeOffset? _tunedSince;
+
+    /// <summary>
+    /// Since when the radio has been on the bulletin frequency without a break (the rig tuned,
+    /// or pdn-soundmodem's receive window granted), through a slot that follows straight on;
+    /// null while it is not.
+    /// </summary>
+    public DateTimeOffset? TunedSince
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _tunedSince;
+            }
+        }
+    }
+
     /// <summary>What it is doing now, in a sentence for the page and the log.</summary>
     public string State
     {
@@ -1340,6 +1358,14 @@ public sealed class Retuner : IAsyncDisposable
     {
         lock (_gate)
         {
+            if (stage != RetuneStage.Tuned)
+            {
+                _tunedSince = null;
+            }
+            else if (_stage != RetuneStage.Tuned || _tunedSince is null)
+            {
+                _tunedSince = _time.GetUtcNow();
+            }
             _stage = stage;
             _state = state;
         }

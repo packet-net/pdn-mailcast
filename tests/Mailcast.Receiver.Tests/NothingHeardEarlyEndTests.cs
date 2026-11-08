@@ -49,8 +49,9 @@ public class NothingHeardEarlyEndTests
     }
 
     [Fact]
-    public async Task NothingHeard_EndsAtTwoMinutes_AndSaysWhy()
+    public async Task Threshold_IsThreeAndAHalfMinutes()
     {
+        Assert.Equal(TimeSpan.FromSeconds(210), ReceiverHost.NothingHeardBy);
         await using var f = new Fixture(SlotStart);
         f.At(ReceiverHost.NothingHeardBy - TimeSpan.FromSeconds(1));
         Assert.Null(f.Host.EarlyEndReason(SlotStart));
@@ -58,7 +59,7 @@ public class NothingHeardEarlyEndTests
         f.At(ReceiverHost.NothingHeardBy);
         string? why = f.Host.EarlyEndReason(SlotStart);
 
-        Assert.Equal("nothing heard from GB7RDG by 12:02 (no tone, probe or frame)", why);
+        Assert.Equal("nothing heard from GB7RDG by 12:03:30 (no tone, probe or frame)", why);
         Assert.Equal((SlotStart, why!), f.Host.LastEarlyEnd);
     }
 
@@ -75,13 +76,41 @@ public class NothingHeardEarlyEndTests
     }
 
     [Fact]
+    public async Task LongOrBrokenToneNotMeasured_ButSeen_KeepsTheWindow()
+    {
+        // A daily station's 30 s tone, which the tone detector never measures, ending 2:20 in.
+        await using var f = new Fixture(SlotStart);
+        f.At(TimeSpan.FromSeconds(140));
+        f.Host.Slots.OnSteadyTone();
+
+        f.At(ReceiverHost.NothingHeardBy + TimeSpan.FromSeconds(30));
+
+        Assert.Null(f.Host.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
     public async Task FrameHeardWithoutATone_KeepsTheWindow()
     {
         await using var f = new Fixture(SlotStart);
-        f.At(TimeSpan.FromSeconds(80));
+        f.At(TimeSpan.FromSeconds(130));
         await f.HearFrameAsync();
 
         f.At(ReceiverHost.NothingHeardBy + TimeSpan.FromSeconds(30));
+
+        Assert.Null(f.Host.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
+    public async Task FrameDecodedButNotYetThroughTheStore_KeepsTheWindow()
+    {
+        // Decoded just before the threshold; the store's worker has not handled it yet (it is
+        // never drained here), so the slot tracker has not seen it.
+        await using var f = new Fixture(SlotStart);
+        f.At(ReceiverHost.NothingHeardBy - TimeSpan.FromSeconds(1));
+        f.Host.Intake.Offer(Samples.Frames([Samples.Bulletin(1)])[1]);
+        Assert.Equal(SlotStart + ReceiverHost.NothingHeardBy - TimeSpan.FromSeconds(1), f.Host.Intake.LastOffered);
+
+        f.At(ReceiverHost.NothingHeardBy);
 
         Assert.Null(f.Host.EarlyEndReason(SlotStart));
     }
@@ -110,14 +139,25 @@ public class NothingHeardEarlyEndTests
         Assert.NotNull(f.Host.EarlyEndReason(SlotStart));
     }
 
-    [Theory]
-    [InlineData(3)] // a receiver started mid-window, after the 2 minute mark
-    [InlineData(1)] // or after the slot began: the tone may have been missed
-    public async Task ListeningOnlySinceAfterTheSlotBegan_KeepsTheWindow(int minutesIn)
+    [Fact]
+    public async Task ListeningOnlySinceAfterTheSlotBegan_IsJudgedFromThen()
     {
-        await using var f = new Fixture(SlotStart.AddMinutes(minutesIn), listening: SlotStart.AddMinutes(minutesIn));
+        // A receiver started, or a web SDR reopened, 3 minutes into the slot.
+        await using var f = new Fixture(SlotStart.AddMinutes(3), listening: SlotStart.AddMinutes(3));
 
-        f.At(TimeSpan.FromMinutes(minutesIn) + ReceiverHost.NothingHeardBy);
+        f.At(TimeSpan.FromMinutes(3) + ReceiverHost.NothingHeardBy - TimeSpan.FromSeconds(1));
+        Assert.Null(f.Host.EarlyEndReason(SlotStart));
+
+        f.At(TimeSpan.FromMinutes(3) + ReceiverHost.NothingHeardBy);
+        Assert.Equal("nothing heard from GB7RDG by 12:06:30 (no tone, probe or frame)", f.Host.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
+    public async Task ListeningOnlySinceLateInTheWindow_KeepsTheWholeWindow()
+    {
+        await using var f = new Fixture(SlotStart.AddMinutes(10), listening: SlotStart.AddMinutes(10));
+
+        f.At(ReceiverConfig.WebSdrAfter - TimeSpan.FromSeconds(1));
 
         Assert.Null(f.Host.EarlyEndReason(SlotStart));
     }
@@ -134,6 +174,52 @@ public class NothingHeardEarlyEndTests
     }
 
     [Fact]
+    public async Task RadioTunedAfterTheSlotBegan_IsJudgedFromThen()
+    {
+        // The audio has been up for hours, but the rig (or pdn-soundmodem's receive window) only
+        // reached the slot's frequency a minute in: a slow "before", a refusal then a retake.
+        await using var f = new Fixture(SlotStart, Samples.SoundCard, listening: SlotStart.AddHours(-3));
+        f.Host.RadioTunedSince = () => SlotStart.AddMinutes(1);
+
+        f.At(ReceiverHost.NothingHeardBy);
+        Assert.Null(f.Host.EarlyEndReason(SlotStart));
+
+        f.At(TimeSpan.FromMinutes(1) + ReceiverHost.NothingHeardBy);
+        Assert.Equal("nothing heard from GB7RDG by 12:04:30 (no tone, probe or frame)", f.Host.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
+    public async Task RadioNeverTuned_KeepsTheWindow()
+    {
+        await using var f = new Fixture(SlotStart, Samples.SoundCard, listening: SlotStart.AddHours(-3));
+        f.Host.RadioTunedSince = () => null;
+
+        f.At(ReceiverHost.NothingHeardBy + TimeSpan.FromMinutes(2));
+
+        Assert.Null(f.Host.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
+    public async Task DecidedOnce_SoTheRetunerAndTheSlotWindowCheckAgree()
+    {
+        // The retuner (polling every 5 s) gives the window up first; a frame then arrives before
+        // the slot window check (every 15 s) looks: it still ends the sound card's window too.
+        await using var f = new Fixture(SlotStart, Samples.SoundCard, listening: SlotStart.AddHours(-3));
+        f.At(ReceiverHost.NothingHeardBy);
+        string? first = f.Host.EarlyEndReason(SlotStart);
+        Assert.NotNull(first);
+
+        f.At(ReceiverHost.NothingHeardBy + TimeSpan.FromSeconds(5));
+        await f.HearFrameAsync();
+        f.At(ReceiverHost.NothingHeardBy + TimeSpan.FromSeconds(10));
+        f.Host.CheckSlotWindow();
+
+        Assert.Equal(first, f.Host.EarlyEndReason(SlotStart));
+        Assert.Contains($"audio: the 12:00 UTC slot is over early: {first}", f.Log);
+        Assert.Equal((SlotStart.AddMinutes(58), SlotStart.AddHours(1)), f.Host.BetweenSlots);
+    }
+
+    [Fact]
     public async Task SoundCard_NothingHeard_StopsDecodingUntilTheNextSlot_AndClosesItsHookWindow()
     {
         await using var f = new Fixture(SlotStart, Samples.SoundCard, listening: SlotStart.AddHours(-3));
@@ -143,20 +229,28 @@ public class NothingHeardEarlyEndTests
 
         var now = f.Time.GetUtcNow();
         Assert.Equal(new HookWindow(SlotStart - ReceiverConfig.WebSdrBefore, now, SlotStart), f.Host.HookWindowAt(now));
-        Assert.Contains("audio: the 12:00 UTC slot is over early: nothing heard from GB7RDG by 12:02 (no tone, probe or frame)", f.Log);
+        Assert.Contains("audio: the 12:00 UTC slot is over early: nothing heard from GB7RDG by 12:03:30 (no tone, probe or frame)", f.Log);
         Assert.Equal((SlotStart.AddMinutes(58), SlotStart.AddHours(1)), f.Host.BetweenSlots);
     }
 
     [Fact]
-    public async Task SlotSummary_SaysNothingWasHeardAndTheWindowEndedEarly()
+    public async Task SlotSummary_SaysNothingWasHeardAndWhenTheWindowEnded_AndALateFrameAddsNoSecondLine()
     {
         await using var f = new Fixture(SlotStart);
         f.At(TimeSpan.FromSeconds(15));
         f.Host.Slots.OnListening(SlotStart);
         f.At(ReceiverHost.NothingHeardBy);
+        Assert.NotNull(f.Host.EarlyEndReason(SlotStart));
 
-        f.Host.Slots.EndIfOver(f.Host.EarlyEndReason(SlotStart) is null ? null : f.Host.LastEarlyEnd?.Slot);
+        f.Host.Slots.EndIfOver(f.Host.LastEarlyEnd?.Slot, f.Host.LastEarlyEndAt);
+        Assert.Contains("slot: the 12:00 UTC slot ended: nothing heard; window ended early at 12:03:30 UTC, as nothing was heard by then", f.Log);
 
-        Assert.Contains("slot: the 12:00 UTC slot ended: nothing heard; window ended early, as nothing was heard in its first 2 minutes", f.Log);
+        // A frame decoded afterwards (a sound card still decoding while a page watches): no
+        // later line contradicting "nothing heard".
+        f.At(ReceiverHost.NothingHeardBy + TimeSpan.FromMinutes(1));
+        await f.HearFrameAsync();
+        f.At(ReceiverConfig.WebSdrAfter + TimeSpan.FromMinutes(1));
+        f.Host.Slots.EndIfOver(f.Host.LastEarlyEnd?.Slot, f.Host.LastEarlyEndAt);
+        Assert.Single(f.Log, l => l.StartsWith("slot: the 12:00 UTC slot ended", StringComparison.Ordinal));
     }
 }

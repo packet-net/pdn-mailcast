@@ -168,7 +168,7 @@ public class EarlyEndReasonTests
         }
         f.Host.Slots.OnProbeCaptured();
         f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
-        Assert.NotNull(f.Host.EarlyEndReason(SlotStart)); // ready, before the stray frame
+        Assert.NotNull(f.Host.EarlyEndCheck(SlotStart)); // ready, before the stray frame
 
         // A frame for some other object entirely (not in this directory) arrives: the head end
         // may still be sending something new, so this is conservative and keeps the window open,
@@ -179,11 +179,11 @@ public class EarlyEndReasonTests
         var stray = Ax25UiFrame.Build(Samples.Source, OnAir.Destination, strayTransfer.Frame(0).ToBytes());
         await f.HearAsync(stray);
 
-        Assert.Null(f.Host.EarlyEndReason(SlotStart));
+        Assert.Null(f.Host.EarlyEndCheck(SlotStart));
 
         // Quiet again for long enough since that last frame: ready once more.
         f.Time.Advance(ReceiverHost.QuietBeforeEarlyEnd + TimeSpan.FromSeconds(1));
-        Assert.NotNull(f.Host.EarlyEndReason(SlotStart));
+        Assert.NotNull(f.Host.EarlyEndCheck(SlotStart));
     }
 
     [Fact]
