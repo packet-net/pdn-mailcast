@@ -28,6 +28,7 @@ public sealed record SlotWaveform(string Mode, IAirtime Airtime, byte[]? SetHard
 /// burst on, and echoes the frame back once it has. Its receivers, and every mailcast receiver,
 /// decode any MS110D waveform and interleaver by itself (autobaud, from the preamble), so listeners
 /// need do nothing.</para>
+/// <para>Evening slots (<see cref="SlotTimetable.Evening"/>) may have modes of their own, taken in turn the same way.</para>
 /// </remarks>
 public sealed class Waveforms
 {
@@ -38,7 +39,8 @@ public sealed class Waveforms
     /// <param name="setOnModem">Whether to switch the modem to each slot's mode with SETHW; false leaves it as configured.</param>
     /// <param name="timetable">The head end's slots, which the turns are counted in.</param>
     /// <param name="measure">The airtime model for a mode.</param>
-    public Waveforms(IReadOnlyList<string> modes, bool setOnModem, SlotTimetable timetable, Func<string, IAirtime> measure)
+    /// <param name="eveningModes">The modes the evening slots take in turn; null for the same as the others.</param>
+    public Waveforms(IReadOnlyList<string> modes, bool setOnModem, SlotTimetable timetable, Func<string, IAirtime> measure, IReadOnlyList<string>? eveningModes = null)
     {
         ArgumentNullException.ThrowIfNull(modes);
         ArgumentNullException.ThrowIfNull(timetable);
@@ -47,10 +49,15 @@ public sealed class Waveforms
         {
             throw new ArgumentException("There must be at least one mode.", nameof(modes));
         }
+        if (eveningModes is { Count: 0 })
+        {
+            throw new ArgumentException("There must be at least one evening mode, or none given.", nameof(eveningModes));
+        }
         Modes = [.. modes];
+        EveningModes = eveningModes is null ? null : [.. eveningModes];
         SetOnModem = setOnModem;
         _timetable = timetable;
-        foreach (string mode in Modes.Distinct(StringComparer.Ordinal))
+        foreach (string mode in Modes.Concat(EveningModes ?? []).Distinct(StringComparer.Ordinal))
         {
             byte[]? payload = null;
             if (setOnModem)
@@ -64,22 +71,26 @@ public sealed class Waveforms
     /// <summary>The modes in turn.</summary>
     public IReadOnlyList<string> Modes { get; }
 
+    /// <summary>The evening slots' modes in turn, or null when they take the same as the others.</summary>
+    public IReadOnlyList<string>? EveningModes { get; }
+
     /// <summary>Whether each slot switches the modem to its mode.</summary>
     public bool SetOnModem { get; }
 
     /// <summary>The mode for the slot starting at <paramref name="slot"/>.</summary>
     public string ModeFor(DateTimeOffset slot)
     {
-        if (Modes.Count == 1)
+        var modes = EveningModes is { } evening && _timetable.IsEvening(slot) ? evening : Modes;
+        if (modes.Count == 1)
         {
-            return Modes[0];
+            return modes[0];
         }
         var day = DateOnly.FromDateTime(slot.UtcDateTime);
         long sinceAnchor = (slot - BroadcastScheduler.Midnight(day)).Ticks - _timetable.Anchor.Ticks;
         long every = TimeSpan.FromMinutes(_timetable.EveryMinutes).Ticks;
         long perDay = _timetable.SlotsPerDay;
         long slotOfDay = ((Math.DivRem(sinceAnchor, every, out long rem) - (rem < 0 ? 1 : 0)) % perDay + perDay) % perDay;
-        return Modes[(int)((slotOfDay + day.DayNumber) % Modes.Count)];
+        return modes[(int)((slotOfDay + day.DayNumber) % modes.Count)];
     }
 
     /// <summary>The waveform for the slot starting at <paramref name="slot"/>.</summary>

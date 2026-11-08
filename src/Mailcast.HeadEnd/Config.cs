@@ -281,8 +281,9 @@ public sealed record HeadEndConfig
     public IReadOnlyList<string> Modes => Schedule.Modes ?? [Station.Mode];
 
     /// <summary>Which waveform each slot uses. With <c>schedule.modes</c> set, each slot switches the modem to its own.</summary>
+    /// <remarks>Evening slots (<c>slot.evening</c>) take their own <c>modes</c> in turn when given; the modem is then switched every slot, so the next daylight slot goes back to its own.</remarks>
     public Waveforms ToWaveforms(Func<string, IAirtime> measure) =>
-        new(Modes, Schedule.Modes is not null, ToSlotTimetable(), measure);
+        new(Modes, Schedule.Modes is not null || Slot.Evening?.Modes is not null, ToSlotTimetable(), measure, Slot.Evening?.Modes);
 
     /// <summary>
     /// The scheduler's options. A daily station's defaults are the core's; any shorter interval
@@ -362,7 +363,12 @@ public sealed record HeadEndConfig
     public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>When the slots are.</summary>
-    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings().ToRule());
+    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings().ToRule(), ToEveningRule());
+
+    /// <summary>The evening slots' rule (<c>slot.evening</c>), or null for none.</summary>
+    public EveningRule? ToEveningRule() =>
+        Slot.Daylight is not null && Slot.Evening is { } evening && TimeOnly.TryParseExact(evening.UntilUtc, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var until)
+            ? new EveningRule(until) : null;
 
     /// <summary>The timetable, or null while validation still has something to say about it.</summary>
     private IReadOnlyList<StationAdvert> AdvertsIfValid()
@@ -453,7 +459,7 @@ public sealed record HeadEndConfig
     }
 
     /// <summary>When the slots are, as the directory carries them.</summary>
-    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToSettings().ToRule());
+    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToSettings().ToRule(), ToEveningRule());
 
     private const int MinutesPerDay = 1440;
 
@@ -512,6 +518,7 @@ public sealed record HeadEndConfig
             problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
             daylightFine = false;
         }
+        problems.AddRange(EveningProblems());
         problems.AddRange(DetailsProblems());
         problems.AddRange(AdvertProblems());
         ValidateSchedule(problems, everyFine && daylightFine && TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _));
@@ -623,6 +630,41 @@ public sealed record HeadEndConfig
         if (problems.Count > 0)
         {
             throw new ConfigException($"{source}: {string.Join("; ", problems)}");
+        }
+    }
+
+    private IEnumerable<string> EveningProblems()
+    {
+        if (Slot.Evening is not { } evening)
+        {
+            yield break;
+        }
+        if (Slot.Daylight is null)
+        {
+            yield return "\"slot\".\"evening\" needs \"slot\".\"daylight\": evening slots start at sunset at its locator, after the daylight ones";
+        }
+        if (!TimeOnly.TryParseExact(evening.UntilUtc ?? "", "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            yield return $"\"slot\".\"evening\".\"untilUtc\" '{evening.UntilUtc}' is not HH:mm: the last evening slot starts before this time, UTC, such as 22:00";
+        }
+        if (Rule != ScheduleRule.Budget)
+        {
+            yield return "\"slot\".\"evening\" needs the budget rule: evening slots are filled to the airtime budget, apart from the daylight ones";
+        }
+        if (evening.Modes is { } modes)
+        {
+            if (modes.Count == 0)
+            {
+                yield return "\"slot\".\"evening\".\"modes\" must list at least one mode, or be left out to use the daylight ones";
+            }
+            else if (modes.FirstOrDefault(m => Waveforms.SetHardwarePayload(m) is null) is { } bad)
+            {
+                yield return $"\"slot\".\"evening\".\"modes\": '{bad}' is not an MS110D waveform the modem can switch to (ms110d-wn0 to ms110d-wn8, or ms110d-wn13; add -long for the long interleaver)";
+            }
+            else if (Schedule.Modes is null && Waveforms.SetHardwarePayload(Station.Mode) is null)
+            {
+                yield return $"\"slot\".\"evening\".\"modes\" needs an MS110D broadcast modem, and \"station\".\"mode\" is '{Station.Mode}'";
+            }
         }
     }
 
@@ -811,6 +853,13 @@ public sealed record SlotConfig
     /// every slot runs. A slot on demand (<c>--run-now</c>) runs whatever the time.
     /// </summary>
     public HeadEndDaylight? Daylight { get; init; }
+
+    /// <summary>
+    /// Extra slots after dark, for listeners far enough away that the path stays open (needs <see cref="Daylight"/> and the
+    /// budget rule): the slots from sunset at the daylight locator until <see cref="HeadEndEvening.UntilUtc"/>. They carry
+    /// everything in rotation but never count against the daylight strategy. Left out, there are none.
+    /// </summary>
+    public HeadEndEvening? Evening { get; init; }
 
     /// <summary>Key nothing until the kernel says the clock is synchronised.</summary>
     public bool RequireClockSync { get; init; } = true;
@@ -1023,6 +1072,16 @@ public sealed record ReportsReaderConfig
     public string User { get; init; } = "";
 
     public string Password { get; init; } = "";
+}
+
+/// <summary>The evening slots (<c>slot.evening</c>): from sunset at the daylight locator until <see cref="UntilUtc"/>.</summary>
+public sealed record HeadEndEvening
+{
+    /// <summary>The last evening slot starts before this time, UTC, HH:mm: 22:00 say. Required.</summary>
+    public string UntilUtc { get; init; } = "";
+
+    /// <summary>The waveforms the evening slots take in turn; left out, the same turns as the daylight slots.</summary>
+    public IReadOnlyList<string>? Modes { get; init; }
 }
 
 /// <summary>

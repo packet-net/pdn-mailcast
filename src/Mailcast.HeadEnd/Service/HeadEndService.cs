@@ -20,11 +20,12 @@ public sealed record RunNowAnswer(bool Accepted, DateTimeOffset? Slot, string? P
 /// <summary>
 /// When slots are: <see cref="Anchor"/> UTC and then every <see cref="Every"/>, which divides a
 /// day, so every day has the same slots. A daily station has one, at the anchor. With a
-/// <see cref="Daylight"/> rule only the slots that start in its window run.
+/// <see cref="Daylight"/> rule only the slots that start in its window run, and with an evening
+/// rule as well those after it (<see cref="SlotTimetable.Evening"/>).
 /// </summary>
 public sealed record SlotSchedule
 {
-    public SlotSchedule(TimeOnly anchor, TimeSpan every, DaylightRule? daylight = null)
+    public SlotSchedule(TimeOnly anchor, TimeSpan every, DaylightRule? daylight = null, EveningRule? evening = null)
     {
         if (every <= TimeSpan.Zero || TimeSpan.FromDays(1).Ticks % every.Ticks != 0 || every.Ticks % TimeSpan.TicksPerMinute != 0)
         {
@@ -32,7 +33,7 @@ public sealed record SlotSchedule
         }
         Anchor = anchor;
         Every = every;
-        Timetable = new SlotTimetable(anchor, (int)every.TotalMinutes, daylight);
+        Timetable = new SlotTimetable(anchor, (int)every.TotalMinutes, daylight, evening);
     }
 
     /// <summary>The same, as Packet.Mailcast and the directory have it.</summary>
@@ -61,14 +62,16 @@ public sealed record SlotSchedule
             return null;
         }
         var window = rule.WindowOn(day);
-        var slots = Timetable.ActiveSlotsOn(day);
+        var evening = Timetable.EveningSlotsOn(day);
+        var slots = Timetable.ActiveSlotsOn(day).Except(evening).ToList();
         string sun = window.Sun.Kind switch
         {
             SunDay.AlwaysUp => "the sun does not set",
             SunDay.AlwaysDown => "the sun does not rise",
             _ => $"sunrise {window.Sun.Sunrise!.Value.UtcDateTime:HH:mm}Z, sunset {window.Sun.Sunset!.Value.UtcDateTime:HH:mm}Z",
         };
-        return $"daylight {day:yyyy-MM-dd} at {rule.Locator}: {sun}; {slots.Count} slot{(slots.Count == 1 ? "" : "s")}{(slots.Count == 0 ? "" : ", " + SlotTimetable.Times(slots))}";
+        string after = Timetable.Evening is null ? "" : $"; {evening.Count} evening slot{(evening.Count == 1 ? "" : "s")}{(evening.Count == 0 ? "" : ", " + SlotTimetable.Times(evening))}";
+        return $"daylight {day:yyyy-MM-dd} at {rule.Locator}: {sun}; {slots.Count} slot{(slots.Count == 1 ? "" : "s")}{(slots.Count == 0 ? "" : ", " + SlotTimetable.Times(slots))}{after}";
     }
 
     /// <summary>One slot a day.</summary>
@@ -338,7 +341,9 @@ public sealed class HeadEndService(
             journal.Write($"forgot {forgotten} bulletins past their remembering days");
         }
 
-        SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null);
+        // An evening slot (slot.evening) never counts against the daylight strategy; a one-off slot is always a normal one.
+        bool evening = requestedBy is null && schedule.Timetable.IsEvening(slot);
+        SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null, evening: evening);
         if (plan.Relay is { Candidates: > 0 } relay)
         {
             // One short line a slot on what is relayed from the other stations the receivers on the LAN hear (issue #218).
@@ -359,7 +364,7 @@ public sealed class HeadEndService(
             // Observe only, the same.
             journal.Write(spots);
         }
-        SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation);
+        SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation, evening);
         report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0 };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);

@@ -86,6 +86,18 @@ public sealed class RotationStore
         }
     }
 
+    /// <summary>
+    /// Plans an evening slot from the bulletins in rotation (<see cref="BroadcastScheduler.PlanEvening"/>): their evening pieces
+    /// only, so nothing the daylight slots decide moves. Nothing is relayed.
+    /// </summary>
+    public SlotBroadcast PlanEvening(DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, SlotBudget budget, string? mode = null, IReadOnlyList<MailcastFrame>? extras = null, ReportReceipts? reports = null)
+    {
+        lock (_gate)
+        {
+            return BroadcastScheduler.PlanEvening(_store.InRotation(slot), slot, seed, compression, options, _store.DirectoryNextEsi, budget, mode, extras, reports);
+        }
+    }
+
     /// <summary>What has been sent of an object relayed from another station.</summary>
     public RelayProgress GetRelayProgress(ulong objectId)
     {
