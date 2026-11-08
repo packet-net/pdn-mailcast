@@ -44,6 +44,33 @@ The other slots are passed over without a word, except for one line in the journ
 
 The head end's directory carries the slot times and the daylight rule, so receivers follow the head end rather than their own settings once they have heard it.
 
+### Evening slots
+
+40 m stops carrying across the UK after dark, but a longer path, Reading to Sweden say, often stays open into the evening. Evening slots are extra slots for those listeners, after the daylight ones:
+
+```json
+"slot": {
+  "minute": 0,
+  "everyMinutes": 60,
+  "daylight": { "locator": "IO91lk" },
+  "evening": { "untilUtc": "22:00", "modes": ["ms110d-wn3"] }
+}
+```
+
+They are the usual slots that start from sunset at the daylight locator until `untilUtc` (UTC, the last one starts before it), so a daylight slot and an evening slot never overlap. At IO91lk with `"untilUtc": "22:00"`:
+
+| Day | Sunset (UTC) | Evening slots |
+|---|---|---|
+| 5 October | 17:33 | 18:00 to 21:00, 4 slots |
+| 21 December | 15:57 | 16:00 to 21:00, 6 slots |
+| 21 June | 20:25 | 21:00, 1 slot |
+
+A day whose sunset is at or after `untilUtc` has none. `modes` is optional: the evening slots take those waveforms in turn, and the modem is switched back for the next daylight slot. Left out, they take the same turns as the daylight slots. Evening slots need `daylight` and the budget rule. Leave `evening` out and nothing changes.
+
+Each evening slot carries everything in rotation, leftover tier included, filled to the same airtime budget, the bulletins the evening slots have sent least of first, at most `schedule.slotCap` K each. They never count against the daylight slots: a bulletin's evening pieces are numbered from their own range (half way through the piece numbers, with their own count kept in its state), so they are always fresh pieces that add to what a receiver holds, and nothing the daylight slots work out (coverage, the leftover tier, retiring, the first slot) moves because of them. A bulletin retired by the daylight rules leaves the evening slots too. An evening slot with nothing to send keys nothing. Other stations' objects are not relayed in the evening, and a slot on demand is always a normal one.
+
+The directory announces them (`evening=22:00` after `daylight=`), so receivers follow them. Receivers from before simply do not listen in the evening. Each evening slot's journal lines start `evening slot` instead of `slot`, its report has `"evening": true`, and the day's line adds them: `...; 9 slots, 09:00 ... 17:00 UTC; 4 evening slots, 18:00, 19:00, 20:00 and 21:00 UTC`.
+
 A few settings have a different default for a daily station and for anything more often:
 
 | Setting | Daily (1440) | Hourly and other intervals |
@@ -305,7 +332,7 @@ pskreporter: MARGINAL, last 30 min to 14:00Z (0 min old), UK and Ireland FT8/FT4
 
 ## Status
 
-`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation (`bulletinsInRotation`) and how many of them are in the leftover tier (`leftoverInRotation`), whether the tone went, whether the channel probe went whole (`probeSent`) and its id (`probeId`, `zc255-2400-rrc015-v1`), the PA temperature maximum, the reference state, who asked for it if it was a one-off (`requestedBy`), its waveform (`mode`), the planner's estimate of its time on the air (`estimatedSeconds`), the ionosonde reading it planned with (`ionosphere`) and how many frames carried it (`ionosphereFrames`), and the same for PSK Reporter (`pskReporter`, `pskReporterFrames`). `iono` is the reading as of now: `state`, `foF2`, `mufd100`, `mufd500`, `mufd1000`, `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes`, `source`, `method`, and the verdict at each distance (`at100`, `at500`, `at1000`). `pskReporter` is the PSK Reporter reading as of now: `state`, `observedUtc`, `windowMinutes`, `feedDown`, `at100`, `at500`, `at1000`, `skipZoneKm`, and `forty` and `eighty`, each with its `bins` (`km`, `fromKm`, `toKm`, `verdict`, `spots`, `stations`, `snrMedianDb`, `closedBy`) and `skipZoneKm`. `pskReporterFeed` says how the feed is doing: `connected`, `since`, `lastMessage`, `spotsHeld`, `messages`, `reconnects` and `problem`. `recent-slots.json` in the state directory keeps the same for the last slots. The journal carries the same in plain lines, each slot named by its start, and with `daylight`, once a day, that day's sunrise, sunset and slots, for example:
+`http://127.0.0.1:8216/status` (`status.bind`, `status.port`) is a small JSON document: whether the head end is waiting or in a slot, the next slot, the slots run today (`slotsToday`: how many, and how many completed, were cut short or were skipped, each slot counted once by its latest run), bulletins held, the last intake, and the last slot: its start time (`slot`), start, end, outcome and reason, frames planned, queued and sent, bursts, bulletins in rotation (`bulletinsInRotation`) and how many of them are in the leftover tier (`leftoverInRotation`), whether the tone went, whether the channel probe went whole (`probeSent`) and its id (`probeId`, `zc255-2400-rrc015-v1`), the PA temperature maximum, the reference state, who asked for it if it was a one-off (`requestedBy`), its waveform (`mode`), the planner's estimate of its time on the air (`estimatedSeconds`), whether it was an evening slot (`evening`), the ionosonde reading it planned with (`ionosphere`) and how many frames carried it (`ionosphereFrames`), and the same for PSK Reporter (`pskReporter`, `pskReporterFrames`). `iono` is the reading as of now: `state`, `foF2`, `mufd100`, `mufd500`, `mufd1000`, `skipZoneKm`, `station`, `soundingTimeUtc`, `ageMinutes`, `source`, `method`, and the verdict at each distance (`at100`, `at500`, `at1000`). `pskReporter` is the PSK Reporter reading as of now: `state`, `observedUtc`, `windowMinutes`, `feedDown`, `at100`, `at500`, `at1000`, `skipZoneKm`, and `forty` and `eighty`, each with its `bins` (`km`, `fromKm`, `toKm`, `verdict`, `spots`, `stations`, `snrMedianDb`, `closedBy`) and `skipZoneKm`. `pskReporterFeed` says how the feed is doing: `connected`, `since`, `lastMessage`, `spotsHeld`, `messages`, `reconnects` and `problem`. `recent-slots.json` in the state directory keeps the same for the last slots. The journal carries the same in plain lines, each slot named by its start, and with `daylight`, once a day, that day's sunrise, sunset and slots, for example:
 
 ```
 daylight 2026-10-05 at IO91lk: sunrise 06:11Z, sunset 17:33Z; 9 slots, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 and 17:00 UTC
