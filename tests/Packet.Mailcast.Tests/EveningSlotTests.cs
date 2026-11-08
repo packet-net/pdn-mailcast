@@ -270,6 +270,22 @@ public class EveningSlotTests
     }
 
     [Fact]
+    public void ABulletinForgottenAndOfferedAgain_CarriesOnPastItsEveningPieces()
+    {
+        using var dir = new TempDirectory();
+        var bulletin = TestBulletins.Make(14, 4000);
+        var store = Store(dir.Path, [bulletin]);
+        store.Commit(PlanEvening(store, Evening));
+        uint evening = store.InRotation(Evening).Single().EveningNextEsi;
+        Assert.True(evening > 0);
+
+        var later = DateOnly.FromDateTime(Evening.UtcDateTime).AddDays(Options.RememberDays);
+        Assert.Equal(1, store.Expire(later));
+        var reopened = new HeadEndStore(dir.Path, Compression.Default, Options);
+        Assert.Equal(evening, reopened.Offer(bulletin, later)!.EveningNextEsi);
+    }
+
+    [Fact]
     public void AnEveningSlot_CarriesTheLeastEveningCoveredFirst_UpToTheCap_AndNothingRetired()
     {
         var rule = Options.Budget!;
