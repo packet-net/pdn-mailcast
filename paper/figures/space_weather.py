@@ -35,6 +35,10 @@ J = os.path.join(root, "data/headend-gb7rdg/headend-journal-to-2026-11-07.txt")
 SURVEY = os.path.join(root, "data/web-sdr-survey-2026-10/slots.csv")
 R_SLOTS = os.path.join(root, "reports/data/slots.csv")
 R_DAYS = os.path.join(root, "reports/data/reports.csv")
+# The paper's frozen report set (see results.py): only reports listed in report-manifest.csv.
+MANIFEST = {tuple(line.strip().split(",")) for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "report-manifest.csv")) if line.strip() and not line.startswith("day,")}
+def in_paper(r):
+    return (r["day"], r["callsign"]) in MANIFEST
 SW = os.path.join(root, "data/space-weather")
 PLOTS = os.path.join(root, "paper/figures/plots")
 CHANGE = "2026-11-02"  # long interleaver, 31 s bursts and the bulk tier began on this day
@@ -205,7 +209,7 @@ with open(SURVEY, newline="") as f:
                          sent=sent[(day, hhmm)][0], snr=float(r["tone_snr_db_3khz"]) if r["tone_snr_db_3khz"] else None,
                          vh=None, km=int(r["km"]), own=True))
 
-day_rows = list(csv.DictReader(open(R_DAYS, newline="")))
+day_rows = [r for r in csv.DictReader(open(R_DAYS, newline="")) if in_paper(r)]
 deaf = {(r["callsign"], r["day"]) for r in day_rows if "AUD" in r["errors"] and r["slots_heard"] == "0"}
 SDR_NAMES = {"wessex.zapto.org": "WESSEX", "nope.tunnel.ubersdr.org": "a web SDR"}
 OWN_SDRS = {"m9twm-1.tunnel.ubersdr.org"}
@@ -220,7 +224,7 @@ def who(call, day):
     return f"{call} via {SDR_NAMES.get(a, a.split('.')[0])}"
 
 
-for r in csv.DictReader(open(R_SLOTS, newline="")):
+for r in (x for x in csv.DictReader(open(R_SLOTS, newline="")) if in_paper(x)):
     if r["station"] not in ("", "M0LTE", "GB7RDG") or (r["callsign"], r["day"]) in deaf:
         continue
     if sent.get((r["day"], r["slot_utc"]), (0,))[0] <= 0:

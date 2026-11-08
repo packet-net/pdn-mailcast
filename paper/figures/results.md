@@ -156,3 +156,18 @@ Median Doppler spread measured by listeners (Hz), by period, all bases and probe
 - Virtual height: median 310 km over 43 measurements.
 - Slots with an E-layer path: 2026-11-06 14:00.
 - Path tests: see data/sweden-sa6daz/path-test-summary.txt (136 rounds, frames decoded per waveform by measured SNR).
+
+### Did the BBS already have it?
+
+| Listener | report days | rebuilt | new to the BBS | already had | share already had |
+|---|---|---|---|---|---|
+| GM4CXF | 13 | 165 | 165 | 0 | 0% |
+| MM0MQN | 2 | 0 | 0 | 0 | - |
+| EI7KX | 6 | 43 | 38 | 0 | 0% |
+| G8BPQ | 22 | 148 | 147 | 1 | 1% |
+| GM8BPQ | 23 | 80 | 78 | 1 | 1% |
+| M7TAW | 10 | 159 | 136 | 19 | 12% |
+| M0NVK | 16 | 158 | 6 | 152 | 96% |
+| G7TAJ | 21 | 122 | 0 | 122 | 100% |
+| M9TWM | 9 | 63 | 0 | 63 | 100% |
+| All | | | 570 | 358 | 39% |

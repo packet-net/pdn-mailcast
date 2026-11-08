@@ -23,8 +23,13 @@ R_DAYS = os.path.join(root, "reports/data/reports.csv")
 # The paper's data runs to 7 November 2026; reports added to the archive later are left out so its
 # figures stay fixed.
 CUTOFF = "2026-11-07"
+# The paper's report set is frozen: only the reports listed in report-manifest.csv (the 131 in the
+# archive when the paper's figures were made) count, so reports that arrive later for earlier
+# days don't move its numbers. Eight such late reports (M9TWM 31 Oct to 6 Nov, GM4CXF 7 Nov) are
+# left for a later revision.
+MANIFEST = {tuple(line.strip().split(",")) for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "report-manifest.csv")) if line.strip() and not line.startswith("day,")}
 def upto(rows):
-    return [r for r in rows if r["day"] <= CUTOFF]
+    return [r for r in rows if r["day"] <= CUTOFF and (r["day"], r["callsign"]) in MANIFEST]
 
 
 def med(xs):
@@ -307,7 +312,7 @@ for lo, hi, label in (("2026-10-25", "2026-10-30", "25 to 30 Oct"), ("2026-10-31
     pr = [float(r["doppler_spread_hz"]) for r in sel if r["channel_basis"] == "probe"]
     print(f"- {label}: {med([float(r['doppler_spread_hz']) for r in sel]):.2f} (n={len(sel)}), probe only {fmt(med(pr), 2)} (n={len(pr)})")
 
-# --- Sweden (section 6.10) ----------------------------------------------------------------------------
+# --- Sweden (section 6.11) ----------------------------------------------------------------------------
 SE = os.path.join(root, "data/sweden-sa6daz/receiver-slot-and-channel-lines.txt")
 print("\n### Sweden (SA6DAZ, JO67fm)\n")
 ended = re.compile(r"slot: the (\d\d:\d\d) UTC slot ended: (?:(\d+) frames?|nothing heard)")
@@ -333,3 +338,22 @@ print(f"- Tone SNR range: {min(tones)} to {max(tones)} dB.")
 print(f"- Virtual height: median {med(heights):.0f} km over {len(heights)} measurements.")
 print(f"- Slots with an E-layer path: {', '.join(sorted(elayer))}.")
 print("- Path tests: see data/sweden-sa6daz/path-test-summary.txt (136 rounds, frames decoded per waveform by measured SNR).")
+
+# --- New to the BBS against already had (Perry M0PYL's question) ----------------------------------
+# Every report with the already_had field (receivers from issue #86 on): bulletins the listener's
+# BBS accepted as new (delivered) against those it already had by normal forwarding. All of a
+# listener's report days count, web SDR days included, since the BBS is the listener's either way.
+print("\n### Did the BBS already have it?\n")
+nh = collections.defaultdict(lambda: [0, 0, 0, 0])
+for r in day_rows:
+    if r["already_had"] == "":
+        continue
+    a = nh[r["callsign"]]
+    a[0] += 1; a[1] += int(r["rebuilt"] or 0); a[2] += int(r["delivered"] or 0); a[3] += int(r["already_had"])
+print("| Listener | report days | rebuilt | new to the BBS | already had | share already had |")
+print("|---|---|---|---|---|---|")
+tn = th = 0
+for c, a in sorted(nh.items(), key=lambda kv: kv[1][3] / max(kv[1][2] + kv[1][3], 1)):
+    tn += a[2]; th += a[3]
+    print(f"| {c} | {a[0]} | {a[1]} | {a[2]} | {a[3]} | {pct(a[3], a[2] + a[3])} |")
+print(f"| All | | | {tn} | {th} | {pct(th, tn + th)} |")
