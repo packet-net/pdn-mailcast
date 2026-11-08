@@ -535,8 +535,42 @@ Perry M0PYL suggested the fountain code. John G8BPQ, Steve G7TAJ, Eoin M0NVK, An
 
 [38] ITU-R M.540-2, "Operational and technical characteristics for an automated direct-printing telegraph system for promulgation of navigational and meteorological warnings and urgent information to ships" (NAVTEX), 1990.
 
-## Appendices (to write)
+## Appendix A. On-air format
 
-- A. On-air format, summarised from `docs/design.md`, with the test vectors.
-- B. The daily report format (MCR1).
-- C. Data and code availability.
+The full specification is `docs/design.md` in the repository; the test vectors in `tests/Packet.Mailcast.Tests/Vectors` define the Model B encoding exactly and have been reproduced independently in Python and Rust.
+
+- **Link layer.** Each frame is an AX.25 UI frame from the transmitting station's callsign to MCAST, PID F0, sent as IL2P with a CRC inside the MS110D bit stream.
+- **Frame payload, 271 bytes.** Version (1 byte), flags (1), object ID (8), dictionary ID (2), RaptorQ object transmission information (12), encoding symbol ID (3), symbol (240), CRC-32 (4).
+- **Object ID.** The first 8 bytes of SHA-256 over the dictionary ID and the object, so an object checks itself.
+- **Coding.** RaptorQ (RFC 6330), one source block per object, 240-byte symbols. Each station sends its own scrambled order of symbol numbers and never reuses one.
+- **Objects.** The first byte gives the object type (Table 2); its top bit flags a metadata block (2-byte length, then the block). Bulletins (type 1) are compressed with zstd 1.5.7 and a trained 64 KB dictionary (dictionary 1). A bulletin is sent in canonical form, with routing lines and per-copy headers moved to a separate envelope object (type 5).
+- **Directory (type 2).** Text, one entry per bulletin in rotation (BID, title, size, object ID and a further 8 bytes of its hash), the station's timetable and the slot's waveform, the daily reports seen, and other stations it advertises; signed with Ed25519.
+- **Propagation readings (type 4).** 24 to 27 bytes each, not compressed: the ionosonde's and PSK Reporter's verdicts at 100, 500 and 1000 km, with the measurements behind them.
+- **Slot.** Clear-channel wait (up to 2 min), 10 s tone at the signal centre, 1.5 s gap, 6.5 s Zadoff-Chu probe (`zc255-2400-rrc015-v1`), CW ident, bursts of up to 18 s with 1 s gaps, closing CW ident; at most 10 minutes from the slot's start.
+
+## Appendix B. The daily report (MCR1)
+
+A report is a public bulletin titled `MCR CALL YYYY-MM-DD` to `MCAST@GB7RDG.#42.GBR.EURO`. Its body is plain ASCII, fields separated by single spaces, `-` for a value not known:
+
+```
+MCR1 0.32.0 IO68vl sc 0/0 14:RIG14 0 0
+10 W4 3 3 +19.9 IU+PU 4 1.5/-1 0.59 0.24 271 p
+11 - 0 - - IU+PU
+S M0LTE 7 5 11 0 3 274 0
+```
+
+- **Header:** format; receiver version; locator; audio source (`sc` for a sound card, or the SDR's host); bulletins rebuilt/delivered; errors (count, then codes such as AUD, BBS, RIG); bulletins the BBS already had; part-received bulletins given up; pieces handed in from outside; part-received bulletins dropped with under half their pieces.
+- **One line per slot:** the hour; waveform; frames decoded; tone SNR in 3 kHz (dB); tone offset (Hz); propagation verdicts heard (I for ionosonde, P for PSK Reporter; G good, M marginal, P poor, U unknown); then, with a channel measurement, the number of paths, the second path's delay/power (ms/dB), delay spread (ms), Doppler spread (Hz), virtual height (km) and whether it came from the probe (p) or the bursts (b).
+- **One line per station:** slots listened, slots heard, frames, bulletins completed, median tone SNR, median virtual height, and second copies of bulletins already delivered.
+
+Readers ignore fields they do not know at the end of each line, so the format can grow without breaking older readers. The authoritative description is `docs/receiver.md`, "The daily report's format".
+
+## Appendix C. Data and code
+
+Everything used in this paper is public in the packet-net/pdn-mailcast repository on GitHub, under the AGPL-3.0 licence for code:
+
+- **Code:** the head end and receiver (`src/`), and pdn-soundmodem with the MS110D modem (packet-net/pdn-soundmodem, M0LTE/M0LTE.Ms110d).
+- **Listener reports:** `reports/daily` (one file per listener per day, with where each copy came from), and `reports/data` (the same as tables). New reports are copied from GB7RDG automatically.
+- **Survey and head end records:** `data/web-sdr-survey-2026-10`, `data/headend-gb7rdg`, `data/space-weather`, and from mid-November `data/web-sdr-survey-2026-11`, copied weekly from the resumed survey.
+- **Analysis:** `paper/figures/results.py`, `heard_share.py`, `plots.py` and `space_weather.py` reproduce every figure and table from the data; the paper's analysis stops at 7 November 2026.
+- **Notes:** `paper/notes/` holds the sourced timeline of changes, the related-work sources, the space weather analysis and listener feedback from the OARC Discord.
