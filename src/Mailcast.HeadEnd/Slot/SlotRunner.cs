@@ -44,6 +44,14 @@ namespace Mailcast.HeadEnd.Slot;
 /// (<see cref="KeepAudioWindow"/>), so a "channel busy" can be checked afterwards. The
 /// request goes off on its own with a short limit: it never delays, blocks or fails the slot. A
 /// station too old to offer it is noted once and not asked again.</para>
+/// <para><b>The 10 MHz reference.</b> A station with a reference feed (a GPSDO display) says in
+/// <c>GET /api/txlease</c> whether its 10 MHz reference is ok, unreliable or unknown. Unreliable
+/// holds the slot: it is read before anything at the station is touched, and each time the lease
+/// is read after (the channel check, before every burst). Seen before anything is queued, nothing
+/// is counted and the slot is skipped as retryable; seen later, the slot stops as other aborts do.
+/// Unknown sends the slot marked: the tone request asks for the CW E marker instead of the steady
+/// tone, and a station that does not know the marker is asked for the plain tone. A station with
+/// no feed says nothing, and the slot runs as it always did.</para>
 /// <para><b>Write-ahead.</b> Every frame of a burst is reported as queued before the first is
 /// written, and nothing is written if that report fails, so a crash mid-burst can never lead to a
 /// piece being sent twice.</para>
@@ -61,6 +69,7 @@ public sealed class SlotRunner
     private int _saidNotTuned;
     private int _saidNoRetune;
     private int _keepAudioNotOffered;
+    private int _saidMarkerRefused;
 
     /// <summary>How far before the slot the kept audio starts.</summary>
     internal static readonly TimeSpan KeepAudioBefore = TimeSpan.FromSeconds(60);
@@ -238,6 +247,12 @@ public sealed class SlotRunner
     /// <summary>The kept audio's label, which names its directory on the station: <c>slot 2026-10-23 1600Z</c>.</summary>
     internal static string KeepAudioLabel(DateTimeOffset slot) => "slot " + slot.UtcDateTime.ToString("yyyy-MM-dd HHmm'Z'", CultureInfo.InvariantCulture);
 
+    /// <summary>The slot's skip reason when the station's 10 MHz reference is unreliable.</summary>
+    internal static string ReferenceHoldReason(ReferenceFeed feed) => $"the 10 MHz reference is unreliable ({feed.DetailOrNone})";
+
+    /// <summary>How bad a reference state is: ok, unknown, unreliable.</summary>
+    private static int Badness(ReferenceFeed feed) => feed.IsUnreliable ? 2 : feed.IsUnknown ? 1 : 0;
+
     /// <summary>
     /// Asks the station to keep the slot's run-up audio. Never throws, and gives up after
     /// <see cref="KeepAudioCallLimit"/>; the slot does not wait for it.
@@ -327,6 +342,14 @@ public sealed class SlotRunner
         private bool _leaseTaken;
         private bool _toneSent;
         private string? _probeId;
+        private readonly Lock _feedGate = new();
+        /// <summary>The reference feed as last read, or null while the station has said nothing of one.</summary>
+        private ReferenceFeed? _feedNow;
+        /// <summary>The worst the reference feed said during the slot, for the report.</summary>
+        private ReferenceFeed? _feedWorst;
+        /// <summary>Why the slot stopped for an unreliable reference, or null if it did not.</summary>
+        private string? _referenceHold;
+        private bool _markerSent;
 
         public void Dispose()
         {
@@ -382,6 +405,14 @@ public sealed class SlotRunner
                 {
                     return Finish(SlotOutcome.Skipped, flexSkip, retryable: true);
                 }
+            }
+
+            // Before the KISS port, the modem's waveform or the lease: a bad reference touches nothing.
+            await ReadLeaseAsync(cancellation);
+            if (FeedNow is { IsUnreliable: true } bad)
+            {
+                _referenceHold = ReferenceHoldReason(bad);
+                return Finish(SlotOutcome.Skipped, _referenceHold, retryable: true);
             }
 
             IKissLink link;
@@ -475,6 +506,11 @@ public sealed class SlotRunner
                         await ReleaseAsync();
                     }
 
+                    if (_referenceHold is not null && _queued == 0)
+                    {
+                        // Turned unreliable before anything was queued: nothing counted, so worth trying again.
+                        return Finish(SlotOutcome.Skipped, _referenceHold, retryable: true);
+                    }
                     if (skipped is not null)
                     {
                         return Finish(skipped.Value, skipReason);
@@ -728,16 +764,65 @@ public sealed class SlotRunner
             }
         }
 
-        private async Task<bool?> ChannelBusyAsync(CancellationToken cancellation)
+        private ReferenceFeed? FeedNow
         {
+            get
+            {
+                lock (_feedGate)
+                {
+                    return _feedNow;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reads the lease (<c>GET /api/txlease</c>) for the channel-busy flag, null when it could not
+        /// be read, and notes the reference feed it carries. With the lease taken, a feed that says
+        /// unreliable stops the slot.
+        /// </summary>
+        private async Task<bool?> ReadLeaseAsync(CancellationToken cancellation)
+        {
+            LeaseAnswer answer;
             try
             {
-                return (await owner._station.ReadLeaseAsync(cancellation)).ChannelBusy;
+                answer = await owner._station.ReadLeaseAsync(cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
                 return null;
             }
+            if (answer.Reference is { } feed)
+            {
+                lock (_feedGate)
+                {
+                    _feedNow = feed;
+                    if (_feedWorst is null || Badness(feed) > Badness(_feedWorst))
+                    {
+                        _feedWorst = feed;
+                    }
+                }
+                if (feed.IsUnreliable && _leaseTaken)
+                {
+                    StopForTheReference(feed);
+                }
+            }
+            return answer.ChannelBusy;
+        }
+
+        /// <summary>Stops the slot because the reference turned unreliable after the lease was taken, once.</summary>
+        private void StopForTheReference(ReferenceFeed feed)
+        {
+            string reason = _queued > 0
+                ? $"the 10 MHz reference turned unreliable ({feed.DetailOrNone})"
+                : ReferenceHoldReason(feed);
+            if (_abort is not null || Interlocked.CompareExchange(ref _referenceHold, reason, null) is not null)
+            {
+                return;
+            }
+            Say(_queued > 0
+                ? $"the 10 MHz reference turned unreliable ({feed.DetailOrNone}); stopping, nothing more is queued"
+                : $"the 10 MHz reference turned unreliable ({feed.DetailOrNone}) before any frame was queued; stopping, nothing counted");
+            Abort(reason);
         }
 
         private async Task<(SlotOutcome?, string?)> ToneAsync(CancellationToken cancellation)
@@ -750,12 +835,32 @@ public sealed class SlotRunner
             bool saidBusy = false;
             // The probe goes on the tone's own audio frequency, so it lands where the tone does on the air.
             ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, ToneHz);
+            bool markerRefused = false;
             while (_abort is null)
             {
-                bool? busy = await ChannelBusyAsync(cancellation);
+                bool? busy = await ReadLeaseAsync(cancellation);
+                if (_abort is not null)
+                {
+                    break;
+                }
                 if (busy != true)
                 {
-                    ToneAnswer answer = await SendToneAsync(probe, cancellation);
+                    // An unknown reference: the CW E marker instead of the steady tone, so a listener
+                    // knows not to trust this slot's frequency.
+                    ReferenceFeed? unknown = FeedNow is { IsUnknown: true } u ? u : null;
+                    string? marker = unknown is not null && !markerRefused ? ToneMarker.CwE : null;
+                    ToneAnswer answer = await SendToneAsync(probe, marker, cancellation);
+                    if (answer.Outcome != ToneOutcome.Sent && marker is not null && answer.Status == 400)
+                    {
+                        // A station that does not know the marker: the plain tone, at once, as for the probe.
+                        if (Interlocked.Exchange(ref owner._saidMarkerRefused, 1) == 0)
+                        {
+                            Say($"the station would not send the CW E marker ({answer.Message}); sending the plain calibration tone instead, as it will each slot until the head end restarts (a pdn-soundmodem with the reference feed knows the marker)");
+                        }
+                        markerRefused = true;
+                        marker = null;
+                        answer = await SendToneAsync(probe, null, cancellation);
+                    }
                     if (answer.Outcome != ToneOutcome.Sent && probe is not null && RefusedForTheProbe(answer))
                     {
                         // Refused because of the probe itself: the tone alone, at once, so the probe
@@ -763,16 +868,26 @@ public sealed class SlotRunner
                         // did not clear) is answered as it always was, and Stop still wins.
                         Say($"the station would not send the tone with the channel probe ({answer.Message}); asking for the tone alone");
                         probe = null;
-                        answer = await SendToneAsync(null, cancellation);
+                        answer = await SendToneAsync(null, marker, cancellation);
                     }
                     if (answer.Outcome == ToneOutcome.Sent)
                     {
-                        _toneSent = true;
                         if (probe is not null && answer.KnowsProbe && answer.ProbeComplete == true && answer.ProbeId is string id)
                         {
                             _probeId = id;
                         }
-                        Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {ToneHz:0} Hz{(probe is null ? "" : ProbeLine(answer))}");
+                        string after = probe is null ? "" : ProbeLine(answer);
+                        if (marker is not null)
+                        {
+                            _markerSent = true;
+                            Say($"the 10 MHz reference state is unknown ({unknown!.DetailOrNone}), so the CW E marker went instead of the calibration tone, {S.ToneLength.TotalSeconds:0} s at {ToneHz:0} Hz{after}");
+                        }
+                        else
+                        {
+                            _toneSent = true;
+                            string note = unknown is not null ? $"; the 10 MHz reference state is unknown ({unknown.DetailOrNone}) but the station does not know the CW E marker" : "";
+                            Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {ToneHz:0} Hz{after}{note}");
+                        }
                         if (_abort is null && S.PauseAfterTone > TimeSpan.Zero)
                         {
                             await Task.Delay(S.PauseAfterTone, owner._time, cancellation);
@@ -780,7 +895,11 @@ public sealed class SlotRunner
                         return (null, null);
                     }
                     // Refused: only the station's channel-busy flag says whether that was the channel.
-                    busy = await ChannelBusyAsync(cancellation);
+                    busy = await ReadLeaseAsync(cancellation);
+                    if (_abort is not null)
+                    {
+                        break;
+                    }
                     if (busy != true)
                     {
                         Say($"the station did not send the tone ({answer.Message}); carrying on without it");
@@ -807,11 +926,11 @@ public sealed class SlotRunner
             return (null, null);
         }
 
-        private async Task<ToneAnswer> SendToneAsync(ProbeRequest? probe, CancellationToken cancellation)
+        private async Task<ToneAnswer> SendToneAsync(ProbeRequest? probe, string? marker, CancellationToken cancellation)
         {
             try
             {
-                return await owner._station.SendToneAsync(S.SubChannel, ToneHz, S.ToneLength.TotalSeconds, probe, cancellation);
+                return await owner._station.SendToneAsync(S.SubChannel, ToneHz, S.ToneLength.TotalSeconds, probe, marker, cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
@@ -842,6 +961,12 @@ public sealed class SlotRunner
             int next = 0;
             foreach (int count in sizes)
             {
+                if (FeedNow is not null)
+                {
+                    // A station with a reference feed: look at it again before each burst, the first
+                    // included, since the channel check may have taken minutes.
+                    await ReadLeaseAsync(cancellation);
+                }
                 if (_abort is not null)
                 {
                     return;
@@ -1054,6 +1179,9 @@ public sealed class SlotRunner
                 BulletinsInRotation = bulletins,
                 LeftoverInRotation = leftover,
                 ToneSent = _toneSent,
+                MarkerSent = _markerSent,
+                ReferenceFeed = _feedWorst?.State,
+                ReferenceFeedDetail = _feedWorst?.Detail,
                 ProbeSent = _probeId is not null,
                 ProbeId = _probeId,
                 Reference = _reference,
@@ -1067,16 +1195,21 @@ public sealed class SlotRunner
                 EstimatedSeconds = _estimate is { } e ? Math.Round(e.TotalSeconds, 1) : null,
             };
             string pa = _paMax is double max ? $"{Degrees(max)} C" : "not read";
+            string feed = _feedWorst is { IsOk: false } worst ? $", reference feed {worst.Describe()}" : "";
+            string tone = _toneSent ? "sent" : _markerSent ? "replaced by the CW E marker" : "not sent";
             switch (outcome)
             {
                 case SlotOutcome.Completed:
-                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {Bulletins(" in rotation")}, tone {(_toneSent ? "sent" : "not sent")}, probe {(_probeId is not null ? "sent" : "not sent")}, PA max {pa}, reference {_reference}");
+                    Say($"done, {Clock(_start)} to {Clock(end)}Z, {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode}, {Bulletins(" in rotation")}, tone {tone}, probe {(_probeId is not null ? "sent" : "not sent")}, PA max {pa}, reference {_reference}{feed}");
                     break;
                 case SlotOutcome.Aborted:
-                    Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode} ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}");
+                    Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode} ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}{feed}");
+                    break;
+                case SlotOutcome.Skipped when _referenceHold is not null:
+                    // The head end writes the one line for this, with when the slot is tried again.
                     break;
                 default:
-                    Say($"skipped: {reason}. {(_toneSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry of this one" : "")}");
+                    Say($"skipped: {reason}. {(_toneSent || _markerSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry of this one" : "")}");
                     break;
             }
             return report;

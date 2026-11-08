@@ -368,10 +368,33 @@ public sealed class HeadEndService(
         report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0 };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
+        if (ReferenceHoldLine(report, time.GetUtcNow()) is { } held)
+        {
+            journal.Write(held);
+        }
         status.SetBulletinsHeld(store.Count);
         SlotsToday today = status.SlotsToday;
         journal.Write($"slots today ({today.Date:yyyy-MM-dd}): {today.Slots}, {today.Completed} completed, {today.Aborted} cut short, {today.Skipped} skipped");
         return report;
+    }
+
+    /// <summary>
+    /// The one journal line for a slot not sent because the station's 10 MHz reference is
+    /// unreliable, with when it is tried again (or the next slot, when the retry would fall outside
+    /// the catch-up window); null for any other slot.
+    /// </summary>
+    public string? ReferenceHoldLine(SlotReport report, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        if (report.Outcome != SlotOutcome.Skipped || report.ReferenceFeed != Station.ReferenceFeed.Unreliable)
+        {
+            return null;
+        }
+        DateTimeOffset next = NextSlot(now, schedule, catchUp, report, retryAfter);
+        string when = schedule.SlotAtOrBefore(next) == report.Slot
+            ? $"trying again at {next.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)}Z"
+            : $"the next slot is {SlotRunner.Name(next)}";
+        return $"{(report.Evening ? "evening slot" : "slot")} {SlotRunner.Name(report.Slot)}: not sent: {report.Reason}; {when}";
     }
 
     /// <summary>The slot's one journal line on the PSK Reporter reading, and whether it went in the slot; null when the head end takes none.</summary>

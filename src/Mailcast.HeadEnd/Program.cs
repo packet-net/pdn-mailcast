@@ -672,7 +672,7 @@ public static partial class Program
 
         public Task<bool> DropQueuedAsync(int subChannel, CancellationToken cancellation) => throw new NotSupportedException();
 
-        public Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation) => throw new NotSupportedException();
+        public Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, string? marker, CancellationToken cancellation) => throw new NotSupportedException();
 
         public Task<KeepAudioAnswer> KeepAudioAsync(DateTimeOffset keepFrom, DateTimeOffset keepTo, string label, CancellationToken cancellation) => throw new NotSupportedException();
     }

@@ -251,7 +251,7 @@ public class StationTests
     {
         using var handler = new Handler((_, _) => ((HttpStatusCode)status, body));
         using var api = Client(handler);
-        var answer = await api.SendToneAsync(4, 1800, 30, null, CancellationToken.None);
+        var answer = await api.SendToneAsync(4, 1800, 30, null, null, CancellationToken.None);
         Assert.Equal(expected, answer.Outcome);
         Assert.Equal(status, answer.Status);
         Assert.False(answer.KnowsProbe);
@@ -273,7 +273,7 @@ public class StationTests
     {
         using var handler = new Handler((_, _) => ((HttpStatusCode)status, body));
         using var api = Client(handler);
-        var answer = await api.SendToneAsync(4, 4050, 10, new ProbeRequest("zc255", 1.5, 4050), CancellationToken.None);
+        var answer = await api.SendToneAsync(4, 4050, 10, new ProbeRequest("zc255", 1.5, 4050), null, CancellationToken.None);
         Assert.Equal(expected, answer.Outcome);
         Assert.Equal(knows, answer.KnowsProbe);
         Assert.Equal(id, answer.ProbeId);

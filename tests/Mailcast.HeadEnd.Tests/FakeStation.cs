@@ -174,10 +174,30 @@ public sealed class FakeStation : IStationApi, IKissConnector
     public async Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation)
     {
         await Task.Yield();
+        ReferenceReads++;
         bool busy = ChannelBusy && !(FirstBusyReadMisses && _busyReads == 0);
-        _busyReads++;
-        return new LeaseAnswer(LeaseHeld, 0, null, busy);
+        if (LeaseHeld)
+        {
+            // The miss is for a read just before a keyup, so a read before the lease does not use it up.
+            _busyReads++;
+        }
+        return new LeaseAnswer(LeaseHeld, 0, null, busy) { Reference = ReferenceAt?.Invoke(_time.GetUtcNow()) ?? Reference };
     }
+
+    /// <summary>The reference feed every lease read carries; null for a station with no feed (or an older pdn-soundmodem).</summary>
+    public ReferenceFeed? Reference { get; set; }
+
+    /// <summary>When set, the reference feed by the time of the read, ahead of <see cref="Reference"/>.</summary>
+    public Func<DateTimeOffset, ReferenceFeed?>? ReferenceAt { get; set; }
+
+    /// <summary>How many times the lease was read.</summary>
+    public int ReferenceReads { get; private set; }
+
+    /// <summary>Whether the station knows the CW E marker: false is an older one, which answers 400 to a tone request with one.</summary>
+    public bool KnowsMarker { get; set; } = true;
+
+    /// <summary>The marker each tone request asked for, null for the plain tone.</summary>
+    public List<string?> MarkersAsked { get; } = [];
 
     public async Task<bool> ReleaseLeaseAsync(int subChannel, CancellationToken cancellation)
     {
@@ -229,10 +249,17 @@ public sealed class FakeStation : IStationApi, IKissConnector
         };
     }
 
-    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation)
+    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, string? marker, CancellationToken cancellation)
     {
         ToneRequests.Add((_time.GetUtcNow(), seconds, probe));
         ToneHzAsked.Add(toneHz);
+        MarkersAsked.Add(marker);
+        if (marker is not null && !KnowsMarker)
+        {
+            await Task.Yield();
+            return new ToneAnswer(ToneOutcome.Failed, "HTTP 400: unknown field \"marker\"") { Status = 400 };
+        }
+        string sound = marker is null ? "tone" : $"{marker} marker";
         if (!ToneAvailable)
         {
             await Task.Yield();
@@ -277,11 +304,11 @@ public sealed class FakeStation : IStationApi, IKissConnector
         }
         if (!withProbe)
         {
-            await KeyAsync(TimeSpan.FromSeconds(Math.Min(seconds, MaxSeconds)), $"tone {toneHz} Hz", cancellation);
+            await KeyAsync(TimeSpan.FromSeconds(Math.Min(seconds, MaxSeconds)), $"{sound} {toneHz} Hz", cancellation);
             return new ToneAnswer(ToneOutcome.Sent, "tone") { Status = 200, KnowsProbe = KnowsProbe };
         }
         double keyed = seconds + (CutsProbeShort ? probeSeconds / 2 : probeSeconds);
-        await KeyAsync(TimeSpan.FromSeconds(keyed), $"tone {toneHz} Hz and probe {probe!.Kind} at {probe.AudioHz} Hz", cancellation);
+        await KeyAsync(TimeSpan.FromSeconds(keyed), $"{sound} {toneHz} Hz and probe {probe!.Kind} at {probe.AudioHz} Hz", cancellation);
         return new ToneAnswer(ToneOutcome.Sent, "tone and probe")
         {
             Status = 200,
