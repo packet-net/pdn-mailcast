@@ -24,7 +24,7 @@ All SDRs together: 45% of frames heard over 883 receiver-slots.
 
 ## Listeners' daily reports, 8 October to 7 November 2026
 
-131 reports from 9 listeners; 9 report-days with no audio at all are left out below.
+139 reports from 9 listeners; 9 report-days with no audio at all are left out below.
 
 Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 November; November from 2 November, when the long interleaver, 31 s bursts and the bulk tier began.
 
@@ -35,9 +35,9 @@ Days on a public web SDR are shown apart, as CALL via SDR. October is to 1 Novem
 | G7TAJ via WESSEX | - | 10-26 to 10-27 | 2 | 14 | 93% | 66% | 66% | - | 27 | 46 |
 | M7TAW | IO91ma | 10-24 to 10-31 | 7 | 56 | 86% | 57% | 57% | - | 10 | 111 |
 | M0NVK | IO90hr | 10-15 to 11-06 | 10 | 71 | 87% | 55% | 67% | 37% | 20 | 124 |
-| GM4CXF | IO75qn | 10-25 to 11-06 | 13 | 99 | 98% | 50% | 66% | 21% | 11 | 165 |
-| M9TWM | IO93fj | 10-08 to 10-30 | 9 | 72 | 89% | 24% | 24% | - | 5 | 63 |
+| GM4CXF | IO75qn | 10-25 to 11-07 | 14 | 105 | 98% | 49% | 66% | 22% | 10 | 171 |
 | G8BPQ | IO92kx | 10-08 to 10-31 | 23 | 168 | 84% | 23% | 23% | - | 4 | 163 |
+| M9TWM | IO93fj | 10-08 to 11-06 | 16 | 123 | 89% | 21% | 22% | 20% | 7 | 106 |
 | EI7KX via a web SDR | - | 11-02 to 11-07 | 6 | 41 | 88% | 18% | - | 18% | 4 | 43 |
 | GM8BPQ | IO68vl | 10-08 to 11-07 | 25 | 180 | 77% | 14% | 17% | 2% | 4 | 99 |
 | G7TAJ | IO81le | 10-08 to 11-03 | 18 | 135 | 64% | 13% | 14% | 5% | 8 | 79 |
@@ -57,14 +57,14 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 | G7TAJ via WESSEX | 64% | 70% | 12.3 | 6.8 |
 | G8BPQ | 15% | 36% | 2.9 | 3.5 |
 | GI3JMC | 0% | 0% | 0.0 | 0.0 |
-| GM4CXF | 48% | 54% | 9.4 | 5.5 |
+| GM4CXF | 47% | 53% | 9.2 | 5.4 |
 | GM8BPQ | 10% | 21% | 1.8 | 2.1 |
 | M0NVK | 55% | 54% | 10.7 | 5.4 |
 | M0NVK via WESSEX | 90% | 88% | 16.8 | 8.4 |
 | M7TAW | 55% | 60% | 10.7 | 5.9 |
 | M7TAW via WESSEX | 80% | 64% | 15.6 | 6.4 |
 | M9PSY | 66% | 75% | 12.3 | 7.2 |
-| M9TWM | 21% | 29% | 3.9 | 2.8 |
+| M9TWM | 20% | 24% | 3.9 | 2.4 |
 | M9TWM-1 | 21% | 29% | 3.9 | 2.8 |
 | MM0MQN | 2% | 6% | 0.3 | 0.6 |
 | STUEY3D | 69% | 76% | 12.9 | 7.4 |
@@ -74,44 +74,44 @@ Share of frames heard, per receiver, over slots of each waveform it listened to 
 
 | Hour | slots | slots with frames | frames heard |
 |---|---|---|---|
-| 09 | 93 | 73% | 31% |
-| 10 | 116 | 76% | 32% |
-| 11 | 117 | 83% | 31% |
-| 12 | 119 | 84% | 33% |
-| 13 | 114 | 86% | 29% |
-| 14 | 114 | 88% | 35% |
-| 15 | 114 | 82% | 28% |
-| 16 | 109 | 84% | 28% |
+| 09 | 96 | 73% | 31% |
+| 10 | 124 | 77% | 32% |
+| 11 | 125 | 83% | 30% |
+| 12 | 127 | 84% | 32% |
+| 13 | 122 | 86% | 29% |
+| 14 | 122 | 89% | 34% |
+| 15 | 122 | 83% | 27% |
+| 16 | 115 | 84% | 28% |
 
 ### The measured channel (report slots with a channel measurement)
 
-- Slots measured: 759 (624 from the probe, 135 from the bursts).
-- Propagation modes seen: 1: 243, 2: 355, 3: 141, 4: 20.
-- virtual height (km): median 268, quartiles 246 to 290, n=436.
-- second mode's delay (ms): median 1.6, quartiles 1.4 to 1.8, n=449.
-- second mode's power against the first (dB): median -12, quartiles -15 to -6, n=449.
-- delay spread (ms): median 0.42, quartiles 0.29 to 0.57, n=759.
-- Doppler spread (Hz): median 0.33, quartiles 0.24 to 0.52, n=757.
+- Slots measured: 809 (654 from the probe, 155 from the bursts).
+- Propagation modes seen: 1: 251, 2: 377, 3: 156, 4: 25.
+- virtual height (km): median 267, quartiles 246 to 291, n=475.
+- second mode's delay (ms): median 1.7, quartiles 1.4 to 1.8, n=488.
+- second mode's power against the first (dB): median -11, quartiles -15 to -6, n=488.
+- delay spread (ms): median 0.42, quartiles 0.30 to 0.60, n=809.
+- Doppler spread (Hz): median 0.34, quartiles 0.24 to 0.55, n=806.
 
 ### The sounding probe (report slots)
 
-- Report slots that sent frames: 896.
-- Measured from the probe: 624, of which 64 decoded no data frame at all.
-- Measured from the data bursts (no probe result): 135.
-- No measurement: 137 (41 of them with frames).
-- Lowest tone SNR at which the probe gave a measurement: -16 dB; median 6 dB.
-- Median virtual height by hour (km): 09:00 271 (n=28), 10:00 260 (n=58), 11:00 263 (n=57), 12:00 270 (n=54), 13:00 258 (n=55), 14:00 277 (n=66), 15:00 262 (n=61), 16:00 267 (n=57).
+- Report slots that sent frames: 953.
+- Measured from the probe: 654, of which 64 decoded no data frame at all.
+- Measured from the data bursts (no probe result): 155.
+- No measurement: 144 (42 of them with frames).
+- Lowest tone SNR at which the probe gave a measurement: -16 dB; median 7 dB.
+- Median virtual height by hour (km): 09:00 271 (n=29), 10:00 260 (n=64), 11:00 263 (n=63), 12:00 270 (n=60), 13:00 258 (n=61), 14:00 277 (n=71), 15:00 264 (n=68), 16:00 267 (n=59).
 
 ### The head end's propagation verdicts against what was heard (survey and report slots)
 
 | Source | verdict | receiver-slots | with frames | frames heard |
 |---|---|---|---|---|
-| ionosonde | good | 833 | 83% | 44% |
-| ionosonde | marginal | 658 | 65% | 35% |
-| ionosonde | unknown | 232 | 78% | 26% |
+| ionosonde | good | 838 | 83% | 44% |
+| ionosonde | marginal | 668 | 65% | 35% |
+| ionosonde | unknown | 274 | 81% | 25% |
 | ionosonde | not logged | 56 | 23% | 14% |
-| PSK Reporter | good | 1689 | 76% | 39% |
-| PSK Reporter | unknown | 34 | 68% | 29% |
+| PSK Reporter | good | 1743 | 76% | 38% |
+| PSK Reporter | unknown | 37 | 70% | 29% |
 | PSK Reporter | not logged | 56 | 23% | 14% |
 
 ### The November drop
@@ -120,8 +120,8 @@ Share of frames heard in slots with a tone of 8 dB or more, from 25 October, lis
 
 | Bursts | WN3 | WN4 | Both | Receiver-slots |
 |---|---|---|---|---|
-| 18 s bursts | 67% | 57% | 61% | 122 |
-| 31 s bursts | 24% | 25% | 24% | 56 |
+| 18 s bursts | 66% | 57% | 60% | 125 |
+| 31 s bursts | 23% | 25% | 24% | 80 |
 
 GM4CXF slot by slot on 2 November:
 
@@ -137,17 +137,18 @@ GM4CXF slot by slot on 2 November:
 WN3 share heard, 25 October to 1 November against 2 to 7 November (own equipment):
 
 - G7TAJ: 18% then 10%
-- GM4CXF: 73% then 22%
+- GM4CXF: 73% then 24%
 - GM8BPQ: 20% then 3%
 - M0NVK: 96% then 29%
+- M9TWM: 31% then 16%
 
 Median Doppler spread measured by listeners (Hz), by period, all bases and probe only:
 
-- Before the transmitter's reference fault (to 31 Oct 14:00): 0.30 (n=601)
+- Before the transmitter's reference fault (to 31 Oct 14:00): 0.30 (n=607)
 - 25 to 30 Oct: 0.28 (n=256), probe only 0.29 (n=206)
-- 31 Oct to 1 Nov: 0.42 (n=46), probe only 0.40 (n=43)
-- 2 Nov: 0.91 (n=31), probe only 0.91 (n=21)
-- 3 to 7 Nov: 0.67 (n=109), probe only 0.63 (n=83)
+- 31 Oct to 1 Nov: 0.39 (n=56), probe only 0.39 (n=48)
+- 2 Nov: 0.91 (n=39), probe only 0.91 (n=25)
+- 3 to 7 Nov: 0.68 (n=140), probe only 0.65 (n=103)
 
 ### Sweden (SA6DAZ, JO67fm)
 
@@ -156,3 +157,18 @@ Median Doppler spread measured by listeners (Hz), by period, all bases and probe
 - Virtual height: median 310 km over 43 measurements.
 - Slots with an E-layer path: 2026-11-06 14:00.
 - Path tests: see data/sweden-sa6daz/path-test-summary.txt (136 rounds, frames decoded per waveform by measured SNR).
+
+### Did the BBS already have it?
+
+| Listener | report days | rebuilt | new to the BBS | already had | share already had |
+|---|---|---|---|---|---|
+| GM4CXF | 14 | 171 | 171 | 0 | 0% |
+| MM0MQN | 2 | 0 | 0 | 0 | - |
+| EI7KX | 6 | 43 | 38 | 0 | 0% |
+| G8BPQ | 22 | 148 | 147 | 1 | 1% |
+| GM8BPQ | 23 | 80 | 78 | 1 | 1% |
+| M7TAW | 10 | 159 | 136 | 19 | 12% |
+| M9TWM | 16 | 106 | 33 | 73 | 69% |
+| M0NVK | 16 | 158 | 6 | 152 | 96% |
+| G7TAJ | 21 | 122 | 0 | 122 | 100% |
+| All | | | 609 | 368 | 38% |

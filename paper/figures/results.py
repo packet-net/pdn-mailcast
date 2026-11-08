@@ -333,3 +333,22 @@ print(f"- Tone SNR range: {min(tones)} to {max(tones)} dB.")
 print(f"- Virtual height: median {med(heights):.0f} km over {len(heights)} measurements.")
 print(f"- Slots with an E-layer path: {', '.join(sorted(elayer))}.")
 print("- Path tests: see data/sweden-sa6daz/path-test-summary.txt (136 rounds, frames decoded per waveform by measured SNR).")
+
+# --- New to the BBS against already had (Perry M0PYL's question) ----------------------------------
+# Every report with the already_had field (receivers from issue #86 on): bulletins the listener's
+# BBS accepted as new (delivered) against those it already had by normal forwarding. All of a
+# listener's report days count, web SDR days included, since the BBS is the listener's either way.
+print("\n### Did the BBS already have it?\n")
+nh = collections.defaultdict(lambda: [0, 0, 0, 0])
+for r in day_rows:
+    if r["already_had"] == "":
+        continue
+    a = nh[r["callsign"]]
+    a[0] += 1; a[1] += int(r["rebuilt"] or 0); a[2] += int(r["delivered"] or 0); a[3] += int(r["already_had"])
+print("| Listener | report days | rebuilt | new to the BBS | already had | share already had |")
+print("|---|---|---|---|---|---|")
+tn = th = 0
+for c, a in sorted(nh.items(), key=lambda kv: kv[1][3] / max(kv[1][2] + kv[1][3], 1)):
+    tn += a[2]; th += a[3]
+    print(f"| {c} | {a[0]} | {a[1]} | {a[2]} | {a[3]} | {pct(a[3], a[2] + a[3])} |")
+print(f"| All | | | {tn} | {th} | {pct(th, tn + th)} |")
