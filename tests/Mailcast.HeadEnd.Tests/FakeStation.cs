@@ -193,8 +193,11 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>How many times the lease was read.</summary>
     public int ReferenceReads { get; private set; }
 
-    /// <summary>Whether the station knows the CW E marker: false is an older one, which answers 400 to a tone request with one.</summary>
+    /// <summary>Whether the station knows the CW E marker: false is today's pdn-soundmodem, which ignores the field, sends the plain tone and does not echo it.</summary>
     public bool KnowsMarker { get; set; } = true;
+
+    /// <summary>A station that answers 400 to a tone request with a marker.</summary>
+    public bool RejectsMarker { get; set; }
 
     /// <summary>The marker each tone request asked for, null for the plain tone.</summary>
     public List<string?> MarkersAsked { get; } = [];
@@ -254,7 +257,11 @@ public sealed class FakeStation : IStationApi, IKissConnector
         ToneRequests.Add((_time.GetUtcNow(), seconds, probe));
         ToneHzAsked.Add(toneHz);
         MarkersAsked.Add(marker);
-        if (marker is not null && !KnowsMarker)
+        if (!KnowsMarker)
+        {
+            marker = null;
+        }
+        if (marker is not null && RejectsMarker)
         {
             await Task.Yield();
             return new ToneAnswer(ToneOutcome.Failed, "HTTP 400: unknown field \"marker\"") { Status = 400 };
@@ -305,7 +312,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
         if (!withProbe)
         {
             await KeyAsync(TimeSpan.FromSeconds(Math.Min(seconds, MaxSeconds)), $"{sound} {toneHz} Hz", cancellation);
-            return new ToneAnswer(ToneOutcome.Sent, "tone") { Status = 200, KnowsProbe = KnowsProbe };
+            return new ToneAnswer(ToneOutcome.Sent, "tone") { Status = 200, KnowsProbe = KnowsProbe, Marker = marker };
         }
         double keyed = seconds + (CutsProbeShort ? probeSeconds / 2 : probeSeconds);
         await KeyAsync(TimeSpan.FromSeconds(keyed), $"{sound} {toneHz} Hz and probe {probe!.Kind} at {probe.AudioHz} Hz", cancellation);
@@ -315,6 +322,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
             KnowsProbe = true,
             ProbeId = CutsProbeShort ? null : ChannelProbe.Descriptor.Id,
             ProbeComplete = !CutsProbeShort,
+            Marker = marker,
         };
     }
 

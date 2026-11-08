@@ -130,6 +130,12 @@ public sealed record ToneAnswer(ToneOutcome Outcome, string Message)
 
     /// <summary>True when all of the probe went out, false when it was cut short or kept off the air, null when the station did not say.</summary>
     public bool? ProbeComplete { get; init; }
+
+    /// <summary>
+    /// The marker the station says it sent (<c>marker</c> in its answer), or null. A station that knows
+    /// the marker echoes it only when it sent it; an older one ignores the field and sends the plain tone.
+    /// </summary>
+    public string? Marker { get; init; }
 }
 
 /// <summary>The markers a tone request may ask for instead of the steady tone (<c>marker</c> in <c>POST /api/txtest</c>).</summary>
@@ -192,7 +198,8 @@ public interface IStationApi
     /// followed in the same keyup by <paramref name="probe"/> when one is given. The station waits
     /// for a clear channel first, up to its own limit (60 s), and answers when the keyup is over.
     /// With <paramref name="marker"/> (<see cref="ToneMarker.CwE"/>) the station sends that marker instead
-    /// of the steady tone, for the same time at the same frequency; a station that does not know it answers 400.
+    /// of the steady tone, for the same time at the same frequency, and echoes the marker in its answer
+    /// (<see cref="ToneAnswer.Marker"/>); an older station ignores it and sends the plain tone.
     /// </summary>
     Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, string? marker, CancellationToken cancellation);
 
@@ -344,6 +351,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
                 KnowsProbe = knowsProbe,
                 ProbeId = probeId,
                 ProbeComplete = probeComplete,
+                Marker = Text(json, "marker"),
             };
         }
         string why = Describe(json, text);

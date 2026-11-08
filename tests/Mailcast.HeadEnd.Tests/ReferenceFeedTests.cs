@@ -96,7 +96,7 @@ public class ReferenceFeedTests
     {
         var rig = new Rig();
         rig.Station.Reference = Offline;
-        rig.Station.KnowsMarker = false;
+        rig.Station.RejectsMarker = true;
         var first = rig.Run(5);
 
         Assert.Equal(SlotOutcome.Completed, first.Outcome);
@@ -112,6 +112,30 @@ public class ReferenceFeedTests
         rig.Run(5);
         Assert.Equal([ToneMarker.CwE, null, ToneMarker.CwE, null], rig.Station.MarkersAsked);
         Assert.Single(rig.Journal.Lines, l => l.Contains("the station would not send the CW E marker (HTTP 400", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Unknown_OnAStationThatIgnoresTheMarker_CountsThePlainTone_AndSaysSoOncePerRun()
+    {
+        // Today's pdn-soundmodem ignores the field: 200, the plain tone, and no echo.
+        var rig = new Rig();
+        rig.Station.Reference = Offline;
+        rig.Station.KnowsMarker = false;
+        var first = rig.Run(5);
+
+        Assert.Equal(SlotOutcome.Completed, first.Outcome);
+        Assert.True(first.ToneSent);
+        Assert.False(first.MarkerSent);
+        Assert.True(first.ProbeSent);
+        Assert.Equal([ToneMarker.CwE], rig.Station.MarkersAsked);
+        Assert.StartsWith("tone 1800 Hz and probe", rig.Station.Keyups[0].What, StringComparison.Ordinal);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("calibration tone sent, 30 s at 1800 Hz, then the channel probe", StringComparison.Ordinal) && l.Contains("the 10 MHz reference state is unknown (display offline) but the station does not know the CW E marker", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains(": done, ", StringComparison.Ordinal) && l.Contains("tone sent", StringComparison.Ordinal));
+
+        rig.Run(5);
+        Assert.Equal([ToneMarker.CwE, ToneMarker.CwE], rig.Station.MarkersAsked);
+        Assert.Single(rig.Journal.Lines, l => l.EndsWith(": the station sent the plain tone; it does not know the CW marker", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("would not send", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -328,11 +352,17 @@ public class ReferenceFeedTests
         using var api = new StationApiClient(new Uri("http://127.0.0.1:8107/"), "secret", TimeSpan.FromSeconds(30), handler);
         var marked = await api.SendToneAsync(4, 1800, 30, new ProbeRequest("zc255", 1.5, 1800), ToneMarker.CwE, CancellationToken.None);
         Assert.Equal(ToneOutcome.Sent, marked.Outcome);
+        Assert.Null(marked.Marker);
         await api.SendToneAsync(4, 1800, 30, null, null, CancellationToken.None);
         Assert.Equal("cw-e", handler.Bodies[0]!["marker"]!.GetValue<string>());
         Assert.False(handler.Bodies[1]!.AsObject().ContainsKey("marker"));
 
-        // An older station: 400, which the runner answers with the plain tone.
+        // A station that sent the marker echoes it.
+        using var echo = new Handler("""{"transmitted": true, "sent": "cw-e marker", "marker": "cw-e"}""");
+        using var echoApi = new StationApiClient(new Uri("http://127.0.0.1:8107/"), "secret", TimeSpan.FromSeconds(30), echo);
+        Assert.Equal(ToneMarker.CwE, (await echoApi.SendToneAsync(4, 1800, 30, null, ToneMarker.CwE, CancellationToken.None)).Marker);
+
+        // A station that refuses it: 400, which the runner answers with the plain tone.
         using var old = new Handler("""{"error": "unknown field marker"}""") { Status = HttpStatusCode.BadRequest };
         using var oldApi = new StationApiClient(new Uri("http://127.0.0.1:8107/"), "secret", TimeSpan.FromSeconds(30), old);
         var refused = await oldApi.SendToneAsync(4, 1800, 30, null, ToneMarker.CwE, CancellationToken.None);

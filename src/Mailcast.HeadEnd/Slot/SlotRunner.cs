@@ -50,7 +50,8 @@ namespace Mailcast.HeadEnd.Slot;
 /// is read after (the channel check, before every burst). Seen before anything is queued, nothing
 /// is counted and the slot is skipped as retryable; seen later, the slot stops as other aborts do.
 /// Unknown sends the slot marked: the tone request asks for the CW E marker instead of the steady
-/// tone, and a station that does not know the marker is asked for the plain tone. A station with
+/// tone; only an answer that echoes the marker counts as the marker sent (an older station ignores
+/// the field and sends the plain tone), and one that refuses it (400) is asked for the plain tone. A station with
 /// no feed says nothing, and the slot runs as it always did.</para>
 /// <para><b>Write-ahead.</b> Every frame of a burst is reported as queued before the first is
 /// written, and nothing is written if that report fails, so a crash mid-burst can never lead to a
@@ -70,6 +71,7 @@ public sealed class SlotRunner
     private int _saidNoRetune;
     private int _keepAudioNotOffered;
     private int _saidMarkerRefused;
+    private int _saidMarkerIgnored;
 
     /// <summary>How far before the slot the kept audio starts.</summary>
     internal static readonly TimeSpan KeepAudioBefore = TimeSpan.FromSeconds(60);
@@ -877,6 +879,15 @@ public sealed class SlotRunner
                             _probeId = id;
                         }
                         string after = probe is null ? "" : ProbeLine(answer);
+                        if (marker is not null && answer.Marker != marker)
+                        {
+                            // No echo: an older station ignored the field and sent the plain tone.
+                            if (Interlocked.Exchange(ref owner._saidMarkerIgnored, 1) == 0)
+                            {
+                                Say("the station sent the plain tone; it does not know the CW marker");
+                            }
+                            marker = null;
+                        }
                         if (marker is not null)
                         {
                             _markerSent = true;
