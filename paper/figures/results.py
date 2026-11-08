@@ -23,8 +23,13 @@ R_DAYS = os.path.join(root, "reports/data/reports.csv")
 # The paper's data runs to 7 November 2026; reports added to the archive later are left out so its
 # figures stay fixed.
 CUTOFF = "2026-11-07"
+# The paper's report set is frozen: only the reports listed in report-manifest.csv (the 131 in the
+# archive when the paper's figures were made) count, so reports that arrive later for earlier
+# days don't move its numbers. Eight such late reports (M9TWM 31 Oct to 6 Nov, GM4CXF 7 Nov) are
+# left for a later revision.
+MANIFEST = {tuple(line.strip().split(",")) for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "report-manifest.csv")) if line.strip() and not line.startswith("day,")}
 def upto(rows):
-    return [r for r in rows if r["day"] <= CUTOFF]
+    return [r for r in rows if r["day"] <= CUTOFF and (r["day"], r["callsign"]) in MANIFEST]
 
 
 def med(xs):
@@ -307,7 +312,7 @@ for lo, hi, label in (("2026-10-25", "2026-10-30", "25 to 30 Oct"), ("2026-10-31
     pr = [float(r["doppler_spread_hz"]) for r in sel if r["channel_basis"] == "probe"]
     print(f"- {label}: {med([float(r['doppler_spread_hz']) for r in sel]):.2f} (n={len(sel)}), probe only {fmt(med(pr), 2)} (n={len(pr)})")
 
-# --- Sweden (section 6.10) ----------------------------------------------------------------------------
+# --- Sweden (section 6.11) ----------------------------------------------------------------------------
 SE = os.path.join(root, "data/sweden-sa6daz/receiver-slot-and-channel-lines.txt")
 print("\n### Sweden (SA6DAZ, JO67fm)\n")
 ended = re.compile(r"slot: the (\d\d:\d\d) UTC slot ended: (?:(\d+) frames?|nothing heard)")

@@ -8,7 +8,7 @@ Tom Fanning, M0LTE
 
 Packet bulletin boards in the UK pass bulletins between each other over slow, connected-mode radio links, and each link carries each bulletin again. Mailcast sends them one way instead. One station transmits on 40 m in daylight, using a MIL-STD-188-110D waveform at 600 or 1200 bps. Each bulletin is compressed, then cut into pieces with a RaptorQ fountain code, so a listener rebuilds it from any set of pieces slightly larger than the bulletin, heard in any slots. A small receiver program hands each rebuilt bulletin to the listener's own BBS as if it came from a forwarding partner. No reply is ever sent on air.
 
-After a day of tests on 5 October, the station ran 259 hourly daylight slots from 6 October to 7 November 2026 and carried 465 bulletins. A two-week survey of eight public web SDRs, from 83 to 544 km away, and 131 daily reports from nine listeners show what reached people. The strongest web SDRs heard 70 to 80% of the frames sent and rebuilt 88% to nearly all of the bulletins, and the best listeners about half; weak receivers heard 13 to 25% and still rebuilt a third to over half of them, because pieces from different hours add up. For four listeners mailcast was effectively the only source of these bulletins; the BBSes of others, better connected by ordinary forwarding, already had most of them. Reception fell sharply from 31 October until 8 November; the cause was the transmitter's GPS-disciplined frequency reference, which had lost lock while still reporting itself locked, smearing the signal by about 1 Hz. A Zadoff-Chu sounding probe at the start of each slot measures the path at every receiver, down to about -15 dB signal to noise, often in slots where no data gets through. Read with a simple mirror model, it shows a typical 40 m NVIS channel: a reflection about 270 km up, usually a second path 1.6 ms later, and in October a Doppler spread of about 0.3 Hz. A receiver in Sweden, 1,100 km away, heard frames in most daylight slots and once saw an E-layer reflection. We describe the design, the results, and Model B, in which several stations transmit and their pieces combine at the listener.
+After a day of tests on 5 October, the station ran 259 hourly daylight slots from 6 October to 7 November 2026 and carried 465 bulletins. A two-week survey of eight public web SDRs, from 83 to 544 km away, and 131 daily reports from nine listeners show what reached people (eight more that arrived after the analysis was frozen are left for a later revision). The strongest web SDRs heard 70 to 80% of the frames sent and rebuilt 88% to nearly all of the bulletins, and the best listeners about half; weak receivers heard 13 to 25% and still rebuilt a third to over half of them, because pieces from different hours add up. For three listeners mailcast delivered nearly every bulletin before ordinary forwarding did; the BBSes of three others, better connected, already held nearly all of them. Reception fell sharply from 31 October until 8 November; the cause was the transmitter's GPS-disciplined frequency reference, which had lost lock while still reporting itself locked, smearing the signal by about 1 Hz. A Zadoff-Chu sounding probe at the start of each slot measures the path at every receiver, down to about -15 dB signal to noise, often in slots where no data gets through. Read with a simple mirror model, it shows a typical 40 m NVIS channel: a reflection about 270 km up, usually a second path 1.6 ms later, and in October a Doppler spread of about 0.3 Hz. A receiver in Sweden, 1,100 km away, heard frames in most daylight slots and once saw an E-layer reflection. We describe the design, the results, and Model B, in which several stations transmit and their pieces combine at the listener.
 
 ## 1. Introduction
 
@@ -206,7 +206,7 @@ Three sources, all in this repository:
 
 - **The head end's journal**, from the first test slot on 5 October to 7 November (the figures below start on 6 October, the first day of hourly slots): what each slot planned and sent, on which waveform, for how long, and what was taken in from the BBS (`data/headend-gb7rdg`).
 - **A web SDR survey**, 6 to 20 October. Eight receivers on one machine, each listening through a different public UberSDR, from 83 to 544 km away, logged every slot (`data/web-sdr-survey-2026-10`). Two of the SDRs were unreachable for some of the time; those slots are left out. The same eight receivers were started again on the evening of 7 November, with the channel measurement recorded too, to follow the recovery (data from 8 November, copied weekly into `data/web-sdr-survey-2026-11`).
-- **Listeners' daily reports**, 131 reports from nine listeners, 8 October to 7 November (`reports/`). Most were copied from GB7RDG; some never reached it and were pasted from other BBSes. Reports from 8 to 18 October are incomplete, because GB7RDG then kept bulletins for only a week and the archive was started later; GB7RDG's message index names 12 more whose text is gone.
+- **Listeners' daily reports**, 131 reports from nine listeners, 8 October to 7 November (`reports/`), frozen as listed in `paper/figures/report-manifest.csv`; eight reports for those dates that reached the archive later (M9TWM's for 31 October to 6 November and GM4CXF's for 7 November) are not included. Most were copied from GB7RDG; some never reached it and were pasted from other BBSes. Reports from 8 to 18 October are incomplete, because GB7RDG then kept bulletins for only a week and the archive was started later; GB7RDG's message index names 12 more whose text is gone.
 
 Throughout, a receiver's *share* is the frames it decoded over the frames sent in the slots it was listening to, and a *receiver-slot* is one receiver listening to one slot. A slot cut short counts the frames it did send; a slot that sent nothing is left out. Days on which a listener's receiver had no audio at all are left out, but slots lost to a shorter audio fault count as heard nothing.
 
@@ -301,23 +301,23 @@ So the 2 November changes were not the cause. They happened to land on a signal 
 
 ### 6.4 Did listeners already have the bulletins?
 
-A rebuilt bulletin is offered to the listener's BBS like any forwarded one, and the BBS says whether it is new or one it already has by its BID. Reports since mid-October count both, which answers a question Perry M0PYL asked: does mailcast deliver anything ordinary forwarding doesn't?
+A rebuilt bulletin is offered to the listener's BBS like any forwarded one, and the BBS says whether it is new or one it already holds, by its BID. Reports since 10 October count both, which answers a question Perry M0PYL asked: does mailcast deliver anything ordinary forwarding doesn't?
 
 | Listener | Report days | Rebuilt | New to the BBS | Already had | Share already had |
 |---|---|---|---|---|---|
-| GM4CXF | 14 | 171 | 171 | 0 | 0% |
+| GM4CXF | 13 | 165 | 165 | 0 | 0% |
 | EI7KX | 6 | 43 | 38 | 0 | 0% |
 | G8BPQ | 22 | 148 | 147 | 1 | 1% |
 | GM8BPQ | 23 | 80 | 78 | 1 | 1% |
 | M7TAW | 10 | 159 | 136 | 19 | 12% |
-| M9TWM | 16 | 106 | 33 | 73 | 69% |
 | M0NVK | 16 | 158 | 6 | 152 | 96% |
 | G7TAJ | 21 | 122 | 0 | 122 | 100% |
-| All | | | 609 | 368 | 38% |
+| M9TWM | 9 | 63 | 0 | 63 | 100% |
+| All | | | 570 | 358 | 39% |
 
-*Table 6. Bulletins each listener's BBS took as new against those it already had by normal forwarding, over every report that counts them (receivers since mid-October) up to 7 November. "Rebuilt" can exceed the two columns' sum where a delivery was still pending.*
+*Table 6. Bulletins each listener's BBS took as new against those it already held, over every report that counts them (receivers since 10 October) up to 7 November. "Already had" means the BBS held that BID already, whether from ordinary forwarding or an earlier copy; "rebuilt" can exceed the two columns' sum where a delivery was still pending.*
 
-It splits sharply by station. For GM4CXF in Ayrshire, GM8BPQ on Lewis, G8BPQ's own BBS and EI7KX, mailcast was effectively the only source of these bulletins. M0NVK's and G7TAJ's BBSes, well connected to the forwarding network, already had nearly everything by the time mailcast rebuilt it, and M9TWM's most of it. The reports do not say how much earlier the other route was, so for those stations mailcast's value is as a second path, not a faster one. The figures include the days of the transmitter fault (section 6.3), when fewer bulletins were rebuilt at all.
+It splits sharply by station. For GM4CXF in Ayrshire, GM8BPQ on Lewis and G8BPQ (and EI7KX over six days), mailcast delivered nearly every bulletin before ordinary forwarding did, if forwarding would have brought it at all. M0NVK's, G7TAJ's and M9TWM's BBSes, well connected to the forwarding network, already held almost everything by the time mailcast rebuilt it. The reports do not say how much earlier the other route was, so for those stations mailcast is a second path rather than a faster one. The figures include the days of the transmitter fault (section 6.3), when fewer bulletins were rebuilt at all.
 
 ### 6.5 Waveforms: 1200 bps against 600 bps
 
