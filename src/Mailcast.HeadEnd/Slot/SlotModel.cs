@@ -191,7 +191,21 @@ public sealed record SlotReport
     /// <summary>The probe's id as the station named it (<c>zc255-2400-rrc015-v1</c>); null when none went out whole.</summary>
     public string? ProbeId { get; init; }
 
+    /// <summary>True when the CW E marker went instead of the calibration tone, because the station's 10 MHz reference state was unknown.</summary>
+    public bool MarkerSent { get; init; }
+
+    /// <summary>The Flex's own view of its reference, such as <c>NOT GPS locked (External ref locked)</c>.</summary>
     public string Reference { get; init; } = "not read";
+
+    /// <summary>
+    /// What the station's 10 MHz reference feed said during the slot, the worst of what it said:
+    /// <c>ok</c>, <c>unknown</c> or <c>unreliable</c>; null when the station has no feed. Not the Flex's
+    /// view (<see cref="Reference"/>), which can say locked while the reference is bad.
+    /// </summary>
+    public string? ReferenceFeed { get; init; }
+
+    /// <summary>The station's words on <see cref="ReferenceFeed"/> (<c>GPS LOST</c>), or null.</summary>
+    public string? ReferenceFeedDetail { get; init; }
 
     public double? PaTemperatureMaxC { get; init; }
 

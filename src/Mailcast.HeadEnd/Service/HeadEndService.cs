@@ -368,10 +368,35 @@ public sealed class HeadEndService(
         report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0 };
         planner.RecordQueued(plan, report.FramesQueued);
         status.RecordSlot(report);
+        if (ReferenceHoldLine(report, time.GetUtcNow()) is { } held)
+        {
+            journal.Write(held);
+        }
         status.SetBulletinsHeld(store.Count);
         SlotsToday today = status.SlotsToday;
         journal.Write($"slots today ({today.Date:yyyy-MM-dd}): {today.Slots}, {today.Completed} completed, {today.Aborted} cut short, {today.Skipped} skipped");
         return report;
+    }
+
+    /// <summary>
+    /// The one journal line for a slot not sent because the station's 10 MHz reference is
+    /// unreliable, with when it is tried again (or the next slot, when the retry would fall outside
+    /// the catch-up window); null for any other slot.
+    /// </summary>
+    public string? ReferenceHoldLine(SlotReport report, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        if (report.Outcome != SlotOutcome.Skipped || report.ReferenceFeed != Station.ReferenceFeed.Unreliable)
+        {
+            return null;
+        }
+        DateTimeOffset next = NextSlot(now, schedule, catchUp, report, retryAfter);
+        string when = schedule.SlotAtOrBefore(next) == report.Slot
+            ? $"trying again at {next.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)}Z"
+            : $"the next slot is {SlotRunner.Name(next)}";
+        // The tone or the marker may have gone before the reference turned: then it was stopped, not unsent.
+        string what = report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent";
+        return $"{(report.Evening ? "evening slot" : "slot")} {SlotRunner.Name(report.Slot)}: {what}: {report.Reason}; {when}";
     }
 
     /// <summary>The slot's one journal line on the PSK Reporter reading, and whether it went in the slot; null when the head end takes none.</summary>
@@ -410,7 +435,8 @@ public sealed class HeadEndService(
     /// <paramref name="catchUp"/> late, otherwise the next that runs. A slot cut short because
     /// the head end was stopping counts as not run, so a restart carries on with it; one skipped
     /// for a reason at the station that may clear (no KISS port, no lease, no Flex) is tried again
-    /// <paramref name="retryAfter"/> later, while that is still inside the catch-up window. A slot
+    /// <paramref name="retryAfter"/> after that attempt's own time (the slot's, then each retry's), while
+    /// that is at or before the end of the catch-up window. A slot
     /// earlier than the last one run is never run, whatever the clock says. With a daylight rule,
     /// slots in the dark are passed over.
     /// </summary>
@@ -436,11 +462,19 @@ public sealed class HeadEndService(
             {
                 return now <= current + catchUp ? now : following;
             }
-            if (last.Retryable && retryAfter is TimeSpan wait)
+            if (last.Retryable && retryAfter is TimeSpan wait && wait > TimeSpan.Zero)
             {
-                DateTimeOffset retry = last.End + wait;
-                retry = retry > now ? retry : now;
-                return retry <= current + catchUp ? retry : following;
+                // Counted from the attempt's own time, not its end: the slot's time for the first try,
+                // the previous retry's after that. So the first retry is the slot plus slot.retryMinutes
+                // to the second, and with catchUpMinutes equal to it, still inside the window.
+                long tries = (last.End - current).Ticks / wait.Ticks + 1;
+                DateTimeOffset retry = current + TimeSpan.FromTicks(wait.Ticks * Math.Max(tries, 1));
+                // The retry's own time is what must fall in the window; the wait loop wakes a moment after it.
+                if (retry > current + catchUp)
+                {
+                    return following;
+                }
+                return retry > now ? retry : now;
             }
             return following;
         }

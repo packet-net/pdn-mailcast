@@ -31,8 +31,78 @@ public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem, boo
     /// <summary>True when the take was refused because the station could not tune the rig, so nothing is tuned and nothing may be sent.</summary>
     public bool TuneFailed { get; init; }
 
+    /// <summary>
+    /// What the station's 10 MHz reference feed says (<c>reference</c> in <c>GET /api/txlease</c>), or
+    /// null when the answer had none: a station with no feed configured, or an older pdn-soundmodem.
+    /// </summary>
+    public ReferenceFeed? Reference { get; init; }
+
     /// <summary>A refusal or failure.</summary>
     public static LeaseAnswer No(string problem) => new(false, 0, problem);
+}
+
+/// <summary>
+/// The state of the station's 10 MHz reference as its reference feed (a GPSDO display) reports it.
+/// The Flex's own view of its reference is <see cref="Flex.ReferenceReading"/>, which is another thing:
+/// this one caught a GPSDO that went bad while still saying it was locked.
+/// </summary>
+/// <param name="State"><see cref="Ok"/>, <see cref="Unreliable"/> or <see cref="Unknown"/>; any other word the station sends is read as unknown.</param>
+/// <param name="Detail">The station's words on it (<c>GPS LOST</c>, <c>display offline</c>), plain ASCII, or null.</param>
+/// <param name="Since">When it entered this state, when the station said.</param>
+public sealed record ReferenceFeed(string State, string? Detail, DateTimeOffset? Since)
+{
+    /// <summary>The reference is good.</summary>
+    public const string Ok = "ok";
+
+    /// <summary>The reference is bad: nothing is sent while it is.</summary>
+    public const string Unreliable = "unreliable";
+
+    /// <summary>Nobody knows: the slot goes, marked.</summary>
+    public const string Unknown = "unknown";
+
+    /// <summary>The longest detail kept from the station.</summary>
+    private const int DetailLength = 80;
+
+    public bool IsOk => State == Ok;
+
+    public bool IsUnreliable => State == Unreliable;
+
+    public bool IsUnknown => State == Unknown;
+
+    /// <summary>The state with the detail in brackets, for the journal: <c>unreliable (GPS LOST)</c>.</summary>
+    public string Describe() => Detail is null ? State : $"{State} ({Detail})";
+
+    /// <summary>The detail, or "no detail given", for a journal line's brackets.</summary>
+    public string DetailOrNone => Detail ?? "no detail given";
+
+    /// <summary>
+    /// Reads the <c>reference</c> object of a lease answer, or null when there is none (or it is JSON
+    /// null). Anything else that is not an object reads as unknown. The detail is cut to plain
+    /// printable ASCII, since it goes into journal lines.
+    /// </summary>
+    public static ReferenceFeed? From(JsonNode? json)
+    {
+        if (json is not JsonObject answer || !answer.TryGetPropertyValue("reference", out JsonNode? value) || value is null)
+        {
+            return null;
+        }
+        if (value is not JsonObject reference)
+        {
+            return new ReferenceFeed(Unknown, "the station's reference field could not be read", null);
+        }
+        string state = reference["state"] is JsonNode s && s.GetValueKind() == JsonValueKind.String ? s.GetValue<string>().Trim().ToLowerInvariant() : "";
+        state = state is Ok or Unreliable ? state : Unknown;
+        string? detail = null;
+        if (reference["detail"] is JsonNode d && d.GetValueKind() == JsonValueKind.String)
+        {
+            string plain = new string([.. d.GetValue<string>().Select(c => c is >= ' ' and <= '~' ? c : ' ')]).Trim();
+            detail = plain.Length == 0 ? null : plain.Length > DetailLength ? plain[..DetailLength] : plain;
+        }
+        DateTimeOffset? since = reference["since"] is JsonNode t && t.GetValueKind() == JsonValueKind.String
+            && DateTimeOffset.TryParse(t.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var at)
+            ? at : null;
+        return new ReferenceFeed(state, detail, since);
+    }
 }
 
 /// <summary>How a calibration tone request ended.</summary>
@@ -65,6 +135,19 @@ public sealed record ToneAnswer(ToneOutcome Outcome, string Message)
 
     /// <summary>True when all of the probe went out, false when it was cut short or kept off the air, null when the station did not say.</summary>
     public bool? ProbeComplete { get; init; }
+
+    /// <summary>
+    /// The marker the station says it sent (<c>marker</c> in its answer), or null. A station that knows
+    /// the marker echoes it only when it sent it; an older one ignores the field and sends the plain tone.
+    /// </summary>
+    public string? Marker { get; init; }
+}
+
+/// <summary>The markers a tone request may ask for instead of the steady tone (<c>marker</c> in <c>POST /api/txtest</c>).</summary>
+public static class ToneMarker
+{
+    /// <summary>A run of Morse E (dits) at the tone's audio frequency for the tone's length: the slot's reference is not known to be good.</summary>
+    public const string CwE = "cw-e";
 }
 
 /// <summary>A channel probe to follow the tone, as <c>POST /api/txtest</c> takes it.</summary>
@@ -102,7 +185,7 @@ public interface IStationApi
     /// </remarks>
     Task<LeaseAnswer> TakeLeaseAsync(int subChannel, int seconds, int maxCarrierWaitSeconds, bool tune, CancellationToken cancellation);
 
-    /// <summary>Reads the lease and the channel-busy flag (<c>GET /api/txlease</c>).</summary>
+    /// <summary>Reads the lease, the channel-busy flag and the reference feed, when the station has one (<c>GET /api/txlease</c>).</summary>
     Task<LeaseAnswer> ReadLeaseAsync(CancellationToken cancellation);
 
     /// <summary>
@@ -119,8 +202,11 @@ public interface IStationApi
     /// Sends a single tone as the lease holder (<c>POST /api/txtest</c> naming the sub-channel),
     /// followed in the same keyup by <paramref name="probe"/> when one is given. The station waits
     /// for a clear channel first, up to its own limit (60 s), and answers when the keyup is over.
+    /// With <paramref name="marker"/> (<see cref="ToneMarker.CwE"/>) the station sends that marker instead
+    /// of the steady tone, for the same time at the same frequency, and echoes the marker in its answer
+    /// (<see cref="ToneAnswer.Marker"/>); an older station ignores it and sends the plain tone.
     /// </summary>
-    Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation);
+    Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, string? marker, CancellationToken cancellation);
 
     /// <summary>
     /// Asks the station to keep its receive audio from <paramref name="keepFrom"/> to <paramref name="keepTo"/>
@@ -203,7 +289,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
     {
         var (status, json, text) = await LeaseCallAsync(HttpMethod.Get, null, cancellation).ConfigureAwait(false);
         return status == HttpStatusCode.OK
-            ? new LeaseAnswer(json?["held"]?.GetValue<bool>() == true, 0, null, Busy(json))
+            ? new LeaseAnswer(json?["held"]?.GetValue<bool>() == true, 0, null, Busy(json)) { Reference = ReferenceFeed.From(json) }
             : LeaseAnswer.No($"HTTP {(int)status}: {Describe(json, text)}");
     }
 
@@ -225,7 +311,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, CancellationToken cancellation)
+    public async Task<ToneAnswer> SendToneAsync(int subChannel, double toneHz, double seconds, ProbeRequest? probe, string? marker, CancellationToken cancellation)
     {
         var body = new JsonObject
         {
@@ -234,6 +320,10 @@ public sealed class StationApiClient : IStationApi, IDisposable
             ["seconds"] = seconds,
             ["subChannel"] = subChannel,
         };
+        if (marker is not null)
+        {
+            body["marker"] = marker;
+        }
         if (probe is not null)
         {
             body["probe"] = new JsonObject
@@ -266,6 +356,7 @@ public sealed class StationApiClient : IStationApi, IDisposable
                 KnowsProbe = knowsProbe,
                 ProbeId = probeId,
                 ProbeComplete = probeComplete,
+                Marker = Text(json, "marker"),
             };
         }
         string why = Describe(json, text);
