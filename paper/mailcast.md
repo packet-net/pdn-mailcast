@@ -115,6 +115,22 @@ Each bulletin is compressed with zstd using a 64 KB dictionary trained on earlie
 
 Each frame carries one symbol, 271 bytes in all: a version byte, flags, an 8-byte object ID, the dictionary ID, the RaptorQ transmission information, the symbol's number, the symbol and a CRC-32. The object ID is the first 8 bytes of a SHA-256 hash over the dictionary ID and the object, so every object checks itself.
 
+**Object types.** The first byte of every object says what it is, so the same frames, coding and receivers can carry more than bulletins:
+
+| Type | What it carries |
+|---|---|
+| 1 | A packet mail bulletin, in the FBB/BPQ message format |
+| 2 | The directory |
+| 3 | A DAPPS message (reserved) |
+| 4 | A propagation reading (the ionosonde's, or PSK Reporter's), a few dozen bytes |
+| 5 | A bulletin's envelope: what one station's copy has besides the canonical bulletin (section 8) |
+| 6 to 111 | Unassigned |
+| 112 to 127 | Experiments, never assigned |
+
+*Table 2. Object types. The top bit of the same byte says a metadata block follows, which a reader that does not understand it skips.*
+
+A receiver handles each object by its type: bulletins go to the BBS, the directory is read, readings are shown, envelopes are checked against the signed directory. A type it does not handle never reaches the BBS; since 31 October (receiver 0.27.0) the receiver keeps such objects, within a size limit, for other programs to collect through its API. Receivers already in the field drop types they do not know. So new kinds of traffic can be added later without breaking any listener: the propagation readings arrived in the first week and the envelopes on 30 October, both over receivers that had never heard of them. One transmission becomes a general one-way carrier for small objects, of which bulletins are only the first use.
+
 Every slot also carries a *directory*: the bulletins in rotation, the timetable and the slot's waveform. Since 15 October directories are signed with Ed25519, and a receiver holds back anything that only an unsigned or unverified directory lists.
 
 ![Fountain coding](figures/plots/fig10-fountain-coding.png)
@@ -218,7 +234,7 @@ The clear-channel check found the channel busy at the start of 150 of 258 slots 
 | M9PSY | 534 | 119 | 96% | 69% | 11 | 220 |
 | GI3JMC | 544 | 119 | 1% | 0% | -10 | 0 |
 
-*Table 2. Web SDR survey, 6 to 20 October. "Bulletins rebuilt" counts each bulletin once, when the receiver first completed it; 224 bulletins had been taken in before the survey's last slot. G4WNC was unreachable for 61 of its slots.*
+*Table 3. Web SDR survey, 6 to 20 October. "Bulletins rebuilt" counts each bulletin once, when the receiver first completed it; 224 bulletins had been taken in before the survey's last slot. G4WNC was unreachable for 61 of its slots.*
 
 ![Share of frames heard by each survey SDR against its median tone SNR and against its distance from Reading](figures/plots/fig01-survey-snr-vs-distance.png)
 
@@ -255,7 +271,7 @@ The two weeks also differed: the nearer strong SDRs heard much more in the secon
 | M0NVK (WESSEX SDR) | - | 9 to 13 Oct | 4 | 29 | 97% | 89% | 89% | - | 26 | 53 |
 | G7TAJ (WESSEX SDR) | - | 26 to 27 Oct | 2 | 14 | 93% | 66% | 66% | - | 27 | 46 |
 
-*Table 3. Listeners' daily reports, 8 October to 7 November, on their own equipment (M9TWM's own UberSDR counts as his) and, below, the days some listened through a public web SDR. Nine report-days with no audio at all are left out. The listeners cover different dates, so the table compares dates as much as stations.*
+*Table 4. Listeners' daily reports, 8 October to 7 November, on their own equipment (M9TWM's own UberSDR counts as his) and, below, the days some listened through a public web SDR. Nine report-days with no audio at all are left out. The listeners cover different dates, so the table compares dates as much as stations.*
 
 The picture matches the survey. On their own equipment three listeners heard about half the frames or more and five heard 13 to 24%; MM0MQN, in central Scotland, sent only two reports. All but MM0MQN heard frames in most slots, from 64% of slots for G7TAJ to 98% for GM4CXF in Ayrshire. GM8BPQ, on Lewis in the Outer Hebrides about 850 km from Reading, heard frames in three slots out of four.
 
@@ -293,7 +309,7 @@ Listeners' own setups mattered a great deal. Several shared a radio with a packe
 | GM8BPQ | 10% | 21% | 1.8 | 2.1 |
 | MM0MQN | 2% | 6% | 0.3 | 0.6 |
 
-*Table 4. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
+*Table 5. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
 
 WN3 is heard a little more often than WN4 by most receivers, but sends half as many frames a minute, so WN4 delivered more data a minute to every receiver except the three weakest: G8BPQ and GM8BPQ, where WN3 more than doubled the share heard, and MM0MQN. For those the order reverses, though only modestly (3.5 against 2.9 frames a minute for G8BPQ). Alternating the two cost most receivers some throughput to help a few; choosing the waveform per slot, or per listener group, from the channel measurement and the daily reports is future work.
 
@@ -352,7 +368,7 @@ By hour of day, report slots with frames ranged from 73% at 09:00 UTC to 88% at 
 | PSK Reporter | good | 1689 | 76% | 39% |
 | PSK Reporter | unknown | 34 | 68% | 29% |
 
-*Table 5. The verdict the head end logged as each slot began, against what the survey and report receivers heard in that slot. 56 receiver-slots had no verdict logged.*
+*Table 6. The verdict the head end logged as each slot began, against what the survey and report receivers heard in that slot. 56 receiver-slots had no verdict logged.*
 
 The ionosonde verdict separates slots modestly: receivers heard 44% of frames in slots it called good and 35% in those it called marginal. Marginal verdicts cluster at the first and last slots of the day, and almost all the unknown verdicts fall in November, when the ionosonde feed was often stale, so the unknown row largely reflects the November drop. PSK Reporter called 40 m open in essentially every slot. FT8 decodes far below what MS110D needs, so "open for FT8" says little about a 1200 bps link; the median SNR of the spots behind each verdict may predict better, and is left for later analysis.
 
@@ -380,7 +396,7 @@ We compared reception with the daily geomagnetic and solar indices (Kp and Ap, F
 | 6 to 7 MHz | 34% | 227 |
 | above 7 MHz | 48 to 53% | 560 |
 
-*Table 6. Survey reception, 6 to 20 October, against the F2 critical frequency at the slot (Dourbes or Fairford ionosonde).*
+*Table 7. Survey reception, 6 to 20 October, against the F2 critical frequency at the slot (Dourbes or Fairford ionosonde).*
 
 - **foF2 is the one ionospheric measure that clearly goes with reception.** Below about 7 MHz, close to the 7.05 MHz carrier, near-vertical signals pass through the layer, and receivers heard about a third as much as above 8 MHz. This holds within each hour of the day, so it is not just the daily cycle. It is clear for receivers within about 250 km (rank correlation +0.3 to +0.5) and absent for those 500 to 850 km away, whose more oblique paths are supported by a lower foF2.
 - **Day to day, Kp, Ap, F10.7 and sunspot number show nothing measurable** (daily share against Ap: rank correlation +0.07 over 15 survey days, -0.06 over 23 listener days, both with wide intervals). The one strong storm, Kp 7.3 on the evening of 10 October, left a one-day dip: the four strong survey SDRs heard 75% on the 10th, 48% on the 11th and 93% on the 12th. Four M-class flares fell inside slots with no visible effect. One storm and four flares are anecdotes, not a result.
@@ -428,7 +444,7 @@ Everything else is built. Each station signs its own directory, and receivers pi
 - Comparing the probe's virtual heights with the ionosonde's h'F for the same hour, which is also a virtual height and so directly comparable.
 - 80 m in the evenings, and QO-100.
 - Moving the transmitter to a better-fed site: GB7WEM, which takes international mail from GB7CIP over UHF, would carry bulletins sooner than Reading, which collects them over HF.
-- Personal mail as well as bulletins (under consultation).
+- Personal mail as well as bulletins (under consultation), and other traffic as new object types, such as DAPPS messages.
 - Measuring the cost of a narrow transmit filter, before stations with ordinary rigs join Model B.
 - The Model B trial.
 
