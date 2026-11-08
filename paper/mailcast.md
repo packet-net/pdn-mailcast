@@ -8,7 +8,7 @@ Tom Fanning, M0LTE
 
 Packet bulletin boards in the UK pass bulletins between each other over slow, connected-mode radio links, and each link carries each bulletin again. Mailcast sends them one way instead. One station transmits on 40 m in daylight, using a MIL-STD-188-110D waveform at 600 or 1200 bps. Each bulletin is compressed, then cut into pieces with a RaptorQ fountain code, so a listener rebuilds it from any set of pieces slightly larger than the bulletin, heard in any slots. A small receiver program hands each rebuilt bulletin to the listener's own BBS as if it came from a forwarding partner. No reply is ever sent on air.
 
-After a day of tests on 5 October, the station ran 259 hourly daylight slots from 6 October to 7 November 2026 and carried 465 bulletins. A two-week survey of eight public web SDRs, from 83 to 544 km away, and 131 daily reports from nine listeners show what reached people. The strongest web SDRs heard 70 to 80% of the frames sent and rebuilt 88% to nearly all of the bulletins, and the best listeners about half; weak receivers heard 13 to 25% and still rebuilt a third to over half of them, because pieces from different hours add up. Reception fell sharply from 31 October until 8 November; the cause was the transmitter's GPS-disciplined frequency reference, which had lost lock while still reporting itself locked, smearing the signal by about 1 Hz. A Zadoff-Chu sounding probe at the start of each slot measures the path at every receiver, down to about -15 dB signal to noise, often in slots where no data gets through. Read with a simple mirror model, it shows a typical 40 m NVIS channel: a reflection about 270 km up, usually a second path 1.6 ms later, and Doppler spread around a third of a hertz. A receiver in Sweden, 1,100 km away, heard frames in most daylight slots and once saw an E-layer reflection. We describe the design, the results, and Model B, in which several stations transmit and their pieces combine at the listener.
+After a day of tests on 5 October, the station ran 259 hourly daylight slots from 6 October to 7 November 2026 and carried 465 bulletins. A two-week survey of eight public web SDRs, from 83 to 544 km away, and 131 daily reports from nine listeners show what reached people. The strongest web SDRs heard 70 to 80% of the frames sent and rebuilt 88% to nearly all of the bulletins, and the best listeners about half; weak receivers heard 13 to 25% and still rebuilt a third to over half of them, because pieces from different hours add up. Reception fell sharply from 31 October until 8 November; the cause was the transmitter's GPS-disciplined frequency reference, which had lost lock while still reporting itself locked, smearing the signal by about 1 Hz. A Zadoff-Chu sounding probe at the start of each slot measures the path at every receiver, down to about -15 dB signal to noise, often in slots where no data gets through. Read with a simple mirror model, it shows a typical 40 m NVIS channel: a reflection about 270 km up, usually a second path 1.6 ms later, and in October a Doppler spread of about 0.3 Hz. A receiver in Sweden, 1,100 km away, heard frames in most daylight slots and once saw an E-layer reflection. We describe the design, the results, and Model B, in which several stations transmit and their pieces combine at the listener.
 
 ## 1. Introduction
 
@@ -194,7 +194,7 @@ Mailcast was not designed once and then measured. It went from a first test tran
 
 Both 2 November waveform changes were undone in the configuration at 23:14 UTC on 7 November, after reception fell sharply with them in place, so the last slot sent that way was 16:00 on 7 November and the first sent the old way 10:00 on 8 November. They turned out not to be the cause: the transmitter's frequency reference was (section 6.3).
 
-Two things follow for reading the results. Most of the reports come from after 15 October, so they describe the filled slots with the leftover tier, alternating WN4 and WN3. And the long interleaver ran only in the last six days, too short to compare with the short interleaver on the air; the Sweden path tests (section 6.10) compared them directly.
+Two things follow for reading the results. Most of the reports come from after 15 October, so they describe the filled slots with the leftover tier, alternating WN4 and WN3. And the long interleaver ran only from 2 to 7 November, all of it under the transmitter's reference fault (section 6.3), so it cannot be compared with the short interleaver on the air; the Sweden path tests (section 6.10) compared them directly.
 
 ![Frames sent and slot time per day, stacked by waveform, with the strategy changes of 6 October, 15 October and 2 November; 5 October's test slots shown on their own.](figures/plots/fig06-headend-per-day.png)
 
@@ -274,29 +274,30 @@ The two weeks also differed: the nearer strong SDRs heard much more in the secon
 
 The picture matches the survey. On their own equipment three listeners heard about half the frames or more and four heard 13 to 24%; MM0MQN, in central Scotland, sent only two reports. All but MM0MQN heard frames in most slots, from 64% of slots for G7TAJ to 98% for GM4CXF in Ayrshire. GM8BPQ, on Lewis in the Outer Hebrides about 850 km from Reading, heard frames in three slots out of four.
 
-**Reception fell sharply from 2 November.** Every listener who reported on both sides of that date heard much less afterwards: GM4CXF from 66% to 21%, M0NVK from 67% to 37%, G7TAJ from 14% to 5%, GM8BPQ from 17% to 2%. Three things changed on 2 November: WN4 moved to the long interleaver, bursts lengthened from 18 s to 31 s on both waveforms, and one sender's digests were sent last; from 3 November the first slot was also 10:00 rather than 09:00 as the days shortened. Of these, only the burst length touched both waveforms: WN3 kept the short interleaver, and sending digests last changes what is sent, not how. The drop is as large on WN3 (GM4CXF 73% to 22%, GM8BPQ 20% to 3%).
+**Reception fell sharply in early November.** Every listener who reported on both sides of 2 November heard much less afterwards: GM4CXF from 66% to 21%, M0NVK from 67% to 37%, G7TAJ from 14% to 5%, GM8BPQ from 17% to 2%. The fall began on 31 October, but three things changed on 2 November that at first looked to blame: WN4 moved to the long interleaver, bursts lengthened from 18 s to 31 s on both waveforms, and one sender's digests were sent last; from 3 November the first slot was also 10:00 rather than 09:00 as the days shortened. Of these, only the burst length touched both waveforms: WN3 kept the short interleaver, and sending digests last changes what is sent, not how. The drop is as large on WN3 (GM4CXF 73% to 22%, GM8BPQ 20% to 3%).
 
-Slot by slot, from 15:00 on 31 October to the end of 1 November reception was poor everywhere and often no tone was heard, which looks like the storm of section 6.11. On the morning of 2 November it recovered: GM4CXF heard 62% and 53% of the 09:00 and 10:00 slots, still sent in 18 s bursts. From 11:00, the first slot with 31 s bursts, it heard 5 to 21% while its tone stayed at 10 to 15 dB. Over all listeners from 25 October, in slots with a tone of 8 dB or more, the share heard was 61% with 18 s bursts (122 receiver-slots) and 24% with 31 s bursts (56), on both waveforms alike. Sources for these and the figures below are listed in `paper/notes/november-drop.md`.
+Slot by slot, from 15:00 on 31 October to the end of 1 November reception was poor everywhere and often no tone was heard, which looks like the storm of section 6.11. On the morning of 2 November it recovered: GM4CXF heard 62% and 53% of the 09:00 and 10:00 slots, still sent in 18 s bursts. From 11:00, the first slot with 31 s bursts, it heard 5 to 21% while its tone stayed at 10 to 15 dB. Over all listeners from 25 October, in slots with a tone of 8 dB or more, the share heard was 61% with 18 s bursts (122 receiver-slots) and 24% with 31 s bursts (56), on both waveforms alike. That, and recordings showing the receiver's equaliser losing the signal partway through November bursts (only 27% of bursts ran to their normal end from 3 to 6 November, against 79% before), made the longer bursts look guilty. Sources for these and the figures below are listed in `paper/notes/november-drop.md`.
 
 **The cause was the transmitter's frequency reference.** Since 26 October the Flex 6500 had taken its 10 MHz reference from an external GPS-disciplined oscillator. That oscillator keeps its 10 MHz output running when it loses GPS lock, so the Flex went on reporting "external reference locked" while its frequency wandered. Every receiver, near and far, saw the result as a Doppler spread of about 1 Hz on GB7RDG's signal, against 0.2 to 0.3 Hz in October. The fault most likely began on the afternoon of 31 October, when reception first fell, overlapping the storm of section 6.11.
 
-The test came on 8 November. The 10:00 slot was the first back on 18 s bursts and the short interleaver, and reception was still poor: WESSEX heard 7 of 51 frames with its tone at 25 dB, EI4HQ 10 at 22 dB, STUEY3D 8 at 16 dB, with the probe reading 1.15 to 1.34 Hz of Doppler spread. Tom power-cycled the GPS oscillator and the Flex at about 10:50. At 11:00 WESSEX, EI4HQ and STUEY3D each heard all 51 frames, M9TWM-1 41 and M9PSY 34, the Doppler spread was back at 0.13 to 0.29 Hz everywhere, and every recorded burst ran to its normal end. The 13:00 slot was the same.
+The test came on 8 November. The 10:00 slot (WN3, 600 bps) was the first back on 18 s bursts and the short interleaver, and reception was still poor: WESSEX heard 7 of 51 frames with its tone at 25 dB, EI4HQ 10 at 22 dB, STUEY3D 8 at 16 dB, with the probe reading 1.15 to 1.34 Hz of Doppler spread. Tom power-cycled the GPS oscillator and the Flex at about 10:50. At 11:00 (WN4, 1200 bps, also 18 s bursts) WESSEX, EI4HQ and STUEY3D each heard all 51 frames, M9TWM-1 41 and M9PSY 34, the Doppler spread was back at 0.13 to 0.29 Hz everywhere, and every recorded burst ran to its normal end; the more robust waveform had failed before the restart and the faster one succeeded after it. At 13:00 (WN4, 86 frames) WESSEX heard 74, STUEY3D 73, EI4HQ 71 and M9TWM-1 59; the 12:00 slot was lost to a separate fault.
 
 | Receiver | 10:00, before the restart | 11:00, after |
 |---|---|---|
-| WESSEX | 7 of 51, 0.91 Hz | 51 of 51, 0.19 Hz |
-| EI4HQ | 10 of 51, 0.81 Hz | 51 of 51, 0.27 Hz |
-| STUEY3D | 8 of 51, 1.01 Hz | 51 of 51, 0.25 Hz |
-| M9TWM-1 | 2 of 51, 0.95 Hz | 41 of 51, 0.19 Hz |
-| M9PSY | 5 of 51, 0.85 Hz | 34 of 51, 0.29 Hz |
+| WESSEX | 7 of 51, +25 dB, 0.91 Hz | 51 of 51, +27 dB, 0.19 Hz |
+| EI4HQ | 10 of 51, +22 dB, 0.81 Hz | 51 of 51, +19 dB, 0.27 Hz |
+| STUEY3D | 8 of 51, +16 dB, 1.01 Hz | 51 of 51, +16 dB, 0.25 Hz |
+| M9TWM-1 | 2 of 51, +8 dB, 0.95 Hz | 41 of 51, +14 dB, 0.19 Hz |
+| M9PSY | 5 of 51, +9 dB, 0.85 Hz | 34 of 51, +8 dB, 0.29 Hz |
+| G4EYR | 8 of 51, +2 dB, 0.94 Hz | 17 of 51, +6 dB, 0.13 Hz |
 
-*Table 6. Frames heard and the Doppler spread measured on the bursts, 8 November, either side of restarting the transmitter's frequency reference. Both slots used 18 s bursts on the short interleaver.*
+*Table 5. Frames heard, tone signal to noise and the Doppler spread measured on the bursts, 8 November, either side of restarting the transmitter's frequency reference. Both slots used 18 s bursts on the short interleaver; 10:00 was WN3 (600 bps), 11:00 WN4 (1200 bps), 51 frames each.*
 
-So the 2 November changes were not the cause. They happened to land on a signal that was already degrading, and the slot-by-slot fall at 11:00 that day may simply be the reference getting worse; the longer bursts may have made a bad signal worse, but going back to short ones did not fix it, and the restart did. The receivers' behaviour fits a transmitter wandering in frequency: the equaliser lost the signal partway through bursts, the probe and the longer bursts read different Doppler spreads, and no receiver change is needed. The sources for every figure here are listed in `paper/notes/november-drop.md`.
+So the 2 November changes were not the cause. They happened to land on a signal that was already degrading, and the slot-by-slot fall at 11:00 that day may simply be the reference getting worse; the longer bursts may have made a bad signal worse, but going back to short ones did not fix it, and the restart did. The receivers' behaviour fits a transmitter wandering in frequency: the equaliser lost the signal partway through bursts, and on our fixed receiver the bursts read a higher Doppler spread than the short probe from 2 November, as a frequency that drifts over a longer key-down would. No receiver change is needed. The sources for every figure here are listed in `paper/notes/november-drop.md`.
 
 ![Listeners' daily share of frames heard on their own equipment, 8 October to 7 November, with October and November shares](figures/plots/fig03-listeners-daily-share.png)
 
-*Figure 9. Listeners' daily share of frames heard on their own equipment, 8 October to 7 November, with October and November shares: the November drop for GM4CXF, M0NVK, GM8BPQ and G7TAJ after the 2 November changes.*
+*Figure 9. Listeners' daily share of frames heard on their own equipment, 8 October to 7 November, with October and November shares: the November drop for GM4CXF, M0NVK, GM8BPQ and G7TAJ, from the transmitter's reference fault of 31 October to 8 November (section 6.3).*
 
 ### 6.4 Waveforms: 1200 bps against 600 bps
 
@@ -317,7 +318,7 @@ So the 2 November changes were not the cause. They happened to land on a signal 
 | GM8BPQ | 10% | 21% | 1.8 | 2.1 |
 | MM0MQN | 2% | 6% | 0.3 | 0.6 |
 
-*Table 5. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
+*Table 6. Frames heard on WN4 and WN3 slots, as a share of what was sent and per minute of slot time, for the survey SDRs and listeners (own equipment) that heard both. WN4 includes its long-interleaver slots from 2 November. Each frame carries the same 240-byte piece on either waveform, so frames a minute is the rate at which bulletin data arrived. M9TWM-1 matches M9TWM and is not repeated.*
 
 WN3 is heard a little more often than WN4 by most receivers, but sends half as many frames a minute, so WN4 delivered more data a minute to every receiver except the three weakest: G8BPQ and GM8BPQ, where WN3 more than doubled the share heard, and MM0MQN. For those the order reverses, though only modestly (3.5 against 2.9 frames a minute for G8BPQ). Alternating the two cost most receivers some throughput to help a few; choosing the waveform per slot, or per listener group, from the channel measurement and the daily reports is future work.
 
@@ -356,13 +357,13 @@ Receivers measure the path in each slot from the sounding probe, or failing that
 - **Virtual height.** Median 268 km, quartiles 246 to 290 km, inferred from the 1F to 2F delay gap (section 3.4).
 - **Second mode.** Median 1.6 ms after the first (quartiles 1.4 to 1.8 ms), and 12 dB weaker (quartiles 15 to 6 dB weaker). Because the model names a mode 2F only if its delay fits an F layer, the height and this delay are two readings of the same measurement, not independent confirmations.
 - **Delay spread.** Median 0.42 ms, quartiles 0.29 to 0.57 ms.
-- **Doppler spread.** Median 0.33 Hz, quartiles 0.24 to 0.52 Hz. These figures include November, when the transmitter's faulty reference added about 1 Hz (section 6.3); in October the median was nearer 0.25 Hz.
+- **Doppler spread.** Median 0.33 Hz, quartiles 0.24 to 0.52 Hz. These figures include November, when the transmitter's faulty reference added about 1 Hz (section 6.3); before the fault (to 31 October 14:00) the median was 0.30 Hz (601 slots).
 
-Against the mid-latitude test channels of ITU-R F.1487, the two-path delay of 1.6 ms lies between the moderate (1 ms) and disturbed (2 ms) channels, and the Doppler spread between the quiet (0.1 Hz) and moderate (0.5 Hz) ones: a channel the 110D equaliser is designed for, fading slowly. In this data reception looks limited more by signal to noise and interference than by the channel's shape, though we have not tested that directly.
+Against the mid-latitude test channels of ITU-R F.1487, the two-path delay of 1.6 ms lies between the moderate (1 ms) and disturbed (2 ms) channels, and the October Doppler spread between the quiet (0.1 Hz) and moderate (0.5 Hz) ones: a channel the 110D equaliser is designed for, fading slowly. In this data reception looks limited more by signal to noise and interference than by the channel's shape, though we have not tested that directly.
 
 ![Distributions of virtual height, second mode's delay, delay spread and Doppler spread over 759 measured report slots, with median and quartiles.](figures/plots/fig05-channel-distributions.png)
 
-*Figure 11. Distributions of virtual height, second mode's delay, delay spread and Doppler spread over 759 measured report slots, with median and quartiles.*
+*Figure 11. Distributions of virtual height, second mode's delay, delay spread and Doppler spread over 759 measured report slots, with median and quartiles November's Doppler values include the transmitter's reference fault.*
 
 By hour of day, report slots with frames ranged from 73% at 09:00 UTC to 88% at 14:00, and the share of frames heard from 28% to 35%, with no strong pattern across the daylight window. The 09:00 slot ran only until 2 November, before the November drop, so it is if anything flattered. The median virtual height stayed between 258 and 277 km from hour to hour, again with no clear trend over the day.
 
@@ -392,6 +393,8 @@ Daz SA6DAZ, near Gothenburg (JO67fm, about 1,100 km from Reading), lent his stat
 
 **Path tests.** Between mailcast slots, from 30 October to 1 November, the head end sent 136 rounds of test bursts to the same station, each round a tone and probe and then one burst of each of eleven MS110D waveform and interleaver combinations, recorded and decoded in Sweden. At 6 to 9 dB signal to noise in 3 kHz the faster waveforms were still useful: WN5 (1600 bps) decoded 95% of its frames, WN13 (2400 bps) 89% and WN6 (3200 bps) 82%, while WN7 (4800 bps) managed 12% and WN8 (6400 bps, 16QAM) none. At 12 to 15 dB WN8 decoded 58%. The robust end, WN1 to WN4, decoded most frames from around 0 dB upwards. These are close to the standard's targets in Table 1, given that the path was fading.
 
+From the afternoon of 31 October these path tests and the reception figures above ran on the transmitter's faulty reference (section 6.3), so if anything they understate what the path supports.
+
 So a single transmitter on 40 m reaches well into Scandinavia in daylight, at least in autumn, and the channel there often supports waveforms two to three times faster than mailcast used.
 
 ### 6.11 Space weather and the ionosphere
@@ -419,13 +422,13 @@ Measured layer heights (hmF2) could not be fetched for comparison: the GIRO serv
 
 ![Reception and space weather over the period](figures/plots/space-weather-context.png)
 
-*Figure 13. Kp, F10.7 solar flux and foF2 (at each slot, and continuously) above daily reception for M9PSY, four survey SDRs and five listeners, 1 October to 7 November, with the 31 October storm and the 2 November change marked. The 10 October storm (Kp 7.3) shows as a one-day dip; the lasting fall from 2 November does not follow the ionosphere.*
+*Figure 13. Kp, F10.7 solar flux and foF2 (at each slot, and continuously) above daily reception for M9PSY, four survey SDRs and five listeners, 1 October to 7 November, with the 31 October storm and the 2 November change marked. The 10 October storm (Kp 7.3) shows as a one-day dip; the lasting fall from 31 October does not follow the ionosphere (it was the transmitter's reference, section 6.3).*
 
 ## 7. Lessons from operation
 
 **Sharing a radio is the hard part.** Most listeners already run a packet node, and the receiver has to borrow the radio for each slot: stop the node transmitting, retune, and put everything back. Rig modes caught people out (a Xiegu G90 needs its UD mode rather than USB for its wider filter), as did receive filters narrower than the signal (section 6.5). The receiver now defaults the rig to PKTUSB, and places the signal in the middle of whatever filter the rig has rather than asking anyone to widen it.
 
-**Watch the transmitter's reference, not just its status.** For a week the station's GPS-disciplined reference had lost lock while the radio still reported it locked, and nothing in the station's own logs said so. The receivers' channel measurements did: every site's Doppler spread jumped at once. A transmitter on a precise frequency needs an independent check of its lock, and a network of receivers that measure the channel is one.
+**Watch the transmitter's reference, not just its status.** For a week the station's GPS-disciplined reference had lost lock while the radio still reported it locked, and nothing in the station's own logs said so. The receivers' channel measurements did, though the jump in every site's Doppler spread coincided with a storm and was first read as the band. A transmitter on a precise frequency needs an independent check of its lock, and a network of receivers that measure the channel is one.
 
 **Getting reports back is a routing problem.** The daily report travels by ordinary packet mail. Several listeners' reports never reached GB7RDG, because some BBS along the way had not set up the next one as a forwarding partner. Nobody has a full map of who forwards to whom any more.
 

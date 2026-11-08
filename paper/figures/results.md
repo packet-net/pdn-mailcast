@@ -143,6 +143,7 @@ WN3 share heard, 25 October to 1 November against 2 to 7 November (own equipment
 
 Median Doppler spread measured by listeners (Hz), by period, all bases and probe only:
 
+- Before the transmitter's reference fault (to 31 Oct 14:00): 0.30 (n=601)
 - 25 to 30 Oct: 0.28 (n=256), probe only 0.29 (n=206)
 - 31 Oct to 1 Nov: 0.42 (n=46), probe only 0.40 (n=43)
 - 2 Nov: 0.91 (n=31), probe only 0.91 (n=21)
