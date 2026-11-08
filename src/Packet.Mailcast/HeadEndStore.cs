@@ -17,7 +17,8 @@ namespace Packet.Mailcast;
 /// object.bin   the object's octets, exactly as coded
 /// envelope.bin the envelope object's octets, for a bulletin first offered since issue #142 (none for an older one)
 /// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi (a count of pieces sent), EsiOrder and EsiStation (shuffled bulletins, issue #143),
-///              and FirstSlot once it has been carried
+///              FirstSlot once it has been carried, and EveningNextEsi once an evening slot has sent some of it (pieces counted
+///              from <see cref="BroadcastScheduler.EveningFirstCount"/>, apart from NextEsi)
 /// </code>
 /// <para>
 /// A bulletin held from before the canonical form keeps its encoding and has no envelope; it is never coded again.
@@ -31,7 +32,7 @@ namespace Packet.Mailcast;
 /// <para>And one file per directory object sent, <c>directories/OBJECTID.txt</c>, with its Day and
 /// NextEsi, so a later plan with the same directory object does not repeat its pieces.</para>
 /// <para>And one file per object relayed from another station (issue #218), <c>relayed/OBJECTID.txt</c>, with its Day, FirstSlot,
-/// and every ESI sent (Sent, hex), so that a restart never repeats one. An envelope object relayed with a bulletin has a file of its own, shared by every bulletin that links it. A bulletin this head end takes later that was relayed first carries on past every ESI relayed, and one it forgets leaves such a file behind, so neither ever starts again from 0.</para>
+/// and every ESI sent (Sent, hex), so that a restart never repeats one. An envelope object relayed with a bulletin has a file of its own, shared by every bulletin that links it. A bulletin this head end takes later that was relayed first carries on past every ESI relayed, and one it forgets leaves such a file behind (with EveningNext, its evening count, when evening slots sent some), so neither ever starts again from 0.</para>
 /// <para>
 /// Both are written to a temporary name and renamed, object first, so a folder whose state is
 /// missing or does not match its object is an interrupted first offer and is discarded.
@@ -181,6 +182,8 @@ public sealed class HeadEndStore
             nextEsi = relayed.NextFresh;
             firstSlot = relayed.FirstSlot;
         }
+        // And past any evening piece it sent before it was forgotten (kept apart: the ESIs sent may include other stations' too).
+        uint eveningNext = relayed?.EveningNext ?? 0;
         // An own envelope counts up from a first ESI; start at the lowest one whose run of K pieces holds none already sent.
         uint envelopeNext = 0;
         if (envelopeObject is not null && _relay.TryGetValue(envelopeObject.ObjectId, out var relayedEnvelope))
@@ -200,7 +203,7 @@ public sealed class HeadEndStore
         {
             taken = taken.AddMilliseconds(1);
         }
-        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, nextEsi, firstSlot, envelopeObject, envelopeNext, shuffle, bulletin.From, taken);
+        var carried = new CarriedBulletin(shared.Bid, shared.Title, serialized.Length, seen, transfer, nextEsi, firstSlot, envelopeObject, envelopeNext, shuffle, bulletin.From, taken, eveningNext);
         var dir = Path.Combine(_bulletins, key);
         Directory.CreateDirectory(dir);
         DurableFile.WriteAtomically(Path.Combine(dir, "object.bin"), transfer.Bytes);
@@ -269,14 +272,19 @@ public sealed class HeadEndStore
         ArgumentNullException.ThrowIfNull(broadcast);
         ArgumentOutOfRangeException.ThrowIfNegative(framesSent);
         var next = new Dictionary<ulong, uint>();
+        // An evening slot's bulletin pieces are counted from EveningFirstCount, kept apart from the daylight count.
+        var evening = new Dictionary<ulong, uint>();
+        var bulletinIds = broadcast.Objects.Where(o => o.Bid is not null).Select(o => o.Transfer.ObjectId).ToHashSet();
         // A shuffled bulletin (issue #143) moves on by count, not by ESI: the count behind each frame sent.
         var shuffles = broadcast.Objects.Where(o => o.Shuffle is not null && o.Bid is not null).ToDictionary(o => o.Transfer.ObjectId, o => o.Shuffle!);
         foreach (var frame in broadcast.Frames.Take(framesSent))
         {
-            uint after = (shuffles.TryGetValue(frame.ObjectId, out var shuffle) ? shuffle.Unmap(frame.EncodingSymbolId) : frame.EncodingSymbolId) + 1;
-            if (!next.TryGetValue(frame.ObjectId, out uint known) || after > known)
+            uint count = shuffles.TryGetValue(frame.ObjectId, out var shuffle) ? shuffle.Unmap(frame.EncodingSymbolId) : frame.EncodingSymbolId;
+            var into = bulletinIds.Contains(frame.ObjectId) && count >= BroadcastScheduler.EveningFirstCount ? evening : next;
+            uint after = (into == evening ? count - BroadcastScheduler.EveningFirstCount : count) + 1;
+            if (!into.TryGetValue(frame.ObjectId, out uint known) || after > known)
             {
-                next[frame.ObjectId] = after;
+                into[frame.ObjectId] = after;
             }
         }
         foreach (ulong id in broadcast.ExtraObjects)
@@ -323,8 +331,17 @@ public sealed class HeadEndStore
                 }
                 continue;
             }
-            if (!next.TryGetValue(o.Transfer.ObjectId, out uint nextEsi)
-                || !_entries.TryGetValue(KeyOf(o.Bid), out var entry) || entry.Carried.Transfer.ObjectId != o.Transfer.ObjectId)
+            if (!_entries.TryGetValue(KeyOf(o.Bid), out var entry) || entry.Carried.Transfer.ObjectId != o.Transfer.ObjectId)
+            {
+                continue;
+            }
+            if (evening.TryGetValue(o.Transfer.ObjectId, out uint eveningNext) && eveningNext > entry.Carried.EveningNextEsi)
+            {
+                // Evening pieces move their own count only: never NextEsi or FirstSlot, which the daylight strategy works from.
+                entry.Carried = entry.Carried with { EveningNextEsi = eveningNext };
+                SaveState(entry);
+            }
+            if (!next.TryGetValue(o.Transfer.ObjectId, out uint nextEsi))
             {
                 continue;
             }
@@ -352,7 +369,7 @@ public sealed class HeadEndStore
             if (today.DayNumber - entry.Carried.FirstSeen.DayNumber >= _options.RememberDays)
             {
                 // Leave its sent ESIs behind, so that if it comes back (offered again, or relayed from a receiver) it never starts from 0.
-                if (entry.Carried.NextEsi > 0)
+                if (entry.Carried.NextEsi > 0 || entry.Carried.EveningNextEsi > 0)
                 {
                     var kept = _relay.TryGetValue(entry.Carried.Transfer.ObjectId, out var had) ? had : new RelayEntry { ObjectId = entry.Carried.Transfer.ObjectId, Day = today };
                     kept.Last = today;
@@ -361,7 +378,12 @@ public sealed class HeadEndStore
                     {
                         kept.Sent.Add(entry.Carried.EsiOf(n));
                     }
+                    for (uint n = 0; n < entry.Carried.EveningNextEsi; n++)
+                    {
+                        kept.Sent.Add(entry.Carried.EsiOf(BroadcastScheduler.EveningFirstCount + n));
+                    }
                     kept.FirstSlot ??= entry.Carried.FirstSlot;
+                    kept.EveningNext = Math.Max(kept.EveningNext, entry.Carried.EveningNextEsi);
                     _relay[kept.ObjectId] = kept;
                     SaveRelay(kept);
                 }
@@ -425,6 +447,9 @@ public sealed class HeadEndStore
 
         /// <summary>The count after the highest of this station's own fresh pieces (in its scrambled order) sent; unchanged ESIs of another station do not move it.</summary>
         public uint NextFresh;
+
+        /// <summary>For a bulletin of this head end's that was forgotten, how many evening pieces it had sent (counted from <see cref="BroadcastScheduler.EveningFirstCount"/>).</summary>
+        public uint EveningNext;
         public readonly HashSet<uint> Sent = [];
     }
 
@@ -441,6 +466,10 @@ public sealed class HeadEndStore
         }
         text.Append(CultureInfo.InvariantCulture, $"Last: {r.Last:yyyy-MM-dd}\n");
         text.Append(CultureInfo.InvariantCulture, $"NextFresh: {r.NextFresh}\n");
+        if (r.EveningNext > 0)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"EveningNext: {r.EveningNext}\n");
+        }
         text.Append("Sent: ").Append(string.Join(',', r.Sent.Order().Select(e => e.ToString("x", CultureInfo.InvariantCulture)))).Append('\n');
         DurableFile.WriteAtomically(RelayPath(r.ObjectId), Bulletin.TextEncoding.GetBytes(text.ToString()));
     }
@@ -468,6 +497,7 @@ public sealed class HeadEndStore
                 Day = DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
                 Last = fields.TryGetValue("Last", out var lastText) ? DateOnly.ParseExact(lastText, "yyyy-MM-dd", CultureInfo.InvariantCulture) : DateOnly.ParseExact(fields["Day"], "yyyy-MM-dd", CultureInfo.InvariantCulture),
                 NextFresh = fields.TryGetValue("NextFresh", out var freshText) ? uint.Parse(freshText, CultureInfo.InvariantCulture) : 0,
+                EveningNext = fields.TryGetValue("EveningNext", out var eveningText) ? uint.Parse(eveningText, CultureInfo.InvariantCulture) : 0,
                 FirstSlot = fields.TryGetValue("FirstSlot", out var slotText)
                     ? DateTimeOffset.ParseExact(slotText, "yyyy-MM-ddTHH:mmZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
                     : null,
@@ -557,6 +587,10 @@ public sealed class HeadEndStore
         {
             text.Append(CultureInfo.InvariantCulture, $"FirstSlot: {firstSlot.UtcDateTime:yyyy-MM-ddTHH:mmZ}\n");
         }
+        if (c.EveningNextEsi > 0)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"EveningNextEsi: {c.EveningNextEsi}\n");
+        }
         DurableFile.WriteAtomically(Path.Combine(entry.Dir, "state.txt"), Bulletin.TextEncoding.GetBytes(text.ToString()));
     }
 
@@ -645,7 +679,8 @@ public sealed class HeadEndStore
                 fields.GetValueOrDefault("From") ?? SenderOf(transfer),
                 fields.TryGetValue("TakenIn", out var takenText)
                     ? DateTimeOffset.ParseExact(takenText, "yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
-                    : null);
+                    : null,
+                fields.TryGetValue("EveningNextEsi", out var eveningText) ? uint.Parse(eveningText, CultureInfo.InvariantCulture) : 0);
             return new Entry(dir, carried);
         }
         catch (Exception e) when (e is FormatException or ArgumentException or KeyNotFoundException or OverflowException)

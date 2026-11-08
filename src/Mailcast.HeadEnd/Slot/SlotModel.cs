@@ -205,6 +205,9 @@ public sealed record SlotReport
     /// <summary>Who asked for a one-off slot (<c>POST /run</c>), or null for a scheduled one.</summary>
     public string? RequestedBy { get; init; }
 
+    /// <summary>True for an evening slot (<c>slot.evening</c>): after dark, with pieces that never count against the daylight strategy.</summary>
+    public bool Evening { get; init; }
+
     /// <summary>The waveform the slot went out on (or would have), as pdn-soundmodem names it; null in a report from before this was kept.</summary>
     public string? Mode { get; init; }
 

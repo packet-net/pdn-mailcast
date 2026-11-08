@@ -33,9 +33,10 @@ public interface ISlotPlanner
     /// <summary>
     /// The frames to send in the slot starting at <paramref name="slot"/>. With
     /// <paramref name="evenIfNothingDue"/>, as for a one-off slot someone asked for, the directory
-    /// goes out even when no bulletin has anything due.
+    /// goes out even when no bulletin has anything due. With <paramref name="evening"/>, an evening slot: its pieces never
+    /// count against the daylight strategy.
     /// </summary>
-    SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false);
+    SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false, bool evening = false);
 
     /// <summary>
     /// Records that the first <paramref name="queued"/> frames of a plan have been handed to the
@@ -97,9 +98,10 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
     public const int OldestSentMinutes = 255;
 
     /// <inheritdoc />
-    public SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false)
+    public SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false, bool evening = false)
     {
-        SlotWaveform? waveform = waveforms?.For(slot);
+        // An on-demand slot is planned as a normal one, so it takes the daylight turn even in the evening.
+        SlotWaveform? waveform = waveforms?.For(slot, evening);
         TimeSpan late = time is null ? TimeSpan.Zero : time.GetUtcNow() - slot;
         SlotBudget? budget = Budget(waveform, late);
         IonoReading? reading = Reading();
@@ -108,12 +110,16 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
         ReportReceipts? listed = reports?.For(DateOnly.FromDateTime(slot.UtcDateTime));
-        SlotBroadcast broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, extras, listed, relay);
+        // An evening slot (slot.evening) sends only evening pieces, and lists relayed objects without sending them; the budget rule is required for it.
+        SlotBroadcast PlanWith(IReadOnlyList<MailcastFrame> withExtras) => evening
+            ? store.PlanEvening(slot, Seed(slot), compression, options, budget ?? throw new InvalidOperationException("Evening slots need the budget rule."), waveform?.Mode, withExtras, listed, relay)
+            : store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, withExtras, listed, relay);
+        SlotBroadcast broadcast = PlanWith(extras);
         if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
         {
             // Both readings would crowd out every bulletin frame: PSK Reporter's go first, and the
             // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
-            broadcast = store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, ionoFrames, listed, relay);
+            broadcast = PlanWith(ionoFrames);
         }
         RelaySummary? summary = relay?.Summary;
         // Own bulletins only; what is relayed is counted apart.

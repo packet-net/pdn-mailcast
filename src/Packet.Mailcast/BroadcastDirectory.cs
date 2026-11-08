@@ -211,6 +211,11 @@ public sealed record EnvelopeLink(ulong ObjectId, string Hash)
 /// for starts with <c>env=</c>); a reader that finds it malformed ignores it too.
 /// </para>
 /// <para>
+/// A head end with evening slots (<see cref="EveningRule"/>) adds <c>evening=HH:mm</c> after <c>daylight=</c>: its slots from
+/// sunset at the daylight locator until that time UTC run as well. Earlier readers ignore it like any field after the title (no
+/// name they look for starts with <c>evening=</c>), so they follow the daylight slots alone, and the signature still checks.
+/// </para>
+/// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
 /// different contents never share an ID, even on the same day. Ed25519 signatures are
 /// deterministic, so the same directory signed twice is the same object.

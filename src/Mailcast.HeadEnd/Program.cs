@@ -306,7 +306,8 @@ public static partial class Program
                 : new ReportLog(Directory.Exists(config.StateDirectory) ? config.StateDirectory : scratch, journal, readOnly: true);
             var planner = new StoreSlotPlanner(store, Compression.Default, scheduleOptions, waveforms, settings, config.FillLimitAfter, reports: reports);
 
-            SlotPlan plan = planner.Plan(slot);
+            bool evening = scheduleOptions.Timetable?.IsEvening(slot) == true;
+            SlotPlan plan = planner.Plan(slot, evening: evening);
             SlotWaveform waveform = plan.Waveform ?? waveforms.For(slot);
             IAirtime airtime = waveform.Airtime;
             var runner = new SlotRunner(settings, new NullStation(), new NullKiss(), null, airtime, journal, TimeProvider.System);
@@ -315,7 +316,7 @@ public static partial class Program
                 ? string.Create(CultureInfo.InvariantCulture, $"airtime on {waveform.Mode}: {linear.PerBurst.TotalSeconds:0.00} s a burst, {linear.Burst([1003]).TotalSeconds - linear.PerBurst.TotalSeconds:0.00} s a full frame (1003 octets)")
                 : string.Create(CultureInfo.InvariantCulture, $"airtime on {waveform.Mode}: {airtime.Burst([1003]).TotalSeconds:0.00} s for a burst of one full frame (1003 octets), in whole interleaver blocks"));
             journal.Write(string.Create(CultureInfo.InvariantCulture,
-                $"plan {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation{(plan.LeftoverInRotation > 0 ? string.Create(CultureInfo.InvariantCulture, $" ({plan.LeftoverInRotation} leftover)") : "")}, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {waveform.Mode}, about {runner.Airtime(plan.Frames, bursts, airtime).TotalMinutes:0.0} min of bursts, {runner.Model(airtime).Slot([.. plan.Frames.Select(f => runner.Ax25(f).Length)], bursts).TotalMinutes:0.0} min on the air with the tone and idents{(scheduleOptions.Budget is null ? "" : string.Create(CultureInfo.InvariantCulture, $" (filled to {config.FillLimit.TotalMinutes:0.0})"))}"));
+                $"{(evening ? "evening plan" : "plan")} {SlotRunner.Name(slot)}: {plan.BulletinsInRotation} bulletins in rotation{(plan.LeftoverInRotation > 0 ? string.Create(CultureInfo.InvariantCulture, $" ({plan.LeftoverInRotation} leftover)") : "")}, {plan.Frames.Count} frames, {bursts.Count} bursts of up to {bursts.DefaultIfEmpty(0).Max()} frames on {waveform.Mode}, about {runner.Airtime(plan.Frames, bursts, airtime).TotalMinutes:0.0} min of bursts, {runner.Model(airtime).Slot([.. plan.Frames.Select(f => runner.Ax25(f).Length)], bursts).TotalMinutes:0.0} min on the air with the tone and idents{(scheduleOptions.Budget is null ? "" : string.Create(CultureInfo.InvariantCulture, $" (filled to {config.FillLimit.TotalMinutes:0.0})"))}"));
 
             if (options.GetValueOrDefault("--wav") is string wavPath)
             {
@@ -456,6 +457,10 @@ public static partial class Program
             ? "pskreporter: off (\"pskReporter\".\"enabled\" is false)"
             : string.Create(CultureInfo.InvariantCulture, $"pskreporter: observe only, live spots from {config.PskReporter.Host}:{config.PskReporter.Port} near a slot, 40 and 80 m FT8/FT4/WSPR with both ends in the UK or Ireland, judged over the last {PskEvaluator.Window.TotalMinutes:0} min; 40 m sent"));
         journal.Write(DescribeSchedule(config));
+        if (DescribeEvening(config, waveforms) is { } eveningLine)
+        {
+            journal.Write(eveningLine);
+        }
         journal.Write(Describe(config, scheduleOptions, waveforms));
         using var receivers = new ReceiverPool(catalogue, journal, time);
         status.Receivers = receivers.StatusView;
@@ -562,6 +567,20 @@ public static partial class Program
         var minutes = Enumerable.Range(0, 60 / every).Select(i => ":" + (first + (i * every)).ToString("00", CultureInfo.InvariantCulture)).ToList();
         string at = minutes.Count == 1 ? minutes[0] : string.Join(", ", minutes[..^1]) + " and " + minutes[^1];
         return $"{line}, so at {at} each hour";
+    }
+
+    /// <summary>
+    /// The start-up line on the evening slots: "evening: extra slots from sunset until 22:00 UTC at IO91lk, on ms110d-wn3;
+    /// they never count against the daylight slots". Null without <c>slot.evening</c>.
+    /// </summary>
+    internal static string? DescribeEvening(HeadEndConfig config, Waveforms waveforms)
+    {
+        if (config.ToEveningRule() is not { } rule || config.Slot.Daylight is not { } daylight)
+        {
+            return null;
+        }
+        var modes = waveforms.EveningModes ?? waveforms.Modes;
+        return $"evening: extra slots {rule.Describe()} at {daylight.Locator}, on {string.Join(", ", modes)}; they never count against the daylight slots";
     }
 
     /// <summary>One journal line on how bulletins are carried and on which waveforms.</summary>

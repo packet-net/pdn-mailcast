@@ -670,8 +670,47 @@ public sealed class ReceiverHost : IAsyncDisposable
         get
         {
             var followed = Listening.Where(l => l.Followed).ToList();
-            return followed.Count == 0 ? FollowedSlots.None : new FollowedSlots([.. followed.Select(l => (l.Station, SlotSchedule.From(l.Timetable)))]);
+            return followed.Count == 0 ? FollowedSlots.None : new FollowedSlots([.. followed.Select(l => (l.Station, SlotSchedule.From(AsFollowed(l.Timetable))))]);
         }
+    }
+
+    private int _eveningNoPlaceSaid;
+
+    // The last evening rule ended at sunset here, kept so its sunset cache lasts from one look at the slots to the next.
+    private (EveningRule Announced, string Here, EveningRule Followed)? _eveningHere;
+
+    /// <summary>
+    /// A station's timetable as this receiver follows it: as announced, unless <see cref="ReceiverConfig.EveningSlots"/> is
+    /// false, when its evening slots end at sunset here as well (where <see cref="Place"/> is), or with no place known (yet,
+    /// for a web SDR) are left out altogether, which the log says once.
+    /// </summary>
+    internal SlotTimetable AsFollowed(SlotTimetable timetable)
+    {
+        ArgumentNullException.ThrowIfNull(timetable);
+        if (timetable.Evening is not { } evening || Config.FollowsEveningSlots)
+        {
+            return timetable;
+        }
+        if (Place?.Locator is { } here && Maidenhead.TryParse(here, out _, out _))
+        {
+            Interlocked.Exchange(ref _eveningNoPlaceSaid, 0);
+            lock (_gate)
+            {
+                if (_eveningHere is not { } kept || !kept.Announced.Equals(evening) || kept.Here != here)
+                {
+                    kept = (evening, here, evening.EndingAtSunsetAt(here));
+                    _eveningHere = kept;
+                }
+                return timetable with { Evening = kept.Followed };
+            }
+        }
+        if (Interlocked.Exchange(ref _eveningNoPlaceSaid, 1) == 0)
+        {
+            _log(AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr
+                ? "slots: \"eveningSlots\" is false and the web SDR has not said where it is yet, so every evening slot is skipped until it does"
+                : "slots: \"eveningSlots\" is false and this receiver's place is not known (no \"locator\"), so it skips every evening slot");
+        }
+        return timetable.WithoutEvening();
     }
 
     /// <summary>

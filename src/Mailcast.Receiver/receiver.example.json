@@ -58,6 +58,10 @@
   // "dialKHz" for each slot and hold its transmitting meanwhile: see docs/receiver.md under
   // "Retuning through pdn-soundmodem".
 
+  // Some stations send extra evening slots after dark. The receiver follows them by default.
+  // If your radio retunes for each slot, or you listen on a web SDR, and it is dark where you
+  // are by then, "eveningSlots": false skips the ones after your local sunset.
+
   // To run commands of your own before and after each slot (to stop another program that
   // shares your radio, and start it again), add "hooks" as docs/receiver.md says under
   // "Running your own commands around each slot".

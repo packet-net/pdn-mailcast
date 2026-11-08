@@ -151,10 +151,11 @@ public sealed class SlotRunner
     /// null for the configured one, left as it is.
     /// </param>
     /// <param name="leftoverInRotation">How many of <paramref name="bulletinsInRotation"/> are in the budget rule's leftover tier, for the log and the report.</param>
-    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null, SlotWaveform? waveform = null, int leftoverInRotation = 0)
+    /// <param name="evening">True for an evening slot: its journal lines say "evening slot", and so does its report.</param>
+    public async Task<SlotReport> RunAsync(DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletinsInRotation, CancellationToken cancellation, Action<int>? queued = null, string? requestedBy = null, SlotWaveform? waveform = null, int leftoverInRotation = 0, bool evening = false)
     {
         ArgumentNullException.ThrowIfNull(frames);
-        using var run = new Run(this, slot, frames, bulletinsInRotation, leftoverInRotation, queued, requestedBy, waveform);
+        using var run = new Run(this, slot, frames, bulletinsInRotation, leftoverInRotation, queued, requestedBy, waveform, evening);
         return await run.ExecuteAsync(cancellation);
     }
 
@@ -293,7 +294,7 @@ public sealed class SlotRunner
     private static string Degrees(double c) => c.ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>One slot's state.</summary>
-    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, int leftover, Action<int>? onQueued, string? requestedBy, SlotWaveform? waveform) : IDisposable
+    private sealed class Run(SlotRunner owner, DateTimeOffset slot, IReadOnlyList<SlotFrame> frames, int bulletins, int leftover, Action<int>? onQueued, string? requestedBy, SlotWaveform? waveform, bool evening = false) : IDisposable
     {
         /// <summary>"15 bulletins", or "15 bulletins (4 leftover)" with some in the leftover tier.</summary>
         private string Bulletins(string after = "") => leftover > 0
@@ -339,7 +340,7 @@ public sealed class SlotRunner
             set => Interlocked.Exchange(ref _leaseUntilTicks, value.UtcTicks);
         }
 
-        private void Say(string line) => owner._journal.Write($"slot {Name(slot)}: {line}");
+        private void Say(string line) => owner._journal.Write($"{(evening ? "evening slot" : "slot")} {Name(slot)}: {line}");
 
         public async Task<SlotReport> ExecuteAsync(CancellationToken cancellation)
         {
@@ -1060,6 +1061,7 @@ public sealed class SlotRunner
                 LeaseTaken = _leaseTaken,
                 LeaseRenewals = _renewals,
                 RequestedBy = requestedBy,
+                Evening = evening,
                 Retryable = retryable,
                 Mode = _mode,
                 EstimatedSeconds = _estimate is { } e ? Math.Round(e.TotalSeconds, 1) : null,

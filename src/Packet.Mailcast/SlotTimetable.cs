@@ -162,15 +162,131 @@ public sealed record DaylightSettings
 }
 
 /// <summary>
+/// A head end's evening slots: after its daylight window, the slots that start from sunset at the
+/// daylight rule's locator until <see cref="UntilUtc"/>, for listeners far enough away that the
+/// path stays open after dark (40 m from Reading to Sweden, say). They come after the daylight
+/// slots, on the same timetable, so the two never overlap, and they never count against the
+/// daylight strategy (see <see cref="BroadcastScheduler.PlanEvening"/>).
+/// </summary>
+/// <remarks>
+/// <para>
+/// Each solar day's evening runs from its sunset to <see cref="UntilUtc"/> on the UTC day of its
+/// solar noon, and never past the next sunrise. A day whose sunset is at or after that time (far
+/// west, or far north in summer) has none, and so does one of polar day or night. A slot the
+/// daylight rule allows is never an evening slot.
+/// </para>
+/// <para>
+/// A receiver that does not want to listen after its own sunset (a rig that retunes, or a web SDR)
+/// adds <see cref="ListenerLocator"/>: an evening slot then runs for it only if it starts before
+/// sunset there too. That is the receiver's own view and never goes in a directory.
+/// </para>
+/// </remarks>
+public sealed class EveningRule : IEquatable<EveningRule>
+{
+    private readonly double? _listenerLatitude;
+    private readonly double? _listenerLongitude;
+    private readonly ConcurrentDictionary<DateOnly, SunTimes> _listenerSun = new();
+
+    /// <summary>Creates a rule. Throws <see cref="ArgumentException"/> for a listener locator that is not one.</summary>
+    public EveningRule(TimeOnly untilUtc, string? listenerLocator = null)
+    {
+        UntilUtc = untilUtc;
+        if (listenerLocator is not null)
+        {
+            if (!Maidenhead.TryParse(listenerLocator, out double lat, out double lon))
+            {
+                throw new ArgumentException($"'{listenerLocator}' is not a 4 or 6 character Maidenhead locator such as JO67fm.", nameof(listenerLocator));
+            }
+            ListenerLocator = listenerLocator;
+            _listenerLatitude = lat;
+            _listenerLongitude = lon;
+        }
+    }
+
+    /// <summary>The last evening slot starts before this time of day, UTC.</summary>
+    public TimeOnly UntilUtc { get; }
+
+    /// <summary>A receiver's own locator: evening slots that start after sunset there are left out. Null for the head end's own rule.</summary>
+    public string? ListenerLocator { get; }
+
+    /// <summary>The same rule, ending at sunset at <paramref name="locator"/> as well.</summary>
+    public EveningRule EndingAtSunsetAt(string locator) => new(UntilUtc, locator);
+
+    /// <summary>
+    /// Whether a slot starting at <paramref name="slot"/> is an evening slot of a head end with the
+    /// daylight rule <paramref name="daylight"/>: not in its daylight, and in some solar day's
+    /// evening (the day before and after are checked too, as <see cref="DaylightRule.Allows"/> does).
+    /// </summary>
+    public bool Allows(DateTimeOffset slot, DaylightRule daylight)
+    {
+        ArgumentNullException.ThrowIfNull(daylight);
+        if (daylight.Allows(slot))
+        {
+            return false;
+        }
+        var day = DateOnly.FromDateTime(slot.UtcDateTime);
+        return InEvening(slot, day, daylight) || InEvening(slot, day.AddDays(-1), daylight) || InEvening(slot, day.AddDays(1), daylight);
+    }
+
+    private bool InEvening(DateTimeOffset slot, DateOnly day, DaylightRule daylight)
+    {
+        var sun = daylight.WindowOn(day).Sun;
+        if (sun.Kind != SunDay.RisesAndSets)
+        {
+            return false;
+        }
+        var opens = sun.Sunset!.Value;
+        var until = new DateTimeOffset(day.ToDateTime(UntilUtc, DateTimeKind.Utc));
+        if (daylight.WindowOn(day.AddDays(1)).Sun is { Kind: SunDay.RisesAndSets, Sunrise: { } nextSunrise } && nextSunrise < until)
+        {
+            until = nextSunrise;
+        }
+        if (slot < opens || slot >= until)
+        {
+            return false;
+        }
+        if (_listenerLatitude is not double lat || _listenerLongitude is not double lon)
+        {
+            return true;
+        }
+        var here = _listenerSun.GetOrAdd(day, d => Solar.SunriseSunset(d, lat, lon));
+        return here.Kind switch
+        {
+            SunDay.AlwaysUp => true,
+            SunDay.AlwaysDown => false,
+            _ => slot < here.Sunset!.Value,
+        };
+    }
+
+    /// <summary>The rule in words: "from sunset until 22:00 UTC", with ", and before sunset at JO67fm" for a listener's.</summary>
+    public string Describe() => string.Create(CultureInfo.InvariantCulture,
+        $"from sunset until {UntilUtc:HH:mm} UTC{(ListenerLocator is null ? "" : $", and only before sunset at {ListenerLocator}")}");
+
+    /// <inheritdoc />
+    public bool Equals(EveningRule? other) =>
+        other is not null && UntilUtc == other.UntilUtc && string.Equals(ListenerLocator, other.ListenerLocator, StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => Equals(obj as EveningRule);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(UntilUtc, ListenerLocator?.ToUpperInvariant());
+
+    /// <inheritdoc />
+    public override string ToString() => Describe();
+}
+
+/// <summary>
 /// When a head end's slots are: one starts at <see cref="Anchor"/> UTC and then every
 /// <see cref="EveryMinutes"/>, round the clock, and with a <see cref="Daylight"/> rule only those
-/// that start in its window run. The same in the head end, in the directory it sends, and in
-/// the receiver.
+/// that start in its window run, and with an <see cref="Evening"/> rule as well those in its
+/// evening. The same in the head end, in the directory it sends, and in the receiver.
 /// </summary>
 /// <param name="Anchor">One slot's start, UTC.</param>
 /// <param name="EveryMinutes">Minutes from one slot to the next; it divides a day.</param>
 /// <param name="Daylight">The daylight rule, or null for every slot.</param>
-public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRule? Daylight = null)
+/// <param name="Evening">The evening slots after the daylight ones, or null for none. Ignored without a daylight rule, since every slot runs then.</param>
+public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRule? Daylight = null, EveningRule? Evening = null)
 {
     /// <summary>How far ahead or back a search for a slot in daylight looks: more than a year, so it always finds one if any day has one.</summary>
     public const int SearchDays = 400;
@@ -202,12 +318,22 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
         return [.. Enumerable.Range(0, SlotsPerDay).Select(i => midnight.AddMinutes(firstMinute + ((double)i * EveryMinutes)))];
     }
 
-    /// <summary>Whether the slot starting at <paramref name="slot"/> runs: always, without a daylight rule.</summary>
-    public bool IsActive(DateTimeOffset slot) => Daylight?.Allows(slot) ?? true;
+    /// <summary>Whether the slot starting at <paramref name="slot"/> runs, in daylight or in the evening: always, without a daylight rule.</summary>
+    public bool IsActive(DateTimeOffset slot) => Daylight is null || Daylight.Allows(slot) || IsEvening(slot);
 
-    /// <summary>The slots that run on a UTC day, earliest first.</summary>
+    /// <summary>Whether the slot starting at <paramref name="slot"/> is one of the evening slots (<see cref="Evening"/>), which never count against the daylight strategy.</summary>
+    public bool IsEvening(DateTimeOffset slot) => Daylight is { } daylight && Evening is { } evening && evening.Allows(slot, daylight);
+
+    /// <summary>The same timetable without its evening slots: what a receiver from before them follows. A method, so that a record's printing does not follow it round.</summary>
+    public SlotTimetable WithoutEvening() => Evening is null ? this : this with { Evening = null };
+
+    /// <summary>The slots that run on a UTC day, daylight and evening, earliest first.</summary>
     public IReadOnlyList<DateTimeOffset> ActiveSlotsOn(DateOnly day) =>
-        Daylight is null ? SlotsOn(day) : [.. SlotsOn(day).Where(Daylight.Allows)];
+        Daylight is null ? SlotsOn(day) : [.. SlotsOn(day).Where(IsActive)];
+
+    /// <summary>The evening slots on a UTC day, earliest first; none without an evening rule.</summary>
+    public IReadOnlyList<DateTimeOffset> EveningSlotsOn(DateOnly day) =>
+        Daylight is null || Evening is null ? [] : [.. SlotsOn(day).Where(IsEvening)];
 
     /// <summary>The first slot that runs starting at or after <paramref name="t"/>, or null if none does within <see cref="SearchDays"/>.</summary>
     public DateTimeOffset? NextActiveAtOrAfter(DateTimeOffset t)
@@ -275,7 +401,11 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
 
     /// <summary>
     /// The fields the directory carries the timetable in, after the first entry's title:
-    /// <c>slots=HH:mm/EVERY</c> and, with a daylight rule, <c>daylight=LOCATOR/AFTER/BEFORE</c>.
+    /// <c>slots=HH:mm/EVERY</c>; with a daylight rule, <c>daylight=LOCATOR/AFTER/BEFORE</c>; and
+    /// with evening slots as well, <c>evening=HH:mm</c>, the time the last evening slot starts
+    /// before. Readers from before the evening slots ignore that field, as they ignore any they
+    /// do not know, so they simply do not listen in the evening. A listener's own sunset
+    /// (<see cref="EveningRule.ListenerLocator"/>) is never written.
     /// </summary>
     public IReadOnlyList<string> ToFields()
     {
@@ -283,20 +413,30 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
         if (Daylight is { } d)
         {
             fields.Add(string.Create(CultureInfo.InvariantCulture, $"daylight={d.Locator}/{d.AfterSunriseMinutes}/{d.BeforeSunsetMinutes}"));
+            if (Evening is { } e)
+            {
+                fields.Add(string.Create(CultureInfo.InvariantCulture, $"{EveningField}{e.UntilUtc:HH:mm}"));
+            }
         }
         return fields;
     }
 
+    /// <summary>The evening slots' field name, with its equals sign.</summary>
+    public const string EveningField = "evening=";
+
     /// <summary>
     /// Reads <see cref="ToFields"/>' fields from among others, which are ignored. Null when there
     /// is no <c>slots=</c> field or it or a <c>daylight=</c> field cannot be read, so a timetable
-    /// a later head end writes differently is ignored rather than misread.
+    /// a later head end writes differently is ignored rather than misread. An <c>evening=</c>
+    /// field that cannot be read, or one without a daylight rule, is left out on its own: the
+    /// daylight slots still stand, as for a receiver from before the evening slots.
     /// </summary>
     public static SlotTimetable? FromFields(IEnumerable<string> fields)
     {
         ArgumentNullException.ThrowIfNull(fields);
         string? slots = null;
         string? daylight = null;
+        string? evening = null;
         foreach (var field in fields)
         {
             if (field.StartsWith("slots=", StringComparison.Ordinal))
@@ -306,6 +446,10 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
             else if (field.StartsWith("daylight=", StringComparison.Ordinal))
             {
                 daylight ??= field["daylight=".Length..];
+            }
+            else if (field.StartsWith(EveningField, StringComparison.Ordinal))
+            {
+                evening ??= field[EveningField.Length..];
             }
         }
         if (slots is null)
@@ -339,6 +483,9 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
                 return null;
             }
         }
-        return new SlotTimetable(anchor, every, rule);
+        EveningRule? eveningRule = rule is not null && evening is not null
+            && TimeOnly.TryParseExact(evening, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var until)
+            ? new EveningRule(until) : null;
+        return new SlotTimetable(anchor, every, rule, eveningRule);
     }
 }
