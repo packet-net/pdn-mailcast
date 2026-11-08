@@ -74,6 +74,8 @@ public class EveningSlotHeadEndTests
     [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}, "evening": {"untilUtc": "22:00", "modes": []}}""", TwoModes, "at least one mode")]
     [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}, "evening": {"untilUtc": "22:00", "modes": ["afsk1200"]}}""", TwoModes, "'afsk1200' is not an MS110D waveform")]
     [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}, "evening": {"untilUtc": "22:00", "fromUtc": "18:00"}}""", TwoModes, "fromUtc")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}, "evening": {"untilUtc": "00:30"}}""", TwoModes, "\"slot\".\"evening\": no evening slot in a whole year starts between sunset at IO91lk and 00:30 UTC")]
+    [InlineData("""{"everyMinutes": 60, "daylight": {"locator": "IO91lk"}, "evening": {"untilUtc": "15:00"}}""", TwoModes, "no evening slot in a whole year")]
     public void Parse_RefusesEveningSettingsThatCannotWork(string slot, string schedule, string mentions)
     {
         var e = Assert.Throws<ConfigException>(() => Parse(slot, schedule));
@@ -154,6 +156,9 @@ public class EveningSlotHeadEndTests
         asked.Store.Offer(Bulletins.Make(1, 3000), new DateOnly(2026, 11, 8));
         var oneOff = asked.Run(SixPm, "a test");
         Assert.False(oneOff.Evening);
+        // And on the daylight turn, not the evening waveform.
+        Assert.Contains(oneOff.Mode, DaylightModes);
+        Assert.DoesNotContain(asked.Journal.Lines, l => l.Contains("ms110d-wn3", StringComparison.Ordinal));
         Assert.Equal(SixPm, asked.Store.InRotation(SixPm.AddHours(1)).Single().FirstSlot);
     }
 }

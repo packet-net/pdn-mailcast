@@ -647,6 +647,10 @@ public sealed record HeadEndConfig
         {
             yield return $"\"slot\".\"evening\".\"untilUtc\" '{evening.UntilUtc}' is not HH:mm: the last evening slot starts before this time, UTC, such as 22:00";
         }
+        else if (Slot.Daylight is { } daylight && EveningTimetable() is { } timetable && !HasEveningSlotInAYear(timetable))
+        {
+            yield return $"\"slot\".\"evening\": no evening slot in a whole year starts between sunset at {daylight.Locator} and {evening.UntilUtc} UTC; \"untilUtc\" must be later the same UTC day than sunset there (evenings do not run past midnight UTC)";
+        }
         if (Rule != ScheduleRule.Budget)
         {
             yield return "\"slot\".\"evening\" needs the budget rule: evening slots are filled to the airtime budget, apart from the daylight ones";
@@ -666,6 +670,38 @@ public sealed record HeadEndConfig
                 yield return $"\"slot\".\"evening\".\"modes\" needs an MS110D broadcast modem, and \"station\".\"mode\" is '{Station.Mode}'";
             }
         }
+    }
+
+    // The timetable with its evening slots, or null while the rest of the slot settings still have something to say.
+    private SlotTimetable? EveningTimetable()
+    {
+        if (Slot.EveryMinutes < 15 || MinutesPerDay % Slot.EveryMinutes != 0 || Slot.Daylight is not { } daylight
+            || !TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
+            || daylight.ToSettings().Problem(Slot.EveryMinutes, anchor) is not null)
+        {
+            return null;
+        }
+        try
+        {
+            return ToSlotTimetable();
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static bool HasEveningSlotInAYear(SlotTimetable timetable)
+    {
+        var start = new DateOnly(2026, 1, 1);
+        for (int d = 0; d < 366; d++)
+        {
+            if (timetable.EveningSlotsOn(start.AddDays(d)).Count > 0)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void ValidateSchedule(List<string> problems, bool everyFine)

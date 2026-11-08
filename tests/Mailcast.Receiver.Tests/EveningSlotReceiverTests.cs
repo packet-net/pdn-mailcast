@@ -41,6 +41,8 @@ public class EveningSlotReceiverTests
         await using var host = new ReceiverHost(Config(dir.Path, false, "IO41"), new FakeTimeProvider(Noon), _ => { });
         var followed = host.AsFollowed(Gb7rdg);
         Assert.Equal("IO41", followed.Evening!.ListenerLocator);
+        // The same rule each time, so its sunsets are worked out once.
+        Assert.Same(followed.Evening, host.AsFollowed(Gb7rdg).Evening);
         // In the far west of Ireland it is still light at 16:00 UTC at midwinter, and dark by 17:00.
         Assert.Equal(["16:00"], Hhmm(followed.EveningSlotsOn(D("2026-12-21"))));
         // The daylight slots are all still followed.
@@ -69,6 +71,18 @@ public class EveningSlotReceiverTests
         var said = Assert.Single(log, l => l.Contains("eveningSlots", StringComparison.Ordinal));
         Assert.Equal("slots: \"eveningSlots\" is false and this receiver's place is not known (no \"locator\"), so it skips every evening slot", said);
         Assert.True(said.All(char.IsAscii));
+    }
+
+    [Fact]
+    public async Task OptedOut_OnAWebSdrThatHasNotSaidWhereItIs_SaysSo()
+    {
+        using var dir = new TempDirectory();
+        var log = new List<string>();
+        await using var host = new ReceiverHost(Config(dir.Path, false, null) with { Audio = "ubersdr:wessex.zapto.org" }, new FakeTimeProvider(Noon), log.Add);
+        log.Clear();
+        Assert.Equal(Gb7rdg.WithoutEvening(), host.AsFollowed(Gb7rdg));
+        Assert.Equal("slots: \"eveningSlots\" is false and the web SDR has not said where it is yet, so every evening slot is skipped until it does",
+            Assert.Single(log, l => l.Contains("eveningSlots", StringComparison.Ordinal)));
     }
 
     [Fact]

@@ -747,11 +747,13 @@ public static class BroadcastScheduler
     /// <see cref="EveningFirstCount"/> plus each bulletin's <see cref="CarriedBulletin.EveningNextEsi"/>, so they are always fresh
     /// and add to what a receiver holds, while <see cref="CarriedBulletin.NextEsi"/>, <see cref="CarriedBulletin.FirstSlot"/> and
     /// everything the daylight strategy works out from them (coverage, the floor, the tiers, retiring) stay exactly as they were.
-    /// A bulletin the daylight rules have retired is not in it. Other stations' objects are not relayed in the evening, since what
-    /// is sent of them counts towards their retiring. Needs the budget rule. A slot with no bulletin to send has no bulletin
-    /// frames, so a planner keys nothing.
+    /// A bulletin the daylight rules have retired is not in it. Other stations' objects (<paramref name="relayed"/>) are listed in
+    /// the directory as a daylight slot would list them, so receivers keep them, but none of their pieces is sent in the evening,
+    /// since what is sent of them counts towards their retiring. The leftover tier has no meaning in an evening slot, so
+    /// <see cref="SlotBroadcast.LeftoverBulletins"/> is 0. Needs the budget rule. A slot with no bulletin to send has no
+    /// bulletin frames, so a planner keys nothing; one keys whenever anything of this head end's own is in rotation.
     /// </summary>
-    public static SlotBroadcast PlanEvening(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, Func<ulong, uint>? directoryNextEsi, SlotBudget budget, string? mode = null, IReadOnlyList<MailcastFrame>? extras = null, ReportReceipts? reports = null)
+    public static SlotBroadcast PlanEvening(IEnumerable<CarriedBulletin> carried, DateTimeOffset slot, int seed, Compression compression, ScheduleOptions options, Func<ulong, uint>? directoryNextEsi, SlotBudget budget, string? mode = null, IReadOnlyList<MailcastFrame>? extras = null, ReportReceipts? reports = null, IReadOnlyList<RelayedObject>? relayed = null, Func<ulong, int>? otherHeard = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(budget);
@@ -759,10 +761,10 @@ public static class BroadcastScheduler
         {
             throw new ArgumentException("Evening slots need the budget rule.", nameof(options));
         }
-        var plan = Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, extras ?? [], reports, [], null, out bool anyRoom, evening: true);
+        var plan = Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, extras ?? [], reports, relayed ?? [], otherHeard, out bool anyRoom, evening: true);
         if (extras is { Count: > 0 } && plan.BulletinFrames == 0 && anyRoom)
         {
-            return Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, [], reports, [], null, out _, evening: true);
+            return Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, [], reports, relayed ?? [], otherHeard, out _, evening: true);
         }
         return plan;
     }
@@ -833,6 +835,15 @@ public static class BroadcastScheduler
             }
         }
 
+        int relayListed = relays.Count(r => r.Listing is not null && r.Transfer is not null);
+        if (evening)
+        {
+            // An evening slot lists the relayed objects as a daylight slot would, so receivers keep them, but sends none of
+            // their pieces: what is sent of them counts towards their retiring.
+            relays.Clear();
+            relayLeftover.Clear();
+        }
+
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
         var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts, options.Details);
         var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
@@ -867,7 +878,7 @@ public static class BroadcastScheduler
         int? directoryCap = null;
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, leftover.Count(l => l), directoryCap, relays.Count(r => r.Listing is not null && r.Transfer is not null), Carried(allItems, main, bulletins.Count), evening);
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, evening ? 0 : leftover.Count(l => l), directoryCap, relayListed, Carried(allItems, main, bulletins.Count), evening);
             if (budget is null || options.Budget is null
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {

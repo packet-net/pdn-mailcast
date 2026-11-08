@@ -270,6 +270,37 @@ public class EveningSlotTests
     }
 
     [Fact]
+    public void AnEveningSlot_ListsRelayedObjectsAsDaylightWould_ButSendsNoneOfTheirPieces()
+    {
+        using var dir = new TempDirectory();
+        var store = Store(dir.Path, [TestBulletins.Make(15, 3000)]);
+        var remote = TransferObject.ForBulletin(TestBulletins.Make(16, 2500), Options.DictionaryId, Compression.Default, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
+        var relayed = new RelayedObject
+        {
+            ObjectId = remote.ObjectId,
+            DictionaryId = remote.DictionaryId,
+            Type = (byte)ObjectKind.Bulletin,
+            Oti = remote.Oti,
+            Transfer = remote,
+            Listing = new RelayListing("1016_GB7XYZ", "Relayed", 2500),
+        };
+
+        var daylight = BroadcastScheduler.Plan(store.InRotation(Evening), Evening, 1, Compression.Default, Options, store.DirectoryNextEsi, Frames(60), null, null, null, [relayed]);
+        var evening = BroadcastScheduler.PlanEvening(store.InRotation(Evening), Evening, 1, Compression.Default, Options, store.DirectoryNextEsi, Frames(60), relayed: [relayed]);
+        Assert.Contains(daylight.Frames, f => f.ObjectId == remote.ObjectId);
+
+        // Listed exactly as a daylight slot lists it, so receivers keep it; not one piece of it sent.
+        Assert.Equal(daylight.Directory.Entries, evening.Directory.Entries);
+        Assert.Contains(evening.Directory.Entries, e => e.ObjectId == remote.ObjectId);
+        Assert.Equal(1, evening.RelayListed);
+        Assert.Empty(evening.Relayed);
+        Assert.DoesNotContain(evening.Frames, f => f.ObjectId == remote.ObjectId);
+        Assert.True(evening.BulletinFrames > 0);
+        store.Commit(evening);
+        Assert.Empty(store.GetRelayProgress(remote.ObjectId).Sent);
+    }
+
+    [Fact]
     public void ABulletinForgottenAndOfferedAgain_CarriesOnPastItsEveningPieces()
     {
         using var dir = new TempDirectory();
@@ -313,6 +344,10 @@ public class EveningSlotTests
         var tightShares = tight.Objects.Where(o => o.Bid is not null).ToDictionary(o => o.Bid!, o => o.Count);
         Assert.Equal(tight.BulletinFrames, tightShares[leftover.Bid]);
         Assert.Equal(0, tightShares[eveningCovered.Bid]);
+
+        // The leftover tier means nothing in the evening, so the plan does not count one.
+        Assert.Equal(0, plenty.LeftoverBulletins);
+        Assert.Equal(1, BroadcastScheduler.Plan([leftover, eveningCovered], Evening, 1, Compression.Default, Options, null, Frames(1000)).LeftoverBulletins);
 
         // Nothing in rotation: no bulletin frames, so a planner keys nothing.
         Assert.Equal(0, BroadcastScheduler.PlanEvening([retired], Evening, 1, Compression.Default, Options, null, Frames(1000)).BulletinFrames);

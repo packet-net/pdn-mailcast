@@ -100,7 +100,8 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
     /// <inheritdoc />
     public SlotPlan Plan(DateTimeOffset slot, bool evenIfNothingDue = false, bool evening = false)
     {
-        SlotWaveform? waveform = waveforms?.For(slot);
+        // An on-demand slot is planned as a normal one, so it takes the daylight turn even in the evening.
+        SlotWaveform? waveform = waveforms?.For(slot, evening);
         TimeSpan late = time is null ? TimeSpan.Zero : time.GetUtcNow() - slot;
         SlotBudget? budget = Budget(waveform, late);
         IonoReading? reading = Reading();
@@ -109,9 +110,9 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         IReadOnlyList<MailcastFrame> spotFrames = Sendable(spots) ? ReadingFrames(spots!, store.NextEsi) : [];
         IReadOnlyList<MailcastFrame> extras = [.. ionoFrames, .. spotFrames];
         ReportReceipts? listed = reports?.For(DateOnly.FromDateTime(slot.UtcDateTime));
-        // An evening slot (slot.evening) sends only evening pieces and relays nothing; the budget rule is required for it.
+        // An evening slot (slot.evening) sends only evening pieces, and lists relayed objects without sending them; the budget rule is required for it.
         SlotBroadcast PlanWith(IReadOnlyList<MailcastFrame> withExtras) => evening
-            ? store.PlanEvening(slot, Seed(slot), compression, options, budget ?? throw new InvalidOperationException("Evening slots need the budget rule."), waveform?.Mode, withExtras, listed)
+            ? store.PlanEvening(slot, Seed(slot), compression, options, budget ?? throw new InvalidOperationException("Evening slots need the budget rule."), waveform?.Mode, withExtras, listed, relay)
             : store.Plan(slot, Seed(slot), compression, options, budget, waveform?.Mode, withExtras, listed, relay);
         SlotBroadcast broadcast = PlanWith(extras);
         if (broadcast.ExtraFrames == 0 && ionoFrames.Count > 0 && spotFrames.Count > 0)
@@ -120,7 +121,7 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
             // ionosonde's stay if they fit alone (the scheduler drops whatever extras are left otherwise).
             broadcast = PlanWith(ionoFrames);
         }
-        RelaySummary? summary = evening ? null : relay?.Summary;
+        RelaySummary? summary = relay?.Summary;
         // Own bulletins only; what is relayed is counted apart.
         int own(SlotBroadcast b) => b.Directory.Entries.Count - b.RelayListed;
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)

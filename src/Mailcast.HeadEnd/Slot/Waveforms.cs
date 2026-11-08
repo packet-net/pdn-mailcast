@@ -77,10 +77,16 @@ public sealed class Waveforms
     /// <summary>Whether each slot switches the modem to its mode.</summary>
     public bool SetOnModem { get; }
 
-    /// <summary>The mode for the slot starting at <paramref name="slot"/>.</summary>
-    public string ModeFor(DateTimeOffset slot)
+    /// <summary>The mode for the slot starting at <paramref name="slot"/>, an evening slot's own if the timetable says it is one.</summary>
+    public string ModeFor(DateTimeOffset slot) => ModeFor(slot, _timetable.IsEvening(slot));
+
+    /// <summary>
+    /// The mode for the slot starting at <paramref name="slot"/>, run as an evening slot or not as <paramref name="evening"/>
+    /// says: an on-demand slot never is one, whatever the time.
+    /// </summary>
+    public string ModeFor(DateTimeOffset slot, bool evening)
     {
-        var modes = EveningModes is { } evening && _timetable.IsEvening(slot) ? evening : Modes;
+        var modes = EveningModes is { } eveningModes && evening ? eveningModes : Modes;
         if (modes.Count == 1)
         {
             return modes[0];
@@ -95,6 +101,9 @@ public sealed class Waveforms
 
     /// <summary>The waveform for the slot starting at <paramref name="slot"/>.</summary>
     public SlotWaveform For(DateTimeOffset slot) => _byMode[ModeFor(slot)];
+
+    /// <summary>The waveform for the slot starting at <paramref name="slot"/>, run as an evening slot or not as <paramref name="evening"/> says.</summary>
+    public SlotWaveform For(DateTimeOffset slot, bool evening) => _byMode[ModeFor(slot, evening)];
 
     /// <summary>The ending that asks for the long interleaver: <c>ms110d-wn4-long</c>.</summary>
     public const string LongSuffix = "-long";
