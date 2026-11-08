@@ -72,6 +72,8 @@ public sealed class SlotRunner
     private int _keepAudioNotOffered;
     private int _saidMarkerRefused;
     private int _saidMarkerIgnored;
+    // Set once the station has shown a reference feed: from then on a lease read that fails counts as "unknown".
+    private int _stationHasFeed;
 
     /// <summary>How far before the slot the kept audio starts.</summary>
     internal static readonly TimeSpan KeepAudioBefore = TimeSpan.FromSeconds(60);
@@ -352,6 +354,8 @@ public sealed class SlotRunner
         /// <summary>Why the slot stopped for an unreliable reference, or null if it did not.</summary>
         private string? _referenceHold;
         private bool _markerSent;
+        /// <summary>True once a lease read in this slot failed, so the reference is looked at before every burst whatever.</summary>
+        private bool _readFailed;
 
         public void Dispose()
         {
@@ -784,47 +788,69 @@ public sealed class SlotRunner
         /// </summary>
         private async Task<bool?> ReadLeaseAsync(CancellationToken cancellation)
         {
-            LeaseAnswer answer;
+            LeaseAnswer? answer = null;
             try
             {
                 answer = await owner._station.ReadLeaseAsync(cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {
-                return null;
             }
-            if (answer.Reference is { } feed)
+            ReferenceFeed? feed;
+            if (answer is null || answer.Problem is not null)
             {
-                lock (_feedGate)
+                _readFailed = true;
+                if (Volatile.Read(ref owner._stationHasFeed) == 0)
                 {
-                    _feedNow = feed;
-                    if (_feedWorst is null || Badness(feed) > Badness(_feedWorst))
-                    {
-                        _feedWorst = feed;
-                    }
+                    return null;
                 }
-                if (feed.IsUnreliable && _leaseTaken)
+                // A station known to have a feed that cannot be read: the reference is not known, not absent.
+                feed = new ReferenceFeed(ReferenceFeed.Unknown, "the station's lease could not be read", null);
+            }
+            else
+            {
+                feed = answer.Reference;
+                if (feed is not null)
                 {
-                    StopForTheReference(feed);
+                    Volatile.Write(ref owner._stationHasFeed, 1);
                 }
             }
-            return answer.ChannelBusy;
+            lock (_feedGate)
+            {
+                // The latest read wins, so a station that drops its feed is no longer marked.
+                _feedNow = feed;
+                if (feed is not null && (_feedWorst is null || Badness(feed) > Badness(_feedWorst)))
+                {
+                    _feedWorst = feed;
+                }
+            }
+            if (feed is { IsUnreliable: true } && _leaseTaken)
+            {
+                StopForTheReference(feed);
+            }
+            return answer?.Problem is null ? answer?.ChannelBusy : null;
         }
 
-        /// <summary>Stops the slot because the reference turned unreliable after the lease was taken, once.</summary>
+        /// <summary>
+        /// Stops the slot because the reference turned unreliable after the lease was taken, unless
+        /// another abort got there first, whose reason then stands.
+        /// </summary>
         private void StopForTheReference(ReferenceFeed feed)
         {
+            string? keyed = _markerSent ? "the CW E marker" : _toneSent ? "the calibration tone" : null;
             string reason = _queued > 0
                 ? $"the 10 MHz reference turned unreliable ({feed.DetailOrNone})"
-                : ReferenceHoldReason(feed);
-            if (_abort is not null || Interlocked.CompareExchange(ref _referenceHold, reason, null) is not null)
+                : keyed is not null
+                    ? $"the 10 MHz reference turned unreliable ({feed.DetailOrNone}) after {keyed} went, before any bulletin"
+                    : ReferenceHoldReason(feed);
+            if (!Abort(reason))
             {
                 return;
             }
+            _referenceHold = reason;
             Say(_queued > 0
                 ? $"the 10 MHz reference turned unreliable ({feed.DetailOrNone}); stopping, nothing more is queued"
                 : $"the 10 MHz reference turned unreliable ({feed.DetailOrNone}) before any frame was queued; stopping, nothing counted");
-            Abort(reason);
         }
 
         private async Task<(SlotOutcome?, string?)> ToneAsync(CancellationToken cancellation)
@@ -852,12 +878,23 @@ public sealed class SlotRunner
                     ReferenceFeed? unknown = FeedNow is { IsUnknown: true } u ? u : null;
                     string? marker = unknown is not null && !markerRefused ? ToneMarker.CwE : null;
                     ToneAnswer answer = await SendToneAsync(probe, marker, cancellation);
+                    if (answer.Outcome != ToneOutcome.Sent && marker is not null && probe is not null && answer.Status == 400)
+                    {
+                        // A 400 to the pair may be the probe's fault, not the marker's: the marker alone first.
+                        ToneAnswer alone = await SendToneAsync(null, marker, cancellation);
+                        if (alone.Status != 400)
+                        {
+                            Say($"the station would not send the CW E marker with the channel probe ({answer.Message}); asked for the marker alone");
+                            probe = null;
+                            answer = alone;
+                        }
+                    }
                     if (answer.Outcome != ToneOutcome.Sent && marker is not null && answer.Status == 400)
                     {
-                        // A station that does not know the marker: the plain tone, at once, as for the probe.
+                        // A station that refuses the marker: the plain tone, at once, as for the probe.
                         if (Interlocked.Exchange(ref owner._saidMarkerRefused, 1) == 0)
                         {
-                            Say($"the station would not send the CW E marker ({answer.Message}); sending the plain calibration tone instead, as it will each slot until the head end restarts (a pdn-soundmodem with the reference feed knows the marker)");
+                            Say($"the station would not send the CW E marker ({answer.Message}); sending the plain calibration tone instead (the marker is asked for again each slot; this is said once)");
                         }
                         markerRefused = true;
                         marker = null;
@@ -972,10 +1009,10 @@ public sealed class SlotRunner
             int next = 0;
             foreach (int count in sizes)
             {
-                if (FeedNow is not null)
+                if (FeedNow is not null || _readFailed || Volatile.Read(ref owner._stationHasFeed) != 0)
                 {
-                    // A station with a reference feed: look at it again before each burst, the first
-                    // included, since the channel check may have taken minutes.
+                    // A station with a reference feed, or one whose lease could not be read: look again
+                    // before each burst, the first included, since the channel check may have taken minutes.
                     await ReadLeaseAsync(cancellation);
                 }
                 if (_abort is not null)
@@ -1148,17 +1185,19 @@ public sealed class SlotRunner
         }
 
         /// <summary>Stops the slot for a reason, once, and asks the station to drop what of ours is not yet keyed.</summary>
-        private void Abort(string reason)
+        /// <returns>True when this was the reason that stopped it; false when another got there first.</returns>
+        private bool Abort(string reason)
         {
             if (Interlocked.CompareExchange(ref _abort, reason, null) is not null)
             {
-                return;
+                return false;
             }
             _aborted.Cancel();
             if (_leaseTaken && _queued > 0)
             {
                 _dropping = DropQueuedAsync();
             }
+            return true;
         }
 
         private static async Task Quietly(Task task)

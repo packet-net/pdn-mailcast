@@ -175,6 +175,14 @@ public sealed class FakeStation : IStationApi, IKissConnector
     {
         await Task.Yield();
         ReferenceReads++;
+        if (ReadDelay > TimeSpan.Zero)
+        {
+            await Task.Delay(ReadDelay, _time, cancellation);
+        }
+        if (FailedReads.Contains(ReferenceReads) || FailAllReads)
+        {
+            throw new HttpRequestException("the station did not answer within 30 s");
+        }
         bool busy = ChannelBusy && !(FirstBusyReadMisses && _busyReads == 0);
         if (LeaseHeld)
         {
@@ -189,6 +197,15 @@ public sealed class FakeStation : IStationApi, IKissConnector
 
     /// <summary>When set, the reference feed by the time of the read, ahead of <see cref="Reference"/>.</summary>
     public Func<DateTimeOffset, ReferenceFeed?>? ReferenceAt { get; set; }
+
+    /// <summary>These lease reads (1-based) fail as if the station did not answer.</summary>
+    public HashSet<int> FailedReads { get; } = [];
+
+    /// <summary>Every lease read fails.</summary>
+    public bool FailAllReads { get; set; }
+
+    /// <summary>How long each lease read takes.</summary>
+    public TimeSpan ReadDelay { get; set; }
 
     /// <summary>How many times the lease was read.</summary>
     public int ReferenceReads { get; private set; }

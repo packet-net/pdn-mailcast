@@ -76,14 +76,19 @@ public sealed record ReferenceFeed(string State, string? Detail, DateTimeOffset?
     public string DetailOrNone => Detail ?? "no detail given";
 
     /// <summary>
-    /// Reads the <c>reference</c> object of a lease answer, or null when there is none. The detail is
-    /// cut to plain printable ASCII, since it goes into journal lines.
+    /// Reads the <c>reference</c> object of a lease answer, or null when there is none (or it is JSON
+    /// null). Anything else that is not an object reads as unknown. The detail is cut to plain
+    /// printable ASCII, since it goes into journal lines.
     /// </summary>
     public static ReferenceFeed? From(JsonNode? json)
     {
-        if (json?["reference"] is not JsonObject reference)
+        if (json is not JsonObject answer || !answer.TryGetPropertyValue("reference", out JsonNode? value) || value is null)
         {
             return null;
+        }
+        if (value is not JsonObject reference)
+        {
+            return new ReferenceFeed(Unknown, "the station's reference field could not be read", null);
         }
         string state = reference["state"] is JsonNode s && s.GetValueKind() == JsonValueKind.String ? s.GetValue<string>().Trim().ToLowerInvariant() : "";
         state = state is Ok or Unreliable ? state : Unknown;

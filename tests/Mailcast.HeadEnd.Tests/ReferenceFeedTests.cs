@@ -98,20 +98,41 @@ public class ReferenceFeedTests
         rig.Station.Reference = Offline;
         rig.Station.RejectsMarker = true;
         var first = rig.Run(5);
+        // The pair, then the marker alone (the 400 might have been the probe's), then the plain tone with the probe.
 
         Assert.Equal(SlotOutcome.Completed, first.Outcome);
         Assert.True(first.ToneSent);
         Assert.False(first.MarkerSent);
         Assert.True(first.ProbeSent);
         Assert.Equal("unknown", first.ReferenceFeed);
-        Assert.Equal([ToneMarker.CwE, null], rig.Station.MarkersAsked);
+        Assert.Equal([ToneMarker.CwE, ToneMarker.CwE, null], rig.Station.MarkersAsked);
+        Assert.Equal([true, false, true], rig.Station.ToneRequests.Select(r => r.Probe is not null));
         Assert.StartsWith("tone 1800 Hz and probe", rig.Station.Keyups.Single(k => !k.What.StartsWith("burst", StringComparison.Ordinal)).What, StringComparison.Ordinal);
         Assert.Contains(rig.Journal.Lines, l => l.Contains("calibration tone sent, 30 s at 1800 Hz, then the channel probe", StringComparison.Ordinal) && l.Contains("the 10 MHz reference state is unknown (display offline) but the station does not know the CW E marker", StringComparison.Ordinal));
 
         // The next slot asks again (the station may have been upgraded), but says nothing more of the refusal.
         rig.Run(5);
-        Assert.Equal([ToneMarker.CwE, null, ToneMarker.CwE, null], rig.Station.MarkersAsked);
-        Assert.Single(rig.Journal.Lines, l => l.Contains("the station would not send the CW E marker (HTTP 400", StringComparison.Ordinal));
+        Assert.Equal([ToneMarker.CwE, ToneMarker.CwE, null, ToneMarker.CwE, ToneMarker.CwE, null], rig.Station.MarkersAsked);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("the station would not send the CW E marker (HTTP 400", StringComparison.Ordinal) && l.Contains("the marker is asked for again each slot", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("restarts", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Unknown_WhenThe400WasTheProbes_SendsTheMarkerAlone()
+    {
+        var rig = new Rig();
+        rig.Station.Reference = Offline;
+        rig.Station.RejectsProbe = true;
+        var report = rig.Run(5);
+
+        Assert.True(report.MarkerSent);
+        Assert.False(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Equal([ToneMarker.CwE, ToneMarker.CwE], rig.Station.MarkersAsked);
+        Assert.Equal([true, false], rig.Station.ToneRequests.Select(r => r.Probe is not null));
+        Assert.Equal("cw-e marker 1800 Hz", rig.Station.Keyups[0].What);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("the station would not send the CW E marker with the channel probe (HTTP 400", StringComparison.Ordinal) && l.EndsWith("asked for the marker alone", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("plain calibration tone instead", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -228,16 +249,88 @@ public class ReferenceFeedTests
         Assert.Equal(SlotOutcome.Skipped, report.Outcome);
         Assert.True(report.Retryable);
         Assert.True(report.ToneSent);
+        Assert.Equal("the 10 MHz reference turned unreliable (GPS LOST) after the calibration tone went, before any bulletin", report.Reason);
         Assert.Equal(0, report.FramesQueued);
         Assert.Empty(rig.Station.Frames);
+    }
+
+    [Fact]
+    public void AFailedRead_KeepsTheChecksBeforeEveryBurst_AndOnAStationWithAFeedCountsAsUnknown()
+    {
+        var rig = new Rig();
+        rig.Station.Reference = Ok;
+        // The first read (before the slot) shows the feed; the next, just before the tone, fails.
+        rig.Station.FailedReads.Add(2);
+        var report = rig.Run(30);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal("unknown", report.ReferenceFeed);
+        Assert.Equal("the station's lease could not be read", report.ReferenceFeedDetail);
+        Assert.True(report.MarkerSent);
+        Assert.Equal(5, report.Bursts);
+        Assert.Equal(2 + 5, rig.Station.ReferenceReads);
+
+        // Remembered across slots: a later slot whose every read fails is unknown and marked, and still checked before each burst.
+        rig.Station.FailAllReads = true;
+        int before = rig.Station.ReferenceReads;
+        var blind = rig.Run(30);
+        Assert.Equal(SlotOutcome.Completed, blind.Outcome);
+        Assert.Equal("unknown", blind.ReferenceFeed);
+        Assert.True(blind.MarkerSent);
+        Assert.True(rig.Station.ReferenceReads - before >= 2 + 5, $"{rig.Station.ReferenceReads - before} reads");
+
+        // A station that never showed a feed: a failed read is just a failed read, but the bursts are still checked.
+        var plain = new Rig();
+        plain.Station.FailedReads.Add(2);
+        var unfed = plain.Run(30);
+        Assert.Null(unfed.ReferenceFeed);
+        Assert.False(unfed.MarkerSent);
+        Assert.Equal(2 + 5, plain.Station.ReferenceReads);
+    }
+
+    [Fact]
+    public void AFeedTheStationDrops_NoLongerMarksTheSlot()
+    {
+        var rig = new Rig();
+        // Unknown before the slot, then the station stops sending a reference at all.
+        rig.Station.ReferenceAt = t => rig.Station.ReferenceReads <= 1 ? Offline : null;
+        var report = rig.Run(5);
+        Assert.Equal([null], rig.Station.MarkersAsked);
+        Assert.True(report.ToneSent);
+        Assert.False(report.MarkerSent);
+    }
+
+    [Fact]
+    public void AnAbortAlreadyUnderWay_KeepsItsReason()
+    {
+        var rig = new Rig();
+        // The tone waits out the station's minute behind other traffic; the renewal at 30 s is
+        // refused meanwhile, and the reference goes at 45 s, before the read after the refused tone.
+        rig.Station.FirstBusyReadMisses = true;
+        rig.Station.RefuseAfterRequests = 1;
+        bool sawLost = false;
+        rig.Station.ReferenceAt = t =>
+        {
+            sawLost |= t >= Noon + TimeSpan.FromSeconds(45);
+            return t < Noon + TimeSpan.FromSeconds(45) ? Ok : Lost;
+        };
+        var report = rig.Time.Run(() =>
+        {
+            rig.Station.KeyOtherTraffic(TimeSpan.FromSeconds(90));
+            return rig.Runner.RunAsync(Noon, [.. Enumerable.Range(0, 5).Select(i => FakeAirtime.Frame(i))], 10, CancellationToken.None);
+        });
+        Assert.True(sawLost, "the reference was never read after it went");
+        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
+        Assert.StartsWith("lease renewal failed", report.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("turned unreliable", StringComparison.Ordinal));
     }
 
     private const string Hourly = """{"minute": 0, "everyMinutes": 60, "catchUpMinutes": 30, "retryMinutes": 5}""";
 
     private sealed class Head
     {
-        public Head(TempDirectory dir)
+        public Head(TempDirectory dir, TimeSpan? catchUpMinutes = null)
         {
+            TimeSpan catchUp = catchUpMinutes ?? TimeSpan.FromMinutes(30);
             Time = new VirtualTime(Noon);
             Station = new FakeStation(Time, 4);
             var config = HeadEndConfig.Parse($$"""{"callsign": "GB7RDG", "station": {"apiKey": "k"}, "slot": {{Hourly}}}""");
@@ -247,7 +340,7 @@ public class ReferenceFeedTests
             var planner = new StoreSlotPlanner(Store, Compression.Default, options, config.ToWaveforms(_ => FakeAirtime.For(Station)), config.ToSlotSettings(), config.FillLimitAfter, Time);
             var runner = new SlotRunner(new SlotSettings { Callsign = "GB7RDG", SubChannel = 4 }, Station, Station, null, FakeAirtime.For(Station), Journal, Time, new FakeClockSync());
             Schedule = config.ToSlotSchedule();
-            Service = new HeadEndService(Schedule, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), planner, Store, [], runner, Status, Journal, Time);
+            Service = new HeadEndService(Schedule, catchUp, TimeSpan.FromMinutes(5), TimeSpan.FromSeconds(30), planner, Store, [], runner, Status, Journal, Time);
         }
 
         public VirtualTime Time { get; }
@@ -300,18 +393,62 @@ public class ReferenceFeedTests
         Assert.Contains("\"referenceFeed\":\"ok\"", head.Status.Render().Replace(" ", "", StringComparison.Ordinal), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AtGb7rdgsSettings_ASkipAtTheStation_IsTriedAgainAtFivePast(bool reference)
+    {
+        // catchUpMinutes 5 and retryMinutes 5, and an attempt that ends a little after the hour.
+        using var dir = new TempDirectory();
+        var head = new Head(dir, TimeSpan.FromMinutes(5));
+        head.Store.Offer(Bulletins.Make(1, 3000), DateOnly.FromDateTime(Noon.UtcDateTime));
+        head.Station.ReadDelay = TimeSpan.FromMilliseconds(300);
+        if (reference)
+        {
+            head.Station.Reference = Lost;
+        }
+        else
+        {
+            // An older reason: the lease refused.
+            head.Station.RefuseFirstLease = true;
+        }
+        var held = head.Run(Noon);
+        Assert.Equal(SlotOutcome.Skipped, held.Outcome);
+        Assert.True(held.Retryable);
+        Assert.True(held.End > Noon);
+        Assert.Equal(Noon.AddMinutes(5), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), held, TimeSpan.FromMinutes(5)));
+        if (reference)
+        {
+            Assert.Contains("slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); trying again at 10:05Z", head.Journal.Lines);
+        }
+
+        // The retry at 10:05 is the last inside the window: one that fails too waits for the next slot.
+        head.Time.Advance(Noon.AddMinutes(5) - head.Time.GetUtcNow());
+        var again = head.Run(Noon);
+        Assert.Equal(Noon.AddHours(1), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), again, TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
+    public void TheHeadEnd_SaysStopped_WhenTheToneHadGone()
+    {
+        using var dir = new TempDirectory();
+        var head = new Head(dir);
+        var stopped = new SlotReport { Slot = Noon, Day = DateOnly.FromDateTime(Noon.UtcDateTime), Start = Noon, End = Noon.AddMinutes(1), Outcome = SlotOutcome.Skipped, Retryable = true, ToneSent = true, Reason = "the 10 MHz reference turned unreliable (GPS LOST) after the calibration tone went, before any bulletin", ReferenceFeed = "unreliable" };
+        Assert.Equal("slot 2026-11-09 10:00Z: stopped before any bulletin went: the 10 MHz reference turned unreliable (GPS LOST) after the calibration tone went, before any bulletin; trying again at 10:05Z", head.Service.ReferenceHoldLine(stopped, Noon.AddMinutes(1)));
+    }
+
     [Fact]
     public void TheHeadEnd_NamesTheNextSlot_WhenTheRetryWouldBePastTheCatchUpWindow()
     {
         using var dir = new TempDirectory();
         var head = new Head(dir);
         head.Station.Reference = Lost;
-        var late = new SlotReport { Slot = Noon, Day = DateOnly.FromDateTime(Noon.UtcDateTime), Start = Noon.AddMinutes(27), End = Noon.AddMinutes(27), Outcome = SlotOutcome.Skipped, Retryable = true, Reason = "the 10 MHz reference is unreliable (GPS LOST)", ReferenceFeed = "unreliable", Evening = true };
-        Assert.Equal("evening slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); the next slot is 2026-11-09 11:00Z", head.Service.ReferenceHoldLine(late, Noon.AddMinutes(27)));
+        var late = new SlotReport { Slot = Noon, Day = DateOnly.FromDateTime(Noon.UtcDateTime), Start = Noon.AddSeconds(1801), End = Noon.AddSeconds(1801), Outcome = SlotOutcome.Skipped, Retryable = true, Reason = "the 10 MHz reference is unreliable (GPS LOST)", ReferenceFeed = "unreliable", Evening = true };
+        Assert.Equal("evening slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); the next slot is 2026-11-09 11:00Z", head.Service.ReferenceHoldLine(late, Noon.AddSeconds(1801)));
 
         // Anything else gets no such line.
-        Assert.Null(head.Service.ReferenceHoldLine(late with { ReferenceFeed = "ok", Reason = "the channel stayed busy for 2 min" }, Noon.AddMinutes(27)));
-        Assert.Null(head.Service.ReferenceHoldLine(late with { Outcome = SlotOutcome.Aborted }, Noon.AddMinutes(27)));
+        Assert.Null(head.Service.ReferenceHoldLine(late with { ReferenceFeed = "ok", Reason = "the channel stayed busy for 2 min" }, Noon.AddSeconds(1801)));
+        Assert.Null(head.Service.ReferenceHoldLine(late with { Outcome = SlotOutcome.Aborted }, Noon.AddSeconds(1801)));
     }
 
     private sealed class Handler(string answer) : HttpMessageHandler
@@ -334,7 +471,10 @@ public class ReferenceFeedTests
     [InlineData("""{"held": false, "reference": {"state": "UNKNOWN", "detail": "display offline"}}""", "unknown", "display offline", null)]
     [InlineData("""{"held": false, "reference": {"state": "warming", "detail": "  OCXO° warm\nup  "}}""", "unknown", "OCXO  warm up", null)]
     [InlineData("""{"held": false, "reference": {}}""", "unknown", null, null)]
-    [InlineData("""{"held": false, "reference": "ok"}""", null, null, null)]
+    [InlineData("""{"held": false, "reference": null}""", null, null, null)]
+    [InlineData("""{"held": false, "reference": "ok"}""", "unknown", "the station's reference field could not be read", null)]
+    [InlineData("""{"held": false, "reference": 5}""", "unknown", "the station's reference field could not be read", null)]
+    [InlineData("""{"held": false, "reference": ["ok"]}""", "unknown", "the station's reference field could not be read", null)]
     public async Task TheClient_ReadsTheReferenceFeed(string answer, string? state, string? detail, string? since)
     {
         using var handler = new Handler(answer);

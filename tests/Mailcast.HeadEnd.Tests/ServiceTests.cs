@@ -189,10 +189,14 @@ public class ServiceTests
         var retry = TimeSpan.FromMinutes(5);
         var skipped = new SlotReport { Day = Day1, Outcome = SlotOutcome.Skipped, Retryable = true, End = new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero) };
         var at = new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero);
-        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 6, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Daily, catchUp, skipped, retry));
+        // Counted from the slot's own time, not the attempt's end.
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 5, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Daily, catchUp, skipped, retry));
 
+        // An attempt that ended at 12:27 is next tried at 12:30, the end of the window, and one ending after that not at all.
         var late = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 27, 0, TimeSpan.Zero) };
-        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(late.End, Daily, catchUp, late, retry));
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 30, 0, TimeSpan.Zero), HeadEndService.NextSlot(late.End, Daily, catchUp, late, retry));
+        var later = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 30, 0, 300, TimeSpan.Zero) };
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(later.End, Daily, catchUp, later, retry));
 
         var notRetryable = skipped with { Retryable = false };
         Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Daily, catchUp, notRetryable, retry));
@@ -274,8 +278,13 @@ public class ServiceTests
 
         // Skipped at the station: tried again five minutes on, while inside the window.
         var skipped = ran with { Outcome = SlotOutcome.Skipped, Retryable = true, End = At(12, 0, 10) };
-        Assert.Equal(At(12, 5, 10), HeadEndService.NextSlot(At(12, 0, 10), Hourly, TimeSpan.FromMinutes(10), skipped, retry));
-        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 0, 10), Hourly, catchUp, skipped, retry));
+        Assert.Equal(At(12, 5), HeadEndService.NextSlot(At(12, 0, 10), Hourly, TimeSpan.FromMinutes(10), skipped, retry));
+        // GB7RDG's settings, catchUpMinutes 5 and retryMinutes 5: the retry at 12:05 is still in the window.
+        Assert.Equal(At(12, 5), HeadEndService.NextSlot(At(12, 0, 10), Hourly, catchUp, skipped, retry));
+        // And the second retry, from the first's own time, is past it.
+        var again = skipped with { End = At(12, 5, 1) };
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 5, 1), Hourly, catchUp, again, retry));
+        Assert.Equal(At(12, 10), HeadEndService.NextSlot(At(12, 5, 1), Hourly, TimeSpan.FromMinutes(10), again, retry));
 
         // The clock has gone back behind the last slot run: the slot after that one, never an earlier.
         var later = ran with { Slot = At(15), End = At(15, 3) };
