@@ -21,6 +21,12 @@ SURVEY = os.path.join(root, "data/web-sdr-survey-2026-10/slots.csv")
 REPORTS = os.path.join(root, "reports/data/slots.csv")
 REPORT_DAYS = os.path.join(root, "reports/data/reports.csv")
 
+# The paper's data runs to 7 November 2026; reports added to the archive later are left out so its
+# figures stay fixed.
+CUTOFF = "2026-11-07"
+def upto(rows):
+    return [r for r in rows if r["day"] <= CUTOFF]
+
 # Frames sent per slot: what went out by the end of it, whether it finished ("done") or was cut
 # short ("ABORTED"; the frames it did send still count). No slot in the data was run twice.
 sent = {}
@@ -48,18 +54,18 @@ survey_names = sorted({k[0] for k in heard})
 # tone in any slot) was not listening, like a survey SDR that was down: it is left out.
 deaf = set()
 with open(REPORT_DAYS, newline="") as f:
-    for r in csv.DictReader(f):
+    for r in upto(csv.DictReader(f)):
         if "AUD" in r["errors"] and r["slots_heard"] == "0":
             deaf.add((r["callsign"], r["day"]))
 with open(REPORTS, newline="") as f:
-    for r in csv.DictReader(f):
+    for r in upto(csv.DictReader(f)):
         key = (r["callsign"], r["day"])
         if r["station"] not in ("", "M0LTE", "GB7RDG") or key in deaf:
             continue
         heard[key]["frames"] += int(r["frames"] or 0)
         listened[key].add(r["slot_utc"])
 with open(REPORT_DAYS, newline="") as f:
-    for r in csv.DictReader(f):
+    for r in upto(csv.DictReader(f)):
         key = (r["callsign"], r["day"])
         if key in listened:
             heard[key]["bulletins"] += int(r["rebuilt"] or 0)

@@ -15,9 +15,11 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-10-11,GM8BPQ,0.9.1,,sc,17,22,0,,,,BBS20,8,8,207,bbs-read-log,size-verified,daily/2026-10-11/GM8BPQ.txt
 2026-10-12,G7TAJ,0.9.1,,sc,7,0,7,,,,,8,6,125,bbs-read-log,size-verified,daily/2026-10-12/G7TAJ.txt
 2026-10-12,G8BPQ,0.9.1,,sc,25,25,0,,,,,8,8,322,bbs-read,none,daily/2026-10-12/G8BPQ.txt
+2026-10-12,M0NVK,0.9.1,IO80qr,wessex.zapto.org,19,0,19,,,,,8,8,837,other,none,daily/2026-10-12/M0NVK.txt
 2026-10-13,G7TAJ,0.10.0,IO81le,sc,18,0,18,,,,,8,8,217,bbs-store-dump,none,daily/2026-10-13/G7TAJ.txt
 2026-10-13,G8BPQ,0.10.0,IO92kx,sc,14,14,0,,,,,8,8,306,bbs-read,none,daily/2026-10-13/G8BPQ.txt
 2026-10-13,GM8BPQ,0.10.0,IO68vl,sc,13,13,0,,,,,8,8,325,bbs-store-dump,none,daily/2026-10-13/GM8BPQ.txt
+2026-10-13,M0NVK,0.9.1,IO80qr,wessex.zapto.org,15,0,15,,,,,8,8,808,other,none,daily/2026-10-13/M0NVK.txt
 2026-10-14,G7TAJ,0.12.0,IO81le,sc,7,0,7,,,,,8,8,137,bbs-read-log,size-verified,daily/2026-10-14/G7TAJ.txt
 2026-10-14,G8BPQ,0.12.0,IO92kx,sc,11,11,0,,,,,8,8,231,bbs-read,none,daily/2026-10-14/G8BPQ.txt
 2026-10-15,G8BPQ,0.13.0,IO92kx,sc,14,14,0,0,,,,8,8,284,bbs-read,none,daily/2026-10-15/G8BPQ.txt
@@ -81,10 +83,15 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-10-28,M0NVK,0.17.1,IO90hr,sdrconnect,17,0,17,0,,,,8,8,747,bbs-read,none,daily/2026-10-28/M0NVK.txt
 2026-10-28,M7TAW,0.22.0,IO91ma,sc,8,8,0,0,,,AUD1 RIG84,8,8,482,pasted,none,daily/2026-10-28/M7TAW.txt
 2026-10-28,M9TWM,0.22.0,IO93fj,m9twm-1.tunnel.ubersdr.org,0,0,0,17,,,,8,8,238,bbs-read,size-verified,daily/2026-10-28/M9TWM.txt
+2026-10-28,MM0MQN,0.22.0,IO86bd,sc,0,0,0,0,,,,4,4,1,bbs-store,size-verified,daily/2026-10-28/MM0MQN.txt
 2026-10-29,G7TAJ,0.22.0,IO81le,sc,6,0,6,0,,,,8,6,114,bbs-read,size-verified,daily/2026-10-29/G7TAJ.txt
 2026-10-29,G8BPQ,0.22.0,IO92kx,sc,14,14,0,2,,,RIG16,8,7,275,bbs-read,size-verified,daily/2026-10-29/G8BPQ.txt
+2026-10-29,GM4CXF,0.21.0,IO75qn,sc,13,13,0,0,,,,8,8,659,bbs-store,size-verified,daily/2026-10-29/GM4CXF.txt
 2026-10-29,GM8BPQ,0.22.0,IO68vl,sc,2,1,1,5,,,RIG17,8,7,65,bbs-read,size-verified,daily/2026-10-29/GM8BPQ.txt
+2026-10-29,M0NVK,0.17.1,IO90hr,sdrconnect,0,0,0,0,,,AUD1792,8,0,0,bbs-store,size-verified,daily/2026-10-29/M0NVK.txt
 2026-10-29,M7TAW,0.22.0,IO91ma,sc,11,11,0,0,,,,8,8,253,pasted,none,daily/2026-10-29/M7TAW.txt
+2026-10-29,M9TWM,0.22.0,IO93fj,m9twm-1.tunnel.ubersdr.org,22,0,22,8,,,,8,8,363,bbs-store,size-verified,daily/2026-10-29/M9TWM.txt
+2026-10-29,MM0MQN,0.22.0,IO86bd,sc,0,0,0,0,,,AUD1,8,4,39,bbs-store,size-verified,daily/2026-10-29/MM0MQN.txt
 2026-10-30,G7TAJ,0.25.0,IO81le,sc,9,0,9,0,,,,8,7,213,bbs-store,size-verified,daily/2026-10-30/G7TAJ.txt
 2026-10-30,G8BPQ,0.23.0,IO92kx,sc,13,13,0,20,,,RIG17,8,8,289,bbs-store,size-verified,daily/2026-10-30/G8BPQ.txt
 2026-10-30,GM4CXF,0.23.0,IO75qn,sc,18,18,0,3,,,,8,8,716,bbs-store,size-verified,daily/2026-10-30/GM4CXF.txt

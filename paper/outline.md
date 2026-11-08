@@ -84,6 +84,6 @@ Each part names its source and the table or figure it needs.
 - [x] Head end slot history: `data/headend-gb7rdg/` (journal to 7 November; the station keeps months more).
 - [x] The 22 October survey tables: rebuilt from the data by `paper/figures/heard_share.py`.
 - [ ] SA6DAZ MS110D path-test results.
-- [ ] Consent from each listener named in the paper.
+- [x] Consent from each listener named in the paper (Tom, 2026-11-07: listeners consent; use first name and callsign, or callsign alone).
 
 Not pursued: listeners' own copies of the reports missing from 8 to 18 October (Tom, 2026-11-07). The paper notes the gap; 124 reports remain.
