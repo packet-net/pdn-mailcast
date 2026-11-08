@@ -469,8 +469,12 @@ public sealed class HeadEndService(
                 // to the second, and with catchUpMinutes equal to it, still inside the window.
                 long tries = (last.End - current).Ticks / wait.Ticks + 1;
                 DateTimeOffset retry = current + TimeSpan.FromTicks(wait.Ticks * Math.Max(tries, 1));
-                retry = retry > now ? retry : now;
-                return retry <= current + catchUp ? retry : following;
+                // The retry's own time is what must fall in the window; the wait loop wakes a moment after it.
+                if (retry > current + catchUp)
+                {
+                    return following;
+                }
+                return retry > now ? retry : now;
             }
             return following;
         }

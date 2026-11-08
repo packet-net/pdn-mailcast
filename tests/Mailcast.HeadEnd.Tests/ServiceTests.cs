@@ -198,6 +198,16 @@ public class ServiceTests
         var later = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 30, 0, 300, TimeSpan.Zero) };
         Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(later.End, Daily, catchUp, later, retry));
 
+        // Woken a moment after the retry's time, 1 ms or 2 s: it still runs, at once.
+        var first = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 0, 10, TimeSpan.Zero) };
+        var justAfter = new DateTimeOffset(2026, 10, 5, 12, 5, 0, 1, TimeSpan.Zero);
+        Assert.Equal(justAfter, HeadEndService.NextSlot(justAfter, Daily, catchUp, first, retry));
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 5, 2, TimeSpan.Zero), HeadEndService.NextSlot(new DateTimeOffset(2026, 10, 5, 12, 5, 2, TimeSpan.Zero), Daily, catchUp, first, retry));
+        // The last mark in the window, 12:30, woken 2 s late, still runs; past it, the next day.
+        Assert.Equal(new DateTimeOffset(2026, 10, 5, 12, 30, 2, TimeSpan.Zero), HeadEndService.NextSlot(new DateTimeOffset(2026, 10, 5, 12, 30, 2, TimeSpan.Zero), Daily, catchUp, late, retry));
+        var pastWindow = skipped with { End = new DateTimeOffset(2026, 10, 5, 12, 30, 5, TimeSpan.Zero) };
+        Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(new DateTimeOffset(2026, 10, 5, 12, 35, 0, 1, TimeSpan.Zero), Daily, catchUp, pastWindow, retry));
+
         var notRetryable = skipped with { Retryable = false };
         Assert.Equal(new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero), HeadEndService.NextSlot(at, Daily, catchUp, notRetryable, retry));
     }
@@ -285,6 +295,12 @@ public class ServiceTests
         var again = skipped with { End = At(12, 5, 1) };
         Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 5, 1), Hourly, catchUp, again, retry));
         Assert.Equal(At(12, 10), HeadEndService.NextSlot(At(12, 5, 1), Hourly, TimeSpan.FromMinutes(10), again, retry));
+
+        // The wait loop wakes a moment after the retry's time: it still runs, at once.
+        Assert.Equal(At(12, 5).AddMilliseconds(1), HeadEndService.NextSlot(At(12, 5).AddMilliseconds(1), Hourly, catchUp, skipped, retry));
+        Assert.Equal(At(12, 5, 2), HeadEndService.NextSlot(At(12, 5, 2), Hourly, catchUp, skipped, retry));
+        // Just past a later mark that is outside the window: the next slot.
+        Assert.Equal(At(13), HeadEndService.NextSlot(At(12, 10).AddMilliseconds(1), Hourly, catchUp, again, retry));
 
         // The clock has gone back behind the last slot run: the slot after that one, never an earlier.
         var later = ran with { Slot = At(15), End = At(15, 3) };
