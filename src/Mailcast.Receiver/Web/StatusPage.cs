@@ -1026,6 +1026,9 @@ public sealed partial class StatusPage : IAsyncDisposable
                 // Issue #49: why its window ended early, for this slot only; null otherwise.
                 endedEarly = _host.LastEarlyEnd is { } early && early.Slot == slot.Scheduled ? early.Reason : null,
             },
+            // The most recent window ended early and why, whether or not anything in its slot was
+            // heard: a slot given back with nothing heard is never the tracked "slot" above.
+            lastEarlyEnd = _host.LastEarlyEnd is { } last ? new { slot = last.Slot, reason = last.Reason } : null,
             framesHeard = _host.Intake.FramesHeard,
             // Changes whenever anything the Bulletins list shows does, so the page fetches the
             // list only then, not every few seconds whatever happened.

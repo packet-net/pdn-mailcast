@@ -351,17 +351,26 @@ public sealed class ReceiverHost : IAsyncDisposable
     internal static readonly TimeSpan QuietBeforeEarlyEnd = TimeSpan.FromMinutes(1);
 
     /// <summary>
+    /// How long after a slot's scheduled start its window is given back when nothing at all has
+    /// been heard (<see cref="NothingHeardReason"/>). Over 147 GB7RDG slots the tone began a
+    /// median 16 s after the slot and never later than 36 s, and the first burst follows it by
+    /// about 25 s: by 2 minutes a slot this receiver can hear has always made itself known.
+    /// </summary>
+    internal static readonly TimeSpan NothingHeardBy = TimeSpan.FromMinutes(2);
+
+    /// <summary>
     /// Issue #49: why the listening window for the slot starting at <paramref name="slotStart"/>
     /// can end now, before its usual close; null while it should keep going. Conservative:
-    /// anything unknown or incomplete, or no slot tracked yet matching <paramref name="slotStart"/>,
-    /// keeps it open.
+    /// anything unknown or incomplete keeps it open. With no slot tracked yet matching
+    /// <paramref name="slotStart"/>, it ends only if nothing at all has been heard by
+    /// <see cref="NothingHeardBy"/> after the slot's start (<see cref="NothingHeardReason"/>).
     /// </summary>
     internal string? EarlyEndReason(DateTimeOffset slotStart)
     {
         var slot = Slots.Last;
         if (slot is null || slot.Scheduled != slotStart)
         {
-            return null;
+            return NothingHeardReason(slotStart);
         }
         if (slot.HeardDirectory is not { } heardDirectory)
         {
@@ -405,6 +414,47 @@ public sealed class ReceiverHost : IAsyncDisposable
             $"the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for {quiet.TotalSeconds:F0} s");
         NoteEarlyEnd(slotStart, reason);
         return reason;
+    }
+
+    /// <summary>
+    /// Why the window of the slot starting at <paramref name="slotStart"/> can be given back now
+    /// although nothing in it has been heard; null while it should keep going. Only once
+    /// <see cref="NothingHeardBy"/> has passed since the slot's start with no tone, probe or
+    /// frame heard since a minute before it (<see cref="SlotTracker.ClockAllowance"/>; any
+    /// broadcast frame from an accepted source counts, whichever station's it is), and only
+    /// when the audio has been listening without a break since the slot's start: a receiver
+    /// started, or a source reopened or reconnected, after that could not have heard the tone,
+    /// so it keeps the whole window as before. A head end that skipped this slot and retries it
+    /// 5 minutes later is missed; it counts nothing as sent for a skipped slot, so its bulletins
+    /// go out again in the next one.
+    /// </summary>
+    private string? NothingHeardReason(DateTimeOffset slotStart)
+    {
+        var now = _time.GetUtcNow();
+        if (now < slotStart + NothingHeardBy || now >= slotStart + ReceiverConfig.WebSdrAfter
+            || Slots.Last?.Scheduled == slotStart
+            || ListeningSince is not { } since || since > slotStart
+            || Slots.LastHeard is { } heard && heard >= slotStart - SlotTracker.ClockAllowance)
+        {
+            return null;
+        }
+        var followed = Followed;
+        string from = (followed.OneStation ? followed.Stations[0].Station : followed.StationAt(slotStart)) ?? "the station";
+        string reason = $"nothing heard from {from} by {(slotStart + NothingHeardBy).UtcDateTime:HH:mm} (no tone, probe or frame)";
+        NoteEarlyEnd(slotStart, reason);
+        return reason;
+    }
+
+    private DateTimeOffset? _listeningSince;
+
+    /// <summary>
+    /// Since when the audio has been listening without a break (<see cref="AudioPhase.Listening"/>);
+    /// null while it is not. Set as <see cref="Audio"/> changes; tests may set it directly.
+    /// </summary>
+    internal DateTimeOffset? ListeningSince
+    {
+        get { lock (_gate) { return _listeningSince; } }
+        set { lock (_gate) { _listeningSince = value; } }
     }
 
     private (DateTimeOffset Slot, string Reason)? _lastEarlyEnd;
@@ -1061,6 +1111,17 @@ public sealed class ReceiverHost : IAsyncDisposable
         get => _audio;
         private set
         {
+            lock (_gate)
+            {
+                if (value.Phase != AudioPhase.Listening)
+                {
+                    _listeningSince = null;
+                }
+                else if (_audio.Phase != AudioPhase.Listening || _listeningSince is null)
+                {
+                    _listeningSince = _time.GetUtcNow();
+                }
+            }
             _audio = value;
             AudioChanged?.Invoke(value);
         }

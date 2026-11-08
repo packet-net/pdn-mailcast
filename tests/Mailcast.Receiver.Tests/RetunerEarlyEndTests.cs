@@ -37,6 +37,37 @@ public sealed partial class RetunerTests
     }
 
     [Fact]
+    public async Task NothingHeard_GivesBackRigAndReleasesLinBpq_AtTwoMinutes_ThenRunsAfterHook()
+    {
+        // The receiver's own check, on the retuner's clock: its audio listening since well before the slot.
+        using var scripts = new TempDirectory();
+        using var stateDir = new TempDirectory();
+        string record = Path.Combine(scripts.Path, "runs");
+        ReceiverHost? host = null;
+        await using var s = new Station(At(11, 57, 30), hooks: Scripts(scripts.Path, record), earlyEnd: slot => host?.EarlyEndReason(slot));
+        host = new ReceiverHost(new ReceiverConfig { Audio = Samples.SoundCard, StateDirectory = stateDir.Path, Stations = StationFixture.EverySlot }, s.Clock, _ => { })
+        {
+            ListeningSince = At(11, 0),
+        };
+        try
+        {
+            s.Start();
+            await s.StepUntil(() => s.Retuner.Stage == RetuneStage.Tuned, "tuned for 12:00");
+
+            await s.RunTo(At(12, 3));
+
+            Assert.Equal(["before 2026-10-05T12:00:00Z 7052.0 7053.8 none", "after 2026-10-05T12:00:00Z 7052.0 7053.8 1"], HookScript.Runs(record));
+            Assert.Equal(PacketDialHz, s.Rig.DialHz);
+            Assert.Equal(0, s.Node!.XmitOff(2));
+            Assert.Contains("retune: ending the 12:00 UTC slot early: nothing heard from GB7RDG by 12:02 (no tone, probe or frame)", s.Log);
+        }
+        finally
+        {
+            await host.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task NeverReady_RunsToTheUsualClose_Unaffected()
     {
         // earlyEnd never fires: the slot closes exactly as it would without issue #49.

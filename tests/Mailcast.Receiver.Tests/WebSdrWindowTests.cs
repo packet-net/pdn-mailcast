@@ -502,6 +502,36 @@ public class WebSdrWindowTests
     }
 
     [Fact]
+    public async Task NothingHeard_WebSdr_ClosesAtTwoMinutesAfterTheSlot_AndSaysWhy()
+    {
+        // Open from 11:59, before the 12:00 slot begins; nothing at all is heard.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 11, 59, 0, TimeSpan.Zero));
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.AudioAsync(AudioPhase.Listening).WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        var twoMinutesIn = new DateTimeOffset(2026, 10, 5, 12, 2, 0, TimeSpan.Zero);
+        for (int i = 0; i < 20 && !input.Disposed; i++)
+        {
+            Assert.False(input.Disposed);
+            rig.Clock.Advance(ReceiverHost.EarlyEndPoll);
+            await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(input.Disposed);
+        Assert.True(rig.Clock.GetUtcNow() >= twoMinutesIn && rig.Clock.GetUtcNow() < twoMinutesIn + ReceiverHost.EarlyEndPoll + ReceiverHost.EarlyEndPoll,
+            $"closed at {rig.Clock.GetUtcNow():HH:mm:ss}");
+        Assert.Contains("audio: ending the 12:00 UTC slot's window early: nothing heard from GB7RDG by 12:02 (no tone, probe or frame)", rig.Log);
+        Assert.DoesNotContain(rig.Log, l => l.Contains("the clock is outside the slot's listening window", StringComparison.Ordinal));
+        Assert.Contains("closed until 13:58 UTC, ready for the 14:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+
+        // The status page says why, though no slot of its own was tracked.
+        var page = new Mailcast.Receiver.Web.StatusPage(rig.Host, null, _ => { });
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        Assert.StartsWith("nothing heard from GB7RDG", json.GetProperty("lastEarlyEnd").GetProperty("reason").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task EarlyEnd_WebSdr_NeverFiresWhileABulletinInTheDirectoryIsStillIncomplete()
     {
         await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero));
