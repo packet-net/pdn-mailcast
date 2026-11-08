@@ -6,27 +6,34 @@ namespace Mailcast.Receiver;
 /// <summary>
 /// One station's slots: one starts at <paramref name="Anchor"/> UTC and then every
 /// <paramref name="EveryMinutes"/>, round the clock, and with a <paramref name="Daylight"/> rule
-/// only those in daylight run.
+/// only those in daylight run, and with an <paramref name="Evening"/> rule those in its evening too.
 /// </summary>
 /// <param name="Anchor">One slot's start, UTC.</param>
 /// <param name="EveryMinutes">Minutes from one slot's start to the next; it divides a day.</param>
 /// <param name="Daylight">The head end's daylight rule, or null when every slot runs.</param>
-public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRule? Daylight = null)
+/// <param name="Evening">The head end's evening slots, as this receiver follows them, or null for none.</param>
+public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRule? Daylight = null, EveningRule? Evening = null)
 {
     private const int MinutesPerDay = 1440;
 
     /// <summary>The same, as Packet.Mailcast and the directory have it.</summary>
-    public SlotTimetable Timetable => new(Anchor, EveryMinutes, Daylight);
+    public SlotTimetable Timetable => new(Anchor, EveryMinutes, Daylight, Evening);
 
     /// <summary>A head end's timetable, as its directory gives it.</summary>
     public static SlotSchedule From(SlotTimetable timetable)
     {
         ArgumentNullException.ThrowIfNull(timetable);
-        return new(timetable.Anchor, timetable.EveryMinutes, timetable.Daylight);
+        return new(timetable.Anchor, timetable.EveryMinutes, timetable.Daylight, timetable.Evening);
     }
 
     /// <summary>The slots that run on a UTC day, earliest first: every slot without a daylight rule.</summary>
     public IReadOnlyList<DateTimeOffset> ActiveOn(DateOnly day) => Timetable.ActiveSlotsOn(day);
+
+    /// <summary>The daylight slots of a UTC day, earliest first: <see cref="ActiveOn"/> less the evening ones.</summary>
+    public IReadOnlyList<DateTimeOffset> DaylightOn(DateOnly day) => Evening is null ? ActiveOn(day) : [.. ActiveOn(day).Except(Timetable.EveningSlotsOn(day))];
+
+    /// <summary>The evening slots of a UTC day, earliest first; none without an evening rule.</summary>
+    public IReadOnlyList<DateTimeOffset> EveningOn(DateOnly day) => Timetable.EveningSlotsOn(day);
 
     /// <summary>The first slot that runs starting at or after <paramref name="now"/>.</summary>
     public DateTimeOffset NextActiveStart(DateTimeOffset now) => Timetable.NextActiveAtOrAfter(now.ToUniversalTime()) ?? NextStart(now);
@@ -69,7 +76,7 @@ public sealed record SlotSchedule(TimeOnly Anchor, int EveryMinutes, DaylightRul
         60 => string.Create(CultureInfo.InvariantCulture, $"every hour at {Anchor.Minute} minutes past"),
         MinutesPerDay => string.Create(CultureInfo.InvariantCulture, $"once a day at {Anchor:HH:mm} UTC"),
         _ => string.Create(CultureInfo.InvariantCulture, $"every {EveryMinutes} minutes from {Anchor:HH:mm} UTC"),
-    } + (Daylight is { } d ? ", in daylight: " + d.Describe() : "");
+    } + (Daylight is { } d ? ", in daylight: " + d.Describe() + (Evening is { } e ? "; and evening slots " + e.Describe() : "") : "");
 }
 
 /// <summary>A station whose slots this receiver knows (issues #178 and #144).</summary>
@@ -208,7 +215,8 @@ public static class ListeningWindow
     /// The slots a web SDR listens to on a UTC day. Without a daylight rule they are
     /// <see cref="WebSdrSlots"/>, the same every day. With one, they are every daylight slot that
     /// fits in its allowance, which is all of them for most of the year, and near midsummer, when
-    /// there are more, the latest that fit.
+    /// there are more, the latest that fit. Evening slots come after: they take only what is left
+    /// of the allowance once every daylight slot that fits has had its turn, the earliest first.
     /// </summary>
     public static IReadOnlyList<DateTimeOffset> WebSdrSlotsOn(FollowedSlots followed, DateOnly day)
     {
@@ -219,10 +227,19 @@ public static class ListeningWindow
         }
         // Several stations share the one allowance, as evenly as their slots allow: each gets an
         // equal part (any a station cannot use goes to the others), and picks within it by the
-        // one-station rule, so no station is left out by the way their slots interleave.
-        var active = followed.Stations.Select(st => st.Schedule.ActiveOn(day)).ToList();
+        // one-station rule, so no station is left out by the way their slots interleave. Their
+        // daylight slots share it first, and their evening slots share whatever is left.
+        var daylight = Share(followed, followed.Stations.Select(st => st.Schedule.DaylightOn(day)).ToList(), ReceiverConfig.MostWebSdrSlotsPerDay, evening: false);
+        var evening = Share(followed, followed.Stations.Select(st => st.Schedule.EveningOn(day)).ToList(), ReceiverConfig.MostWebSdrSlotsPerDay - daylight.Count, evening: true);
+        return [.. daylight.Concat(evening).Distinct().Order()];
+    }
+
+    // Shares an allowance of slots between the stations' lists, as evenly as they allow; within a station's part its daylight
+    // slots are the latest that fit, its evening slots the earliest, and without a daylight rule they are spread over the day.
+    private static List<DateTimeOffset> Share(FollowedSlots followed, List<IReadOnlyList<DateTimeOffset>> active, int allowance, bool evening)
+    {
         var quota = new int[active.Count];
-        int left = ReceiverConfig.MostWebSdrSlotsPerDay;
+        int left = Math.Max(0, allowance);
         while (left > 0)
         {
             var wanting = Enumerable.Range(0, active.Count).Where(i => quota[i] < active[i].Count).ToList();
@@ -247,16 +264,20 @@ public static class ListeningWindow
             {
                 picked.AddRange(active[i]);
             }
+            else if (evening)
+            {
+                picked.AddRange(active[i].Take(n));
+            }
             else if (schedule.Daylight is not null)
             {
                 picked.AddRange(active[i].Skip(active[i].Count - n));
             }
-            else
+            else if (n > 0)
             {
                 picked.AddRange(Enumerable.Range(0, n).Select(k => active[i][k * active[i].Count / n]));
             }
         }
-        return [.. picked.Distinct().Order()];
+        return picked;
     }
 
     /// <summary>One station's web SDR slots on a day (see the overload for several).</summary>
@@ -267,12 +288,14 @@ public static class ListeningWindow
         {
             return [.. WebSdrSlots(schedule).Select(t => new DateTimeOffset(day.ToDateTime(t, DateTimeKind.Utc)))];
         }
-        var active = schedule.ActiveOn(day);
+        var active = schedule.DaylightOn(day);
         // When there are more daylight slots than fit in the allowance (near midsummer), the
         // earliest morning ones are left out, not the late afternoon ones: late afternoon is often
         // the best time for 40 m to reach stations near M0LTE, and an early morning slot hears little.
         int n = Math.Min(ReceiverConfig.MostWebSdrSlotsPerDay, active.Count);
-        return [.. active.Skip(active.Count - n)];
+        // Evening slots only take what the daylight ones leave of the allowance, the earliest first.
+        var evening = schedule.EveningOn(day).Take(ReceiverConfig.MostWebSdrSlotsPerDay - n);
+        return [.. active.Skip(active.Count - n).Concat(evening).Order()];
     }
 
     /// <summary>
@@ -398,9 +421,10 @@ public static class ListeningWindow
         var active = schedule.ActiveOn(day);
         var listened = WebSdrSlotsOn(schedule, day);
         var skipped = active.Except(listened).ToList();
+        string kind = schedule.Evening is null ? "daylight slots" : "daylight and evening slots";
         string which = active.Count == 0 ? "no slots, as none is in daylight"
-            : skipped.Count == 0 ? (active.Count == 1 ? $"the one daylight slot, at {SlotTimetable.Times(listened)}" : $"all {active.Count} daylight slots, at {SlotTimetable.Times(listened)}")
-            : $"{listened.Count} of the {active.Count} daylight slots, at {SlotTimetable.Times(listened)}, and skips {SlotTimetable.Times(skipped)}";
+            : skipped.Count == 0 ? (active.Count == 1 ? $"the one {(schedule.Evening is null ? "daylight slot" : "slot")}, at {SlotTimetable.Times(listened)}" : $"all {active.Count} {kind}, at {SlotTimetable.Times(listened)}")
+            : $"{listened.Count} of the {active.Count} {kind}, at {SlotTimetable.Times(listened)}, and skips {SlotTimetable.Times(skipped)}";
         return string.Create(CultureInfo.InvariantCulture,
             $"on {day:yyyy-MM-dd} the web SDR listens to {which}, from {ReceiverConfig.WebSdrBefore.TotalMinutes:F0} minutes before each to {ReceiverConfig.WebSdrAfter.TotalMinutes:F0} after, to stay inside its listening allowance of about 3 hours a day");
     }

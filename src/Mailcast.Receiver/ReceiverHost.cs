@@ -670,8 +670,34 @@ public sealed class ReceiverHost : IAsyncDisposable
         get
         {
             var followed = Listening.Where(l => l.Followed).ToList();
-            return followed.Count == 0 ? FollowedSlots.None : new FollowedSlots([.. followed.Select(l => (l.Station, SlotSchedule.From(l.Timetable)))]);
+            return followed.Count == 0 ? FollowedSlots.None : new FollowedSlots([.. followed.Select(l => (l.Station, SlotSchedule.From(AsFollowed(l.Timetable))))]);
         }
+    }
+
+    private int _eveningNoPlaceSaid;
+
+    /// <summary>
+    /// A station's timetable as this receiver follows it: as announced, unless <see cref="ReceiverConfig.EveningSlots"/> is
+    /// false, when its evening slots end at sunset here as well (where <see cref="Place"/> is), or with no place known are
+    /// left out altogether, which the log says once.
+    /// </summary>
+    internal SlotTimetable AsFollowed(SlotTimetable timetable)
+    {
+        ArgumentNullException.ThrowIfNull(timetable);
+        if (timetable.Evening is not { } evening || Config.FollowsEveningSlots)
+        {
+            return timetable;
+        }
+        if (Place?.Locator is { } here && Maidenhead.TryParse(here, out _, out _))
+        {
+            Interlocked.Exchange(ref _eveningNoPlaceSaid, 0);
+            return timetable with { Evening = evening.EndingAtSunsetAt(here) };
+        }
+        if (Interlocked.Exchange(ref _eveningNoPlaceSaid, 1) == 0)
+        {
+            _log("slots: \"eveningSlots\" is false and this receiver's place is not known (no \"locator\"), so it skips every evening slot");
+        }
+        return timetable.WithoutEvening;
     }
 
     /// <summary>

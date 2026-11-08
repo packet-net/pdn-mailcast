@@ -293,6 +293,20 @@ public sealed record ReceiverConfig
     public bool Retune { get; init; }
 
     /// <summary>
+    /// Whether to listen at a station's evening slots (the extra slots some head ends send after dark) once it is dark here
+    /// too. Null or true (the default) follows every slot the station announces. False skips its evening slots that start
+    /// after sunset at this receiver (<see cref="Locator"/>, or where the web SDR says it is), so a radio that retunes or a
+    /// web SDR is not moved for a signal that will not be heard; with no place known, every evening slot is skipped. A sound
+    /// card that listens all the time needs nothing. Left out of a saved file while null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? EveningSlots { get; init; }
+
+    /// <summary>Whether evening slots after this receiver's own sunset are followed: <see cref="EveningSlots"/> is not false.</summary>
+    [JsonIgnore]
+    public bool FollowsEveningSlots => EveningSlots != false;
+
+    /// <summary>
     /// Programs to run before and after each slot the receiver listens to, for a radio shared
     /// with something else. Null (the default) runs nothing.
     /// </summary>

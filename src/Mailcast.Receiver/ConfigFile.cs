@@ -227,7 +227,9 @@ public sealed class ConfigFile
             { Enabled: true } feedback => $"daily report on as {feedback.From}",
             _ => "daily report off",
         };
-        return $"config: {retuning}, {hooks}, {report}";
+        // Said only when off, so the usual line is unchanged.
+        string evening = config.FollowsEveningSlots ? "" : ", evening slots skipped after sunset here (\"eveningSlots\": false)";
+        return $"config: {retuning}, {hooks}, {report}{evening}";
     }
 
     /// <summary>
