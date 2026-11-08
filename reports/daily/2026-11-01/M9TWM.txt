@@ -1,0 +1,20 @@
+Title: MCR M9TWM 2026-11-01
+From: M9TWM
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 6305A0M9TWM
+Source: GB7RDG's LinBPQ mail store, message 4730 (m_004730.mes), copied 2026-11-08
+Check: stored size matches the BBS's index
+
+R:261101/1630Z 19273@GB7LOX.#19.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.26.1 IO93fj m9twm-1.tunnel.ubersdr.org 0/0 0 0 0
+09 - 0 - - IU+PU
+10 - 0 - - IU+PU
+11 - 0 - - IU+PU
+12 - 0 - - IU+PU
+13 - 0 - - IU+PU
+14 W4 8 - - IU+PU 1 - 1.09 0.39 - b
+15 W3 17 - - IU+PG 1 - 0.37 0.65 - b
+16 - 0 - - IU+PU
+S GB7RDG 8 2 25 0 - - 0
