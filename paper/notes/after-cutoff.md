@@ -1,6 +1,6 @@
 # After the paper's data: running notes
 
-Observations after 7 November 2026, kept for the next revision of the paper. Each is as reported by the reception recovery session unless marked otherwise. Not yet in the paper.
+Observations after 7 November 2026, outside the paper's main data. The 9 November reception and burst figures are quoted in section 6.3; the rest is kept for reference. Each is as reported by the reception recovery session unless marked otherwise. Its 8 November column was computed on the day as per-slot medians and differs by a point or so from the totals in `november-drop.md` (95, 94, 56, 17%), which the paper uses.
 
 ## 9 November (day 2 after the reference fix)
 
