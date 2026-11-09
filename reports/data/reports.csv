@@ -133,6 +133,7 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-05,M0NVK,0.33.1,IO90hr,sdrconnect,10,0,12,1,,,,7,7,306,pasted,none,daily/2026-11-05/M0NVK.txt
 2026-11-05,M9TWM,0.33.1,IO93fj,m9twm-1.tunnel.ubersdr.org,12,12,0,0,,,,7,7,225,bbs-store,size-verified,daily/2026-11-05/M9TWM.txt
 2026-11-06,EI7KX,0.33.1,IO83jj,nope.tunnel.ubersdr.org,1,1,0,5,0,2,,6,6,40,bbs-store,size-verified,daily/2026-11-06/EI7KX.txt
+2026-11-06,G7TAJ,0.33.1,IO81le,sc,2,0,2,0,,,,6,6,48,bbs-store,size-verified,daily/2026-11-06/G7TAJ.txt
 2026-11-06,GM4CXF,0.33.1,IO75qn,sc,6,8,0,3,0,1,,6,6,142,bbs-store,size-verified,daily/2026-11-06/GM4CXF.txt
 2026-11-06,GM8BPQ,0.32.0,IO68vl,sc,0,0,0,0,,,RIG12,6,6,10,bbs-store,size-verified,daily/2026-11-06/GM8BPQ.txt
 2026-11-06,M0NVK,0.33.1,IO90hr,sdrconnect,7,0,7,2,,,,6,6,182,pasted,none,daily/2026-11-06/M0NVK.txt
