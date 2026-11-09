@@ -180,4 +180,39 @@ public class ToneDetectorTests
     {
         Assert.Empty(Run(Signal(15, 1800, 10, toneFrom: 5, toneTo: 9, seed: 10)));
     }
+
+    /// <summary>The steady runs <see cref="ToneDetector.SteadyRunEnded"/> raises for these samples.</summary>
+    private static List<TimeSpan> SteadyRuns(float[] samples)
+    {
+        var detector = new ToneDetector();
+        var runs = new List<TimeSpan>();
+        detector.SteadyRunEnded += runs.Add;
+        for (int offset = 0; offset < samples.Length; offset += 4800)
+        {
+            detector.Process(samples.AsSpan(offset, Math.Min(4800, samples.Length - offset)));
+        }
+        return runs;
+    }
+
+    [Fact]
+    public void ThirtySecondTone_IsNotMeasured_ButIsRaisedAsASteadyRun()
+    {
+        var samples = Signal(40, 1800, 10, toneFrom: 3, toneTo: 33, seed: 12);
+
+        Assert.Empty(Run(samples));
+        Assert.InRange(Assert.Single(SteadyRuns(samples)), TimeSpan.FromSeconds(27), TimeSpan.FromSeconds(32));
+    }
+
+    [Fact]
+    public void ShortBlip_IsNotMeasured_ButIsRaisedAsASteadyRun()
+    {
+        Assert.Single(SteadyRuns(Signal(15, 1800, 10, toneFrom: 5, toneTo: 9, seed: 10)));
+    }
+
+    [Fact]
+    public void NoiseOnly_AndACarrierThatNeverStops_RaiseNoSteadyRun()
+    {
+        Assert.Empty(SteadyRuns(Signal(40, 1800, 0, toneFrom: 0, toneTo: 0, seed: 9)));
+        Assert.Empty(SteadyRuns(Signal(80, 1800, 10, toneFrom: 2, toneTo: 80, seed: 8)));
+    }
 }

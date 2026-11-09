@@ -51,6 +51,18 @@ public sealed class ToneDetector
     public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(20);
 
     /// <summary>
+    /// The shortest run of steady tone blocks raised as <see cref="SteadyRunEnded"/>: two blocks,
+    /// so a single noisy block is not taken as a sign of the slot.
+    /// </summary>
+    public const int SteadyRunMinBlocks = 2;
+
+    /// <summary>
+    /// The longest run raised as <see cref="SteadyRunEnded"/>: a daily station's 30 s tone fits,
+    /// a carrier that never stops (a birdie) is never raised at all, since its run never ends.
+    /// </summary>
+    public static readonly TimeSpan SteadyRunMax = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// The least share of the power near the line that the line itself holds in a block of
     /// steady carrier; keyed CW holds 80% or less, and a steady tone 95% or more down to about -12 dB SNR.
     /// </summary>
@@ -118,6 +130,15 @@ public sealed class ToneDetector
 
     /// <summary>Raised when a tone has ended, with what was measured.</summary>
     public event Action<ToneReport>? ToneMeasured;
+
+    /// <summary>
+    /// Raised when any run of steady tone near the expected frequency ends, with how long it
+    /// lasted, whether or not it was the right length to be measured as the slot's tone: from
+    /// <see cref="SteadyRunMinBlocks"/> blocks up to <see cref="SteadyRunMax"/>. A 30 s tone, or
+    /// a 10 s one broken up by fading, is never measured (<see cref="MinDuration"/>,
+    /// <see cref="MaxDuration"/>) but is still a sign that the slot is being heard.
+    /// </summary>
+    public event Action<TimeSpan>? SteadyRunEnded;
 
     /// <summary>The tone's frequency while one is being heard, for the spectrogram's marker.</summary>
     public double? LiveFrequencyHz { get; private set; }
@@ -216,6 +237,10 @@ public sealed class ToneDetector
         if (_runBlocks > 0)
         {
             var duration = TimeSpan.FromSeconds(_runBlocks * Size / (double)Rate);
+            if (_runBlocks >= SteadyRunMinBlocks && duration <= SteadyRunMax)
+            {
+                SteadyRunEnded?.Invoke(duration);
+            }
             if (duration >= MinDuration && duration <= MaxDuration)
             {
                 double frequency = _runFrequencySum / _runBlocks;

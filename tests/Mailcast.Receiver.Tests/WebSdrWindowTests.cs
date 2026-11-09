@@ -192,10 +192,15 @@ public class WebSdrWindowTests
         var input = await rig.Inputs.Reader.ReadAsync();
         await rig.Waits.Reader.ReadAsync();
 
-        // It stays open past midnight, to 00:12 on the 6th.
+        // It stays open past midnight, to 00:12 on the 6th (the slot's tone is heard, so it is
+        // not given back for nothing heard).
         for (int i = 0; i < 13; i++)
         {
             rig.Clock.Advance(ReceiverHost.ClockCheck);
+            if (i == 1)
+            {
+                rig.Host.Slots.OnSteadyTone();
+            }
             Assert.False(input.Disposed);
             await rig.Waits.Reader.ReadAsync();
         }
@@ -499,6 +504,36 @@ public class WebSdrWindowTests
         var page = new Mailcast.Receiver.Web.StatusPage(rig.Host, null, _ => { });
         var json = System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
         Assert.Contains("the directory and everything in rotation are heard", json.GetProperty("slot").GetProperty("endedEarly").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task NothingHeard_WebSdr_ClosesThreeAndAHalfMinutesAfterTheSlot_AndSaysWhy()
+    {
+        // Open from 11:59, before the 12:00 slot begins; nothing at all is heard.
+        await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 11, 59, 0, TimeSpan.Zero));
+        var input = await rig.Inputs.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.AudioAsync(AudioPhase.Listening).WaitAsync(TimeSpan.FromSeconds(10));
+        await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        var threshold = new DateTimeOffset(2026, 10, 5, 12, 3, 30, TimeSpan.Zero);
+        for (int i = 0; i < 30 && !input.Disposed; i++)
+        {
+            Assert.False(input.Disposed);
+            rig.Clock.Advance(ReceiverHost.EarlyEndPoll);
+            await rig.Waits.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(input.Disposed);
+        Assert.True(rig.Clock.GetUtcNow() >= threshold && rig.Clock.GetUtcNow() < threshold + ReceiverHost.EarlyEndPoll + ReceiverHost.EarlyEndPoll,
+            $"closed at {rig.Clock.GetUtcNow():HH:mm:ss}");
+        Assert.Contains("audio: ending the 12:00 UTC slot's window early: nothing heard from GB7RDG by 12:03:30 (no tone, probe or frame)", rig.Log);
+        Assert.DoesNotContain(rig.Log, l => l.Contains("the clock is outside the slot's listening window", StringComparison.Ordinal));
+        Assert.Contains("closed until 13:58 UTC, ready for the 14:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
+
+        // The status page says why, though no slot of its own was tracked.
+        var page = new Mailcast.Receiver.Web.StatusPage(rig.Host, null, _ => { });
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(page.Status(), ReceiverConfig.JsonLine);
+        Assert.StartsWith("nothing heard from GB7RDG", json.GetProperty("lastEarlyEnd").GetProperty("reason").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]

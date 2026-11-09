@@ -316,6 +316,14 @@ public sealed class Intake : IAsyncDisposable
     /// <summary>Broadcast frames heard since start.</summary>
     public long FramesHeard => Interlocked.Read(ref _framesHeard);
 
+    private long _lastOfferedTicks = long.MinValue;
+
+    /// <summary>
+    /// When the newest broadcast frame was offered, as it was decoded, before the worker has
+    /// handled it; null before any. A frame still queued is already heard.
+    /// </summary>
+    public DateTimeOffset? LastOffered => Interlocked.Read(ref _lastOfferedTicks) is var t && t != long.MinValue ? new DateTimeOffset(t, TimeSpan.Zero) : null;
+
     /// <summary>Broadcast frames dropped because the store was not keeping up.</summary>
     public long FramesDropped => Interlocked.Read(ref _framesDropped);
 
@@ -355,6 +363,7 @@ public sealed class Intake : IAsyncDisposable
             return false;
         }
         Interlocked.Increment(ref _framesHeard);
+        Interlocked.Exchange(ref _lastOfferedTicks, _time.GetUtcNow().UtcTicks);
         Interlocked.Increment(ref _offered);
         if (!_queue.Writer.TryWrite((payload, waveform)))
         {

@@ -118,6 +118,7 @@ public sealed class SlotTracker
     private FollowedSlots? _schedule;
     private DateTimeOffset? _listening;
     private DateTimeOffset? _lastEnded;
+    private DateTimeOffset? _lastHeard;
 
     /// <summary>Creates a tracker.</summary>
     public SlotTracker(TimeProvider time, Action<string> log, FollowedSlots? schedule = null)
@@ -158,15 +159,33 @@ public sealed class SlotTracker
         }
     }
 
+    /// <summary>
+    /// When a tone (or any steady tone, <see cref="OnSteadyTone"/>), a probe or a frame was last heard, whichever slot (if any) it was taken as
+    /// part of; null before anything has been. For giving a slot's window back when nothing at
+    /// all is heard near its start (<see cref="ReceiverHost.NothingHeardBy"/>).
+    /// </summary>
+    public DateTimeOffset? LastHeard
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lastHeard;
+            }
+        }
+    }
+
     /// <summary>A tone has been measured: if it is at a slot's start, that slot begins with it.</summary>
     public void OnTone(ToneReport tone)
     {
-        var began = _time.GetUtcNow() - tone.Duration;
+        var now = _time.GetUtcNow();
+        var began = now - tone.Duration;
         string measured = string.Create(CultureInfo.InvariantCulture,
             $"{tone.FrequencyHz:F1} Hz, {tone.OffsetHz:+0.0;-0.0;0.0} Hz from {tone.FrequencyHz - tone.OffsetHz:F0} Hz, SNR {tone.SnrDb:F1} dB in 3 kHz, {tone.Duration.TotalSeconds:F0} s");
         string? ended = null;
         lock (_gate)
         {
+            _lastHeard = now;
             DateTimeOffset? slot = null;
             if (_schedule is { Stations.Count: > 0 } schedule)
             {
@@ -208,6 +227,7 @@ public sealed class SlotTracker
         string? ended = null;
         lock (_gate)
         {
+            _lastHeard = now;
             if (_schedule is { Stations.Count: > 0 } schedule)
             {
                 var slot = schedule.LatestStart(now + ClockAllowance);
@@ -302,11 +322,27 @@ public sealed class SlotTracker
     private static bool BelongsToSameSlot(BroadcastDirectory tracked, BroadcastDirectory candidate) =>
         candidate.Date > tracked.Date || (candidate.Date == tracked.Date && candidate.Entries.SequenceEqual(tracked.Entries));
 
+    /// <summary>
+    /// A run of steady tone near the slot's tone frequency ended, measured as the tone or not
+    /// (<see cref="ToneDetector.SteadyRunEnded"/>): only a sign that something was heard, for
+    /// <see cref="LastHeard"/>; the slot's tone measurement is <see cref="OnTone"/>'s.
+    /// </summary>
+    public void OnSteadyTone()
+    {
+        var now = _time.GetUtcNow();
+        lock (_gate)
+        {
+            _lastHeard = now;
+        }
+    }
+
     /// <summary>Issue #49: the probe audio after the slot's tone has been captured.</summary>
     public void OnProbeCaptured()
     {
+        var now = _time.GetUtcNow();
         lock (_gate)
         {
+            _lastHeard = now;
             if (_current is not null)
             {
                 _current = _current with { ProbeCaptured = true };
@@ -374,9 +410,10 @@ public sealed class SlotTracker
     /// Issue #133: writes the slot's summary line once its listening window is over: when the
     /// window closes (<see cref="ReceiverConfig.WebSdrAfter"/> after its start, which is after
     /// the closing CW ident), or as soon as <paramref name="endedEarly"/> names it, the slot
-    /// whose window was ended early. Once a slot; nothing without a schedule (see <see cref="Finish"/>).
+    /// whose window was ended early, at <paramref name="endedAt"/> if known. Once a slot; nothing
+    /// without a schedule (see <see cref="Finish"/>).
     /// </summary>
-    public void EndIfOver(DateTimeOffset? endedEarly)
+    public void EndIfOver(DateTimeOffset? endedEarly, DateTimeOffset? endedAt = null)
     {
         var now = _time.GetUtcNow();
         string? line = null;
@@ -394,13 +431,17 @@ public sealed class SlotTracker
             }
             else if (_listening is { } listened && (endedEarly == listened || now >= listened + ReceiverConfig.WebSdrAfter))
             {
-                // A slot listened to that nothing at all was heard in.
+                // A slot listened to that nothing at all was heard in. Its window can only have
+                // ended early because nothing was heard near its start: the other early end needs
+                // the slot's directory and rotation heard.
                 _listening = null;
                 _lastEnded = listened;
                 if (_current?.Scheduled != listened)
                 {
                     line = $"slot: the {listened.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)} UTC slot ended: nothing heard"
-                        + (endedEarly == listened ? "; window ended early, nothing left to wait for" : "");
+                        + (endedEarly != listened ? ""
+                            : endedAt is { } at ? $"; window ended early at {at.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} UTC, as nothing was heard by then"
+                            : "; window ended early, as nothing was heard");
                 }
             }
         }
@@ -464,6 +505,13 @@ public sealed class SlotTracker
             {
                 _listening = null;
             }
+        }
+        if (next.Scheduled is { } scheduled && scheduled == _lastEnded)
+        {
+            // A late frame or tone of a slot that has already had its line (one given back with
+            // nothing heard, then decoded while a page watches the spectrogram): no second line
+            // saying otherwise.
+            next = next with { Ended = true };
         }
         _current = next;
         return line;
