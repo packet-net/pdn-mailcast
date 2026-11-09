@@ -21,4 +21,6 @@ Section 6.3 of the paper. Figures marked "results.py" are recomputed from the re
 
 Precisions from the reception recovery session: the equaliser error rose above 1 between about 3 and 15 s into most November bursts, against 0.03 to 0.2 throughout every burst on 30 October; in simulation (Watterson Poor geometry, 2 equal paths 2 ms apart, 10 to 13 dB, M0LTE.Ms110d 0.4.1) Doppler spreads of 1, 2 and 3 Hz decode 94 to 100% with no fall-off along the burst, while a 200 ppm transmit/receive clock skew does produce a length-dependent cliff; the transmit audio to the Flex had an 80 ms pre-fill then exactly 187.5 packets/s, no gap over 12 ms, through every 28 s burst on 7 November.
 
+Figures for 9 November (the day after the fix) are in `after-cutoff.md`.
+
 The space weather analysis (`space-weather.md`) uses a 9 dB threshold and gets 65% against 26%; the paper uses results.py's 8 dB figures. Both say the same thing.
