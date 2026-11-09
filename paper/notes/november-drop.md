@@ -6,11 +6,11 @@ Section 6.3 of the paper. Figures marked "results.py" are recomputed from the re
 
 | Figure in the paper | Source |
 |---|---|
-| Shares at a tone of 8 dB or more: 61% with 18 s bursts (122 receiver-slots), 24% with 31 s bursts (56) | results.py |
+| Shares at a tone of 8 dB or more: 63% from 25 October until the fault (114 receiver-slots), 26% during it (64); by burst length 61% with 18 s bursts (122), 24% with 31 s (56) | results.py |
 | GM4CXF on 2 November: 62% and 53% at 09:00 and 10:00, then 4 to 21% | results.py |
 | WN3 shares before and after: GM4CXF 73% to 22%, GM8BPQ 20% to 3% | results.py |
 | Listeners' median Doppler spread: 0.28 Hz (25 to 30 Oct), 0.91 Hz (2 Nov), 0.67 Hz (3 to 7 Nov) | results.py |
-| Bursts running to their normal end: 79% (29 Oct to 1 Nov) against 27% (3 to 6 Nov) | MS110D shadow recorder on CT 153, per-burst comparisons in /var/lib/ms110d-shadow/slots/<UTC>/compare.md, decoded by the C# receiver and the C++ port; reported by the C++ port session |
+| Bursts running to their normal end: 87 to 97% a day in late October against 21 to 35% a day from 3 to 7 November (earlier summary: 79% for 29 Oct to 1 Nov, 27% for 3 to 6 Nov) | MS110D shadow recorder on CT 153, per-burst comparisons in /var/lib/ms110d-shadow/slots/<UTC>/compare.md, decoded by the C# receiver and the C++ port; reported by the C++ port session |
 | The equaliser losing the signal 3 to 5 s into November bursts; switching off the signal-absent exit recovers no frames | Re-decoding of 11 shadow slots (30 Oct, 3, 6, 7 Nov) with per-frame equaliser error; reported by the reception recovery session |
 | Simulation: 27 s bursts decode as well as 13 s on the Poor channel, and at 2 to 3 Hz Doppler spread | Simulation with the transmit and receive code (M0LTE.Ms110d), reported by the reception recovery session |
 | Transmit audio to the Flex steady through every long burst | Packet capture on GB7RDG's node, reported by the reception recovery session |
@@ -20,5 +20,7 @@ Section 6.3 of the paper. Figures marked "results.py" are recomputed from the re
 | The 12:00 slot on 8 November lost to a separate fault (the Flex dropped its clients at 11:59; pdn-soundmodem restarted at 12:20) | Reported by the reception recovery session; not part of the reference fault |
 
 Precisions from the reception recovery session: the equaliser error rose above 1 between about 3 and 15 s into most November bursts, against 0.03 to 0.2 throughout every burst on 30 October; in simulation (Watterson Poor geometry, 2 equal paths 2 ms apart, 10 to 13 dB, M0LTE.Ms110d 0.4.1) Doppler spreads of 1, 2 and 3 Hz decode 94 to 100% with no fall-off along the burst, while a 200 ppm transmit/receive clock skew does produce a length-dependent cliff; the transmit audio to the Flex had an 80 ms pre-fill then exactly 187.5 packets/s, no gap over 12 ms, through every 28 s burst on 7 November.
+
+Figures for 9 November (the day after the fix) are in `after-cutoff.md`.
 
 The space weather analysis (`space-weather.md`) uses a 9 dB threshold and gets 65% against 26%; the paper uses results.py's 8 dB figures. Both say the same thing.

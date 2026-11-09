@@ -123,6 +123,11 @@ Share of frames heard in slots with a tone of 8 dB or more, from 25 October, lis
 | 18 s bursts | 67% | 57% | 61% | 122 |
 | 31 s bursts | 24% | 25% | 24% | 56 |
 
+The same, split by the reference fault (from 31 October 15:00):
+
+- before the fault: 63% over 114 receiver-slots
+- during the fault: 26% over 64 receiver-slots
+
 GM4CXF slot by slot on 2 November:
 
 - 09:00 wn4, 146 frames in 24 bursts: heard 62%, tone 10 dB, Doppler spread 0.52 Hz

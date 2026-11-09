@@ -282,6 +282,18 @@ print("|---|---|---|---|---|")
 for era in ("18 s bursts", "31 s bursts"):
     print(f"| {era} | {pct(acc[(era, 'WN3')][0], acc[(era, 'WN3')][1])} | {pct(acc[(era, 'WN4')][0], acc[(era, 'WN4')][1])} | {pct(acc[(era, 'both')][0], acc[(era, 'both')][1])} | {acc[(era, 'both')][2]} |")
 
+# The same, split by the transmitter's reference fault (31 October 15:00 to the end of 7 November)
+# rather than by burst length.
+fa = collections.defaultdict(lambda: [0, 0, 0])
+for r in rows:
+    if r["day"] < "2026-10-25" or not r["snr_db"] or float(r["snr_db"]) < 8 or " via " in r["who"]:
+        continue
+    n = sent[(r["day"], r["slot_utc"])][0]
+    fault = r["day"] > "2026-10-31" or (r["day"] == "2026-10-31" and r["slot_utc"] >= "15:00")
+    a = fa["during the fault" if fault else "before the fault"]; a[0] += int(r["frames"] or 0); a[1] += n; a[2] += 1
+print("\nThe same, split by the reference fault (from 31 October 15:00):\n")
+for k in ("before the fault", "during the fault"):
+    print(f"- {k}: {pct(fa[k][0], fa[k][1])} over {fa[k][2]} receiver-slots")
 print("\nGM4CXF slot by slot on 2 November:\n")
 for r in rows:
     if r["callsign"] == "GM4CXF" and r["day"] == "2026-11-02":
