@@ -984,6 +984,13 @@ day,callsign,slot_utc,station,waveform,frames,snr_db,offset_hz,ionosonde,psk_rep
 2026-11-05,EI7KX,14:00,,W4,33,9,0.1,unknown,unknown,3,1.6,-16,0.36,0.15,261,probe
 2026-11-05,EI7KX,15:00,,W3,9,13,0,unknown,unknown,4,1.6,-13,0.62,0.42,251,probe
 2026-11-05,EI7KX,16:00,,W4,21,8,0,unknown,unknown,2,1.6,-24,0.23,0.89,258,probe
+2026-11-05,G7TAJ,10:00,,W4,3,13,6.3,unknown,unknown,3,,,0.33,0.25,,probe
+2026-11-05,G7TAJ,11:00,,W3,12,8,6.7,unknown,good,3,3,-10,0.78,0.75,447,probe
+2026-11-05,G7TAJ,12:00,,W4,6,,,unknown,unknown,,,,,,,
+2026-11-05,G7TAJ,13:00,,W3,20,8,6.5,unknown,good,2,1.6,-8,0.6,0.57,248,bursts
+2026-11-05,G7TAJ,14:00,,W4,12,5,6.8,unknown,unknown,2,1.6,-14,0.38,0.19,251,probe
+2026-11-05,G7TAJ,15:00,,W3,1,,,unknown,unknown,1,,,0.33,1.2,,bursts
+2026-11-05,G7TAJ,16:00,,W4,10,15,7.2,unknown,unknown,2,,,0.38,0.89,,probe
 2026-11-05,GM4CXF,10:00,,W4,20,17,-0.1,unknown,unknown,2,1.4,-13,0.34,0.26,252,probe
 2026-11-05,GM4CXF,11:00,,W3,19,11,-0.2,unknown,good,3,1.2,-8,0.8,0.59,235,probe
 2026-11-05,GM4CXF,12:00,,W4,18,,,unknown,unknown,,,,,,,
