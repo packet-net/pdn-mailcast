@@ -1166,3 +1166,14 @@ day,callsign,slot_utc,station,waveform,frames,snr_db,offset_hz,ionosonde,psk_rep
 2026-11-09,GM4CXF,19:00,,,0,,,unknown,unknown,,,,,,,
 2026-11-09,GM4CXF,20:00,,,0,,,unknown,unknown,,,,,,,
 2026-11-09,GM4CXF,21:00,,,0,,,unknown,unknown,,,,,,,
+2026-11-09,GM8BPQ,10:00,,W4,4,1,20,unknown,unknown,1,,,0.4,0.26,,probe
+2026-11-09,GM8BPQ,11:00,,W3,17,,,unknown,good,1,,,0.49,0.38,,bursts
+2026-11-09,GM8BPQ,12:00,,,0,0,18.8,unknown,unknown,1,,,0.45,0.35,,probe
+2026-11-09,GM8BPQ,13:00,,,0,4,19.9,unknown,unknown,1,,,0.32,0.31,,probe
+2026-11-09,GM8BPQ,14:00,,,0,0,19.6,unknown,unknown,1,,,0.24,0.31,,probe
+2026-11-09,GM8BPQ,15:00,,W3,17,5,19.5,unknown,unknown,1,,,0.07,0.38,,probe
+2026-11-09,GM8BPQ,17:00,,W3,19,6,19.7,unknown,good,1,,,0.38,0.4,,probe
+2026-11-09,GM8BPQ,18:00,,W3,50,9,19.7,unknown,good,1,,,0.34,0.34,,probe
+2026-11-09,GM8BPQ,19:00,,,0,,,unknown,unknown,,,,,,,
+2026-11-09,GM8BPQ,20:00,,,0,,,unknown,unknown,,,,,,,
+2026-11-09,GM8BPQ,21:00,,,0,,,unknown,unknown,,,,,,,
