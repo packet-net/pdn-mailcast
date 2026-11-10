@@ -32,7 +32,14 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
 
     private sealed record Info(string Bid, bool Bulk, DateTimeOffset TakenIn, int Pass);
 
-    private sealed record SlotRec(DateTimeOffset At, int Day, int IndexInDay, int[] Frames, int[] Bursts, double OnAirMinutes, int[] RetiredBefore);
+    private sealed record SlotRec(DateTimeOffset At, int Day, int IndexInDay, int[] Frames, int[] Bursts, double OnAirMinutes, int[] RetiredBefore)
+    {
+        public int InRotation { get; init; }
+
+        public int LeftoverFrames { get; init; }
+
+        public int BulkFrames { get; init; }
+    }
 
     private sealed class Trace
     {
@@ -44,6 +51,8 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         public Dictionary<int, DateTimeOffset> BaseRetire { get; } = [];
 
         public int NearFlagged { get; set; }
+
+        public HashSet<int> Started { get; } = [];
     }
 
     private static readonly Lazy<(List<(TimeSpan At, Bulletin Bulletin, bool Bulk, int Pass)> Arrivals, int Span)> Intake = new(() =>
@@ -189,7 +198,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
 
     private static string Schedule => "\"modes\": [\"ms110d-wn4\", \"ms110d-wn3\"], \"bulk\": [\"LU9DCE\"]";
 
-    private static Trace Record(Config config, DateTimeOffset start, List<Info> infos)
+    private static Trace Record(Config config, DateTimeOffset start, List<Info> infos, string schedule)
     {
         var (arrivals, span) = Intake.Value;
         int days = span * 3;
@@ -197,7 +206,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         BroadcastScheduler.SimRetire.Value = new SimRetireOverride(config.Coverage, config.Hours, config.UsesNear ? near.Contains : null, config.NearCoverage, config.NearHours);
         try
         {
-            using var headEnd = new BudgetTests.HeadEnd(Schedule, realStore: true);
+            using var headEnd = new BudgetTests.HeadEnd(schedule, realStore: true);
             var timetable = headEnd.Config.ToSlotTimetable();
             var trace = new Trace();
             var index = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -236,7 +245,9 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
                         lastDay = d;
                         inDay = 0;
                     }
-                    var inRotation = headEnd.InRotation(slot).Select(c => index[c.Bid]).ToHashSet();
+                    var held = headEnd.InRotation(slot);
+                    var inRotation = held.Select(c => index[c.Bid]).ToHashSet();
+                    var leftover = held.Where(c => BroadcastScheduler.Leftover(c, slot, headEnd.Options.Budget!)).Select(c => index[c.Bid]).ToHashSet();
                     int[] retired = [.. active.Where(b => !inRotation.Contains(b))];
                     active = inRotation;
                     foreach (int b in inRotation.Where(b => firstSlot.ContainsKey(b) && !trace.BaseRetire.ContainsKey(b)))
@@ -250,7 +261,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
                     var (plan, waveform) = headEnd.Run(slot);
                     if (plan.BulletinFrames == 0)
                     {
-                        trace.Slots.Add(new SlotRec(slot, d, inDay++, [], [], 0, retired));
+                        trace.Slots.Add(new SlotRec(slot, d, inDay++, [], [], 0, retired) { InRotation = inRotation.Count });
                         continue;
                     }
                     var byObject = new Dictionary<ulong, int>();
@@ -268,7 +279,16 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
                     int[] frames = [.. plan.Frames.Select(f => byObject.TryGetValue(f.ObjectId, out int b) ? b : -1)];
                     int[] lengths = [.. plan.Frames.Select(f => f.ToBytes().Length + MailcastFrame.Ax25UiOverhead)];
                     int[] bursts = [.. new SlotAirtime(headEnd.Settings, waveform.Airtime).BurstSizes(lengths)];
-                    var rec = new SlotRec(slot, d, inDay++, frames, bursts, headEnd.OnAir(plan, waveform).TotalMinutes, retired);
+                    foreach (int b in frames.Where(b => b >= 0))
+                    {
+                        trace.Started.Add(b);
+                    }
+                    var rec = new SlotRec(slot, d, inDay++, frames, bursts, headEnd.OnAir(plan, waveform).TotalMinutes, retired)
+                    {
+                        InRotation = inRotation.Count,
+                        LeftoverFrames = frames.Count(b => b >= 0 && leftover.Contains(b)),
+                        BulkFrames = frames.Count(b => b >= 0 && infos[b].Bulk),
+                    };
                     trace.Slots.Add(rec);
                     foreach (var r in reporters)
                     {
@@ -386,8 +406,8 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         // Calibration: the real listeners, each on their own days, on the October season the reports came from, today's rule.
         {
             var infos = new List<Info>();
-            var trace = Record(Configs[0], new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero), infos);
-            Line("Calibration, October season, today's rule, each real listener on their own days (per day):");
+            var trace = Record(Configs[0], new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero), infos, "\"modes\": [\"ms110d-wn4\", \"ms110d-wn3\"]");
+            Line("Calibration, October season, rule without bulk last (as late October ran), each real listener on their own days (per day):");
             Line("| Listener | Share | Completed normal+bulk | Given up (half held) |");
             foreach (string call in Weak.Concat(Strong))
             {
@@ -401,13 +421,17 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         var start = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero);
         var results = new ConcurrentDictionary<(int, double), Result>();
         var airtime = new ConcurrentDictionary<int, (double Minutes, double Slots, int Flagged)>();
+        var detail = new ConcurrentDictionary<int, string>();
         var pools = Shares.ToDictionary(s => s, s => Pool.For(s < 0.4 ? Weak : Strong, s));
         Parallel.For(0, Configs.Length, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, c =>
         {
             var infos = new List<Info>();
-            var trace = Record(Configs[c], start, infos);
+            var trace = Record(Configs[c], start, infos, Schedule);
             var window = trace.Slots.Where(s => s.Day >= span && s.Day < 2 * span).ToList();
             airtime[c] = (window.Sum(s => s.OnAirMinutes) / span, window.Count(s => s.OnAirMinutes > 0) / (double)span, trace.NearFlagged);
+            var sending = window.Where(s => s.Frames.Length > 0).ToList();
+            var cohort = Enumerable.Range(0, infos.Count).Where(b => infos[b].Pass == 1).ToList();
+            detail[c] = string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {window.Average(s => s.InRotation):0.0} | {sending.Average(s => s.Frames.Length):0} | {sending.Average(s => s.Frames.Count(b => b < 0)):0.0} | {sending.Average(s => s.BulkFrames):0.0} | {sending.Average(s => s.LeftoverFrames):0.0} | {cohort.Count(b => !infos[b].Bulk && !trace.Started.Contains(b))} | {cohort.Count(b => infos[b].Bulk && !trace.Started.Contains(b))} of {cohort.Count(b => infos[b].Bulk)} |");
             foreach (double share in Shares)
             {
                 results[(c, share)] = Evaluate(trace, infos, pools[share], listeners, span);
@@ -422,6 +446,13 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         for (int c = 0; c < Configs.Length; c++)
         {
             Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {airtime[c].Minutes:0.0} | {airtime[c].Slots:0.0} | {(Configs[c].UsesNear ? airtime[c].Flagged.ToString(CultureInfo.InvariantCulture) : "")} |"));
+        }
+        Line("");
+        Line("| Rule | In rotation | Frames per sending slot | Directory and other frames | Bulk frames | Leftover-tier frames | Normal never sent | Bulk never sent |");
+        Line("|---|---|---|---|---|---|---|---|");
+        for (int c = 0; c < Configs.Length; c++)
+        {
+            Line(detail[c]);
         }
         foreach (double share in Shares)
         {
