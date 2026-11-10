@@ -476,7 +476,9 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
             Seeds.Average(s => results[(c, s, share)].GivenUpNormal), Seeds.Average(s => results[(c, s, share)].GivenUpBulk),
             Seeds.Average(s => results[(c, s, share)].Rescued), Seeds.Average(s => results[(c, s, share)].NormalIn24h), Seeds.Average(s => results[(c, s, share)].NormalMedianHours));
 
-        Line(string.Create(CultureInfo.InvariantCulture, $"November season (from 3 Nov), cohort = the middle of three passes of the real intake ({span} days, {Intake(Seeds[0]).Arrivals.Count(a => a.Pass == 1 && !a.Bulk)} normal and {Intake(Seeds[0]).Arrivals.Count(a => a.Pass == 1 && a.Bulk)} bulk bulletins), {listeners} listeners per share, averaged over {Seeds.Length} arrival-time seeds.");
+        int normalCount = Intake(Seeds[0]).Arrivals.Count(a => a.Pass == 1 && !a.Bulk);
+        int bulkCount = Intake(Seeds[0]).Arrivals.Count(a => a.Pass == 1 && a.Bulk);
+        Line(string.Create(CultureInfo.InvariantCulture, $"November season (from 3 Nov), cohort = the middle of three passes of the real intake ({span} days, {normalCount} normal and {bulkCount} bulk bulletins), {listeners} listeners per share, averaged over {Seeds.Length} arrival-time seeds.");
         Line("");
         Line("Head end, per day and per sending slot (cohort window):");
         Line("");
