@@ -293,6 +293,12 @@ public sealed class SlotBroadcast
     /// </summary>
     public int LeftoverBulletins { get; internal init; }
 
+    /// <summary>
+    /// How many of this head end's own bulletins are in rotation in this slot. The directory lists only those that have started or
+    /// get their first pieces in this slot (<see cref="BroadcastScheduler.Started"/>), so this can be more than the own entries in <see cref="Directory"/>.
+    /// </summary>
+    public int OwnInRotation { get; internal init; }
+
     /// <summary>How many of this head end's own normal bulletins this slot carries pieces of, leaving out the leftover tier's turn (issue #234).</summary>
     public int NormalCarried { get; internal init; }
 
@@ -457,6 +463,16 @@ public static class BroadcastScheduler
             return SlotIndex(carried, slot, options) is var i && i >= 0 && i < options.SlotsInRotation;
         }
         return slot >= first && slot < RotationEnd(first, options);
+    }
+
+    /// <summary>
+    /// Whether a bulletin has started: any piece of it has ever been sent (it has a first slot, or sent ESIs, daylight or evening).
+    /// One held from before with no stored first slot counts from its sent ESIs.
+    /// </summary>
+    public static bool Started(CarriedBulletin carried)
+    {
+        ArgumentNullException.ThrowIfNull(carried);
+        return carried.FirstSlot is not null || carried.NextEsi > 0 || carried.EveningNextEsi > 0;
     }
 
     /// <summary>
@@ -792,6 +808,7 @@ public static class BroadcastScheduler
 
         var bulletins = new List<(CarriedBulletin Carried, int Index)>();
         var leftover = new List<bool>();
+        var ownEntries = new List<DirectoryEntry>(); // parallel to bulletins; the directory's line for each
         var entries = new List<DirectoryEntry>();
         var takenBids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var takenIds = new HashSet<ulong>();
@@ -803,10 +820,11 @@ public static class BroadcastScheduler
             }
             bulletins.Add((c, index));
             leftover.Add(options.Budget is { } r && LeftoverAt(c.NextEsi + (long)Others(c), c.Transfer.SourceSymbols, c.FirstSlot, slot, r));
-            entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind,
+            ownEntries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind,
                 options.Signer is null ? null : ObjectId.LongHash(c.Transfer.DictionaryId, c.Transfer.Bytes),
                 c.Envelope is { } env ? new EnvelopeLink(env.ObjectId, ObjectId.LongHash(env.DictionaryId, env.Bytes)) : null));
         }
+        var relayEntries = new List<DirectoryEntry>();
 
         // Relayed objects (issue #218) join under the budget rule, after the bulletins so that ties go to those. A complete, checked one
         // is listed with a long hash computed from its own octets; until then it is sent but unlisted.
@@ -828,7 +846,7 @@ public static class BroadcastScheduler
                 if (r.Listing is { } l && r.Transfer is { } transfer)
                 {
                     takenBids.Add(l.Bid);
-                    entries.Add(new DirectoryEntry(r.ObjectId, r.DictionaryId, l.Size, l.Bid, l.Title, r.Type,
+                    relayEntries.Add(new DirectoryEntry(r.ObjectId, r.DictionaryId, l.Size, l.Bid, l.Title, r.Type,
                         options.Signer is null ? null : ObjectId.LongHash(transfer.DictionaryId, transfer.Bytes),
                         r.Envelope is { } renv ? new EnvelopeLink(renv.ObjectId, ObjectId.LongHash(renv.DictionaryId, renv.Bytes)) : null));
                 }
@@ -845,31 +863,58 @@ public static class BroadcastScheduler
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
-        var directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts, options.Details);
-        var directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
-        uint directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
-
+        BroadcastDirectory directory;
+        TransferObject directoryObject;
+        uint directoryFirst;
         int[] counts;
         int[] main; // of each count, the pieces from before the leftover tier's turn, which go first
         anyRoom = false;
-        if (options.Budget is { } rule)
+
+        // The directory lists a bulletin from the slot in which its first piece is sent until it retires, never one that has not
+        // started: its line would cost directory bytes in every slot for up to 48 hours. Under the budget rule whether an unstarted
+        // bulletin gets pieces depends on the room the directory leaves, and the directory depends on which get pieces, so plan
+        // again, adding the unstarted bulletins that got pieces, until no more do. The set only grows, so this ends. Without the
+        // budget rule every bulletin in rotation is sent from its first slot, so every one is listed.
+        var starting = new HashSet<ulong>();
+        bool Listed(CarriedBulletin c) => options.Budget is null || Started(c) || starting.Contains(c.Transfer.ObjectId);
+        while (true)
         {
-            counts = Fill([.. bulletins.Select(b => new FillItem(b.Carried, null, Others(b.Carried), rule, evening)), .. relays.Select(r => new FillItem(null, r, 0, rule))], [.. leftover, .. relayLeftover], directoryObject, options, rule, budget!, extras, out anyRoom, out main);
-        }
-        else
-        {
-            counts = new int[bulletins.Count];
+            entries = [.. ownEntries.Where((_, i) => Listed(bulletins[i].Carried)), .. relayEntries];
+            directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts, options.Details);
+            directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
+            directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
+            if (options.Budget is { } rule)
+            {
+                counts = Fill([.. bulletins.Select(b => new FillItem(b.Carried, null, Others(b.Carried), rule, evening)), .. relays.Select(r => new FillItem(null, r, 0, rule))], [.. leftover, .. relayLeftover], directoryObject, options, rule, budget!, extras, out anyRoom, out main);
+            }
+            else
+            {
+                counts = new int[bulletins.Count];
+                for (int i = 0; i < bulletins.Count; i++)
+                {
+                    // Everything due up to and including this slot, less what has gone already. For a head
+                    // end whose every slot went out whole that is exactly this slot's share; frames a
+                    // cut-short or skipped slot did not send are added to the next slot's, and a second plan
+                    // of the same slot sends only what the first did not.
+                    var c = bulletins[i].Carried;
+                    uint due = (uint)DueAt(c.Transfer.SourceSymbols, c.FirstSlot ?? slot, slot, options);
+                    counts[i] = c.NextEsi >= due ? 0 : (int)(due - c.NextEsi);
+                }
+                main = counts;
+            }
+            bool grew = false;
             for (int i = 0; i < bulletins.Count; i++)
             {
-                // Everything due up to and including this slot, less what has gone already. For a head
-                // end whose every slot went out whole that is exactly this slot's share; frames a
-                // cut-short or skipped slot did not send are added to the next slot's, and a second plan
-                // of the same slot sends only what the first did not.
-                var c = bulletins[i].Carried;
-                uint due = (uint)DueAt(c.Transfer.SourceSymbols, c.FirstSlot ?? slot, slot, options);
-                counts[i] = c.NextEsi >= due ? 0 : (int)(due - c.NextEsi);
+                if (counts[i] > 0 && !Listed(bulletins[i].Carried))
+                {
+                    starting.Add(bulletins[i].Carried.Transfer.ObjectId);
+                    grew = true;
+                }
             }
-            main = counts;
+            if (!grew)
+            {
+                break;
+            }
         }
 
         var itemRule = options.Budget ?? new BudgetRule();
@@ -878,7 +923,7 @@ public static class BroadcastScheduler
         int? directoryCap = null;
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, evening ? 0 : leftover.Count(l => l), directoryCap, relayListed, Carried(allItems, main, bulletins.Count), evening);
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, evening ? 0 : leftover.Count(l => l), directoryCap, relayListed, Carried(allItems, main, bulletins.Count), evening, bulletins.Count);
             if (budget is null || options.Budget is null
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {
@@ -1131,7 +1176,7 @@ public static class BroadcastScheduler
     /// the slot's first part and the rest (the leftover tier's turn) after them all, so a slot cut
     /// short loses the leftover tier's pieces before any other.
     /// </summary>
-    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, List<RelayedObject> relays, int[] counts, int[] main, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null, int relayListed = 0, (int Normal, int Bulk) carriedNow = default, bool evening = false)
+    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, List<RelayedObject> relays, int[] counts, int[] main, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null, int relayListed = 0, (int Normal, int Bulk) carriedNow = default, bool evening = false, int ownInRotation = 0)
     {
         var scheduled = new List<ScheduledObject>();
         for (int i = 0; i < bulletins.Count; i++)
@@ -1260,9 +1305,9 @@ public static class BroadcastScheduler
                 int place = 1 + (int)((((2L * i) + 1) * before) / (2L * extras.Count));
                 frames.Insert(Math.Min(place, frames.Count), extras[i]);
             }
-            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras) { LeftoverBulletins = leftoverBulletins, Relayed = relayed, RelayListed = relayListed, NormalCarried = carriedNow.Normal, BulkCarried = carriedNow.Bulk, Evening = evening };
+            return new SlotBroadcast(slot, directory, scheduled, frames, [], extras) { LeftoverBulletins = leftoverBulletins, Relayed = relayed, RelayListed = relayListed, NormalCarried = carriedNow.Normal, BulkCarried = carriedNow.Bulk, Evening = evening, OwnInRotation = ownInRotation };
         }
-        return new SlotBroadcast(slot, directory, scheduled, frames, []) { LeftoverBulletins = leftoverBulletins, Relayed = relayed, RelayListed = relayListed, NormalCarried = carriedNow.Normal, BulkCarried = carriedNow.Bulk, Evening = evening };
+        return new SlotBroadcast(slot, directory, scheduled, frames, []) { LeftoverBulletins = leftoverBulletins, Relayed = relayed, RelayListed = relayListed, NormalCarried = carriedNow.Normal, BulkCarried = carriedNow.Bulk, Evening = evening, OwnInRotation = ownInRotation };
     }
 
     /// <summary>Midnight UTC at the start of a day.</summary>
