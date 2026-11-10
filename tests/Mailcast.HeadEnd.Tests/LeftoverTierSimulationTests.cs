@@ -245,9 +245,9 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
                         lastDay = d;
                         inDay = 0;
                     }
-                    var held = headEnd.InRotation(slot);
-                    var inRotation = held.Select(c => index[c.Bid]).ToHashSet();
-                    var leftover = held.Where(c => BroadcastScheduler.Leftover(c, slot, headEnd.Options.Budget!)).Select(c => index[c.Bid]).ToHashSet();
+                    var rotation = headEnd.InRotation(slot);
+                    var inRotation = rotation.Select(c => index[c.Bid]).ToHashSet();
+                    var leftover = rotation.Where(c => BroadcastScheduler.Leftover(c, slot, headEnd.Options.Budget!)).Select(c => index[c.Bid]).ToHashSet();
                     int[] retired = [.. active.Where(b => !inRotation.Contains(b))];
                     active = inRotation;
                     foreach (int b in inRotation.Where(b => firstSlot.ContainsKey(b) && !trace.BaseRetire.ContainsKey(b)))
