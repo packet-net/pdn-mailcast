@@ -485,7 +485,8 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         for (int c = 0; c < Configs.Length; c++)
         {
             var l = L(c);
-            Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {l.Minutes:0.0} | {l.Slots:0.0} | {l.InRotation:0.0} | {l.Frames:0} | {l.Directory:0.0} | {l.Bulk:0.0} | {l.Leftover:0.0} | {l.NormalNeverSent:0.0} | {l.BulkNeverSent:0.0} | {(Configs[c].Reports ? l.Flagged.ToString("0", CultureInfo.InvariantCulture) : "")} |"));
+            string flagged = Configs[c].Reports ? l.Flagged.ToString("0", CultureInfo.InvariantCulture) : "";
+            Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {l.Minutes:0.0} | {l.Slots:0.0} | {l.InRotation:0.0} | {l.Frames:0} | {l.Directory:0.0} | {l.Bulk:0.0} | {l.Leftover:0.0} | {l.NormalNeverSent:0.0} | {l.BulkNeverSent:0.0} | {flagged} |"));
         }
         foreach (double share in Shares)
         {
