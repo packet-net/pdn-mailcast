@@ -25,9 +25,16 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
 {
     private const double InBurst = 0.95;
 
-    private sealed record Config(string Name, double Coverage, double Hours, double NearCoverage = 0, double NearHours = 0, double NearShare = 0)
+    /// <summary>
+    /// A rule to try: retirement at <paramref name="Coverage"/> K or <paramref name="Hours"/> h, and for the bulletins it singles out
+    /// (the normal ones with <paramref name="NormalOnly"/>, or those a reporting listener holds <paramref name="NearShare"/> of K of,
+    /// as of yesterday's reports) at <paramref name="NearCoverage"/> K or <paramref name="NearHours"/> h.
+    /// </summary>
+    private sealed record Config(string Name, double Coverage, double Hours, double NearCoverage = 0, double NearHours = 0, double NearShare = 0, bool NormalOnly = false, bool StrongReportersOnly = false)
     {
-        public bool UsesNear => NearShare > 0;
+        public bool UsesNear => NearShare > 0 || NormalOnly;
+
+        public bool Reports => NearShare > 0;
     }
 
     private sealed record Info(string Bid, bool Bulk, DateTimeOffset TakenIn, int Pass);
@@ -55,7 +62,13 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         public HashSet<int> Started { get; } = [];
     }
 
-    private static readonly Lazy<(List<(TimeSpan At, Bulletin Bulletin, bool Bulk, int Pass)> Arrivals, int Span)> Intake = new(() =>
+    private static readonly ConcurrentDictionary<int, Lazy<(List<(TimeSpan At, Bulletin Bulletin, bool Bulk, int Pass)> Arrivals, int Span)>> Intakes = new();
+
+    /// <summary>The real intake three times over, each bulletin at a random minute of its day (<paramref name="seed"/>).</summary>
+    private static (List<(TimeSpan At, Bulletin Bulletin, bool Bulk, int Pass)> Arrivals, int Span) Intake(int seed) =>
+        Intakes.GetOrAdd(seed, s => new(() => MakeIntake(s))).Value;
+
+    private static (List<(TimeSpan At, Bulletin Bulletin, bool Bulk, int Pass)> Arrivals, int Span) MakeIntake(int seed)
     {
         var rows = new List<(string Suffix, int K, int Day)>();
         DateOnly? first = null;
@@ -67,7 +80,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
             rows.Add((f[2], int.Parse(f[3], CultureInfo.InvariantCulture), day.DayNumber - first.Value.DayNumber));
         }
         int span = rows.Max(r => r.Day) + 1;
-        var rng = new Random(2026);
+        var rng = new Random(seed);
         var arrivals = new List<(TimeSpan, Bulletin, bool, int)>();
         for (int pass = 0; pass < 3; pass++)
         {
@@ -80,7 +93,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         }
         arrivals.Sort((a, b) => a.Item1.CompareTo(b.Item1));
         return (arrivals, span);
-    });
+    }
 
     /// <summary>A made-up bulletin of exactly <paramref name="k"/> pieces from <paramref name="from"/>.</summary>
     private static Bulletin MakeWithK(int seed, int k, string from)
@@ -198,9 +211,9 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
 
     private static string Schedule => "\"modes\": [\"ms110d-wn4\", \"ms110d-wn3\"], \"bulk\": [\"LU9DCE\"]";
 
-    private static Trace Record(Config config, DateTimeOffset start, List<Info> infos, string schedule)
+    private static Trace Record(Config config, DateTimeOffset start, List<Info> infos, string schedule, int seed)
     {
-        var (arrivals, span) = Intake.Value;
+        var (arrivals, span) = Intake(seed);
         int days = span * 3;
         var near = new HashSet<string>(StringComparer.Ordinal);
         BroadcastScheduler.SimRetire.Value = new SimRetireOverride(config.Coverage, config.Hours, config.UsesNear ? near.Contains : null, config.NearCoverage, config.NearHours);
@@ -212,7 +225,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
             var index = new Dictionary<string, int>(StringComparer.Ordinal);
             var sentBefore = new Dictionary<int, int>();
             var firstSlot = new Dictionary<int, DateTimeOffset>();
-            var reporters = config.UsesNear ? Weak.Concat(Strong).Select((c, i) => new Listener(Pool.For([c], null), 900 + i)).ToList() : [];
+            var reporters = config.Reports ? (config.StrongReportersOnly ? Strong : Weak.Concat(Strong)).Select((c, i) => new Listener(Pool.For([c], null), 900 + i)).ToList() : [];
             var active = new HashSet<int>();
             int next = 0;
             int lastDay = -1;
@@ -226,6 +239,10 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
                         var a = arrivals[next++];
                         var takenIn = start.Add(a.At);
                         index[a.Bulletin.Bid] = infos.Count;
+                        if (config.NormalOnly && !a.Bulk)
+                        {
+                            near.Add(a.Bulletin.Bid);
+                        }
                         infos.Add(new Info(a.Bulletin.Bid, a.Bulk, takenIn, a.Pass));
                         headEnd.Offer(a.Bulletin, DateOnly.FromDateTime(takenIn.UtcDateTime), takenIn);
                     }
@@ -375,12 +392,19 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         new("12 K / 96 h", 12, 96),
         new("15 K / 96 h", 15, 96),
         new("20 K / 96 h", 20, 96),
-        new("near (half held): 15 K / 72 h", 10, 48, 15, 72, 0.5),
-        new("near (half held): 20 K / 96 h", 10, 48, 20, 96, 0.5),
-        new("near (0.8 K held): 20 K / 96 h", 10, 48, 20, 96, 0.8),
+        new("normal only: 15 K / 72 h", 10, 48, 15, 72, NormalOnly: true),
+        new("normal only: 20 K / 96 h", 10, 48, 20, 96, NormalOnly: true),
+        new("near, half held, any reporter: 15 K / 72 h", 10, 48, 15, 72, 0.5),
+        new("near, half held, any reporter: 20 K / 96 h", 10, 48, 20, 96, 0.5),
+        new("near, 0.8 K held, any reporter: 20 K / 96 h", 10, 48, 20, 96, 0.8),
+        new("near, half held, strong reporters: 20 K / 96 h", 10, 48, 20, 96, 0.5, StrongReportersOnly: true),
     ];
 
     private static readonly double[] Shares = [0.15, 0.25, 0.50, 0.75];
+
+    private static readonly int[] Seeds = [2026, 7, 99];
+
+    private sealed record Load(double Minutes, double Slots, double Flagged, double InRotation, double Frames, double Directory, double Bulk, double Leftover, double NormalNeverSent, double BulkNeverSent);
 
     [Fact]
     public void Sweep_LeftoverTier()
@@ -392,7 +416,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
             return;
         }
         int listeners = int.TryParse(Environment.GetEnvironmentVariable("SIM241_LISTENERS"), out int n) ? n : 200;
-        var (_, span) = Intake.Value;
+        int span = Intake(Seeds[0]).Span;
         var report = new StringBuilder();
         void Line(string s)
         {
@@ -403,12 +427,14 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
             }
         }
 
-        // Calibration: the real listeners, each on their own days, on the October season the reports came from, today's rule.
+        // Calibration: the real listeners, each on their own days, on the October season the reports came from.
         {
             var infos = new List<Info>();
-            var trace = Record(Configs[0], new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero), infos, "\"modes\": [\"ms110d-wn4\", \"ms110d-wn3\"]");
+            var trace = Record(Configs[0], new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero), infos, "\"modes\": [\"ms110d-wn4\", \"ms110d-wn3\"]", Seeds[0]);
             Line("Calibration, October season, rule without bulk last (as late October ran), each real listener on their own days (per day):");
+            Line("");
             Line("| Listener | Share | Completed normal+bulk | Given up (half held) |");
+            Line("|---|---|---|---|");
             foreach (string call in Weak.Concat(Strong))
             {
                 var pool = Pool.For([call], null);
@@ -419,51 +445,58 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         }
 
         var start = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero);
-        var results = new ConcurrentDictionary<(int, double), Result>();
-        var airtime = new ConcurrentDictionary<int, (double Minutes, double Slots, int Flagged)>();
-        var detail = new ConcurrentDictionary<int, string>();
+        var results = new ConcurrentDictionary<(int, int, double), Result>();
+        var loads = new ConcurrentDictionary<(int, int), Load>();
         var pools = Shares.ToDictionary(s => s, s => Pool.For(s < 0.4 ? Weak : Strong, s));
-        Parallel.For(0, Configs.Length, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, c =>
+        var jobs = Enumerable.Range(0, Configs.Length).SelectMany(c => Seeds.Select(seed => (c, seed))).ToList();
+        Parallel.ForEach(jobs, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, job =>
         {
+            var (c, seed) = job;
             var infos = new List<Info>();
-            var trace = Record(Configs[c], start, infos, Schedule);
+            var trace = Record(Configs[c], start, infos, Schedule, seed);
             var window = trace.Slots.Where(s => s.Day >= span && s.Day < 2 * span).ToList();
-            airtime[c] = (window.Sum(s => s.OnAirMinutes) / span, window.Count(s => s.OnAirMinutes > 0) / (double)span, trace.NearFlagged);
             var sending = window.Where(s => s.Frames.Length > 0).ToList();
             var cohort = Enumerable.Range(0, infos.Count).Where(b => infos[b].Pass == 1).ToList();
-            detail[c] = string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {window.Average(s => s.InRotation):0.0} | {sending.Average(s => s.Frames.Length):0} | {sending.Average(s => s.Frames.Count(b => b < 0)):0.0} | {sending.Average(s => s.BulkFrames):0.0} | {sending.Average(s => s.LeftoverFrames):0.0} | {cohort.Count(b => !infos[b].Bulk && !trace.Started.Contains(b))} | {cohort.Count(b => infos[b].Bulk && !trace.Started.Contains(b))} of {cohort.Count(b => infos[b].Bulk)} |");
+            loads[(c, seed)] = new Load(window.Sum(s => s.OnAirMinutes) / span, sending.Count / (double)span, trace.NearFlagged, window.Average(s => s.InRotation),
+                sending.Average(s => s.Frames.Length), sending.Average(s => s.Frames.Count(b => b < 0)), sending.Average(s => s.BulkFrames), sending.Average(s => s.LeftoverFrames),
+                cohort.Count(b => !infos[b].Bulk && !trace.Started.Contains(b)), cohort.Count(b => infos[b].Bulk && !trace.Started.Contains(b)));
             foreach (double share in Shares)
             {
-                results[(c, share)] = Evaluate(trace, infos, pools[share], listeners, span);
+                results[(c, seed, share)] = Evaluate(trace, infos, pools[share], listeners, span);
             }
-            Line(string.Create(CultureInfo.InvariantCulture, $"<!-- done: {Configs[c].Name} -->"));
+            Line(string.Create(CultureInfo.InvariantCulture, $"<!-- done: {Configs[c].Name}, seed {seed} -->"));
         });
 
-        Line(string.Create(CultureInfo.InvariantCulture, $"November season (from 3 Nov), cohort = the middle of three passes of the real intake ({span} days), {listeners} listeners per share. Per day:"));
+        Load L(int c) => new(
+            Seeds.Average(s => loads[(c, s)].Minutes), Seeds.Average(s => loads[(c, s)].Slots), Seeds.Average(s => loads[(c, s)].Flagged), Seeds.Average(s => loads[(c, s)].InRotation),
+            Seeds.Average(s => loads[(c, s)].Frames), Seeds.Average(s => loads[(c, s)].Directory), Seeds.Average(s => loads[(c, s)].Bulk), Seeds.Average(s => loads[(c, s)].Leftover),
+            Seeds.Average(s => loads[(c, s)].NormalNeverSent), Seeds.Average(s => loads[(c, s)].BulkNeverSent));
+        Result R(int c, double share) => new(
+            Seeds.Average(s => results[(c, s, share)].CompletedNormal), Seeds.Average(s => results[(c, s, share)].CompletedBulk),
+            Seeds.Average(s => results[(c, s, share)].GivenUpNormal), Seeds.Average(s => results[(c, s, share)].GivenUpBulk),
+            Seeds.Average(s => results[(c, s, share)].Rescued), Seeds.Average(s => results[(c, s, share)].NormalIn24h), Seeds.Average(s => results[(c, s, share)].NormalMedianHours));
+
+        Line(string.Create(CultureInfo.InvariantCulture, $"November season (from 3 Nov), cohort = the middle of three passes of the real intake ({span} days, {Intake(Seeds[0]).Arrivals.Count(a => a.Pass == 1 && !a.Bulk)} normal and {Intake(Seeds[0]).Arrivals.Count(a => a.Pass == 1 && a.Bulk)} bulk bulletins), {listeners} listeners per share, averaged over {Seeds.Length} arrival-time seeds.");
         Line("");
-        Line("| Rule | On air min/day | Slots/day | Bulletins flagged near |");
-        Line("|---|---|---|---|");
+        Line("Head end, per day and per sending slot (cohort window):");
+        Line("");
+        Line("| Rule | On air min/day | Slots/day | In rotation | Frames per slot | Directory and envelope frames | Bulk frames | Leftover-tier frames | Normal never sent (cohort) | Bulk never sent (cohort) | Bulletins flagged near |");
+        Line("|---|---|---|---|---|---|---|---|---|---|---|");
         for (int c = 0; c < Configs.Length; c++)
         {
-            Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {airtime[c].Minutes:0.0} | {airtime[c].Slots:0.0} | {(Configs[c].UsesNear ? airtime[c].Flagged.ToString(CultureInfo.InvariantCulture) : "")} |"));
-        }
-        Line("");
-        Line("| Rule | In rotation | Frames per sending slot | Directory and other frames | Bulk frames | Leftover-tier frames | Normal never sent | Bulk never sent |");
-        Line("|---|---|---|---|---|---|---|---|");
-        for (int c = 0; c < Configs.Length; c++)
-        {
-            Line(detail[c]);
+            var l = L(c);
+            Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {l.Minutes:0.0} | {l.Slots:0.0} | {l.InRotation:0.0} | {l.Frames:0} | {l.Directory:0.0} | {l.Bulk:0.0} | {l.Leftover:0.0} | {l.NormalNeverSent:0.0} | {l.BulkNeverSent:0.0} | {(Configs[c].Reports ? l.Flagged.ToString("0", CultureInfo.InvariantCulture) : "")} |"));
         }
         foreach (double share in Shares)
         {
             Line("");
-            Line(string.Create(CultureInfo.InvariantCulture, $"Listener hearing {share:P0} of frames:"));
+            Line(string.Create(CultureInfo.InvariantCulture, $"Listener hearing {share:P0} of frames, per day:"));
             Line("");
             Line("| Rule | Completed normal | Completed bulk | Given up normal | Given up bulk | Rescued (finished after today's retirement point) | Normal done within 24 h | Normal median hours |");
             Line("|---|---|---|---|---|---|---|---|");
             for (int c = 0; c < Configs.Length; c++)
             {
-                var r = results[(c, share)];
+                var r = R(c, share);
                 Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {r.CompletedNormal:0.00} | {r.CompletedBulk:0.00} | {r.GivenUpNormal:0.00} | {r.GivenUpBulk:0.00} | {r.Rescued:0.00} | {r.NormalIn24h:0.00} | {r.NormalMedianHours:0.0} |"));
             }
         }
