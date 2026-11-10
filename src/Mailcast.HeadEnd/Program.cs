@@ -398,6 +398,10 @@ public static partial class Program
         {
             journal.Write("config: schedule.symbolSize is ignored (pieces are always 240 octets); harmless to keep");
         }
+        if (config.Slot.ToneHz is not null)
+        {
+            journal.Write("config: slot.toneHz is ignored (the tone always goes at the centre of the data, where pdn-soundmodem says the modem sits); harmless to keep");
+        }
         SlotSettings settings = config.ToSlotSettings();
         Waveforms waveforms = config.ToWaveforms(Waveforms.Measure);
         var store = new RotationStore(config.StateDirectory, Compression.Default, scheduleOptions, journal);

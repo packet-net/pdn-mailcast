@@ -226,7 +226,6 @@ public sealed record HeadEndConfig
         RequireClockSync = Slot.RequireClockSync,
         WhenStillBusy = Slot.WhenStillBusy,
         ToneLength = TimeSpan.FromSeconds(Slot.Tone),
-        ToneHz = Slot.ToneHz,
         SignalHz = FrequencyHz,
         SignalLsb = Sideband is not null && Sideband.Equals("lsb", StringComparison.OrdinalIgnoreCase),
         PauseAfterTone = TimeSpan.FromSeconds(Slot.PauseAfterToneSeconds),
@@ -911,7 +910,11 @@ public sealed record SlotConfig
     [JsonIgnore]
     public double Tone => ToneSeconds ?? (EveryMinutes == 1440 ? 30 : 10);
 
-    public double ToneHz { get; init; } = 1800;
+    /// <summary>
+    /// No longer used: the tone and probe always go at the centre of the slot's data, where the station
+    /// says its modem sits. Still read so an old file loads; the head end says once at start-up that it is ignored.
+    /// </summary>
+    public double? ToneHz { get; init; }
 
     public double PauseAfterToneSeconds { get; init; } = 8;
 

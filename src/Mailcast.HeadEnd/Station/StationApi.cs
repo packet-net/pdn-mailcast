@@ -22,7 +22,7 @@ public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem, boo
     /// <summary>The dial the station tuned to, in Hz, when it said.</summary>
     public double? DialHz { get; init; }
 
-    /// <summary>The audio centre of the holder's modem in Hz (<c>audioCentreHz</c>), when the station tuned and said.</summary>
+    /// <summary>The audio centre of the holder's modem in Hz (<c>audioCentreHz</c>), when the station said: a tuned lease from pdn-soundmodem 0.101.0, any lease from a later one.</summary>
     public double? AudioCentreHz { get; init; }
 
     /// <summary>The station's note on the tuning (why it did not tune), when it gave one.</summary>
