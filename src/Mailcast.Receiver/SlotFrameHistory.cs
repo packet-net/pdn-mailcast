@@ -124,8 +124,9 @@ public sealed record HeardSlotPieces(DateTimeOffset Slot, IReadOnlyList<HeardBur
 /// the audio side only ever hands off a lightweight, already-published snapshot
 /// (<see cref="BurstWatch.Shown"/> for a burst's identity and waveform, <see cref="ChannelReport"/>
 /// for its SNR once measured), and this class does the recording and bookkeeping on the worker.</para>
-/// <para>This is a live debugging view, not an archive: it does not survive a restart, and
-/// nothing here is written to disk.</para>
+/// <para>A live look, not an archive: the host saves it with the rest of the page's history
+/// (<see cref="StatusMemory"/>) at a slot's end and at shutdown, never per piece, so a restart
+/// does not empty it.</para>
 /// <para>Bounded two ways, whichever binds first: at most <see cref="MostSlots"/> slots, and at
 /// most <see cref="MostFrames"/> pieces in total. The oldest slot is dropped first, but the
 /// newest slot is never dropped even if it alone holds more than <see cref="MostFrames"/> pieces.</para>
@@ -244,6 +245,32 @@ public sealed class SlotFrameHistory
         {
             var working = _slots.FirstOrDefault(s => s.Slot == slot);
             return working is null ? null : Snapshot(working);
+        }
+    }
+
+    /// <summary>
+    /// Puts back slots kept from before a restart (<see cref="StatusMemory"/>), oldest first,
+    /// within the same bounds as <see cref="Record"/>. Anything already recorded is replaced.
+    /// </summary>
+    public void Restore(IEnumerable<HeardSlotPieces> slots)
+    {
+        ArgumentNullException.ThrowIfNull(slots);
+        lock (_gate)
+        {
+            _slots.Clear();
+            _totalPieces = 0;
+            foreach (var slot in slots.Where(s => s?.Bursts is not null).OrderBy(s => s.Slot))
+            {
+                var working = NewSlot(slot.Slot);
+                foreach (var burst in slot.Bursts.Where(b => b?.Pieces is not null))
+                {
+                    var restored = NewBurst(working, burst.Started, burst.Waveform);
+                    restored.SnrDb = burst.SnrDb;
+                    restored.Pieces.AddRange(burst.Pieces.Where(p => p is not null));
+                    _totalPieces += restored.Pieces.Count;
+                }
+            }
+            Trim();
         }
     }
 

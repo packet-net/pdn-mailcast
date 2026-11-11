@@ -485,6 +485,51 @@ public sealed class SlotTracker
         }
     }
 
+    /// <summary>The slot tracked and the newest slot that has had its summary line, for <see cref="StatusMemory"/>.</summary>
+    internal (SlotSummary? Current, DateTimeOffset? LastEnded) Saved()
+    {
+        lock (_gate)
+        {
+            return (_current, _lastEnded);
+        }
+    }
+
+    /// <summary>The newest slot that has had its summary line, if any.</summary>
+    internal DateTimeOffset? LastEnded
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lastEnded;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Puts back what was tracked before a restart (<see cref="StatusMemory"/>). A slot whose
+    /// window closed while the receiver was stopped counts as having had its line: the journal
+    /// gets no late line for it, and a new one is not mixed with it.
+    /// </summary>
+    internal void Restore(SlotSummary? current, DateTimeOffset? lastEnded)
+    {
+        var now = _time.GetUtcNow();
+        lock (_gate)
+        {
+            if (current is { Ended: false, Scheduled: { } slot } && now >= slot + ReceiverConfig.WebSdrAfter)
+            {
+                current = current with { Ended = true };
+                lastEnded = lastEnded is { } ended && ended > slot ? ended : slot;
+            }
+            _current = current;
+            _lastEnded = lastEnded;
+            if (current?.LastFrame is { } frame && (_lastHeard is null || frame > _lastHeard))
+            {
+                _lastHeard = frame;
+            }
+        }
+    }
+
     /// <summary>The station of a slot, when more than one is followed; under <see cref="_gate"/>.</summary>
     private string? StationOf(DateTimeOffset? slot) =>
         slot is { } start && _schedule is { OneStation: false } followed ? followed.StationAt(start) : null;
