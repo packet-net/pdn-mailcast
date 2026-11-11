@@ -69,7 +69,7 @@ public sealed class SlotRunner
     private readonly IClockSync? _clock;
     private int _saidNotTuned;
     private int _saidNoRetune;
-    private int _saidNoTone;
+    private string? _saidNoTone;
     private int _keepAudioNotOffered;
     private int _saidMarkerRefused;
     private int _saidMarkerIgnored;
@@ -664,9 +664,9 @@ public sealed class SlotRunner
 
         private void SayNoTone(string why)
         {
-            if (S.ToneLength > TimeSpan.Zero && Interlocked.Exchange(ref owner._saidNoTone, 1) == 0)
+            if (S.ToneLength > TimeSpan.Zero && Interlocked.Exchange(ref owner._saidNoTone, why) != why)
             {
-                Say($"no calibration tone or channel probe this run: {why}. Receivers decode without them (said once per run)");
+                Say($"no calibration tone or channel probe this run: {why}. Receivers decode without them (said once per run for each reason)");
             }
         }
 
@@ -873,10 +873,14 @@ public sealed class SlotRunner
 
         private async Task<(SlotOutcome?, string?)> ToneAsync(CancellationToken cancellation)
         {
-            if (S.ToneLength <= TimeSpan.Zero || ToneHz is not double toneHz)
+            if (S.ToneLength <= TimeSpan.Zero)
             {
                 return (null, null);
             }
+            // With nowhere known to put the tone, the channel check still runs (and whenStillBusy still
+            // applies); only the tone and probe are left out.
+            double toneHz = ToneHz ?? 0;
+            bool placed = ToneHz is not null;
             DateTimeOffset giveUp = Now + S.ChannelWait;
             bool saidBusy = false;
             // The probe goes on the tone's own audio frequency, so it lands where the tone does on the air.
@@ -888,6 +892,10 @@ public sealed class SlotRunner
                 if (_abort is not null)
                 {
                     break;
+                }
+                if (busy != true && !placed)
+                {
+                    return (null, null);
                 }
                 if (busy != true)
                 {

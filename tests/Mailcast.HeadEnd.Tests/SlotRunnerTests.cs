@@ -590,6 +590,27 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Run_StillWaitsForAClearChannel_WhenNoToneCanBePlaced()
+    {
+        var skip = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
+        skip.Station.TunedAnswer = false;
+        skip.Station.AudioCentre = null;
+        skip.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
+        var report = skip.Run(5);
+        Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.Empty(skip.Station.Frames);
+
+        var wait = new Rig();
+        wait.Station.TunedAnswer = false;
+        wait.Station.AudioCentre = null;
+        wait.Station.ChannelBusyUntil = Noon + TimeSpan.FromSeconds(30);
+        Assert.Equal(SlotOutcome.Completed, wait.Run(5).Outcome);
+        Assert.Contains(wait.Journal.Lines, l => l.Contains("channel busy; waiting up to", StringComparison.Ordinal));
+        Assert.Empty(wait.Station.ToneRequests);
+        Assert.NotEmpty(wait.Station.Frames);
+    }
+
+    [Fact]
     public void Run_SendsNoTone_WhenTunedWithoutACentreOrAFrequency()
     {
         var none = new Rig();
