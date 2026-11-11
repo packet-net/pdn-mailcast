@@ -365,7 +365,8 @@ public sealed class SlotBroadcast
 /// frame of the slot and then at least one in every <see cref="ScheduleOptions.DirectoryEvery"/>.
 /// There are enough of them that a station decoding only a quarter of the slot's frames still
 /// has a good chance of a whole directory from it alone, not just <see cref="ScheduleOptions.DirectoryExtra"/>
-/// above its K (see <see cref="DirectoryFloor"/>, issue #69).
+/// above its K (see <see cref="DirectoryFloor"/>, issue #69). Under the budget rule, when that floor alone would leave no
+/// room for any bulletin piece, it takes no more frames than the bulletins do instead.
 /// </para>
 /// </remarks>
 public static class BroadcastScheduler
@@ -869,6 +870,7 @@ public static class BroadcastScheduler
         int[] counts = [];
         int[] main = []; // of each count, the pieces from before the leftover tier's turn, which go first
         bool roomLeft = false;
+        bool shareFloor = false; // the directory's floor gives way to the bulletins (DirectoryFrames)
 
         // The directory lists a bulletin from the slot in which its first piece is sent until it retires, never one that has not
         // started: its line would cost directory bytes in every slot for up to 48 hours. Under the budget rule whether an unstarted
@@ -891,7 +893,17 @@ public static class BroadcastScheduler
                 var take = Enumerable.Range(0, counts.Length).Where(i => !onlyListed || i >= bulletins.Count || Listed(bulletins[i].Carried)).ToList();
                 var all = new List<FillItem>([.. bulletins.Select(b => new FillItem(b.Carried, null, Others(b.Carried), rule, evening)), .. relays.Select(r => new FillItem(null, r, 0, rule))]);
                 var allLeftover = new List<bool>([.. leftover, .. relayLeftover]);
-                var got = Fill([.. take.Select(i => all[i])], [.. take.Select(i => allLeftover[i])], directoryObject, options, rule, budget!, extras, out bool room, out int[] gotMain);
+                List<FillItem> taken = [.. take.Select(i => all[i])];
+                List<bool> takenLeftover = [.. take.Select(i => allLeftover[i])];
+                shareFloor = false;
+                var got = Fill(taken, takenLeftover, directoryObject, options, rule, budget!, extras, shareFloor, out bool room, out int[] gotMain);
+                if (room && got.All(n => n == 0))
+                {
+                    // The directory's weak-station floor alone leaves no room for a single piece (a big directory on a slow
+                    // waveform: GB7RDG's WN3 slots, November 2026), so the slot would key nothing at all. Let the floor give way.
+                    shareFloor = true;
+                    got = Fill(taken, takenLeftover, directoryObject, options, rule, budget!, extras, shareFloor, out room, out gotMain);
+                }
                 roomLeft |= room; // sticky: a bulletin pruned from the fill still had room, so the caller may retry without extras
                 for (int j = 0; j < take.Count; j++)
                 {
@@ -962,7 +974,7 @@ public static class BroadcastScheduler
         int? directoryCap = null;
         while (true)
         {
-            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, evening ? 0 : leftover.Count(l => l), directoryCap, relayListed, Carried(allItems, main, bulletins.Count), evening, bulletins.Count);
+            var plan = Build(slot, directory, directoryObject, directoryFirst, bulletins, relays, counts, main, seed, options, extras, evening ? 0 : leftover.Count(l => l), directoryCap, relayListed, Carried(allItems, main, bulletins.Count), evening, bulletins.Count, shareFloor);
             if (budget is null || options.Budget is null
                 || budget.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= budget.Limit)
             {
@@ -1103,9 +1115,20 @@ public static class BroadcastScheduler
         return 1 - below;
     }
 
-    private static int DirectoryFrames(TransferObject directory, int bulletinFrames, ScheduleOptions options) =>
-        Math.Max(Math.Max(directory.SourceSymbols + options.DirectoryExtra, DirectoryFloor(directory.SourceSymbols)),
-            (int)Math.Ceiling(bulletinFrames / (double)(options.DirectoryEvery - 1)));
+    /// <summary>
+    /// How many directory frames go with <paramref name="bulletinFrames"/> bulletin frames: at least K plus
+    /// <see cref="ScheduleOptions.DirectoryExtra"/> and one in every <see cref="ScheduleOptions.DirectoryEvery"/>, and the
+    /// weak-station floor (<see cref="DirectoryFloor"/>). With <paramref name="shareFloor"/> the floor takes no more frames than
+    /// the bulletins get: the budget rule asks for that only when the whole floor would leave room for no bulletin piece at all.
+    /// A directory listing many bulletins has a big floor (about 5 frames per directory symbol), and on a slow waveform that
+    /// alone can fill a slot, which then keyed nothing (GB7RDG's WN3 slots, 9 to 11 November 2026).
+    /// </summary>
+    private static int DirectoryFrames(TransferObject directory, int bulletinFrames, ScheduleOptions options, bool shareFloor = false)
+    {
+        int least = Math.Max(directory.SourceSymbols + options.DirectoryExtra, (int)Math.Ceiling(bulletinFrames / (double)(options.DirectoryEvery - 1)));
+        int floor = DirectoryFloor(directory.SourceSymbols);
+        return Math.Max(least, shareFloor ? Math.Min(floor, bulletinFrames) : floor);
+    }
 
     /// <summary>
     /// The budget rule's share of the slot for each bulletin, in order: one symbol at a time to the
@@ -1119,7 +1142,7 @@ public static class BroadcastScheduler
     /// another bulletin, and never gets pieces in a slot that has none of any other. <paramref name="main"/> is each count
     /// before the leftover tier's turn: those pieces go first in the slot (<see cref="Build"/>).
     /// </summary>
-    private static int[] Fill(List<FillItem> bulletins, List<bool> leftover, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, out bool anyRoom, out int[] main)
+    private static int[] Fill(List<FillItem> bulletins, List<bool> leftover, TransferObject directory, ScheduleOptions options, BudgetRule rule, SlotBudget budget, IReadOnlyList<MailcastFrame> extras, bool shareFloor, out bool anyRoom, out int[] main)
     {
         var counts = new int[bulletins.Count];
         int[] extraLengths = [.. extras.Select(f => f.ToBytes().Length)];
@@ -1151,7 +1174,7 @@ public static class BroadcastScheduler
         var envelopesCounted = new HashSet<ulong>(); // bulletins with the same envelope share its one object
         bool Fits()
         {
-            int directoryFrames = DirectoryFrames(directory, bulletinLengths.Count, options);
+            int directoryFrames = DirectoryFrames(directory, bulletinLengths.Count, options, shareFloor);
             var all = new List<int>(directoryFrames + bulletinLengths.Count + envelopeLengths.Count + extraLengths.Length);
             all.AddRange(Enumerable.Repeat(directoryLength, directoryFrames));
             all.AddRange(bulletinLengths);
@@ -1215,7 +1238,7 @@ public static class BroadcastScheduler
     /// the slot's first part and the rest (the leftover tier's turn) after them all, so a slot cut
     /// short loses the leftover tier's pieces before any other.
     /// </summary>
-    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, List<RelayedObject> relays, int[] counts, int[] main, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null, int relayListed = 0, (int Normal, int Bulk) carriedNow = default, bool evening = false, int ownInRotation = 0)
+    private static SlotBroadcast Build(DateTimeOffset slot, BroadcastDirectory directory, TransferObject directoryObject, uint directoryFirst, List<(CarriedBulletin Carried, int Index)> bulletins, List<RelayedObject> relays, int[] counts, int[] main, int seed, ScheduleOptions options, IReadOnlyList<MailcastFrame> extras, int leftoverBulletins, int? directoryFramesCap = null, int relayListed = 0, (int Normal, int Bulk) carriedNow = default, bool evening = false, int ownInRotation = 0, bool shareFloor = false)
     {
         var scheduled = new List<ScheduledObject>();
         for (int i = 0; i < bulletins.Count; i++)
@@ -1247,7 +1270,7 @@ public static class BroadcastScheduler
         int bulletinFrames = ownFrames + relayFrames;
         // Capped only when the budget rule's Plan loop finds even the directory alone over
         // budget (issue #69's bigger floor made this reachable): never below one frame.
-        int directoryFrames = Math.Max(1, Math.Min(DirectoryFrames(directoryObject, bulletinFrames, options), directoryFramesCap ?? int.MaxValue));
+        int directoryFrames = Math.Max(1, Math.Min(DirectoryFrames(directoryObject, bulletinFrames, options, shareFloor), directoryFramesCap ?? int.MaxValue));
         scheduled.Insert(0, new ScheduledObject(directoryObject, 0, directoryFirst, directoryFrames));
         // Each bulletin that sends pieces this slot repeats its envelope (issue #142), after the
         // bulletins so that their interleaving is the same with or without envelopes.
