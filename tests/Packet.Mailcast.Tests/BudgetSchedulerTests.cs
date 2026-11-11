@@ -323,22 +323,61 @@ public class BudgetSchedulerTests
     /// directory alone can be over a tight budget, with no bulletin frames for the fill to give
     /// up instead (it gives every one up first, since none of them fit either). The directory's
     /// own frame count must then give way, one at a time, rather than the plan going over budget.
+    /// Since the floor itself gives way to the bulletins when it would leave them no room, that takes a
+    /// budget under the directory's K plus its extra symbols.
     /// </summary>
     [Fact]
     public void Fill_CapsTheDirectoryItself_WhenEvenItAloneIsOverBudget()
     {
         var bulletins = Enumerable.Range(0, 27).Select(i => AtCoverage(400 + i, 1000 + (i * 300), 0)).ToList();
-        var tiny = Frames(5);
+        var tiny = Frames(2);
         var plan = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, Options, null, tiny);
         Assert.Equal(0, plan.BulletinFrames);
         Assert.True(plan.Objects[0].Count >= 1);
         Assert.True(tiny.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= tiny.Limit,
-            $"{plan.Frames.Count} frames in a budget of 5, directory alone");
+            $"{plan.Frames.Count} frames in a budget of 2, directory alone");
+
+        // A budget under the floor (6 frames for a directory of one symbol) but over K plus its extra: the floor gives way.
+        var small = Frames(5);
+        var some = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, Options, null, small);
+        Assert.True(some.BulletinFrames > 0);
+        Assert.True(some.Objects[0].Count >= some.Objects[0].Transfer.SourceSymbols + Options.DirectoryExtra);
+        Assert.True(small.Airtime([.. some.Frames.Select(f => f.ToBytes().Length)]) <= small.Limit, $"{some.Frames.Count} frames in a budget of 5");
 
         // A budget too tight even for one frame: still only ever the one, never zero.
         var impossible = Frames(0);
         var smallest = BroadcastScheduler.Plan(bulletins, Slot, 1, Compression.Default, Options, null, impossible);
         Assert.Equal(1, smallest.Objects[0].Count);
+    }
+
+    /// <summary>
+    /// GB7RDG, 9 to 11 November 2026: so many bulletins had started that the directory's weak-station floor alone filled a WN3
+    /// slot, and every WN3 slot keyed nothing while WN4 slots, with twice the room, went out. When the whole floor would leave no
+    /// room for a single piece, the floor gives way: the directory takes no more frames than the bulletins, and never fewer
+    /// than its K plus its extra symbols. With room for the whole floor and some pieces, nothing changes.
+    /// </summary>
+    [Fact]
+    public void Fill_LetsTheDirectoryFloorGiveWay_WhenItAloneWouldLeaveNoRoomForAPiece()
+    {
+        var started = Enumerable.Range(0, 120).Select(i => AtCoverage(600 + i, 2000 + (i * 397 % 9000), 0.5)).ToList();
+        var big = BroadcastScheduler.Plan(started, Slot, 1, Compression.Default, Options, null, Frames(1000));
+        int k = big.Objects[0].Transfer.SourceSymbols;
+        int floor = BroadcastScheduler.DirectoryFloor(k);
+        Assert.True(floor > 40, $"a directory of {k} symbols has a floor of {floor}");
+        Assert.True(big.Objects[0].Count >= floor);
+
+        // Under the floor: before, nothing at all; now pieces, with the directory no bigger than they are.
+        var under = Frames(floor);
+        var plan = BroadcastScheduler.Plan(started, Slot, 1, Compression.Default, Options, null, under);
+        Assert.True(plan.BulletinFrames > 0);
+        Assert.Equal(k, plan.Objects[0].Transfer.SourceSymbols);
+        Assert.InRange(plan.Objects[0].Count, k + Options.DirectoryExtra, Math.Max(k + Options.DirectoryExtra, plan.BulletinFrames));
+        Assert.True(under.Airtime([.. plan.Frames.Select(f => f.ToBytes().Length)]) <= under.Limit);
+
+        // Room for the floor and a few pieces: the whole floor, as before.
+        var over = BroadcastScheduler.Plan(started, Slot, 1, Compression.Default, Options, null, Frames(floor + 10));
+        Assert.True(over.BulletinFrames > 0);
+        Assert.Equal(floor, over.Objects[0].Count);
     }
 
     [Fact]

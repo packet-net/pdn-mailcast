@@ -97,7 +97,7 @@ The tone gives each receiver three things:
 - its frequency offset from M0LTE;
 - the slot's signal-to-noise ratio, logged.
 
-M0LTE's Flex is normally GPS locked, so the tone is a true frequency reference. The head end checks the Flex's reference before the slot and says so in the log if it is running on its internal TCXO instead (it was, briefly, on 2026-09-28). Even unlocked it is close: in August the Wessex web SDR, which is GPS disciplined, measured M0LTE's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so the tone is a check rather than a necessity.
+M0LTE's Flex normally runs on an external 10 MHz from a GPSDO (it has no GPSDO of its own), so the tone is a true frequency reference. The head end checks the Flex's reference before the slot and warns in the log if it is running on its internal TCXO instead (it was, briefly, on 2026-09-28) or the reference is not locked. Even unlocked it is close: in August the Wessex web SDR, which is GPS disciplined, measured M0LTE's dial at +1.98 Hz. MS110D's receiver tracks offsets of tens of Hz without help, so the tone is a check rather than a necessity.
 
 ### Power and duty
 
