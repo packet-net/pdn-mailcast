@@ -260,8 +260,8 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// Issue #48: what the last few slots carried, burst by burst and piece by piece, for the
-    /// status page's "what was heard" section and <c>GET /api/slots/{slot}/frames</c>. In
-    /// memory only; empty again after a restart.
+    /// status page's "what was heard" section and <c>GET /api/slots/{slot}/frames</c>. Kept
+    /// across a restart with the rest of the page's history (<see cref="RestoreStatus"/>).
     /// </summary>
     public SlotFrameHistory FrameHistory { get; } = new();
 
@@ -277,6 +277,108 @@ public sealed class ReceiverHost : IAsyncDisposable
         var burstStarted = Pipeline?.Burst.Shown?.Started;
         var directory = Intake.Progress().Directory;
         FrameHistory.Record(slot, burstStarted, piece.Waveform, HeardPiece.From(piece.Result, piece.Esi, piece.Heard, directory));
+    }
+
+    private StatusMemory? _statusMemory;
+
+    /// <summary>
+    /// Reads back what the status page showed before a restart (<see cref="StatusMemory"/>): "What
+    /// was heard", the last slot, the last window ended early, where stations were heard and what
+    /// the web SDR said about itself. Once; from then on that is saved again as it changes. Not for
+    /// --decode, which must leave a running service's state directory alone.
+    /// </summary>
+    public void RestoreStatus()
+    {
+        lock (_gate)
+        {
+            if (_statusMemory is not null)
+            {
+                return;
+            }
+            _statusMemory = new StatusMemory(Config.StateDirectory, _time, _log);
+        }
+        if (_statusMemory.Load() is not { } saved)
+        {
+            return;
+        }
+        try
+        {
+            var now = _time.GetUtcNow();
+            // Anything dated after now can only come from a clock that was wrong: let go, as the daily report's notes are.
+            var latest = now + SlotTracker.ClockAllowance;
+            var heard = (saved.Heard ?? []).Where(s => s is not null).ToList();
+            int dropped = heard.RemoveAll(s => s.Slot > latest || (s.Bursts ?? []).Any(b => b is not null && (b.Started > latest || (b.Pieces ?? []).Any(p => p is not null && p.Heard > latest))));
+            FrameHistory.Restore(heard);
+            bool future = Slots.Restore(saved.Slot?.ToSummary(), saved.LastEnded) | dropped > 0;
+            if (future)
+            {
+                _log("status: some of the page's history is dated after now (was the clock wrong?); that part is let go");
+            }
+            lock (_gate)
+            {
+                // A window ended early is kept only once it is over: a restart within it judges the slot afresh.
+                if (saved.LastEarlyEnd is { Reason: not null } early && now >= early.Slot + ReceiverConfig.WebSdrAfter)
+                {
+                    _lastEarlyEnd = (early.Slot, early.Reason);
+                    _lastEarlyEndAt = early.At;
+                }
+                foreach (var (station, hz) in saved.HeardAtHz ?? [])
+                {
+                    _heardAtHz[station] = hz;
+                }
+                if (saved.WebSdrAbout is { Source: not null, Words: not null } about)
+                {
+                    _webSdrAbout = (about.Source, about.Words);
+                }
+                // Only a place the web SDR gave: one it would not give is asked for again (NotePlaceAsync).
+                if (saved.WebSdrPlace is { Source: not null, Place: not null } place)
+                {
+                    _webSdrPlace = (place.Source, place.Place);
+                }
+            }
+            _log($"status: read back {FrameHistory.Slots.Count} slot{(FrameHistory.Slots.Count == 1 ? "" : "s")} of the page's history from before the restart");
+        }
+        catch (Exception e) when (e is FormatException or ArgumentException or InvalidOperationException)
+        {
+            _log($"status: {StatusMemory.FileName} is not usable, starting empty: {Ascii.Clean(e.Message)}");
+            FrameHistory.Restore([]);
+            Slots.Restore(null, null);
+        }
+    }
+
+    /// <summary>What <see cref="StatusMemory"/> keeps, as it is now.</summary>
+    internal SavedStatus StatusSnapshot()
+    {
+        var (current, lastEnded) = Slots.Saved();
+        lock (_gate)
+        {
+            return new SavedStatus
+            {
+                Version = StatusMemory.CurrentVersion,
+                Heard = [.. FrameHistory.Slots],
+                Slot = current is null ? null : SavedSlot.From(current),
+                LastEnded = lastEnded,
+                LastEarlyEnd = _lastEarlyEnd is { } early ? new SavedEarlyEnd(early.Slot, early.Reason, _lastEarlyEndAt) : null,
+                HeardAtHz = _heardAtHz.Count == 0 ? null : new Dictionary<string, long>(_heardAtHz, StringComparer.Ordinal),
+                WebSdrAbout = _webSdrAbout is { } about ? new SavedWords(about.Source, about.Words) : null,
+                WebSdrPlace = _webSdrPlace is { } place ? new SavedPlace(place.Source, place.Place) : null,
+            };
+        }
+    }
+
+    /// <summary>
+    /// Saves the page's history if it changed: at once when <paramref name="now"/> (a slot's end,
+    /// shutdown), else at most every <see cref="StatusMemory.SaveEvery"/>. Nothing before
+    /// <see cref="RestoreStatus"/>. True if it wrote.
+    /// </summary>
+    internal bool SaveStatus(bool now)
+    {
+        StatusMemory? memory;
+        lock (_gate)
+        {
+            memory = _statusMemory;
+        }
+        return memory is not null && memory.Save(StatusSnapshot, now);
     }
 
     /// <summary>
@@ -835,7 +937,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     private void OnDirectoryHeard(BroadcastDirectory directory)
     {
         // A station whose directory says nothing of its frequency is where this receiver was
-        // listening when the directory decoded (issue #179); kept for this run.
+        // listening when the directory decoded (issue #179); kept across restarts (RestoreStatus).
         if (Intake.StationOf(directory) is { } heardStation && Intake.HeardDetails(heardStation)?.FrequencyHz is null)
         {
             lock (_gate)
@@ -1230,6 +1332,7 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// </summary>
     public async Task RunAsync(CancellationToken cancellation)
     {
+        RestoreStatus();
         _log($"pdn-mailcast receiver {Version}: listening on {Config.Audio} ({(Config.ResolvedDialKHz is null ? "no USB dial set" : $"USB dial {OnAir.Mhz(Config.DialHz)} MHz")}), delivering to {DescribeBbs(Config.Bbs)}");
         foreach (string line in SlotLines())
         {
@@ -1400,7 +1503,10 @@ public sealed class ReceiverHost : IAsyncDisposable
                 {
                     Slots.OnListening(open);
                 }
+                var ended = Slots.LastEnded;
                 Slots.EndIfOver(LastEarlyEnd?.Slot, LastEarlyEndAt);
+                // The page's history: at once when a slot's window has ended, else now and then while it changes.
+                SaveStatus(now: Slots.LastEnded != ended);
             }
             catch (Exception e)
             {
@@ -2024,26 +2130,38 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// Asks the web SDR where it is, once for each audio setting, and keeps the answer.
     /// pdn-soundmodem (0.86.0) reads the web SDR's <c>/api/description</c> when it opens it, but
     /// keeps only a line of words from it, without the position, so it is read again here: once
-    /// a run of the receiver, not every slot.
+    /// a run of the receiver, not every slot. A place kept from before a restart is used meanwhile,
+    /// and kept if the web SDR will not say this time; one it does give replaces it (a moved web SDR).
     /// </summary>
-    private async Task NotePlaceAsync(AudioSource source, string audio, CancellationToken cancellation)
+    internal async Task NotePlaceAsync(AudioSource source, string audio, CancellationToken cancellation)
     {
         lock (_gate)
         {
-            if (source.Kind != AudioSourceKind.UberSdr || _webSdrPlace?.Source == audio)
+            if (source.Kind != AudioSourceKind.UberSdr || _webSdrPlaceAsked == audio)
             {
                 return;
             }
         }
-        var place = await AudioPipeline.FetchWebSdrPlaceAsync(Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target), cancellation).ConfigureAwait(false);
+        var place = await FetchWebSdrPlace(source, cancellation).ConfigureAwait(false);
         if (place is not null || !cancellation.IsCancellationRequested)
         {
             lock (_gate)
             {
-                _webSdrPlace = (audio, place);
+                _webSdrPlaceAsked = audio;
+                if (place is not null || _webSdrPlace is not { Place: not null } kept || kept.Source != audio)
+                {
+                    _webSdrPlace = (audio, place);
+                }
             }
         }
     }
+
+    /// <summary>The audio setting whose web SDR has been asked where it is in this run.</summary>
+    private string? _webSdrPlaceAsked;
+
+    /// <summary>Asks a web SDR where it is; tests may replace it.</summary>
+    internal Func<AudioSource, CancellationToken, Task<GroundPlace?>> FetchWebSdrPlace { get; set; } =
+        (source, cancellation) => AudioPipeline.FetchWebSdrPlaceAsync(Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target), cancellation);
 
     private void Attach(AudioPipeline pipeline)
     {
@@ -2088,6 +2206,15 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         await Intake.DisposeAsync().ConfigureAwait(false);
         await ChannelWatch.DisposeAsync().ConfigureAwait(false);
+        // After the intake and the channel measurement have finished, so their last pieces and SNRs are in it.
+        try
+        {
+            SaveStatus(now: true);
+        }
+        catch (Exception e)
+        {
+            _log($"status: cannot save the page's history at shutdown: {Ascii.Clean(e.Message)}");
+        }
         Hooks.Dispose();
         _bbsTurn.Dispose();
     }

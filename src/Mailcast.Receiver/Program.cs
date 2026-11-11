@@ -100,6 +100,8 @@ static async Task<int> ReceiveAsync(string configPath, string? decode, Cancellat
         // Issue #154: a hand edit is read only at the next start; say so when one is made.
         _ = file.RunAsync(TimeProvider.System, Log, stop);
 
+        // What the page showed before a restart, before the page can be asked.
+        host.RestoreStatus();
         await using var page = new StatusPage(host, file, Log) { Updates = updates };
         try
         {
