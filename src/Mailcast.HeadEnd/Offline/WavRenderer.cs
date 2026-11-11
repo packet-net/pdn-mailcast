@@ -31,6 +31,12 @@ public sealed class WavRenderer
         _sampleRate = sampleRate;
     }
 
+    /// <summary>
+    /// The tone's and probe's audio frequency in the render: the centre of the data as a receiver on
+    /// the usual dial hears it. On the air they go wherever the station says its modem sits.
+    /// </summary>
+    internal const double ToneHz = 1800;
+
     /// <summary>Writes the slot to <paramref name="path"/>, 16-bit mono at the renderer's rate.</summary>
     public WavSummary Render(IReadOnlyList<SlotFrame> frames, string path, DateTimeOffset start)
     {
@@ -38,7 +44,7 @@ public sealed class WavRenderer
         IModem modem = Waveforms.CreateModem(_mode, _sampleRate);
         var clock = new SampleClock(start, _sampleRate);
         var identifier = new StationIdentifier(
-            _settings.Callsign, modeSuffix: null, toneHz: _settings.ToneHz, wordsPerMinute: 20,
+            _settings.Callsign, modeSuffix: null, toneHz: ToneHz, wordsPerMinute: 20,
             interval: TimeSpan.FromMinutes(10), sampleRate: _sampleRate, time: clock);
 
         using var wav = new WavWriter(path, _sampleRate);
@@ -67,14 +73,14 @@ public sealed class WavRenderer
         bool probe = false;
         if (tone)
         {
-            Write(new TestTone([_settings.ToneHz], 0.5, _sampleRate, _settings.ToneLength.TotalSeconds).Render());
+            Write(new TestTone([ToneHz], 0.5, _sampleRate, _settings.ToneLength.TotalSeconds).Render());
             // The probe follows in the same keyup, peaking where the tone does, as the station sends it;
             // left out at a rate too low to hold its band, where the station would refuse it too.
-            probe = ProbeSignal.BandProblem(ChannelProbe.Descriptor, _settings.ToneHz, _sampleRate) is null;
+            probe = ProbeSignal.BandProblem(ChannelProbe.Descriptor, ToneHz, _sampleRate) is null;
             if (probe)
             {
                 Silence(ChannelProbe.Gap.TotalSeconds);
-                Write(ProbeSignal.Render(ChannelProbe.Descriptor, _settings.ToneHz, 0.5, _sampleRate));
+                Write(ProbeSignal.Render(ChannelProbe.Descriptor, ToneHz, 0.5, _sampleRate));
             }
             identifier.NoteTransmission();
             IdentIfDue();

@@ -69,11 +69,15 @@ public sealed class SlotRunner
     private readonly IClockSync? _clock;
     private int _saidNotTuned;
     private int _saidNoRetune;
+    private string? _saidNoTone;
     private int _keepAudioNotOffered;
     private int _saidMarkerRefused;
     private int _saidMarkerIgnored;
     // Set once the station has shown a reference feed: from then on a lease read that fails counts as "unknown".
     private int _stationHasFeed;
+
+    /// <summary>The first pdn-soundmodem that says where the lease holder's modem sits in the audio on every lease, tuned or not.</summary>
+    internal const string AudioCentreVersion = "pdn-soundmodem 0.106.0";
 
     /// <summary>How far before the slot the kept audio starts.</summary>
     internal static readonly TimeSpan KeepAudioBefore = TimeSpan.FromSeconds(60);
@@ -608,57 +612,70 @@ public sealed class SlotRunner
             return null;
         }
 
-        private double? _tunedToneHz;
-
-        /// <summary>The calibration tone's (and probe's) audio frequency: slot.toneHz, or the signal centre's place in the audio when the rig was tuned.</summary>
-        private double ToneHz => _tunedToneHz ?? S.ToneHz;
+        /// <summary>
+        /// The calibration tone's (and probe's) audio frequency: the centre of the slot's data, so the
+        /// tone lands on the station's signal frequency. Null when the station did not say where its
+        /// modem sits and it cannot be worked out: then no tone and no probe go.
+        /// </summary>
+        private double? ToneHz { get; set; }
 
         /// <summary>
-        /// With the rig tuned to <paramref name="dialHz"/>, the signal centre (frequencyHz) sits at
-        /// frequencyHz - dial (USB) or dial - frequencyHz (LSB) in the audio; the tone and probe go
-        /// there, as slot.toneHz is the signal centre on an untuned station.
+        /// Finds the centre of the data in the audio. A station that says where the lease holder's
+        /// modem sits (<c>audioCentreHz</c>, from pdn-soundmodem 0.106.0 on every lease, tuned or not)
+        /// is believed. Failing that, with the rig tuned to a dial and frequencyHz configured, the
+        /// signal centre sits at frequencyHz - dial (USB) or dial - frequencyHz (LSB). Otherwise
+        /// nothing is guessed: the slot goes without the tone and probe, said once per run.
         /// </summary>
-        private void PlaceTone(double dialHz, double? stationCentreHz)
+        private void PlaceTone(LeaseAnswer answer)
         {
-            if (stationCentreHz is double centre)
+            ToneHz = null;
+            double? dial = answer.Tuned is true ? answer.DialHz : null;
+            if (answer.AudioCentreHz is double centre)
             {
-                if (S.SignalHz is long configured)
+                if (dial is double tunedDial && S.SignalHz is long configured)
                 {
-                    double computed = S.SignalLsb ? dialHz - configured : configured - dialHz;
+                    double computed = S.SignalLsb ? tunedDial - configured : configured - tunedDial;
                     if (Math.Abs(computed - centre) > 50)
                     {
                         Say($"the station says the modem's audio centre is {centre:0} Hz but frequencyHz and the dial give {computed:0} Hz; using the station's");
                     }
                 }
-                _tunedToneHz = centre;
-                Say($"calibration tone and probe follow the tuned dial: {centre:0} Hz audio");
+                ToneHz = centre;
+                return;
+            }
+            if (dial is not double dialHz)
+            {
+                SayNoTone($"this pdn-soundmodem does not say where the bulletin modem sits in the audio; upgrade it to {AudioCentreVersion} or later");
                 return;
             }
             if (S.SignalHz is not long signal)
             {
-                Say($"no frequencyHz configured, so the calibration tone stays at {S.ToneHz:0} Hz although the dial moved");
+                SayNoTone("the station tuned the rig but did not say where the bulletin modem sits in the audio, and no frequencyHz is configured");
                 return;
             }
             double audio = S.SignalLsb ? dialHz - signal : signal - dialHz;
             if (audio is < 200 or > 3500)
             {
-                Say($"the tuned dial is {audio:0} Hz from the signal centre, outside the audio passband, so the calibration tone stays at {S.ToneHz:0} Hz");
+                SayNoTone($"the tuned dial puts frequencyHz at {audio:0} Hz, outside the audio passband");
                 return;
             }
-            _tunedToneHz = audio;
-            Say($"calibration tone and probe follow the tuned dial: {audio:0} Hz audio");
+            ToneHz = audio;
         }
 
-        /// <summary>Journals what the station said to the tuning request: the dial, or once per run why not.</summary>
+        private void SayNoTone(string why)
+        {
+            if (S.ToneLength > TimeSpan.Zero && Interlocked.Exchange(ref owner._saidNoTone, why) != why)
+            {
+                Say($"no calibration tone or channel probe this run: {why}. Receivers decode without them (said once per run for each reason)");
+            }
+        }
+
+        /// <summary>Journals what the station said to the tuning request: the dial, or once per run why not. Then places the tone.</summary>
         private void SayTuning(LeaseAnswer answer)
         {
             if (answer.Tuned is true)
             {
                 Say(answer.DialHz is double hz ? $"station tuned the rig for the slot, dial {hz / 1e6:0.000###} MHz" : "station tuned the rig for the slot");
-                if (answer.DialHz is double dial)
-                {
-                    PlaceTone(dial, answer.AudioCentreHz);
-                }
             }
             else if (answer.Tuned is false)
             {
@@ -671,6 +688,7 @@ public sealed class SlotRunner
             {
                 Say("this pdn-soundmodem does not retune for the slot; upgrade it if your radio must move for the slot");
             }
+            PlaceTone(answer);
         }
 
         private async Task<LeaseAnswer> AskForLeaseAsync(CancellationToken cancellation)
@@ -859,10 +877,14 @@ public sealed class SlotRunner
             {
                 return (null, null);
             }
+            // With nowhere known to put the tone, the channel check still runs (and whenStillBusy still
+            // applies); only the tone and probe are left out.
+            double toneHz = ToneHz ?? 0;
+            bool placed = ToneHz is not null;
             DateTimeOffset giveUp = Now + S.ChannelWait;
             bool saidBusy = false;
             // The probe goes on the tone's own audio frequency, so it lands where the tone does on the air.
-            ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, ToneHz);
+            ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, toneHz);
             bool markerRefused = false;
             while (_abort is null)
             {
@@ -871,17 +893,21 @@ public sealed class SlotRunner
                 {
                     break;
                 }
+                if (busy != true && !placed)
+                {
+                    return (null, null);
+                }
                 if (busy != true)
                 {
                     // An unknown reference: the CW E marker instead of the steady tone, so a listener
                     // knows not to trust this slot's frequency.
                     ReferenceFeed? unknown = FeedNow is { IsUnknown: true } u ? u : null;
                     string? marker = unknown is not null && !markerRefused ? ToneMarker.CwE : null;
-                    ToneAnswer answer = await SendToneAsync(probe, marker, cancellation);
+                    ToneAnswer answer = await SendToneAsync(toneHz, probe, marker, cancellation);
                     if (answer.Outcome != ToneOutcome.Sent && marker is not null && probe is not null && answer.Status == 400)
                     {
                         // A 400 to the pair may be the probe's fault, not the marker's: the marker alone first.
-                        ToneAnswer alone = await SendToneAsync(null, marker, cancellation);
+                        ToneAnswer alone = await SendToneAsync(toneHz, null, marker, cancellation);
                         if (alone.Status != 400)
                         {
                             Say($"the station would not send the CW E marker with the channel probe ({answer.Message}); asked for the marker alone");
@@ -898,7 +924,7 @@ public sealed class SlotRunner
                         }
                         markerRefused = true;
                         marker = null;
-                        answer = await SendToneAsync(probe, null, cancellation);
+                        answer = await SendToneAsync(toneHz, probe, null, cancellation);
                     }
                     if (answer.Outcome != ToneOutcome.Sent && probe is not null && RefusedForTheProbe(answer))
                     {
@@ -907,7 +933,7 @@ public sealed class SlotRunner
                         // did not clear) is answered as it always was, and Stop still wins.
                         Say($"the station would not send the tone with the channel probe ({answer.Message}); asking for the tone alone");
                         probe = null;
-                        answer = await SendToneAsync(null, marker, cancellation);
+                        answer = await SendToneAsync(toneHz, null, marker, cancellation);
                     }
                     if (answer.Outcome == ToneOutcome.Sent)
                     {
@@ -928,13 +954,13 @@ public sealed class SlotRunner
                         if (marker is not null)
                         {
                             _markerSent = true;
-                            Say($"the 10 MHz reference state is unknown ({unknown!.DetailOrNone}), so the CW E marker went instead of the calibration tone, {S.ToneLength.TotalSeconds:0} s at {ToneHz:0} Hz{after}");
+                            Say($"the 10 MHz reference state is unknown ({unknown!.DetailOrNone}), so the CW E marker went instead of the calibration tone, {S.ToneLength.TotalSeconds:0} s at {toneHz:0} Hz{after}");
                         }
                         else
                         {
                             _toneSent = true;
                             string note = unknown is not null ? $"; the 10 MHz reference state is unknown ({unknown.DetailOrNone}) but the station does not know the CW E marker" : "";
-                            Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {ToneHz:0} Hz{after}{note}");
+                            Say($"calibration tone sent, {S.ToneLength.TotalSeconds:0} s at {toneHz:0} Hz{after}{note}");
                         }
                         if (_abort is null && S.PauseAfterTone > TimeSpan.Zero)
                         {
@@ -974,11 +1000,11 @@ public sealed class SlotRunner
             return (null, null);
         }
 
-        private async Task<ToneAnswer> SendToneAsync(ProbeRequest? probe, string? marker, CancellationToken cancellation)
+        private async Task<ToneAnswer> SendToneAsync(double toneHz, ProbeRequest? probe, string? marker, CancellationToken cancellation)
         {
             try
             {
-                return await owner._station.SendToneAsync(S.SubChannel, ToneHz, S.ToneLength.TotalSeconds, probe, marker, cancellation);
+                return await owner._station.SendToneAsync(S.SubChannel, toneHz, S.ToneLength.TotalSeconds, probe, marker, cancellation);
             }
             catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
             {

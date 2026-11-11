@@ -75,12 +75,10 @@ public sealed record SlotSettings
     /// <summary>The calibration tone's length; zero sends none, and no channel probe either.</summary>
     public TimeSpan ToneLength { get; init; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>The calibration tone's audio frequency: the signal centre.</summary>
-    public double ToneHz { get; init; } = 1800;
-
     /// <summary>
     /// The RF frequency of the signal centre (the config's <c>frequencyHz</c>), or null when none is configured.
-    /// With a tuned lease the tone and probe audio frequency are worked out from it and the dial.
+    /// With a tuned lease from a station that does not report its modem's audio centre, the tone and probe
+    /// audio frequency are worked out from it and the dial.
     /// </summary>
     public long? SignalHz { get; init; }
 

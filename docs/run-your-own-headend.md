@@ -39,6 +39,8 @@ Pick a time no other mailcast station on your frequency uses. M0LTE sends on the
 
 If your station has a CAT rig and a rig section in pdn-soundmodem, you do nothing: for each slot pdn-soundmodem moves the radio so the bulletin modem's signal sits in the passband, and puts it back when the slot ends. There is no setting for it. A Flex or a station with no CAT is left alone, and the journal says so once. An older pdn-soundmodem does not retune; the journal says that once too, so upgrade it if your radio must move for the slot.
 
+Upgrade pdn-soundmodem to 0.106.0 or later before the head end. From that version pdn-soundmodem tells the head end where the bulletin modem sits in the audio on every slot, and the head end puts the calibration tone and the channel probe there, at the centre of the data. With an older pdn-soundmodem on a station that is not tuned for the slot (a Flex, or a station with no CAT), the head end cannot tell, so it sends the slot without the tone and the probe and says so once in the journal. Receivers still decode the bulletins. `slot.toneHz` is no longer used and can be left in the file.
+
 ## The signing key
 
 Every head end signs its directories, and receivers use none that are unsigned. The package makes your key when you install it, so there is nothing to do. The journal's `signing:` line gives your public key (or run `sudo pdn-mailcast-headend --make-key` to see it again). The service will not start without the key. Keep the private key safe and backed up: a new key means telling every listener again.

@@ -37,8 +37,8 @@ public sealed class FakeStation : IStationApi, IKissConnector
     /// <summary>Each lease request's time and whether it was granted.</summary>
     public List<(DateTimeOffset At, bool Granted)> LeaseRequests { get; } = [];
 
-    /// <summary>The audio centre the station reports when it tunes, or null to leave it out.</summary>
-    public double? AudioCentre { get; set; }
+    /// <summary>The audio centre the station reports for the holder's modem (tuned or not), or null to leave it out, as an older pdn-soundmodem does.</summary>
+    public double? AudioCentre { get; set; } = 1800;
 
     /// <summary>The audio frequency of each tone request.</summary>
     public List<double> ToneHzAsked { get; } = [];
@@ -165,7 +165,7 @@ public sealed class FakeStation : IStationApi, IKissConnector
         return new LeaseAnswer(true, granted, null, ChannelBusy)
         {
             Tuned = tune ? TunedAnswer : null,
-            AudioCentreHz = tune && TunedAnswer == true ? AudioCentre : null,
+            AudioCentreHz = AudioCentre,
             DialHz = tune && TunedAnswer == true ? 7_047_000 : null,
             TuneNote = tune && TunedAnswer == false ? "no rig, nothing to tune" : null,
         };

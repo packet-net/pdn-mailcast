@@ -50,7 +50,6 @@
     "channelWaitSeconds": 120,
     "whenStillBusy": "go",
     "toneSeconds": 10,
-    "toneHz": 1800,
     "pauseAfterToneSeconds": 8,
     "burstGapSeconds": 1
   },

@@ -303,7 +303,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(0, report.FramesQueued);
     }
 
-    private static readonly SlotSettings TenSecondTone = new() { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10), ToneHz = 4050 };
+    private static readonly SlotSettings TenSecondTone = new() { Callsign = "M0LTE", SubChannel = 4, ToneLength = TimeSpan.FromSeconds(10) };
 
     [Fact]
     public void Run_FollowsTheToneWithTheChannelProbe_InOneKeyup_AndReportsIt()
@@ -317,16 +317,16 @@ public class SlotRunnerTests(ITestOutputHelper output)
 
         // One request, the probe on the tone's own audio frequency, 1.5 s after it.
         var request = Assert.Single(rig.Station.ToneRequests);
-        Assert.Equal(new ProbeRequest("zc255", 1.5, 4050), request.Probe);
+        Assert.Equal(new ProbeRequest("zc255", 1.5, 1800), request.Probe);
         var keyup = rig.Station.Keyups[0];
-        Assert.Equal("tone 4050 Hz and probe zc255 at 4050 Hz", keyup.What);
+        Assert.Equal("tone 1800 Hz and probe zc255 at 1800 Hz", keyup.What);
         // To the millisecond, the fake clock's resolution.
         Assert.InRange((keyup.End - keyup.Start - TimeSpan.FromSeconds(10) - ChannelProbe.Airtime).Duration().TotalMilliseconds, 0, 1);
         Assert.InRange(ChannelProbe.Airtime.TotalSeconds, 8.0, 8.01);
 
         // The pause for the ident is counted from the end of the probe.
         Assert.True(rig.Station.Frames[0].At >= keyup.End + TenSecondTone.PauseAfterTone);
-        Assert.Contains(rig.Journal.Lines, l => l.Contains("calibration tone sent, 10 s at 4050 Hz, then the channel probe (zc255-2400-rrc015-v1, 8 s more)", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("calibration tone sent, 10 s at 1800 Hz, then the channel probe (zc255-2400-rrc015-v1, 8 s more)", StringComparison.Ordinal));
         Assert.Contains(rig.Journal.Lines, l => l.Contains("tone sent, probe sent", StringComparison.Ordinal));
         AssertNothingKeyedOutsideTheLease(rig.Station);
     }
@@ -343,7 +343,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.False(report.ProbeSent);
         Assert.Null(report.ProbeId);
         Assert.Single(rig.Station.ToneRequests);
-        Assert.Equal("tone 4050 Hz", rig.Station.Keyups[0].What);
+        Assert.Equal("tone 1800 Hz", rig.Station.Keyups[0].What);
         Assert.Contains(rig.Journal.Lines, l => l.Contains("without the channel probe: the station does not know it", StringComparison.Ordinal));
         Assert.Contains(rig.Journal.Lines, l => l.Contains("tone sent, probe not sent", StringComparison.Ordinal));
     }
@@ -401,7 +401,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(2, rig.Station.ToneRequests.Count);
         Assert.NotNull(rig.Station.ToneRequests[0].Probe);
         Assert.Null(rig.Station.ToneRequests[1].Probe);
-        Assert.Equal("tone 4050 Hz", rig.Station.Keyups[0].What);
+        Assert.Equal("tone 1800 Hz", rig.Station.Keyups[0].What);
         Assert.Contains(rig.Journal.Lines, l => l.Contains("would not send the tone with the channel probe (HTTP 400", StringComparison.Ordinal));
     }
 
@@ -509,33 +509,22 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Run_PlacesTheToneAndProbeFromTheTunedDial()
+    public void Run_PlacesTheToneAndProbeFromTheTunedDial_WhenTheStationDoesNotSayTheCentre()
     {
         var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_048_500 });
         rig.Station.TunedAnswer = true;
+        rig.Station.AudioCentre = null;
         rig.Run(5);
+        Assert.NotEmpty(rig.Station.ToneHzAsked);
         Assert.All(rig.Station.ToneHzAsked, hz => Assert.Equal(1500, hz));
         Assert.All(rig.Station.ToneRequests, t => Assert.Equal(1500, t.Probe?.AudioHz ?? 1500));
 
         var lsb = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_045_500, SignalLsb = true });
         lsb.Station.TunedAnswer = true;
+        lsb.Station.AudioCentre = null;
         lsb.Run(5);
+        Assert.NotEmpty(lsb.Station.ToneHzAsked);
         Assert.All(lsb.Station.ToneHzAsked, hz => Assert.Equal(1500, hz));
-    }
-
-    [Fact]
-    public void Run_KeepsToneHzWhenUntunedOrWithoutAFrequency()
-    {
-        var untuned = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_048_500 });
-        untuned.Station.TunedAnswer = false;
-        untuned.Run(5);
-        Assert.All(untuned.Station.ToneHzAsked, hz => Assert.Equal(1800, hz));
-
-        var none = new Rig();
-        none.Station.TunedAnswer = true;
-        none.Run(5);
-        Assert.All(none.Station.ToneHzAsked, hz => Assert.Equal(1800, hz));
-        Assert.Single(none.Journal.Lines, l => l.Contains("no frequencyHz configured, so the calibration tone stays at 1800 Hz", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -547,6 +536,89 @@ public class SlotRunnerTests(ITestOutputHelper output)
         rig.Run(5);
         Assert.All(rig.Station.ToneHzAsked, hz => Assert.Equal(1600, hz));
         Assert.Contains(rig.Journal.Lines, l => l.Contains("audio centre is 1600 Hz but frequencyHz and the dial give 1500 Hz", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Run_PutsTheToneAtTheReportedCentre_WhenUntuned()
+    {
+        // G8BPQ's case: the modem at 1500 Hz audio on a station that is not tuned for the slot.
+        // The tone has to go with the data, whatever an old config's slot.toneHz said.
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_053_800 });
+        rig.Station.TunedAnswer = false;
+        rig.Station.AudioCentre = 1500;
+        rig.Run(5);
+        Assert.NotEmpty(rig.Station.ToneHzAsked);
+        Assert.All(rig.Station.ToneHzAsked, hz => Assert.Equal(1500, hz));
+        Assert.All(rig.Station.ToneRequests, t => Assert.Equal(1500, t.Probe?.AudioHz ?? 1500));
+        Assert.All(rig.Journal.Lines, l => Assert.True(l.All(char.IsAscii), l));
+    }
+
+    [Fact]
+    public void Run_SendsGb7rdgsToneExactlyAsBefore()
+    {
+        // GB7RDG: a Flex, no rig, the modem at 4050 Hz audio on a 7.04975 MHz dial; the station reports 4050.
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_053_800, ToneLength = TimeSpan.FromSeconds(10) });
+        rig.Station.TunedAnswer = false;
+        rig.Station.AudioCentre = 4050;
+        rig.Run(5);
+        var request = Assert.Single(rig.Station.ToneRequests);
+        Assert.Equal(new ProbeRequest("zc255", 1.5, 4050), request.Probe);
+        Assert.Equal([4050.0], rig.Station.ToneHzAsked);
+    }
+
+    [Fact]
+    public void Run_SendsNoToneOrProbe_WhenTheStationCannotSayWhereTheDataIs_AndSaysSoOncePerRun()
+    {
+        // An older pdn-soundmodem on a station not tuned for the slot: no centre, no dial. Nothing is guessed.
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, SignalHz = 7_053_800 });
+        rig.Station.TunedAnswer = false;
+        rig.Station.AudioCentre = null;
+        var report = rig.Run(5);
+        rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.False(report.ToneSent);
+        Assert.False(report.ProbeSent);
+        Assert.Empty(rig.Station.ToneRequests);
+        Assert.NotEmpty(rig.Station.Frames);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("no calibration tone or channel probe this run: this pdn-soundmodem does not say where the bulletin modem sits in the audio; upgrade it to pdn-soundmodem 0.106.0 or later", StringComparison.Ordinal));
+
+        var old = new Rig();
+        old.Station.TunedAnswer = null;
+        old.Station.AudioCentre = null;
+        old.Run(5);
+        Assert.Empty(old.Station.ToneRequests);
+    }
+
+    [Fact]
+    public void Run_StillWaitsForAClearChannel_WhenNoToneCanBePlaced()
+    {
+        var skip = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
+        skip.Station.TunedAnswer = false;
+        skip.Station.AudioCentre = null;
+        skip.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
+        var report = skip.Run(5);
+        Assert.Equal(SlotOutcome.Skipped, report.Outcome);
+        Assert.Empty(skip.Station.Frames);
+
+        var wait = new Rig();
+        wait.Station.TunedAnswer = false;
+        wait.Station.AudioCentre = null;
+        wait.Station.ChannelBusyUntil = Noon + TimeSpan.FromSeconds(30);
+        Assert.Equal(SlotOutcome.Completed, wait.Run(5).Outcome);
+        Assert.Contains(wait.Journal.Lines, l => l.Contains("channel busy; waiting up to", StringComparison.Ordinal));
+        Assert.Empty(wait.Station.ToneRequests);
+        Assert.NotEmpty(wait.Station.Frames);
+    }
+
+    [Fact]
+    public void Run_SendsNoTone_WhenTunedWithoutACentreOrAFrequency()
+    {
+        var none = new Rig();
+        none.Station.TunedAnswer = true;
+        none.Station.AudioCentre = null;
+        none.Run(5);
+        Assert.Empty(none.Station.ToneRequests);
+        Assert.Single(none.Journal.Lines, l => l.Contains("did not say where the bulletin modem sits in the audio, and no frequencyHz is configured", StringComparison.Ordinal));
     }
 
     [Fact]
