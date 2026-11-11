@@ -175,8 +175,11 @@ public class ReferenceFeedTests
         Assert.Null(report.ReferenceFeedDetail);
         Assert.Equal([null], rig.Station.MarkersAsked);
         Assert.StartsWith("tone 1800 Hz", rig.Station.Keyups[0].What, StringComparison.Ordinal);
-        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("reference feed", StringComparison.Ordinal) || l.Contains("10 MHz", StringComparison.Ordinal));
-        Assert.Contains(rig.Journal.Lines, l => l.Contains(": done, ", StringComparison.Ordinal) && l.Contains("tone sent", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("10 MHz", StringComparison.Ordinal));
+        // A good feed is said only in the done line, beside the Flex's own view; no feed, nothing.
+        Assert.Equal(withFeed ? 1 : 0, rig.Journal.Lines.Count(l => l.Contains("reference feed", StringComparison.Ordinal)));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains(": done, ", StringComparison.Ordinal) && l.Contains("tone sent", StringComparison.Ordinal)
+            && (withFeed ? l.EndsWith(", reference feed ok", StringComparison.Ordinal) : !l.Contains("reference feed", StringComparison.Ordinal)));
     }
 
     [Fact]

@@ -84,9 +84,9 @@ A few settings have a different default for a daily station and for anything mor
 
 At each slot the head end:
 
-1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the slot's frames. If no bulletin has anything to send, it keys nothing, not even the directory, and waits for the next slot. Under the budget rule that only happens when nothing is in rotation, or only bulletins in the leftover tier (see below).
+1. Collects any bulletins waiting at the BBS, for 30 s at most (`intake.preSlotSeconds`) so a BBS that does not answer cannot hold the slot up, and plans the slot's frames. If no bulletin has anything to send, it keys nothing, not even the directory, and waits for the next slot. Under the budget rule that only happens when nothing is in rotation, or only bulletins in the leftover tier (see below). The directory normally gets enough frames that a station hearing a quarter of them still rebuilds it; when that alone would fill the slot (a long directory on a slow waveform such as WN3), it takes no more frames than the bulletins instead, so the slot still carries bulletins.
 2. Checks that the system clock is synchronised (the kernel's own flag, as timedatectl shows it), and keys nothing until it is (`slot.requireClockSync`); a slot it skips for this is retried. It never runs a slot earlier than the last one it ran, whatever the clock says.
-3. Reads the Flex's frequency reference and PA temperature, if configured, and logs whether it is GPS locked. It does not start with the PA already over the limit.
+3. Reads the Flex's frequency reference and PA temperature, if configured, and logs what the radio runs on: `external 10 MHz, locked`, `internal GPSDO, locked` (a Flex with the GPSDO option), or `its own TCXO` (or OCXO). It warns only when that is not a true frequency reference: the radio on its own TCXO or OCXO, or its external 10 MHz or GPSDO not locked. It does not start with the PA already over the limit.
 4. Opens the bulletin modem's KISS port, then takes the transmit lease for that modem's sub-channel. From here on pdn-soundmodem refuses everyone else's transmissions. The lease is renewed every 30 s, and tells the station to send each burst anyway once it has waited 10 s for a clear channel (`station.maxCarrierWaitSeconds`). The first take also carries `"tune": true`, asking pdn-soundmodem to move the rig so this modem sits at its own dial for the slot (every take carries it, renewals too; releasing the lease puts the rig back). The journal says the dial; a station without a rig (a Flex) answers `tuned: false` and the head end says why once per run; an older pdn-soundmodem sends no `tuned` field and the head end says once that it does not retune. The calibration tone and the channel probe always go at the centre of the slot's data, so they land on the station's signal frequency (`frequencyHz`): at the modem's audio centre as the station reports it in the lease answer (`audioCentreHz`, on every lease from pdn-soundmodem 0.106.0, on a tuned lease only from 0.101.0), or failing that, with a tuned lease, at `frequencyHz` minus the dial (USB) or the dial minus `frequencyHz` (LSB); one journal line if the two differ by over 50 Hz. If the head end cannot learn where the data sits (an older pdn-soundmodem on a station that is not tuned for the slot, a tuned one with no `frequencyHz` configured, or a tuned dial that puts `frequencyHz` outside 200 to 3500 Hz of audio), it does not guess: the slot goes without the tone and the probe, and one journal line a run says why. It still waits for a clear channel as in step 5, and `whenStillBusy` still applies. Receivers decode without the tone. If the take is refused with `tuneFailed` it is tried twice more, 2 s apart; if it still fails, the slot is not sent (one journal line, shown as the skip reason in the status) and the next slot tries again.
 5. Asks pdn-soundmodem to keep the audio it hears around the channel check (see [Keeping the run-up audio](#keeping-the-run-up-audio)), then waits for the station's channel-busy flag to clear, for up to 2 minutes (`slot.channelWaitSeconds`), then sends the calibration tone at the centre of the data (`slot.toneSeconds`, 10 s at M0LTE) as the lease holder's transmitter test, with the channel probe after it in the same keyup (see below). If the channel never clears it goes ahead without the tone (`"whenStillBusy": "go"`) or gives up on the slot (`"skip"`).
 6. Pauses 8 s so the modem's CW ident, which falls due with the first transmission, goes out before the first burst.
@@ -120,7 +120,7 @@ slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST);
 slot 2026-11-09 11:00Z: the 10 MHz reference state is unknown (display offline), so the CW E marker went instead of the calibration tone, 30 s at 1800 Hz, then the channel probe (zc255-2400-rrc015-v1, 8 s more)
 ```
 
-This is the station's reference, not the Flex's own view of it (the slot's `reference`, such as `GPS locked`), which is what said all was well in November.
+This is the station's reference, not the Flex's own view of it (the slot's `reference`, such as `external 10 MHz, locked`), which is what said all was well in November. When the station has a feed, the slot's `done` line gives both: the Flex's view after `reference`, then `reference feed` and what the feed said, `ok` included.
 
 ### Keeping the run-up audio
 
@@ -357,10 +357,10 @@ pskreporter: MARGINAL, last 30 min to 14:00Z (0 min old), UK and Ireland FT8/FT4
 daylight 2026-10-05 at IO91lk: sunrise 06:11Z, sunset 17:33Z; 9 slots, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 and 17:00 UTC
 next slot 2026-10-05 13:00Z; 38 bulletins held
 slot 2026-10-05 13:00Z: starting at 13:00:03Z, 64 frames for 38 bulletins in 10 bursts on ms110d-wn4, about 3.6 min on the air with the tone and idents
-slot 2026-10-05 13:00Z: Flex reference GPS locked (GPSDO locked)
+slot 2026-10-05 13:00Z: Flex reference: external 10 MHz, locked
 slot 2026-10-05 13:00Z: transmit lease taken for sub-channel 4, 120 s, renewed every 30 s
 slot 2026-10-05 13:00Z: calibration tone sent, 10 s at 1800 Hz, then the channel probe (zc255-2400-rrc015-v1, 8 s more)
-slot 2026-10-05 13:00Z: done, 13:00:03 to 13:03:29Z, 64 of 64 frames sent in 10 bursts on ms110d-wn4, 38 bulletins in rotation, tone sent, probe sent, PA max 41.0 C, reference GPS locked (GPSDO locked)
+slot 2026-10-05 13:00Z: done, 13:00:03 to 13:03:29Z, 64 of 64 frames sent in 10 bursts on ms110d-wn4, 38 bulletins in rotation, tone sent, probe sent, PA max 41.0 C, reference external 10 MHz, locked, reference feed ok
 slots today (2026-10-05): 14, 13 completed, 0 cut short, 1 skipped
 ```
 

@@ -4,20 +4,18 @@ using M0LTE.Flex;
 namespace Mailcast.HeadEnd.Flex;
 
 /// <summary>The Flex's frequency reference, as the head end reports it.</summary>
-/// <param name="Description">The radio's state in a few words, such as "GPSDO locked".</param>
-/// <param name="GpsLocked">True when the radio runs on its GPS-disciplined oscillator and it is locked; null when unknown.</param>
-public sealed record ReferenceReading(string Description, bool? GpsLocked)
+/// <param name="Description">What the radio says it is running on, in a few words, such as "external 10 MHz, locked" or "its own TCXO".</param>
+/// <param name="Disciplined">
+/// True when the radio runs on a locked external 10 MHz or a locked internal GPSDO, so the slot's tone is a true frequency
+/// reference; false when it runs on its own TCXO or OCXO, or its reference is not locked; null when unknown.
+/// </param>
+public sealed record ReferenceReading(string Description, bool? Disciplined)
 {
     /// <summary>Nothing known.</summary>
     public static ReferenceReading Unknown { get; } = new("unknown", null);
 
-    /// <summary>The line the journal carries.</summary>
-    public string Summary => GpsLocked switch
-    {
-        true => $"GPS locked ({Description})",
-        false => $"NOT GPS locked ({Description})",
-        null => $"unknown ({Description})",
-    };
+    /// <summary>The words the journal and the slot report carry: the description.</summary>
+    public string Summary => Description;
 }
 
 /// <summary>
@@ -165,8 +163,26 @@ public sealed class FlexMonitor : IFlexMonitor
         {
             return ReferenceReading.Unknown;
         }
-        bool gps = status.State == FlexOscillatorSource.Gpsdo && status.Locked;
-        return new ReferenceReading(status.Describe(), gps);
+        static string Source(FlexOscillatorSource source) => source switch
+        {
+            FlexOscillatorSource.External => "external 10 MHz",
+            FlexOscillatorSource.Gpsdo => "internal GPSDO",
+            FlexOscillatorSource.Tcxo => "its own TCXO",
+            FlexOscillatorSource.Ocxo => "its own OCXO",
+            _ => "a source it did not name",
+        };
+        switch (status.State)
+        {
+            case FlexOscillatorSource.External or FlexOscillatorSource.Gpsdo:
+                return new ReferenceReading($"{Source(status.State)}, {(status.Locked ? "locked" : "NOT locked")}", status.Locked);
+            case FlexOscillatorSource.Tcxo or FlexOscillatorSource.Ocxo:
+                // Set to an external reference or the GPSDO but not running on it: say so, it is what wants fixing.
+                return new ReferenceReading(status.Setting is FlexOscillatorSource.External or FlexOscillatorSource.Gpsdo
+                    ? $"{Source(status.State)}, though set to {Source(status.Setting)}"
+                    : Source(status.State), false);
+            default:
+                return new ReferenceReading($"set to {Source(status.Setting)}, but the source in use not reported", null);
+        }
     }
 
     private async Task CloseAsync()

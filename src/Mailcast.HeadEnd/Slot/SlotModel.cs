@@ -192,7 +192,7 @@ public sealed record SlotReport
     /// <summary>True when the CW E marker went instead of the calibration tone, because the station's 10 MHz reference state was unknown.</summary>
     public bool MarkerSent { get; init; }
 
-    /// <summary>The Flex's own view of its reference, such as <c>NOT GPS locked (External ref locked)</c>.</summary>
+    /// <summary>The Flex's own view of its reference, such as <c>external 10 MHz, locked</c>, <c>internal GPSDO, locked</c> or <c>its own TCXO</c>.</summary>
     public string Reference { get; init; } = "not read";
 
     /// <summary>

@@ -9,16 +9,16 @@ public class SlotRunnerTests(ITestOutputHelper output)
 {
     private static readonly DateTimeOffset Noon = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset Day = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
-    private static readonly ReferenceReading Gps = new("GPSDO locked", true);
+    private static readonly ReferenceReading Gps = new("external 10 MHz, locked", true);
 
     private sealed class Rig
     {
-        public Rig(SlotSettings? settings = null, Func<TimeSpan, double?>? pa = null, bool flexReachable = true, bool withFlex = true)
+        public Rig(SlotSettings? settings = null, Func<TimeSpan, double?>? pa = null, bool flexReachable = true, bool withFlex = true, ReferenceReading? reference = null)
         {
             Time = new VirtualTime(Noon);
             Station = new FakeStation(Time, 4);
             Settings = settings ?? new SlotSettings { Callsign = "M0LTE", SubChannel = 4 };
-            Flex = withFlex ? new FakeFlex(Time, pa ?? (_ => 40.0), Gps, flexReachable) : null;
+            Flex = withFlex ? new FakeFlex(Time, pa ?? (_ => 40.0), reference ?? Gps, flexReachable) : null;
             Runner = new SlotRunner(Settings, Station, Station, Flex, FakeAirtime.For(Station), Journal, Time, Clock);
         }
 
@@ -78,6 +78,30 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.All(station.Frames, f => Assert.True(f.LeaseHeld, $"a frame was queued at {f.At:HH:mm:ss} without the lease"));
     }
 
+    /// <summary>
+    /// The reference line says what the Flex runs on, and warns only when that is not a true frequency reference: GB7RDG's
+    /// external 10 MHz from a GPSDO is one, though its Flex has no GPSDO of its own.
+    /// </summary>
+    [Theory]
+    [InlineData("external", true, "external 10 MHz, locked", false)]
+    [InlineData("gpsdo", true, "internal GPSDO, locked", false)]
+    [InlineData("external", false, "external 10 MHz, NOT locked", true)]
+    [InlineData("tcxo", true, "its own TCXO", true)]
+    public void Run_SaysWhatTheFlexReferenceIs_AndWarnsOnlyWhenItIsNoTrueReference(string source, bool locked, string summary, bool warns)
+    {
+        var parsed = M0LTE.Flex.FlexReferenceStatus.ParseSource(source);
+        var rig = new Rig(reference: FlexMonitor.Read(new M0LTE.Flex.FlexReferenceStatus(parsed, parsed, locked, null, source, source)));
+        var report = rig.Run(5);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(summary, report.Reference);
+        Assert.Contains(rig.Journal.Lines, l => l.EndsWith($": Flex reference: {summary}", StringComparison.Ordinal));
+        Assert.Equal(warns, rig.Journal.Lines.Any(l => l.Contains("WARNING - the Flex is not on a locked external 10 MHz or GPSDO, so this slot's tone is not a true frequency reference", StringComparison.Ordinal)));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains(": done, ", StringComparison.Ordinal) && l.EndsWith($", reference {summary}", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("GPS locked", StringComparison.Ordinal));
+        Assert.All(rig.Journal.Lines, l => Assert.True(l.All(char.IsAscii), l));
+    }
+
     [Fact]
     public void Run_TakesTheLeaseFirst_RenewsIt_SendsEverything_AndReleasesIt()
     {
@@ -88,7 +112,7 @@ public class SlotRunnerTests(ITestOutputHelper output)
         Assert.Equal(60, report.FramesSent);
         Assert.Equal(60, report.FramesQueued);
         Assert.True(report.ToneSent);
-        Assert.Equal("GPS locked (GPSDO locked)", report.Reference);
+        Assert.Equal("external 10 MHz, locked", report.Reference);
 
         var firstLease = rig.Station.LeaseRequests[0];
         Assert.True(firstLease.Granted);

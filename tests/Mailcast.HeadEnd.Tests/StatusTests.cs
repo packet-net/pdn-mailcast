@@ -22,7 +22,7 @@ public class StatusTests
         Bursts = 18,
         BulletinsInRotation = 34,
         ToneSent = true,
-        Reference = "GPS locked (GPSDO locked)",
+        Reference = "external 10 MHz, locked",
         PaTemperatureMaxC = 71,
     };
 
@@ -40,7 +40,7 @@ public class StatusTests
         Assert.Equal("Aborted", json["lastSlot"]!["outcome"]!.GetValue<string>());
         Assert.Equal(120, json["lastSlot"]!["framesSent"]!.GetValue<int>());
         Assert.Equal(71, json["lastSlot"]!["paTemperatureMaxC"]!.GetValue<double>());
-        Assert.Equal("GPS locked (GPSDO locked)", json["lastSlot"]!["reference"]!.GetValue<string>());
+        Assert.Equal("external 10 MHz, locked", json["lastSlot"]!["reference"]!.GetValue<string>());
     }
 
     [Fact]

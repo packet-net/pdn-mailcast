@@ -591,10 +591,10 @@ public sealed class SlotRunner
 
             ReferenceReading reference = flex.Reference;
             _reference = reference.Summary;
-            Say($"Flex reference {reference.Summary}");
-            if (reference.GpsLocked == false)
+            Say($"Flex reference: {reference.Summary}");
+            if (reference.Disciplined == false)
             {
-                Say("WARNING - the Flex is not GPS locked, so this slot's tone is not a true frequency reference");
+                Say("WARNING - the Flex is not on a locked external 10 MHz or GPSDO, so this slot's tone is not a true frequency reference");
             }
             if (flex.PaTemperatureC is double pa)
             {
@@ -1271,7 +1271,8 @@ public sealed class SlotRunner
                 EstimatedSeconds = _estimate is { } e ? Math.Round(e.TotalSeconds, 1) : null,
             };
             string pa = _paMax is double max ? $"{Degrees(max)} C" : "not read";
-            string feed = _feedWorst is { IsOk: false } worst ? $", reference feed {worst.Describe()}" : "";
+            // The station's own reference feed, when it has one, in the same line as the Flex's view, the worst it said in the slot.
+            string feed = _feedWorst is { } worst ? $", reference feed {worst.Describe()}" : "";
             string tone = _toneSent ? "sent" : _markerSent ? "replaced by the CW E marker" : "not sent";
             switch (outcome)
             {
