@@ -155,3 +155,5 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-09,G7TAJ,0.35.0,IO81le,sc,2,0,1,4,0,1,,11,4,184,bbs-store,size-verified,daily/2026-11-09/G7TAJ.txt
 2026-11-09,GM4CXF,0.35.0,IO75qn,sc,9,9,0,0,,,,11,7,546,bbs-store,size-verified,daily/2026-11-09/GM4CXF.txt
 2026-11-09,GM8BPQ,0.35.0,IO68vl,sc,0,2,0,1,0,1,RIG22,11,8,107,bbs-store,size-verified,daily/2026-11-09/GM8BPQ.txt
+2026-11-10,EI7KX,0.35.0,IO83jj,nope.tunnel.ubersdr.org,11,11,0,0,,,,11,3,266,bbs-store,size-verified,daily/2026-11-10/EI7KX.txt
+2026-11-10,G7TAJ,0.35.0,IO81le,sc,1,0,2,0,,,,11,3,212,bbs-store,size-verified,daily/2026-11-10/G7TAJ.txt
