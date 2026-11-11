@@ -46,6 +46,8 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         public int LeftoverFrames { get; init; }
 
         public int BulkFrames { get; init; }
+
+        public int DirectoryFrames { get; init; }
     }
 
     private sealed class Trace
@@ -305,6 +307,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
                         InRotation = inRotation.Count,
                         LeftoverFrames = frames.Count(b => b >= 0 && leftover.Contains(b)),
                         BulkFrames = frames.Count(b => b >= 0 && infos[b].Bulk),
+                        DirectoryFrames = plan.Objects.Where(o => o.Bid is null && o.EnvelopeFor is null).Sum(o => o.Count),
                     };
                     trace.Slots.Add(rec);
                     foreach (var r in reporters)
@@ -404,7 +407,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
 
     private static readonly int[] Seeds = [2026, 7, 99];
 
-    private sealed record Load(double Minutes, double Slots, double Flagged, double InRotation, double Frames, double Directory, double Bulk, double Leftover, double NormalNeverSent, double BulkNeverSent);
+    private sealed record Load(double Minutes, double Slots, double Flagged, double InRotation, double Frames, double Directory, double Bulk, double Leftover, double DirectoryOnly, double NormalNeverSent, double BulkNeverSent);
 
     [Fact]
     public void Sweep_LeftoverTier()
@@ -458,7 +461,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
             var sending = window.Where(s => s.Frames.Length > 0).ToList();
             var cohort = Enumerable.Range(0, infos.Count).Where(b => infos[b].Pass == 1).ToList();
             loads[(c, seed)] = new Load(window.Sum(s => s.OnAirMinutes) / span, sending.Count / (double)span, trace.NearFlagged, window.Average(s => s.InRotation),
-                sending.Average(s => s.Frames.Length), sending.Average(s => s.Frames.Count(b => b < 0)), sending.Average(s => s.BulkFrames), sending.Average(s => s.LeftoverFrames),
+                sending.Average(s => s.Frames.Length), sending.Average(s => s.Frames.Count(b => b < 0)), sending.Average(s => s.BulkFrames), sending.Average(s => s.LeftoverFrames), sending.Average(s => s.DirectoryFrames),
                 cohort.Count(b => !infos[b].Bulk && !trace.Started.Contains(b)), cohort.Count(b => infos[b].Bulk && !trace.Started.Contains(b)));
             foreach (double share in Shares)
             {
@@ -469,7 +472,7 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
 
         Load L(int c) => new(
             Seeds.Average(s => loads[(c, s)].Minutes), Seeds.Average(s => loads[(c, s)].Slots), Seeds.Average(s => loads[(c, s)].Flagged), Seeds.Average(s => loads[(c, s)].InRotation),
-            Seeds.Average(s => loads[(c, s)].Frames), Seeds.Average(s => loads[(c, s)].Directory), Seeds.Average(s => loads[(c, s)].Bulk), Seeds.Average(s => loads[(c, s)].Leftover),
+            Seeds.Average(s => loads[(c, s)].Frames), Seeds.Average(s => loads[(c, s)].Directory), Seeds.Average(s => loads[(c, s)].Bulk), Seeds.Average(s => loads[(c, s)].Leftover), Seeds.Average(s => loads[(c, s)].DirectoryOnly),
             Seeds.Average(s => loads[(c, s)].NormalNeverSent), Seeds.Average(s => loads[(c, s)].BulkNeverSent));
         Result R(int c, double share) => new(
             Seeds.Average(s => results[(c, s, share)].CompletedNormal), Seeds.Average(s => results[(c, s, share)].CompletedBulk),
@@ -482,13 +485,13 @@ public class LeftoverTierSimulationTests(ITestOutputHelper output)
         Line("");
         Line("Head end, per day and per sending slot (cohort window):");
         Line("");
-        Line("| Rule | On air min/day | Slots/day | In rotation | Frames per slot | Directory and envelope frames | Bulk frames | Leftover-tier frames | Normal never sent (cohort) | Bulk never sent (cohort) | Bulletins flagged near |");
-        Line("|---|---|---|---|---|---|---|---|---|---|---|");
+        Line("| Rule | On air min/day | Slots/day | In rotation | Frames per slot | Directory and envelope frames | of which directory | Bulk frames | Leftover-tier frames | Normal never sent (cohort) | Bulk never sent (cohort) | Bulletins flagged near |");
+        Line("|---|---|---|---|---|---|---|---|---|---|---|---|");
         for (int c = 0; c < Configs.Length; c++)
         {
             var l = L(c);
             string flagged = Configs[c].Reports ? l.Flagged.ToString("0", CultureInfo.InvariantCulture) : "";
-            Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {l.Minutes:0.0} | {l.Slots:0.0} | {l.InRotation:0.0} | {l.Frames:0} | {l.Directory:0.0} | {l.Bulk:0.0} | {l.Leftover:0.0} | {l.NormalNeverSent:0.0} | {l.BulkNeverSent:0.0} | {flagged} |"));
+            Line(string.Create(CultureInfo.InvariantCulture, $"| {Configs[c].Name} | {l.Minutes:0.0} | {l.Slots:0.0} | {l.InRotation:0.0} | {l.Frames:0} | {l.Directory:0.0} | {l.DirectoryOnly:0.0} | {l.Bulk:0.0} | {l.Leftover:0.0} | {l.NormalNeverSent:0.0} | {l.BulkNeverSent:0.0} | {flagged} |"));
         }
         foreach (double share in Shares)
         {
