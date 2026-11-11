@@ -1,0 +1,28 @@
+Title: MCR GB7NOT 2026-11-09
+From: GB7NOT
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 6313BMGB7NOT
+Source: GB7RDG's LinBPQ mail store, message 4870 (m_004870.mes), copied 2026-11-11
+Check: stored size matches the BBS's index
+
+R:261111/1020Z 15906@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261111/1019Z 10816@GB7BWR.#45.GBR.EURO LinBPQ6.0.25
+R:261110/0000Z 2679@GB7NOT.#23.GBR.EU LinBPQ6.0.26
+
+MCR1 0.35.0 - sc 0/0 25:RIG25 0 0
+1630 - 0 - - IU+PU - - - - - - GM8BPQ
+17 - 0 - - IU+PU - - - - - - M0LTE
+1730 - 0 - - IU+PU - - - - - - GM8BPQ
+18 - 0 - - IU+PU - - - - - - M0LTE
+1830 - 0 - - IU+PU - - - - - - GM8BPQ
+19 - 0 - - IU+PU - - - - - - M0LTE
+1930 - 0 - - IU+PU - - - - - - GM8BPQ
+20 - 0 - - IU+PU - - - - - - M0LTE
+2030 - 0 - - IU+PU - - - - - - GM8BPQ
+21 - 0 - - IU+PU - - - - - - M0LTE
+2130 - 0 - - IU+PU - - - - - - GM8BPQ
+2230 - 0 - - IU+PU - - - - - - GM8BPQ
+2330 - 0 - - IU+PU - - - - - - GM8BPQ
+S GM8BPQ 8 0 0 0 - - 0
+S M0LTE 5 0 0 0 - - 0
