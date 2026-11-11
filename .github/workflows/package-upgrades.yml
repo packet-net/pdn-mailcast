@@ -25,13 +25,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      # The modem library is moved by hand, since it changes what the live head end transmits.
       - name: Upgrade, build and test
         id: full
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/bump-packages.py pdn-mailcast.slnx | tee "$RUNNER_TEMP/bump-full.txt"
+          python3 scripts/bump-packages.py pdn-mailcast.slnx --exclude-prefix pdn-soundmodem | tee "$RUNNER_TEMP/bump-full.txt"
           dotnet build -c Release
           dotnet test -c Release --no-build --filter "Category!=Docker"
       - name: Security fixes only, if the full upgrade failed
@@ -41,7 +42,7 @@ jobs:
           set -euo pipefail
           git reset --hard
           git clean -fdx -e .dotnet
-          python3 scripts/bump-packages.py pdn-mailcast.slnx --vulnerable-only | tee "$RUNNER_TEMP/bump-security.txt"
+          python3 scripts/bump-packages.py pdn-mailcast.slnx --exclude-prefix pdn-soundmodem --vulnerable-only | tee "$RUNNER_TEMP/bump-security.txt"
           dotnet build -c Release
           dotnet test -c Release --no-build --filter "Category!=Docker"
       - name: Commit and push to main
