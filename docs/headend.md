@@ -196,13 +196,13 @@ Why less than the hourly plan below: all of a day's carrying has to fit in the d
 
 `tests/Mailcast.HeadEnd.Tests/DaylightAirtimeTests.cs` checks this on a sample of that size, with each slot stopping at 10 minutes as a real one does. The morning's first slot is the long one because it carries everything that arrived overnight. Even the first carrying alone would average about 3.6 minutes in December, so the repeat is kept small; in summer there is room for more, and `slotShares` can say so.
 
-A web SDR receiver hears 8 of each day's daylight slots (see the receiver's documentation): in December that is all of them, and in June 8 of 14. It rebuilds a bulletin from its first slot alone, so on these settings it gets those whose first slot it hears: all of them in December, about 19 in 20 in October, and about 5 in 6 in June. A receiver on its own radio hears everything.
+A receiver hears every slot, whether on its own radio or a web SDR, and rebuilds a bulletin from its first slot alone.
 
 ### The shares rule: every hour
 
 A bulletin's first slot is the first slot planned after it is taken in. That slot carries enough of it for a clean rebuild from that slot alone: 1.5 times its K (the number of pieces it is cut into) plus 2 spare pieces, which still rebuilds it with a fifth of the frames lost. It then goes out again with fresh pieces, never repeats, 5, 10, 17 and 25 hours later, 0.7 K each time, so a listener who missed that hour still gets it, and it is heard in five different hours of the day over a little more than a day. Pieces from different slots add together at the receiver.
 
-A web SDR receiver listens to every third slot (8 a day), to stay inside the web SDR's allowance. Two of the four repeats fall in each of the two sets of every third slot that miss a bulletin's first slot, so whichever set a receiver hears, it gets at least 1.4 K of every bulletin. A receiver on its own radio hears everything.
+Every receiver, on its own radio or a web SDR, listens to every slot. The repeat hours were picked when a web SDR receiver heard only every third slot: two of the four repeats fall in each of the two sets of every third slot that miss a bulletin's first slot, so a receiver that misses most slots still gets at least 1.4 K of every bulletin.
 
 If a repeat's slot is skipped or cut short, the next slot makes up what it owed. After the last repeat a bulletin stays in rotation for 3 more slots (`schedule.carryOverSlots`) to make up a shortfall, then leaves it. The directory goes out in every slot that keys, listing every bulletin in rotation.
 

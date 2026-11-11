@@ -2,7 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace Mailcast.Receiver.Tests;
 
-/// <summary>Issue #53's "Listen now": the daily allowance, the refusals, and the session it opens.</summary>
+/// <summary>Issue #53's "Listen now": the refusals, and the session it opens.</summary>
 public class ListenNowTests
 {
     private static readonly DateTimeOffset Noon = new(2026, 10, 5, 12, 0, 0, TimeSpan.Zero);
@@ -11,7 +11,7 @@ public class ListenNowTests
     public void Request_WellBeforeTheNextWindow_Opens_ForTheFullDuration()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
 
         var result = service.Request(Noon, Noon + TimeSpan.FromHours(1), alreadyListening: false);
 
@@ -25,7 +25,7 @@ public class ListenNowTests
     public void Request_WithinFiveMinutesOfAWindow_IsRefused()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
 
         var result = service.Request(Noon, Noon + TimeSpan.FromMinutes(4), alreadyListening: false);
 
@@ -40,7 +40,7 @@ public class ListenNowTests
         // The refusal boundary (5 minutes) is further off than a session's own duration (3
         // minutes), so an accepted request's session always fits before the window: nothing to cap.
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
 
         var result = service.Request(Noon, Noon + ListenNowService.MinBeforeWindow, alreadyListening: false);
 
@@ -49,50 +49,38 @@ public class ListenNowTests
     }
 
     [Fact]
-    public void AlreadyListening_IsRefused_WithoutSpendingAUse()
+    public void AlreadyListening_IsRefused()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
 
         var result = service.Request(Noon, Noon + TimeSpan.FromHours(1), alreadyListening: true);
 
         Assert.False(result.Ok);
         Assert.Contains("Already listening", result.Reason, StringComparison.Ordinal);
-        Assert.Equal(ListenNowService.MaxPerDay, service.UsesLeft(Noon));
     }
 
     [Fact]
-    public void AtMostThreeUsesADay_ThenRefused_UntilTheNextUtcDay()
+    public void AsManyUsesAsWanted_NoDailyLimit()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
         TimeSpan farAhead = TimeSpan.FromHours(6);
 
-        for (int i = 0; i < ListenNowService.MaxPerDay; i++)
+        for (int i = 0; i < 20; i++)
         {
-            time.SetUtcNow(Noon.AddMinutes(i * 10));
             var r = service.Request(time.GetUtcNow(), time.GetUtcNow() + farAhead, alreadyListening: false);
             Assert.True(r.Ok, $"use {i + 1} should be allowed");
-            // Let the session end before the next request, so each counts as a separate use.
+            Assert.Equal(time.GetUtcNow() + ListenNowService.Duration, r.Until);
             time.Advance(ListenNowService.Duration);
         }
-
-        var refused = service.Request(time.GetUtcNow(), time.GetUtcNow() + farAhead, alreadyListening: false);
-        Assert.False(refused.Ok);
-        Assert.Contains($"used {ListenNowService.MaxPerDay} times today", refused.Reason, StringComparison.Ordinal);
-        Assert.Equal(0, service.UsesLeft(time.GetUtcNow()));
-
-        // A new UTC day: the allowance is back.
-        time.SetUtcNow(Noon.AddDays(1));
-        Assert.Equal(ListenNowService.MaxPerDay, service.UsesLeft(time.GetUtcNow()));
-        Assert.True(service.Request(time.GetUtcNow(), time.GetUtcNow() + farAhead, alreadyListening: false).Ok);
     }
 
     [Fact]
-    public void RequestWhileASessionIsStillOpen_ReturnsTheSameSession_WithoutSpendingAnotherUse()
+    public void RequestWhileASessionIsStillOpen_ReturnsTheSameSession()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
         var farWindow = Noon + TimeSpan.FromHours(1);
 
         var first = service.Request(Noon, farWindow, alreadyListening: false);
@@ -101,14 +89,13 @@ public class ListenNowTests
 
         Assert.True(second.Ok);
         Assert.Equal(first.Until, second.Until);
-        Assert.Equal(ListenNowService.MaxPerDay - 1, service.UsesLeft(Noon));
     }
 
     [Fact]
     public void ActiveUntil_EndsOnceTheDurationHasPassed()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
         var farWindow = Noon + TimeSpan.FromHours(1);
         service.Request(Noon, farWindow, alreadyListening: false);
 
@@ -126,7 +113,7 @@ public class ListenNowTests
         // than it looked when the session was granted. ActiveUntil must still never say a time
         // past that window's opening, however it is asked afterwards.
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
         var farWindow = Noon + TimeSpan.FromHours(1);
         var result = service.Request(Noon, farWindow, alreadyListening: false);
         Assert.Equal(Noon + ListenNowService.Duration, result.Until);
@@ -142,29 +129,13 @@ public class ListenNowTests
     }
 
     [Fact]
-    public void Count_IsPersisted_AcrossARestart()
-    {
-        using var dir = new TempDirectory();
-        var time = new FakeTimeProvider(Noon);
-        var farWindow = Noon + TimeSpan.FromHours(1);
-        var first = new ListenNowService(time, dir.Path);
-        first.Request(Noon, farWindow, alreadyListening: false);
-        time.Advance(ListenNowService.Duration);
-        first.Request(time.GetUtcNow(), farWindow, alreadyListening: false);
-
-        var reopened = new ListenNowService(time, dir.Path);
-
-        Assert.Equal(ListenNowService.MaxPerDay - 2, reopened.UsesLeft(time.GetUtcNow()));
-    }
-
-    [Fact]
-    public void Problem_MirrorsRequestWithoutSpendingAUse()
+    public void Problem_MirrorsRequestWithoutOpeningASession()
     {
         var time = new FakeTimeProvider(Noon);
-        var service = new ListenNowService(time, null);
+        var service = new ListenNowService();
 
         Assert.Null(service.Problem(Noon, Noon + TimeSpan.FromHours(1), alreadyListening: false));
-        Assert.Equal(ListenNowService.MaxPerDay, service.UsesLeft(Noon)); // Problem() alone never spends a use
+        Assert.Null(service.ActiveUntil(Noon, Noon + TimeSpan.FromHours(1))); // Problem() alone never opens one
 
         Assert.NotNull(service.Problem(Noon, Noon + TimeSpan.FromMinutes(1), alreadyListening: false));
         Assert.NotNull(service.Problem(Noon, Noon + TimeSpan.FromHours(1), alreadyListening: true));

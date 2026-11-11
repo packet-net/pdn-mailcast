@@ -49,9 +49,9 @@ public class WebSdrWindowTests
         public Rig(DateTimeOffset start, Func<ReceiverConfig, ReceiverConfig>? configure = null)
         {
             Clock = new SteppableClock(start);
-            // Every slot, as before daylight hours, so the web SDR listens to 12 of the 24, every
-            // other hour; the daylight tests below set their own.
-            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Stations = StationFixture.EverySlot };
+            // A slot every other hour, round the clock, so there is a gap between windows; the
+            // web SDR listens to each. The daylight tests below set their own.
+            var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org", StateDirectory = Dir.Path, Stations = StationFixture.Custom(every: 120) };
             config = configure?.Invoke(config) ?? config;
             Host = new ReceiverHost(config, Clock, line => Log.Enqueue(line));
             Host.ClockWaiting += () => Waits.Writer.TryWrite(true);
@@ -116,15 +116,15 @@ public class WebSdrWindowTests
     }
 
     [Fact]
-    public async Task Hourly_ListensToEveryOtherSlotAndSaysWhich()
+    public async Task EveryOtherHour_ListensToEverySlotAndSaysWhich()
     {
-        // 09:20: 09:00 is not one it listens to, so the next is 10:00's, from 09:58.
+        // 09:20: there is no 09:00 slot, so the next is 10:00's, from 09:58.
         await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 9, 20, 0, TimeSpan.Zero));
         await rig.Waits.Reader.ReadAsync();
 
         Assert.Contains("closed until 09:58 UTC, ready for the 10:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
-        Assert.Contains(rig.Log, l => l.Contains("12 of the 24 slots a day, at 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00 and 22:00 UTC, and skips the other 12", StringComparison.Ordinal));
-        Assert.Contains(rig.Log, l => l.Contains("every hour on the hour", StringComparison.Ordinal));
+        Assert.Contains(rig.Log, l => l.Contains("listens to all 12 slots, at 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00 and 22:00 UTC, from 2 minutes before each to 12 after", StringComparison.Ordinal));
+        Assert.Contains(rig.Log, l => l.Contains("every 120 minutes from 00:00 UTC", StringComparison.Ordinal));
         Assert.DoesNotContain(rig.Log, l => l.Contains("everyMinutes", StringComparison.Ordinal));
     }
 
@@ -263,7 +263,7 @@ public class WebSdrWindowTests
         rig.Clock.Advance(ReceiverHost.ClockCheck);
         await rig.Waits.Reader.ReadAsync();
 
-        Assert.Single(rig.Log, l => l == "config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every daylight slot that fits in its allowance");
+        Assert.Single(rig.Log, l => l == "config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every slot");
         Assert.All(rig.Log, l => Assert.True(l.All(c => c is >= ' ' and <= '~'), l));
         Assert.Contains(rig.Log, l => l.Contains("on 2026-10-05 the web SDR listens to all 9 daylight slots", StringComparison.Ordinal));
         Assert.Contains("closed until 08:58 UTC, ready for the 09:00 UTC slot", rig.Host.AudioState, StringComparison.Ordinal);
@@ -287,12 +287,12 @@ public class WebSdrWindowTests
     // Midwinter: all 5.
     [InlineData("2026-12-21T06:00:00Z", "closed until 10:58 UTC, ready for the 11:00 UTC slot",
         "on 2026-12-21 the web SDR listens to all 5 daylight slots, at 11:00, 12:00, 13:00, 14:00 and 15:00 UTC")]
-    // Midsummer: 12 of the 14, leaving out 06:00 and 07:00, so the morning starts at 08:00.
-    [InlineData("2026-06-21T05:00:00Z", "closed until 07:58 UTC, ready for the 08:00 UTC slot",
-        "on 2026-06-21 the web SDR listens to 12 of the 14 daylight slots, at 08:00, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00 and 19:00 UTC, and skips 06:00 and 07:00 UTC")]
+    // Midsummer: all 14, the early morning ones too.
+    [InlineData("2026-06-21T05:00:00Z", "closed until 05:58 UTC, ready for the 06:00 UTC slot",
+        "on 2026-06-21 the web SDR listens to all 14 daylight slots, at 06:00, 07:00, 08:00, 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00 and 19:00 UTC")]
     [InlineData("2026-06-21T18:30:00Z", "closed until 18:58 UTC, ready for the 19:00 UTC slot",
-        "on 2026-06-21 the web SDR listens to 12 of the 14 daylight slots")]
-    public async Task Daylight_ListensToEveryDaylightSlotThatFits(string now, string state, string logged)
+        "on 2026-06-21 the web SDR listens to all 14 daylight slots")]
+    public async Task Daylight_ListensToEveryDaylightSlot(string now, string state, string logged)
     {
         await using var rig = new Rig(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture),
             c => c with { Stations = StationFixture.Stations });
@@ -631,6 +631,7 @@ public class WebSdrWindowTests
         await using var rig = new Rig(new DateTimeOffset(2026, 10, 5, 12, 1, 0, TimeSpan.Zero), c => c with
         {
             Audio = Samples.SoundCard,
+            Stations = StationFixture.EverySlot,
             Hooks = new HooksSettings
             {
                 Before = HookScript.Write(scripts.Path, "before.sh", record),

@@ -177,9 +177,9 @@ public sealed record ScheduleOptions
     /// An hourly station's carrying: enough for a clean rebuild from the first slot alone (1.5 K
     /// and two spare symbols, which survives a fifth of the frames lost), then four repeats of
     /// 0.7 K, 5, 10, 17 and 25 hours later, so a bulletin goes out in five different hours of the
-    /// day over a little more than a day. A web SDR receiver hears every third slot; two of the
-    /// repeats fall in each of the two sets of every third slot that miss the first, so whichever
-    /// set it hears, it gets at least 1.4 K. On M0LTE's volume this is about 3.3 minutes on the
+    /// day over a little more than a day. The repeat hours were picked for a receiver that hears
+    /// only every third slot: two of the repeats fall in each of the two sets of every third slot
+    /// that miss the first, so whichever set it hears, it gets at least 1.4 K. On M0LTE's volume this is about 3.3 minutes on the
     /// air in an average hour (a little more than before the directory's bigger floor, issue #69).
     /// </summary>
     public static ScheduleOptions Hourly { get; } = new()

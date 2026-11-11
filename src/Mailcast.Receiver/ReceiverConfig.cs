@@ -218,19 +218,6 @@ public sealed record ReceiverConfig
     /// <summary>How long after a slot starts a web SDR is kept open.</summary>
     public static readonly TimeSpan WebSdrAfter = TimeSpan.FromMinutes(12);
 
-    /// <summary>A web SDR's listening allowance, in minutes a day: public UberSDR allows each address about three hours.</summary>
-    public const int WebSdrAllowanceMinutes = 180;
-
-    /// <summary>Minutes of the allowance one slot uses.</summary>
-    public static int WebSdrMinutesPerSlot => (int)(WebSdrBefore + WebSdrAfter).TotalMinutes;
-
-    /// <summary>
-    /// The most slots a day a web SDR can be listened to inside its allowance: 12. It listens to
-    /// every daylight slot that fits (see <see cref="ListeningWindow.WebSdrSlotsOn"/>); a sound
-    /// card listens to every slot.
-    /// </summary>
-    public static int MostWebSdrSlotsPerDay => WebSdrAllowanceMinutes / WebSdrMinutesPerSlot;
-
     /// <summary>
     /// Set when the file had <c>webSdrSlotsPerDay</c>, from 0.5.1 and before. It is no longer
     /// used: the key is ignored, not refused, so those files keep working, and the receiver says

@@ -60,7 +60,6 @@ public class ConfigTests
         var config = ReceiverConfig.Load(path);
 
         Assert.Equal(new SlotSchedule(new TimeOnly(0, 0), 60, StationFixture.Daylight), Fixture.Slots(config));
-        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, ListeningWindow.WebSdrSlots(Fixture.Slots(config)).Count);
         Assert.Empty(config.SlotSettingsIgnored);
     }
 
@@ -111,7 +110,6 @@ public class ConfigTests
         var config = ReceiverConfig.Load(path);
 
         Assert.True(config.WebSdrSlotsPerDayIgnored);
-        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, ListeningWindow.WebSdrSlots(Fixture.Slots(config)).Count);
         config.Save(path);
         Assert.DoesNotContain("webSdrSlotsPerDay", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.False(ReceiverConfig.Load(path).WebSdrSlotsPerDayIgnored);
