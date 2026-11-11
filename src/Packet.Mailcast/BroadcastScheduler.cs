@@ -379,6 +379,13 @@ public static class BroadcastScheduler
     public const int LeftoverHours = 48;
 
     /// <summary>
+    /// Simulation only (issue #241, branch sim/241-leftover): replaces the fixed retirement limits, <see cref="LeftoverCoverage"/> and
+    /// <see cref="LeftoverHours"/>, for the code running in this async flow, and optionally gives bulletins that <see cref="SimRetireOverride.Near"/>
+    /// names longer ones. Null (always, outside the simulation) keeps the fixed limits. The 48 h limit for a bulletin never started is not changed.
+    /// </summary>
+    public static readonly AsyncLocal<SimRetireOverride?> SimRetire = new();
+
+    /// <summary>
     /// Where the evening slots' pieces of a bulletin are counted from: half way through the 24-bit ESI space. A bulletin's
     /// daylight pieces count up from 0 and its evening ones from here, both through the same <see cref="CarriedBulletin.EsiOf"/>
     /// (the station's own order is a permutation of the whole space), so the two never meet: daylight would need over eight
@@ -488,15 +495,15 @@ public static class BroadcastScheduler
     {
         ArgumentNullException.ThrowIfNull(carried);
         ArgumentNullException.ThrowIfNull(rule);
-        return RetiredAt(carried.NextEsi, carried.Transfer.SourceSymbols, carried.FirstSlot, slot, rule);
+        return RetiredAt(carried.NextEsi, carried.Transfer.SourceSymbols, carried.FirstSlot, slot, rule, carried.Bid);
     }
 
     // Retired for good, from total coverage in pieces (own bulletins: pieces sent; relayed objects: heard on air plus sent).
-    internal static bool RetiredAt(long total, int sourceSymbols, DateTimeOffset? firstSlot, DateTimeOffset slot, BudgetRule rule) =>
-        total >= RetireSymbols(sourceSymbols, rule) || (firstSlot is DateTimeOffset first && slot - first >= RetireAge(rule));
+    internal static bool RetiredAt(long total, int sourceSymbols, DateTimeOffset? firstSlot, DateTimeOffset slot, BudgetRule rule, string? bid = null) =>
+        total >= RetireSymbols(sourceSymbols, rule, bid) || (firstSlot is DateTimeOffset first && slot - first >= RetireAge(rule, bid));
 
-    internal static bool LeftoverAt(long total, int sourceSymbols, DateTimeOffset? firstSlot, DateTimeOffset slot, BudgetRule rule) =>
-        !RetiredAt(total, sourceSymbols, firstSlot, slot, rule)
+    internal static bool LeftoverAt(long total, int sourceSymbols, DateTimeOffset? firstSlot, DateTimeOffset slot, BudgetRule rule, string? bid = null) =>
+        !RetiredAt(total, sourceSymbols, firstSlot, slot, rule, bid)
         && (total >= LeftoverSymbols(sourceSymbols, rule) || (firstSlot is DateTimeOffset first && slot - first >= rule.RetireAfter));
 
     /// <summary>
@@ -509,7 +516,7 @@ public static class BroadcastScheduler
     {
         ArgumentNullException.ThrowIfNull(carried);
         ArgumentNullException.ThrowIfNull(rule);
-        return LeftoverAt(carried.NextEsi, carried.Transfer.SourceSymbols, carried.FirstSlot, slot, rule);
+        return LeftoverAt(carried.NextEsi, carried.Transfer.SourceSymbols, carried.FirstSlot, slot, rule, carried.Bid);
     }
 
     /// <summary>How many symbols in all a bulletin of K source symbols moves to the leftover tier after: <see cref="BudgetRule.RetireCoverage"/> K.</summary>
@@ -523,20 +530,23 @@ public static class BroadcastScheduler
     /// How many symbols in all a bulletin of K source symbols retires for good after:
     /// <see cref="LeftoverCoverage"/> K, or <see cref="BudgetRule.RetireCoverage"/> K if that is more.
     /// </summary>
-    public static int RetireSymbols(int sourceSymbols, BudgetRule rule)
+    public static int RetireSymbols(int sourceSymbols, BudgetRule rule, string? bid = null)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        return Symbols(Math.Max(LeftoverCoverage, rule.RetireCoverage), sourceSymbols);
+        var sim = SimRetire.Value;
+        double coverage = sim is null ? LeftoverCoverage : bid is not null && sim.Near?.Invoke(bid) == true ? sim.NearCoverage : sim.Coverage;
+        return Symbols(Math.Max(coverage, rule.RetireCoverage), sourceSymbols);
     }
 
     /// <summary>
     /// How long after its first slot a bulletin retires for good, whatever its coverage:
     /// <see cref="LeftoverHours"/>, or <see cref="BudgetRule.RetireAfter"/> if that is longer.
     /// </summary>
-    public static TimeSpan RetireAge(BudgetRule rule)
+    public static TimeSpan RetireAge(BudgetRule rule, string? bid = null)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        var leftover = TimeSpan.FromHours(LeftoverHours);
+        var sim = SimRetire.Value;
+        var leftover = TimeSpan.FromHours(sim is null ? LeftoverHours : bid is not null && sim.Near?.Invoke(bid) == true ? sim.NearHours : sim.Hours);
         return rule.RetireAfter > leftover ? rule.RetireAfter : leftover;
     }
 
@@ -783,7 +793,7 @@ public static class BroadcastScheduler
         // This slot's bulletins in a fixed order, so the plan does not depend on the caller's order.
         int Others(CarriedBulletin c) => otherHeard?.Invoke(c.Transfer.ObjectId) ?? 0;
         var inRotation = carried
-            .Where(c => InRotation(c, slot, options) && !(options.Budget is { } budgetRule && Others(c) > 0 && RetiredAt(c.NextEsi + (long)Others(c), c.Transfer.SourceSymbols, c.FirstSlot, slot, budgetRule)))
+            .Where(c => InRotation(c, slot, options) && !(options.Budget is { } budgetRule && Others(c) > 0 && RetiredAt(c.NextEsi + (long)Others(c), c.Transfer.SourceSymbols, c.FirstSlot, slot, budgetRule, c.Bid)))
             .Select(c => (Carried: c, Index: SlotIndex(c, slot, options)))
             .OrderBy(c => c.Carried.Bid.ToUpperInvariant(), StringComparer.Ordinal)
             .ThenBy(c => c.Index)
@@ -802,7 +812,7 @@ public static class BroadcastScheduler
                 continue;
             }
             bulletins.Add((c, index));
-            leftover.Add(options.Budget is { } r && LeftoverAt(c.NextEsi + (long)Others(c), c.Transfer.SourceSymbols, c.FirstSlot, slot, r));
+            leftover.Add(options.Budget is { } r && LeftoverAt(c.NextEsi + (long)Others(c), c.Transfer.SourceSymbols, c.FirstSlot, slot, r, c.Bid));
             entries.Add(new DirectoryEntry(c.Transfer.ObjectId, c.Transfer.DictionaryId, c.Size, c.Bid, c.Title, (byte)c.Transfer.Kind,
                 options.Signer is null ? null : ObjectId.LongHash(c.Transfer.DictionaryId, c.Transfer.Bytes),
                 c.Envelope is { } env ? new EnvelopeLink(env.ObjectId, ObjectId.LongHash(env.DictionaryId, env.Bytes)) : null));
@@ -957,6 +967,8 @@ public static class BroadcastScheduler
 
         public int K => own?.Transfer.SourceSymbols ?? relay!.K;
 
+        public string? Bid => own?.Bid;
+
         /// <summary>Pieces on the air so far: for a bulletin those this head end sent; for a relayed object those heard from others as well.</summary>
         public long Sent => own is not null ? (Evening ? own.EveningNextEsi : own.NextEsi + (long)others) : relay!.Total;
 
@@ -1056,7 +1068,7 @@ public static class BroadcastScheduler
             else
             {
                 room[i] = Math.Min(c.MaxPieces, leftover[i] ? 0 : Math.Clamp(LeftoverSymbols(k, rule) - sent, 0, CapSymbols(k, rule)));
-                spare[i] = Math.Min(c.MaxPieces, Math.Clamp(RetireSymbols(k, rule) - sent, 0, CapSymbols(k, rule)));
+                spare[i] = Math.Min(c.MaxPieces, Math.Clamp(RetireSymbols(k, rule, c.Bid) - sent, 0, CapSymbols(k, rule)));
             }
             floor[i] = Math.Min(room[i], FloorSymbols(k, rule));
             lengths[i] = c.FrameLength;
@@ -1305,3 +1317,6 @@ public static class BroadcastScheduler
         }
     }
 }
+
+/// <summary>Simulation only (issue #241): retirement limits in K and hours, and longer ones for the bulletins <see cref="Near"/> names.</summary>
+public sealed record SimRetireOverride(double Coverage, double Hours, Func<string, bool>? Near = null, double NearCoverage = 0, double NearHours = 0);
