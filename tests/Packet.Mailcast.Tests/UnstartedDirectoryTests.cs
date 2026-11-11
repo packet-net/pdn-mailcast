@@ -90,4 +90,22 @@ public class UnstartedDirectoryTests
         Assert.True(tight.Objects[0].Transfer.SourceSymbols < plenty.Objects[0].Transfer.SourceSymbols);
         Assert.All(bulk, c => Assert.True(Listed(plenty, c)));
     }
+
+    [Fact]
+    public void AnyBudget_ListedUnstartedAlwaysGetPieces_AndUnlistedNeverDo()
+    {
+        var started = Held(1, 6000, 2, Slot.AddHours(-1));
+        var bulk = Enumerable.Range(10, 8).Select(i => Held(i, 6000, from: "LU9DCE")).ToList();
+        for (int budget = 6; budget <= 60; budget++)
+        {
+            var plan = BroadcastScheduler.Plan([started, .. bulk], Slot, 1, Compression.Default, Options, null, Frames(budget));
+            if (plan.BulletinFrames == 0)
+            {
+                continue;
+            }
+            var sent = plan.Objects.Where(o => o.Bid is not null).ToDictionary(o => o.Bid!);
+            Assert.True(Listed(plan, started), $"budget {budget}");
+            Assert.All(bulk, c => Assert.True(Listed(plan, c) == sent[c.Bid].Count > 0, $"budget {budget}: {c.Bid}"));
+        }
+    }
 }

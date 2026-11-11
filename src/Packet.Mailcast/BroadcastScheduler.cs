@@ -757,7 +757,7 @@ public static class BroadcastScheduler
         Plan(carried, slot, seed, compression, options, directoryNextEsi, budget, mode, null);
 
     /// <summary>
-    /// Plans an evening slot (<see cref="SlotTimetable.Evening"/>): the same bulletins as a daylight slot at that time would list,
+    /// Plans an evening slot (<see cref="SlotTimetable.Evening"/>): the bulletins a daylight slot at that time would list (those started, plus unstarted ones that get pieces here),
     /// the leftover tier among them, filled to <paramref name="budget"/> least evening-covered first (evening pieces sent over
     /// K) up to the budget rule's slot cap each, normal bulletins before bulk. Their pieces are counted from
     /// <see cref="EveningFirstCount"/> plus each bulletin's <see cref="CarriedBulletin.EveningNextEsi"/>, so they are always fresh
@@ -863,12 +863,12 @@ public static class BroadcastScheduler
         }
 
         var today = DateOnly.FromDateTime(slot.UtcDateTime);
-        BroadcastDirectory directory;
-        TransferObject directoryObject;
-        uint directoryFirst;
-        int[] counts;
-        int[] main; // of each count, the pieces from before the leftover tier's turn, which go first
-        anyRoom = false;
+        BroadcastDirectory directory = null!;
+        TransferObject directoryObject = null!;
+        uint directoryFirst = 0;
+        int[] counts = [];
+        int[] main = []; // of each count, the pieces from before the leftover tier's turn, which go first
+        bool roomLeft = false;
 
         // The directory lists a bulletin from the slot in which its first piece is sent until it retires, never one that has not
         // started: its line would cost directory bytes in every slot for up to 48 hours. Under the budget rule whether an unstarted
@@ -877,19 +877,30 @@ public static class BroadcastScheduler
         // budget rule every bulletin in rotation is sent from its first slot, so every one is listed.
         var starting = new HashSet<ulong>();
         bool Listed(CarriedBulletin c) => options.Budget is null || Started(c) || starting.Contains(c.Transfer.ObjectId);
-        while (true)
+        void Replan(bool onlyListed)
         {
             entries = [.. ownEntries.Where((_, i) => Listed(bulletins[i].Carried)), .. relayEntries];
             directory = new BroadcastDirectory(today, entries, options.Timetable, mode, options.Signer, reports, options.Station, options.Adverts, options.Details);
             directoryObject = TransferObject.ForDirectory(directory, options.DictionaryId, compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
             directoryFirst = directoryNextEsi?.Invoke(directoryObject.ObjectId) ?? 0;
+            counts = new int[bulletins.Count + relays.Count];
+            main = new int[counts.Length];
             if (options.Budget is { } rule)
             {
-                counts = Fill([.. bulletins.Select(b => new FillItem(b.Carried, null, Others(b.Carried), rule, evening)), .. relays.Select(r => new FillItem(null, r, 0, rule))], [.. leftover, .. relayLeftover], directoryObject, options, rule, budget!, extras, out anyRoom, out main);
+                // In the last phase an unlisted bulletin is left out of the fill altogether, so it sends nothing.
+                var take = Enumerable.Range(0, counts.Length).Where(i => !onlyListed || i >= bulletins.Count || Listed(bulletins[i].Carried)).ToList();
+                var all = new List<FillItem>([.. bulletins.Select(b => new FillItem(b.Carried, null, Others(b.Carried), rule, evening)), .. relays.Select(r => new FillItem(null, r, 0, rule))]);
+                var allLeftover = new List<bool>([.. leftover, .. relayLeftover]);
+                var got = Fill([.. take.Select(i => all[i])], [.. take.Select(i => allLeftover[i])], directoryObject, options, rule, budget!, extras, out bool room, out int[] gotMain);
+                roomLeft |= room; // sticky: a bulletin pruned from the fill still had room, so the caller may retry without extras
+                for (int j = 0; j < take.Count; j++)
+                {
+                    counts[take[j]] = got[j];
+                    main[take[j]] = gotMain[j];
+                }
             }
             else
             {
-                counts = new int[bulletins.Count];
                 for (int i = 0; i < bulletins.Count; i++)
                 {
                     // Everything due up to and including this slot, less what has gone already. For a head
@@ -899,9 +910,18 @@ public static class BroadcastScheduler
                     var c = bulletins[i].Carried;
                     uint due = (uint)DueAt(c.Transfer.SourceSymbols, c.FirstSlot ?? slot, slot, options);
                     counts[i] = c.NextEsi >= due ? 0 : (int)(due - c.NextEsi);
+                    main[i] = counts[i];
                 }
-                main = counts;
             }
+        }
+
+        // Grow: add the unstarted bulletins that got pieces, until no more do. Then prune: take out any of them that, with the
+        // bigger directory, got none (they would be listed but unsent, and unlisted again next slot), leaving the unlisted
+        // ones out of the fill, until every unstarted bulletin listed gets pieces. Pruning only makes the directory smaller,
+        // so the rest keep their room.
+        Replan(false);
+        while (true)
+        {
             bool grew = false;
             for (int i = 0; i < bulletins.Count; i++)
             {
@@ -915,8 +935,27 @@ public static class BroadcastScheduler
             {
                 break;
             }
+            Replan(false);
+        }
+        if (options.Budget is not null)
+        {
+            Replan(true);
+            while (true)
+            {
+                var idle = Enumerable.Range(0, bulletins.Count).Where(i => counts[i] == 0 && starting.Contains(bulletins[i].Carried.Transfer.ObjectId)).ToList();
+                if (idle.Count == 0)
+                {
+                    break;
+                }
+                foreach (int i in idle)
+                {
+                    starting.Remove(bulletins[i].Carried.Transfer.ObjectId);
+                }
+                Replan(true);
+            }
         }
 
+        anyRoom = roomLeft;
         var itemRule = options.Budget ?? new BudgetRule();
         var allItems = new List<FillItem>([.. bulletins.Select(b => new FillItem(b.Carried, null, Others(b.Carried), itemRule, evening)), .. relays.Select(r => new FillItem(null, r, 0, itemRule))]);
         var allLeftover = new List<bool>([.. leftover, .. relayLeftover]);
