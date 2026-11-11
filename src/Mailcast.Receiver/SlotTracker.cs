@@ -509,11 +509,25 @@ public sealed class SlotTracker
     /// <summary>
     /// Puts back what was tracked before a restart (<see cref="StatusMemory"/>). A slot whose
     /// window closed while the receiver was stopped counts as having had its line: the journal
-    /// gets no late line for it, and a new one is not mixed with it.
+    /// gets no late line for it, and a new one is not mixed with it. Anything dated after now
+    /// (allowing <see cref="ClockAllowance"/>), which only a clock that was wrong can have left, is
+    /// let go. True if something was.
     /// </summary>
-    internal void Restore(SlotSummary? current, DateTimeOffset? lastEnded)
+    internal bool Restore(SlotSummary? current, DateTimeOffset? lastEnded)
     {
         var now = _time.GetUtcNow();
+        var latest = now + ClockAllowance;
+        bool future = false;
+        if (current is not null && (current.Started > latest || current.Scheduled > latest || current.LastFrame > latest))
+        {
+            current = null;
+            future = true;
+        }
+        if (lastEnded > latest)
+        {
+            lastEnded = null;
+            future = true;
+        }
         lock (_gate)
         {
             if (current is { Ended: false, Scheduled: { } slot } && now >= slot + ReceiverConfig.WebSdrAfter)
@@ -528,6 +542,7 @@ public sealed class SlotTracker
                 _lastHeard = frame;
             }
         }
+        return future;
     }
 
     /// <summary>The station of a slot, when more than one is followed; under <see cref="_gate"/>.</summary>

@@ -33,6 +33,8 @@ internal sealed class StatusMemory
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // A tone heard over no noise at all has an SNR of +Infinity.
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -110,7 +112,7 @@ internal sealed class StatusMemory
             {
                 text = JsonSerializer.Serialize(snapshot(), Json);
             }
-            catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+            catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException or ArgumentException)
             {
                 _log($"status: cannot save the page's history: {Ascii.Clean(e.Message)}");
                 return false;

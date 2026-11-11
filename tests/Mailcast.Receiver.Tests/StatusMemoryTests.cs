@@ -31,6 +31,7 @@ public class StatusMemoryTests
             host.FrameHistory.Record(SlotStart.AddHours(1), null, null, new HeardPiece(SlotStart.AddHours(1), null, PieceStatus.NotRecognised, false, "not a mailcast frame"));
         }
 
+        time.Advance(TimeSpan.FromHours(2));
         await using var restarted = Host(dir, time);
         restarted.RestoreStatus();
 
@@ -161,6 +162,97 @@ public class StatusMemoryTests
         var saved = again.StatusSnapshot();
         Assert.Equal(7047000, saved.HeardAtHz!["G4XYZ"]);
         Assert.Equal("G4ABC, Wessex, IO90", again.WebSdrAbout);
+    }
+
+    [Fact]
+    public async Task AWebSdrPlaceThatWasNotGiven_IsAskedForAgain_AndAKeptOneIsReplacedByANewAnswer()
+    {
+        using var dir = new TempDirectory();
+        const string Audio = "ubersdr:wessex.zapto.org";
+        var source = AudioSource.Parse(Audio);
+        var time = new FakeTimeProvider(SlotStart);
+        var moved = new GroundPlace(52.0, -2.0, "IO82xa");
+
+        // Saved with no place (the web SDR would not say): asked again after the restart.
+        File.WriteAllText(FilePath(dir), """{"version":1,"webSdrPlace":{"source":"ubersdr:wessex.zapto.org"}}""");
+        await using (var host = Host(dir, time))
+        {
+            host.RestoreStatus();
+            int asked = 0;
+            host.FetchWebSdrPlace = (_, _) => { asked++; return Task.FromResult<GroundPlace?>(moved); };
+            await host.NotePlaceAsync(source, Audio, CancellationToken.None);
+            await host.NotePlaceAsync(source, Audio, CancellationToken.None);
+            Assert.Equal(1, asked); // once a run
+            Assert.Equal("IO82xa", host.Place?.Locator);
+        }
+
+        // Saved with a place: used at once, still asked once this run, and a new answer wins.
+        await using (var host = Host(dir, time))
+        {
+            host.RestoreStatus();
+            Assert.Equal("IO82xa", host.Place?.Locator);
+            int asked = 0;
+            host.FetchWebSdrPlace = (_, _) => { asked++; return Task.FromResult<GroundPlace?>(new GroundPlace(51.0, -1.0, "IO91aa")); };
+            await host.NotePlaceAsync(source, Audio, CancellationToken.None);
+            Assert.Equal(1, asked);
+            Assert.Equal("IO91aa", host.Place?.Locator);
+        }
+
+        // A web SDR that will not say this time leaves the kept place alone.
+        await using var silent = Host(dir, time);
+        silent.RestoreStatus();
+        silent.FetchWebSdrPlace = (_, _) => Task.FromResult<GroundPlace?>(null);
+        await silent.NotePlaceAsync(source, Audio, CancellationToken.None);
+        Assert.Equal("IO91aa", silent.Place?.Locator);
+    }
+
+    [Fact]
+    public async Task HistoryDatedAfterNow_IsLetGo_AsAWrongClockLeftIt()
+    {
+        using var dir = new TempDirectory();
+        var future = new FakeTimeProvider(SlotStart.AddDays(3).AddSeconds(20));
+        await using (var host = Host(dir, future))
+        {
+            host.RestoreStatus();
+            host.Slots.OnFrame("ms110d-wn4", 100);
+            host.FrameHistory.Record(SlotStart.AddDays(3), null, null, Piece(SlotStart.AddDays(3).AddSeconds(20), 0));
+            host.FrameHistory.Record(SlotStart.AddDays(3).AddHours(1), null, null, Piece(SlotStart.AddDays(3).AddHours(1), 1));
+        }
+
+        // The clock put right: back to the real day.
+        var lines = new List<string>();
+        var now = new FakeTimeProvider(SlotStart.AddSeconds(5));
+        await using var restarted = Host(dir, now, lines.Add);
+        restarted.RestoreStatus();
+
+        Assert.Null(restarted.Slots.Last);
+        Assert.Null(restarted.Slots.LastHeard);
+        Assert.Null(restarted.Slots.LastEnded);
+        Assert.Empty(restarted.FrameHistory.Slots);
+        Assert.Contains(lines, l => l.Contains("dated after now", StringComparison.Ordinal));
+        // Nothing heard by NothingHeardBy still gives the window back.
+        restarted.ListeningSince = SlotStart;
+        now.Advance(ReceiverHost.NothingHeardBy);
+        Assert.NotNull(restarted.EarlyEndReason(SlotStart));
+    }
+
+    [Fact]
+    public async Task AToneOverNoNoise_InfiniteSnr_SavesAndComesBack()
+    {
+        using var dir = new TempDirectory();
+        var time = new FakeTimeProvider(SlotStart.AddSeconds(20));
+        var lines = new List<string>();
+        await using (var host = Host(dir, time, lines.Add))
+        {
+            host.RestoreStatus();
+            host.Slots.OnTone(new ToneReport(1800, 0, double.PositiveInfinity, TimeSpan.FromSeconds(10)));
+            Assert.True(host.SaveStatus(now: true));
+        }
+
+        Assert.DoesNotContain(lines, l => l.StartsWith("status: cannot", StringComparison.Ordinal));
+        await using var restarted = Host(dir, time);
+        restarted.RestoreStatus();
+        Assert.Equal(double.PositiveInfinity, restarted.Slots.Last!.Tone!.SnrDb);
     }
 
     [Fact]

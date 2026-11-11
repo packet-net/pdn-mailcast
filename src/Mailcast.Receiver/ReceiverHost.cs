@@ -303,9 +303,17 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         try
         {
-            FrameHistory.Restore(saved.Heard ?? []);
-            Slots.Restore(saved.Slot?.ToSummary(), saved.LastEnded);
             var now = _time.GetUtcNow();
+            // Anything dated after now can only come from a clock that was wrong: let go, as the daily report's notes are.
+            var latest = now + SlotTracker.ClockAllowance;
+            var heard = (saved.Heard ?? []).Where(s => s is not null).ToList();
+            int dropped = heard.RemoveAll(s => s.Slot > latest || (s.Bursts ?? []).Any(b => b is not null && (b.Started > latest || (b.Pieces ?? []).Any(p => p is not null && p.Heard > latest))));
+            FrameHistory.Restore(heard);
+            bool future = Slots.Restore(saved.Slot?.ToSummary(), saved.LastEnded) | dropped > 0;
+            if (future)
+            {
+                _log("status: some of the page's history is dated after now (was the clock wrong?); that part is let go");
+            }
             lock (_gate)
             {
                 // A window ended early is kept only once it is over: a restart within it judges the slot afresh.
@@ -322,7 +330,8 @@ public sealed class ReceiverHost : IAsyncDisposable
                 {
                     _webSdrAbout = (about.Source, about.Words);
                 }
-                if (saved.WebSdrPlace is { Source: not null } place)
+                // Only a place the web SDR gave: one it would not give is asked for again (NotePlaceAsync).
+                if (saved.WebSdrPlace is { Source: not null, Place: not null } place)
                 {
                     _webSdrPlace = (place.Source, place.Place);
                 }
@@ -2121,26 +2130,38 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// Asks the web SDR where it is, once for each audio setting, and keeps the answer.
     /// pdn-soundmodem (0.86.0) reads the web SDR's <c>/api/description</c> when it opens it, but
     /// keeps only a line of words from it, without the position, so it is read again here: once
-    /// a run of the receiver, not every slot.
+    /// a run of the receiver, not every slot. A place kept from before a restart is used meanwhile,
+    /// and kept if the web SDR will not say this time; one it does give replaces it (a moved web SDR).
     /// </summary>
-    private async Task NotePlaceAsync(AudioSource source, string audio, CancellationToken cancellation)
+    internal async Task NotePlaceAsync(AudioSource source, string audio, CancellationToken cancellation)
     {
         lock (_gate)
         {
-            if (source.Kind != AudioSourceKind.UberSdr || _webSdrPlace?.Source == audio)
+            if (source.Kind != AudioSourceKind.UberSdr || _webSdrPlaceAsked == audio)
             {
                 return;
             }
         }
-        var place = await AudioPipeline.FetchWebSdrPlaceAsync(Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target), cancellation).ConfigureAwait(false);
+        var place = await FetchWebSdrPlace(source, cancellation).ConfigureAwait(false);
         if (place is not null || !cancellation.IsCancellationRequested)
         {
             lock (_gate)
             {
-                _webSdrPlace = (audio, place);
+                _webSdrPlaceAsked = audio;
+                if (place is not null || _webSdrPlace is not { Place: not null } kept || kept.Source != audio)
+                {
+                    _webSdrPlace = (audio, place);
+                }
             }
         }
     }
+
+    /// <summary>The audio setting whose web SDR has been asked where it is in this run.</summary>
+    private string? _webSdrPlaceAsked;
+
+    /// <summary>Asks a web SDR where it is; tests may replace it.</summary>
+    internal Func<AudioSource, CancellationToken, Task<GroundPlace?>> FetchWebSdrPlace { get; set; } =
+        (source, cancellation) => AudioPipeline.FetchWebSdrPlaceAsync(Packet.SoundModem.UberSdr.UberSdrDevice.Parse(source.Target), cancellation);
 
     private void Attach(AudioPipeline pipeline)
     {
@@ -2186,7 +2207,14 @@ public sealed class ReceiverHost : IAsyncDisposable
         await Intake.DisposeAsync().ConfigureAwait(false);
         await ChannelWatch.DisposeAsync().ConfigureAwait(false);
         // After the intake and the channel measurement have finished, so their last pieces and SNRs are in it.
-        SaveStatus(now: true);
+        try
+        {
+            SaveStatus(now: true);
+        }
+        catch (Exception e)
+        {
+            _log($"status: cannot save the page's history at shutdown: {Ascii.Clean(e.Message)}");
+        }
         Hooks.Dispose();
         _bbsTurn.Dispose();
     }
