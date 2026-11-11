@@ -67,15 +67,15 @@ public class ListenNowApiTests
         using var _c = http;
 
         var ln = (await StatusAsync(http)).GetProperty("listenNow");
-        Assert.Equal(3, ln.GetProperty("usesLeft").GetInt32());
-        Assert.Equal(3, ln.GetProperty("usesMax").GetInt32());
+        Assert.False(ln.TryGetProperty("usesLeft", out _));
+        Assert.Equal(3, ln.GetProperty("minutes").GetInt32());
         Assert.True(ln.GetProperty("canUse").GetBoolean());
         Assert.Equal(JsonValueKind.Null, ln.GetProperty("until").ValueKind);
         Assert.Equal(JsonValueKind.Null, ln.GetProperty("problem").ValueKind);
     }
 
     [Fact]
-    public async Task Post_Opens_ACountedSession_ShownInStatus()
+    public async Task Post_Opens_ASession_ShownInStatus()
     {
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(Start);
@@ -93,7 +93,6 @@ public class ListenNowApiTests
 
         var ln = (await StatusAsync(http)).GetProperty("listenNow");
         Assert.Equal(until, ln.GetProperty("until").GetDateTimeOffset());
-        Assert.Equal(2, ln.GetProperty("usesLeft").GetInt32());
     }
 
     [Fact]
@@ -115,7 +114,7 @@ public class ListenNowApiTests
     }
 
     [Fact]
-    public async Task Post_ThreeTimes_ThenRefusedForToday()
+    public async Task Post_ManyTimes_IsNeverRefusedForToday()
     {
         using var dir = new TempDirectory();
         var time = new FakeTimeProvider(Start);
@@ -124,16 +123,11 @@ public class ListenNowApiTests
         await using var _p = page;
         using var _c = http;
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 6; i++)
         {
             Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(ListenNow())).StatusCode);
             time.Advance(ListenNowService.Duration);
         }
-
-        var refused = await http.SendAsync(ListenNow());
-        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-        var body = await refused.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains("used 3 times today", body.GetProperty("error").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -149,7 +143,7 @@ public class ListenNowApiTests
         var crossSite = await http.SendAsync(ListenNow(origin: "http://evil.example"));
 
         Assert.Equal(HttpStatusCode.Forbidden, crossSite.StatusCode);
-        Assert.Equal(3, (await StatusAsync(http)).GetProperty("listenNow").GetProperty("usesLeft").GetInt32());
+        Assert.Equal(JsonValueKind.Null, (await StatusAsync(http)).GetProperty("listenNow").GetProperty("until").ValueKind);
     }
 
     [Fact]

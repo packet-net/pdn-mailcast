@@ -1295,8 +1295,6 @@ public sealed partial class StatusPage : IAsyncDisposable
         bool alreadyListening = (host.Audio.Phase is AudioPhase.Listening or AudioPhase.Reconnecting) && until is null;
         return new
         {
-            usesLeft = host.ListenNow.UsesLeft(now),
-            usesMax = ListenNowService.MaxPerDay,
             minutes = (int)ListenNowService.Duration.TotalMinutes,
             until,
             canUse = until is null && host.ListenNow.Problem(now, nextOpens, alreadyListening) is null,
@@ -1378,7 +1376,6 @@ public sealed partial class StatusPage : IAsyncDisposable
         var todays = followed.ActiveOn(today);
         bool webSdr = AudioSource.Parse(config.Audio).Kind == AudioSourceKind.UberSdr;
         var (opens, closes, listenSlot) = ListeningWindow.Next(now, followed);
-        var listened = ListeningWindow.WebSdrSlotsOn(followed, today);
         static string Hhmm(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         return new
         {
@@ -1402,8 +1399,6 @@ public sealed partial class StatusPage : IAsyncDisposable
             toneSeconds = OnAir.ToneSeconds,
             webSdr = !webSdr ? null : new
             {
-                slotsPerDay = listened.Count,
-                times = listened.Select(Hhmm),
                 slot = listenSlot,
                 opens,
                 closes,

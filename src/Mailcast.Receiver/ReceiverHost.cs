@@ -90,7 +90,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         {
             RadioTunedSince = () => retuner.TunedSince;
         }
-        ListenNow = new ListenNowService(time, config.StateDirectory);
+        ListenNow = new ListenNowService();
         Feedback = CreateFeedback();
         RefreshSources(say: false); // said after the start-up banner (RunAsync)
     }
@@ -191,12 +191,8 @@ public sealed class ReceiverHost : IAsyncDisposable
     /// <summary>The daily report to the broadcast's author, when the config's <c>feedback</c> turns it on.</summary>
     public FeedbackService Feedback { get; }
 
-    /// <summary>The slots the receiver listens to on a UTC day, of every station it follows: a web SDR's own, or every one that runs.</summary>
-    private IReadOnlyList<DateTimeOffset> ListenedOn(DateOnly day)
-    {
-        var followed = Followed;
-        return AudioSource.Parse(Config.Audio).Kind == AudioSourceKind.UberSdr ? ListeningWindow.WebSdrSlotsOn(followed, day) : followed.ActiveOn(day);
-    }
+    /// <summary>The slots the receiver listens to on a UTC day: every one that runs, of every station it follows, whatever the audio.</summary>
+    private IReadOnlyList<DateTimeOffset> ListenedOn(DateOnly day) => Followed.ActiveOn(day);
 
     private FeedbackService CreateFeedback()
     {
@@ -959,7 +955,7 @@ public sealed class ReceiverHost : IAsyncDisposable
 
     /// <summary>
     /// Issue #224: an entry never heard within 7 days of being added is retired, with one log line,
-    /// so a mistake cannot take a web SDR's allowance for ever. The page shows it as no longer needed.
+    /// so a mistake cannot keep the receiver listening for it for ever. The page shows it as no longer needed.
     /// </summary>
     internal void ExpireListenFor()
     {
@@ -1267,7 +1263,7 @@ public sealed class ReceiverHost : IAsyncDisposable
         }
         if (Config.WebSdrSlotsPerDayIgnored)
         {
-            _log("config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every daylight slot that fits in its allowance");
+            _log("config: webSdrSlotsPerDay is no longer used and is ignored; a web SDR listens to every slot");
         }
         foreach (var (name, now) in Config.IgnoredSkips)
         {
@@ -1506,8 +1502,7 @@ public sealed class ReceiverHost : IAsyncDisposable
             DateTimeOffset? closingSlot = null;
             if (source.Kind == AudioSourceKind.UberSdr)
             {
-                // A public web SDR allows each address about three hours a day, so it is only
-                // listened to around some of the slots.
+                // A web SDR is only opened around each slot, every slot of every station followed.
                 // Said again whenever it changes: once a day with a daylight rule, as the days
                 // lengthen and shorten.
                 var schedule = Followed;

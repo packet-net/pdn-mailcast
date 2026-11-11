@@ -4,7 +4,7 @@ using Packet.Mailcast;
 
 namespace Mailcast.Receiver.Tests;
 
-/// <summary>Receivers and a head end's evening slots: followed by default, the "eveningSlots" opt-out, and a web SDR's allowance.</summary>
+/// <summary>Receivers and a head end's evening slots: followed by default, the "eveningSlots" opt-out, and a web SDR listening to all of them.</summary>
 public class EveningSlotReceiverTests
 {
     private static readonly SlotTimetable Gb7rdg = new(TimeOnly.MinValue, 60, StationFixture.Daylight, new EveningRule(new TimeOnly(22, 0)));
@@ -106,30 +106,57 @@ public class EveningSlotReceiverTests
     }
 
     [Theory]
-    // Midwinter: 5 daylight and 6 evening slots, 11 in all, inside the allowance of 12.
+    // Midwinter: 5 daylight and 6 evening slots.
     [InlineData("2026-12-21", "11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00")]
-    // October: 9 daylight slots, and the 3 earliest of the 4 evening ones in what is left.
-    [InlineData("2026-10-05", "09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00")]
-    // Midsummer: 14 daylight slots already fill it; the evening slot gets nothing.
-    [InlineData("2026-06-21", "08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00")]
-    public void AWebSdr_GivesItsAllowanceToTheDaylightSlotsFirst(string day, string expected)
+    // October: 9 daylight and 4 evening slots.
+    [InlineData("2026-10-05", "09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00")]
+    // Midsummer: 14 daylight slots, from 06:00, and the one evening slot.
+    [InlineData("2026-06-21", "06:00,07:00,08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,21:00")]
+    public void AWebSdr_ListensToEveryDaylightAndEveningSlot(string day, string expected)
     {
-        var schedule = SlotSchedule.From(Gb7rdg);
-        Assert.Equal(expected.Split(','), Hhmm(ListeningWindow.WebSdrSlotsOn(schedule, D(day))));
-        Assert.Equal(expected.Split(','), Hhmm(ListeningWindow.WebSdrSlotsOn(FollowedSlots.One(schedule, "GB7RDG"), D(day))));
+        var followed = FollowedSlots.One(SlotSchedule.From(Gb7rdg), "GB7RDG");
+        Assert.Equal(expected.Split(','), Hhmm(WebSdrSlotsOn(followed, D(day))));
     }
 
-    [Fact]
-    public void AWebSdr_FollowingTwoStations_SharesWhatTheDaylightSlotsLeave()
+    [Theory]
+    [InlineData("2026-12-21")]
+    [InlineData("2026-10-05")]
+    [InlineData("2026-06-21")]
+    public void AWebSdr_FollowingTwoStations_ListensToAllTheirDaylightAndEveningSlots(string day)
     {
-        // GB7RDG with evening slots, and another station at :30 in daylight only: midwinter, 5 + 5 daylight slots, then 2 evening.
-        var other = new SlotSchedule(new TimeOnly(0, 30), 60, StationFixture.Daylight);
-        var followed = new FollowedSlots([("GB7RDG", SlotSchedule.From(Gb7rdg)), ("G8BPQ", other)]);
-        var slots = ListeningWindow.WebSdrSlotsOn(followed, D("2026-12-21"));
-        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, slots.Count);
-        Assert.Equal(["16:00", "17:00"], Hhmm(slots.Where(s => s.Minute == 0 && s.Hour >= 16)));
-        Assert.Equal(10, slots.Count(s => !Gb7rdg.IsEvening(s)));
-        Assert.Contains("12 of the 16 slots of the 2 stations", ListeningWindow.Describe(followed, D("2026-12-21")), StringComparison.Ordinal);
+        // M0LTE on the hour and GM8BPQ at half past, both with daylight and evening slots.
+        var m0lte = SlotSchedule.From(Gb7rdg);
+        var gm8bpq = new SlotSchedule(new TimeOnly(0, 30), 60, StationFixture.Daylight, new EveningRule(new TimeOnly(22, 0)));
+        var followed = new FollowedSlots([("M0LTE", m0lte), ("GM8BPQ", gm8bpq)]);
+
+        var listened = WebSdrSlotsOn(followed, D(day));
+
+        Assert.Equal(m0lte.ActiveOn(D(day)).Concat(gm8bpq.ActiveOn(D(day))).Order(), listened);
+        Assert.Contains(listened, s => s.Minute == 0 && Gb7rdg.IsEvening(s));
+        Assert.Contains(listened, s => s.Minute == 30 && gm8bpq.Timetable.IsEvening(s));
+        Assert.Contains(listened, s => s.Minute == 0 && !Gb7rdg.IsEvening(s));
+        Assert.Contains(listened, s => s.Minute == 30 && !gm8bpq.Timetable.IsEvening(s));
+        // More than the 12 a day it used to be held to, M0LTE's evening slots among them.
+        Assert.True(listened.Count > 12);
+        Assert.Contains(listened, s => s.Hour == 21 && s.Minute == 0);
+        Assert.Contains($"all {listened.Count} slots of the 2 stations it follows", ListeningWindow.Describe(followed, D(day)), StringComparison.Ordinal);
+    }
+
+    // The slots a web SDR opens for on a day, found by walking its windows one after another.
+    private static List<DateTimeOffset> WebSdrSlotsOn(FollowedSlots followed, DateOnly day)
+    {
+        var opened = new List<DateTimeOffset>();
+        var at = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        while (true)
+        {
+            var (_, closes, slot) = ListeningWindow.Next(at, followed);
+            if (DateOnly.FromDateTime(slot.UtcDateTime) != day)
+            {
+                return opened;
+            }
+            opened.Add(slot);
+            at = closes;
+        }
     }
 
     [Fact]
@@ -137,6 +164,6 @@ public class EveningSlotReceiverTests
     {
         Assert.Equal("every hour on the hour, in daylight: from 120 minutes after sunrise to 30 minutes before sunset at IO91lk; and evening slots from sunset until 22:00 UTC",
             SlotSchedule.From(Gb7rdg).Describe());
-        Assert.Contains("all 11 daylight and evening slots", ListeningWindow.Describe(SlotSchedule.From(Gb7rdg), D("2026-12-21")), StringComparison.Ordinal);
+        Assert.Contains("all 11 daylight and evening slots", ListeningWindow.Describe(FollowedSlots.One(SlotSchedule.From(Gb7rdg), "GB7RDG"), D("2026-12-21")), StringComparison.Ordinal);
     }
 }

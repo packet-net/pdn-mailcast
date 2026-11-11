@@ -469,9 +469,9 @@ public class StatusPageTests
     private static DateTimeOffset T(string s) => DateTimeOffset.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
 
     [Theory]
-    // During a slot the web SDR listens to, during one it doesn't, between slots, and around midnight.
+    // During a slot, during the next one, between slots, and around midnight: the web SDR listens to every slot.
     [InlineData("2026-10-05T12:05:00Z", "2026-10-05T13:00:00Z", "2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", true)]
-    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T14:00:00Z", false)]
+    [InlineData("2026-10-05T13:05:00Z", "2026-10-05T14:00:00Z", "2026-10-05T13:00:00Z", "2026-10-05T13:00:00Z", true)]
     [InlineData("2026-10-05T13:20:00Z", "2026-10-05T14:00:00Z", null, "2026-10-05T14:00:00Z", false)]
     [InlineData("2026-10-05T23:59:00Z", "2026-10-06T00:00:00Z", null, "2026-10-06T00:00:00Z", true)]
     [InlineData("2026-10-06T00:03:00Z", "2026-10-06T01:00:00Z", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z", true)]
@@ -493,9 +493,7 @@ public class StatusPageTests
         var web = schedule.GetProperty("webSdr");
         Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
         Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
-        // Without daylight hours, 12 of the 24, every other hour.
-        Assert.Equal(12, web.GetProperty("times").GetArrayLength());
-        Assert.Equal("02:00", web.GetProperty("times")[1].GetString());
+        Assert.Equal(24, schedule.GetProperty("slotsPerDay").GetInt32());
     }
 
     [Fact]
@@ -514,7 +512,7 @@ public class StatusPageTests
     [InlineData("2026-10-05T12:05:00Z", "2026-10-05T13:00:00Z", "2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", true)]
     [InlineData("2026-10-05T06:00:00Z", "2026-10-05T09:00:00Z", null, "2026-10-05T09:00:00Z", false)]
     [InlineData("2026-10-05T17:20:00Z", "2026-10-06T09:00:00Z", null, "2026-10-06T09:00:00Z", false)]
-    public void Schedule_InDaylight_GivesTodaysSlots_AndTheWebSdrSpreadOverThem(string now, string next, string? recent, string webSlot, bool webOpen)
+    public void Schedule_InDaylight_GivesTodaysSlots_AndTheWebSdrsNext(string now, string next, string? recent, string webSlot, bool webOpen)
     {
         var config = new ReceiverConfig { Audio = "ubersdr:wessex.zapto.org" };
 
@@ -529,9 +527,7 @@ public class StatusPageTests
         var web = schedule.GetProperty("webSdr");
         Assert.Equal(T(webSlot), web.GetProperty("slot").GetDateTimeOffset());
         Assert.Equal(webOpen, web.GetProperty("openNow").GetBoolean());
-        // Every one of the 9, 17:00 too: they all fit in the allowance.
-        Assert.Equal(9, web.GetProperty("slotsPerDay").GetInt32());
-        Assert.Equal(["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"], web.GetProperty("times").EnumerateArray().Select(e => e.GetString()));
+        Assert.False(web.TryGetProperty("times", out _));
     }
 
     [Fact]

@@ -28,7 +28,6 @@ public class FollowedStationsTests
             Assert.Equal(ListeningWindow.Next(t, Fixture.Of(gb7rdg)), ListeningWindow.Next(t, one));
         }
         Assert.Equal(gb7rdg.ActiveOn(Day), one.ActiveOn(Day));
-        Assert.Equal(ListeningWindow.WebSdrSlotsOn(gb7rdg, Day), ListeningWindow.WebSdrSlotsOn(one, Day));
         Assert.Equal(gb7rdg.Describe(), one.Describe());
     }
 
@@ -51,19 +50,14 @@ public class FollowedStationsTests
     }
 
     [Fact]
-    public void AWebSdr_SharesItsAllowance_AcrossTheStations()
+    public void AWebSdr_ListensToEverySlot_OfBothStations()
     {
-        var listened = ListeningWindow.WebSdrSlotsOn(Two, Day);
-        Assert.Equal(ReceiverConfig.MostWebSdrSlotsPerDay, listened.Count);
-        Assert.Contains(listened, s => s.Minute == 30);
-        Assert.Contains(listened, s => s.Minute == 0);
-        Assert.Equal(listened.Order(), listened);
-        Assert.All(listened, s => Assert.NotNull(Two.StationAt(s)));
-        Assert.Contains("of the 2 stations it follows", ListeningWindow.Describe(Two, Day), StringComparison.Ordinal);
-        Assert.Equal(6, listened.Count(s => s.Minute == 30)); // an equal share each
+        Assert.Contains("all 48 slots of the 2 stations it follows", ListeningWindow.Describe(Two, Day), StringComparison.Ordinal);
         var next = ListeningWindow.Next(At(10, 13), Two);
-        Assert.Equal(listened.First(s => s > At(10, 13)), next.Slot);
+        Assert.Equal(At(10, 30), next.Slot);
         Assert.Equal(next.Slot - ReceiverConfig.WebSdrBefore, next.Opens);
+        next = ListeningWindow.Next(At(10, 43), Two);
+        Assert.Equal(At(11, 0), next.Slot);
     }
 
     [Fact]

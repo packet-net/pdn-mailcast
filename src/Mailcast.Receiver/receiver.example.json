@@ -43,8 +43,7 @@
   // the package ships one, and a stations.json beside this file is used instead of it. Once the
   // receiver has heard a station's own directory, which gives its slots, it uses those. A sound card decodes
   // from 2 minutes before each slot until it is over, and rests between slots unless a status page shows the
-  // spectrogram. A web SDR listens from 2 minutes before each daylight slot to 12 after, which is every slot
-  // for most of the year; near midsummer it skips the earliest morning ones to stay inside its 3 hours a day.
+  // spectrogram. A web SDR listens to the same slots, from 2 minutes before each to 12 after.
 
   // The receiver keeps its own copy of each bulletin once your BBS has answered for it, to
   // read on the status page or send to the BBS again: for "days", and "maxMegabytes" in all,

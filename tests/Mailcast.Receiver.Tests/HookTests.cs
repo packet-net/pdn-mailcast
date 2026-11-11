@@ -176,10 +176,10 @@ public sealed class HookTests
         using var dir = new TempDirectory();
         await using var host = Host(dir, "ubersdr:wessex.zapto.org");
 
-        // 12 of 24 hourly slots: every other hour, so after 08:00 the next is 10:00.
+        // Every hourly slot, the same as a sound card.
         Assert.Equal(new HookWindow(At(9, 58), At(10, 12), At(10, 0)), host.HookWindowAt(At(9, 20)));
         Assert.Equal(new HookWindow(At(7, 58), At(8, 12), At(8, 0)), host.HookWindowAt(At(8, 5)));
-        Assert.Equal(new HookWindow(At(11, 58), At(12, 12), At(12, 0)), host.HookWindowAt(At(10, 12)));
+        Assert.Equal(new HookWindow(At(10, 58), At(11, 12), At(11, 0)), host.HookWindowAt(At(10, 12)));
         Assert.False(host.RetunerRunsHooks);
     }
 
@@ -352,7 +352,7 @@ public sealed class HookTests
     }
 
     [Fact]
-    public async Task WebSdr_OnlyAroundTheSlotsItListensTo()
+    public async Task WebSdr_AroundEverySlot()
     {
         await using var loop = new Loop(At(9, 20), audio: "ubersdr:wessex.zapto.org");
         loop.Start();
@@ -364,11 +364,11 @@ public sealed class HookTests
             ["before 2026-10-05T10:00:00Z 7052.0 7053.8 none", "after 2026-10-05T10:00:00Z 7052.0 7053.8 1"],
             loop.Runs);
 
-        // The next it listens to is 12:00's: nothing for 11:00.
-        await loop.RunTo(At(11, 56));
+        // And the next hour's too: every slot, not every other one.
+        await loop.RunTo(At(10, 56));
         Assert.Equal(2, loop.Runs.Length);
-        await loop.RunTo(At(12, 12));
-        Assert.Equal("after 2026-10-05T12:00:00Z 7052.0 7053.8 1", loop.Runs[^1]);
+        await loop.RunTo(At(11, 12));
+        Assert.Equal("after 2026-10-05T11:00:00Z 7052.0 7053.8 1", loop.Runs[^1]);
     }
 
     [Fact]

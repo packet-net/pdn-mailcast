@@ -61,7 +61,7 @@ A one-way HF transmission of packet BBS bulletins from M0LTE, received by a stan
 | | |
 |---|---|
 | Software | pdn-mailcast receiver (Linux, amd64, arm64 and armhf; from the packet-net apt repo) |
-| Audio | A radio on 7.052 MHz USB into a sound card (decodes around every daylight slot), or a public UberSDR web receiver (listens to every daylight slot, 14 minutes each, up to 12 a day to stay inside the 3 hours a day such receivers allow) |
+| Audio | A radio on 7.052 MHz USB into a sound card (decodes around every daylight slot), or a public UberSDR web receiver (listens to every slot, from 2 minutes before each to 12 after) |
 | Delivery | Logs in to the listener's LinBPQ or Linux FBB as forwarding partner Q0CAST and offers each rebuilt bulletin by FBB B1F; the BBS keeps or refuses it by BID like any partner |
 | Durability | Rebuilt bulletins stay in an on-disk outbox until the BBS has answered; completed markers expire after 14 days, and partial objects 14 days after their last piece, or 24 hours after a directory shows the head end has stopped sending them |
 | Signatures | From 0.14.0: M0LTE's key in the shipped stations file, others added in `trustedKeys`; the page shows "signed by" only for a bulletin whose own hash matched a trusted signed list, else "not signed" or what is wrong. A directory that fails its check is not used, and what only it lists is held, not delivered. Since issue #146 an unsigned directory is not used and every head end signs |
