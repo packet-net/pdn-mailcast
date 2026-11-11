@@ -10,7 +10,8 @@ namespace Mailcast.HeadEnd.Planning;
 /// <summary>A slot's frames, in sending order.</summary>
 /// <param name="Slot">The slot's start.</param>
 /// <param name="Frames">What to send: empty when no bulletin has anything due, since the directory alone is not worth keying for.</param>
-/// <param name="BulletinsInRotation">How many bulletins the slot's directory lists.</param>
+/// <param name="BulletinsInRotation">How many of this head end's own bulletins are in rotation: started, or getting their first pieces in this slot, or waiting unstarted.</param>
+/// <param name="BulletinsListed">How many of those the directory lists: the started ones and those getting their first pieces in this slot.</param>
 /// <param name="Broadcast">The core's plan, which a commit refers back to.</param>
 /// <param name="Waveform">The waveform the slot goes out on; null for the broadcast modem's own, left as it is.</param>
 /// <param name="Ionosphere">The ionosonde reading as the slot was planned; null when the head end takes none.</param>
@@ -21,7 +22,7 @@ namespace Mailcast.HeadEnd.Planning;
 /// <param name="Relay">What the relay found when the slot was planned (issue #218); null when this head end does not relay.</param>
 /// <param name="RelayedObjects">How many other stations' objects the slot sends pieces of.</param>
 /// <param name="RelayedFrames">How many of <paramref name="Frames"/> are pieces of those.</param>
-public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0, RelaySummary? Relay = null, int RelayedObjects = 0, int RelayedFrames = 0)
+public sealed record SlotPlan(DateTimeOffset Slot, IReadOnlyList<SlotFrame> Frames, int BulletinsInRotation, SlotBroadcast? Broadcast, SlotWaveform? Waveform = null, IonoReading? Ionosphere = null, int IonosphereFrames = 0, PskReading? PskReporter = null, int PskReporterFrames = 0, int LeftoverInRotation = 0, RelaySummary? Relay = null, int RelayedObjects = 0, int RelayedFrames = 0, int BulletinsListed = 0)
 {
     /// <summary>A plan with nothing in it.</summary>
     public static SlotPlan Empty(DateTimeOffset slot) => new(slot, [], 0, null);
@@ -123,14 +124,15 @@ public sealed class StoreSlotPlanner(RotationStore store, Compression compressio
         }
         RelaySummary? summary = relay?.Summary;
         // Own bulletins only; what is relayed is counted apart.
-        int own(SlotBroadcast b) => b.Directory.Entries.Count - b.RelayListed;
+        int listedOwn(SlotBroadcast b) => b.Directory.Entries.Count - b.RelayListed;
+        int own(SlotBroadcast b) => b.OwnInRotation;
         if (broadcast.BulletinFrames == 0 && !evenIfNothingDue)
         {
-            return new SlotPlan(slot, [], own(broadcast), null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins, Relay: summary);
+            return new SlotPlan(slot, [], own(broadcast), null, waveform, reading, PskReporter: spots, LeftoverInRotation: broadcast.LeftoverBulletins, Relay: summary, BulletinsListed: listedOwn(broadcast));
         }
         var frames = broadcast.Frames.Select(f => new SlotFrame(f.ToBytes(), f.ObjectId, f.EncodingSymbolId)).ToList();
         bool Carried(IReadOnlyList<MailcastFrame> some) => some.Count > 0 && broadcast.ExtraObjects.Contains(some[0].ObjectId);
-        return new SlotPlan(slot, frames, own(broadcast), broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins, summary, broadcast.Relayed.Count, broadcast.RelayedFrames);
+        return new SlotPlan(slot, frames, own(broadcast), broadcast, waveform, reading, Carried(ionoFrames) ? ionoFrames.Count : 0, spots, Carried(spotFrames) ? spotFrames.Count : 0, broadcast.LeftoverBulletins, summary, broadcast.Relayed.Count, broadcast.RelayedFrames, listedOwn(broadcast));
     }
 
     /// <summary>Whether a reading goes on the air: it has a sounding, and one under <see cref="OldestSentMinutes"/> old.</summary>
