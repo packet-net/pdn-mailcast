@@ -897,10 +897,11 @@ public static class BroadcastScheduler
                 List<bool> takenLeftover = [.. take.Select(i => allLeftover[i])];
                 shareFloor = false;
                 var got = Fill(taken, takenLeftover, directoryObject, options, rule, budget!, extras, shareFloor, out bool room, out int[] gotMain);
-                if (room && got.All(n => n == 0))
+                if (room && got.All(n => n == 0) && (extras.Count == 0 || Fill(taken, takenLeftover, directoryObject, options, rule, budget!, [], false, out _, out _).All(n => n == 0)))
                 {
                     // The directory's weak-station floor alone leaves no room for a single piece (a big directory on a slow
                     // waveform: GB7RDG's WN3 slots, November 2026), so the slot would key nothing at all. Let the floor give way.
+                    // Not when it is only the extras that crowd the pieces out: they give way first (the caller plans again without them).
                     shareFloor = true;
                     got = Fill(taken, takenLeftover, directoryObject, options, rule, budget!, extras, shareFloor, out room, out gotMain);
                 }
