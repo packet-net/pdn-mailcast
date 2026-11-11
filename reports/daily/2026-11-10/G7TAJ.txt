@@ -1,0 +1,24 @@
+Title: MCR G7TAJ 2026-11-10
+From: G7TAJ
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 631490G7TAJ
+Source: GB7RDG's LinBPQ mail store, message 4862 (m_004862.mes), copied 2026-11-11
+Check: stored size matches the BBS's index
+
+R:261110/2130Z 15896@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261110/2130Z 10806@GB7BWR.#45.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.35.0 IO81le sc 1/0 0 2 0
+10 - 0 - - IU+PU
+11 W4 50 8 +6.5 IU+PG 1 - 0.25 0.11 - p
+12 - 0 - - IU+PU
+13 W4 85 13 +7.0 IU+PG 2 - 0.28 0.1 - p
+14 - 0 - - IU+PU
+15 W4 77 - - IU+PG 1 - 0.39 0.19 - b
+17 - 0 - - IU+PU
+18 - 0 - - IU+PU
+19 - 0 - - IU+PU
+20 - 0 - - IU+PU
+21 - 0 - - IU+PU
+S M0LTE 11 3 212 1 10 - 0
