@@ -39,6 +39,19 @@ public static class StationFixture
     /// <summary>A daylight rule: from 2 hours after sunrise to 30 minutes before sunset at the fixture's place.</summary>
     public static DaylightRule Daylight { get; } = new(Locator, 120, 30);
 
+    /// <summary>The months of the UK 40 m NVIS window measured in issue #273, as a configuration gives them, January first.</summary>
+    public static IReadOnlyList<string> SeasonMonths { get; } =
+    [
+        "08:30-17:18", "08:02-18:39", "07:59-20:06", "09:25-20:53", "07:42-22:23", "07:36-00:00",
+        "06:56-23:42", "07:04-22:13", "08:41-19:20", "08:19-17:17", "07:49-16:43", "08:24-17:01",
+    ];
+
+    /// <summary>That window, for a 10 minute slot.</summary>
+    public static SeasonalWindow Season { get; } = SeasonalWindow.FromSettings(SeasonMonths, 10, out _)!;
+
+    /// <summary>The daylight rule with that window: M0LTE's in the shipped stations file.</summary>
+    public static DaylightRule SeasonalDaylight { get; } = new(Locator, 120, 30, Season);
+
     /// <summary>The stations file as JSON; with <paramref name="daylight"/> false, a station whose every slot runs.</summary>
     public static string Json(bool daylight = true, string callsign = Callsign, string? formerly = null, int minute = 0, int every = 60) => $$"""
         {

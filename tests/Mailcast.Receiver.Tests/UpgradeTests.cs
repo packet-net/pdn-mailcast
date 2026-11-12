@@ -27,7 +27,7 @@ public class UpgradeTests
         Assert.Equal("M0LTE", station.Callsign);
         Assert.Equal("6f39d04c925c01cf", KeyId.Format(station.Key.KeyId));
         Assert.Equal("e1ZU+I6EO97joFIDmTGCdGkpAi+CNlfiUe/nJJKlIGo=", Convert.ToBase64String(station.Key.PublicKey));
-        Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60, new DaylightRule("IO91lk", 120, 30)), station.Slots);
+        Assert.Equal(new SlotTimetable(TimeOnly.MinValue, 60, StationFixture.SeasonalDaylight), station.Slots);
         Assert.Equal((7_053_800L, Sideband.Usb, "IO91lk"), (station.FrequencyHz, station.Sideband, station.Locator));
         Assert.Equal(["GB7RDG"], station.Formerly);
         Assert.Equal("M0LTE", file.Legacy);

@@ -77,6 +77,30 @@ public class ConfigTests
         Assert.Equal(("Q0HEAD", "Q0HEAD"), (config.Intake.Fbb!.User, config.Intake.Fbb.PartnerCallsign));
     }
 
+    [Fact]
+    public void ADaylightSeason_IsFollowed_WithTheHardStopAsTheSlotsLength()
+    {
+        string months = string.Join(", ", StationFixture.SeasonMonths.Select(m => $"\"{m}\""));
+        var config = HeadEndConfig.Parse($$$"""
+            {
+              "callsign": "M0LTE",
+              "station": {"apiKey": "k"},
+              "slot": {"everyMinutes": 60, "maxMinutes": 20, "daylight": {"locator": "IO91lk", "season": [{{{months}}}]}}
+            }
+            """);
+        var rule = config.ToSlotTimetable().Daylight!;
+        Assert.Equal(20, rule.Season!.SlotMinutes);
+        Assert.Equal(config.ToSlotTimetable(), config.ToSlotSchedule().Timetable);
+        // 15 October closes 17:17: a 20 minute slot at 17:00 would overrun it.
+        Assert.Equal(new DateTimeOffset(2026, 10, 15, 16, 0, 0, TimeSpan.Zero), config.ToSlotTimetable().ActiveAtOrBefore(new DateTimeOffset(2026, 10, 15, 18, 0, 0, TimeSpan.Zero)));
+        Assert.Contains("season: slots may start 08:19Z to 16:57Z", config.ToSlotSchedule().DescribeDay(new DateOnly(2026, 10, 15)), StringComparison.Ordinal);
+
+        var e = Assert.Throws<ConfigException>(() => HeadEndConfig.Parse("""
+            {"callsign": "M0LTE", "station": {"apiKey": "k"}, "slot": {"everyMinutes": 60, "daylight": {"locator": "IO91lk", "season": ["08:00-17:00"]}}}
+            """));
+        Assert.Contains("twelve months", e.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("""{"station": {}}""", "apiKey")]
     [InlineData("""{"callsign": "M0LTE", "station": {"apiKey": "k", "leaseSeconds": 60}}""", "leaseSeconds")]

@@ -70,6 +70,12 @@ public sealed record SlotSchedule
             SunDay.AlwaysDown => "the sun does not rise",
             _ => $"sunrise {window.Sun.Sunrise!.Value.UtcDateTime:HH:mm}Z, sunset {window.Sun.Sunset!.Value.UtcDateTime:HH:mm}Z",
         };
+        if (window.Seasonal)
+        {
+            sun += window.Opens is { } opens && window.Closes is { } last
+                ? $"; season: slots may start {opens.UtcDateTime:HH:mm}Z to {last.UtcDateTime:HH:mm}Z{(DateOnly.FromDateTime(last.UtcDateTime) > day ? " the next day" : "")}"
+                : "; season: no slot fits";
+        }
         string after = Timetable.Evening is null ? "" : $"; {evening.Count} evening slot{(evening.Count == 1 ? "" : "s")}{(evening.Count == 0 ? "" : ", " + SlotTimetable.Times(evening))}";
         return $"daylight {day:yyyy-MM-dd} at {rule.Locator}: {sun}; {slots.Count} slot{(slots.Count == 1 ? "" : "s")}{(slots.Count == 0 ? "" : ", " + SlotTimetable.Times(slots))}{after}";
     }

@@ -11,9 +11,18 @@ namespace Packet.Mailcast;
 /// nobody, and those from three hours after sunrise to two before sunset were.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Each day's window is worked out from the sun alone (<see cref="Solar"/>), in UTC. A day of
 /// polar day counts as daylight throughout, and one of polar night, or one shorter than the two
 /// offsets together, has no slots.
+/// </para>
+/// <para>
+/// With a <see cref="Season"/> (issue #273) the window comes from that instead, and the offsets
+/// are kept only for receivers from before it. A year of UK 40 m WSPR showed the band does not
+/// follow sunrise and sunset by fixed offsets: in winter it opens within half an hour of sunrise
+/// and stays open an hour past sunset, and in summer it opens hours after sunrise and stays open
+/// until about midnight. The sun is still worked out, for the evening slots and the journal.
+/// </para>
 /// </remarks>
 public sealed class DaylightRule : IEquatable<DaylightRule>
 {
@@ -26,7 +35,7 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
     private readonly ConcurrentDictionary<DateOnly, DaylightWindow> _windows = new();
 
     /// <summary>Creates a rule. Throws <see cref="ArgumentException"/> for a locator or an offset that cannot be.</summary>
-    public DaylightRule(string locator, int afterSunriseMinutes, int beforeSunsetMinutes)
+    public DaylightRule(string locator, int afterSunriseMinutes, int beforeSunsetMinutes, SeasonalWindow? season = null)
     {
         if (!Maidenhead.TryParse(locator, out double lat, out double lon))
         {
@@ -39,6 +48,7 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
         Locator = locator.Length == 6 ? locator[..4].ToUpperInvariant() + locator[4..].ToLowerInvariant() : locator.ToUpperInvariant();
         AfterSunriseMinutes = afterSunriseMinutes;
         BeforeSunsetMinutes = beforeSunsetMinutes;
+        Season = season;
         Latitude = lat;
         Longitude = lon;
     }
@@ -52,6 +62,9 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
     /// <summary>The last slot may start this many minutes before sunset.</summary>
     public int BeforeSunsetMinutes { get; }
 
+    /// <summary>The measured window the slots follow instead of the offsets, or null to follow the sun.</summary>
+    public SeasonalWindow? Season { get; }
+
     /// <summary>The locator's centre, degrees north.</summary>
     public double Latitude { get; }
 
@@ -62,6 +75,13 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
     public DaylightWindow WindowOn(DateOnly day) => _windows.GetOrAdd(day, d =>
     {
         var sun = Solar.SunriseSunset(d, Latitude, Longitude);
+        if (Season is { } season)
+        {
+            var midnight = new DateTimeOffset(d.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+            return season.MinutesOn(d) is var (open, last)
+                ? new DaylightWindow(d, sun, midnight.AddMinutes(open), midnight.AddMinutes(last), Seasonal: true)
+                : new DaylightWindow(d, sun, null, null, Seasonal: true);
+        }
         if (sun.Kind != SunDay.RisesAndSets)
         {
             return new DaylightWindow(d, sun, null, null);
@@ -82,8 +102,8 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
         return WindowOn(day).Contains(slot) || WindowOn(day.AddDays(-1)).Contains(slot) || WindowOn(day.AddDays(1)).Contains(slot);
     }
 
-    /// <summary>The rule in words: "from 120 minutes after sunrise to 30 before sunset at IO91lk".</summary>
-    public string Describe() => string.Create(CultureInfo.InvariantCulture,
+    /// <summary>The rule in words: "from 120 minutes after sunrise to 30 before sunset at IO91lk", or with a season "by month, UTC, ...".</summary>
+    public string Describe() => Season is { } season ? season.Describe() : string.Create(CultureInfo.InvariantCulture,
         $"from {Minutes(AfterSunriseMinutes, "after sunrise", "before sunrise")} to {Minutes(BeforeSunsetMinutes, "before sunset", "after sunset")} at {Locator}");
 
     private static string Minutes(int minutes, string positive, string negative) => minutes switch
@@ -96,13 +116,13 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
     /// <inheritdoc />
     public bool Equals(DaylightRule? other) =>
         other is not null && string.Equals(Locator, other.Locator, StringComparison.OrdinalIgnoreCase)
-        && AfterSunriseMinutes == other.AfterSunriseMinutes && BeforeSunsetMinutes == other.BeforeSunsetMinutes;
+        && AfterSunriseMinutes == other.AfterSunriseMinutes && BeforeSunsetMinutes == other.BeforeSunsetMinutes && Equals(Season, other.Season);
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => Equals(obj as DaylightRule);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(Locator.ToUpperInvariant(), AfterSunriseMinutes, BeforeSunsetMinutes);
+    public override int GetHashCode() => HashCode.Combine(Locator.ToUpperInvariant(), AfterSunriseMinutes, BeforeSunsetMinutes, Season);
 
     /// <inheritdoc />
     public override string ToString() => Describe();
@@ -112,11 +132,12 @@ public sealed class DaylightRule : IEquatable<DaylightRule>
 /// <param name="Day">The UTC day.</param>
 /// <param name="Sun">Sunrise and sunset.</param>
 /// <param name="Opens">The first time a slot may start, or null for none (or all day, in polar day).</param>
-/// <param name="Closes">The last time a slot may start, likewise.</param>
-public sealed record DaylightWindow(DateOnly Day, SunTimes Sun, DateTimeOffset? Opens, DateTimeOffset? Closes)
+/// <param name="Closes">The last time a slot may start, likewise; with a season it may be on the next UTC day.</param>
+/// <param name="Seasonal">From a <see cref="SeasonalWindow"/> rather than the sun, so polar day does not make it all day.</param>
+public sealed record DaylightWindow(DateOnly Day, SunTimes Sun, DateTimeOffset? Opens, DateTimeOffset? Closes, bool Seasonal = false)
 {
     /// <summary>The sun never sets: every slot of the UTC day is in daylight.</summary>
-    public bool AllDay => Sun.Kind == SunDay.AlwaysUp;
+    public bool AllDay => !Seasonal && Sun.Kind == SunDay.AlwaysUp;
 
     /// <summary>No slot of the day is in daylight: polar night, or a day shorter than the offsets.</summary>
     public bool None => !AllDay && Opens is null;
@@ -139,6 +160,17 @@ public sealed record DaylightSettings
     /// <summary>The last slot may start this long before sunset.</summary>
     public int BeforeSunsetMinutes { get; init; } = 30;
 
+    /// <summary>
+    /// The measured window to follow instead of the offsets (issue #273): twelve months, January
+    /// first, each the band's opening and closing on the 15th, UTC, such as <c>"08:30-17:18"</c>.
+    /// Left out, the slots follow the sun.
+    /// </summary>
+    public IReadOnlyList<string>? Season { get; init; }
+
+    /// <summary>How long a slot lasts, for <see cref="Season"/>: the last one ends by the close. Not read from a file; the head end gives its own.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int SlotMinutes { get; init; } = 10;
+
     /// <summary>What is wrong with the settings, in a sentence, or null when they are fine.</summary>
     public string? Problem(int everyMinutes, TimeOnly anchor)
     {
@@ -150,15 +182,22 @@ public sealed record DaylightSettings
         {
             return $"\"afterSunriseMinutes\" and \"beforeSunsetMinutes\" must each be {DaylightRule.LeastMinutes} to {DaylightRule.MostMinutes}";
         }
+        if (Season is not null && SeasonalWindow.FromSettings(Season, SlotMinutes, out string? seasonProblem) is null)
+        {
+            return seasonProblem;
+        }
         if (everyMinutes >= 1 && 1440 % everyMinutes == 0 && !new SlotTimetable(anchor, everyMinutes, ToRule()).HasActiveSlotInAYear())
         {
-            return $"no slot in a whole year starts in daylight at {Locator} with these offsets";
+            return Season is null
+                ? $"no slot in a whole year starts in daylight at {Locator} with these offsets"
+                : "no slot in a whole year fits in the \"season\" window";
         }
         return null;
     }
 
     /// <summary>The rule. Throws <see cref="ArgumentException"/> if <see cref="Problem"/> has something to say.</summary>
-    public DaylightRule ToRule() => new(Locator, AfterSunriseMinutes, BeforeSunsetMinutes);
+    public DaylightRule ToRule() => new(Locator, AfterSunriseMinutes, BeforeSunsetMinutes,
+        Season is null ? null : SeasonalWindow.FromSettings(Season, SlotMinutes, out string? problem) ?? throw new ArgumentException(problem, nameof(Season)));
 }
 
 /// <summary>
@@ -402,9 +441,11 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
     /// <summary>
     /// The fields the directory carries the timetable in, after the first entry's title:
     /// <c>slots=HH:mm/EVERY</c>; with a daylight rule, <c>daylight=LOCATOR/AFTER/BEFORE</c>; and
+    /// with a measured window, <c>season=</c> and <see cref="SeasonalWindow.ToText"/>; and
     /// with evening slots as well, <c>evening=HH:mm</c>, the time the last evening slot starts
     /// before. Readers from before the evening slots ignore that field, as they ignore any they
-    /// do not know, so they simply do not listen in the evening. A listener's own sunset
+    /// do not know, so they simply do not listen in the evening; readers from before the season
+    /// likewise follow the <c>daylight=</c> offsets alone. A listener's own sunset
     /// (<see cref="EveningRule.ListenerLocator"/>) is never written.
     /// </summary>
     public IReadOnlyList<string> ToFields()
@@ -413,6 +454,10 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
         if (Daylight is { } d)
         {
             fields.Add(string.Create(CultureInfo.InvariantCulture, $"daylight={d.Locator}/{d.AfterSunriseMinutes}/{d.BeforeSunsetMinutes}"));
+            if (d.Season is { } season)
+            {
+                fields.Add(SeasonalWindow.FieldName + season.ToText());
+            }
             if (Evening is { } e)
             {
                 fields.Add(string.Create(CultureInfo.InvariantCulture, $"{EveningField}{e.UntilUtc:HH:mm}"));
@@ -429,7 +474,8 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
     /// is no <c>slots=</c> field or it or a <c>daylight=</c> field cannot be read, so a timetable
     /// a later head end writes differently is ignored rather than misread. An <c>evening=</c>
     /// field that cannot be read, or one without a daylight rule, is left out on its own: the
-    /// daylight slots still stand, as for a receiver from before the evening slots.
+    /// daylight slots still stand, as for a receiver from before the evening slots. A
+    /// <c>season=</c> field that cannot be read is likewise left out, and the offsets stand.
     /// </summary>
     public static SlotTimetable? FromFields(IEnumerable<string> fields)
     {
@@ -437,6 +483,7 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
         string? slots = null;
         string? daylight = null;
         string? evening = null;
+        string? season = null;
         foreach (var field in fields)
         {
             if (field.StartsWith("slots=", StringComparison.Ordinal))
@@ -450,6 +497,10 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
             else if (field.StartsWith(EveningField, StringComparison.Ordinal))
             {
                 evening ??= field[EveningField.Length..];
+            }
+            else if (field.StartsWith(SeasonalWindow.FieldName, StringComparison.Ordinal))
+            {
+                season ??= field[SeasonalWindow.FieldName.Length..];
             }
         }
         if (slots is null)
@@ -476,7 +527,7 @@ public sealed record SlotTimetable(TimeOnly Anchor, int EveryMinutes, DaylightRu
             }
             try
             {
-                rule = new DaylightRule(d[0], after, before);
+                rule = new DaylightRule(d[0], after, before, SeasonalWindow.FromText(season));
             }
             catch (ArgumentException)
             {
