@@ -373,6 +373,8 @@ public static partial class Program
         using DirectoryLock? stateLock = DirectoryLock.Take(config.StateDirectory, "\"stateDirectory\"", out string? problem);
         using DirectoryLock? dropLock = problem is not null || config.DropDirectory is not { } drop || SameDirectory(drop, config.StateDirectory) ? null
             : DirectoryLock.Take(drop, "\"intake\".\"dropDirectory\"", out problem);
+        // Nor send as the same station on the same frequency: they would send the same pieces.
+        using StationLock? stationLock = problem is not null ? null : StationLock.Take(config.Callsign, config.FrequencyHz, out problem);
         if (problem is not null)
         {
             await Console.Error.WriteLineAsync($"pdn-mailcast-headend: {problem}");

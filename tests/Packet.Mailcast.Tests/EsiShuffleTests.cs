@@ -22,6 +22,31 @@ public class EsiShuffleTests
         Assert.Equal(expected, counters.Select(EsiShuffle.For(callsign.ToLowerInvariant(), objectId).Map)); // upper-cased
     }
 
+    [Theory]
+    [InlineData("M0LTE", 0x0123456789ABCDEFUL, 7053800L, new uint[] { 8538244, 4871435, 2009641, 5060994, 10604631, 6573241 })]
+    [InlineData("M0LTE", 0x0123456789ABCDEFUL, 10489750000L, new uint[] { 11648663, 10540816, 2652039, 339042, 1782874, 13492529 })]
+    public void Map_WithAFrequency_MatchesTheTestVectors(string callsign, ulong objectId, long hz, uint[] expected)
+    {
+        uint[] counters = [0, 1, 2, 3, 100, 16777215];
+        var shuffle = EsiShuffle.For(callsign, objectId, hz);
+        Assert.Equal(hz, shuffle.FrequencyHz);
+        Assert.Equal(expected, counters.Select(shuffle.Map));
+        Assert.Equal(counters, expected.Select(shuffle.Unmap));
+    }
+
+    [Fact]
+    public void OneCallsign_OnTwoFrequencies_FirstSixtyPieces_DoNotCollide()
+    {
+        var hf = EsiShuffle.For("M0LTE", 42, 7053800);
+        var other = EsiShuffle.For("M0LTE", 42, 10489750000);
+        var none = EsiShuffle.For("M0LTE", 42);
+        var first = Enumerable.Range(0, 60).Select(i => hf.Map((uint)i)).ToHashSet();
+        Assert.DoesNotContain(Enumerable.Range(0, 60).Select(i => other.Map((uint)i)), first.Contains);
+        Assert.DoesNotContain(Enumerable.Range(0, 60).Select(i => none.Map((uint)i)), first.Contains);
+        Assert.Null(none.FrequencyHz);
+        Assert.Throws<ArgumentOutOfRangeException>(() => EsiShuffle.For("M0LTE", 42, 0));
+    }
+
     [Fact]
     public void Map_IsABijectionOverTheWholeEsiSpace()
     {
@@ -56,14 +81,17 @@ public class EsiShuffleTests
         Assert.NotEqual(Enumerable.Range(0, 20).Select(i => a.Map((uint)i)), Enumerable.Range(0, 20).Select(i => EsiShuffle.For("GB7RDG", 43).Map((uint)i)));
     }
 
-    private static HeadEndStore Store(string dir, string? station) =>
-        new(dir, Compression.Default, new ScheduleOptions { Station = station });
+    private static HeadEndStore Store(string dir, string? station, long? hz = null) =>
+        new(dir, Compression.Default, Options(station, hz));
+
+    private static ScheduleOptions Options(string? station, long? hz) =>
+        new() { Station = station, Details = hz is null ? null : new StationDetails(hz) };
 
     /// <summary>Plans and commits one slot a day for some days, returning every ESI sent per object ID (in order).</summary>
-    private static Dictionary<ulong, List<uint>> RunDays(string dir, string? station, IEnumerable<Bulletin> offer, int days, bool restartEachDay = true)
+    private static Dictionary<ulong, List<uint>> RunDays(string dir, string? station, IEnumerable<Bulletin> offer, int days, bool restartEachDay = true, long? hz = null)
     {
         var sent = new Dictionary<ulong, List<uint>>();
-        var store = Store(dir, station);
+        var store = Store(dir, station, hz);
         foreach (var b in offer)
         {
             store.Offer(b, Day1);
@@ -72,10 +100,10 @@ public class EsiShuffleTests
         {
             if (restartEachDay)
             {
-                store = Store(dir, station);
+                store = Store(dir, station, hz);
             }
             var day = Day1.AddDays(d);
-            var plan = BroadcastScheduler.Plan(store.InRotation(day), day, d, Compression.Default, new ScheduleOptions { Station = station }, store.DirectoryNextEsi);
+            var plan = BroadcastScheduler.Plan(store.InRotation(day), day, d, Compression.Default, Options(station, hz), store.DirectoryNextEsi);
             store.Commit(plan);
             foreach (var f in plan.Frames)
             {
@@ -105,6 +133,49 @@ public class EsiShuffleTests
             Assert.Equal(b[id].Count, b[id].Distinct().Count());
             Assert.Empty(esis.Intersect(b[id]));
             Assert.All(esis, e => Assert.True(e > 1000)); // scattered over the whole range, not counting up from 0
+        }
+    }
+
+    [Fact]
+    public void OneCallsign_TwoHeadEndsOnTwoFrequencies_SendDisjointPieces_AndKeepTheirOrderAcrossRestarts()
+    {
+        using var dirA = new TempDirectory();
+        using var dirB = new TempDirectory();
+        var bulletins = TestBulletins.Day(7, 4);
+        var a = RunDays(dirA.Path, "M0LTE", bulletins, 3, hz: 7053800);
+        var b = RunDays(dirB.Path, "M0LTE", bulletins, 3, hz: 10489750000);
+        Assert.Equal(a.Keys.Order(), b.Keys.Order());
+        Assert.NotEmpty(a);
+        foreach (var (id, esis) in a)
+        {
+            Assert.Equal(esis.Count, esis.Distinct().Count());
+            Assert.Empty(esis.Intersect(b[id]));
+            Assert.Equal(EsiShuffle.For("M0LTE", id, 7053800).Map(0), esis[0]);
+        }
+        Assert.All(Directory.EnumerateFiles(Path.Combine(dirA.Path, "bulletins"), "state.txt", SearchOption.AllDirectories),
+            f => Assert.Contains("EsiOrder: shuffled\nEsiStation: M0LTE\nEsiFrequency: 7053800\n", File.ReadAllText(f)));
+    }
+
+    [Fact]
+    public void HeldBulletin_KeepsTheOrderItWasTakenWith_WhenTheFrequencyIsGivenOrChangedLater()
+    {
+        using var dir = new TempDirectory();
+        var store = Store(dir.Path, "M0LTE"); // taken before the station gave a frequency
+        foreach (var b in TestBulletins.Day(8, 2))
+        {
+            store.Offer(b, Day1);
+        }
+        var first = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default, Options("M0LTE", null), store.DirectoryNextEsi);
+        store.Commit(first, first.Frames.Count / 2); // cut short, so the same slot sends more
+        Assert.All(Directory.EnumerateFiles(Path.Combine(dir.Path, "bulletins"), "state.txt", SearchOption.AllDirectories),
+            f => Assert.DoesNotContain("EsiFrequency", File.ReadAllText(f)));
+
+        store = Store(dir.Path, "M0LTE", 7053800);
+        var second = BroadcastScheduler.Plan(store.InRotation(Day1), Day1, 1, Compression.Default, Options("M0LTE", 7053800), store.DirectoryNextEsi);
+        Assert.Contains(second.Objects, o => o.Bid is not null);
+        foreach (var o in second.Objects.Where(o => o.Bid is not null))
+        {
+            Assert.Equal(EsiShuffle.For("M0LTE", o.Transfer.ObjectId).Map(o.FirstEsi), second.Frames.First(f => f.ObjectId == o.Transfer.ObjectId).EncodingSymbolId);
         }
     }
 
