@@ -9,7 +9,8 @@ namespace Mailcast.HeadEnd.Service;
 /// pieces of every bulletin (the piece order is keyed by callsign and frequency), and a listener
 /// hearing both would gain nothing from the second. A second one stops at start-up and says what to
 /// change. The claim is a Linux abstract socket name, which needs no writable directory (each
-/// instance has its own state directory and a private /tmp) and which the system lets go when the
+/// instance has its own state directory and a private /tmp) and which is seen across one network
+/// namespace only (head ends in separate containers are not checked), and which the system lets go when the
 /// process ends, however it ends. Elsewhere there is no check.
 /// </summary>
 public sealed class StationLock : IDisposable
@@ -34,15 +35,16 @@ public sealed class StationLock : IDisposable
         {
             return new StationLock(null);
         }
-        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        Socket? socket = null;
         try
         {
+            socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
             socket.Bind(new UnixDomainSocketEndPoint(Name(callsign, frequencyHz)));
             return new StationLock(socket);
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
         {
-            socket.Dispose();
+            socket?.Dispose();
             problem = frequencyHz is { } hz
                 ? string.Create(CultureInfo.InvariantCulture, $"another head end on this machine already sends as {callsign.ToUpperInvariant()} on {hz} Hz, so the two would send the same pieces; give this one its own \"frequencyHz\" or \"callsign\"")
                 : $"another head end on this machine already sends as {callsign.ToUpperInvariant()} with no \"frequencyHz\", so the two would send the same pieces; give each its own \"frequencyHz\"";
@@ -50,8 +52,8 @@ public sealed class StationLock : IDisposable
         }
         catch (SocketException)
         {
-            // Not able to make the claim at all (no Unix sockets here): carry on unchecked rather than refuse to run.
-            socket.Dispose();
+            // Not able to make the claim at all (Unix sockets not allowed here): carry on unchecked rather than refuse to run.
+            socket?.Dispose();
             return new StationLock(null);
         }
     }

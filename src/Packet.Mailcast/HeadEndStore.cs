@@ -173,7 +173,9 @@ public sealed class HeadEndStore
         // A bulletin taken now is sent in this station's own piece order (issue #143); with no station named, in sequence.
         var shuffle = _options.Station is { } station ? EsiShuffle.For(station, transfer.ObjectId, _options.Details?.FrequencyHz) : null;
         // Relayed before it was taken (it came from the receivers first, or was forgotten and is back): carry on past every ESI sent,
-        // with its first slot, so none is repeated and its age is not lost.
+        // with its first slot, so its age is not lost and none of its own fresh pieces is repeated. The count was kept under the order
+        // in force when it was relayed; if the station's callsign or frequency has changed since, the new order avoids the old pieces
+        // only by chance (about one in 16 million a piece), which costs at most a wasted frame.
         uint nextEsi = 0;
         DateTimeOffset? firstSlot = null;
         if (_relay.TryGetValue(transfer.ObjectId, out var relayed))
