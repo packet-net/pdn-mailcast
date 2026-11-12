@@ -124,6 +124,10 @@ public class SeasonTests
         var tooShort = new DaylightSettings { Locator = "IO91lk", Season = [.. Enumerable.Repeat("12:05-12:10", 12)] };
         Assert.Contains("no slot in a whole year", tooShort.Problem(60, TimeOnly.MinValue), StringComparison.Ordinal);
         Assert.Null(new DaylightSettings { Locator = "IO91lk", Season = StationFixture.SeasonMonths }.Problem(60, TimeOnly.MinValue));
+        // An opening that jumps round midnight from one month to the next is refused, on the air too.
+        var jumps = new DaylightSettings { Locator = "IO91lk", Season = [.. Enumerable.Repeat("23:30-08:00", 6), .. Enumerable.Repeat("00:30-08:00", 6)] };
+        Assert.Contains("Jan: the opening moves more than 12 hours", jumps.Problem(60, TimeOnly.MinValue), StringComparison.Ordinal);
+        Assert.Null(SeasonalWindow.FromText("10/" + string.Join('/', [.. Enumerable.Repeat("2330-0800", 6), .. Enumerable.Repeat("0030-0800", 6)])));
     }
 
     [Fact]

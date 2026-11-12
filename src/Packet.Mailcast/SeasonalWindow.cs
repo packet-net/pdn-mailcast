@@ -50,6 +50,10 @@ public sealed class SeasonalWindow : IEquatable<SeasonalWindow>
             }
             _months[m] = (opens, closes <= opens ? closes + 1440 : closes);
         }
+        if (Jump(_months) is { } month)
+        {
+            throw new ArgumentException($"{month}: the opening moves more than 12 hours from the month before.", nameof(months));
+        }
         SlotMinutes = slotMinutes;
     }
 
@@ -77,6 +81,20 @@ public sealed class SeasonalWindow : IEquatable<SeasonalWindow>
         return last < opens ? null : (opens, last);
     }
 
+    // The first month whose opening is more than 12 hours from the month before's, or null: the days between are
+    // interpolated straight, not round midnight, so such a pair would sweep the window back through the day.
+    private static string? Jump((int Opens, int Closes)[] months)
+    {
+        for (int m = 0; m < 12; m++)
+        {
+            if (Math.Abs(months[m].Opens - months[(m + 11) % 12].Opens) > 720)
+            {
+                return MonthNames[m];
+            }
+        }
+        return null;
+    }
+
     private static int Step(int change, int k, int span) => (int)Math.Round((double)change * k / span, MidpointRounding.AwayFromZero);
 
     /// <summary>The window as the directory carries it, after <see cref="FieldName"/>: <c>10/0830-1718/0802-1839/...</c>, the slot's length then the months from January.</summary>
@@ -101,7 +119,14 @@ public sealed class SeasonalWindow : IEquatable<SeasonalWindow>
             }
             months.Add((opens, closes));
         }
-        return new SeasonalWindow(months, slot);
+        try
+        {
+            return new SeasonalWindow(months, slot);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -131,8 +156,16 @@ public sealed class SeasonalWindow : IEquatable<SeasonalWindow>
             problem = $"a slot's length must be 0 to {MostSlotMinutes} minutes for \"season\"";
             return null;
         }
-        problem = null;
-        return new SeasonalWindow(read, slotMinutes);
+        try
+        {
+            problem = null;
+            return new SeasonalWindow(read, slotMinutes);
+        }
+        catch (ArgumentException x)
+        {
+            problem = $"\"season\": {x.Message.Split(" (Parameter", 2)[0]}";
+            return null;
+        }
     }
 
     private static string Printable(string text) => new([.. text.Select(c => c is >= ' ' and <= '~' ? c : '?')]);

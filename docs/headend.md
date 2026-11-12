@@ -67,7 +67,7 @@ These are the measured times for 100 to 400 km paths, January first. Each is the
 | 15 June | 06:00 to 19:00, 14 slots | 08:00 to 23:00, 16 slots |
 | 15 October | 09:00 to 17:00, 9 slots | 09:00 to 17:00, 9 slots |
 
-The directory carries the window as `season=` after `daylight=`, so receivers follow it. Receivers from before ignore the field and keep to the `daylight=` offsets, so leave `afterSunriseMinutes` and `beforeSunsetMinutes` as they are for them. The sunset at `locator` still starts the evening slots, and a slot in the window is never an evening slot: in summer the window runs past `untilUtc`, so there are no evening slots then. The window will drift with the solar cycle; the analysis can be re-run from the public WSPR archive and the table updated here, with no new release.
+The directory carries the window as `season=` after `daylight=`, so receivers follow it. Receivers from before ignore the field and keep to the `daylight=` offsets, so leave `afterSunriseMinutes` and `beforeSunsetMinutes` as they are for them. The sunset at `locator` still starts the evening slots, and a slot in the window is never an evening slot: in summer the window runs past `untilUtc`, so there are no evening slots then, and the late summer slots go out on the daylight waveforms (not `evening.modes`). A receiver with `"eveningSlots": false` still follows them: they are the station's daylight slots, the best NVIS of a summer day, not evening ones. The window will drift with the solar cycle; the analysis can be re-run from the public WSPR archive and the table updated here, with no new release.
 
 ### Evening slots
 
