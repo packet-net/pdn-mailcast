@@ -216,6 +216,12 @@ public sealed record EnvelopeLink(ulong ObjectId, string Hash)
 /// name they look for starts with <c>evening=</c>), so they follow the daylight slots alone, and the signature still checks.
 /// </para>
 /// <para>
+/// A head end whose daylight rule follows a measured window (<see cref="SeasonalWindow"/>, issue #273) adds
+/// <c>season=</c> after <c>daylight=</c>: the slot's length in minutes, then twelve <c>HHmm-HHmm</c> months from January,
+/// all separated by <c>/</c>. Earlier readers ignore it like any field after the title, so they follow the
+/// <c>daylight=</c> offsets, and the signature still checks.
+/// </para>
+/// <para>
 /// Like every object, the directory's ID is the hash of its own octets, so two directories with
 /// different contents never share an ID, even on the same day. Ed25519 signatures are
 /// deterministic, so the same directory signed twice is the same object.

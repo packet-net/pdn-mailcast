@@ -44,6 +44,31 @@ The other slots are passed over without a word, except for one line in the journ
 
 The head end's directory carries the slot times and the daylight rule, so receivers follow the head end rather than their own settings once they have heard it.
 
+### Seasonal window
+
+40 m does not open and close by fixed offsets from sunrise and sunset. A year of UK to UK 40 m WSPR (issue #273) showed that in winter the band opens within about half an hour of sunrise and stays open about an hour past sunset, while in spring and summer it opens three to five hours after sunrise and stays open until about midnight. So the daylight rule can follow a measured window instead, one opening and closing time UTC per month:
+
+```json
+"daylight": {
+  "locator": "IO91lk",
+  "season": [
+    "08:30-17:18", "08:02-18:39", "07:59-20:06", "09:25-20:53", "07:42-22:23", "07:36-00:00",
+    "06:56-23:42", "07:04-22:13", "08:41-19:20", "08:19-17:17", "07:49-16:43", "08:24-17:01"
+  ]
+}
+```
+
+These are the measured times for 100 to 400 km paths, January first. Each is the band on the 15th of the month; the days between move in a straight line from one 15th to the next. A close at or before its opening is the next day's, so June's `07:36-00:00` runs to midnight. A slot runs if it starts at or after the day's opening and its hard stop (`slot.maxMinutes`, 10 for an hourly station) comes at or before the close, so a slot always ends before the band shuts. At IO91lk, hourly:
+
+| Day | Offsets (120/30) | Season |
+|---|---|---|
+| 15 December | 11:00 to 15:00, 5 slots | 09:00 to 16:00, 8 slots |
+| 15 April | 08:00 to 18:00, 11 slots | 10:00 to 20:00, 11 slots |
+| 15 June | 06:00 to 19:00, 14 slots | 08:00 to 23:00, 16 slots |
+| 15 October | 09:00 to 17:00, 9 slots | 09:00 to 17:00, 9 slots |
+
+The directory carries the window as `season=` after `daylight=`, so receivers follow it. Receivers from before ignore the field and keep to the `daylight=` offsets, so leave `afterSunriseMinutes` and `beforeSunsetMinutes` as they are for them. The sunset at `locator` still starts the evening slots, and a slot in the window is never an evening slot: in summer the window runs past `untilUtc`, so there are no evening slots then. The window will drift with the solar cycle; the analysis can be re-run from the public WSPR archive and the table updated here, with no new release.
+
 ### Evening slots
 
 40 m stops carrying across the UK after dark, but a longer path, Reading to Sweden say, often stays open into the evening. Evening slots are extra slots for those listeners, after the daylight ones:

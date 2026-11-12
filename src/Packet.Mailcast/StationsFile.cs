@@ -258,6 +258,7 @@ public sealed class StationsFile
                 Locator = Text(d, "locator", where + " daylight") ?? throw new FormatException($"{where}: \"daylight\" needs a \"locator\""),
                 AfterSunriseMinutes = Number(d, "afterSunriseMinutes", where + " daylight") ?? throw new FormatException($"{where}: \"daylight\" needs \"afterSunriseMinutes\""),
                 BeforeSunsetMinutes = Number(d, "beforeSunsetMinutes", where + " daylight") ?? throw new FormatException($"{where}: \"daylight\" needs \"beforeSunsetMinutes\""),
+                Season = Season(d, where),
             };
             if (settings.Problem(every, new TimeOnly(0, minute)) is { } problem)
             {
@@ -309,6 +310,20 @@ public sealed class StationsFile
         return p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out int v)
             ? v
             : throw new FormatException($"{where}: \"{name}\" must be a whole number");
+    }
+
+    // The optional "season": a list of twelve "08:30-17:18" (see DaylightSettings.Season), checked with the rest of the rule.
+    private static List<string>? Season(JsonElement daylight, string where)
+    {
+        if (!daylight.TryGetProperty("season", out var season) || season.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+        if (season.ValueKind != JsonValueKind.Array || season.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.String))
+        {
+            throw new FormatException($"{where}: \"daylight\": \"season\" must be a list of twelve months, each such as \"08:30-17:18\"");
+        }
+        return [.. season.EnumerateArray().Select(x => x.GetString()!)];
     }
 
     private static string Clean(string text) => new([.. text.Select(c => c is >= ' ' and <= '~' ? c : '?')]);

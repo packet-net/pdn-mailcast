@@ -362,7 +362,7 @@ public sealed record HeadEndConfig
     public TimeOnly SlotTime => TimeOnly.ParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture);
 
     /// <summary>When the slots are.</summary>
-    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings().ToRule(), ToEveningRule());
+    public Service.SlotSchedule ToSlotSchedule() => new(SlotTime, TimeSpan.FromMinutes(Slot.EveryMinutes), Slot.Daylight?.ToSettings(Slot.Max).ToRule(), ToEveningRule());
 
     /// <summary>The evening slots' rule (<c>slot.evening</c>), or null for none.</summary>
     public EveningRule? ToEveningRule() =>
@@ -432,6 +432,10 @@ public sealed record HeadEndConfig
             {
                 problems.Add($"{where}: \"slot\".\"daylight\": {problem}");
             }
+            else if (a.Slot.Daylight is { Season: not null })
+            {
+                problems.Add($"{where}: \"slot\".\"daylight\".\"season\" is not carried in an advert; the station's own directory gives it");
+            }
         }
         foreach (var twice in Advertise.Where(a => a is not null).GroupBy(a => (a.Callsign, a.FrequencyHz, a.Sideband.ToLowerInvariant())).Where(g => g.Count() > 1))
         {
@@ -458,7 +462,7 @@ public sealed record HeadEndConfig
     }
 
     /// <summary>When the slots are, as the directory carries them.</summary>
-    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToSettings().ToRule(), ToEveningRule());
+    public SlotTimetable ToSlotTimetable() => new(SlotTime, Slot.EveryMinutes, Slot.Daylight?.ToSettings(Slot.Max).ToRule(), ToEveningRule());
 
     private const int MinutesPerDay = 1440;
 
@@ -512,7 +516,7 @@ public sealed record HeadEndConfig
             daylightFine = false;
         }
         else if (Slot.Daylight is { } daylight && TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
-            && daylight.ToSettings().Problem(everyFine ? Slot.EveryMinutes : 0, anchor) is { } daylightProblem)
+            && daylight.ToSettings(Slot.Max).Problem(everyFine ? Slot.EveryMinutes : 0, anchor) is { } daylightProblem)
         {
             problems.Add($"\"slot\".\"daylight\": {daylightProblem}");
             daylightFine = false;
@@ -676,7 +680,7 @@ public sealed record HeadEndConfig
     {
         if (Slot.EveryMinutes < 15 || MinutesPerDay % Slot.EveryMinutes != 0 || Slot.Daylight is not { } daylight
             || !TimeOnly.TryParseExact(Slot.Anchor, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var anchor)
-            || daylight.ToSettings().Problem(Slot.EveryMinutes, anchor) is not null)
+            || daylight.ToSettings(Slot.Max).Problem(Slot.EveryMinutes, anchor) is not null)
         {
             return null;
         }
@@ -1138,8 +1142,24 @@ public sealed record HeadEndDaylight
     /// <summary>The last slot may start this long before sunset.</summary>
     public int BeforeSunsetMinutes { get; init; } = 30;
 
-    /// <summary>As Packet.Mailcast takes them.</summary>
-    public DaylightSettings ToSettings() => new() { Locator = Locator, AfterSunriseMinutes = AfterSunriseMinutes, BeforeSunsetMinutes = BeforeSunsetMinutes };
+    /// <summary>
+    /// The measured window to follow instead of the offsets (issue #273): twelve months, January
+    /// first, each the band's opening and closing on the 15th, UTC, <c>"08:30-17:18"</c>. A slot
+    /// runs if it starts at or after the day's opening and its hard stop
+    /// (<see cref="SlotConfig.MaxMinutes"/>) is at or before the close. The offsets still go in
+    /// the directory, for receivers from before. Left out, the slots follow the sun.
+    /// </summary>
+    public IReadOnlyList<string>? Season { get; init; }
+
+    /// <summary>As Packet.Mailcast takes them, a slot lasting <paramref name="slotMinutes"/> (rounded up) for the season.</summary>
+    public DaylightSettings ToSettings(double slotMinutes = 10) => new()
+    {
+        Locator = Locator,
+        AfterSunriseMinutes = AfterSunriseMinutes,
+        BeforeSunsetMinutes = BeforeSunsetMinutes,
+        Season = Season,
+        SlotMinutes = (int)Math.Ceiling(Math.Clamp(slotMinutes, 0, SeasonalWindow.MostSlotMinutes)),
+    };
 }
 
 /// <summary>One step of logging in to the BBS: wait for some text, then send a line.</summary>
