@@ -16,7 +16,7 @@ namespace Packet.Mailcast;
 /// <code>
 /// object.bin   the object's octets, exactly as coded
 /// envelope.bin the envelope object's octets, for a bulletin first offered since issue #142 (none for an older one)
-/// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi (a count of pieces sent), EsiOrder and EsiStation (shuffled bulletins, issue #143),
+/// state.txt    Key: value lines: Bid, Title, Size, FirstSeen, Object, Dictionary, Oti, NextEsi (a count of pieces sent), EsiOrder, EsiStation and EsiFrequency (shuffled bulletins, issue #143),
 ///              FirstSlot once it has been carried, and EveningNextEsi once an evening slot has sent some of it (pieces counted
 ///              from <see cref="BroadcastScheduler.EveningFirstCount"/>, apart from NextEsi)
 /// </code>
@@ -171,7 +171,7 @@ public sealed class HeadEndStore
         var transfer = TransferObject.ForBulletin(shared, _options.DictionaryId, _compression, MailcastFrame.FixedSymbolSize, MailcastFrame.StandardAlignment);
         var envelopeObject = envelope is null ? null : TransferObject.ForEnvelope(envelope, _options.DictionaryId, _compression);
         // A bulletin taken now is sent in this station's own piece order (issue #143); with no station named, in sequence.
-        var shuffle = _options.Station is { } station ? EsiShuffle.For(station, transfer.ObjectId) : null;
+        var shuffle = _options.Station is { } station ? EsiShuffle.For(station, transfer.ObjectId, _options.Details?.FrequencyHz) : null;
         // Relayed before it was taken (it came from the receivers first, or was forgotten and is back): carry on past every ESI sent,
         // with its first slot, so none is repeated and its age is not lost.
         uint nextEsi = 0;
@@ -432,7 +432,7 @@ public sealed class HeadEndStore
         entry.Last = broadcast.Date;
         if (fresh)
         {
-            var shuffle = _options.Station is { } station ? EsiShuffle.For(station, objectId) : null;
+            var shuffle = _options.Station is { } station ? EsiShuffle.For(station, objectId, _options.Details?.FrequencyHz) : null;
             entry.NextFresh = Math.Max(entry.NextFresh, sent.Max(esi => shuffle?.Unmap(esi) ?? esi) + 1);
         }
         SaveRelay(entry);
@@ -572,10 +572,14 @@ public sealed class HeadEndStore
         text.Append(CultureInfo.InvariantCulture, $"NextEsi: {c.NextEsi}\n");
         if (c.Shuffle is { } shuffle)
         {
-            // NextEsi counts pieces sent; the ESI sent is the keyed shuffle of the count. The callsign is kept so that a
-            // later change of the station's callsign never changes the order of a bulletin part sent.
+            // NextEsi counts pieces sent; the ESI sent is the keyed shuffle of the count. The callsign and frequency are kept so
+            // that a later change of either never changes the order of a bulletin part sent.
             text.Append("EsiOrder: shuffled\n");
             text.Append("EsiStation: ").Append(shuffle.Station).Append('\n');
+            if (shuffle.FrequencyHz is { } hz)
+            {
+                text.Append(CultureInfo.InvariantCulture, $"EsiFrequency: {hz}\n");
+            }
         }
         if (c.Envelope is { } envelope)
         {
@@ -663,7 +667,9 @@ public sealed class HeadEndStore
             EsiShuffle? shuffle = null;
             if (fields.TryGetValue("EsiOrder", out var order) && order == "shuffled")
             {
-                shuffle = EsiShuffle.For(fields["EsiStation"], transfer.ObjectId);
+                // A bulletin taken before the order was keyed by frequency too has no EsiFrequency, and keeps its old order.
+                long? esiHz = fields.TryGetValue("EsiFrequency", out var hzText) ? long.Parse(hzText, NumberStyles.None, CultureInfo.InvariantCulture) : null;
+                shuffle = EsiShuffle.For(fields["EsiStation"], transfer.ObjectId, esiHz);
             }
             var carried = new CarriedBulletin(
                 fields["Bid"],

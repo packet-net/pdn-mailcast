@@ -1260,7 +1260,7 @@ public static class BroadcastScheduler
             {
                 continue;
             }
-            var shuffle = options.Station is { } station ? EsiShuffle.For(station, r.ObjectId) : null;
+            var shuffle = options.Station is { } station ? EsiShuffle.For(station, r.ObjectId, options.Details?.FrequencyHz) : null;
             var pieces = r.NextPieces(n, shuffle);
             if (pieces.Count > 0)
             {
@@ -1309,7 +1309,7 @@ public static class BroadcastScheduler
             var source = relays.First(r => r.ObjectId == relay.ObjectId);
             if (source.Transfer is not null && source.Envelope is { } envelope && envelopeSeen.Add(envelope.ObjectId))
             {
-                var envelopePieces = source.EnvelopePieces(options.Station is { } station ? EsiShuffle.For(station, envelope.ObjectId) : null);
+                var envelopePieces = source.EnvelopePieces(options.Station is { } station ? EsiShuffle.For(station, envelope.ObjectId, options.Details?.FrequencyHz) : null);
                 relayed.Add(relay with { Envelope = envelope, EnvelopeFrames = envelopePieces });
                 lanes.Add((envelopePieces.Count, envelopePieces.Count, i => envelopePieces[i]));
                 envelopeFrames += envelopePieces.Count;

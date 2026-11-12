@@ -6,7 +6,8 @@ Documentation=https://github.com/packet-net/pdn-mailcast/blob/main/docs/headend.
 # same machine (another band, another modem). It is the plain unit with the paths parameterised
 # and nothing else changed. Each config must name its own modem (station.apiUrl, kissPort), its
 # own "status"."port" and its own BBS partner login; the head end stops at start-up and says so
-# if its status port or state directory is already another's. All instances, and the plain one,
+# if its status port or state directory is already another's, or another sends as the same
+# callsign on the same "frequencyHz". All instances, and the plain one,
 # share the one signing key, /etc/pdn-mailcast-headend/signing-key.pem.
 # Started after the pdn-soundmodem instance of the same name, when there is one.
 After=network-online.target time-sync.target pdn-soundmodem.service pdn-soundmodem@%i.service

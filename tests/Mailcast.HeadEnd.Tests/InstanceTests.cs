@@ -102,6 +102,34 @@ public class InstanceTests
     }
 
     [Fact]
+    public void StationLock_OneCallsignOnOneFrequency_IsOneHeadEnd_ButAnotherFrequencyIsFine()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+        // A frequency of its own for each run, so a head end really running here is never in the way.
+        long hz = 7_000_000 + Random.Shared.Next(1_000_000);
+        using (var first = StationLock.Take("q9test", hz, out string? none))
+        {
+            Assert.NotNull(first);
+            Assert.Null(none);
+            Assert.Null(StationLock.Take("Q9TEST", hz, out string? problem));
+            Assert.Equal($"another head end on this machine already sends as Q9TEST on {hz} Hz, so the two would send the same pieces; give this one its own \"frequencyHz\" or \"callsign\"", problem);
+            using var elsewhere = StationLock.Take("Q9TEST", hz + 1, out string? fine);
+            Assert.NotNull(elsewhere);
+            Assert.Null(fine);
+            using var noFrequency = StationLock.Take("Q9TEST", null, out _);
+            Assert.NotNull(noFrequency);
+            Assert.Null(StationLock.Take("Q9TEST", null, out string? both));
+            Assert.Contains("with no \"frequencyHz\"", both);
+        }
+        using var again = StationLock.Take("Q9TEST", hz, out string? later);
+        Assert.NotNull(again);
+        Assert.Null(later);
+    }
+
+    [Fact]
     public void DirectoryLock_ADirectoryItCannotWrite_SaysSoInOneLine()
     {
         using var dir = new TempDirectory();

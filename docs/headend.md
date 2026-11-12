@@ -40,7 +40,7 @@ A slot runs if it starts between `afterSunriseMinutes` after sunrise and `before
 | 21 December | 08:07 and 15:57 | 11:00 to 15:00, 5 slots |
 | 21 June | 03:47 and 20:25 | 06:00 to 19:00, 14 slots |
 
-The other slots are passed over without a word, except for one line in the journal each day listing that day's slots (see Status below). A day with no slot (polar night, or offsets longer than the day) has none; polar day runs every slot. A configuration under which no slot in a whole year would run is refused. Left out, every slot runs, as before.
+The other slots are passed over without a word, except for one line in the journal each day listing that day's slots (see Status below). A day with no slot (polar night, or offsets longer than the day) has none; polar day runs every slot. A configuration under which no slot in a whole year would run is refused. Left out, every slot runs, day and night: leave `daylight` out for a path that does not depend on the sun.
 
 The head end's directory carries the slot times and the daylight rule, so receivers follow the head end rather than their own settings once they have heard it.
 
@@ -487,7 +487,8 @@ sudo systemctl enable --now pdn-mailcast-headend@qo100
 
 In the new file, set:
 
-- `callsign`, `frequencyHz` and the slot times for that station.
+- `callsign`, `frequencyHz` and the slot times for that station. Leave `slot.daylight` out if this path does not depend on daylight: its slots then run around the clock.
+- `frequencyHz` in both configs when they send as the same callsign. Each head end sends a bulletin's pieces in an order keyed by its callsign and frequency, so with a frequency each, a listener who hears both gets different pieces from each. Two head ends on one machine with the same callsign and the same frequency, or both with none, would send the same pieces, so the second stops at start-up and says what to change. Head ends on different machines are not checked: give each its `frequencyHz` there too.
 - `station.apiUrl`, `station.apiKey` and `station.kissPort`: the second pdn-soundmodem's. A waveform that suits the path goes in `station.mode` or `schedule.modes`.
 - `status.port`: anything but the first head end's 8216, such as 8217.
 - `intake.fbb`: its own partner on the BBS, such as Q1HEAD, set up like the first. The BBS sends each bulletin once to each partner, so two head ends sharing a login would each get only some of them.
