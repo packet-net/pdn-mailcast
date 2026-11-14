@@ -364,7 +364,7 @@ public class ReferenceFeedTests
     }
 
     [Fact]
-    public void TheHeadEnd_HoldsTheSlot_CountsNothing_SaysWhenItTriesAgain_AndThenSends()
+    public void TheHeadEnd_HoldsTheSlot_CountsNothing_LooksAgainUntilTwoMinutesIn_AndThenSendsTheNextSlot()
     {
         using var dir = new TempDirectory();
         var head = new Head(dir);
@@ -373,8 +373,14 @@ public class ReferenceFeedTests
 
         var held = head.Run(Noon);
         Assert.Equal(SlotOutcome.Skipped, held.Outcome);
-        Assert.Single(head.Journal.Lines, l => l.Contains("10 MHz", StringComparison.Ordinal));
-        Assert.Contains("slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); trying again at 10:05Z", head.Journal.Lines);
+        // Looked at every 15 s while the slot could still be heard, then given up: no retry at 10:05, which no receiver would hear.
+        Assert.False(held.Retryable);
+        Assert.Equal(
+            [
+                "slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); looking at it again every 15 s until 10:02:00Z",
+                "slot 2026-11-09 10:00Z: not sent: the 10 MHz reference was still unreliable at 10:02:00Z, too late for receivers to hear the slot; everything rolls on to the next slot, 2026-11-09 11:00Z",
+            ],
+            head.Journal.Lines.Where(l => l.Contains("10 MHz", StringComparison.Ordinal)));
         string status = head.Status.Render().Replace(" ", "", StringComparison.Ordinal);
         Assert.Contains("\"referenceFeed\":\"unreliable\"", status, StringComparison.Ordinal);
         Assert.Contains("\"referenceFeedDetail\":\"GPSLOST\"", status, StringComparison.Ordinal);
@@ -384,46 +390,33 @@ public class ReferenceFeedTests
         var bulletin = head.Store.InRotation(Noon).Single();
         Assert.Equal((0u, 0u, (DateTimeOffset?)null), (bulletin.NextEsi, bulletin.EveningNextEsi, bulletin.FirstSlot));
 
-        // Tried again five minutes later, inside the catch-up window, and sent once the reference is back.
-        DateTimeOffset retry = HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(30), held, TimeSpan.FromMinutes(5));
-        Assert.Equal(held.End + TimeSpan.FromMinutes(5), retry);
+        // The next slot goes once the reference is back, with everything the held one would have sent.
+        DateTimeOffset next = HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(30), held, TimeSpan.FromMinutes(5));
+        Assert.Equal(Noon.AddHours(1), next);
         head.Station.Reference = Ok;
-        head.Time.Advance(retry - head.Time.GetUtcNow());
-        var sent = head.Run(head.Schedule.SlotAtOrBefore(retry));
+        head.Time.Advance(next - head.Time.GetUtcNow());
+        var sent = head.Run(next);
         Assert.Equal(SlotOutcome.Completed, sent.Outcome);
         Assert.Equal("ok", sent.ReferenceFeed);
-        Assert.Equal(Noon, head.Store.InRotation(Noon).Single().FirstSlot);
+        Assert.Equal(next, head.Store.InRotation(Noon).Single().FirstSlot);
         Assert.Contains("\"referenceFeed\":\"ok\"", head.Status.Render().Replace(" ", "", StringComparison.Ordinal), StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AtGb7rdgsSettings_ASkipAtTheStation_IsTriedAgainAtFivePast(bool reference)
+    [Fact]
+    public void AtGb7rdgsSettings_ASkipAtTheStation_IsTriedAgainAtFivePast()
     {
-        // catchUpMinutes 5 and retryMinutes 5, and an attempt that ends a little after the hour.
+        // catchUpMinutes 5 and retryMinutes 5, and an attempt that ends a little after the hour. A reference hold is
+        // looked at again in place instead (ReferenceHoldRetryTests); this is any other skip that may clear: the lease refused.
         using var dir = new TempDirectory();
         var head = new Head(dir, TimeSpan.FromMinutes(5));
         head.Store.Offer(Bulletins.Make(1, 3000), DateOnly.FromDateTime(Noon.UtcDateTime));
         head.Station.ReadDelay = TimeSpan.FromMilliseconds(300);
-        if (reference)
-        {
-            head.Station.Reference = Lost;
-        }
-        else
-        {
-            // An older reason: the lease refused.
-            head.Station.RefuseFirstLease = true;
-        }
+        head.Station.RefuseFirstLease = true;
         var held = head.Run(Noon);
         Assert.Equal(SlotOutcome.Skipped, held.Outcome);
         Assert.True(held.Retryable);
         Assert.True(held.End > Noon);
         Assert.Equal(Noon.AddMinutes(5), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), held, TimeSpan.FromMinutes(5)));
-        if (reference)
-        {
-            Assert.Contains("slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); trying again at 10:05Z", head.Journal.Lines);
-        }
 
         // The retry at 10:05 is the last inside the window: one that fails too waits for the next slot.
         head.Time.Advance(Noon.AddMinutes(5) - head.Time.GetUtcNow());

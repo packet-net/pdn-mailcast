@@ -370,19 +370,95 @@ public sealed class HeadEndService(
             // Observe only, the same.
             journal.Write(spots);
         }
-        SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation, evening);
-        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0 };
-        planner.RecordQueued(plan, report.FramesQueued);
-        status.RecordSlot(report);
-        if (ReferenceHoldLine(report, time.GetUtcNow()) is { } held)
+        SlotReport report = await RunPlannedAsync(slot, plan, requestedBy, evening, cancellation);
+        bool held = false;
+        if (IsReferenceHold(report))
         {
-            journal.Write(held);
+            (report, held) = await HoldForTheReferenceAsync(slot, report, requestedBy, evening, cancellation);
+        }
+        status.RecordSlot(report);
+        if (!held && ReferenceHoldLine(report, time.GetUtcNow()) is { } holdLine)
+        {
+            journal.Write(holdLine);
         }
         status.SetBulletinsHeld(store.Count);
         SlotsToday today = status.SlotsToday;
         journal.Write($"slots today ({today.Date:yyyy-MM-dd}): {today.Slots}, {today.Completed} completed, {today.Aborted} cut short, {today.Skipped} skipped");
         return report;
     }
+
+    /// <summary>How often a slot held back for the 10 MHz reference looks at it again.</summary>
+    public static readonly TimeSpan ReferenceRecheckEvery = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// The latest, after its own time, that a slot held back for the 10 MHz reference still starts.
+    /// Receivers give a slot's window back 3 min 30 s in if nothing at all has been heard
+    /// (docs/receiver.md); the station may take up to <see cref="SlotRunner.StationToneWait"/> to
+    /// key the tone once asked, and the run-up (KISS, waveform, lease, tuning) takes some seconds
+    /// more. Starting by 2 minutes in leaves the tone inside that window on a clear channel. A slot
+    /// still held then is not tried again at <c>slot.retryMinutes</c>: a retry at 5 minutes past
+    /// would go after every receiver has stopped listening, and its fill (the budget less its
+    /// lateness) is too small to carry a bulletin anyway. It rolls on to the next slot.
+    /// </summary>
+    public static readonly TimeSpan ReferenceLatestStart = TimeSpan.FromMinutes(2);
+
+    /// <summary>A slot skipped, with nothing counted, because the station's 10 MHz reference is unreliable.</summary>
+    private static bool IsReferenceHold(SlotReport report) =>
+        report.Outcome == SlotOutcome.Skipped && report.Retryable && report.FramesQueued == 0
+        && report.ReferenceFeed == Station.ReferenceFeed.Unreliable;
+
+    /// <summary>Runs a planned slot, and records what it queued.</summary>
+    private async Task<SlotReport> RunPlannedAsync(DateTimeOffset slot, SlotPlan plan, string? requestedBy, bool evening, CancellationToken cancellation)
+    {
+        SlotReport report = await runner.RunAsync(slot, plan.Frames, plan.BulletinsInRotation, cancellation, queued => planner.RecordQueued(plan, queued), requestedBy, plan.Waveform, plan.LeftoverInRotation, evening);
+        report = report with { Ionosphere = plan.Ionosphere, IonosphereFrames = plan.IonosphereFrames, PskReporter = plan.PskReporter, PskReporterFrames = plan.PskReporterFrames, RelayedObjects = plan.RelayedObjects, RelayedFrames = plan.RelayedFrames, NormalCarried = plan.Broadcast?.NormalCarried ?? 0, BulkCarried = plan.Broadcast?.BulkCarried ?? 0 };
+        planner.RecordQueued(plan, report.FramesQueued);
+        return report;
+    }
+
+    /// <summary>
+    /// A slot held back for the 10 MHz reference: looks at the reference again every
+    /// <see cref="ReferenceRecheckEvery"/>, touching nothing else at the station, and as soon as it
+    /// is not unreliable plans the slot afresh (its fill counts its lateness) and runs it, up to
+    /// <see cref="ReferenceLatestStart"/> after the slot's time. One still held then rolls on to the
+    /// next slot. Returns the slot's report, and whether this wrote the journal's hold lines.
+    /// </summary>
+    private async Task<(SlotReport Report, bool Held)> HoldForTheReferenceAsync(DateTimeOffset slot, SlotReport report, string? requestedBy, bool evening, CancellationToken cancellation)
+    {
+        DateTimeOffset latest = slot + ReferenceLatestStart;
+        string name = $"{(evening ? "evening slot" : "slot")} {SlotRunner.Name(slot)}";
+        if (time.GetUtcNow() + ReferenceRecheckEvery > latest)
+        {
+            // Already too late to be heard: no retry at slot.retryMinutes either.
+            return (report with { Retryable = false }, false);
+        }
+        string what = report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent";
+        journal.Write($"{name}: {what}: {report.Reason}; looking at it again every {ReferenceRecheckEvery.TotalSeconds:0} s until {Clock(latest)}Z");
+        while (time.GetUtcNow() + ReferenceRecheckEvery <= latest)
+        {
+            await Task.Delay(ReferenceRecheckEvery, time, cancellation);
+            Station.ReferenceFeed? feed = await runner.ReadReferenceAsync(cancellation);
+            if (feed is { IsUnreliable: true })
+            {
+                continue;
+            }
+            DateTimeOffset now = time.GetUtcNow();
+            journal.Write($"{name}: the 10 MHz reference is {(feed is null ? "no longer reported unreliable" : feed.Describe())}; starting {(now - slot).TotalSeconds:0} s after the slot's time");
+            SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null, evening: evening);
+            report = await RunPlannedAsync(slot, plan, requestedBy, evening, cancellation);
+            if (!IsReferenceHold(report))
+            {
+                return (report, true);
+            }
+            journal.Write($"{name}: {(report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent")}: {report.Reason}; looking at it again every {ReferenceRecheckEvery.TotalSeconds:0} s until {Clock(latest)}Z");
+        }
+        report = report with { Retryable = false };
+        DateTimeOffset next = NextSlot(time.GetUtcNow(), schedule, catchUp, report, retryAfter);
+        journal.Write($"{name}: not sent: the 10 MHz reference was still unreliable at {Clock(time.GetUtcNow())}Z, too late for receivers to hear the slot; everything rolls on to the next slot, {SlotRunner.Name(next)}");
+        return (report, true);
+    }
+
+    private static string Clock(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// The one journal line for a slot not sent because the station's 10 MHz reference is
