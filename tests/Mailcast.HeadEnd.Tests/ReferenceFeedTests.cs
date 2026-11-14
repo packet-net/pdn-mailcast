@@ -403,25 +403,28 @@ public class ReferenceFeedTests
     }
 
     [Fact]
-    public void AtGb7rdgsSettings_ASkipAtTheStation_IsTriedAgainAtFivePast()
+    public void AtGb7rdgsSettings_ASkipAtTheStation_IsTriedAgainInPlace_NotAtFivePast()
     {
-        // catchUpMinutes 5 and retryMinutes 5, and an attempt that ends a little after the hour. A reference hold is
-        // looked at again in place instead (ReferenceHoldRetryTests); this is any other skip that may clear: the lease refused.
+        // catchUpMinutes 5 and retryMinutes 5. A retry at 10:05 would go after every receiver had given the
+        // window back, 3 min 30 s in with nothing heard: any skip that may clear, here the lease refused, is
+        // tried again in place every 15 s instead, as a reference hold is (ReferenceHoldRetryTests, SkipRetryInPlaceTests).
         using var dir = new TempDirectory();
         var head = new Head(dir, TimeSpan.FromMinutes(5));
         head.Store.Offer(Bulletins.Make(1, 3000), DateOnly.FromDateTime(Noon.UtcDateTime));
         head.Station.ReadDelay = TimeSpan.FromMilliseconds(300);
         head.Station.RefuseFirstLease = true;
-        var held = head.Run(Noon);
-        Assert.Equal(SlotOutcome.Skipped, held.Outcome);
-        Assert.True(held.Retryable);
-        Assert.True(held.End > Noon);
-        Assert.Equal(Noon.AddMinutes(5), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), held, TimeSpan.FromMinutes(5)));
+        var sent = head.Run(Noon);
+        Assert.Equal(SlotOutcome.Completed, sent.Outcome);
+        Assert.InRange(sent.Start, Noon.AddSeconds(15), Noon.AddSeconds(20));
+        Assert.Equal(Noon.AddHours(1), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), sent, TimeSpan.FromMinutes(5)));
 
-        // The retry at 10:05 is the last inside the window: one that fails too waits for the next slot.
-        head.Time.Advance(Noon.AddMinutes(5) - head.Time.GetUtcNow());
-        var again = head.Run(Noon);
-        Assert.Equal(Noon.AddHours(1), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), again, TimeSpan.FromMinutes(5)));
+        // Refused throughout: given up at 10:02 and rolled on, with no retry at 10:05.
+        head.Station.RefuseAfterRequests = 0;
+        head.Time.Advance(Noon.AddHours(1) - head.Time.GetUtcNow());
+        var held = head.Run(Noon.AddHours(1));
+        Assert.Equal(SlotOutcome.Skipped, held.Outcome);
+        Assert.False(held.Retryable);
+        Assert.Equal(Noon.AddHours(2), HeadEndService.NextSlot(head.Time.GetUtcNow(), head.Schedule, TimeSpan.FromMinutes(5), held, TimeSpan.FromMinutes(5)));
     }
 
     [Fact]
@@ -430,7 +433,7 @@ public class ReferenceFeedTests
         using var dir = new TempDirectory();
         var head = new Head(dir);
         var stopped = new SlotReport { Slot = Noon, Day = DateOnly.FromDateTime(Noon.UtcDateTime), Start = Noon, End = Noon.AddMinutes(1), Outcome = SlotOutcome.Skipped, Retryable = true, ToneSent = true, Reason = "the 10 MHz reference turned unreliable (GPS LOST) after the calibration tone went, before any bulletin", ReferenceFeed = "unreliable" };
-        Assert.Equal("slot 2026-11-09 10:00Z: stopped before any bulletin went: the 10 MHz reference turned unreliable (GPS LOST) after the calibration tone went, before any bulletin; trying again at 10:05Z", head.Service.ReferenceHoldLine(stopped, Noon.AddMinutes(1)));
+        Assert.Equal("slot 2026-11-09 10:00Z: stopped before any bulletin went: the 10 MHz reference turned unreliable (GPS LOST) after the calibration tone went, before any bulletin; the next slot is 2026-11-09 11:00Z", head.Service.SkipLine(stopped, Noon.AddMinutes(1)));
     }
 
     [Fact]
@@ -440,11 +443,11 @@ public class ReferenceFeedTests
         var head = new Head(dir);
         head.Station.Reference = Lost;
         var late = new SlotReport { Slot = Noon, Day = DateOnly.FromDateTime(Noon.UtcDateTime), Start = Noon.AddSeconds(1801), End = Noon.AddSeconds(1801), Outcome = SlotOutcome.Skipped, Retryable = true, Reason = "the 10 MHz reference is unreliable (GPS LOST)", ReferenceFeed = "unreliable", Evening = true };
-        Assert.Equal("evening slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); the next slot is 2026-11-09 11:00Z", head.Service.ReferenceHoldLine(late, Noon.AddSeconds(1801)));
+        Assert.Equal("evening slot 2026-11-09 10:00Z: not sent: the 10 MHz reference is unreliable (GPS LOST); the next slot is 2026-11-09 11:00Z", head.Service.SkipLine(late, Noon.AddSeconds(1801)));
 
         // Anything else gets no such line.
-        Assert.Null(head.Service.ReferenceHoldLine(late with { ReferenceFeed = "ok", Reason = "the channel stayed busy for 2 min" }, Noon.AddSeconds(1801)));
-        Assert.Null(head.Service.ReferenceHoldLine(late with { Outcome = SlotOutcome.Aborted }, Noon.AddSeconds(1801)));
+        Assert.Null(head.Service.SkipLine(late with { ReferenceFeed = "ok", Reason = "the channel stayed busy for 2 min" }, Noon.AddSeconds(1801)));
+        Assert.Null(head.Service.SkipLine(late with { Outcome = SlotOutcome.Aborted }, Noon.AddSeconds(1801)));
     }
 
     private sealed class Handler(string answer) : HttpMessageHandler

@@ -314,6 +314,41 @@ public class SlotRunnerTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Run_StartedLate_CutsTheClearChannelWait_SoTheToneIsAskedForBy2Min20()
+    {
+        // A slot held in place for 2 minutes, then started on a busy channel: waiting the whole 2 minutes
+        // would ask for the tone at 4 min, after receivers give up at 3 min 30 s with nothing heard.
+        var rig = new Rig();
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
+        rig.Time.StepWallClock(TimeSpan.FromMinutes(2));
+        var report = rig.Run(5);
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("channel busy; waiting up to 20 s for it to clear (cut from 2 min, as the slot started 120 s late", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains("channel still busy after 20 s; going ahead without the tone", StringComparison.Ordinal));
+        Assert.InRange(rig.Station.Frames[0].At, Noon + SlotRunner.LatestToneAsk, Noon + SlotRunner.LatestToneAsk + TimeSpan.FromSeconds(30));
+        Assert.True(SlotRunner.LatestToneAsk + SlotRunner.StationToneWait < SlotRunner.ReceiverGiveUp);
+
+        // Past it, the channel is looked at once and whenStillBusy decides at once.
+        var skip = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
+        skip.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
+        skip.Time.StepWallClock(TimeSpan.FromMinutes(3));
+        var skipped = skip.Run(5);
+        Assert.Equal(SlotOutcome.Skipped, skipped.Outcome);
+        Assert.Equal("the channel stayed busy for 0 s", skipped.Reason);
+        Assert.Empty(skip.Station.Frames);
+    }
+
+    [Fact]
+    public void Run_OnTime_WaitsTheWholeClearChannelWait()
+    {
+        var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });
+        rig.Station.ChannelBusyUntil = Noon + TimeSpan.FromHours(1);
+        var report = rig.Run(5);
+        Assert.Equal("the channel stayed busy for 2 min", report.Reason);
+        Assert.Contains(rig.Journal.Lines, l => l.EndsWith("channel busy; waiting up to 2 min for it to clear", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Run_SkipsWhenTheChannelStaysBusyAndTheConfigurationSaysSo()
     {
         var rig = new Rig(new SlotSettings { Callsign = "M0LTE", SubChannel = 4, WhenStillBusy = BusyPolicy.Skip });

@@ -133,6 +133,41 @@ public enum SlotOutcome
     Skipped,
 }
 
+/// <summary>
+/// Why a slot was skipped for a reason at the station that may clear (<see cref="SlotReport.Retryable"/>).
+/// The head end decides from it whether to try the slot again in place, while receivers can still
+/// hear it, or let it roll on to the next slot.
+/// </summary>
+public enum SkipCause
+{
+    /// <summary>Not a skip that may clear.</summary>
+    None,
+
+    /// <summary>The system clock is not known to be synchronised.</summary>
+    Clock,
+
+    /// <summary>The Flex API could not be reached, and the configuration says not to broadcast without it.</summary>
+    Flex,
+
+    /// <summary>The PA was already over its temperature limit.</summary>
+    HotPa,
+
+    /// <summary>The station's 10 MHz reference is unreliable.</summary>
+    Reference,
+
+    /// <summary>The station's KISS port could not be reached.</summary>
+    KissPort,
+
+    /// <summary>The modem could not be switched to the slot's waveform, or did not confirm it (no SETHW echo).</summary>
+    Waveform,
+
+    /// <summary>The station refused the transmit lease.</summary>
+    Lease,
+
+    /// <summary>The station could not tune the rig for the slot.</summary>
+    Tune,
+}
+
 /// <summary>What happened in one slot. This is also what the status endpoint shows.</summary>
 public sealed record SlotReport
 {
@@ -211,6 +246,10 @@ public sealed record SlotReport
 
     /// <summary>True when it was skipped for a reason at the station that may clear, so it is worth trying the same slot again.</summary>
     public bool Retryable { get; init; }
+
+    /// <summary>Why it was <see cref="Retryable"/>; <see cref="SkipCause.None"/> otherwise. Not kept: the head end acts on it at once.</summary>
+    [JsonIgnore]
+    public SkipCause Cause { get; init; }
 
     public int LeaseRenewals { get; init; }
 
