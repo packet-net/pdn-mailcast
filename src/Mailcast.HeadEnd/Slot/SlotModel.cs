@@ -197,10 +197,19 @@ public sealed record SlotReport
 
     /// <summary>
     /// What the station's 10 MHz reference feed said during the slot, the worst of what it said:
-    /// <c>ok</c>, <c>unknown</c> or <c>unreliable</c>; null when the station has no feed. Not the Flex's
-    /// view (<see cref="Reference"/>), which can say locked while the reference is bad.
+    /// <c>ok</c>, <c>holdover</c>, <c>unknown</c> or <c>unreliable</c>; null when the station has no
+    /// feed. Not the Flex's view (<see cref="Reference"/>), which can say locked while the reference
+    /// is bad.
     /// </summary>
     public string? ReferenceFeed { get; init; }
+
+    /// <summary>
+    /// True when the feed said <c>holdover</c> at any read in the slot: the GPSDO had lost its PPS or
+    /// its lock and was coasting (packet-net/pdn-soundmodem#807). Kept apart from
+    /// <see cref="ReferenceFeed"/>, which a later unknown read would hide it behind, so a measurement
+    /// made in this slot can be flagged.
+    /// </summary>
+    public bool SentOnHoldover { get; init; }
 
     /// <summary>The station's words on <see cref="ReferenceFeed"/> (<c>GPS LOST</c>), or null.</summary>
     public string? ReferenceFeedDetail { get; init; }

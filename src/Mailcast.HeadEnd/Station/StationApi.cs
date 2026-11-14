@@ -46,7 +46,7 @@ public sealed record LeaseAnswer(bool Held, double Seconds, string? Problem, boo
 /// The Flex's own view of its reference is <see cref="Flex.ReferenceReading"/>, which is another thing:
 /// this one caught a GPSDO that went bad while still saying it was locked.
 /// </summary>
-/// <param name="State"><see cref="Ok"/>, <see cref="Unreliable"/> or <see cref="Unknown"/>; any other word the station sends is read as unknown.</param>
+/// <param name="State"><see cref="Ok"/>, <see cref="Holdover"/>, <see cref="Unreliable"/> or <see cref="Unknown"/>; any other word the station sends is read as unknown.</param>
 /// <param name="Detail">The station's words on it (<c>GPS LOST</c>, <c>display offline</c>), plain ASCII, or null.</param>
 /// <param name="Since">When it entered this state, when the station said.</param>
 public sealed record ReferenceFeed(string State, string? Detail, DateTimeOffset? Since)
@@ -56,6 +56,14 @@ public sealed record ReferenceFeed(string State, string? Detail, DateTimeOffset?
 
     /// <summary>The reference is bad: nothing is sent while it is.</summary>
     public const string Unreliable = "unreliable";
+
+    /// <summary>
+    /// The station's GPSDO has lost its PPS or its lock but still shows a good 10 MHz
+    /// (packet-net/pdn-soundmodem#807): its OCXO coasting is far better than the 20 Hz receivers
+    /// tolerate, so the slot goes as for ok, noted as sent on holdover. A head end older than this
+    /// reads the word as unknown, and sends the slot marked.
+    /// </summary>
+    public const string Holdover = "holdover";
 
     /// <summary>Nobody knows: the slot goes, marked.</summary>
     public const string Unknown = "unknown";
@@ -69,8 +77,15 @@ public sealed record ReferenceFeed(string State, string? Detail, DateTimeOffset?
 
     public bool IsUnknown => State == Unknown;
 
-    /// <summary>The state with the detail in brackets, for the journal: <c>unreliable (GPS LOST)</c>.</summary>
-    public string Describe() => Detail is null ? State : $"{State} ({Detail})";
+    public bool IsHoldover => State == Holdover;
+
+    /// <summary>The state with the detail in brackets, for the journal: <c>unreliable (GPS LOST)</c>,
+    /// <c>in holdover (UNLOCKED, relocking 1124/1500 s, TIE -33 ns)</c>.</summary>
+    public string Describe()
+    {
+        string state = IsHoldover ? "in holdover" : State;
+        return Detail is null ? state : $"{state} ({Detail})";
+    }
 
     /// <summary>The detail, or "no detail given", for a journal line's brackets.</summary>
     public string DetailOrNone => Detail ?? "no detail given";
@@ -91,7 +106,7 @@ public sealed record ReferenceFeed(string State, string? Detail, DateTimeOffset?
             return new ReferenceFeed(Unknown, "the station's reference field could not be read", null);
         }
         string state = reference["state"] is JsonNode s && s.GetValueKind() == JsonValueKind.String ? s.GetValue<string>().Trim().ToLowerInvariant() : "";
-        state = state is Ok or Unreliable ? state : Unknown;
+        state = state is Ok or Unreliable or Holdover ? state : Unknown;
         string? detail = null;
         if (reference["detail"] is JsonNode d && d.GetValueKind() == JsonValueKind.String)
         {

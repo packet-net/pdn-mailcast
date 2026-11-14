@@ -51,7 +51,11 @@ namespace Mailcast.HeadEnd.Slot;
 /// is counted and the slot is skipped as retryable; seen later, the slot stops as other aborts do.
 /// Unknown sends the slot marked: the tone request asks for the CW E marker instead of the steady
 /// tone; only an answer that echoes the marker counts as the marker sent (an older station ignores
-/// the field and sends the plain tone), and one that refuses it (400) is asked for the plain tone. A station with
+/// the field and sends the plain tone), and one that refuses it (400) is asked for the plain tone.
+/// Holdover (packet-net/pdn-soundmodem#807: the GPSDO lost its PPS or lock, but its OCXO is still
+/// on frequency) sends the slot as ok does, steady tone and all, since the tone is still worth
+/// measuring; the slot is marked in its report (<see cref="SlotReport.SentOnHoldover"/>) and the
+/// journal, and a reference that moves into holdover mid-slot never stops it. A station with
 /// no feed says nothing, and the slot runs as it always did.</para>
 /// <para><b>Write-ahead.</b> Every frame of a burst is reported as queued before the first is
 /// written, and nothing is written if that report fails, so a crash mid-burst can never lead to a
@@ -277,8 +281,8 @@ public sealed class SlotRunner
     /// <summary>The slot's skip reason when the station's 10 MHz reference is unreliable.</summary>
     internal static string ReferenceHoldReason(ReferenceFeed feed) => $"the 10 MHz reference is unreliable ({feed.DetailOrNone})";
 
-    /// <summary>How bad a reference state is: ok, unknown, unreliable.</summary>
-    private static int Badness(ReferenceFeed feed) => feed.IsUnreliable ? 2 : feed.IsUnknown ? 1 : 0;
+    /// <summary>How bad a reference state is: ok, holdover, unknown, unreliable.</summary>
+    private static int Badness(ReferenceFeed feed) => feed.IsUnreliable ? 3 : feed.IsUnknown ? 2 : feed.IsHoldover ? 1 : 0;
 
     /// <summary>
     /// Asks the station to keep the slot's run-up audio. Never throws, and gives up after
@@ -376,6 +380,8 @@ public sealed class SlotRunner
         private ReferenceFeed? _feedWorst;
         /// <summary>Why the slot stopped for an unreliable reference, or null if it did not.</summary>
         private string? _referenceHold;
+        /// <summary>True once a read in this slot said holdover; said in the journal once.</summary>
+        private bool _holdover;
         private bool _markerSent;
         /// <summary>True once a lease read in this slot failed, so the reference is looked at before every burst whatever.</summary>
         private bool _readFailed;
@@ -861,6 +867,13 @@ public sealed class SlotRunner
                     _feedWorst = feed;
                 }
             }
+            if (feed is { IsHoldover: true } && !_holdover)
+            {
+                // Holdover sends: never held back, never a reason to stop. Said once, so the slot's
+                // measurements can be read with it in mind.
+                _holdover = true;
+                Say($"the 10 MHz reference is in holdover ({feed.DetailOrNone}); fine to send on, so the slot goes on, marked as sent on holdover");
+            }
             if (feed is { IsUnreliable: true } && _leaseTaken)
             {
                 StopForTheReference(feed);
@@ -1277,6 +1290,7 @@ public sealed class SlotRunner
                 MarkerSent = _markerSent,
                 ReferenceFeed = _feedWorst?.State,
                 ReferenceFeedDetail = _feedWorst?.Detail,
+                SentOnHoldover = _holdover,
                 ProbeSent = _probeId is not null,
                 ProbeId = _probeId,
                 Reference = _reference,

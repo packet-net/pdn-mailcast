@@ -121,6 +121,36 @@ public class ReferenceHoldRetryTests
     }
 
     [Fact]
+    public void AHeldSlot_StartsWhenTheReferenceMovesIntoHoldover()
+    {
+        // packet-net/pdn-soundmodem#807: NO PPS past 60 s is holdover from a pdn-soundmodem that
+        // knows the word; one that does not yet says unreliable, and the slot is held as before.
+        using var head = new Head();
+        var holdover = new ReferenceFeed(ReferenceFeed.Holdover, "NO PPS, TIE -3 ns", Ten.AddSeconds(20));
+        head.Station.ReferenceAt = t => t < Ten.AddSeconds(20) ? NoPps : holdover;
+
+        var report = head.Run(Ten);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(Ten.AddSeconds(30), report.Start, TimeSpan.FromSeconds(2));
+        Assert.True(report.SentOnHoldover);
+        Assert.Contains(head.Lines, l => l.StartsWith("slot 2026-11-14 10:00Z: the 10 MHz reference is in holdover (NO PPS, TIE -3 ns); starting 30 s after the slot's time", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ASlotInHoldoverAtItsTime_IsNotHeldAtAll()
+    {
+        using var head = new Head();
+        head.Station.Reference = new ReferenceFeed(ReferenceFeed.Holdover, "UNLOCKED, relocking 1124/1500 s, TIE -33 ns", Ten.AddMinutes(-1));
+
+        var report = head.Run(Ten);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(Ten, report.Start, TimeSpan.FromSeconds(2));
+        Assert.DoesNotContain(head.Lines, l => l.Contains("looking at it again", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void AReferenceThatStaysBad_RollsOnToTheNextSlot_WithNothingCounted_AndNoUnheardRetryAtFivePast()
     {
         using var head = new Head();
