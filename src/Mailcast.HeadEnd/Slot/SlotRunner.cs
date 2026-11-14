@@ -153,6 +153,25 @@ public sealed class SlotRunner
 
     private int[] Lengths(IReadOnlyList<SlotFrame> frames) => [.. frames.Select(f => Ax25(f).Length)];
 
+    /// <summary>
+    /// Reads the station's 10 MHz reference feed on its own (<c>GET /api/txlease</c>), touching
+    /// nothing at the station: for a slot held back for the reference, to see whether it has come
+    /// back. Null when the station gives no feed or the lease could not be read. Never throws but
+    /// for <paramref name="cancellation"/>.
+    /// </summary>
+    public async Task<ReferenceFeed?> ReadReferenceAsync(CancellationToken cancellation)
+    {
+        try
+        {
+            LeaseAnswer answer = await _station.ReadLeaseAsync(cancellation);
+            return answer.Problem is null ? answer.Reference : null;
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !cancellation.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Runs the slot. Never throws for anything the station or the radio does.</summary>
     /// <param name="slot">The slot's start, which names it in the journal and the report.</param>
     /// <param name="frames">The frames, in sending order.</param>
