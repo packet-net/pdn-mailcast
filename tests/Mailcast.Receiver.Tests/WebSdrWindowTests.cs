@@ -796,8 +796,13 @@ public class WebSdrWindowTests
         Assert.DoesNotContain("setTimeout(connect", html, StringComparison.Ordinal);
         Assert.DoesNotContain("\nconnect();", html, StringComparison.Ordinal);
         Assert.Contains("if (live && !ws) connect();", html, StringComparison.Ordinal);
-        // Turned off on the page, or the tab hidden, nothing is streamed: "live" is the switch, the audio and the tab.
-        Assert.Contains("const on = spectroOn(), live = on && s.audio.live && !document.hidden;", html, StringComparison.Ordinal);
+        // Turned off on the page, nothing is streamed: "live" is the switch and the audio. A hidden
+        // tab lets it go only for a sound card between slots, so it doesn't keep the receiver decoding.
+        Assert.Contains("const on = spectroOn(), audio = on && s.audio.live, live = audio && !(document.hidden && s.audio.betweenSlots);", html, StringComparison.Ordinal);
+        // Otherwise a hidden tab holds the rows that come and draws them when it is shown again.
+        Assert.Contains("if (document.hidden) hold(bytes.subarray(5));", html, StringComparison.Ordinal);
+        Assert.Contains("if (!document.hidden) drawHeld();", html, StringComparison.Ordinal);
+        Assert.Contains("if (held.length > canvas.height)", html, StringComparison.Ordinal);
         Assert.Contains("The web SDR ${sdr(s)} is closed between slots. The spectrogram comes back at", html, StringComparison.Ordinal);
         Assert.Contains("The web SDR ${esc(sdr(s))} is tuned for it", html, StringComparison.Ordinal);
         Assert.Contains("${w.about ? ` (${esc(w.about)})` : \"\"}", html, StringComparison.Ordinal);
