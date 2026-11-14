@@ -343,7 +343,19 @@ public sealed class FakeStation : IStationApi, IKissConnector
         };
     }
 
-    public Task<IKissLink> ConnectAsync(CancellationToken cancellation) => Task.FromResult<IKissLink>(new FakeLink(this));
+    /// <summary>The KISS port refuses connections until then, as while pdn-soundmodem restarts.</summary>
+    public DateTimeOffset KissUnreachableUntil { get; set; }
+
+    /// <summary>Every KISS connection asked for, whether it was made or not.</summary>
+    public int KissConnects { get; private set; }
+
+    public Task<IKissLink> ConnectAsync(CancellationToken cancellation)
+    {
+        KissConnects++;
+        return _time.GetUtcNow() < KissUnreachableUntil
+            ? Task.FromException<IKissLink>(new IOException("connection refused"))
+            : Task.FromResult<IKissLink>(new FakeLink(this));
+    }
 
     private void DropUnkeyed()
     {
@@ -492,12 +504,26 @@ public sealed class FakeFlex(TimeProvider time, Func<TimeSpan, double?> temperat
 
     public double? PaTemperatureC => Connected ? temperature(time.GetUtcNow() - _connectedAt) : null;
 
+    /// <summary>Whether the next connection is made.</summary>
+    public bool Reachable
+    {
+        get => ReachableIf();
+        set => ReachableIf = () => value;
+    }
+
+    /// <summary>Whether a connection is made, asked at each.</summary>
+    public Func<bool> ReachableIf { get; set; } = () => reachable;
+
+    /// <summary>Every connection asked for.</summary>
+    public int Connects { get; private set; }
+
     public Task<bool> ConnectAsync(CancellationToken cancellation)
     {
-        Connected = reachable;
-        Problem = reachable ? null : "no route to host";
+        Connects++;
+        Connected = Reachable;
+        Problem = Reachable ? null : "no route to host";
         _connectedAt = time.GetUtcNow();
-        return Task.FromResult(reachable);
+        return Task.FromResult(Reachable);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -506,7 +532,14 @@ public sealed class FakeFlex(TimeProvider time, Func<TimeSpan, double?> temperat
 /// <summary>A system clock that is, or is not, synchronised.</summary>
 public sealed class FakeClockSync(bool synchronised = true) : IClockSync
 {
-    public bool Synchronised { get; set; } = synchronised;
+    public bool Synchronised
+    {
+        get => SynchronisedIf();
+        set => SynchronisedIf = () => value;
+    }
+
+    /// <summary>Whether it is synchronised, asked at each check.</summary>
+    public Func<bool> SynchronisedIf { get; set; } = () => synchronised;
 
     public ClockState Check() => new(Synchronised, Synchronised ? "synchronised" : "the kernel says the clock is not synchronised");
 }
