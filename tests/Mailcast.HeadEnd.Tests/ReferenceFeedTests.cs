@@ -22,6 +22,8 @@ public class ReferenceFeedTests
     private static readonly ReferenceFeed Ok = new(ReferenceFeed.Ok, null, null);
     private static readonly ReferenceFeed Lost = new(ReferenceFeed.Unreliable, "GPS LOST", Noon.AddMinutes(-20));
     private static readonly ReferenceFeed Offline = new(ReferenceFeed.Unknown, "display offline", null);
+    /// <summary>What pdn-soundmodem says for the report that cost the 14:00 slot on 2026-11-14 (packet-net/pdn-soundmodem#807).</summary>
+    private static readonly ReferenceFeed Relocking = new(ReferenceFeed.Holdover, "UNLOCKED, relocking 1124/1500 s, TIE -33 ns", Noon.AddMinutes(-1));
 
     private sealed class Rig
     {
@@ -180,6 +182,79 @@ public class ReferenceFeedTests
         Assert.Equal(withFeed ? 1 : 0, rig.Journal.Lines.Count(l => l.Contains("reference feed", StringComparison.Ordinal)));
         Assert.Contains(rig.Journal.Lines, l => l.Contains(": done, ", StringComparison.Ordinal) && l.Contains("tone sent", StringComparison.Ordinal)
             && (withFeed ? l.EndsWith(", reference feed ok", StringComparison.Ordinal) : !l.Contains("reference feed", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Holdover_SendsTheSlotWithTheSteadyTone_MarkedAsSentOnHoldover()
+    {
+        var rig = new Rig();
+        rig.Station.Reference = Relocking;
+        var report = rig.Run(10);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal(10, report.FramesSent);
+        // The tone is still worth measuring: the OCXO is tens of nanoseconds off, so no CW E marker.
+        Assert.True(report.ToneSent);
+        Assert.False(report.MarkerSent);
+        Assert.True(report.ProbeSent);
+        Assert.Equal([null], rig.Station.MarkersAsked);
+        Assert.True(report.SentOnHoldover);
+        Assert.Equal("holdover", report.ReferenceFeed);
+        Assert.Equal("UNLOCKED, relocking 1124/1500 s, TIE -33 ns", report.ReferenceFeedDetail);
+        Assert.Single(rig.Journal.Lines, l => l.EndsWith(": the 10 MHz reference is in holdover (UNLOCKED, relocking 1124/1500 s, TIE -33 ns); fine to send on, so the slot goes on, marked as sent on holdover", StringComparison.Ordinal));
+        Assert.Contains(rig.Journal.Lines, l => l.Contains(": done, ", StringComparison.Ordinal) && l.Contains("tone sent", StringComparison.Ordinal)
+            && l.EndsWith(", reference feed in holdover (UNLOCKED, relocking 1124/1500 s, TIE -33 ns)", StringComparison.Ordinal));
+        Assert.All(rig.Journal.Lines, l => Assert.True(l.All(char.IsAscii), l));
+    }
+
+    [Fact]
+    public void TurningHoldoverMidSlot_NeverStopsIt()
+    {
+        // The 14:00 slot on 2026-11-14: the reference went from ok to "NO PPS for over 60 s" 75 s in,
+        // and the slot was aborted after 8 of 70 frames. Holdover now: it goes to the end.
+        var rig = new Rig();
+        DateTimeOffset turns = Noon + TimeSpan.FromMinutes(1.25);
+        rig.Station.ReferenceAt = t => t < turns ? Ok : Relocking;
+        var report = rig.Run(40);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Null(report.Reason);
+        Assert.Equal(40, report.FramesSent);
+        Assert.True(report.ToneSent);
+        Assert.True(report.SentOnHoldover);
+        Assert.Equal("holdover", report.ReferenceFeed);
+        Assert.Single(rig.Journal.Lines, l => l.Contains("the 10 MHz reference is in holdover", StringComparison.Ordinal));
+        Assert.DoesNotContain(rig.Journal.Lines, l => l.Contains("ABORTED", StringComparison.Ordinal) || l.Contains("stopping", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FromHoldoverToARealFaultMidSlot_StillStopsIt()
+    {
+        var rig = new Rig();
+        DateTimeOffset turns = Noon + TimeSpan.FromMinutes(3);
+        var past = new ReferenceFeed(ReferenceFeed.Unreliable, "UNLOCKED, in holdover for over 6h00m", turns);
+        rig.Station.ReferenceAt = t => t < turns ? Relocking : past;
+        var report = rig.Run(40);
+
+        Assert.Equal(SlotOutcome.Aborted, report.Outcome);
+        Assert.Equal("the 10 MHz reference turned unreliable (UNLOCKED, in holdover for over 6h00m)", report.Reason);
+        Assert.Equal("unreliable", report.ReferenceFeed);
+        Assert.True(report.SentOnHoldover, "it was sent on holdover until it stopped");
+        Assert.InRange(report.FramesSent, 1, 39);
+        Assert.All(rig.Station.Keyups, k => Assert.True(k.End <= turns + TimeSpan.FromMinutes(1.1), $"{k.What} at {k.Start:HH:mm:ss} keyed after the reference went"));
+    }
+
+    [Fact]
+    public void TheWorstFeed_RanksHoldoverBetweenOkAndUnknown()
+    {
+        var rig = new Rig();
+        int reads = 0;
+        rig.Station.ReferenceAt = _ => ++reads switch { 1 => Ok, 2 => Relocking, 3 => Offline, _ => Relocking };
+        var report = rig.Run(30);
+
+        Assert.Equal(SlotOutcome.Completed, report.Outcome);
+        Assert.Equal("unknown", report.ReferenceFeed);
+        Assert.True(report.SentOnHoldover, "a later unknown does not hide that it was sent on holdover");
     }
 
     [Fact]
@@ -465,6 +540,7 @@ public class ReferenceFeedTests
     [InlineData("""{"held": false, "channelBusy": false, "reference": {"state": "ok", "detail": "GPS locked", "since": "2026-11-09T09:40:00Z"}}""", "ok", "GPS locked", "2026-11-09T09:40:00Z")]
     [InlineData("""{"held": false, "reference": {"state": "unreliable", "detail": "GPS LOST", "since": "2026-11-09T09:40:00Z"}}""", "unreliable", "GPS LOST", "2026-11-09T09:40:00Z")]
     [InlineData("""{"held": false, "reference": {"state": "UNKNOWN", "detail": "display offline"}}""", "unknown", "display offline", null)]
+    [InlineData("""{"held": false, "reference": {"state": "holdover", "detail": "UNLOCKED, relocking 1124/1500 s, TIE -33 ns", "since": "2026-11-14T14:01:15Z"}}""", "holdover", "UNLOCKED, relocking 1124/1500 s, TIE -33 ns", "2026-11-14T14:01:15Z")]
     [InlineData("""{"held": false, "reference": {"state": "warming", "detail": "  OCXO° warm\nup  "}}""", "unknown", "OCXO  warm up", null)]
     [InlineData("""{"held": false, "reference": {}}""", "unknown", null, null)]
     [InlineData("""{"held": false, "reference": null}""", null, null, null)]
