@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using M0LTE.Radio.Audio;
 using Mailcast.Receiver.Hooks;
+using Mailcast.Receiver.Web;
 using Microsoft.Extensions.Time.Testing;
 using M0LTE.Ms110d;
 using Packet.SoundModem.Modems;
@@ -110,12 +111,18 @@ public class SlotWindowTests
         f.Host.CheckSlotWindow();
         Assert.Equal((SlotStart.AddMinutes(58), SlotStart.AddHours(1)), f.Host.BetweenSlots);
         Assert.Contains(f.Log, line => line.StartsWith("audio: between slots until 12:58 UTC, ready for the 13:00 UTC slot", StringComparison.Ordinal));
+        // The page lets the spectrogram go while hidden only now, so a hidden tab does not keep it decoding.
+        Assert.True(StatusAudio(f.Host).GetProperty("betweenSlots").GetBoolean());
 
         f.Time.Advance(TimeSpan.FromMinutes(28));
         f.Host.CheckSlotWindow();
         Assert.Null(f.Host.BetweenSlots);
         Assert.Contains("audio: decoding for the 13:00 UTC slot", f.Log);
+        Assert.False(StatusAudio(f.Host).GetProperty("betweenSlots").GetBoolean());
     }
+
+    private static System.Text.Json.JsonElement StatusAudio(ReceiverHost host) =>
+        System.Text.Json.JsonSerializer.SerializeToElement(new StatusPage(host, null, _ => { }).Status(), ReceiverConfig.JsonLine).GetProperty("audio");
 
     [Fact]
     public async Task WebSdrAndRecording_AreLeftAlone()

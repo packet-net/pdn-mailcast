@@ -908,6 +908,9 @@ public sealed partial class StatusPage : IAsyncDisposable
                 kind = AudioKind(config.Audio),
                 live = _host.Audio.Phase == AudioPhase.Listening,
                 phase = AudioPhaseName(_host.Audio.Phase),
+                // A sound card between slots: it decodes only while a page shows the spectrogram,
+                // so a hidden page lets the spectrogram go then, and keeps it in a slot.
+                betweenSlots = _host.BetweenSlots is not null,
                 reopens = _host.Audio.Reopens,
                 forSlot = _host.Audio.ForSlot,
                 problem = _host.Audio.Problem,

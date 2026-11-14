@@ -1593,21 +1593,39 @@ function colour(v) {
   return stops[i].map((c, k) => Math.round(c + (stops[i + 1][k] - c) * f));
 }
 
-function line(bins) {
-  const w = canvas.width, h = canvas.height;
-  // scroll down one row
-  ctx.drawImage(canvas, 0, 0, w, h - 1, 0, 1, w, h - 1);
-  const n = Math.min(bins.length, Math.round(SPAN_HZ / cfg.binWidthHz));
-  if (!image || image.width !== w) image = ctx.createImageData(w, 1);
+/* Rows, oldest first, drawn at the top: the canvas scrolls down once for all of them. One row
+   as it comes, or every row held while the page was hidden, when it is shown again. */
+function lines(rows) {
+  const w = canvas.width, h = canvas.height, k = Math.min(rows.length, h);
+  if (!k) return;
+  // scroll down k rows
+  if (k < h) ctx.drawImage(canvas, 0, 0, w, h - k, 0, k, w, h - k);
+  if (!image || image.width !== w || image.height !== k) image = ctx.createImageData(w, k);
   // a fixed range that suits most receivers: -100 dB at the bottom of the colours, -40 at the top
-  for (let x = 0; x < w; x++) {
-    const b = bins[Math.min(n - 1, Math.floor(x / w * n))];
-    const db = -100 + b * 100 / 255;
-    const [r, g, bl] = colour((db + 100) / 60);
-    image.data[x * 4] = r; image.data[x * 4 + 1] = g; image.data[x * 4 + 2] = bl; image.data[x * 4 + 3] = 255;
+  for (let y = 0; y < k; y++) {
+    const bins = rows[rows.length - 1 - y], n = Math.min(bins.length, Math.round(SPAN_HZ / cfg.binWidthHz));
+    for (let x = 0, p = y * w * 4; x < w; x++, p += 4) {
+      const b = bins[Math.min(n - 1, Math.floor(x / w * n))];
+      const db = -100 + b * 100 / 255;
+      const [r, g, bl] = colour((db + 100) / 60);
+      image.data[p] = r; image.data[p + 1] = g; image.data[p + 2] = bl; image.data[p + 3] = 255;
+    }
   }
   ctx.putImageData(image, 0, 0);
   markers();
+}
+
+/* Rows that come while the page is hidden are held, not drawn, up to the canvas's height: a
+   hidden page draws nothing, and is shown again with what it missed. */
+let held = [];
+function hold(bins) {
+  held.push(bins);
+  if (held.length > canvas.height) held.splice(0, held.length - canvas.height);
+}
+function drawHeld() {
+  const rows = held;
+  held = [];
+  if (cfg) lines(rows);
 }
 
 function markers() {
@@ -1646,7 +1664,8 @@ function connect() {
     }
     const bytes = new Uint8Array(e.data);
     if (bytes[0] !== 0x01 || !cfg) return;
-    line(bytes.subarray(5));
+    if (document.hidden) hold(bytes.subarray(5));
+    else lines([bytes.subarray(5)]);
   };
   ws.onclose = () => { if (ws === socket) ws = null; };
 }
@@ -1684,21 +1703,25 @@ function audioNote(s) {
   }
 }
 /* The spectrogram can be turned off on this page, remembered by this browser. Off, nothing is
-   streamed to it: the page asks for no spectrogram and no level, and says so. It is closed too
-   while the tab is hidden, and opened again when it is shown, so a tab left in the background
-   doesn't keep the receiver working for it. */
+   streamed to it: the page asks for no spectrogram and no level, and says so.
+   A hidden tab (another tab in front, or the window minimised or covered) keeps it open while the
+   receiver decodes anyway, holding the rows to draw when it is shown, so nothing is missed in a
+   slot. A sound card between slots decodes only while a page shows the spectrogram, so there a
+   hidden tab lets it go, and a tab left in the background doesn't keep the receiver working for
+   it; the spectrogram picks up again, where it left off, when the tab is shown or the slot's
+   window opens (two minutes before the slot). */
 let audioLive = false;
 const spectroOn = () => localStorage.getItem("mailcast.spectrogram") !== "off";
 function spectrogram(s) {
-  const on = spectroOn(), live = on && s.audio.live && !document.hidden;
+  const on = spectroOn(), audio = on && s.audio.live, live = audio && !(document.hidden && s.audio.betweenSlots);
   const note = on ? audioNote(s) : "The spectrogram is off. Turn it on with the button below to see it and the input level.";
   const box = $("specNotice");
   box.hidden = !note;
   box.textContent = note || "";
   if (live && !ws) connect();
   if (!live && ws) { const old = ws; ws = null; old.close(); }
-  if (!live && audioLive) { ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-  audioLive = live;
+  if (!audio && audioLive) { held = []; ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  audioLive = audio;
 }
 function showSwitch() {
   const on = spectroOn();
@@ -1723,7 +1746,10 @@ window.addEventListener("storage", e => {
   showSwitch();
   if (status && !down) spectrogram(status);
 });
-document.addEventListener("visibilitychange", () => { if (status && !down) spectrogram(status); });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) drawHeld();
+  if (status && !down) spectrogram(status);
+});
 
 let levelTimer = null;
 showSwitch();
