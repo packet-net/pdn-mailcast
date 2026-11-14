@@ -178,3 +178,4 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-12,M7TAW,0.40.0,IO91ma,sc,6,6,0,0,,,,16,11,566,bbs-store,size-verified,daily/2026-11-12/M7TAW.txt
 2026-11-12,M9TWM,0.39.0,IO93fj,m9twm-1.tunnel.ubersdr.org,7,0,8,7,0,3,,16,12,310,bbs-store,size-verified,daily/2026-11-12/M9TWM.txt
 2026-11-13,EI7KX,0.40.0,IO83jj,nope.tunnel.ubersdr.org,2,1,0,0,,,,22,16,560,bbs-store,size-verified,daily/2026-11-13/EI7KX.txt
+2026-11-13,M9TWM,0.39.0,IO93fj,m9twm-1.tunnel.ubersdr.org,1,0,1,5,0,1,,19,12,147,bbs-store,size-verified,daily/2026-11-13/M9TWM.txt
