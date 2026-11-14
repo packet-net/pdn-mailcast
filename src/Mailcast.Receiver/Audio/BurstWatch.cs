@@ -140,8 +140,9 @@ public sealed class BurstWatch(TimeProvider time)
     /// <remarks>
     /// pdn-soundmodem (0.86.0) makes the receiver's lock public on <see cref="Ms110dDemodulator"/>,
     /// but <see cref="Ms110dModem"/> keeps its receiver in a private field and does not pass the
-    /// lock on (its <c>Mode</c> and each frame's <c>FrameQuality.Mode</c> are the transmit
-    /// waveform). So the field is read here, once, and a test pins it: a pdn-soundmodem that
+    /// whole lock on (its <c>Mode</c> is the transmit waveform; since 0.108.0 each received frame's
+    /// <c>FrameQuality.Mode</c> names the waveform heard, which is what the embedded waterfall
+    /// shows). So the field is read here, once, and a test pins it: a pdn-soundmodem that
     /// renames it fails that test rather than quietly losing the speed.
     /// </remarks>
     internal static Ms110dDemodulator? ReceiverOf(Ms110dModem modem) =>
