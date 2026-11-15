@@ -122,3 +122,5 @@ day,callsign,station,listened,heard,frames,completed,snr_db,virtual_height_km,ot
 2026-11-13,GM8BPQ,M0LTE,11,8,52,0,-1,245,0
 2026-11-13,M9TWM,GM8BPQ,8,7,6,0,2,236,0
 2026-11-13,M9TWM,M0LTE,11,5,141,1,2,259,3
+2026-11-14,EI7KX,GM8BPQ,8,0,0,0,,,0
+2026-11-14,EI7KX,M0LTE,14,8,350,15,6,265,0

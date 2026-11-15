@@ -181,3 +181,4 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-13,GM4CXF,0.40.0,IO75qn,sc,3,3,0,0,,,,20,15,976,bbs-store,size-verified,daily/2026-11-13/GM4CXF.txt
 2026-11-13,GM8BPQ,0.40.0,IO68vl,sc,0,0,0,0,0,5,RIG22,19,8,52,bbs-store,size-verified,daily/2026-11-13/GM8BPQ.txt
 2026-11-13,M9TWM,0.39.0,IO93fj,m9twm-1.tunnel.ubersdr.org,1,0,1,5,0,1,,19,12,147,bbs-store,size-verified,daily/2026-11-13/M9TWM.txt
+2026-11-14,EI7KX,0.41.0,IO83jj,nope.tunnel.ubersdr.org,15,16,0,2,,,,22,8,350,bbs-store,size-verified,daily/2026-11-14/EI7KX.txt
