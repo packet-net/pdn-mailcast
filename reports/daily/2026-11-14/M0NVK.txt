@@ -1,0 +1,27 @@
+Title: MCR M0NVK 2026-11-14
+From: M0NVK
+Source: pasted by M0LTE on 2026-11-16 (report text only, no BBS headers, no date); date from the slots heard against M0LTE's head end log (10:00 skipped, 14:00 aborted after 8 frames)
+Check: none available
+
+MCR1 0.37.0 IO90hr sdrconnect 14/0 0 15 1
+0830 - 0 - - IU+PU - - - - - - GM8BPQ
+0930 - 0 - - IU+PG - - - - - - GM8BPQ
+10 - 0 - - IU+PU - - - - - - M0LTE
+1030 - 0 - - IU+PU - - - - - - GM8BPQ
+11 W4 142 18 +5.8 IU+PG 4 1.6/-5 1.03 0.71 248 p M0LTE
+1130 - 0 - - IU+PG - - - - - - GM8BPQ
+12 W3 70 19 +5.9 IU+PG 3 1.7/-10 0.51 0.31 255 p M0LTE
+1230 - 0 - - IU+PG - - - - - - GM8BPQ
+13 W4 145 21 +5.4 IU+PG 3 1.8/-4 1 0.45 279 p M0LTE
+1330 - 0 - - IU+PG - - - - - - GM8BPQ
+14 W3 8 16 +5.8 IU+PU 3 1.7/-12 0.46 0.31 257 p M0LTE
+1430 - 0 - - IU+PU - - - - - - GM8BPQ
+15 W4 142 17 +5.6 IU+PG 2 1.7/-17 0.24 0.08 259 p M0LTE
+1530 - 0 - - IU+PG - - - - - - GM8BPQ
+17 - 0 - - IU+PU - - - - - - M0LTE
+18 - 0 - - IU+PU - - - - - - M0LTE
+19 - 0 - - IU+PU - - - - - - M0LTE
+20 - 0 - - IU+PU - - - - - - M0LTE
+21 - 0 - - IU+PU - - - - - - M0LTE
+S GM8BPQ 8 0 0 0 - - 0
+S M0LTE 11 5 507 8 18 257 0
