@@ -89,6 +89,22 @@ public sealed class SlotRunner
     /// </summary>
     internal static readonly TimeSpan StationToneWait = TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// How long after a slot's time receivers give its window back when nothing at all has been
+    /// heard: no tone, probe or frame (docs/receiver.md). Fixed in the receiver; there is no setting.
+    /// </summary>
+    public static readonly TimeSpan ReceiverGiveUp = TimeSpan.FromSeconds(210);
+
+    /// <summary>
+    /// The latest, after the slot's time, that the clear-channel wait asks for the tone:
+    /// <see cref="ReceiverGiveUp"/> less <see cref="StationToneWait"/> and 10 s to spare, so 2 min
+    /// 20 s. An on-time slot's 2 minute wait ends before it; a slot that starts late (held in place
+    /// for a reason that cleared, or caught up) has its wait cut to end here, so its tone still
+    /// comes before receivers give the window back. Past it, the channel is looked at once and
+    /// <c>whenStillBusy</c> decides at once.
+    /// </summary>
+    public static readonly TimeSpan LatestToneAsk = ReceiverGiveUp - StationToneWait - TimeSpan.FromSeconds(10);
+
     /// <summary>How far past the end of the longest channel check, tone and probe included, the kept audio runs.</summary>
     internal static readonly TimeSpan KeepAudioMargin = TimeSpan.FromSeconds(10);
 
@@ -331,6 +347,11 @@ public sealed class SlotRunner
 
     private static string Clock(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
+    /// <summary>A wait as the journal says it: "2 min", "1.5 min", or "20 s" under a minute.</summary>
+    private static string Wait(TimeSpan t) => t >= TimeSpan.FromMinutes(1)
+        ? t.TotalMinutes.ToString("0.#", CultureInfo.InvariantCulture) + " min"
+        : t.TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s";
+
     private static string Minutes(TimeSpan t) => t.TotalMinutes.ToString("0.0", CultureInfo.InvariantCulture);
 
     private static string Degrees(double c) => c.ToString("0.0", CultureInfo.InvariantCulture);
@@ -423,16 +444,16 @@ public sealed class SlotRunner
                 if (clock.Synchronised != true)
                 {
                     Say($"waiting for the system clock: {clock.Detail}");
-                    return Finish(SlotOutcome.Skipped, $"the system clock is not known to be synchronised ({clock.Detail}), and nothing keys until it is", retryable: true);
+                    return Finish(SlotOutcome.Skipped, $"the system clock is not known to be synchronised ({clock.Detail}), and nothing keys until it is", SkipCause.Clock);
                 }
             }
 
             if (owner._flex is not null)
             {
-                string? flexSkip = await ReadFlexAsync(cancellation);
+                (string? flexSkip, SkipCause flexCause) = await ReadFlexAsync(cancellation);
                 if (flexSkip is not null)
                 {
-                    return Finish(SlotOutcome.Skipped, flexSkip, retryable: true);
+                    return Finish(SlotOutcome.Skipped, flexSkip, flexCause);
                 }
             }
 
@@ -441,7 +462,7 @@ public sealed class SlotRunner
             if (FeedNow is { IsUnreliable: true } bad)
             {
                 _referenceHold = ReferenceHoldReason(bad);
-                return Finish(SlotOutcome.Skipped, _referenceHold, retryable: true);
+                return Finish(SlotOutcome.Skipped, _referenceHold, SkipCause.Reference);
             }
 
             IKissLink link;
@@ -451,7 +472,7 @@ public sealed class SlotRunner
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                return Finish(SlotOutcome.Skipped, $"cannot reach the station's KISS port: {e.Message}", retryable: true);
+                return Finish(SlotOutcome.Skipped, $"cannot reach the station's KISS port: {e.Message}", SkipCause.KissPort);
             }
 
             await using (link)
@@ -470,11 +491,11 @@ public sealed class SlotRunner
                         }
                         catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or InvalidOperationException)
                         {
-                            return Finish(SlotOutcome.Skipped, $"cannot switch the modem to {_mode}: {e.Message}", retryable: true);
+                            return Finish(SlotOutcome.Skipped, $"cannot switch the modem to {_mode}: {e.Message}", SkipCause.Waveform);
                         }
                         if (!set)
                         {
-                            return Finish(SlotOutcome.Skipped, $"the modem did not confirm the change to {_mode} within {S.SetHardwareWait.TotalSeconds:0} s (no SETHW echo; pdn-soundmodem's journal says why), so nothing was sent", retryable: true);
+                            return Finish(SlotOutcome.Skipped, $"the modem did not confirm the change to {_mode} within {S.SetHardwareWait.TotalSeconds:0} s (no SETHW echo; pdn-soundmodem's journal says why), so nothing was sent", SkipCause.Waveform);
                         }
                         Say($"modem switched to {_mode}");
                     }
@@ -492,9 +513,9 @@ public sealed class SlotRunner
                     {
                         if (first.TuneFailed)
                         {
-                            return Finish(SlotOutcome.Skipped, $"the station could not tune the rig for the slot, so nothing was sent: {first.Problem}", retryable: true);
+                            return Finish(SlotOutcome.Skipped, $"the station could not tune the rig for the slot, so nothing was sent: {first.Problem}", SkipCause.Tune);
                         }
-                        return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", retryable: true);
+                        return Finish(SlotOutcome.Skipped, $"the station refused the transmit lease: {first.Problem}", SkipCause.Lease);
                     }
                     SayTuning(first);
                     _leaseTaken = true;
@@ -538,7 +559,7 @@ public sealed class SlotRunner
                     if (_referenceHold is not null && _queued == 0)
                     {
                         // Turned unreliable before anything was queued: nothing counted, so worth trying again.
-                        return Finish(SlotOutcome.Skipped, _referenceHold, retryable: true);
+                        return Finish(SlotOutcome.Skipped, _referenceHold, SkipCause.Reference);
                     }
                     if (skipped is not null)
                     {
@@ -593,7 +614,8 @@ public sealed class SlotRunner
                 : $"WARNING - could not put the modem back on {S.Mode}; it may stay on {_mode} until the next slot or the head end's next start");
         }
 
-        private async Task<string?> ReadFlexAsync(CancellationToken cancellation)
+        /// <summary>Reads the Flex: why the slot is skipped and for what cause, or (null, None) to go on.</summary>
+        private async Task<(string?, SkipCause)> ReadFlexAsync(CancellationToken cancellation)
         {
             IFlexMonitor flex = owner._flex!;
             if (!await flex.ConnectAsync(cancellation))
@@ -602,10 +624,10 @@ public sealed class SlotRunner
                 Say($"Flex API unreachable: {flex.Problem}");
                 if (S.WhenFlexUnreachable == FlexUnreachablePolicy.Skip)
                 {
-                    return $"the Flex API could not be reached ({flex.Problem}) and the configuration says not to broadcast without it";
+                    return ($"the Flex API could not be reached ({flex.Problem}) and the configuration says not to broadcast without it", SkipCause.Flex);
                 }
                 Say("carrying on without the PA temperature watch");
-                return null;
+                return (null, SkipCause.None);
             }
 
             ReferenceReading reference = flex.Reference;
@@ -621,14 +643,14 @@ public sealed class SlotRunner
                 Say($"Flex PA temperature {Degrees(pa)} C, limit {Degrees(S.PaTemperatureLimitC)} C");
                 if (pa > S.PaTemperatureLimitC)
                 {
-                    return $"the PA is already at {Degrees(pa)} C, over the {Degrees(S.PaTemperatureLimitC)} C limit";
+                    return ($"the PA is already at {Degrees(pa)} C, over the {Degrees(S.PaTemperatureLimitC)} C limit", SkipCause.HotPa);
                 }
             }
             else
             {
                 Say("Flex PA temperature not reported yet");
             }
-            return null;
+            return (null, SkipCause.None);
         }
 
         /// <summary>
@@ -900,7 +922,13 @@ public sealed class SlotRunner
             // applies); only the tone and probe are left out.
             double toneHz = ToneHz ?? 0;
             bool placed = ToneHz is not null;
+            // Cut for a late start, so the tone still comes while receivers are listening.
             DateTimeOffset giveUp = Now + S.ChannelWait;
+            if (giveUp > slot + LatestToneAsk)
+            {
+                giveUp = slot + LatestToneAsk > Now ? slot + LatestToneAsk : Now;
+            }
+            TimeSpan waitFor = giveUp - Now;
             bool saidBusy = false;
             // The probe goes on the tone's own audio frequency, so it lands where the tone does on the air.
             ProbeRequest? probe = new(ChannelProbe.Kind, ChannelProbe.Gap.TotalSeconds, toneHz);
@@ -1004,15 +1032,17 @@ public sealed class SlotRunner
                 {
                     if (S.WhenStillBusy == BusyPolicy.Skip)
                     {
-                        return (SlotOutcome.Skipped, $"the channel stayed busy for {S.ChannelWait.TotalMinutes:0.#} min");
+                        return (SlotOutcome.Skipped, $"the channel stayed busy for {Wait(waitFor)}");
                     }
-                    Say($"channel still busy after {S.ChannelWait.TotalMinutes:0.#} min; going ahead without the tone (each burst goes anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel)");
+                    Say($"channel still busy after {Wait(waitFor)}; going ahead without the tone (each burst goes anyway after waiting {S.MaxCarrierWait.TotalSeconds:0} s for a clear channel)");
                     return (null, null);
                 }
                 if (!saidBusy)
                 {
                     saidBusy = true;
-                    Say($"channel busy; waiting up to {S.ChannelWait.TotalMinutes:0.#} min for it to clear");
+                    Say(waitFor < S.ChannelWait
+                        ? $"channel busy; waiting up to {Wait(waitFor)} for it to clear (cut from {Wait(S.ChannelWait)}, as the slot started {(_start - slot).TotalSeconds:0} s late and its tone must come before receivers give up, {ReceiverGiveUp.TotalMinutes:0.#} min in)"
+                        : $"channel busy; waiting up to {Wait(waitFor)} for it to clear");
                 }
                 await Task.Delay(TimeSpan.FromSeconds(5), owner._time, cancellation);
             }
@@ -1256,8 +1286,9 @@ public sealed class SlotRunner
             }
         }
 
-        private SlotReport Finish(SlotOutcome outcome, string? reason, bool retryable = false)
+        private SlotReport Finish(SlotOutcome outcome, string? reason, SkipCause cause = SkipCause.None)
         {
+            bool retryable = cause != SkipCause.None;
             DateTimeOffset end = Now;
             var report = new SlotReport
             {
@@ -1286,6 +1317,7 @@ public sealed class SlotRunner
                 RequestedBy = requestedBy,
                 Evening = evening,
                 Retryable = retryable,
+                Cause = cause,
                 Mode = _mode,
                 EstimatedSeconds = _estimate is { } e ? Math.Round(e.TotalSeconds, 1) : null,
             };
@@ -1301,11 +1333,11 @@ public sealed class SlotRunner
                 case SlotOutcome.Aborted:
                     Say($"ABORTED at {Clock(end)}Z: {reason}. {_sent} of {frames.Count} frames sent in {_bursts} bursts on {_mode} ({_queued} queued); the rest roll on to the next slot. PA max {pa}, reference {_reference}{feed}");
                     break;
-                case SlotOutcome.Skipped when _referenceHold is not null:
-                    // The head end writes the one line for this, with when the slot is tried again.
+                case SlotOutcome.Skipped when retryable:
+                    // The head end writes the one line for this: tried again in place, or rolled on to the next slot.
                     break;
                 default:
-                    Say($"skipped: {reason}. {(_toneSent || _markerSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot{(retryable ? ", which may be a retry of this one" : "")}");
+                    Say($"skipped: {reason}. {(_toneSent || _markerSent || _queued > 0 ? "Something was sent" : "Nothing was transmitted")}; everything rolls on to the next slot");
                     break;
             }
             return report;

@@ -871,7 +871,12 @@ public sealed record SlotConfig
     [JsonIgnore]
     public int CatchUp => CatchUpMinutes ?? (EveryMinutes == 1440 ? 30 : 5);
 
-    /// <summary>A slot skipped for a reason at the station is tried again after this long, within the catch-up window.</summary>
+    /// <summary>
+    /// No longer used by the head end: a slot skipped for a reason at the station that may clear is
+    /// tried again in place, up to 2 minutes in, or rolls on to the next slot (docs/headend.md).
+    /// Still read, so a configuration that sets it loads; it applies only to a skip recorded by an
+    /// older version that the head end finds when it starts.
+    /// </summary>
     public double RetryMinutes { get; init; } = 5;
 
     /// <summary>

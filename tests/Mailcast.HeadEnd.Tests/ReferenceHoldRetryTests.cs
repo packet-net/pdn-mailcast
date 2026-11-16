@@ -136,7 +136,7 @@ public class ReferenceHoldRetryTests
         Assert.Equal(leases, head.Station.LeaseRequests.Count);
         Assert.Equal(before, head.NextEsis());
         // Given up at the last look that could still be heard; the next slot is 11:00, not a retry at 10:05.
-        Assert.True(head.Time.GetUtcNow() <= Ten + HeadEndService.ReferenceLatestStart, $"gave up at {head.Time.GetUtcNow():HH:mm:ss}");
+        Assert.True(head.Time.GetUtcNow() <= Ten + HeadEndService.HoldLatestStart, $"gave up at {head.Time.GetUtcNow():HH:mm:ss}");
         Assert.Equal(Ten.AddHours(1), head.Next(report));
         Assert.Contains(head.Lines, l => l.StartsWith("slot 2026-11-14 10:00Z: not sent: the 10 MHz reference was still unreliable at 10:02:00Z, too late for receivers to hear the slot; everything rolls on to the next slot, 2026-11-14 11:00Z", StringComparison.Ordinal));
         Assert.DoesNotContain(head.Lines, l => l.Contains("trying again at", StringComparison.Ordinal));
@@ -153,7 +153,7 @@ public class ReferenceHoldRetryTests
         var report = head.Run(Ten);
 
         Assert.Equal(SlotOutcome.Completed, report.Outcome);
-        Assert.InRange(report.Start, Ten.AddMinutes(1), Ten + HeadEndService.ReferenceLatestStart);
+        Assert.InRange(report.Start, Ten.AddMinutes(1), Ten + HeadEndService.HoldLatestStart);
         Assert.Equal(2, head.Lines.Count(l => l.Contains("looking at it again every 15 s until 10:02:00Z", StringComparison.Ordinal)));
     }
 
@@ -181,6 +181,6 @@ public class ReferenceHoldRetryTests
         Assert.Equal(TimeSpan.Parse("00:07:49", CultureInfo.InvariantCulture), config.FillLimitAfter(TimeSpan.Zero));
         Assert.Equal(TimeSpan.Parse("00:02:49", CultureInfo.InvariantCulture), config.FillLimitAfter(TimeSpan.FromMinutes(5)));
         // A held slot that starts by 2 minutes in keeps most of it.
-        Assert.Equal(TimeSpan.Parse("00:05:49", CultureInfo.InvariantCulture), config.FillLimitAfter(HeadEndService.ReferenceLatestStart));
+        Assert.Equal(TimeSpan.Parse("00:05:49", CultureInfo.InvariantCulture), config.FillLimitAfter(HeadEndService.HoldLatestStart));
     }
 }

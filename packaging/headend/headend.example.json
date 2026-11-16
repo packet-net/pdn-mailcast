@@ -45,7 +45,6 @@
     "daylight": { "locator": "", "afterSunriseMinutes": 120, "beforeSunsetMinutes": 30 },
     "catchUpMinutes": 5,
     "requireClockSync": true,
-    "retryMinutes": 5,
     "maxMinutes": 10,
     "channelWaitSeconds": 120,
     "whenStillBusy": "go",

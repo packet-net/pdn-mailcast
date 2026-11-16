@@ -371,41 +371,55 @@ public sealed class HeadEndService(
             journal.Write(spots);
         }
         SlotReport report = await RunPlannedAsync(slot, plan, requestedBy, evening, cancellation);
-        bool held = false;
-        if (IsReferenceHold(report))
+        if (IsHold(report))
         {
-            (report, held) = await HoldForTheReferenceAsync(slot, report, requestedBy, evening, cancellation);
+            report = await HoldAsync(slot, report, requestedBy, evening, cancellation);
         }
         status.RecordSlot(report);
-        if (!held && ReferenceHoldLine(report, time.GetUtcNow()) is { } holdLine)
-        {
-            journal.Write(holdLine);
-        }
         status.SetBulletinsHeld(store.Count);
         SlotsToday today = status.SlotsToday;
         journal.Write($"slots today ({today.Date:yyyy-MM-dd}): {today.Slots}, {today.Completed} completed, {today.Aborted} cut short, {today.Skipped} skipped");
         return report;
     }
 
-    /// <summary>How often a slot held back for the 10 MHz reference looks at it again.</summary>
-    public static readonly TimeSpan ReferenceRecheckEvery = TimeSpan.FromSeconds(15);
+    /// <summary>How often a slot held back for a reason that may clear is looked at again.</summary>
+    public static readonly TimeSpan HoldRecheckEvery = TimeSpan.FromSeconds(15);
 
     /// <summary>
-    /// The latest, after its own time, that a slot held back for the 10 MHz reference still starts.
-    /// Receivers give a slot's window back 3 min 30 s in if nothing at all has been heard
-    /// (docs/receiver.md); the station may take up to <see cref="SlotRunner.StationToneWait"/> to
-    /// key the tone once asked, and the run-up (KISS, waveform, lease, tuning) takes some seconds
-    /// more. Starting by 2 minutes in leaves the tone inside that window on a clear channel. A slot
-    /// still held then is not tried again at <c>slot.retryMinutes</c>: a retry at 5 minutes past
-    /// would go after every receiver has stopped listening, and its fill (the budget less its
-    /// lateness) is too small to carry a bulletin anyway. It rolls on to the next slot.
+    /// The latest, after its own time, that a slot held back for a reason that may clear still
+    /// starts. Receivers give a slot's window back 3 min 30 s in if nothing at all has been heard
+    /// (docs/receiver.md, <see cref="SlotRunner.ReceiverGiveUp"/>); the station may take up to
+    /// <see cref="SlotRunner.StationToneWait"/> to key the tone once asked, and the run-up (KISS,
+    /// waveform, lease, tuning) takes some seconds more. Starting by 2 minutes in leaves the tone
+    /// inside that window, with the clear-channel wait cut to fit (<see cref="SlotRunner.LatestToneAsk"/>).
+    /// A slot still held then is not tried again at <c>slot.retryMinutes</c>: a retry at 5 minutes
+    /// past would go after every receiver has stopped listening, and its fill (the budget less its
+    /// lateness) is often too small to carry a bulletin anyway. It rolls on to the next slot.
     /// </summary>
-    public static readonly TimeSpan ReferenceLatestStart = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan HoldLatestStart = TimeSpan.FromMinutes(2);
 
-    /// <summary>A slot skipped, with nothing counted, because the station's 10 MHz reference is unreliable.</summary>
-    private static bool IsReferenceHold(SlotReport report) =>
-        report.Outcome == SlotOutcome.Skipped && report.Retryable && report.FramesQueued == 0
-        && report.ReferenceFeed == Station.ReferenceFeed.Unreliable;
+    /// <summary>
+    /// Whether a slot skipped for <paramref name="cause"/> is tried again in place, every
+    /// <see cref="HoldRecheckEvery"/> up to <see cref="HoldLatestStart"/>, or rolls straight on to
+    /// the next slot. In place for what often clears within seconds and costs nothing on the air to
+    /// look at again: the clock (chrony stepping it after a boot), the Flex API (a dropped
+    /// connection), the 10 MHz reference (a GPSDO's PPS coming back), the KISS port (pdn-soundmodem
+    /// restarting), the lease (another holder letting go) and the rig's tuning (rigctld
+    /// restarting). Not for a hot PA, which cools over minutes, not seconds: one only just back
+    /// under its limit would likely pass it again part way through and stop the slot, spending its
+    /// pieces. Nor for a modem that would not take the slot's waveform, which is the modem's
+    /// configuration far more often than a passing fault, and where each try switches the
+    /// broadcast modem's waveform and back.
+    /// </summary>
+    public static bool RetriedInPlace(SkipCause cause) => cause switch
+    {
+        SkipCause.Clock or SkipCause.Flex or SkipCause.Reference or SkipCause.KissPort or SkipCause.Lease or SkipCause.Tune => true,
+        _ => false,
+    };
+
+    /// <summary>A slot skipped, with nothing counted, for a reason at the station that may clear.</summary>
+    private static bool IsHold(SlotReport report) =>
+        report.Outcome == SlotOutcome.Skipped && report.Retryable && report.FramesQueued == 0;
 
     /// <summary>Runs a planned slot, and records what it queued.</summary>
     private async Task<SlotReport> RunPlannedAsync(DateTimeOffset slot, SlotPlan plan, string? requestedBy, bool evening, CancellationToken cancellation)
@@ -417,68 +431,92 @@ public sealed class HeadEndService(
     }
 
     /// <summary>
-    /// A slot held back for the 10 MHz reference: looks at the reference again every
-    /// <see cref="ReferenceRecheckEvery"/>, touching nothing else at the station, and as soon as it
-    /// is not unreliable plans the slot afresh (its fill counts its lateness) and runs it, up to
-    /// <see cref="ReferenceLatestStart"/> after the slot's time. One still held then rolls on to the
-    /// next slot. Returns the slot's report, and whether this wrote the journal's hold lines.
+    /// A slot skipped for a reason that may clear. When <see cref="RetriedInPlace"/> says so, and
+    /// there is still time, it is looked at again every <see cref="HoldRecheckEvery"/> up to
+    /// <see cref="HoldLatestStart"/> after the slot's time: for the 10 MHz reference by reading it
+    /// alone, touching nothing else at the station, and once it is not unreliable by planning the
+    /// slot afresh (its fill counts its lateness) and running it; for anything else by planning and
+    /// running the slot again, whose own run-up looks at what held it. One still held then, or not
+    /// retried in place, rolls on to the next slot, never retried at <c>slot.retryMinutes</c>.
+    /// Writes the journal's lines for the hold, and returns the slot's report.
     /// </summary>
-    private async Task<(SlotReport Report, bool Held)> HoldForTheReferenceAsync(DateTimeOffset slot, SlotReport report, string? requestedBy, bool evening, CancellationToken cancellation)
+    private async Task<SlotReport> HoldAsync(DateTimeOffset slot, SlotReport report, string? requestedBy, bool evening, CancellationToken cancellation)
     {
-        DateTimeOffset latest = slot + ReferenceLatestStart;
+        DateTimeOffset latest = slot + HoldLatestStart;
         string name = $"{(evening ? "evening slot" : "slot")} {SlotRunner.Name(slot)}";
-        if (time.GetUtcNow() + ReferenceRecheckEvery > latest)
+        if (!RetriedInPlace(report.Cause) || time.GetUtcNow() + HoldRecheckEvery > latest)
         {
-            // Already too late to be heard: no retry at slot.retryMinutes either.
-            return (report with { Retryable = false }, false);
+            // Not worth trying again in place, or already too late to be heard: no retry at slot.retryMinutes either.
+            report = report with { Retryable = false };
+            journal.Write(SkipLine(report, time.GetUtcNow())!);
+            return report;
         }
-        string what = report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent";
-        journal.Write($"{name}: {what}: {report.Reason}; looking at it again every {ReferenceRecheckEvery.TotalSeconds:0} s until {Clock(latest)}Z");
-        while (time.GetUtcNow() + ReferenceRecheckEvery <= latest)
+        journal.Write(HoldLine(name, report, latest));
+        while (time.GetUtcNow() + HoldRecheckEvery <= latest)
         {
-            await Task.Delay(ReferenceRecheckEvery, time, cancellation);
-            Station.ReferenceFeed? feed = await runner.ReadReferenceAsync(cancellation);
-            if (feed is { IsUnreliable: true })
+            await Task.Delay(HoldRecheckEvery, time, cancellation);
+            if (report.Cause == SkipCause.Reference)
             {
-                continue;
+                Station.ReferenceFeed? feed = await runner.ReadReferenceAsync(cancellation);
+                if (feed is { IsUnreliable: true })
+                {
+                    continue;
+                }
+                journal.Write($"{name}: the 10 MHz reference is {(feed is null ? "no longer reported unreliable" : feed.Describe())}; starting {(time.GetUtcNow() - slot).TotalSeconds:0} s after the slot's time");
             }
-            DateTimeOffset now = time.GetUtcNow();
-            journal.Write($"{name}: the 10 MHz reference is {(feed is null ? "no longer reported unreliable" : feed.Describe())}; starting {(now - slot).TotalSeconds:0} s after the slot's time");
+            SlotReport before = report;
             SlotPlan plan = planner.Plan(slot, evenIfNothingDue: requestedBy is not null, evening: evening);
             report = await RunPlannedAsync(slot, plan, requestedBy, evening, cancellation);
-            if (!IsReferenceHold(report))
+            if (!IsHold(report))
             {
-                return (report, true);
+                return report;
             }
-            journal.Write($"{name}: {(report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent")}: {report.Reason}; looking at it again every {ReferenceRecheckEvery.TotalSeconds:0} s until {Clock(latest)}Z");
+            if (!RetriedInPlace(report.Cause))
+            {
+                // Past what held it, but held now for something not worth trying again in place.
+                report = report with { Retryable = false };
+                journal.Write(SkipLine(report, time.GetUtcNow())!);
+                return report;
+            }
+            if (report.Cause == SkipCause.Reference || report.Reason != before.Reason)
+            {
+                // Held by the reference again, or for something new: said again. The same reason again is not.
+                journal.Write(HoldLine(name, report, latest));
+            }
         }
         report = report with { Retryable = false };
-        DateTimeOffset next = NextSlot(time.GetUtcNow(), schedule, catchUp, report, retryAfter);
-        journal.Write($"{name}: not sent: the 10 MHz reference was still unreliable at {Clock(time.GetUtcNow())}Z, too late for receivers to hear the slot; everything rolls on to the next slot, {SlotRunner.Name(next)}");
-        return (report, true);
+        DateTimeOffset now = time.GetUtcNow();
+        DateTimeOffset next = NextSlot(now, schedule, catchUp, report, retryAfter);
+        string still = report.Cause == SkipCause.Reference
+            ? $"the 10 MHz reference was still unreliable at {Clock(now)}Z"
+            : $"{report.Reason}, still at {Clock(now)}Z";
+        journal.Write($"{name}: not sent: {still}, too late for receivers to hear the slot; everything rolls on to the next slot, {SlotRunner.Name(next)}");
+        return report;
     }
+
+    /// <summary>"slot ...: not sent: why; trying again every 15 s until 10:02:00Z".</summary>
+    private static string HoldLine(string name, SlotReport report, DateTimeOffset latest) =>
+        $"{name}: {What(report)}: {report.Reason}; {(report.Cause == SkipCause.Reference ? "looking at it again" : "trying again")} every {HoldRecheckEvery.TotalSeconds:0} s until {Clock(latest)}Z";
+
+    /// <summary>"not sent", or "stopped before any bulletin went" when the tone or the marker had gone.</summary>
+    private static string What(SlotReport report) => report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent";
 
     private static string Clock(DateTimeOffset t) => t.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The one journal line for a slot not sent because the station's 10 MHz reference is
-    /// unreliable, with when it is tried again (or the next slot, when the retry would fall outside
-    /// the catch-up window); null for any other slot.
+    /// The one journal line for a slot skipped for a reason that may clear (or for an unreliable
+    /// 10 MHz reference) and not tried again in place: what held it and the next slot. Null for
+    /// any other slot.
     /// </summary>
-    public string? ReferenceHoldLine(SlotReport report, DateTimeOffset now)
+    public string? SkipLine(SlotReport report, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(report);
-        if (report.Outcome != SlotOutcome.Skipped || report.ReferenceFeed != Station.ReferenceFeed.Unreliable)
+        if (report.Outcome != SlotOutcome.Skipped || (report.Cause == SkipCause.None && report.ReferenceFeed != Station.ReferenceFeed.Unreliable))
         {
             return null;
         }
-        DateTimeOffset next = NextSlot(now, schedule, catchUp, report, retryAfter);
-        string when = schedule.SlotAtOrBefore(next) == report.Slot
-            ? $"trying again at {next.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)}Z"
-            : $"the next slot is {SlotRunner.Name(next)}";
-        // The tone or the marker may have gone before the reference turned: then it was stopped, not unsent.
-        string what = report.ToneSent || report.MarkerSent ? "stopped before any bulletin went" : "not sent";
-        return $"{(report.Evening ? "evening slot" : "slot")} {SlotRunner.Name(report.Slot)}: {what}: {report.Reason}; {when}";
+        DateTimeOffset next = NextSlot(now, schedule, catchUp, report with { Retryable = false }, retryAfter);
+        return $"{(report.Evening ? "evening slot" : "slot")} {SlotRunner.Name(report.Slot)}: {What(report)}: {report.Reason}; the next slot is {SlotRunner.Name(next)}";
     }
 
     /// <summary>The slot's one journal line on the PSK Reporter reading, and whether it went in the slot; null when the head end takes none.</summary>
@@ -516,9 +554,11 @@ public sealed class HeadEndService(
     /// <paramref name="now"/> of a slot that runs) if it has not run and it is no more than
     /// <paramref name="catchUp"/> late, otherwise the next that runs. A slot cut short because
     /// the head end was stopping counts as not run, so a restart carries on with it; one skipped
-    /// for a reason at the station that may clear (no KISS port, no lease, no Flex) is tried again
-    /// <paramref name="retryAfter"/> after that attempt's own time (the slot's, then each retry's), while
-    /// that is at or before the end of the catch-up window. A slot
+    /// for a reason at the station that may clear and recorded as <see cref="SlotReport.Retryable"/>
+    /// is tried again <paramref name="retryAfter"/> after that attempt's own time (the slot's, then
+    /// each retry's), while that is at or before the end of the catch-up window. The head end itself
+    /// no longer records such a report (it tries a held slot again in place, or rolls it on: see
+    /// <see cref="RetriedInPlace"/>), so this is for one recorded by an older version. A slot
     /// earlier than the last one run is never run, whatever the clock says. With a daylight rule,
     /// slots in the dark are passed over.
     /// </summary>
