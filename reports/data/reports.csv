@@ -187,6 +187,8 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-13,M7TAW,0.40.0,IO91ma,sc,3,3,0,1,,,,20,12,295,bbs-store,size-verified,daily/2026-11-13/M7TAW.txt
 2026-11-13,M9TWM,0.39.0,IO93fj,m9twm-1.tunnel.ubersdr.org,1,0,1,5,0,1,,19,12,147,bbs-store,size-verified,daily/2026-11-13/M9TWM.txt
 2026-11-14,EI7KX,0.41.0,IO83jj,nope.tunnel.ubersdr.org,15,16,0,2,,,,22,8,350,bbs-store,size-verified,daily/2026-11-14/EI7KX.txt
+2026-11-14,G7TAJ,0.40.0,IO81le,sc,8,0,7,0,,,,22,6,185,bbs-store,size-verified,daily/2026-11-14/G7TAJ.txt
+2026-11-14,GB7NOT,0.40.0,IO92kx,sc,21,20,1,0,0,1,RIG76,38,8,414,bbs-store,size-verified,daily/2026-11-14/GB7NOT.txt
 2026-11-14,GM4CXF,0.42.0,IO75qn,sc,20,22,0,1,,,,22,9,555,bbs-store,size-verified,daily/2026-11-14/GM4CXF.txt
 2026-11-14,GM8BPQ,0.40.0,IO68vl,sc,0,0,0,0,,,RIG2,1,1,2,bbs-store,size-verified,daily/2026-11-14/GM8BPQ.txt
 2026-11-14,M7TAW,0.42.0,IO91ma,sc,20,20,0,1,,,AUD2 RIG1,22,8,495,bbs-store,size-verified,daily/2026-11-14/M7TAW.txt
