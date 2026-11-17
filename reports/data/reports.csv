@@ -204,3 +204,4 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-15,M0NVK,0.37.0,IO90hr,sdrconnect,5,0,5,5,,,,19,15,627,pasted,none,daily/2026-11-15/M0NVK.txt
 2026-11-15,M7TAW,0.42.0,IO91ma,sc,5,3,0,4,0,12,,22,14,176,bbs-store,size-verified,daily/2026-11-15/M7TAW.txt
 2026-11-15,M9TWM,0.42.0,IO93fj,m9twm-1.tunnel.ubersdr.org,9,0,8,1,0,12,,20,14,333,bbs-store,size-verified,daily/2026-11-15/M9TWM.txt
+2026-11-16,EI7KX,0.41.0,IO83jj,nope.tunnel.ubersdr.org,9,9,0,0,,,,22,16,620,bbs-store,size-verified,daily/2026-11-16/EI7KX.txt
