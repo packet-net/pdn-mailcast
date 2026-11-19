@@ -1,0 +1,53 @@
+Title: MCR GB7NOT 2026-11-16
+From: GB7NOT
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 6320BMGB7NOT
+Source: GB7RDG's LinBPQ mail store, message 5083 (m_005083.mes), copied 2026-11-19
+Check: stored size matches the BBS's index
+
+R:261117/1319Z 16157@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261117/1314Z 11055@GB7BWR.#45.GBR.EURO LinBPQ6.0.25
+R:261117/0000Z 2786@GB7NOT.#23.GBR.EU LinBPQ6.0.26
+
+MCR1 0.43.0 IO92kx sc 16/15 77:RIG77 0 1 0 1
+0030 - 0 - - IU+PU - - - - - - GM8BPQ
+0130 - 0 - - IU+PU - - - - - - GM8BPQ
+0230 - 0 - - IU+PU - - - - - - GM8BPQ
+0330 - 0 - - IU+PU - - - - - - GM8BPQ
+0430 - 0 - - IU+PU - - - - - - GM8BPQ
+0530 - 0 - - IU+PU - - - - - - GM8BPQ
+0630 - 0 - - IU+PU - - - - - - GM8BPQ
+0730 - 0 - - IU+PU - - - - - - GM8BPQ
+08 W3 14 8 +0.8 IU+PU 1 - 0.1 0.22 - p M0LTE
+0830 - 0 4 -19.7 IU+PU 1 - 0.36 0.14 - p GM8BPQ
+09 W4 112 1 -0.3 IU+PG 1 - 0.37 0.43 - b M0LTE
+0930 - 0 1 -19.7 IU+PG 1 - 0.39 0.46 - p GM8BPQ
+10 W3 18 8 -0.4 IU+PG 2 1.6/-5 0.67 0.27 240 p M0LTE
+1030 - 0 2 -20.2 IU+PG 1 - 0.36 0.32 - p GM8BPQ
+11 W4 94 7 -0.9 IU+PG 2 1.5/-21 0.14 0.21 230 p M0LTE
+1130 - 0 3 -19.7 IU+PG 1 - 0.07 0.28 - p GM8BPQ
+12 W3 19 10 -1.5 IU+PU 1 - 0.18 0.11 - p M0LTE
+1230 - 0 -2 -20.8 IU+PU 1 - 0.26 0.72 - p GM8BPQ
+13 W4 100 2 -0.8 IU+PG 2 - 0.18 0.11 - p M0LTE
+1330 - 0 - - IU+PG - - - - - - GM8BPQ
+14 W3 18 12 -0.7 IU+PU 2 1.8/-11 0.46 0.16 269 p M0LTE
+1430 - 0 -3 -21.5 IU+PU 2 1.8/-18 0.25 0.23 332 p GM8BPQ
+15 W4 135 7 -0.6 IU+PG 1 - 0.28 0.38 - p M0LTE
+1530 - 0 8 -20.9 IU+PG 1 - 0.39 0.2 - p GM8BPQ
+16 W3 7 6 -1.0 IU+PU 2 2.0/-20 0.22 0.25 309 p M0LTE
+1630 - 0 - - IU+PU - - - - - - GM8BPQ
+17 - 0 - - IU+PU - - - - - - M0LTE
+1730 - 0 - - IU+PU - - - - - - GM8BPQ
+18 - 0 - - IU+PU - - - - - - M0LTE
+1830 - 0 - - IU+PU - - - - - - GM8BPQ
+19 - 0 - - IU+PU - - - - - - M0LTE
+1930 - 0 - - IU+PU - - - - - - GM8BPQ
+20 - 0 - - IU+PU - - - - - - M0LTE
+2030 - 0 - - IU+PU - - - - - - GM8BPQ
+21 - 0 - - IU+PU - - - - - - M0LTE
+2130 - 0 - - IU+PU - - - - - - GM8BPQ
+2230 - 0 - - IU+PU - - - - - - GM8BPQ
+2330 - 0 - - IU+PU - - - - - - GM8BPQ
+S GM8BPQ 24 7 0 0 2 332 0
+S M0LTE 14 9 517 16 7 254 0
