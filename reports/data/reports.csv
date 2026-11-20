@@ -209,16 +209,21 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-16,GB7NOT,0.43.0,IO92kx,sc,16,15,0,1,0,1,RIG77,38,16,517,bbs-store,size-verified,daily/2026-11-16/GB7NOT.txt
 2026-11-16,GM4CXF,0.42.0,IO75qn,sc,10,10,0,0,,,,22,16,1677,bbs-store,size-verified,daily/2026-11-16/GM4CXF.txt
 2026-11-16,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,HOOK1 RIG29,14,11,74,bbs-store,size-verified,daily/2026-11-16/GM8BPQ.txt
+2026-11-16,M7TAW,0.42.0,IO91ma,sc,20,22,0,0,,,,22,16,639,bbs-store,size-verified,daily/2026-11-16/M7TAW.txt
+2026-11-16,M9TWM,0.42.0,IO93fj,m9twm-1.tunnel.ubersdr.org,7,0,7,4,0,1,,22,14,352,bbs-store,size-verified,daily/2026-11-16/M9TWM.txt
 2026-11-17,EI7KX,0.41.0,IO83jj,nope.tunnel.ubersdr.org,10,8,0,0,,,,22,12,623,bbs-store,size-verified,daily/2026-11-17/EI7KX.txt
 2026-11-17,G7TAJ,0.43.0,IO81le,sc,2,0,3,1,0,1,,22,9,82,bbs-store,size-verified,daily/2026-11-17/G7TAJ.txt
 2026-11-17,GB7NOT,0.43.0,IO92kx,sc,11,11,0,0,,,RIG60,30,12,587,bbs-store,size-verified,daily/2026-11-17/GB7NOT.txt
 2026-11-17,GM4CXF,0.43.0,IO75qn,sc,8,8,0,0,,,,22,12,811,bbs-store,size-verified,daily/2026-11-17/GM4CXF.txt
 2026-11-17,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,AUD3 RIG22,15,5,12,bbs-store,size-verified,daily/2026-11-17/GM8BPQ.txt
+2026-11-17,M7TAW,0.42.0,IO91ma,sc,5,5,0,0,,,AUD6,22,7,311,bbs-store,size-verified,daily/2026-11-17/M7TAW.txt
 2026-11-18,EI7KX,0.41.0,IO83jj,nope.tunnel.ubersdr.org,20,21,1,4,,,,22,15,1000,bbs-store,size-verified,daily/2026-11-18/EI7KX.txt
 2026-11-18,G7TAJ,0.43.0,IO81le,sc,5,0,3,0,0,1,,22,11,169,bbs-store,size-verified,daily/2026-11-18/G7TAJ.txt
 2026-11-18,GB7NOT,0.43.0,IO92kx,sc,13,13,0,3,0,1,RIG44,22,15,461,bbs-store,size-verified,daily/2026-11-18/GB7NOT.txt
 2026-11-18,GM4CXF,0.43.0,IO75qn,sc,21,20,0,3,0,1,,22,16,1370,bbs-store,size-verified,daily/2026-11-18/GM4CXF.txt
 2026-11-18,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,AUD253 RIG31,22,10,12,bbs-store,size-verified,daily/2026-11-18/GM8BPQ.txt
+2026-11-18,M7TAW,0.43.0,IO91ma,sc,2,2,0,1,,,AUD2,22,8,133,bbs-store,size-verified,daily/2026-11-18/M7TAW.txt
 2026-11-19,EI7KX,0.43.0,IO83jj,nope.tunnel.ubersdr.org,3,3,0,10,0,2,,22,14,732,bbs-store,size-verified,daily/2026-11-19/EI7KX.txt
 2026-11-19,GM4CXF,0.43.0,IO75qn,sc,6,7,0,10,0,1,,22,14,926,bbs-store,size-verified,daily/2026-11-19/GM4CXF.txt
 2026-11-19,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,RIG29,14,8,20,bbs-store,size-verified,daily/2026-11-19/GM8BPQ.txt
+2026-11-19,M7TAW,0.43.0,IO91ma,sc,4,4,0,5,,,,22,3,87,bbs-store,size-verified,daily/2026-11-19/M7TAW.txt
