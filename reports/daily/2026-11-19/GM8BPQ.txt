@@ -1,0 +1,26 @@
+Title: MCR GM8BPQ 2026-11-19
+From: GM8BPQ
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 63237FGM8BPQ
+Source: GB7RDG's LinBPQ mail store, message 5103 (m_005103.mes), copied 2026-11-20
+Check: stored size matches the BBS's index
+
+R:261119/2130Z 2015@GB7BPQ.#76.GBR.EU LinBPQ6.0.26
+
+MCR1 0.43.0 IO68vl sc 0/0 29:RIG29 0 0
+08 - 0 -6 +2.7 IU+PU 2 2.0/-10 0.62 0.41 375 p
+09 - 0 - - IU+PU
+10 - 0 -4 +3.0 IU+PU 3 1.0/-5 0.66 0.52 244 p
+11 - 0 -6 +2.3 IU+PU 2 0.8/-4 0.37 0.59 203 p
+12 - 0 - - IU+PU
+13 - 0 -4 +2.2 IU+PU 1 - 0.42 0.62 - p
+14 - 0 - - IU+PU
+15 W3 6 -3 +2.3 IU+PU 1 - 0.28 0.36 - p
+16 - 0 -2 +2.1 IU+PU 1 - 0.43 0.41 - p
+17 W3 6 -4 +2.3 IU+PU 1 - 0.36 0.43 - p
+18 W3 8 -10 +2.3 IU+PU 1 - 0.25 0.39 - p
+19 - 0 - - IU+PU
+20 - 0 - - IU+PU
+21 - 0 - - IU+PU
+S M0LTE 14 8 20 0 -4 244 0
