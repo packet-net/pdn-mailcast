@@ -217,5 +217,8 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-18,EI7KX,0.41.0,IO83jj,nope.tunnel.ubersdr.org,20,21,1,4,,,,22,15,1000,bbs-store,size-verified,daily/2026-11-18/EI7KX.txt
 2026-11-18,G7TAJ,0.43.0,IO81le,sc,5,0,3,0,0,1,,22,11,169,bbs-store,size-verified,daily/2026-11-18/G7TAJ.txt
 2026-11-18,GB7NOT,0.43.0,IO92kx,sc,13,13,0,3,0,1,RIG44,22,15,461,bbs-store,size-verified,daily/2026-11-18/GB7NOT.txt
+2026-11-18,GM4CXF,0.43.0,IO75qn,sc,21,20,0,3,0,1,,22,16,1370,bbs-store,size-verified,daily/2026-11-18/GM4CXF.txt
 2026-11-18,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,AUD253 RIG31,22,10,12,bbs-store,size-verified,daily/2026-11-18/GM8BPQ.txt
 2026-11-19,EI7KX,0.43.0,IO83jj,nope.tunnel.ubersdr.org,3,3,0,10,0,2,,22,14,732,bbs-store,size-verified,daily/2026-11-19/EI7KX.txt
+2026-11-19,GM4CXF,0.43.0,IO75qn,sc,6,7,0,10,0,1,,22,14,926,bbs-store,size-verified,daily/2026-11-19/GM4CXF.txt
+2026-11-19,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,RIG29,14,8,20,bbs-store,size-verified,daily/2026-11-19/GM8BPQ.txt
