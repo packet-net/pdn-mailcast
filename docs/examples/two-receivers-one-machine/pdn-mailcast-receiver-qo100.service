@@ -1,0 +1,40 @@
+# A second pdn-mailcast receiver on the same machine, with its own config file and its own
+# state. It is the packaged unit (/lib/systemd/system/pdn-mailcast-receiver.service) with the
+# three paths changed: the config file, the state directory and the directory the status page
+# may write the config back to.
+[Unit]
+Description=pdn-mailcast receiver (QO-100): mailcast bulletins into your BBS
+After=network-online.target sound.target time-sync.target
+Wants=network-online.target time-sync.target
+ConditionPathExists=/etc/pdn-mailcast-qo100/receiver.json
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pdn-mailcast-receiver --config /etc/pdn-mailcast-qo100/receiver.json
+Restart=on-failure
+RestartSec=10
+RestartPreventExitStatus=2
+KillMode=mixed
+TimeoutStopSec=400
+User=pdn-mailcast
+Group=pdn-mailcast
+StateDirectory=pdn-mailcast-qo100
+StateDirectoryMode=0750
+SupplementaryGroups=audio
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/pdn-mailcast-qo100
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+LockPersonality=true
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

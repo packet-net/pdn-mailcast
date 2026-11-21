@@ -1,0 +1,14 @@
+web: status page at http://127.0.0.1:8130/ and on the local network
+discovery: announcing this receiver on the network as "79447ba84249 1cd7._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=2 (USB dial 10489.630 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/bench/receiver/stations.json lists no stations
+slots: G8BPQ's slots are every hour at 58 minutes past (added by hand)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: G8BPQ
+config: read /etc/bench/receiver/receiver.json
+config: rig retuning off (no "rig"), hooks off (no "hooks"), daily report off (no "feedback")
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=2 at 48000 Hz, the radio on USB dial 10489.630 MHz
+audio: between slots until 18:56 UTC, ready for the 18:58 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+audio: decoding for the 18:58 UTC slot
+tone: 1749.2 Hz, -50.8 Hz from 1800 Hz, SNR 21.1 dB in 3 kHz, 9 s
+channel: the 18:58 UTC slot, from the probe, measured in 0.6 s: Signal to noise 20.3 dB, heard 55.3 Hz low. This is not a skywave path, so there is no height or multipath to measure.

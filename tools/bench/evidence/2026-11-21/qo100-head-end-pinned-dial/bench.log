@@ -1,0 +1,5 @@
+18:23:05 bench: scenario qo100-head-end-pinned-dial; slot at 18:27 UTC
+18:23:07 bench: pdn-soundmodem tx started from docs/examples/qo100-head-end/soundmodem.json with .dialFrequency=2400130000
+18:23:12 bench: head end G8BPQ started from docs/examples/qo100-head-end/headend.json
+18:23:12 bench: receiver receiver started from docs/examples/qo100-receiver-sound-card/receiver.json and docs/examples/qo100-receiver-sound-card/stations.json
+18:36:03 bench: done

@@ -1,0 +1,24 @@
+{
+  "callsign": "G8BPQ",
+  "slot": {
+    "minute": 58,
+    "everyMinutes": 60
+  },
+  "station": {
+    "apiUrl": "http://127.0.0.1:8107/",
+    "apiKey": "bench-api-key",
+    "kissPort": 8112,
+    "subChannel": 4,
+    "mode": "ms110d-wn4"
+  },
+  "intake": {},
+  "frequencyHz": 10489631800,
+  "sideband": "usb",
+  "locator": "IO68vl",
+  "ionosphere": {
+    "stations": []
+  },
+  "pskReporter": {
+    "enabled": false
+  }
+}

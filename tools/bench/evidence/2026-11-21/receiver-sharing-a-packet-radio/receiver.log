@@ -1,0 +1,35 @@
+web: status page at http://127.0.0.1:8130/ and on the local network
+discovery: announcing this receiver on the network as "c75a15f2f118 2ece._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on soundmodem (USB dial 7.052 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/bench/receiver/stations.json lists M0LTE
+slots: M0LTE's slots are every hour at 9 minutes past (from the stations file)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: M0LTE
+config: read /etc/bench/receiver/receiver.json
+config: retuning through pdn-soundmodem's receive window on ("retune"), hooks off (no "hooks"), daily report off (no "feedback")
+retune: the radio is retuned through pdn-soundmodem's receive window on 127.0.0.1:8107 to dial 7.052 MHz for each slot; pdn-soundmodem holds its own transmitting meanwhile
+audio: pdn-soundmodem on 127.0.0.1:8107, its channel at 12000 Hz, brought up to 48000 Hz, the radio on USB dial 7.0501 MHz, as pdn-soundmodem says ("dialKHz", 7.052 MHz, is not used while it does), the signal's centre at 3700 Hz in its audio; that is outside the 1000 to 2000 Hz a radio's own filter usually passes whole, which is fine for a Flex (pdn-soundmodem opens its filter for it) or an SDR, but a radio on a sound card needs its filter open from 2250 to 5150 Hz. Its audio is moved to 1800 Hz here, where the usual dial puts the signal
+audio: pdn-soundmodem's radio is on USB dial 7.052 MHz now, the signal's centre at 1800 Hz in its audio
+retune: tuned to 7.052 MHz through pdn-soundmodem's receive window for the 18:09 UTC slot until 18:21 UTC; pdn-soundmodem holds its transmitting
+tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 84.4 dB in 3 kHz, 10 s
+slot: 1 frame heard on 1200 bps (WN4)
+directory for 2026-11-21: 3 bulletins in rotation, sent on 1200 bps (WN4), signed by M0LTE
+slots: M0LTE's directory gives its slots as every hour at 9 minutes past; using that instead of the stations file's
+store: bulletin 18053_BENCH (7b12e74c73f040d4) is complete, waiting for its station's details
+bulletin complete: 18053_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
+store: bulletin 18053_BENCH (7b12e74c73f040d4) delivered with the envelope of M0LTE: its envelope arrived
+bulletin released to the outbox: 18053_BENCH
+bbs: Connection refused. Trying again in 30 s.
+store: bulletin 18052_BENCH (4256716e31f7ad59) delivered with the envelope of M0LTE: its envelope arrived
+bulletin complete: 18052_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
+store: bulletin 18051_BENCH (b03901bf7f41f151) delivered with the envelope of M0LTE: its envelope arrived
+bulletin complete: 18051_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
+bbs: Connection refused. Trying again in 1 min.
+retune: ending the 18:09 UTC slot early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 61 s
+retune: gave pdn-soundmodem's receive window back; it puts its radio back, now on 7.0501 MHz
+audio: pdn-soundmodem's radio is on USB dial 7.0501 MHz now, the signal's centre at 3700 Hz in its audio, moved to 1800 Hz here
+bbs: Connection refused. Trying again in 2 min.
+slot: the 18:09 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 84 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
+channel: the 18:09 UTC slot, from the probe and 3 of 3 bursts, measured in 1.4 s: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed). From the bursts: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed).
+bbs: Connection refused. Trying again in 5 min.
+bbs: Connection refused. Trying again in 10 min.

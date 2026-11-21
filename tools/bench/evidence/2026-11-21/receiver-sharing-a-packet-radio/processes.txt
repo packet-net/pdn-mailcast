@@ -1,0 +1,6 @@
+   1035 00:00:04  8468 rigctld -m 1 -t 4532
+   1033 00:03:28 129068 python3 /repo/tools/bench/air.py --log /out/air.jsonl --tx /run/bench/tx.out@7052300 --rx /run/bench/rx.in@rig:127.0
+   1031 00:03:19 150604 pdn-soundmodem --config /etc/bench/tx-soundmodem.json
+   1031 00:06:22 155964 pdn-soundmodem --config /etc/bench/rx-soundmodem.json
+   1025 00:00:05 120972 pdn-mailcast-headend --config /etc/bench/headend.json
+   1025 00:01:02 232096 pdn-mailcast-receiver --config /etc/bench/receiver/receiver.json

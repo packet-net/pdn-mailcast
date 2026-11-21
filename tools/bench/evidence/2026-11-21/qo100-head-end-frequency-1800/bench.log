@@ -1,0 +1,5 @@
+18:23:04 bench: scenario qo100-head-end-frequency-1800; slot at 18:27 UTC
+18:23:06 bench: pdn-soundmodem tx started from docs/examples/qo100-head-end/soundmodem.json with .modems[0] |= (del(.rfFrequency) | .frequency=1800)
+18:23:12 bench: head end G8BPQ started from docs/examples/qo100-head-end/headend.json
+18:23:12 bench: receiver receiver started from docs/examples/qo100-receiver-sound-card/receiver.json and docs/examples/qo100-receiver-sound-card/stations.json
+18:36:02 bench: done

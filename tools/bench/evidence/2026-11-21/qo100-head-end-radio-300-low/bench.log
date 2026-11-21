@@ -1,0 +1,5 @@
+18:54:04 bench: scenario qo100-head-end-radio-300-low; slot at 18:58 UTC
+18:54:06 bench: pdn-soundmodem tx started from docs/examples/qo100-head-end/soundmodem.json
+18:54:11 bench: head end G8BPQ started from docs/examples/qo100-head-end/headend.json
+18:54:12 bench: receiver receiver started from docs/examples/qo100-receiver-sound-card/receiver.json and docs/examples/qo100-receiver-sound-card/stations.json
+19:07:02 bench: done

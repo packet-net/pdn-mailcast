@@ -1,0 +1,5 @@
+18:41:03 bench: scenario qo100-head-end-faster-soundmodem-only; slot at 18:45 UTC
+18:41:05 bench: pdn-soundmodem tx started from docs/examples/qo100-head-end/soundmodem.json with .modems[0].mode="ms110d-wn6"
+18:41:10 bench: head end G8BPQ started from docs/examples/qo100-head-end/headend.json
+18:41:10 bench: receiver receiver started from docs/examples/qo100-receiver-sound-card/receiver.json and docs/examples/qo100-receiver-sound-card/stations.json
+18:54:00 bench: done

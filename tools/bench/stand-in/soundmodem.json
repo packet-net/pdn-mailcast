@@ -1,0 +1,12 @@
+{
+  "device": "plughw:CARD=Device,DEV=0",
+  "sideband": "usb",
+  "kissPort": 8205,
+  "modems": [
+    { "subChannel": 4, "mode": "ms110d-wn4", "port": 8112, "rfFrequency": 7053800,
+      "maxBurstSeconds": 18, "burstGatherSeconds": 0.5,
+      "identify": { "callsign": "M0LTE", "intervalMinutes": 10 } }
+  ],
+  "api": { "key": "change-me" },
+  "waterfall": { "port": 8108 }
+}

@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Rust build output for tools/raptorq-vectors
 tools/raptorq-vectors/target/
+
+# The examples bench keeps the logs of its runs as evidence.
+!tools/bench/evidence/**/*.log
