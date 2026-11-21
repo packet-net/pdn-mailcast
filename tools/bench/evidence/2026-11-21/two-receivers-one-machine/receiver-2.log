@@ -1,0 +1,15 @@
+web: status page at http://127.0.0.1:8131/ and on the local network
+discovery: announcing this receiver on the network as "de67798bc60f 8198-p8131._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8131)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=5 (USB dial 10489.630 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/bench/receiver-2/stations.json lists no stations
+slots: G8BPQ's slots are every hour at 45 minutes past (added by hand)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: G8BPQ
+config: read /etc/bench/receiver-2/receiver.json
+config: rig retuning off (no "rig"), hooks off (no "hooks"), daily report off (no "feedback")
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=5 at 48000 Hz, the radio on USB dial 10489.630 MHz
+audio: between slots until 18:43 UTC, ready for the 18:45 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+audio: decoding for the 18:45 UTC slot
+audio: the 18:45 UTC slot is over early: nothing heard from G8BPQ by 18:48:30 (no tone, probe or frame)
+audio: between slots until 19:43 UTC, ready for the 19:45 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+slot: the 18:45 UTC slot ended: nothing heard; window ended early at 18:48:41 UTC, as nothing was heard by then

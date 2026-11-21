@@ -1,0 +1,12 @@
+{
+  "device": "plughw:CARD=Device,DEV=0",
+  "sideband": "usb",
+  "dialFrequency": 7050100,
+  "rig": { "rigctld": "127.0.0.1:4532" },
+  "ptt": { "type": "rigctld" },
+  "modems": [
+    { "subChannel": 0, "mode": "bpsk300", "rfFrequency": 7051600 }
+  ],
+  "api": { "key": "change-me" },
+  "waterfall": { "port": 8107 }
+}

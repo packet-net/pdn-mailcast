@@ -1,0 +1,18 @@
+{
+  "device": "pipe:/run/bench/rx.in,/run/bench/rx.out",
+  "sideband": "usb",
+  "dialFrequency": 7052000,
+  "modems": [
+    {
+      "subChannel": 0,
+      "mode": "bpsk300",
+      "frequency": 1500
+    }
+  ],
+  "api": {
+    "key": "bench-api-key"
+  },
+  "waterfall": {
+    "port": 8107
+  }
+}

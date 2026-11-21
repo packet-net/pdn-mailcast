@@ -1,0 +1,35 @@
+web: status page at http://127.0.0.1:8130/ and on the local network
+discovery: announcing this receiver on the network as "34256d342f25 f07c._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=0 (USB dial 10489.630 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/bench/receiver/stations.json lists no stations
+slots: G8BPQ's slots are every hour at 58 minutes past (added by hand)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: G8BPQ
+config: read /etc/bench/receiver/receiver.json
+config: rig retuning off (no "rig"), hooks off (no "hooks"), daily report off (no "feedback")
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=0 at 48000 Hz, the radio on USB dial 10489.630 MHz
+audio: between slots until 18:56 UTC, ready for the 18:58 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+audio: decoding for the 18:58 UTC slot
+tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 95.7 dB in 3 kHz, 10 s
+slot: 1 frame heard on 1200 bps (WN4)
+store: pinned G8BPQ's key 78b6d83bac4d0e1d, learnt from its first signed directory; its bulletins are delivered from now on
+directory for 2026-11-21: 3 bulletins in rotation, sent on 1200 bps (WN4), signed by G8BPQ
+listen-for: G8BPQ was heard (its own signed directory); no longer needed, its own slots are used from now on
+store: bulletin 18542_BENCH (5214619838b0832e) is complete, waiting for its station's details
+bulletin complete: 18542_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
+store: bulletin 18543_BENCH (77bb1f695e700f12) delivered with the envelope of G8BPQ: its envelope arrived
+bulletin complete: 18543_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
+bbs: Connection refused. Trying again in 30 s.
+store: bulletin 18541_BENCH (a392f8464b4285e6) is complete, waiting for its station's details
+bulletin complete: 18541_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
+store: bulletin 18541_BENCH (a392f8464b4285e6) delivered with the envelope of G8BPQ: its envelope arrived
+bulletin released to the outbox: 18541_BENCH
+store: bulletin 18542_BENCH (5214619838b0832e) delivered with the envelope of G8BPQ: its envelope arrived
+bulletin released to the outbox: 18542_BENCH
+bbs: Connection refused. Trying again in 1 min.
+audio: the 18:58 UTC slot is over early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 62 s
+audio: between slots until 19:56 UTC, ready for the 19:58 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+bbs: Connection refused. Trying again in 2 min.
+slot: the 18:58 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 96 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
+channel: the 18:58 UTC slot, from the probe and 3 of 3 bursts, measured in 1.2 s: Signal to noise 40.9 dB, heard 0 Hz high. This is not a skywave path, so there is no height or multipath to measure. From the probe: Signal to noise 66.8 dB, heard 0 Hz high. This is not a skywave path, so there is no height or multipath to measure.
+bbs: Connection refused. Trying again in 5 min.

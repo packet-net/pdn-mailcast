@@ -1,0 +1,38 @@
+pdn-mailcast-headend 0.43.0+0de123a60251f8352e232db12a35894c7dcabf7d starting
+signing: directories are signed with key 78b6d83bac4d0e1d, public key XutAGwspLubu5aH9/ah0KO9dJ6yaoQ9r3QgBTrPnv5Q=
+this station: 7.0538 MHz USB, locator IO91lk in every directory
+advertising: no other stations ("advertise" in the configuration)
+state: /var/lib/pdn-mailcast-headend, file drop /var/lib/pdn-mailcast-headend/drop
+intake: file drop /var/lib/pdn-mailcast-headend/drop, checked every minute
+station: KISS 127.0.0.1:8112, API http://127.0.0.1:8108/, sub-channel 4, ms110d-wn4, bursts up to 60 s
+flex: not configured, so no PA temperature watch and no reference check
+ionosonde: off ("ionosphere"."stations" is empty)
+pskreporter: off ("pskReporter"."enabled" is false)
+schedule: a slot every 60 min, counted from minute 45 past 00:00Z, so at :45 each hour
+carrying: each slot filled to 7.8 min on the air (10 min budget, at most 10 min less 131 s for the clear-channel and carrier waits, and less any lateness), least covered first, each bulletin enough a slot that any 3 slots rebuild it and at most 0.6 K, after 6 K or 36 h only in airtime nothing else wants (the leftover tier), retired after 10 K or 48 h; every slot on ms110d-wn4
+status: http://127.0.0.1:8216/status
+station: broadcast modem set to ms110d-wn4
+receiver: found this machine at http://127.0.0.1:8130/ (on this machine)
+intake: 18411_BENCH from G0ABC to BENCH@WW, 879 octets: Bench bulletin 1
+intake: 18412_BENCH from G0ABC to BENCH@WW, 879 octets: Bench bulletin 2
+intake: 18413_BENCH from G0ABC to BENCH@WW, 879 octets: Bench bulletin 3
+intake (file drop): 3 taken, 0 refused; 3 held
+next slot 2026-11-21 18:45Z; 3 bulletins held
+receiver: found 03efc240ab72 6888 at http://172.17.0.2:8130/ (on the network, version 0.43.0)
+receiver: found ea0eae78ef76 b3a7 at http://172.17.0.3:8130/ (on the network, version 0.43.0)
+receiver: found de67798bc60f 8198-p8131 at http://172.17.0.4:8131/ (on the network, version 0.43.0)
+next slot 2026-11-21 18:45Z (the clock moved)
+carried: 3 normal and 0 bulk bulletins
+slot 2026-11-21 18:45Z: starting at 18:45:00Z, 17 frames for 3 bulletins in 1 bursts on ms110d-wn4, about 1.3 min on the air with the tone and idents
+slot 2026-11-21 18:45Z: station did not tune the rig for the slot: this station has no "rig" section, so there is no rig to tune; "tune" was ignored
+slot 2026-11-21 18:45Z: transmit lease taken for sub-channel 4, 120 s, renewed every 30 s; frames go anyway after waiting 10 s for a clear channel
+slot 2026-11-21 18:45Z: the station is keeping the receive audio from 18:44:00 to 18:48:28Z in /var/lib/pdn-soundmodem/kept-audio/20261121T184400Z-slot-2026-11-21-1845Z
+slot 2026-11-21 18:45Z: calibration tone sent, 10 s at 1500 Hz, then the channel probe (zc255-2400-rrc015-v1, 8 s more)
+slot 2026-11-21 18:45Z: 17 of 17 frames sent in 1 bursts
+slot 2026-11-21 18:45Z: transmit lease released; anything of ours not yet keyed is dropped, and the station sends the closing ident
+slot 2026-11-21 18:45Z: done, 18:45:00 to 18:46:11Z, 17 of 17 frames sent in 1 bursts on ms110d-wn4, 3 bulletins in rotation, tone sent, probe sent, PA max not read, reference not read (no Flex configured)
+slots today (2026-11-21): 1, 1 completed, 0 cut short, 0 skipped
+next slot 2026-11-21 19:45Z; 3 bulletins held
+receiver: de67798bc60f 8198 gave 5 new piece(s) and 6 rebuilt object(s)
+receiver: 03efc240ab72 6888 gave 6 new piece(s) and 6 rebuilt object(s)
+receiver: ea0eae78ef76 b3a7 gave 4 new piece(s) and 4 rebuilt object(s)

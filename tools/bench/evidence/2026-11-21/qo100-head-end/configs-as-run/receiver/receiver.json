@@ -1,0 +1,27 @@
+{
+  "audio": "plughw:CARD=Loopback,DEV=1,SUBDEV=0",
+  "dialKHz": 10489630.0,
+  "listenFor": [
+    {
+      "callsign": "G8BPQ",
+      "minute": 58,
+      "everyMinutes": 60,
+      "frequencyHz": 10489631800,
+      "sideband": "usb"
+    }
+  ],
+  "bbs": {
+    "type": "linBpq",
+    "host": "127.0.0.1",
+    "port": 8011,
+    "login": "Q0CAST",
+    "password": "change-me",
+    "command": "BBS"
+  },
+  "web": {
+    "port": 8130,
+    "lan": true,
+    "password": ""
+  },
+  "stateDirectory": "/var/lib/bench-receiver"
+}
