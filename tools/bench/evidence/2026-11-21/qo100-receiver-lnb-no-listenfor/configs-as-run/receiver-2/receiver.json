@@ -1,0 +1,18 @@
+{
+  "audio": "soundmodem:8109",
+  "lnbHz": 9750012345,
+  "bbs": {
+    "type": "linBpq",
+    "host": "127.0.0.1",
+    "port": 8011,
+    "login": "Q0CAST",
+    "password": "change-me",
+    "command": "BBS"
+  },
+  "web": {
+    "port": 8131,
+    "lan": true,
+    "password": ""
+  },
+  "stateDirectory": "/var/lib/bench-receiver-2"
+}

@@ -1,6 +1,6 @@
 # QO-100 receiver on a sound card
 
-A receiver for a station on QO-100, fed by a sound card: audio from the [QO-100 web SDR](https://eshail.batc.org.uk/nb/) in a browser, or from any receiver you tune by hand. The receiver does not tune anything here; you do.
+A receiver for a station on QO-100, fed by a sound card: audio from the [QO-100 web SDR](https://eshail.batc.org.uk/nb/) in a browser, or from any receiver or SDR program you tune by hand. The receiver does not tune anything here; you do. With your own dish, LNB and RTL-SDR dongle, the [LNB receiver](../qo100-receiver-lnb-rtl-sdr/) tunes itself.
 
 | File | Goes in |
 |---|---|
@@ -14,7 +14,7 @@ Change the sound card, the BBS login, and the station under `listenFor`: its cal
 | `frequencyHz` | 10489631800 |
 | `dialKHz`, and the web SDR's dial | 10489630.0, that is 10489.630000 MHz USB |
 
-**You need `stations.json`.** Without it the receiver checks `dialKHz` against the station it ships with, M0LTE on 40 m, and will not start:
+**You need `stations.json`.** Without it the receiver checks `dialKHz` against the station it ships with, M0LTE on 40 m, and will not start (the line goes on):
 
 ```
 "dialKHz" 10489630 puts the signal's centre at -10482576200 Hz in your audio, outside the 1000 to 2000 Hz this receiver can use
@@ -24,7 +24,7 @@ The empty list here replaces the shipped one for this receiver, so it follows on
 
 ## Check it
 
-The journal at start-up:
+The journal at start-up (the first line goes on):
 
 ```
 pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Device,DEV=0 (USB dial 10489.630 MHz)
@@ -32,7 +32,7 @@ stations: /etc/pdn-mailcast/stations.json lists no stations
 slots: G8BPQ's slots are every hour at 15 minutes past (added by hand)
 ```
 
-And at the first slot it hears:
+And at the first slot it hears (the first line goes on):
 
 ```
 tone: 1800.0 Hz, 0.0 Hz from 1800 Hz
@@ -44,7 +44,7 @@ Between slots a sound card receiver rests, and decodes only while its status pag
 
 ## What was seen
 
-Hearing the [QO-100 head end](../qo100-head-end/) example: tone at 1800.0 Hz, 17 of 17 frames, 3 of 3 bulletins complete, and the receiver stopped decoding by itself about two and a half minutes after the slot began.
+Hearing the [QO-100 head end](../qo100-head-end/) example, with the web SDR's part played by a receiver on a 10489.630000 MHz USB dial: tone at 1800.0 Hz, 17 of 17 frames, 3 of 3 bulletins complete, and the receiver stopped decoding by itself a little over two minutes after the slot began.
 
 ## Not tested here
 

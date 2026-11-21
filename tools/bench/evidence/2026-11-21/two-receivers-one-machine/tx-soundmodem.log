@@ -14,33 +14,33 @@ kiss tcp: 127.0.0.1:8112 (modem 4 ms110d-wn4 only, as nibble 0)
 audio: pipe in=/run/bench/tx.in out=/run/bench/tx.out 48000 Hz -> 48000 Hz
 api: keep receive audio over http://127.0.0.1:8108/api/keepaudio (key required), kept under /var/lib/pdn-soundmodem/kept-audio for 30 days
 tx test: ready - two-tone 700+1900 Hz or a single tone, 5 s by default, capped at 30 s
-kiss[8112] 127.0.0.1:43740 connected - 1 client (modem 4 only)
+kiss[8112] 127.0.0.1:47450 connected - 1 client (modem 4 only)
 modem 4: SETHW -> ms110d-wn4, short interleaver
-kiss[8112] 127.0.0.1:43740 disconnected - 0 clients (modem 4 only)
-kiss[8112] 127.0.0.1:42104 connected - 1 client (modem 4 only)
-tx lease: sub-channel 4 (ms110d-wn4) holds the transmitter until 2026-11-21T18:47:00Z; transmissions from other sub-channels are refused until it ends
-keep audio: keeping 2026-11-21T18:44:00Z to 2026-11-21T18:48:28Z as 20261121T184400Z-slot-2026-11-21-1845Z
+kiss[8112] 127.0.0.1:47450 disconnected - 0 clients (modem 4 only)
+kiss[8112] 127.0.0.1:52372 connected - 1 client (modem 4 only)
+tx lease: sub-channel 4 (ms110d-wn4) holds the transmitter until 2026-11-21T20:07:00Z; transmissions from other sub-channels are refused until it ends
+keep audio: keeping 2026-11-21T20:04:00Z to 2026-11-21T20:08:28Z as 20261121T200400Z-slot-2026-11-21-2005Z
 tx test: single tone 1500 Hz (FM Bessel null at 3.6 kHz deviation), 10.0 s, then after 1.5 s the zc255-2400-rrc015-v1 probe at 1500 Hz, 6.5 s, peak level 0.80
 tx test: done, 18.0 s on air
 id[4] M0LTE in CW
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.9s waiting for the channel
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 20.2s (16.2s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 36.5s (32.5s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 36.5s (32.5s behind our own transmissions)
-tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 36.5s (32.5s behind our own transmissions)
-kiss[8112] 127.0.0.1:42104 disconnected - 0 clients (modem 4 only)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 3.4s waiting for the channel
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 19.7s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 36.4s (32.5s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 36.4s (32.5s behind our own transmissions)
+tx[4] ms110d-wn4 M0LTE>MCAST 287 bytes  held 36.4s (32.5s behind our own transmissions)
+kiss[8112] 127.0.0.1:52372 disconnected - 0 clients (modem 4 only)
 id[4] M0LTE in CW
-tx lease: sub-channel 4 (ms110d-wn4) released the transmitter after 1m15s; 0 transmissions from others refused; normal service resumes
-keep audio: wrote /var/lib/pdn-soundmodem/kept-audio/20261121T184400Z-slot-2026-11-21-1845Z (268 s, busy in 0 of 2680 looks)
+tx lease: sub-channel 4 (ms110d-wn4) released the transmitter after 1m14s; 0 transmissions from others refused; normal service resumes
+keep audio: wrote /var/lib/pdn-soundmodem/kept-audio/20261121T200400Z-slot-2026-11-21-2005Z (268 s, busy in 0 of 2680 looks)

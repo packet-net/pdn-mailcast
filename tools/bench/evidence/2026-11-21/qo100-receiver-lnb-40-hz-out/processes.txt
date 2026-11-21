@@ -1,0 +1,6 @@
+    778 00:04:46 128152 python3 /repo/tools/bench/air.py --log /out/air.jsonl --tx /run/bench/tx.out@432130300+10057500000 --rx alsa:plughw:
+    776 00:02:30 182880 pdn-soundmodem --config /etc/bench/tx-soundmodem.json
+    776 00:00:43 90008 pdn-soundmodem --config /etc/bench/rx-soundmodem.json
+    770 00:00:04 107248 pdn-mailcast-headend --config /etc/bench/headend.json
+    770 00:00:25 224344 pdn-mailcast-receiver --config /etc/bench/receiver/receiver.json
+    770 00:01:03 194512 pdn-mailcast-receiver --config /etc/bench/receiver-2/receiver.json

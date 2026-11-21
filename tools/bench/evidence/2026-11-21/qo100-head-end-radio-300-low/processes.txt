@@ -1,4 +1,6 @@
-    777 00:02:17 112600 python3 /repo/tools/bench/air.py --log /out/air.jsonl --tx /run/bench/tx.out@10489630000 --rx alsa:plughw:CARD=Loopb
-    775 00:02:28 145412 pdn-soundmodem --config /etc/bench/tx-soundmodem.json
-    770 00:00:04 117764 pdn-mailcast-headend --config /etc/bench/headend.json
-    770 00:00:28 166416 pdn-mailcast-receiver --config /etc/bench/receiver/receiver.json
+    777 00:04:35 120828 python3 /repo/tools/bench/air.py --log /out/air.jsonl --tx /run/bench/tx.out@432130000+10057500000 --rx alsa:plughw:
+    775 00:02:30 181964 pdn-soundmodem --config /etc/bench/tx-soundmodem.json
+    775 00:00:42 93596 pdn-soundmodem --config /etc/bench/rx-soundmodem.json
+    770 00:00:03 106780 pdn-mailcast-headend --config /etc/bench/headend.json
+    770 00:00:28 147360 pdn-mailcast-receiver --config /etc/bench/receiver/receiver.json
+    770 00:00:49 119700 pdn-mailcast-receiver --config /etc/bench/receiver-2/receiver.json

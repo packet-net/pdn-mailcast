@@ -1,33 +1,36 @@
 web: status page at http://127.0.0.1:8130/ and on the local network
-discovery: announcing this receiver on the network as "03efc240ab72 6888._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
-pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=2 (USB dial 10489.630 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+discovery: announcing this receiver on the network as "be48ba539b98 49eb._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=0 (USB dial 10489.630 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
 stations: /etc/bench/receiver/stations.json lists no stations
-slots: G8BPQ's slots are every hour at 45 minutes past (added by hand)
+slots: G8BPQ's slots are every hour at 18 minutes past (added by hand)
 config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
 config: frames are also accepted from the stations this receiver knows of: G8BPQ
 config: read /etc/bench/receiver/receiver.json
 config: rig retuning off (no "rig"), hooks off (no "hooks"), daily report off (no "feedback")
-audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=2 at 48000 Hz, the radio on USB dial 10489.630 MHz
-audio: between slots until 18:43 UTC, ready for the 18:45 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
-audio: decoding for the 18:45 UTC slot
-tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 83.0 dB in 3 kHz, 10 s
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=0 at 48000 Hz, the radio on USB dial 10489.630 MHz
+audio: between slots until 20:16 UTC, ready for the 20:18 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+update: cannot check for a newer version: Resource temporarily unavailable (packet-net.github.io:443). It tries again every 6 hours, and says nothing more about this until it works
+audio: decoding for the 20:18 UTC slot
+tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 96.4 dB in 3 kHz, 10 s
 slot: 1 frame heard on 1200 bps (WN4)
 store: pinned G8BPQ's key 78b6d83bac4d0e1d, learnt from its first signed directory; its bulletins are delivered from now on
 directory for 2026-11-21: 3 bulletins in rotation, sent on 1200 bps (WN4), signed by G8BPQ
 listen-for: G8BPQ was heard (its own signed directory); no longer needed, its own slots are used from now on
-store: bulletin 18413_BENCH (dde4c51368695fee) is complete, waiting for its station's details
-bulletin complete: 18413_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
-store: bulletin 18412_BENCH (954aafbc3afba68c) delivered with the envelope of G8BPQ: its envelope arrived
-bulletin complete: 18412_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
+store: bulletin 20143_BENCH (bd4198422ca41793) is complete, waiting for its station's details
+bulletin complete: 20143_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
+store: bulletin 20141_BENCH (964a88fe3a4745cd) is complete, waiting for its station's details
+bulletin complete: 20141_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
+store: bulletin 20142_BENCH (eb80bd0a8ea38cff) delivered with the envelope of G8BPQ: its envelope arrived
+bulletin complete: 20142_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
 bbs: Connection refused. Trying again in 30 s.
-store: bulletin 18411_BENCH (c2cace89834d6492) delivered with the envelope of G8BPQ: its envelope arrived
-bulletin complete: 18411_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
-store: bulletin 18413_BENCH (dde4c51368695fee) delivered with the envelope of G8BPQ: its envelope arrived
-bulletin released to the outbox: 18413_BENCH
+store: bulletin 20141_BENCH (964a88fe3a4745cd) delivered with the envelope of G8BPQ: its envelope arrived
+bulletin released to the outbox: 20141_BENCH
+store: bulletin 20143_BENCH (bd4198422ca41793) delivered with the envelope of G8BPQ: its envelope arrived
+bulletin released to the outbox: 20143_BENCH
 bbs: Connection refused. Trying again in 1 min.
-audio: the 18:45 UTC slot is over early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 75 s
-audio: between slots until 19:43 UTC, ready for the 19:45 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+audio: the 20:18 UTC slot is over early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 60 s
+audio: between slots until 21:16 UTC, ready for the 21:18 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+slot: the 20:18 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 96 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
 bbs: Connection refused. Trying again in 2 min.
-slot: the 18:45 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 83 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
-channel: the 18:45 UTC slot, from the probe and 3 of 3 bursts, measured in 1.5 s: Signal to noise 41 dB, heard 0 Hz high. This is not a skywave path, so there is no height or multipath to measure. From the probe: Signal to noise 67.9 dB, heard 0 Hz high. This is not a skywave path, so there is no height or multipath to measure.
+channel: the 20:18 UTC slot, from the probe and 3 of 3 bursts, measured in 1.6 s: Signal to noise 41 dB, heard 0 Hz high. This is not a skywave path, so there is no height or multipath to measure. From the probe: Signal to noise 67.7 dB, heard 0 Hz high. This is not a skywave path, so there is no height or multipath to measure.
 bbs: Connection refused. Trying again in 5 min.

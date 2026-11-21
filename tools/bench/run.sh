@@ -26,9 +26,12 @@ done
 python3 $B/air.py --log $O/air.jsonl $AIR >$O/air.out 2>&1 &
 sleep 2
 
-soundmodem() {   # NAME FILE PATCH: the audio device, the keying and the API key are replaced
-  jq --arg dev "pipe:$R/$1.in,$R/$1.out" --arg key $KEY "$3"' | .device=$dev | del(.captureDevice,.playbackDevice,.alsa)
-     | (if (.ptt.type // "") == "rigctld" then . else del(.ptt) end) | .api.key=$key' $2 >/etc/bench/$1-soundmodem.json
+soundmodem() {   # NAME FILE PATCH: the sound card, the keying and the API key are replaced
+  # An rtltcp: device is left as it is: the air serves it a dongle on the port it names.
+  jq --arg dev "pipe:$R/$1.in,$R/$1.out" --arg key $KEY "$3"' | (if (.device | startswith("rtltcp:")) then . else .device=$dev end)
+     | del(.captureDevice,.playbackDevice,.alsa)
+     | (if (.ptt.type // "") == "rigctld" then . else del(.ptt) end)
+     | (if (.device | startswith("rtltcp:")) then . else .api.key=$key end)' $2 >/etc/bench/$1-soundmodem.json
   pdn-soundmodem --config /etc/bench/$1-soundmodem.json >$O/$1-soundmodem.log 2>&1 &
   say "pdn-soundmodem $1 started from ${2#/repo/}$([ "$3" = . ] || echo " with $3")"
 }
@@ -41,7 +44,9 @@ HEADEND=${HEADEND:-$B/stand-in/headend.json}
 jq --arg key $KEY --argjson minute $MINUTE "$HEADEND_PATCH"' | .station.apiKey=$key | .slot.minute=$minute
    | .slot.everyMinutes=60 | del(.slot.daylight,.intake.fbb,.intake.reports)
    | .ionosphere.stations=[] | .pskReporter.enabled=false' $HEADEND >/etc/bench/headend.json
-pdn-mailcast-headend --check-config --config /etc/bench/headend.json >$O/headend-check.log 2>&1
+if ! pdn-mailcast-headend --check-config --config /etc/bench/headend.json >$O/headend-check.log 2>&1; then
+  say "the head end refused its configuration: see headend-check.log"; exit 1
+fi
 PUBKEY=$(pdn-mailcast-headend --make-key 2>&1 | grep -oE '[A-Za-z0-9+/]{40,}=*' | tail -1)
 CALL=$(jq -r .callsign /etc/bench/headend.json); HZ=$(jq -r .frequencyHz /etc/bench/headend.json)
 mkdir -p /var/lib/pdn-mailcast-headend/drop

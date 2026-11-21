@@ -4,7 +4,7 @@
   "listenFor": [
     {
       "callsign": "G8BPQ",
-      "minute": 27,
+      "minute": 47,
       "everyMinutes": 60,
       "frequencyHz": 10489631800,
       "sideband": "usb"

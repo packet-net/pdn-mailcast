@@ -44,7 +44,7 @@ One slot, with every bulletin completing:
 
 ## Packet frames while the radio is away
 
-pdn-soundmodem holds a frame for 30 seconds, then drops it. In the run above the frame waited 14.5 seconds and was sent. In the long run below, with the radio away for 13 minutes, the same frame was dropped:
+pdn-soundmodem holds a frame for 30 seconds, then drops it. In the run above the frame waited 14.6 seconds and was sent. In the long run below, with the radio away for 13 minutes, the same frame was dropped:
 
 ```
 tx[0] DROPPED G0ABC>BENCH 49 bytes: another service is holding the channel (waited 30s); transmission dropped
@@ -54,10 +54,10 @@ So a connected packet session has to survive on its own retries while the radio 
 
 ## How long the radio is away
 
-The receiver hands the radio back early only when everything in the station's directory is complete and nothing has been heard for a minute. With bulletins too big to finish in one slot, the head end finished sending 1 minute 39 seconds into the slot, and the radio stayed on 7.052 MHz until 12 minutes after the slot's start: 13 minutes away in all. There is no end-of-slot marker for the receiver to go by.
+The receiver hands the radio back early only when everything in the station's directory is complete and nothing has been heard for a minute. With bulletins too big to finish in one slot, the head end finished sending 1 minute 39 seconds into the slot, and the radio stayed on 7.052 MHz until 12 minutes after the slot's start: 13 minutes away in all. Nothing sent in a slot tells a receiver the slot is over ([#285](https://github.com/packet-net/pdn-mailcast/issues/285)).
 
 ## Not tested here
 
-A real radio and rigctld back end (the bench uses Hamlib's dummy rig); your radio accepting the 3250 Hz passband (pdn-soundmodem falls back to the mode's normal width if it will not); delivery to a BBS.
+A real radio and rigctld back end (the bench uses Hamlib's dummy rig); your radio accepting the 3250 Hz passband pdn-soundmodem asks for; delivery to a BBS.
 
 Run it yourself: `tools/bench/bench.sh receiver-sharing-a-packet-radio`, and `receiver-sharing-a-packet-radio-unfinished` for the long case.

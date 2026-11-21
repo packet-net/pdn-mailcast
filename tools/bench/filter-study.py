@@ -36,7 +36,7 @@ def run(job):
     out = wave.open(path, "w"); out.setnchannels(1); out.setsampwidth(2); out.setframerate(RATE)
     out.writeframes((np.clip(y, -1, 1) * 32767).astype("<i2").tobytes()); out.close()
     os.makedirs("/tmp/c-" + tag, exist_ok=True)
-    cfg = json.load(open(sys.argv[2] + "/receiver.json")); cfg["stateDirectory"] = "/tmp/s-" + tag; cfg["web"]["port"] = 20000 + abs(hash(tag)) % 20000
+    cfg = json.load(open(sys.argv[2] + "/receiver.json")); cfg["stateDirectory"] = "/tmp/s-" + tag; cfg.setdefault("web", {})["port"] = 20000 + abs(hash(tag)) % 20000
     json.dump(cfg, open("/tmp/c-%s/receiver.json" % tag, "w")); subprocess.run(["cp", sys.argv[2] + "/stations.json", "/tmp/c-" + tag])
     log = subprocess.run(["pdn-mailcast-receiver", "--decode", path, "--config", "/tmp/c-%s/receiver.json" % tag],
                          capture_output=True, text=True).stdout

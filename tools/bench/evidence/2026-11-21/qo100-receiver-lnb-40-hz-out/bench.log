@@ -1,0 +1,7 @@
+20:14:03 bench: scenario qo100-receiver-lnb-40-hz-out; slot at 20:18 UTC
+20:14:05 bench: pdn-soundmodem tx started from docs/examples/qo100-head-end/soundmodem.json
+20:14:05 bench: pdn-soundmodem rx started from docs/examples/qo100-receiver-lnb-rtl-sdr/soundmodem.json with .waterfall.port=8109 | .kissPort=8305
+20:14:10 bench: head end G8BPQ started from docs/examples/qo100-head-end/headend.json
+20:14:10 bench: receiver receiver started from docs/examples/qo100-receiver-sound-card/receiver.json and docs/examples/qo100-receiver-sound-card/stations.json
+20:14:10 bench: receiver receiver-2 started from docs/examples/qo100-receiver-lnb-rtl-sdr/receiver.json and /usr/share/pdn-mailcast-receiver/stations.json
+20:27:01 bench: done

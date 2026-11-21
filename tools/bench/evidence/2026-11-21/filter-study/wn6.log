@@ -1,31 +1,13 @@
 data level -15.0 dBFS
-no filter          SNR  2.0 dB seed 1: 0 of 45 frames
-no filter          SNR  2.0 dB seed 2: 0 of 45 frames
-modem at 1500 Hz   SNR  2.0 dB seed 1: 0 of 45 frames
-modem at 1500 Hz   SNR  2.0 dB seed 2: 0 of 45 frames
-modem at 1800 Hz   SNR  2.0 dB seed 1: 0 of 45 frames
-modem at 1800 Hz   SNR  2.0 dB seed 2: 0 of 45 frames
-no filter          SNR  3.0 dB seed 1: 0 of 45 frames
-no filter          SNR  3.0 dB seed 2: 0 of 45 frames
-modem at 1500 Hz   SNR  3.0 dB seed 1: 0 of 45 frames
-modem at 1500 Hz   SNR  3.0 dB seed 2: 0 of 45 frames
-modem at 1800 Hz   SNR  3.0 dB seed 1: 0 of 45 frames
-modem at 1800 Hz   SNR  3.0 dB seed 2: 0 of 45 frames
-no filter          SNR  4.0 dB seed 1: 17 of 45 frames
-no filter          SNR  4.0 dB seed 2: 15 of 45 frames
-modem at 1500 Hz   SNR  4.0 dB seed 1: 4 of 45 frames
-modem at 1500 Hz   SNR  4.0 dB seed 2: 1 of 45 frames
-modem at 1800 Hz   SNR  4.0 dB seed 1: 0 of 45 frames
-modem at 1800 Hz   SNR  4.0 dB seed 2: 0 of 45 frames
-no filter          SNR  5.0 dB seed 1: 42 of 45 frames
-no filter          SNR  5.0 dB seed 2: 42 of 45 frames
-modem at 1500 Hz   SNR  5.0 dB seed 1: 36 of 45 frames
-modem at 1500 Hz   SNR  5.0 dB seed 2: 37 of 45 frames
-modem at 1800 Hz   SNR  5.0 dB seed 1: 4 of 45 frames
-modem at 1800 Hz   SNR  5.0 dB seed 2: 6 of 45 frames
-no filter          SNR  6.0 dB seed 1: 45 of 45 frames
-no filter          SNR  6.0 dB seed 2: 45 of 45 frames
-modem at 1500 Hz   SNR  6.0 dB seed 1: 45 of 45 frames
-modem at 1500 Hz   SNR  6.0 dB seed 2: 45 of 45 frames
-modem at 1800 Hz   SNR  6.0 dB seed 1: 41 of 45 frames
-modem at 1800 Hz   SNR  6.0 dB seed 2: 40 of 45 frames
+no filter           5.0 dB over the noise, run 1: 42 frames
+no filter           5.0 dB over the noise, run 2: 42 frames
+modem at 1500 Hz    5.0 dB over the noise, run 1: 36 frames
+modem at 1500 Hz    5.0 dB over the noise, run 2: 37 frames
+modem at 1800 Hz    5.0 dB over the noise, run 1: 4 frames
+modem at 1800 Hz    5.0 dB over the noise, run 2: 6 frames
+no filter           6.0 dB over the noise, run 1: 45 frames
+no filter           6.0 dB over the noise, run 2: 45 frames
+modem at 1500 Hz    6.0 dB over the noise, run 1: 45 frames
+modem at 1500 Hz    6.0 dB over the noise, run 2: 45 frames
+modem at 1800 Hz    6.0 dB over the noise, run 1: 41 frames
+modem at 1800 Hz    6.0 dB over the noise, run 2: 40 frames

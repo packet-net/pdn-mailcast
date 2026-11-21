@@ -12,4 +12,4 @@ kiss tcp: 127.0.0.1:8105 (all modems, by sub-channel nibble, frames to 8192 byte
 audio: pipe in=/run/bench/rx.in out=/run/bench/rx.out 48000 Hz -> 12000 Hz
 api: keep receive audio over http://127.0.0.1:8107/api/keepaudio (key required), kept under /var/lib/pdn-soundmodem/kept-audio for 30 days
 tx test: ready - two-tone 700+1900 Hz or a single tone, 5 s by default, capped at 30 s
-channel-audio: 127.0.0.1:46954 connected - 1 client
+channel-audio: 127.0.0.1:54068 connected - 1 client

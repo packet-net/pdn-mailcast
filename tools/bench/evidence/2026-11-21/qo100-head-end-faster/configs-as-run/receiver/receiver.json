@@ -1,10 +1,10 @@
 {
-  "audio": "plughw:CARD=Loopback,DEV=1,SUBDEV=0",
+  "audio": "plughw:CARD=Loopback,DEV=1,SUBDEV=2",
   "dialKHz": 10489630.0,
   "listenFor": [
     {
       "callsign": "G8BPQ",
-      "minute": 45,
+      "minute": 5,
       "everyMinutes": 60,
       "frequencyHz": 10489631800,
       "sideband": "usb"

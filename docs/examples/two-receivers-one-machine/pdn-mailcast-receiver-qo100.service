@@ -1,7 +1,7 @@
 # A second pdn-mailcast receiver on the same machine, with its own config file and its own
-# state. It is the packaged unit (/lib/systemd/system/pdn-mailcast-receiver.service) with the
-# three paths changed: the config file, the state directory and the directory the status page
-# may write the config back to.
+# state. It is the packaged unit (/lib/systemd/system/pdn-mailcast-receiver.service) with its
+# description and three paths changed: the config file, the state directory and the directory
+# the status page may write the config back to.
 [Unit]
 Description=pdn-mailcast receiver (QO-100): mailcast bulletins into your BBS
 After=network-online.target sound.target time-sync.target

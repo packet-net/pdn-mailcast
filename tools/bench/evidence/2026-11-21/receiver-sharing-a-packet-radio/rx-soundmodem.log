@@ -18,13 +18,13 @@ ptt: rigctld 127.0.0.1:4532 (T 1 to key, T 0 to unkey)
 api: keep receive audio over http://127.0.0.1:8107/api/keepaudio (key required), kept under /var/lib/pdn-soundmodem/kept-audio for 30 days
 api: rig control over http://127.0.0.1:8107/api/rig and api/rig/tune (key required)
 tx test: ready - two-tone 700+1900 Hz or a single tone, 5 s by default, capped at 30 s
-channel-audio: 127.0.0.1:46324 connected - 1 client
-rig: tuned to 7.052000 MHz USB (3250 Hz passband) for a receive window until 2026-11-21T18:13:00Z; transmissions are held until it is put back to 7.050100 MHz USB (2400 Hz passband)
-rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-21T18:14:00Z
-rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-21T18:15:00Z
-rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-21T18:16:00Z
-kiss[8105] 127.0.0.1:46032 connected - 1 client (all modems)
-kiss[8105] 127.0.0.1:46032 disconnected - 0 clients (all modems)
+channel-audio: 127.0.0.1:60840 connected - 1 client
+rig: tuned to 7.052000 MHz USB (3250 Hz passband) for a receive window until 2026-11-21T19:33:00Z; transmissions are held until it is put back to 7.050100 MHz USB (2400 Hz passband)
+rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-21T19:34:00Z
+rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-21T19:35:00Z
+rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-21T19:36:00Z
+kiss[8105] 127.0.0.1:51048 connected - 1 client (all modems)
+kiss[8105] 127.0.0.1:51048 disconnected - 0 clients (all modems)
 rig: the window on 7.052000 MHz USB (3250 Hz passband) for a receive window has ended (a receive window released it)
 rig: put back to 7.050100 MHz USB (2400 Hz passband); transmissions resume
-tx[0] bpsk300 G0ABC>BENCH 49 bytes  held 14.5s (14.3s another service held the channel)
+tx[0] bpsk300 G0ABC>BENCH 49 bytes  held 14.6s (14.5s another service held the channel)

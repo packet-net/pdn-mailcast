@@ -1,7 +1,10 @@
-{"event": "dial", "radio": "tx", "hz": 10489630300.0, "fixed": true, "utc": "2026-11-21T18:41:03Z"}
-{"event": "filter", "radio": "tx", "lowHz": 50.0, "highHz": 3600.0, "utc": "2026-11-21T18:41:03Z"}
-{"event": "dial", "radio": "rx alsa:plughw:CARD=Loopback,DEV=0,SUBDEV=0", "hz": 10489630000.0, "fixed": true, "utc": "2026-11-21T18:41:03Z"}
-{"event": "transmission", "radio": "tx", "started": "18:45:02", "seconds": 10.1, "kind": "tone", "levelDbfs": -5.0, "audioPeakHz": 1500.0, "audioLowHz": 1499, "audioHighHz": 1501, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T18:45:12Z"}
-{"event": "transmission", "radio": "tx", "started": "18:45:13", "seconds": 6.5, "kind": "data", "levelDbfs": -8.1, "audioPeakHz": 2441.2, "audioLowHz": 278, "audioHighHz": 2722, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T18:45:20Z"}
-{"event": "transmission", "radio": "tx", "started": "18:45:22", "seconds": 3.5, "kind": "tone", "levelDbfs": -6.5, "audioPeakHz": 1500.0, "audioLowHz": 1469, "audioHighHz": 1531, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T18:45:27Z"}
-{"event": "transmission", "radio": "tx", "started": "18:45:31", "seconds": 18.1, "kind": "data", "levelDbfs": -11.7, "audioPeakHz": 1500.0, "audioLowHz": 333, "audioHighHz": 2744, "audioCentreHz": 1538, "dialHz": 10489630300.0, "rfCentreHz": 10489631838, "utc": "2026-11-21T18:45:50Z"}
+{"event": "dial", "radio": "tx", "hz": 432130300.0, "onAirHz": 10489630300.0, "fixed": true, "utc": "2026-11-21T20:01:03Z"}
+{"event": "filter", "radio": "tx", "lowHz": 50.0, "highHz": 3600.0, "utc": "2026-11-21T20:01:03Z"}
+{"event": "dial", "radio": "rx alsa:plughw:CARD=Loopback,DEV=0,SUBDEV=2", "hz": 10489630000.0, "onAirHz": 10489630000.0, "fixed": true, "utc": "2026-11-21T20:01:03Z"}
+{"event": "dongle", "port": 1234, "lnbHz": 9750012345.0, "utc": "2026-11-21T20:01:03Z"}
+{"event": "dongle tuned", "hz": 739592655, "hearsRfHz": 10489605000.0, "utc": "2026-11-21T20:01:05Z"}
+{"event": "transmission", "radio": "tx", "started": "20:05:01", "seconds": 10.1, "kind": "tone", "levelDbfs": -5.0, "audioPeakHz": 1500.0, "audioLowHz": 1499, "audioHighHz": 1501, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T20:05:11Z"}
+{"event": "transmission", "radio": "tx", "started": "20:05:12", "seconds": 6.5, "kind": "data", "levelDbfs": -8.1, "audioPeakHz": 2441.2, "audioLowHz": 278, "audioHighHz": 2722, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T20:05:19Z"}
+{"event": "transmission", "radio": "tx", "started": "20:05:22", "seconds": 3.5, "kind": "tone", "levelDbfs": -6.5, "audioPeakHz": 1500.0, "audioLowHz": 1469, "audioHighHz": 1531, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T20:05:26Z"}
+{"event": "transmission", "radio": "tx", "started": "20:05:30", "seconds": 14.7, "kind": "data", "levelDbfs": -15.1, "audioPeakHz": 1966.6, "audioLowHz": 272, "audioHighHz": 2846, "audioCentreHz": 1559, "dialHz": 10489630300.0, "rfCentreHz": 10489631859, "utc": "2026-11-21T20:05:45Z"}
+{"event": "transmission", "radio": "tx", "started": "20:05:45", "seconds": 3.5, "kind": "tone", "levelDbfs": -6.5, "audioPeakHz": 1500.0, "audioLowHz": 1469, "audioHighHz": 1531, "audioCentreHz": 1500, "dialHz": 10489630300.0, "rfCentreHz": 10489631800, "utc": "2026-11-21T20:05:50Z"}

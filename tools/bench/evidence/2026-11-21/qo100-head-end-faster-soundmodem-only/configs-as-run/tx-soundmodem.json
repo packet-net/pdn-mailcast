@@ -6,7 +6,7 @@
       "subChannel": 4,
       "mode": "ms110d-wn6",
       "port": 8112,
-      "rfFrequency": 2400131800,
+      "rfFrequency": 432131800,
       "maxBurstSeconds": 18,
       "burstGatherSeconds": 0.5,
       "identify": {

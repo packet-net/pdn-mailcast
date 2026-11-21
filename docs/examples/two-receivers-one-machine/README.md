@@ -16,7 +16,7 @@ The first receiver is the packaged one, unchanged, with whatever audio it alread
 - its own `stateDirectory`, `/var/lib/pdn-mailcast-qo100`;
 - its own `web.port`, 8131.
 
-Both can deliver to the same BBS with the same login.
+The BBS login can be the same in both; delivery was not run here.
 
 ## Set it up
 
@@ -29,11 +29,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now pdn-mailcast-receiver-qo100
 ```
 
-The package has no template unit for a second receiver, so the unit file here is the packaged one with three paths changed. Its journal is `journalctl -u pdn-mailcast-receiver-qo100`.
+The package has no template unit for a second receiver, so the unit file here is the packaged one with its three paths and its description changed. Its journal is `journalctl -u pdn-mailcast-receiver-qo100`.
 
 ## What was seen
 
-Under systemd, from the packages, with both services started:
+Under systemd, from the packages, with both services started (each on a loopback sound card there, so the first was not on pdn-soundmodem's audio in that test):
 
 - both active, with status pages answering on ports 8130 and 8131;
 - separate state in `/var/lib/pdn-mailcast` and `/var/lib/pdn-mailcast-qo100`;
@@ -43,6 +43,6 @@ On the bench, both running through one slot from a 40 m station: the first heard
 
 ## Not tested here
 
-Both receivers decoding in the same minute; delivery to a BBS from either.
+Both receivers with a signal to decode at once (here both were decoding in the same minutes, but only the first had anything to hear); delivery to a BBS from either.
 
 Run it yourself: `tools/bench/bench.sh two-receivers-one-machine`.

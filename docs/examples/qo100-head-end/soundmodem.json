@@ -1,18 +1,28 @@
 {
   "device": "plughw:CARD=Device,DEV=0",
-  "ptt": { "type": "serial", "device": "/dev/ttyUSB0" },
+  "ptt": {
+    "type": "serial",
+    "device": "/dev/ttyUSB0"
+  },
   "sideband": "usb",
   "modems": [
     {
       "subChannel": 4,
       "mode": "ms110d-wn4",
       "port": 8112,
-      "rfFrequency": 2400131800,
+      "rfFrequency": 432131800,
       "maxBurstSeconds": 18,
       "burstGatherSeconds": 0.5,
-      "identify": { "callsign": "G8BPQ", "intervalMinutes": 10 }
+      "identify": {
+        "callsign": "G8BPQ",
+        "intervalMinutes": 10
+      }
     }
   ],
-  "api": { "key": "change-me" },
-  "waterfall": { "port": 8107 }
+  "api": {
+    "key": "change-me"
+  },
+  "waterfall": {
+    "port": 8107
+  }
 }
