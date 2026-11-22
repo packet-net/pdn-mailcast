@@ -235,3 +235,4 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-20,EI7KX,0.43.0,IO83jj,nope.tunnel.ubersdr.org,10,10,0,1,,,,22,11,489,bbs-store,size-verified,daily/2026-11-20/EI7KX.txt
 2026-11-20,GM8BPQ,0.43.0,IO68vl,sc,0,0,0,0,,,RIG24,14,6,42,bbs-store,size-verified,daily/2026-11-20/GM8BPQ.txt
 2026-11-20,M9TWM,0.43.0,IO93fj,m9twm-1.tunnel.ubersdr.org,7,0,7,1,0,10,,22,10,327,bbs-store,size-verified,daily/2026-11-20/M9TWM.txt
+2026-11-21,EI7KX,0.43.0,IO83jj,nope.tunnel.ubersdr.org,21,20,1,0,,,AUD4,22,17,930,bbs-store,size-verified,daily/2026-11-21/EI7KX.txt
