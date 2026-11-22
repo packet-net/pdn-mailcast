@@ -1,0 +1,15 @@
+== pdn-soundmodem: "frequency": 1800 added beside "rfFrequency"
+pdn-soundmodem 0.109.0, commit 19fd53b99c209310d26349f697829e393b178a93
+configuration error in /tmp/both.json
+  modem 4 sets both "frequency" (1800) and "rfFrequency" (432131800): keep one.
+
+  The service will not start until this is fixed. As root, to start
+  from a known-good file:
+    cp /usr/share/pdn-soundmodem/soundmodem.example.json /tmp/both.json
+  Then edit it for your sound device and PTT, and:
+    systemctl restart pdn-soundmodem
+  Every setting is documented at https://github.com/packet-net/pdn-soundmodem/blob/main/docs/reference/config.md
+exit status 2
+== pdn-mailcast-headend: "frequencyHz" given as the uplink, 2400131800
+pdn-mailcast-headend: /tmp/uplink.json: "frequencyHz" 2400131800 is in QO-100's uplink band; give the downlink listeners receive on, 10489.632 MHz
+exit status 2

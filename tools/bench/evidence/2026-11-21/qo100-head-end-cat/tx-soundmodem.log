@@ -1,0 +1,51 @@
+pdn-soundmodem 0.109.0, commit 19fd53b99c209310d26349f697829e393b178a93
+config: /etc/bench/tx-soundmodem.json
+band plan: dial 432.130300 MHz USB, ms110d-wn4 at 1500 Hz audio
+carrier sense: from the audio (no radio to ask)
+modem 4: ms110d-wn4 @ 1500 Hz
+modem 4: frames queued together share one burst, up to 18 s (gathering for 0.5 s first)
+modem 4: identifying as G8BPQ in CW @ 1500 Hz = 432.131800 MHz, 20 wpm, every 10 min (4.1 s)
+frequency matching: on - after 3 frames within 20 Hz, trim up to 50 Hz; back off 30 min if a station moves over 10 Hz, give up after 3 moves
+waterfall: http://127.0.0.1:8107/
+api: configuration page at http://127.0.0.1:8107/config and http://127.0.0.1:8107/api/config (key required). POST replaces it for one run; add ?persist=true to write /etc/bench/tx-soundmodem.json.
+api: WARNING - not running under systemd, so an applied change will stop the daemon, not restart it
+kiss tcp: 127.0.0.1:8105 (all modems, by sub-channel nibble, frames to 8192 bytes)
+kiss tcp: 127.0.0.1:8112 (modem 4 ms110d-wn4 only, as nibble 0)
+rig: rigctld at 127.0.0.1:4531: 432.000000 MHz USB (2400 Hz passband)
+rig: setting the rig to 432.130300 MHz USB (2801 Hz passband) from the band plan
+rig: a receive window for another program on this machine, at http://127.0.0.1:8107/rig-window (loopback only, no key)
+audio: pipe in=/run/bench/tx.in out=/run/bench/tx.out 48000 Hz -> 48000 Hz
+ptt: rigctld 127.0.0.1:4531 (T 1 to key, T 0 to unkey)
+api: keep receive audio over http://127.0.0.1:8107/api/keepaudio (key required), kept under /var/lib/pdn-soundmodem/kept-audio for 30 days
+api: rig control over http://127.0.0.1:8107/api/rig and api/rig/tune (key required)
+tx test: ready - two-tone 700+1900 Hz or a single tone, 5 s by default, capped at 30 s
+kiss[8112] 127.0.0.1:60366 connected - 1 client (modem 4 only)
+modem 4: SETHW -> ms110d-wn4, short interleaver
+kiss[8112] 127.0.0.1:60366 disconnected - 0 clients (modem 4 only)
+kiss[8112] 127.0.0.1:37636 connected - 1 client (modem 4 only)
+tx lease: sub-channel 4 (ms110d-wn4) holds the transmitter until 2026-11-21T19:49:00Z; transmissions from other sub-channels are refused until it ends
+keep audio: keeping 2026-11-21T19:46:00Z to 2026-11-21T19:50:28Z as 20261121T194600Z-slot-2026-11-21-1947Z
+tx test: single tone 1500 Hz (FM Bessel null at 3.6 kHz deviation), 10.0 s, then after 1.5 s the zc255-2400-rrc015-v1 probe at 1500 Hz, 6.5 s, peak level 0.80
+tx test: done, 18.0 s on air
+id[4] G8BPQ in CW
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 2.8s waiting for the channel
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 19.3s (16.2s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 36.0s (32.5s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 36.0s (32.5s behind our own transmissions)
+tx[4] ms110d-wn4 G8BPQ>MCAST 287 bytes  held 36.0s (32.5s behind our own transmissions)
+kiss[8112] 127.0.0.1:37636 disconnected - 0 clients (modem 4 only)
+id[4] G8BPQ in CW
+tx lease: sub-channel 4 (ms110d-wn4) released the transmitter after 1m14s; 0 transmissions from others refused; normal service resumes
+keep audio: wrote /var/lib/pdn-soundmodem/kept-audio/20261121T194600Z-slot-2026-11-21-1947Z (268 s, busy in 0 of 2680 looks)

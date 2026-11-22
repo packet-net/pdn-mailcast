@@ -1,0 +1,81 @@
++ cd /tmp
++ cp /repo/docs/examples/two-receivers-one-machine/README.md /repo/docs/examples/two-receivers-one-machine/pdn-mailcast-receiver-qo100.service /repo/docs/examples/two-receivers-one-machine/receiver-qo100.json /repo/docs/examples/two-receivers-one-machine/receiver.json /repo/docs/examples/two-receivers-one-machine/soundmodem.json /repo/docs/examples/two-receivers-one-machine/stations-qo100.json .
++ sed -i 's|plughw:CARD=Device_1,DEV=0|plughw:CARD=Loopback,DEV=1,SUBDEV=7|' receiver-qo100.json
++ jq '.audio="plughw:CARD=Loopback,DEV=1,SUBDEV=6" | .dialKHz=7052.0' receiver.json
++ systemctl restart pdn-mailcast-receiver
++ sudo install -d -o root -g pdn-mailcast -m 0770 /etc/pdn-mailcast-qo100
++ sudo install -o root -g pdn-mailcast -m 0660 receiver-qo100.json /etc/pdn-mailcast-qo100/receiver.json
++ sudo install -m 0644 pdn-mailcast-receiver-qo100.service /etc/systemd/system/
++ sudo systemctl daemon-reload
++ : first without stations.json, to show the refusal
++ sudo systemctl enable --now pdn-mailcast-receiver-qo100
+Created symlink '/etc/systemd/system/multi-user.target.wants/pdn-mailcast-receiver-qo100.service' → '/etc/systemd/system/pdn-mailcast-receiver-qo100.service'.
++ sleep 6
++ systemctl is-active pdn-mailcast-receiver-qo100
+failed
++ journalctl -u pdn-mailcast-receiver-qo100 --no-pager -o cat
++ tail -n 3
+"dialKHz" 10489630 puts the signal's centre at -10482576200 Hz in your audio, outside the 1000 to 2000 Hz this receiver can use; the usual dial puts it at 1800 Hz
+pdn-mailcast-receiver-qo100.service: Main process exited, code=exited, status=2/INVALIDARGUMENT
+pdn-mailcast-receiver-qo100.service: Failed with result 'exit-code'.
++ : then with it
++ sudo install -o root -g pdn-mailcast -m 0640 stations-qo100.json /etc/pdn-mailcast-qo100/stations.json
++ sudo systemctl restart pdn-mailcast-receiver-qo100
++ sleep 12
++ systemctl is-active pdn-mailcast-receiver pdn-mailcast-receiver-qo100
+active
+active
++ journalctl -u pdn-mailcast-receiver-qo100 --no-pager -o cat --since -13s
+Started pdn-mailcast-receiver-qo100.service - pdn-mailcast receiver (QO-100): mailcast bulletins into your BBS.
+web: status page at http://127.0.0.1:8131/ and on the local network
+discovery: announcing this receiver on the network as "6fca8cffc69d 7273-p8131._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8131)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=7 (USB dial 10489.630 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/pdn-mailcast-qo100/stations.json lists no stations
+slots: G8BPQ's slots are every hour at 15 minutes past (added by hand)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: G8BPQ
+config: read /etc/pdn-mailcast-qo100/receiver.json
+config: rig retuning off (no "rig"), hooks off (no "hooks"), daily report off (no "feedback")
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=7 at 48000 Hz, the radio on USB dial 10489.630 MHz
+audio: between slots until 19:13 UTC, ready for the 19:15 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
++ journalctl -u pdn-mailcast-receiver --no-pager -o cat --since -20s
+Stopping pdn-mailcast-receiver.service - pdn-mailcast receiver: mailcast bulletins into your BBS...
+stopped
+pdn-mailcast-receiver.service: Deactivated successfully.
+Stopped pdn-mailcast-receiver.service - pdn-mailcast receiver: mailcast bulletins into your BBS.
+Started pdn-mailcast-receiver.service - pdn-mailcast receiver: mailcast bulletins into your BBS.
+status: read back 0 slots of the page's history from before the restart
+web: status page at http://127.0.0.1:8130/ and on the local network
+discovery: announcing this receiver on the network as "6fca8cffc69d 7273._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=6 (USB dial 7.052 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /usr/share/pdn-mailcast-receiver/stations.json lists M0LTE
+slots: M0LTE's slots are every hour on the hour, in daylight: by month, UTC, each slot ending by the close (10 minutes): Jan 08:30-17:18, Feb 08:02-18:39, Mar 07:59-20:06, Apr 09:25-20:53, May 07:42-22:23, Jun 07:36-00:00, Jul 06:56-23:42, Aug 07:04-22:13, Sep 08:41-19:20, Oct 08:19-17:17, Nov 07:49-16:43, Dec 08:24-17:01 (from the stations file)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: M0LTE
+config: read /etc/pdn-mailcast/receiver.json
+config: rig retuning off (no "rig"), hooks off (no "hooks"), daily report off (no "feedback")
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=6 at 48000 Hz, the radio on USB dial 7.052 MHz
+audio: between slots until 07:58 UTC, ready for the 08:00 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
++ ls -ld /var/lib/pdn-mailcast /var/lib/pdn-mailcast-qo100
+drwxr-x--- 3 pdn-mailcast pdn-mailcast 4096 Nov 21 18:54 /var/lib/pdn-mailcast
+drwxr-x--- 3 pdn-mailcast pdn-mailcast 4096 Nov 21 18:54 /var/lib/pdn-mailcast-qo100
++ ls /var/lib/pdn-mailcast /var/lib/pdn-mailcast-qo100
+/var/lib/pdn-mailcast:
+status-history.json
+store
+
+/var/lib/pdn-mailcast-qo100:
+listen-for.json
+status-history.json
+store
++ ss -ltn
++ grep -E ':813[01] '
+LISTEN 0      500          0.0.0.0:8131      0.0.0.0:*   
+LISTEN 0      500          0.0.0.0:8130      0.0.0.0:*   
++ curl -s -o /dev/null -w '8130 %{http_code}\n' http://127.0.0.1:8130/
+8130 200
++ curl -s -o /dev/null -w '8131 %{http_code}\n' http://127.0.0.1:8131/
+8131 200
++ sudo -u pdn-mailcast test -w /etc/pdn-mailcast-qo100/receiver.json
++ echo 'the second service can write its config back'
+the second service can write its config back

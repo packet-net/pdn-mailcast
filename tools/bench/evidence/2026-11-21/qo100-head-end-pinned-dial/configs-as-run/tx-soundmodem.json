@@ -1,0 +1,25 @@
+{
+  "device": "pipe:/run/bench/tx.in,/run/bench/tx.out",
+  "sideband": "usb",
+  "modems": [
+    {
+      "subChannel": 4,
+      "mode": "ms110d-wn4",
+      "port": 8112,
+      "rfFrequency": 432131800,
+      "maxBurstSeconds": 18,
+      "burstGatherSeconds": 0.5,
+      "identify": {
+        "callsign": "G8BPQ",
+        "intervalMinutes": 10
+      }
+    }
+  ],
+  "api": {
+    "key": "bench-api-key"
+  },
+  "waterfall": {
+    "port": 8107
+  },
+  "dialFrequency": 432130000
+}

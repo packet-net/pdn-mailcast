@@ -1,0 +1,9 @@
+{
+  "device": "rtltcp:127.0.0.1",
+  "sideband": "usb",
+  "dialFrequency": 739617655,
+  "waterfall": {
+    "port": 8109
+  },
+  "kissPort": 8305
+}

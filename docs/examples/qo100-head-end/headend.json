@@ -1,0 +1,17 @@
+{
+  "callsign": "G8BPQ",
+  "slot": { "minute": 15, "everyMinutes": 60 },
+  "station": {
+    "apiUrl": "http://127.0.0.1:8107/",
+    "apiKey": "change-me",
+    "kissPort": 8112,
+    "subChannel": 4,
+    "mode": "ms110d-wn4"
+  },
+  "intake": {
+    "fbb": { "host": "127.0.0.1", "port": 8011, "partnerCallsign": "Q0HEAD", "user": "Q0HEAD", "password": "change-me" }
+  },
+  "frequencyHz": 10489631800,
+  "sideband": "usb",
+  "locator": "IO68vl"
+}

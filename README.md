@@ -14,6 +14,8 @@ The idea of sending the bulletins with a fountain code, so that a one-way link c
 
 AGPL-3.0. See [LICENSE](LICENSE).
 
+Setting a station up? [docs/examples](docs/examples/) has whole config files for set-ups people have asked about (a QO-100 head end, QO-100 receivers, a receiver sharing a packet radio, two receivers on one machine), each run as written through the released packages.
+
 ## Building
 
 You need the .NET 10 SDK.

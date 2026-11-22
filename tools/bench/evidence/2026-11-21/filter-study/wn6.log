@@ -1,0 +1,13 @@
+data level -15.0 dBFS
+no filter           5.0 dB over the noise, run 1: 42 frames
+no filter           5.0 dB over the noise, run 2: 42 frames
+modem at 1500 Hz    5.0 dB over the noise, run 1: 36 frames
+modem at 1500 Hz    5.0 dB over the noise, run 2: 37 frames
+modem at 1800 Hz    5.0 dB over the noise, run 1: 4 frames
+modem at 1800 Hz    5.0 dB over the noise, run 2: 6 frames
+no filter           6.0 dB over the noise, run 1: 45 frames
+no filter           6.0 dB over the noise, run 2: 45 frames
+modem at 1500 Hz    6.0 dB over the noise, run 1: 45 frames
+modem at 1500 Hz    6.0 dB over the noise, run 2: 45 frames
+modem at 1800 Hz    6.0 dB over the noise, run 1: 41 frames
+modem at 1800 Hz    6.0 dB over the noise, run 2: 40 frames

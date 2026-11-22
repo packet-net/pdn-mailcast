@@ -1,0 +1,7 @@
+20:01:03 bench: scenario two-receivers-one-machine; slot at 20:05 UTC
+20:01:05 bench: pdn-soundmodem tx started from tools/bench/stand-in/soundmodem.json
+20:01:05 bench: pdn-soundmodem rx started from docs/examples/two-receivers-one-machine/soundmodem.json
+20:01:10 bench: head end M0LTE started from tools/bench/stand-in/headend.json
+20:01:10 bench: receiver receiver started from docs/examples/two-receivers-one-machine/receiver.json
+20:01:10 bench: receiver receiver-2 started from docs/examples/two-receivers-one-machine/receiver-qo100.json and docs/examples/two-receivers-one-machine/stations-qo100.json
+20:14:01 bench: done

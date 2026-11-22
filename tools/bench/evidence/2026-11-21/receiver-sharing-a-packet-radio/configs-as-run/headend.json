@@ -1,0 +1,23 @@
+{
+  "callsign": "M0LTE",
+  "slot": {
+    "minute": 29,
+    "everyMinutes": 60
+  },
+  "station": {
+    "apiUrl": "http://127.0.0.1:8108/",
+    "apiKey": "bench-api-key",
+    "kissPort": 8112,
+    "subChannel": 4,
+    "mode": "ms110d-wn4"
+  },
+  "frequencyHz": 7053800,
+  "sideband": "usb",
+  "locator": "IO91lk",
+  "ionosphere": {
+    "stations": []
+  },
+  "pskReporter": {
+    "enabled": false
+  }
+}

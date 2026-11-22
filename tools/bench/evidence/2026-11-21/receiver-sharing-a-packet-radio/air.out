@@ -1,0 +1,14 @@
+{"event": "dial", "radio": "tx", "hz": 7052300.0, "onAirHz": 7052300.0, "fixed": true, "utc": "2026-11-21T19:25:54Z"}
+{"event": "filter", "radio": "tx", "lowHz": 50.0, "highHz": 3600.0, "utc": "2026-11-21T19:25:54Z"}
+{"event": "dial", "radio": "rx rx.in", "hz": 7050100.0, "onAirHz": 7050100.0, "mode": "USB 2400", "utc": "2026-11-21T19:25:54Z"}
+{"event": "dial", "radio": "watched rx.out", "hz": 7050100.0, "onAirHz": 7050100.0, "mode": "USB 2400", "utc": "2026-11-21T19:25:54Z"}
+{"event": "dial", "radio": "watched rx.out", "hz": 7052000.0, "onAirHz": 7052000.0, "mode": "USB 3250", "utc": "2026-11-21T19:28:00Z"}
+{"event": "dial", "radio": "rx rx.in", "hz": 7052000.0, "onAirHz": 7052000.0, "mode": "USB 3250", "utc": "2026-11-21T19:28:00Z"}
+{"event": "transmission", "radio": "tx", "started": "19:29:01", "seconds": 10.1, "kind": "tone", "levelDbfs": -5.0, "audioPeakHz": 1500.0, "audioLowHz": 1499, "audioHighHz": 1501, "audioCentreHz": 1500, "dialHz": 7052300.0, "rfCentreHz": 7053800, "utc": "2026-11-21T19:29:11Z"}
+{"event": "transmission", "radio": "tx", "started": "19:29:12", "seconds": 6.5, "kind": "data", "levelDbfs": -8.1, "audioPeakHz": 2441.2, "audioLowHz": 278, "audioHighHz": 2722, "audioCentreHz": 1500, "dialHz": 7052300.0, "rfCentreHz": 7053800, "utc": "2026-11-21T19:29:19Z"}
+{"event": "transmission", "radio": "tx", "started": "19:29:23", "seconds": 2.4, "kind": "tone", "levelDbfs": -6.2, "audioPeakHz": 1500.0, "audioLowHz": 1475, "audioHighHz": 1525, "audioCentreHz": 1500, "dialHz": 7052300.0, "rfCentreHz": 7053800, "utc": "2026-11-21T19:29:26Z"}
+{"event": "transmission", "radio": "tx", "started": "19:29:30", "seconds": 16.1, "kind": "data", "levelDbfs": -15.1, "audioPeakHz": 1968.8, "audioLowHz": 278, "audioHighHz": 2850, "audioCentreHz": 1564, "dialHz": 7052300.0, "rfCentreHz": 7053864, "utc": "2026-11-21T19:29:47Z"}
+{"event": "transmission", "radio": "tx", "started": "19:29:47", "seconds": 26.2, "kind": "data", "levelDbfs": -13.1, "audioPeakHz": 1500.0, "audioLowHz": 300, "audioHighHz": 2796, "audioCentreHz": 1548, "dialHz": 7052300.0, "rfCentreHz": 7053848, "utc": "2026-11-21T19:30:15Z"}
+{"event": "dial", "radio": "rx rx.in", "hz": 7050100.0, "onAirHz": 7050100.0, "mode": "USB 2400", "utc": "2026-11-21T19:31:15Z"}
+{"event": "dial", "radio": "watched rx.out", "hz": 7050100.0, "onAirHz": 7050100.0, "mode": "USB 2400", "utc": "2026-11-21T19:31:15Z"}
+{"event": "transmission", "radio": "rx.out", "started": "19:31:15", "seconds": 2.6, "kind": "data", "levelDbfs": -8.9, "audioPeakHz": 1483.2, "audioLowHz": 1333, "audioHighHz": 1667, "audioCentreHz": 1500, "dialHz": 7050100.0, "rfCentreHz": 7051600, "utc": "2026-11-21T19:31:18Z"}

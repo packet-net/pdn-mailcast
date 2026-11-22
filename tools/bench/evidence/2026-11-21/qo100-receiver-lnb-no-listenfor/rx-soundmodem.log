@@ -1,0 +1,14 @@
+pdn-soundmodem 0.109.0, commit 19fd53b99c209310d26349f697829e393b178a93
+config: /etc/bench/rx-soundmodem.json
+carrier sense: audio shape needs 48000 Hz, this channel runs at 12000 Hz; using the energy detector (a control cable to the radio is the fix)
+modem 0: afsk1200
+frequency matching: on - after 3 frames within 20 Hz, trim up to 50 Hz; back off 30 min if a station moves over 10 Hz, give up after 3 moves
+waterfall: http://127.0.0.1:8109/
+api: configuration page at http://127.0.0.1:8109/config, open to anyone who can reach it (no "api"."key" set)
+api: WARNING - not running under systemd, so an applied change will stop the daemon, not restart it
+kiss tcp: 127.0.0.1:8305 (all modems, by sub-channel nibble, frames to 8192 bytes)
+kiss: receive only - frames arriving on these ports are refused, not transmitted
+rtltcp: 127.0.0.1:1234 has a dongle with an R820T tuner (29 gain steps)
+audio: rtl_tcp 127.0.0.1:1234 (dongle at 739.592655 MHz, 1024000 S/s, tuner AGC) -> USB 150-3450 Hz at 739.617655 MHz, audio at 12000 Hz (RECEIVE ONLY)
+tx test: unavailable - this station receives only: its audio comes from the rtl_tcp server at 127.0.0.1:1234, an SDR receiver with no transmitter.
+channel-audio: 127.0.0.1:52166 connected - 1 client
