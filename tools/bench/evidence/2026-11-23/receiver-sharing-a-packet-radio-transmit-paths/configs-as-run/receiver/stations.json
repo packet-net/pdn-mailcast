@@ -1,0 +1,16 @@
+{
+  "report": "MCAST@GB7RDG.#42.GBR.EURO",
+  "stations": [
+    {
+      "callsign": "M0LTE",
+      "publicKey": "zYGwmqvQXVLCig9TBkjAdlSpETrV4Uu7wYrGt+NKqYY=",
+      "slots": {
+        "minute": 27,
+        "everyMinutes": 60
+      },
+      "frequencyHz": 7053800,
+      "sideband": "usb",
+      "locator": "IO91lk"
+    }
+  ]
+}

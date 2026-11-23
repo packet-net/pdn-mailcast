@@ -1,0 +1,32 @@
+{
+  "audio": "soundmodem",
+  "retune": true,
+  "bbs": {
+    "type": "linBpq",
+    "host": "127.0.0.1",
+    "port": 8011,
+    "login": "Q0CAST",
+    "password": "change-me",
+    "command": "BBS"
+  },
+  "web": {
+    "port": 8130,
+    "lan": true,
+    "password": ""
+  },
+  "hooks": {
+    "before": {
+      "command": "/repo/tools/bench/scenarios/log-hook.sh",
+      "args": [
+        "before"
+      ]
+    },
+    "after": {
+      "command": "/repo/tools/bench/scenarios/log-hook.sh",
+      "args": [
+        "after"
+      ]
+    }
+  },
+  "stateDirectory": "/var/lib/bench-receiver"
+}
