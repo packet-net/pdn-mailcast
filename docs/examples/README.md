@@ -43,4 +43,4 @@ What that does not cover: your radio's filters and levels, keying, a real BBS ta
 
 The logs of every run are in [`tools/bench/evidence`](../../tools/bench/evidence/).
 
-Tested on 2026-11-21 with pdn-soundmodem 0.109.0, pdn-mailcast-headend 0.43.0 and pdn-mailcast-receiver 0.43.0 from the packet-net apt repository, on Debian 13.
+Tested on 2026-11-21, and one more scenario on 2026-11-23, with pdn-soundmodem 0.109.0, pdn-mailcast-headend 0.43.0 and pdn-mailcast-receiver 0.43.0 from the packet-net apt repository, on Debian 13.

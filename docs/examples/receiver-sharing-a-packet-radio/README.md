@@ -52,6 +52,28 @@ tx[0] DROPPED G0ABC>BENCH 49 bytes: another service is holding the channel (wait
 
 So a connected packet session has to survive on its own retries while the radio is away, and a beacon or other one-off frame sent in that time is lost.
 
+## What else is kept off the air
+
+pdn-soundmodem kept its own transmitter off the air while the radio was away, in each way that was tried: a packet frame over KISS was held up to 30 seconds and then dropped (above), and an ARDOP call was dropped at once. On that showing, a LinBPQ whose only way to the radio is this pdn-soundmodem's KISS or ARDOP port needs no `XMITOFF`. A second run tried two more things around one slot:
+
+| What was tried | What happened |
+|---|---|
+| Six long packet frames, 40 seconds of sending, started 75 seconds before the slot | They went out on the packet frequency. pdn-soundmodem refused to move the radio while it was keyed (it normally moves 60 seconds before the slot, as in the first run), and the radio moved 3 seconds after the last frame ended, 30 seconds before the slot. All 17 mailcast frames were still heard |
+| An ARDOP modem beside the packet one, told to call a station 90 seconds into the slot | Nothing went out on the air. pdn-soundmodem's log says `ardop: transmission dropped` for each of its five tries, and the call failed. The program driving ARDOP was still told `PTT TRUE` and `PTT FALSE` each time, as if it had sent |
+
+Not tried: LinBPQ itself (a script played its part on the KISS and ARDOP ports), ARDOP's data port, a CW ident, and the transmitter test. And pdn-soundmodem cannot stop anything that keys the radio without going through it, such as another TNC or sound modem on the same radio. For that, use the receiver's hooks.
+
+## Your own commands still run
+
+`hooks` in `receiver.json` work in this set-up too ([receiver.md](../../receiver.md#running-your-own-commands-around-each-slot)). With a "before" and an "after" command added, "before" ran 90 seconds before the slot, a minute ahead of the radio moving, and "after" ran in the second the radio came back. What the two commands wrote for the 09:27:00 slot (each line goes on), with the radio moving at 09:26:30 and back at 09:29:15:
+
+```
+09:25:30 hook before ran: MAILCAST_HOOK=before MAILCAST_SLOT_UTC=2026-11-23T09:27:00Z
+09:29:15 hook after ran: MAILCAST_HOOK=after MAILCAST_SLOT_UTC=2026-11-23T09:27:00Z
+```
+
+So a hook that sends LinBPQ `XMITOFF` and back would run at the right moments here. It is the way to stop LinBPQ trying at all, or to stop something this pdn-soundmodem does not control. A real `XMITOFF` hook against LinBPQ was not run; the bench's hooks only wrote down when they ran.
+
 ## How long the radio is away
 
 The receiver hands the radio back early only when everything in the station's directory is complete and nothing has been heard for a minute. With bulletins too big to finish in one slot, the head end finished sending 1 minute 39 seconds into the slot, and the radio stayed on 7.052 MHz until 12 minutes after the slot's start: 13 minutes away in all. Nothing sent in a slot tells a receiver the slot is over ([#285](https://github.com/packet-net/pdn-mailcast/issues/285)).
@@ -60,4 +82,4 @@ The receiver hands the radio back early only when everything in the station's di
 
 A real radio and rigctld back end (the bench uses Hamlib's dummy rig); your radio accepting the 3250 Hz passband pdn-soundmodem asks for; delivery to a BBS.
 
-Run it yourself: `tools/bench/bench.sh receiver-sharing-a-packet-radio`, and `receiver-sharing-a-packet-radio-unfinished` for the long case.
+Run it yourself: `tools/bench/bench.sh receiver-sharing-a-packet-radio`, `receiver-sharing-a-packet-radio-unfinished` for the long case, and `receiver-sharing-a-packet-radio-transmit-paths` for these two tries and the hooks.

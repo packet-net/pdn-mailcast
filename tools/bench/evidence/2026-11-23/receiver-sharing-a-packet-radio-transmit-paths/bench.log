@@ -1,0 +1,7 @@
+09:23:08 bench: scenario receiver-sharing-a-packet-radio-transmit-paths; slot at 09:27 UTC
+09:23:10 bench: dummy rig listener on port 4532 at 7050100 Hz USB
+09:23:12 bench: pdn-soundmodem tx started from tools/bench/stand-in/soundmodem.json
+09:23:12 bench: pdn-soundmodem rx started from docs/examples/receiver-sharing-a-packet-radio/soundmodem.json with .modems += [{"subChannel":1,"mode":"ardop","rfFrequency":7050800,"bandwidth":500,"port":8515}]
+09:23:18 bench: head end M0LTE started from tools/bench/stand-in/headend.json
+09:23:18 bench: receiver receiver started from docs/examples/receiver-sharing-a-packet-radio/receiver.json
+09:41:03 bench: done

@@ -1,0 +1,5 @@
+/etc/bench/headend.json: fine
+signing: directories are signed with key 0309b720269a962a, public key zYGwmqvQXVLCig9TBkjAdlSpETrV4Uu7wYrGt+NKqYY=
+this station: 7.0538 MHz USB, locator IO91lk in every directory
+advertising: no other stations ("advertise" in the configuration)
+state: /var/lib/pdn-mailcast-headend, file drop /var/lib/pdn-mailcast-headend/drop
