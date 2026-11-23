@@ -243,3 +243,4 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-21,GB7NOT,0.43.0,IO92kx,sc,12,12,0,0,,,RIG44,22,16,550,bbs-store,size-verified,daily/2026-11-21/GB7NOT.txt
 2026-11-21,GM4CXF,0.43.0,IO75qn,sc,10,9,1,0,,,,22,16,1103,bbs-store,size-verified,daily/2026-11-21/GM4CXF.txt
 2026-11-21,GM8BPQ,0.43.0,IO68vl,sc,1,0,0,0,,,AUD2 RIG31,22,10,129,bbs-store,size-verified,daily/2026-11-21/GM8BPQ.txt
+2026-11-22,EI7KX,0.43.0,IO83jj,nope.tunnel.ubersdr.org,12,12,0,0,,,,22,14,1076,bbs-store,size-verified,daily/2026-11-22/EI7KX.txt
