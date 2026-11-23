@@ -1,8 +1,8 @@
 web: status page at http://127.0.0.1:8130/ and on the local network
-discovery: announcing this receiver on the network as "5751125918ba e5c7._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+discovery: announcing this receiver on the network as "6322d293a243 07b2._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
 pdn-mailcast receiver 0.43.0: listening on soundmodem (USB dial 7.052 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
 stations: /etc/bench/receiver/stations.json lists M0LTE
-slots: M0LTE's slots are every hour at 32 minutes past (from the stations file)
+slots: M0LTE's slots are every hour at 20 minutes past (from the stations file)
 config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
 config: frames are also accepted from the stations this receiver knows of: M0LTE
 config: read /etc/bench/receiver/receiver.json
@@ -11,40 +11,40 @@ hooks: "before" each slot listened to runs /usr/local/bin/bpq-xmitoff 1, started
 retune: the radio is retuned through pdn-soundmodem's receive window on 127.0.0.1:8107 to dial 7.052 MHz for each slot; pdn-soundmodem holds its own transmitting meanwhile
 audio: pdn-soundmodem on 127.0.0.1:8107, its channel at 12000 Hz, brought up to 48000 Hz, the radio on USB dial 7.0501 MHz, as pdn-soundmodem says ("dialKHz", 7.052 MHz, is not used while it does), the signal's centre at 3700 Hz in its audio; that is outside the 1000 to 2000 Hz a radio's own filter usually passes whole, which is fine for a Flex (pdn-soundmodem opens its filter for it) or an SDR, but a radio on a sound card needs its filter open from 2250 to 5150 Hz. Its audio is moved to 1800 Hz here, where the usual dial puts the signal
 update: cannot check for a newer version: Resource temporarily unavailable (packet-net.github.io:443). It tries again every 6 hours, and says nothing more about this until it works
-hooks: running "before" for the 10:32 UTC slot: /usr/local/bin/bpq-xmitoff 1
-hooks: before: LinBPQ port 2: XMITOFF is now 1
+hooks: running "before" for the 11:20 UTC slot: /usr/local/bin/bpq-xmitoff 1
+hooks: before: LinBPQ port 2: BENCH:G0ABC-1} XMITOFF was 0 now 1
 hooks: "before" finished (exit 0) after 16.0 s
 audio: pdn-soundmodem's radio is on USB dial 7.052 MHz now, the signal's centre at 1800 Hz in its audio
-retune: tuned to 7.052 MHz through pdn-soundmodem's receive window for the 10:32 UTC slot until 10:44 UTC; pdn-soundmodem holds its transmitting
-tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 86.8 dB in 3 kHz, 10 s
+retune: tuned to 7.052 MHz through pdn-soundmodem's receive window for the 11:20 UTC slot until 11:32 UTC; pdn-soundmodem holds its transmitting
+tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 83.5 dB in 3 kHz, 10 s
 slot: 1 frame heard on 1200 bps (WN4)
 directory for 2026-11-23: 3 bulletins in rotation, sent on 1200 bps (WN4), signed by M0LTE
-slots: M0LTE's directory gives its slots as every hour at 32 minutes past; using that instead of the stations file's
-store: bulletin 10283_BENCH (a70f6883aa0ecb20) is complete, waiting for its station's details
-bulletin complete: 10283_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
-store: bulletin 10283_BENCH (a70f6883aa0ecb20) delivered with the envelope of M0LTE: its envelope arrived
-bulletin released to the outbox: 10283_BENCH
+slots: M0LTE's directory gives its slots as every hour at 20 minutes past; using that instead of the stations file's
+store: bulletin 11163_BENCH (1045ac202504115a) is complete, waiting for its station's details
+bulletin complete: 11163_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
+store: bulletin 11163_BENCH (1045ac202504115a) delivered with the envelope of M0LTE: its envelope arrived
+bulletin released to the outbox: 11163_BENCH
 bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
 bbs: delivery login: the BBS answered "user:"
 bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 30 s.
-store: bulletin 10281_BENCH (bb7e5b520a9f1c1a) delivered with the envelope of M0LTE: its envelope arrived
-bulletin complete: 10281_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
-store: bulletin 10282_BENCH (91178b607b570330) delivered with the envelope of M0LTE: its envelope arrived
-bulletin complete: 10282_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
+store: bulletin 11161_BENCH (3b1338cd5a83021f) delivered with the envelope of M0LTE: its envelope arrived
+bulletin complete: 11161_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
+store: bulletin 11162_BENCH (01d5466ca12f7b1d) delivered with the envelope of M0LTE: its envelope arrived
+bulletin complete: 11162_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
 bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
 bbs: delivery login: the BBS answered "user:"
 bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 1 min.
-retune: ending the 10:32 UTC slot early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 61 s
+retune: ending the 11:20 UTC slot early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 64 s
 retune: gave pdn-soundmodem's receive window back; it puts its radio back, now on 7.0501 MHz
 audio: pdn-soundmodem's radio is on USB dial 7.0501 MHz now, the signal's centre at 3700 Hz in its audio, moved to 1800 Hz here
-hooks: running "after" for the 10:32 UTC slot: /usr/local/bin/bpq-xmitoff 0
-slot: the 10:32 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 87 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
+hooks: running "after" for the 11:20 UTC slot: /usr/local/bin/bpq-xmitoff 0
 bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
 bbs: delivery login: the BBS answered "user:"
 bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 2 min.
-hooks: after: LinBPQ port 2: XMITOFF is now 0
+slot: the 11:20 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 84 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
+hooks: after: LinBPQ port 2: BENCH:G0ABC-1} XMITOFF was 1 now 0
 hooks: "after" finished (exit 0) after 16.0 s
-channel: the 10:32 UTC slot, from the probe and 3 of 3 bursts, measured in 1.1 s: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed). From the bursts: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed).
+channel: the 11:20 UTC slot, from the probe and 3 of 3 bursts, measured in 1.1 s: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed). From the bursts: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed).
 bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
 bbs: delivery login: the BBS answered "user:"
 bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 5 min.

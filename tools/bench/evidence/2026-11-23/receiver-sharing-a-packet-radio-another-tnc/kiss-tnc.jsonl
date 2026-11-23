@@ -1,14 +1,9 @@
-{"event": "LinBPQ connected", "utc": "2026-11-23T10:28:24Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:30:15Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:34:19Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:35:20Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:36:21Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:37:22Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:38:22Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:39:23Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:40:14Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:41:15Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:42:16Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:43:17Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:44:18Z"}
-{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:45:20Z"}
+{"event": "LinBPQ connected", "utc": "2026-11-23T11:16:59Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:22:54Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:23:55Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:24:56Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:25:56Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:26:57Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:27:58Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:28:49Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T11:29:50Z"}

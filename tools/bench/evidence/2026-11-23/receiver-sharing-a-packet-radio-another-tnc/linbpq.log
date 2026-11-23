@@ -7,9 +7,10 @@ Configuration file Preprocessor.
 Using Configuration file /var/lib/bench-linbpq/bpq32.cfg
 Conversion (probably) successful
 
-PORTS 0x5c5990f93560 LINKS 0x5c5990f95640 DESTS 0x5c5990f9ce40 ROUTES 0x5c5990fa9960 L4 0x5c5990facd60 BUFFERS 0x5c5990fb8168
+PORTS 0x5b987b0ea560 LINKS 0x5b987b0ec640 DESTS 0x5b987b0f3e40 ROUTES 0x5b987b100960 L4 0x5b987b103d60 BUFFERS 0x5b987b10f168
 
 Route/Node recovery file BPQNODES.dat not found - Continuing without it
 Initialising Port 01     Telnet Server 
 Initialising Port 02     TCPKISS IP 127.0.0.1 Port 8100 Chan A 
 MQTT Enabled 0
+Connect Failed for KISSTCP Port 2 - error code = 111

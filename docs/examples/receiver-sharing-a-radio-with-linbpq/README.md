@@ -1,6 +1,6 @@
 # Receiver sharing a radio with LinBPQ
 
-A LinBPQ packet station whose radio the receiver borrows for each slot, with no pdn-soundmodem involved: the receiver is on a sound card on the radio's receive audio, moves the radio through rigctld, and tells LinBPQ itself to stop transmitting (`XMITOFF`) while the radio is away. It suits a hardware TNC such as a NinoTNC, or QtSoundModem or Direwolf on a KISS port.
+A LinBPQ packet station whose radio the receiver borrows for each slot, with no pdn-soundmodem involved: the receiver is on a sound card on the radio's receive audio, moves the radio through rigctld, and tells LinBPQ itself to stop transmitting (`XMITOFF`) while the radio is away. It suits a hardware KISS TNC such as a NinoTNC, which needs no sound card of its own on the computer.
 
 If pdn-soundmodem has the sound card, use [receiver sharing a packet radio](../receiver-sharing-a-packet-radio/) and its section on another TNC instead.
 
@@ -53,10 +53,10 @@ retune: WARNING - cannot check that the radio is not transmitting (rigctld answe
 retune: not retuning for the 10:32 UTC slot
 ```
 
-Nothing was decoded, and LinBPQ was still kept off for the whole 12 minute window. Try `echo t | nc -q1 127.0.0.1 4532` against your own rigctld: on the bench `0` came back from a rig that can tell, and `RPRT -11` from this one.
+No frames were decoded, and LinBPQ was still kept off for the whole 12 minute window. Try `echo t | nc -q1 127.0.0.1 4532` against your own rigctld: on the bench `0` came back from a rig that can tell, and `RPRT -11` from this one.
 
 ## Not tested here
 
-A real radio, rigctld back end and TNC; a TNC that is still holding a frame when LinBPQ is turned off; delivery to the BBS. The stand-in TNC puts nothing on the bench's air, so what a transmission of your own does to your reception is not shown.
+A real radio, rigctld back end and TNC; a TNC that is still holding a frame when LinBPQ is turned off, or a radio that is transmitting when the receiver checks; a sound modem as the TNC, which would want the same sound card; delivery to the BBS. The stand-in TNC puts nothing on the bench's air, so what a transmission of your own does to your reception is not shown.
 
 Run it yourself: `tools/bench/bench.sh receiver-sharing-a-radio-with-linbpq`, and `receiver-sharing-a-radio-with-linbpq-ptt-unreadable`.

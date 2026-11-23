@@ -18,6 +18,7 @@ It needs Docker. Each run is one slot: the bench sets the slot 4 minutes ahead, 
 | `run.sh` | Starts everything for one scenario inside the container, and collects the logs |
 | `air.py` | The simulated air: see below |
 | `kiss-tnc.py` | A stand-in for a hardware KISS TNC on the listener's radio: it takes a real LinBPQ's frames, keys the dummy rig for each, and writes down where the dial was in `kiss-tnc.jsonl`. It puts nothing on the air |
+| `hook-failures.sh` | The `bpq-xmitoff` hook against the bench's LinBPQ, right and wrong |
 | `filter-study.py`, `refusals.sh` | Two things that need no air: an offline comparison of where the signal sits in a transmit filter, and two settings the programs refuse |
 | `scenarios/NAME.env` | Which example files a scenario runs, where each radio's dial is, and any one-line change that makes it a variant |
 | `stand-in/` | A head end on 7.0538 MHz that stands in for M0LTE in the 40 m scenarios, and the `bpq32.cfg` of the bench's LinBPQ |

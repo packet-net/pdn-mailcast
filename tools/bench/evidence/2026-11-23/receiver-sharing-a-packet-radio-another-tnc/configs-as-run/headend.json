@@ -1,7 +1,7 @@
 {
   "callsign": "M0LTE",
   "slot": {
-    "minute": 32,
+    "minute": 20,
     "everyMinutes": 60
   },
   "station": {

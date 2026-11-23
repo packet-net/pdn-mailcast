@@ -100,4 +100,6 @@ end=$(( slot_epoch + ${RUN_MINUTES:-9} * 60 ))
 while [ $(date -u +%s) -lt $end ]; do sleep 5; done
 ps -eo etimes,cputime,rss,args | grep -E "pdn-|rigctld|air.py" | grep -v grep | cut -c1-140 >$O/processes.txt
 cp -r /etc/bench $O/configs-as-run
+for f in ${INSTALL:-}; do cp ${f##*:} $O/configs-as-run/; done   # as installed, and LinBPQ's file as it ran
+[ -n "${LINBPQ:-}" ] && cp /var/lib/bench-linbpq/bpq32.cfg $O/configs-as-run/
 say "done"

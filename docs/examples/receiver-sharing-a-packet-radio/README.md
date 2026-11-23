@@ -67,22 +67,25 @@ Not tried: LinBPQ itself (a script played its part on the KISS and ARDOP ports),
 
 ## If LinBPQ transmits through a TNC of its own
 
-A common arrangement: LinBPQ sends through a hardware TNC (a NinoTNC, say), and pdn-soundmodem only listens to the same radio through a sound card and moves it with CAT. pdn-soundmodem knows nothing of that TNC, so something has to tell LinBPQ to stop while the radio is away. [`receiver-with-another-tnc.json`](receiver-with-another-tnc.json) is `receiver.json` with two hooks that do, and [`bpq-xmitoff`](bpq-xmitoff) is the command they run: it logs in to LinBPQ as a sysop and sends `XMITOFF`. Set the five values at the top of it, and make it runnable by the receiver (`sudo install -m 0755 bpq-xmitoff /usr/local/bin/`). It needs `nc`.
+A common arrangement: LinBPQ sends through a hardware TNC (a NinoTNC, say), and pdn-soundmodem only listens to the same radio through a sound card and moves it with CAT. pdn-soundmodem knows nothing of that TNC, so something has to tell LinBPQ to stop while the radio is away. [`receiver-with-another-tnc.json`](receiver-with-another-tnc.json) is `receiver.json` with two hooks that do, and [`bpq-xmitoff`](bpq-xmitoff) is the command they run: it logs in to LinBPQ as a sysop and sends `XMITOFF`. Set the five values at the top of it, and install it so that only root and the receiver can read it, since it holds a sysop password: `sudo install -o root -g pdn-mailcast -m 0750 bpq-xmitoff /usr/local/bin/`. It needs `nc` from netcat-openbsd.
 
-With a real LinBPQ sending its ID every minute through a stand-in for the TNC, which keys the radio and writes down where its dial was each time, and the slot at 10:32:00:
+With a real LinBPQ sending its ID every minute through a stand-in for the TNC, which keys the radio and writes down where its dial was each time, and the slot at 11:20:00:
 
 | When | What happened |
 |---|---|
-| 10:30:15 | LinBPQ's ID went out on 7.050100 MHz |
-| Next | "before" ran (90 seconds ahead of the slot, as timed in the run below), and LinBPQ confirmed: `hooks: before: LinBPQ port 2: XMITOFF is now 1` |
-| 10:31:00 | Radio moved to 7.052000 MHz |
+| 90 seconds before the slot (as timed in the run below) | "before" ran, and LinBPQ confirmed: `hooks: before: LinBPQ port 2: BENCH:G0ABC-1} XMITOFF was 0 now 1` |
+| 11:19:00 | Radio moved to 7.052000 MHz |
 | During | Tone at 1800.0 Hz, 17 of 17 frames, 3 of 3 bulletins. The TNC was handed nothing |
-| 10:34:15 | Radio back on 7.050100 MHz, and "after" ran: `hooks: after: LinBPQ port 2: XMITOFF is now 0` |
-| 10:34:19 | LinBPQ's next ID went out, on 7.050100 MHz |
+| 11:22:15 | Radio back on 7.050100 MHz, and "after" ran: `hooks: after: LinBPQ port 2: BENCH:G0ABC-1} XMITOFF was 1 now 0` |
+| 11:22:54 | LinBPQ's ID went out on 7.050100 MHz, and every minute after that |
 
-Each hook took 16 seconds, inside the 30 it is allowed.
+LinBPQ had not long started in this run, and "before" came ahead of its first ID, so the TNC's record shows nothing until 11:22:54. The run without hooks, next, shows the IDs it would otherwise have sent.
 
-**Without the hooks**, with the plain `receiver.json`, LinBPQ keyed the radio four times while it was on 7.052000 MHz: at 10:49:09, 10:50:10, 10:51:11 and 10:52:11, in a slot that began at 10:50:00. That is packet sent on top of the mailcast.
+The script fails as it should: against the same LinBPQ it exited with an error for a wrong password, for a port LinBPQ does not have, and with LinBPQ stopped. The receiver's guide says the radio is only moved if "before" worked; a failing "before" inside a whole slot was not run here.
+
+Each hook took 16 seconds, inside the 30 it is allowed. "after" always turns transmit back on, even if you had turned the port off yourself before the slot.
+
+**Without the hooks**, with the plain `receiver.json`, LinBPQ keyed the radio four times while it was on 7.052000 MHz: at 10:49:09, 10:50:10, 10:51:11 and 10:52:11, in a slot that began at 10:50:00. Two of those were while the head end was sending. The stand-in TNC puts nothing on the bench's air, so the bench's receiver lost nothing; a real station would be transmitting packet on the mailcast frequency.
 
 If nothing else needs pdn-soundmodem on that sound card, [receiver sharing a radio with LinBPQ](../receiver-sharing-a-radio-with-linbpq/) does the same job with no script: the receiver sends `XMITOFF` itself and checks the radio is not transmitting before it moves it.
 
