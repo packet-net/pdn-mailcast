@@ -1,0 +1,4 @@
+{"event": "LinBPQ connected", "utc": "2026-11-23T10:28:24Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:30:15Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:44:18Z"}
+{"event": "frame keyed", "bytes": 36, "seconds": 1.5, "dialHz": 7050100.0, "text": "G0ABC-1 bench node", "utc": "2026-11-23T10:45:19Z"}

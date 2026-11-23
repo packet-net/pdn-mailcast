@@ -1,0 +1,27 @@
+{
+  "audio": "plughw:CARD=Loopback,DEV=1,SUBDEV=2",
+  "rig": {
+    "rigctld": "127.0.0.1:4532"
+  },
+  "bpq": {
+    "host": "127.0.0.1",
+    "port": 8011,
+    "user": "sysop",
+    "password": "change-me",
+    "hfPort": 2
+  },
+  "bbs": {
+    "type": "linBpq",
+    "host": "127.0.0.1",
+    "port": 8011,
+    "login": "Q0CAST",
+    "password": "change-me",
+    "command": "BBS"
+  },
+  "web": {
+    "port": 8130,
+    "lan": true,
+    "password": ""
+  },
+  "stateDirectory": "/var/lib/bench-receiver"
+}

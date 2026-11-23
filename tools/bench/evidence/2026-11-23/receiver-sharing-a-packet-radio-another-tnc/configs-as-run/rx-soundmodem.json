@@ -1,0 +1,24 @@
+{
+  "device": "pipe:/run/bench/rx.in,/run/bench/rx.out",
+  "sideband": "usb",
+  "dialFrequency": 7050100,
+  "rig": {
+    "rigctld": "127.0.0.1:4532"
+  },
+  "ptt": {
+    "type": "rigctld"
+  },
+  "modems": [
+    {
+      "subChannel": 0,
+      "mode": "bpsk300",
+      "rfFrequency": 7051600
+    }
+  ],
+  "api": {
+    "key": "bench-api-key"
+  },
+  "waterfall": {
+    "port": 8107
+  }
+}

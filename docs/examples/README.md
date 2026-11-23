@@ -7,7 +7,8 @@ Whole config files for set-ups people have asked about. Each file was run exactl
 | [QO-100 head end](qo100-head-end/) | Sending mailcast through QO-100 from an SSB radio and a transverter |
 | [QO-100 receiver with an LNB and RTL-SDR](qo100-receiver-lnb-rtl-sdr/) | Receiving a QO-100 station with your own dish, LNB and dongle |
 | [QO-100 receiver on a sound card](qo100-receiver-sound-card/) | Receiving a QO-100 station from a web SDR or any receiver tuned by hand |
-| [Receiver sharing a packet radio](receiver-sharing-a-packet-radio/) | An HF packet station whose radio moves to 7.052 MHz for each slot and back |
+| [Receiver sharing a packet radio](receiver-sharing-a-packet-radio/) | An HF packet station on pdn-soundmodem whose radio moves to 7.052 MHz for each slot and back, with or without a TNC of LinBPQ's own on the same radio |
+| [Receiver sharing a radio with LinBPQ](receiver-sharing-a-radio-with-linbpq/) | The same without pdn-soundmodem: the receiver moves the radio and holds LinBPQ off itself |
 | [Two receivers on one machine](two-receivers-one-machine/) | A second receiver, such as one for QO-100 beside one for 40 m |
 
 ## The one rule about frequencies
@@ -26,7 +27,7 @@ If the receiver's log says the tone is far from 1800 Hz, one radio is not on the
 
 The bench in [`tools/bench`](../../tools/bench/) runs the packaged programs in a container and puts a simulated air between them:
 
-- The transmitting pdn-soundmodem's audio is treated as upper sideband on the transmit radio's dial, and each receiver gets the audio a radio on its own dial would hear. A radio with CAT is a Hamlib dummy rig, and the air follows wherever it is tuned. An RTL-SDR dongle behind an LNB is a program that speaks rtl_tcp's protocol and sends the IQ such a dongle would.
+- The transmitting pdn-soundmodem's audio is treated as upper sideband on the transmit radio's dial, and each receiver gets the audio a radio on its own dial would hear. A radio with CAT is a Hamlib dummy rig, and the air follows wherever it is tuned. Where a station has LinBPQ, it is a real one, and a TNC of its own is a program that takes LinBPQ's frames over KISS, keys the dummy rig for each and writes down where the dial was. An RTL-SDR dongle behind an LNB is a program that speaks rtl_tcp's protocol and sends the IQ such a dongle would.
 - The radios on the bench pass 50 to 3600 Hz of audio, wider than a real one, so nothing here says what your radio's filter does to the signal.
 - The bench measures every transmission as it leaves the transmitter, so each page can say where the signal really was.
 - Only these parts of a file are replaced for a run, and everything else runs as written:
@@ -43,4 +44,4 @@ What that does not cover: your radio's filters and levels, keying, a real BBS ta
 
 The logs of every run are in [`tools/bench/evidence`](../../tools/bench/evidence/).
 
-Tested on 2026-11-21, and one more scenario on 2026-11-23, with pdn-soundmodem 0.109.0, pdn-mailcast-headend 0.43.0 and pdn-mailcast-receiver 0.43.0 from the packet-net apt repository, on Debian 13.
+Tested on 2026-11-21, and the LinBPQ and transmit-path scenarios on 2026-11-23 (LinBPQ 6.0.25.41), with pdn-soundmodem 0.109.0, pdn-mailcast-headend 0.43.0 and pdn-mailcast-receiver 0.43.0 from the packet-net apt repository, on Debian 13.
