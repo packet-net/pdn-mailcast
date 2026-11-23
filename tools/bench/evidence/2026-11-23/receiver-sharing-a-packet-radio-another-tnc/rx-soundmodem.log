@@ -18,10 +18,10 @@ ptt: rigctld 127.0.0.1:4532 (T 1 to key, T 0 to unkey)
 api: keep receive audio over http://127.0.0.1:8107/api/keepaudio (key required), kept under /var/lib/pdn-soundmodem/kept-audio for 30 days
 api: rig control over http://127.0.0.1:8107/api/rig and api/rig/tune (key required)
 tx test: ready - two-tone 700+1900 Hz or a single tone, 5 s by default, capped at 30 s
-channel-audio: 127.0.0.1:39200 connected - 1 client
-rig: tuned to 7.052000 MHz USB (3250 Hz passband) for a receive window until 2026-11-23T10:36:00Z; transmissions are held until it is put back to 7.050100 MHz USB (2400 Hz passband)
-rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-23T10:37:00Z
-rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-23T10:38:00Z
-rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-23T10:39:00Z
+channel-audio: 127.0.0.1:57708 connected - 1 client
+rig: tuned to 7.052000 MHz USB (3250 Hz passband) for a receive window until 2026-11-23T11:24:00Z; transmissions are held until it is put back to 7.050100 MHz USB (2400 Hz passband)
+rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-23T11:25:00Z
+rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-23T11:26:00Z
+rig: a receive window renewed its window on 7.052000 MHz USB (3250 Hz passband) until 2026-11-23T11:27:00Z
 rig: the window on 7.052000 MHz USB (3250 Hz passband) for a receive window has ended (a receive window released it)
 rig: put back to 7.050100 MHz USB (2400 Hz passband); transmissions resume

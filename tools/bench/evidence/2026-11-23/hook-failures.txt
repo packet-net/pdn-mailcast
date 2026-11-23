@@ -1,0 +1,16 @@
+== as written: off, then on
+LinBPQ port 2: BENCH:G0ABC-1} XMITOFF was 0 now 1
+LinBPQ port 2: BENCH:G0ABC-1} XMITOFF was 1 now 0
+exit status 0
+== the wrong password
+LinBPQ did not confirm XMITOFF 2 1; it said: password:password:password:password:
+exit status 1
+== a port LinBPQ does not have
+LinBPQ did not confirm XMITOFF 9 1; it said: BENCH:G0ABC-1} Ok
+BENCH:G0ABC-1} Invalid Port Number
+Disconnected from Node - Telnet Session kept
+exit status 1
+/repo/tools/bench/hook-failures.sh: line 15:    11 Killed                  LD_LIBRARY_PATH=/opt/linbpq /opt/linbpq/linbpq > /dev/null 2>&1
+== LinBPQ not running
+LinBPQ did not confirm XMITOFF 2 1; it said: 
+exit status 1

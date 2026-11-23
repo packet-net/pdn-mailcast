@@ -5,7 +5,7 @@
       "callsign": "M0LTE",
       "publicKey": "RwZDIoOntr+O+H3wpUqFKvizHfW8B4vjWsXJahhtqX8=",
       "slots": {
-        "minute": 32,
+        "minute": 20,
         "everyMinutes": 60
       },
       "frequencyHz": 7053800,
