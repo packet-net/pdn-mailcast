@@ -54,26 +54,25 @@ So a connected packet session has to survive on its own retries while the radio 
 
 ## What else is kept off the air
 
-Everything pdn-soundmodem itself would send is held while the radio is away, so nothing needs to tell LinBPQ to stop (no `XMITOFF`), as long as LinBPQ reaches the radio through this pdn-soundmodem. A second run tried two more ways to key the radio around one slot (the first run above already had a packet frame held during the window):
+pdn-soundmodem kept its own transmitter off the air while the radio was away, in each way that was tried: a packet frame over KISS was held up to 30 seconds and then dropped (above), and an ARDOP call was dropped at once. On that showing, a LinBPQ whose only way to the radio is this pdn-soundmodem's KISS or ARDOP port needs no `XMITOFF`. A second run tried two more things around one slot:
 
 | What was tried | What happened |
 |---|---|
-| Six long packet frames, 40 seconds of sending, started 75 seconds before the slot | They went out on the packet frequency. The radio was due to move 60 seconds before the slot; pdn-soundmodem refused while it was keyed, and the radio moved 3 seconds after the last frame ended, 30 seconds before the slot. All 17 mailcast frames were still heard |
-| An ARDOP modem beside the packet one, told to call a station 90 seconds into the slot | Nothing was sent. The log says `ardop: transmission dropped` for each of its five tries, and the call failed |
+| Six long packet frames, 40 seconds of sending, started 75 seconds before the slot | They went out on the packet frequency. pdn-soundmodem refused to move the radio while it was keyed (it normally moves 60 seconds before the slot, as in the first run), and the radio moved 3 seconds after the last frame ended, 30 seconds before the slot. All 17 mailcast frames were still heard |
+| An ARDOP modem beside the packet one, told to call a station 90 seconds into the slot | Nothing went out on the air. pdn-soundmodem's log says `ardop: transmission dropped` for each of its five tries, and the call failed. The program driving ARDOP was still told `PTT TRUE` and `PTT FALSE` each time, as if it had sent |
 
-What pdn-soundmodem cannot hold is anything that keys the radio without going through it: another TNC or sound modem on the same radio. For that, use the receiver's hooks.
+Not tried: LinBPQ itself (a script played its part on the KISS and ARDOP ports), ARDOP's data port, a CW ident, and the transmitter test. And pdn-soundmodem cannot stop anything that keys the radio without going through it, such as another TNC or sound modem on the same radio. For that, use the receiver's hooks.
 
 ## Your own commands still run
 
-`hooks` in `receiver.json` work in this set-up too ([receiver.md](../../receiver.md#running-your-own-commands-around-each-slot)). With a "before" and an "after" command added, "before" ran 90 seconds before the slot, ahead of the radio moving, and "after" ran as the radio came back:
+`hooks` in `receiver.json` work in this set-up too ([receiver.md](../../receiver.md#running-your-own-commands-around-each-slot)). With a "before" and an "after" command added, "before" ran 90 seconds before the slot, a minute ahead of the radio moving, and "after" ran in the second the radio came back. What the two commands wrote for the 09:27:00 slot (each line goes on), with the radio moving at 09:26:30 and back at 09:29:15:
 
 ```
-hooks: running "before" for the 09:27 UTC slot: /repo/tools/bench/scenarios/log-hook.sh before
-retune: gave pdn-soundmodem's receive window back; it puts its radio back, now on 7.0501 MHz
-hooks: running "after" for the 09:27 UTC slot: /repo/tools/bench/scenarios/log-hook.sh after
+09:25:30 hook before ran: MAILCAST_HOOK=before MAILCAST_SLOT_UTC=2026-11-23T09:27:00Z
+09:29:15 hook after ran: MAILCAST_HOOK=after MAILCAST_SLOT_UTC=2026-11-23T09:27:00Z
 ```
 
-So a hook that sends LinBPQ `XMITOFF` and back still does its job here, and is the way to stop LinBPQ trying at all, or to stop something this pdn-soundmodem does not control. A real `XMITOFF` hook against LinBPQ was not run here; the bench's hooks only wrote down when they ran.
+So a hook that sends LinBPQ `XMITOFF` and back would run at the right moments here. It is the way to stop LinBPQ trying at all, or to stop something this pdn-soundmodem does not control. A real `XMITOFF` hook against LinBPQ was not run; the bench's hooks only wrote down when they ran.
 
 ## How long the radio is away
 
