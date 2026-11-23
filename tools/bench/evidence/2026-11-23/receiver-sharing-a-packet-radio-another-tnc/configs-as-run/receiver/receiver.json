@@ -1,0 +1,32 @@
+{
+  "audio": "soundmodem",
+  "retune": true,
+  "bbs": {
+    "type": "linBpq",
+    "host": "127.0.0.1",
+    "port": 8011,
+    "login": "Q0CAST",
+    "password": "change-me",
+    "command": "BBS"
+  },
+  "web": {
+    "port": 8130,
+    "lan": true,
+    "password": ""
+  },
+  "hooks": {
+    "before": {
+      "command": "/usr/local/bin/bpq-xmitoff",
+      "args": [
+        "1"
+      ]
+    },
+    "after": {
+      "command": "/usr/local/bin/bpq-xmitoff",
+      "args": [
+        "0"
+      ]
+    }
+  },
+  "stateDirectory": "/var/lib/bench-receiver"
+}

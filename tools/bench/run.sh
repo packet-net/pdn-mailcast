@@ -18,13 +18,28 @@ say "scenario $1; slot at $(date -u -d @$slot_epoch +%H:%M) UTC"
 
 for n in ${RIGS:-}; do   # NAME:PORT:HZ:MODE:PASSBAND, a Hamlib dummy rig
   IFS=: read name port hz mode pb <<<"$n"
-  rigctld -m 1 -t $port >$O/rigctld-$name.log 2>&1 &
+  # -P RIG has the dummy answer "is it transmitting", as a radio's CAT does; without it
+  # rigctld says it cannot tell (RIG_OPTIONS= in a scenario shows what follows from that).
+  rigctld -m 1 ${RIG_OPTIONS--P RIG} -t $port >$O/rigctld-$name.log 2>&1 &
   sleep 1; printf 'F %s\nM %s %s\n' $hz $mode $pb | nc -q1 127.0.0.1 $port >/dev/null
   say "dummy rig $name on port $port at $hz Hz $mode"
 done
 
 python3 $B/air.py --log $O/air.jsonl $AIR >$O/air.out 2>&1 &
 sleep 2
+
+for f in ${INSTALL:-}; do   # FROM:TO, a file a scenario's config expects to find on the machine
+  install -D -m 0755 ${f%%:*} ${f##*:}; say "installed ${f%%:*} as ${f##*:}"
+done
+if [ -n "${KISS_TNC:-}" ]; then   # PORT:RIG-PORT, a stand-in for a hardware KISS TNC on the listener's radio
+  python3 $B/kiss-tnc.py ${KISS_TNC%%:*} 127.0.0.1:${KISS_TNC##*:} $O/kiss-tnc.jsonl >$O/kiss-tnc.out 2>&1 &
+  say "stand-in KISS TNC on port ${KISS_TNC%%:*}, keying the dummy rig on port ${KISS_TNC##*:}"
+fi
+if [ -n "${LINBPQ:-}" ]; then   # a real LinBPQ, run from the bpq32.cfg named
+  mkdir -p /var/lib/bench-linbpq && cp $LINBPQ /var/lib/bench-linbpq/bpq32.cfg
+  ( cd /var/lib/bench-linbpq && LD_LIBRARY_PATH=/opt/linbpq /opt/linbpq/linbpq >$O/linbpq.log 2>&1 & )
+  say "LinBPQ started from ${LINBPQ#/repo/}"
+fi
 
 soundmodem() {   # NAME FILE PATCH: the sound card, the keying and the API key are replaced
   # An rtltcp: device is left as it is: the air serves it a dongle on the port it names.

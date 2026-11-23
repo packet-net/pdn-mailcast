@@ -6,6 +6,8 @@ An HF packet station on pdn-soundmodem, with a CAT radio that normally sits on i
 |---|---|
 | [`soundmodem.json`](soundmodem.json) | `/etc/pdn-soundmodem/soundmodem.json` |
 | [`receiver.json`](receiver.json) | `/etc/pdn-mailcast/receiver.json` |
+| [`receiver-with-another-tnc.json`](receiver-with-another-tnc.json) | the same place, instead, if LinBPQ transmits through a TNC of its own: see [below](#if-linbpq-transmits-through-a-tnc-of-its-own) |
+| [`bpq-xmitoff`](bpq-xmitoff) | `/usr/local/bin/bpq-xmitoff`, with that file |
 
 Change the sound card, the API key, the BBS login, and the packet modems and dial to your own.
 
@@ -61,7 +63,28 @@ pdn-soundmodem kept its own transmitter off the air while the radio was away, in
 | Six long packet frames, 40 seconds of sending, started 75 seconds before the slot | They went out on the packet frequency. pdn-soundmodem refused to move the radio while it was keyed (it normally moves 60 seconds before the slot, as in the first run), and the radio moved 3 seconds after the last frame ended, 30 seconds before the slot. All 17 mailcast frames were still heard |
 | An ARDOP modem beside the packet one, told to call a station 90 seconds into the slot | Nothing went out on the air. pdn-soundmodem's log says `ardop: transmission dropped` for each of its five tries, and the call failed. The program driving ARDOP was still told `PTT TRUE` and `PTT FALSE` each time, as if it had sent |
 
-Not tried: LinBPQ itself (a script played its part on the KISS and ARDOP ports), ARDOP's data port, a CW ident, and the transmitter test. And pdn-soundmodem cannot stop anything that keys the radio without going through it, such as another TNC or sound modem on the same radio. For that, use the receiver's hooks.
+Not tried: LinBPQ itself (a script played its part on the KISS and ARDOP ports), ARDOP's data port, a CW ident, and the transmitter test. And pdn-soundmodem cannot stop anything that keys the radio without going through it, such as another TNC or sound modem on the same radio. For that, use the receiver's hooks, as the next section does.
+
+## If LinBPQ transmits through a TNC of its own
+
+A common arrangement: LinBPQ sends through a hardware TNC (a NinoTNC, say), and pdn-soundmodem only listens to the same radio through a sound card and moves it with CAT. pdn-soundmodem knows nothing of that TNC, so something has to tell LinBPQ to stop while the radio is away. [`receiver-with-another-tnc.json`](receiver-with-another-tnc.json) is `receiver.json` with two hooks that do, and [`bpq-xmitoff`](bpq-xmitoff) is the command they run: it logs in to LinBPQ as a sysop and sends `XMITOFF`. Set the five values at the top of it, and make it runnable by the receiver (`sudo install -m 0755 bpq-xmitoff /usr/local/bin/`). It needs `nc`.
+
+With a real LinBPQ sending its ID every minute through a stand-in for the TNC, which keys the radio and writes down where its dial was each time, and the slot at 10:32:00:
+
+| When | What happened |
+|---|---|
+| 10:30:15 | LinBPQ's ID went out on 7.050100 MHz |
+| Next | "before" ran (90 seconds ahead of the slot, as timed in the run below), and LinBPQ confirmed: `hooks: before: LinBPQ port 2: XMITOFF is now 1` |
+| 10:31:00 | Radio moved to 7.052000 MHz |
+| During | Tone at 1800.0 Hz, 17 of 17 frames, 3 of 3 bulletins. The TNC was handed nothing |
+| 10:34:15 | Radio back on 7.050100 MHz, and "after" ran: `hooks: after: LinBPQ port 2: XMITOFF is now 0` |
+| 10:34:19 | LinBPQ's next ID went out, on 7.050100 MHz |
+
+Each hook took 16 seconds, inside the 30 it is allowed.
+
+**Without the hooks**, with the plain `receiver.json`, LinBPQ keyed the radio four times while it was on 7.052000 MHz: at 10:49:09, 10:50:10, 10:51:11 and 10:52:11, in a slot that began at 10:50:00. That is packet sent on top of the mailcast.
+
+If nothing else needs pdn-soundmodem on that sound card, [receiver sharing a radio with LinBPQ](../receiver-sharing-a-radio-with-linbpq/) does the same job with no script: the receiver sends `XMITOFF` itself and checks the radio is not transmitting before it moves it.
 
 ## Your own commands still run
 
@@ -72,7 +95,7 @@ Not tried: LinBPQ itself (a script played its part on the KISS and ARDOP ports),
 09:29:15 hook after ran: MAILCAST_HOOK=after MAILCAST_SLOT_UTC=2026-11-23T09:27:00Z
 ```
 
-So a hook that sends LinBPQ `XMITOFF` and back would run at the right moments here. It is the way to stop LinBPQ trying at all, or to stop something this pdn-soundmodem does not control. A real `XMITOFF` hook against LinBPQ was not run; the bench's hooks only wrote down when they ran.
+In that run the hooks only wrote down when they ran. The section above has hooks that really send LinBPQ `XMITOFF`.
 
 ## How long the radio is away
 
@@ -80,6 +103,6 @@ The receiver hands the radio back early only when everything in the station's di
 
 ## Not tested here
 
-A real radio and rigctld back end (the bench uses Hamlib's dummy rig); your radio accepting the 3250 Hz passband pdn-soundmodem asks for; delivery to a BBS.
+A real radio, rigctld back end and TNC (the bench uses Hamlib's dummy rig, and a stand-in TNC that puts nothing on the bench's air, so what a transmission of your own does to your reception is not shown); your radio accepting the 3250 Hz passband pdn-soundmodem asks for; delivery to a BBS.
 
-Run it yourself: `tools/bench/bench.sh receiver-sharing-a-packet-radio`, `receiver-sharing-a-packet-radio-unfinished` for the long case, and `receiver-sharing-a-packet-radio-transmit-paths` for these two tries and the hooks.
+Run it yourself: `tools/bench/bench.sh receiver-sharing-a-packet-radio`, `receiver-sharing-a-packet-radio-unfinished` for the long case, `receiver-sharing-a-packet-radio-transmit-paths` for these two tries and the hooks, and `receiver-sharing-a-packet-radio-another-tnc` and `-another-tnc-no-hooks` for the TNC of LinBPQ's own.

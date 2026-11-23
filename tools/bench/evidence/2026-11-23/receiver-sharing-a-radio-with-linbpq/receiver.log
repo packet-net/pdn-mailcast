@@ -1,0 +1,53 @@
+web: status page at http://127.0.0.1:8130/ and on the local network
+discovery: announcing this receiver on the network as "9a9e72b551ed d163._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on plughw:CARD=Loopback,DEV=1,SUBDEV=0 (USB dial 7.052 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/bench/receiver/stations.json lists M0LTE
+slots: M0LTE's slots are every hour at 32 minutes past (from the stations file)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: M0LTE
+config: read /etc/bench/receiver/receiver.json
+config: rig retuning on, with LinBPQ held off the air through "bpq", hooks off (no "hooks"), daily report off (no "feedback")
+audio: sound card plughw:CARD=Loopback,DEV=1,SUBDEV=0 at 48000 Hz, the radio on USB dial 7.052 MHz
+retune: the radio is retuned through rigctld at 127.0.0.1:4532 to dial 7.052 MHz in PKTUSB with a 3000 Hz filter (USB, or its normal width, on a rig without them) for each slot, with LinBPQ port 2's transmit held off meanwhile through its node at 127.0.0.1:8011 as sysop
+rig: rigctld at 127.0.0.1:4532: 7.050100 MHz USB (2400 Hz passband)
+audio: between slots until 10:30 UTC, ready for the 10:32 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+retune: LinBPQ port 2 is "HF on the KISS TNC", asked on LinBPQ's FBBPORT at 127.0.0.1:8011
+update: cannot check for a newer version: Resource temporarily unavailable (packet-net.github.io:443). It tries again every 6 hours, and says nothing more about this until it works
+audio: decoding for the 10:32 UTC slot
+retune: LinBPQ port 2's transmit is off for the 10:32 UTC slot (XMITOFF 2 1 confirmed)
+rig: tuned to 7.052000 MHz PKTUSB (3000 Hz passband) for pdn-mailcast until 2026-11-23T10:36:19Z; transmissions are held until it is put back to 7.050100 MHz USB (2400 Hz passband)
+retune: tuned to 7.052 MHz for the 10:32 UTC slot until 10:44 UTC; LinBPQ port 2 transmit off
+tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 89.8 dB in 3 kHz, 10 s
+slot: 1 frame heard on 1200 bps (WN4)
+directory for 2026-11-23: 3 bulletins in rotation, sent on 1200 bps (WN4), signed by M0LTE
+slots: M0LTE's directory gives its slots as every hour at 32 minutes past; using that instead of the stations file's
+store: bulletin 10283_BENCH (a70f6883aa0ecb20) is complete, waiting for its station's details
+bulletin complete: 10283_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
+store: bulletin 10283_BENCH (a70f6883aa0ecb20) delivered with the envelope of M0LTE: its envelope arrived
+bulletin released to the outbox: 10283_BENCH
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 30 s.
+store: bulletin 10281_BENCH (bb7e5b520a9f1c1a) delivered with the envelope of M0LTE: its envelope arrived
+bulletin complete: 10281_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
+store: bulletin 10282_BENCH (91178b607b570330) delivered with the envelope of M0LTE: its envelope arrived
+bulletin complete: 10282_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 1 min.
+retune: ending the 10:32 UTC slot early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 63 s
+rig: the window on 7.052000 MHz PKTUSB (3000 Hz passband) for pdn-mailcast has ended (pdn-mailcast released it)
+rig: put back to 7.050100 MHz USB (2400 Hz passband); transmissions resume
+retune: the rig is back; LinBPQ port 2's transmit is on again (XMITOFF 2 0 confirmed)
+slot: the 10:32 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 90 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
+audio: between slots until 11:30 UTC, ready for the 11:32 UTC slot; the sound card stays open, but it only decodes while a status page shows the spectrogram
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 2 min.
+channel: the 10:32 UTC slot, from the probe and 3 of 3 bursts, measured in 1.0 s: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed). From the bursts: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed).
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 5 min.
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 10 min.

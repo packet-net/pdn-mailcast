@@ -1,0 +1,16 @@
+#!/bin/sh
+# Tells LinBPQ to stop transmitting on one port (bpq-xmitoff 1) or lets it again (bpq-xmitoff 0),
+# for the receiver's "before" and "after" hooks. Needs nc (netcat-openbsd). Set these four:
+HOST=127.0.0.1     # LinBPQ's Telnet port's FBBPORT
+PORT=8011
+USER=sysop         # a user whose USER= line in bpq32.cfg ends in SYSOP
+PASSWORD=change-me
+HFPORT=2           # LinBPQ's port number for the radio, as its PORTS command lists it
+
+answer=$({ printf '%s\r%s\r' "$USER" "$PASSWORD"; sleep 2; printf 'PASSWORD\r'; sleep 1
+           printf 'XMITOFF %s %s\r' "$HFPORT" "$1"; sleep 2; printf 'BYE\r'; sleep 1
+         } | nc -w 10 "$HOST" "$PORT" | tr '\r' '\n')
+case "$answer" in
+  *"now $1"*) echo "LinBPQ port $HFPORT: XMITOFF is now $1"; exit 0 ;;
+  *) echo "LinBPQ did not confirm XMITOFF $HFPORT $1; it said: $answer"; exit 1 ;;
+esac

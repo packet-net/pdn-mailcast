@@ -1,0 +1,5 @@
+   1070 00:00:02  8472 rigctld -m 1 -P RIG -t 4532
+   1068 00:02:43 112732 python3 /repo/tools/bench/air.py --log /out/air.jsonl --tx /run/bench/tx.out@7052300 --rx alsa:plughw:CARD=Loopback,
+   1066 00:02:55 180000 pdn-soundmodem --config /etc/bench/tx-soundmodem.json
+   1060 00:00:03 109292 pdn-mailcast-headend --config /etc/bench/headend.json
+   1060 00:00:23 220640 pdn-mailcast-receiver --config /etc/bench/receiver/receiver.json

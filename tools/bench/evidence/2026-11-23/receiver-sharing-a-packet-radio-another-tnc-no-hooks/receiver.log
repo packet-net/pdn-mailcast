@@ -1,0 +1,50 @@
+web: status page at http://127.0.0.1:8130/ and on the local network
+discovery: announcing this receiver on the network as "8bfcb6bc2de2 ce39._pdn-mailcast._tcp.local" (_pdn-mailcast._tcp, port 8130)
+pdn-mailcast receiver 0.43.0: listening on soundmodem (USB dial 7.052 MHz), delivering to LinBPQ at 127.0.0.1:8011 as Q0CAST
+stations: /etc/bench/receiver/stations.json lists M0LTE
+slots: M0LTE's slots are every hour at 50 minutes past (from the stations file)
+config: there is no "sources" in the config file, so frames are accepted from the stations it knows of; add "sources" to accept others
+config: frames are also accepted from the stations this receiver knows of: M0LTE
+config: read /etc/bench/receiver/receiver.json
+config: retuning through pdn-soundmodem's receive window on ("retune"), hooks off (no "hooks"), daily report off (no "feedback")
+retune: the radio is retuned through pdn-soundmodem's receive window on 127.0.0.1:8107 to dial 7.052 MHz for each slot; pdn-soundmodem holds its own transmitting meanwhile
+audio: pdn-soundmodem on 127.0.0.1:8107, its channel at 12000 Hz, brought up to 48000 Hz, the radio on USB dial 7.0501 MHz, as pdn-soundmodem says ("dialKHz", 7.052 MHz, is not used while it does), the signal's centre at 3700 Hz in its audio; that is outside the 1000 to 2000 Hz a radio's own filter usually passes whole, which is fine for a Flex (pdn-soundmodem opens its filter for it) or an SDR, but a radio on a sound card needs its filter open from 2250 to 5150 Hz. Its audio is moved to 1800 Hz here, where the usual dial puts the signal
+update: cannot check for a newer version: Resource temporarily unavailable (packet-net.github.io:443). It tries again every 6 hours, and says nothing more about this until it works
+audio: pdn-soundmodem's radio is on USB dial 7.052 MHz now, the signal's centre at 1800 Hz in its audio
+retune: tuned to 7.052 MHz through pdn-soundmodem's receive window for the 10:50 UTC slot until 11:02 UTC; pdn-soundmodem holds its transmitting
+tone: 1800.0 Hz, 0.0 Hz from 1800 Hz, SNR 91.3 dB in 3 kHz, 10 s
+slot: 1 frame heard on 1200 bps (WN4)
+directory for 2026-11-23: 3 bulletins in rotation, sent on 1200 bps (WN4), signed by M0LTE
+slots: M0LTE's directory gives its slots as every hour at 50 minutes past; using that instead of the stations file's
+store: bulletin 10462_BENCH (c0a04051c14bc401) is complete, waiting for its station's details
+bulletin complete: 10462_BENCH from G0ABC to BENCH@WW, "Bench bulletin 2"
+store: bulletin 10461_BENCH (4bcc878cbb0c4c65) is complete, waiting for its station's details
+bulletin complete: 10461_BENCH from G0ABC to BENCH@WW, "Bench bulletin 1"
+store: bulletin 10463_BENCH (5114e8974768e284) is complete, waiting for its station's details
+bulletin complete: 10463_BENCH from G0ABC to BENCH@WW, "Bench bulletin 3"
+store: bulletin 10461_BENCH (4bcc878cbb0c4c65) delivered with the envelope of M0LTE: its envelope arrived
+bulletin released to the outbox: 10461_BENCH
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 30 s.
+store: bulletin 10463_BENCH (5114e8974768e284) delivered with the envelope of M0LTE: its envelope arrived
+bulletin released to the outbox: 10463_BENCH
+store: bulletin 10462_BENCH (c0a04051c14bc401) delivered with the envelope of M0LTE: its envelope arrived
+bulletin released to the outbox: 10462_BENCH
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 1 min.
+retune: ending the 10:50 UTC slot early: the directory and everything in rotation are heard, the probe/channel measurement is captured, and it has been quiet for 61 s
+retune: gave pdn-soundmodem's receive window back; it puts its radio back, now on 7.0501 MHz
+audio: pdn-soundmodem's radio is on USB dial 7.0501 MHz now, the signal's centre at 3700 Hz in its audio, moved to 1800 Hz here
+slot: the 10:50 UTC slot ended: 17 frames on 1200 bps (WN4); 4.6 KB decoded from them; tone SNR 91 dB, 0.0 Hz off; bulletins 3 completed, 0 delivered; directory heard, signed; window ended early, nothing left to wait for
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 2 min.
+channel: the 10:50 UTC slot, from the probe and 3 of 3 bursts, measured in 0.9 s: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed). From the bursts: 1 path. Doppler spread under 0.1 Hz: steady (suits any speed).
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "user:"
+bbs: LinBPQ asked for the login again, so no USER= line on this port has the login "Q0CAST"; LinBPQ logins are case-sensitive, so it must match the USER= line exactly; it said "user:". Trying again in 5 min.
+bbs: delivery login: sent LinBPQ at 127.0.0.1:8011 the login "Q0CAST", a password and the command "BBS", each line ending in CR, all at once
+bbs: delivery login: the BBS answered "Too many attempts - Disconnected<CR><LF><00>", then closed the connection
+bbs: the BBS closed the connection before it offered a forwarding session; check that "Q0CAST" and its password match a USER= line in LinBPQ's Telnet port, that the port is its FBBPORT, and that "BBS" reaches the mail application. Trying again in 10 min.

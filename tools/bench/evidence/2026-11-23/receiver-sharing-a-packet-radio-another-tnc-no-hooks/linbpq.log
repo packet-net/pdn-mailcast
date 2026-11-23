@@ -1,0 +1,15 @@
+G8BPQ AX25 Packet Switch System Version 6.0.25.41 September 2026
+Copyright © 2001-2026 John Wiseman G8BPQ
+208Current Directory is /var/lib/bench-linbpq
+Log Directory is /var/lib/bench-linbpq
+Making Directory /var/lib/bench-linbpq/logs
+Configuration file Preprocessor.
+Using Configuration file /var/lib/bench-linbpq/bpq32.cfg
+Conversion (probably) successful
+
+PORTS 0x5e50b73ce560 LINKS 0x5e50b73d0640 DESTS 0x5e50b73d7e40 ROUTES 0x5e50b73e4960 L4 0x5e50b73e7d60 BUFFERS 0x5e50b73f3168
+
+Route/Node recovery file BPQNODES.dat not found - Continuing without it
+Initialising Port 01     Telnet Server 
+Initialising Port 02     TCPKISS IP 127.0.0.1 Port 8100 Chan A 
+MQTT Enabled 0
