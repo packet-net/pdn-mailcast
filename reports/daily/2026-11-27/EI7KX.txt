@@ -1,0 +1,33 @@
+Title: MCR EI7KX 2026-11-27
+From: EI7KX
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 63312AEI7KX
+Source: GB7RDG's LinBPQ mail store, message 5301 (m_005301.mes), copied 2026-11-28
+Check: stored size matches the BBS's index
+
+R:261127/2130Z 672@EI7KX.EI7KX.IRL.EURO LinBPQ6.0.26
+
+MCR1 0.43.0 IO83jj nope.tunnel.ubersdr.org 11/11 0 0 0
+09 W3 59 3 +0.2 IU+PG 2 1.7/-21 0.19 0.3 268 b M0LTE
+0930 W4 9 12 -2.3 IU+PG 1 - 0.23 0.24 - p GM8BPQ
+10 W4 61 11 +0.5 IU+PG 2 1.7/-13 0.35 0.3 271 p M0LTE
+1030 - 0 - - IU+PG - - - - - - GM8BPQ
+11 W3 69 10 +0.2 IU+PG 2 1.6/-12 0.37 0.21 260 p M0LTE
+1130 - 0 - - IU+PG - - - - - - GM8BPQ
+12 W4 85 6 +0.2 IG+PG 3 1.6/-11 0.49 0.29 250 p M0LTE
+1230 - 0 - - IU+PG - - - - - - GM8BPQ
+13 W3 72 8 +0.0 IU+PG 3 1.7/-14 0.42 0.22 271 p M0LTE
+1330 - 0 - - IU+PG - - - - - - GM8BPQ
+14 W4 80 9 -0.2 IU+PG 3 1.8/-9 0.69 0.28 283 p M0LTE
+1430 W4 2 5 -3.0 IU+PU 2 1.5/-12 0.35 0.26 237 p GM8BPQ
+15 W3 69 9 -0.1 IU+PG 2 1.6/-17 0.24 0.12 261 p M0LTE
+1530 W4 1 5 -3.1 IU+PU 1 - 0.37 0.24 - p GM8BPQ
+16 - 0 - - IU+PU - - - - - - M0LTE
+17 - 0 - - IU+PU - - - - - - M0LTE
+18 - 0 - - IU+PU - - - - - - M0LTE
+19 - 0 - - IU+PU - - - - - - M0LTE
+20 - 0 - - IU+PU - - - - - - M0LTE
+21 - 0 - - IU+PU - - - - - - M0LTE
+S GM8BPQ 7 3 12 0 5 237 0
+S M0LTE 13 7 495 11 9 268 0
