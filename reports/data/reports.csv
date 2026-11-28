@@ -268,6 +268,8 @@ day,callsign,receiver_version,locator,audio,rebuilt,delivered,already_had,given_
 2026-11-24,M7TAW,0.43.0,IO91ma,sc,8,6,0,0,,,,21,13,762,bbs-store,size-verified,daily/2026-11-24/M7TAW.txt
 2026-11-24,M9TWM,0.43.0,IO93fj,m9twm-1.tunnel.ubersdr.org,14,1,8,0,,,,21,14,394,bbs-store,size-verified,daily/2026-11-24/M9TWM.txt
 2026-11-25,EI7KX,0.43.0,IO83jj,nope.tunnel.ubersdr.org,15,15,1,1,0,1,,20,14,1281,bbs-store,size-verified,daily/2026-11-25/EI7KX.txt
+2026-11-25,G7TAJ,0.43.0,IO81le,sc,9,0,9,2,0,1,,20,14,195,bbs-store,size-verified,daily/2026-11-25/G7TAJ.txt
+2026-11-25,GB7NOT,0.43.0,IO92kx,sc,13,13,0,3,0,2,RIG39,20,14,768,bbs-store,size-verified,daily/2026-11-25/GB7NOT.txt
 2026-11-25,GM4CXF,0.43.0,IO75qn,sc,16,15,1,1,,,,20,15,2072,bbs-store,size-verified,daily/2026-11-25/GM4CXF.txt
 2026-11-25,M7TAW,0.43.0,IO91ma,sc,17,18,0,2,,,,20,13,700,bbs-store,size-verified,daily/2026-11-25/M7TAW.txt
 2026-11-25,M9TWM,0.43.0,IO93fj,m9twm-1.tunnel.ubersdr.org,15,0,20,5,0,2,,20,14,622,bbs-store,size-verified,daily/2026-11-25/M9TWM.txt
