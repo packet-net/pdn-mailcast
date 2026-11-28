@@ -1,0 +1,34 @@
+Title: MCR G7TAJ 2026-11-27
+From: G7TAJ
+To: MCAST@GB7RDG.#42.GBR.EURO
+Type: B (bulletin)
+Bid: 633190G7TAJ
+Source: GB7RDG's LinBPQ mail store, message 5333 (m_005333.mes), copied 2026-11-28
+Check: stored size matches the BBS's index
+
+R:261127/2131Z 16543@GB7BEX.#38.GBR.EURO LinBPQ6.0.25
+R:261127/2130Z 11438@GB7BWR.#45.GBR.EURO LinBPQ6.0.25
+
+MCR1 0.43.0 IO81le sc 9/0 0 8 1 0 4
+09 W3 12 10 +5.9 IU+PU 2 1.6/-11 0.46 0.32 246 p M0LTE
+0930 W4 13 6 +3.9 IU+PU 2 0.4/-3 0.45 0.48 - p GM8BPQ
+10 W4 32 11 +8.0 IU+PU 2 - 0.5 0.28 - p M0LTE
+1030 - 0 - - IU+PU - - - - - - GM8BPQ
+11 W3 11 17 +6.8 IU+PU 1 - 0.98 0.61 - p M0LTE
+1130 - 0 - - IU+PU - - - - - - GM8BPQ
+12 W4 55 9 +6.9 IG+PG 2 - 0.29 0.14 - p M0LTE
+1230 - 0 - - IU+PG - - - - - - GM8BPQ
+13 - 0 - - IU+PU - - - - - - M0LTE
+1330 - 0 - - IU+PU - - - - - - GM8BPQ
+14 W4 26 8 +6.3 IU+PG 2 1.6/-6 0.74 0.34 252 p M0LTE
+1430 W4 3 10 +3.3 IU+PG 1 - 0.54 0.31 - p GM8BPQ
+15 W3 10 11 +6.3 IU+PU 2 - 0.76 0.67 - p M0LTE
+1530 - 0 8 +2.5 IU+PU 3 0.5/-3 0.47 0.32 - p GM8BPQ
+16 - 0 - - IU+PU - - - - - - M0LTE
+17 - 0 - - IU+PU - - - - - - M0LTE
+18 - 0 - - IU+PU - - - - - - M0LTE
+19 - 0 - - IU+PU - - - - - - M0LTE
+20 - 0 - - IU+PU - - - - - - M0LTE
+21 - 0 - - IU+PU - - - - - - M0LTE
+S GM8BPQ 7 3 16 0 8 - 0
+S M0LTE 13 6 146 9 10 249 0
